@@ -1,0 +1,16 @@
+.fable/
+.fake/
+.vs/
+obj/
+bin/
+packages/
+paket-files/
+node_modules/
+src/Client/public/js/
+release.cmd
+release.sh
+.idea/
+*.orig
+*.DotSettings.user
+deploy
+.ionide/

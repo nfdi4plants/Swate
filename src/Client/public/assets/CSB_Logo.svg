@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 585 133" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:1.5;">
+    <g transform="matrix(1,0,0,1,-624,-153)">
+        <g transform="matrix(0.454884,0,0,0.454884,491.629,-14.852)">
+            <g>
+                <g>
+                    <g transform="matrix(1.13433,0,0,1.07042,-63.5373,-42.0423)">
+                        <path d="M439.5,526C457.989,526 473,541.907 473,561.5C473,581.093 457.989,597 439.5,597C421.011,597 406,581.093 406,561.5C406,541.907 421.011,526 439.5,526ZM439.5,539.494C450.961,539.494 460.266,549.355 460.266,561.5C460.266,573.645 450.961,583.506 439.5,583.506C428.039,583.506 418.734,573.645 418.734,561.5C418.734,549.355 428.039,539.494 439.5,539.494Z" style="fill:white;"/>
+                    </g>
+                    <g transform="matrix(0.826625,0,0,0.826625,81.0526,68.9164)">
+                        <path d="M467.5,397.5L435,559" style="fill:none;stroke:white;stroke-width:17.18px;"/>
+                    </g>
+                    <g transform="matrix(0.796056,0,0,0.796056,65.1602,119.795)">
+                        <path d="M435,559L319.5,587.388" style="fill:none;stroke:white;stroke-width:17.84px;"/>
+                    </g>
+                    <g transform="matrix(0.674595,0,0,0.674595,151.151,205.457)">
+                        <path d="M435,559L464.5,631.388" style="fill:none;stroke:white;stroke-width:21.05px;"/>
+                    </g>
+                    <g transform="matrix(0.774669,0,0,0.742492,84.1609,123.732)">
+                        <path d="M373.5,480.5L435,559" style="fill:none;stroke:white;stroke-width:18.72px;"/>
+                    </g>
+                    <path d="M373.5,480.5L467.5,397.5" style="fill:none;stroke:white;stroke-width:14.2px;"/>
+                    <g transform="matrix(1.425,0,0,1.46154,-155.175,-223.231)">
+                        <ellipse cx="371" cy="481.5" rx="20" ry="19.5" style="fill:rgb(234,125,59);"/>
+                    </g>
+                    <g transform="matrix(1.425,0,0,1.46154,-61.175,-306.231)">
+                        <ellipse cx="371" cy="481.5" rx="20" ry="19.5" style="fill:rgb(234,125,59);"/>
+                    </g>
+                    <g transform="matrix(1.425,0,0,1.46154,-64.175,-72.3423)">
+                        <ellipse cx="371" cy="481.5" rx="20" ry="19.5" style="fill:rgb(234,125,59);"/>
+                    </g>
+                    <g transform="matrix(1.425,0,0,1.46154,-209.175,-116.342)">
+                        <ellipse cx="371" cy="481.5" rx="20" ry="19.5" style="fill:rgb(234,125,59);"/>
+                    </g>
+                </g>
+                <g transform="matrix(1,0,0,1,0.0282867,-8)">
+                    <text x="542px" y="604.694px" style="font-family:'Montserrat-Bold', 'Montserrat';font-weight:700;font-size:235px;fill:white;">C<tspan x="700.08px 837.245px " y="604.694px 604.694px ">SB</tspan></text>
+                </g>
+                <g transform="matrix(1,0,0,1,14,-3)">
+                    <g transform="matrix(1,0,0,1,0,-4.44414)">
+                        <text x="1046px" y="480.5px" style="font-family:'Montserrat-Medium', 'Montserrat';font-weight:500;font-size:60px;fill:white;">C<tspan x="1085.89px 1133.71px 1188.42px 1228.67px 1272.77px 1303.3px 1342.53px 1375.16px 1391.18px 1438.99px 1485.12px 1526.46px " y="480.5px 480.5px 480.5px 480.5px 480.5px 480.5px 480.5px 480.5px 480.5px 480.5px 480.5px 480.5px ">OMPUTATIONAL</tspan></text>
+                    </g>
+                    <g transform="matrix(1,0,0,1,0.673828,-3.55871)">
+                        <text x="1046px" y="540.5px" style="font-family:'Montserrat-Medium', 'Montserrat';font-weight:500;font-size:60px;fill:white;">S<tspan x="1079.77px 1115.11px 1149.18px 1181.81px 1219.42px 1274.14px " y="540.5px 540.5px 540.5px 540.5px 540.5px 540.5px ">YSTEMS</tspan></text>
+                    </g>
+                    <g transform="matrix(1,0,0,1,-1.55273,121.282)">
+                        <text x="1046px" y="480.5px" style="font-family:'Montserrat-Medium', 'Montserrat';font-weight:500;font-size:60px;fill:white;">B<tspan x="1088.83px 1104.85px 1152.66px 1184.93px 1232.75px 1276.48px " y="480.5px 480.5px 480.5px 480.5px 480.5px 480.5px ">IOLOGY</tspan></text>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>
