@@ -6,6 +6,9 @@ open Fable.React
 open Fable.React.Props
 open Fulma
 open Thoth.Json
+open Model
+open ExcelColors
+open Shared
 
 module OfficeInterop =
     open Fable.Core
@@ -167,156 +170,8 @@ module OfficeInterop =
     let syncContext (passthroughMessage : string) =
         Excel.run (fun context -> context.sync(passthroughMessage))
 
-module ExcelColors =
-    //https://developer.microsoft.com/en-us/fluentui#/styles/web/colors/products
-    module Excel =
-
-        let Shade20    = "#004b1c"
-        let Shade10    = "#0e5c2f"
-        let Primary    = "#217346"
-        let Tint10     = "#3f8159"
-        let Tint20     = "#4e9668"
-        let Tint30     = "#6eb38a"
-        let Tint40     = "#9fcdb3"
-        let Tint50     = "#e9f5ee"
-
-    module Colorfull =
-
-        let gray180 = "#252423"
-        let gray140 = "#484644"
-        let gray130 = "#605e5c"
-        let gray80  = "#b3b0ad"
-        let gray60  = "#c8c6c4"
-        let gray50  = "#d2d0ce"
-        let gray40  = "#e1dfdd"
-        let gray30  = "#edebe9"
-        let gray20  = "#f3f2f1"
-        let white   = "#ffffff"
 
 
-    module Black =
-
-        let Primary = "#000000"
-        let gray190 = "#201f1e"
-        let gray180 = "#252423"
-        let gray170 = "#292827"
-        let gray160 = "#323130"
-        let gray150 = "#3b3a39"
-        let gray140 = "#484644"
-        let gray130 = "#605e5c"
-        let gray100 = "#979593"
-        let gray90  = "#a19f9d"
-        let gray70  = "#bebbb8"
-        let gray40  = "#e1dfdd"
-        let white   = "#ffffff"
-
-    type ColorMode = {
-        Name                    : string
-        BodyBackground          : string
-        BodyForeground          : string
-        ControlBackground       : string
-        ControlForeground       : string
-        ElementBackground       : string
-        ElementForeground       : string
-        Text                    : string
-        Accent                  : string
-        Fade                    : string
-
-    }
-
-    let darkMode = {
-        Name                    = "Dark"
-        BodyBackground          = Black.gray180
-        BodyForeground          = Black.gray160
-        ControlBackground       = Black.gray140
-        ControlForeground       = Black.gray100
-        ElementBackground       = Black.Primary
-        ElementForeground       = Black.gray140
-        Text                    = Black.white
-        Accent                  = Black.white
-        Fade                    = Black.gray70
-    }
-
-    let colorfullMode = {
-        Name                    = "Colorfull"
-        BodyBackground          = Colorfull.gray20
-        BodyForeground          = Colorfull.gray20
-        ControlBackground       = Colorfull.white
-        ControlForeground       = Colorfull.gray40
-        ElementBackground       = Excel.Tint10
-        ElementForeground       = Colorfull.white
-        Text                    = Colorfull.gray180
-        Accent                  = Excel.Primary
-        Fade                    = Excel.Tint30
-    }
-
-    let colorElement (mode:ColorMode) =
-        Style [
-            BackgroundColor mode.ElementBackground
-            BorderColor     mode.ElementForeground
-            Color           mode.Text
-        ]
-
-    let colorControl (mode:ColorMode) =
-        Style [
-            BackgroundColor mode.ControlBackground
-            BorderColor     mode.ControlForeground
-            Color           mode.Text
-        ]
-
-    let colorBackground (mode:ColorMode) =
-        Style [
-            BackgroundColor mode.BodyBackground
-            BorderColor     mode.BodyForeground
-            Color           mode.Text
-        ]
-
-open Shared
-
-type LogItem =
-    | Debug of (System.DateTime*string)
-    | Info  of (System.DateTime*string)
-    | Error of (System.DateTime*string)
-
-    static member toTableRow = function
-        | Debug (t,m) ->
-            tr [] [
-                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "green"; FontWeight "bold"]] [str "Debug"]
-                td [] [str m]
-            ]
-        | Info  (t,m) ->
-            tr [] [
-                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "lightblue"; FontWeight "bold"]] [str "Info"]
-                td [] [str m]
-            ]
-        | Error (t,m) ->
-            tr [] [
-                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "red"; FontWeight "bold"]] [str "ERROR"]
-                td [] [str m]
-            ]
-
-// The model holds data that you want to keep track of while the application is running
-// in this case, we are keeping track of a counter
-// we mark it as optional, because initially it will not be available from the client
-// the initial value will be requested from server
-type Model = {
-    //Error handling
-    LastFullError       : System.Exception option
-    Log                 : LogItem list
-
-    //Site Meta Options (Styling etc)
-    DisplayMessage      : string
-    BurgerVisible       : bool
-    IsDarkMode          : bool
-    ColorMode           : ExcelColors.ColorMode
-
-    //Data for the App
-    FillSelectionText   : string
-    AddColumnText       : string
-    }
 
 // The Msg type defines what events/actions can occur while the application is running
 // the state of the application changes *only* in reaction to these events
@@ -343,6 +198,7 @@ type Msg =
     //=======================================================
     //UserInput
     | FillSectionTextChange of string
+    | FillSuggestionUsed    of string
     | AddColumnTextChange   of string
 
     //=======================================================
@@ -370,15 +226,23 @@ let initializeAddIn () =
     OfficeInterop.Office.onReady()
     
 let initialModel = {
-    LastFullError       = None
-    Log                 = []
-    DisplayMessage      = "Initializing AddIn ..."
-    BurgerVisible       = false
-    IsDarkMode          = false
-    ColorMode           = (ExcelColors.colorfullMode)
-    FillSelectionText   = ""
-    AddColumnText       = ""
+    LastFullError           = None
+    Log                     = []
+    DisplayMessage          = "Initializing AddIn ..."
+    BurgerVisible           = false
+    IsDarkMode              = false
+    ColorMode               = (ExcelColors.colorfullMode)
+    FillSelectionText       = ""
+    FillSuggestions         = [|
+        "Some";"Random";"Text";"IDK";"IsThiSCasEsEnsItIve?";"ISTHISCASESENSITIVE?";
+        "isthiscasesensitive?";"Lena";"Kevin";"Schneider";"Hallo";"Halli";"allo";"sup";
+        "AWD";"EFEWTGWE";"AWDfFGRGH";"erte_EWh";"wAWWWWW";"EGSWRH";"EHRJJJJJJJJJJJJJ";"AWgGRSHSR"
+    |]
+    ShowFillSuggestions     = false
+    ShowFillSuggestionUsed  = false
+    AddColumnText           = ""
     }
+
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> =
     let loadCountCmd =
@@ -467,8 +331,20 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel = {
             currentModel with
                 FillSelectionText = newText
+                ShowFillSuggestions = newText.Length > 2
+                ShowFillSuggestionUsed = false
             }
         nextModel, Cmd.none
+
+    | FillSuggestionUsed suggestion ->
+        let nextModel = {
+            currentModel with
+                FillSelectionText = suggestion
+                ShowFillSuggestions = false
+                ShowFillSuggestionUsed = true
+            }
+        nextModel, Cmd.none
+
     | AddColumnTextChange newText ->
         let nextModel = {
             currentModel with
@@ -534,6 +410,34 @@ let button (colorMode: ExcelColors.ColorMode) (isActive:bool) txt onClick =
         str txt
     ]
 
+let inline sorensenDice (x : Set<'T>) (y : Set<'T>) =
+    match  (x.Count, y.Count) with
+    | (0,0) -> 1.
+    | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
+
+
+let createBigrams (s:string) =
+    s
+        .ToUpperInvariant()
+        .ToCharArray()
+    |> Array.windowed 2
+    |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
+    |> set
+
+let getBestSuggestions (model:Model)  =
+    let searchSet = model.FillSelectionText |> createBigrams
+    model.FillSuggestions
+    |> Array.sortByDescending (fun sugg ->
+        sorensenDice (createBigrams sugg) searchSet
+    )
+    |> Array.take 5
+
+let createSuggestions model dispatch =
+    getBestSuggestions model
+    |> Array.map (fun sugg ->
+        Dropdown.Item.div [Dropdown.Item.Props [ OnClick (fun _ -> (sugg     |> FillSuggestionUsed) |> dispatch)]] [str sugg      ]
+    )
+
 let mainForm (model : Model) (dispatch : Msg -> unit) =
     form [
         OnSubmit (fun e -> e.preventDefault())
@@ -545,11 +449,21 @@ let mainForm (model : Model) (dispatch : Msg -> unit) =
                 str "Fill Selection"
             ]
             Control.div [] [
+
+
                 Input.input [   Input.Placeholder ""
                                 Input.Size Size.IsLarge
                                 Input.Props [ExcelColors.colorControl model.ColorMode]
                                 Input.OnChange (fun e -> FillSectionTextChange e.Value |> dispatch)
+                                if model.ShowFillSuggestionUsed then Input.Value model.FillSelectionText
                             ]   
+
+                Container.container[] [
+                    Dropdown.content [Props [Style [if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None]]] [
+                        yield! createSuggestions model dispatch
+                    ]
+                ]
+                
             ]
             Help.help [] [str "When applicable, search for an ontology item to fill into the selected field(s)"]
         ]
