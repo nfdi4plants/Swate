@@ -7,8 +7,52 @@ module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
-/// A type that specifies the communication protocol between client and server
-/// to learn more, read the docs at https://zaid-ajaj.github.io/Fable.Remoting/src/basics.html
-type ICounterApi =
-    { initialCounter : unit -> Async<Counter> }
+module DbDomain =
+    
+    type Ontology = {
+        ID              : int64
+        Name            : string
+        CurrentVersion  : string
+        Definition      : string
+        DateCreated     : System.DateTime
+        UserID          : string
+    }
 
+    let createOntology id name currentVersion definition dateCreated userID = {
+        ID              = id            
+        Name            = name          
+        CurrentVersion  = currentVersion
+        Definition      = definition    
+        DateCreated     = dateCreated   
+        UserID          = userID        
+    }
+
+    type Term = {
+        ID              : int64
+        OntologyId      : int64
+        Accession       : string
+        Name            : string
+        Definition      : string
+        XRefValueType   : string option
+        IsObsolete      : bool
+    }
+
+    let createTerm id accession ontologyID name definition xrefvaluetype isObsolete = {
+        ID            = id           
+        OntologyId    = ontologyID   
+        Accession     = accession    
+        Name          = name         
+        Definition    = definition   
+        XRefValueType = xrefvaluetype
+        IsObsolete    = isObsolete   
+    }
+
+    type TermRelationship = {
+        TermID              : int64
+        RelationshipType    : string
+        RelatedTermID       : int64
+    }
+
+type IAnnotatorAPI = {
+    testOntologyInsert: (string*string*string*System.DateTime*string) -> Async<DbDomain.Ontology>
+}

@@ -25,13 +25,12 @@ type Msg =
     | ToggleColorMode
 
     //=======================================================
-    //EDebugging
+    //Debugging
     | LogTableMetadata
-
+    | GenericLog            of (string*string)
     //=======================================================
     //Error handling
     | GenericError          of exn
-
     //=======================================================
     //UserInput
     | FillSectionTextChange of string
@@ -47,6 +46,9 @@ type Msg =
     | CreateAnnotationTable
     | FormatAnnotationTable
 
+    //=======================================================
+    //Server communication
+    | TestOntologyInsert    of (string*string*string*System.DateTime*string)
 
 module Server =
 
@@ -54,10 +56,10 @@ module Server =
     open Fable.Remoting.Client
 
     /// A proxy you can use to talk to server directly
-    let api : ICounterApi =
+    let api : IAnnotatorAPI =
       Remoting.createApi()
       |> Remoting.withRouteBuilder Route.builder
-      |> Remoting.buildProxy<ICounterApi>
+      |> Remoting.buildProxy<IAnnotatorAPI>
 
 let initializeAddIn () =
     OfficeInterop.Office.onReady()
@@ -150,6 +152,14 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             SyncContext
             GenericError
 
+    | GenericLog (level,passthroughMessage) ->
+        let nextModel = {
+            currentModel with
+                DisplayMessage = passthroughMessage
+                Log = (LogItem.ofStringNow level passthroughMessage)::currentModel.Log
+            }
+        nextModel, Cmd.none
+
     //=======================================================
     //Error handling
     | GenericError e        ->
@@ -229,7 +239,15 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             SyncContext
             GenericError
 
-
+    //=======================================================
+    //Server communication
+    | TestOntologyInsert (a,b,c,d,e) ->
+        currentModel,
+        Cmd.OfAsync.either
+            Server.api.testOntologyInsert
+            (a,b,c,d,e)
+            (fun x -> GenericLog ("Debug",sprintf "Successfully created %A" x))
+            GenericError
 
     //| _ -> currentModel, Cmd.none
 
@@ -272,7 +290,7 @@ let getBestSuggestions (model:Model)  =
 let createSuggestions model dispatch =
     getBestSuggestions model
     |> Array.map (fun sugg ->
-        Dropdown.Item.div [Dropdown.Item.Props [ OnClick (fun _ -> (sugg     |> FillSuggestionUsed) |> dispatch)]] [str sugg      ]
+        Dropdown.Item.div [Dropdown.Item.Props [ OnClick (fun _ -> (sugg |> FillSuggestionUsed) |> dispatch); colorControl model.ColorMode]] [str sugg      ]
     )
 
 let mainForm (model : Model) (dispatch : Msg -> unit) =
@@ -296,7 +314,13 @@ let mainForm (model : Model) (dispatch : Msg -> unit) =
                             ]   
 
                 Container.container[] [
-                    Dropdown.content [Props [Style [if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None]]] [
+                    Dropdown.content [Props [
+                        Style [
+                            if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
+                            BackgroundColor model.ColorMode.ControlBackground
+                            BorderColor     model.ColorMode.ControlForeground
+                        ]]
+                    ] [
                         yield! createSuggestions model dispatch
                     ]
                 ]
@@ -363,13 +387,12 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"]] [
                 img [Props.Src "../assets/CSB_Logo.png"]
             ]
-            Navbar.burger [ if model.BurgerVisible then CustomClass "is-active"
-                            Props [
+            Navbar.burger [ Navbar.Burger.IsActive model.BurgerVisible
+                            Navbar.Burger.OnClick (fun e -> ToggleBurger |> dispatch)
+                            Navbar.Burger.Props[
                                     Role "button"
                                     AriaLabel "menu"
                                     Props.AriaExpanded false
-                                    OnClick (fun e -> ToggleBurger |> dispatch)
-
                             ]
             ] [
                 span [AriaHidden true] []
@@ -415,6 +438,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
             br []
             mainForm model dispatch
             br []
+            button model.ColorMode true "make a test db insert xd" (fun _ -> TestOntologyInsert ((sprintf "Me am test %A" (System.Guid.NewGuid())),"1","Me is testerino",System.DateTime.UtcNow,"MEEEMuser") |> dispatch)
             button model.ColorMode true "idk man=(" (fun _ -> TryExcel |> dispatch)
             button model.ColorMode true "create annoation table" (fun _ -> CreateAnnotationTable |> dispatch)
             button model.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> dispatch)

@@ -29,6 +29,12 @@ type LogItem =
                 td [] [str m]
             ]
 
+    static member ofStringNow (level:string) (message: string) =
+        match level with
+        | "Debug" -> Debug(System.DateTime.UtcNow,message)
+        | "Info"  -> Info (System.DateTime.UtcNow,message)
+        | "Error" -> Error(System.DateTime.UtcNow,message)
+
 // The model holds data that you want to keep track of while the application is running
 // in this case, we are keeping track of a counter
 // we mark it as optional, because initially it will not be available from the client
