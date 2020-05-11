@@ -114,21 +114,22 @@ Target.create "OfficeDebug" (fun _ ->
     let server = async {
         runDotNet "watch run" serverPath
     }
-    let client = async {
-        runTool npxTool "webpack-dev-server" __SOURCE_DIRECTORY__
-    }
     let officeDebug = async {
          runTool npxTool "office-addin-debugging start manifest.xml desktop --debug-method web" __SOURCE_DIRECTORY__
+    }
+    let client = async {
+        runTool npxTool "webpack-dev-server" __SOURCE_DIRECTORY__
     }
 
     let vsCodeSession = Environment.hasEnvironVar "vsCodeSession"
     let safeClientOnly = Environment.hasEnvironVar "safeClientOnly"
 
     let tasks =
-        [ if not safeClientOnly then yield server
+        [
+          yield officeDebug 
           yield client
-          yield officeDebug ]
-
+          if not safeClientOnly then yield server
+          ]
     tasks
     |> Async.Parallel
     |> Async.RunSynchronously

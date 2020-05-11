@@ -11,7 +11,7 @@ var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var CopyWebpackPlugin = require('copy-webpack-plugin');
 var MiniCssExtractPlugin = require('mini-css-extract-plugin');
-var fs = require("fs");
+//var fs = require("fs");
 
 var CONFIG = {
     // The tags to include the generated JS and CSS will be automatically injected in the HTML template
@@ -26,16 +26,25 @@ var CONFIG = {
     // to a external API server. See https://webpack.js.org/configuration/dev-server/#devserver-proxy
     devServerProxy: {
         // redirect requests that start with /api/ to the server on port 8085
-        '/api/**': {
-            target: 'https://localhost:' + (process.env.SERVER_PROXY_PORT || "8085"),
-            "secure": false,
-            changeOrigin: true
-           },
+        '/api': {
+            target: 'https://localhost:8080',
+            secure: false,
+            changeOrigin: true,
+            ignorePath: false
+        },
+        '/test': {
+            target: 'https://localhost:8080',
+            secure: false,
+            changeOrigin: true,
+            ignorePath: false
+        },
         // redirect websocket requests that start with /socket/ to the server on the port 8085
-        '/socket/**': {
-            target: 'https://localhost:' + (process.env.SERVER_PROXY_PORT || "8085"),
+        '/socket': {
+            target: 'https://localhost:8080',
             ws: true,
-            "secure": false
+            secure: false,
+            changeOrigin: true,
+            ignorePath: false
            }
        },
     // Use babel-preset-env to generate JS compatible with most-used browsers.
@@ -121,9 +130,9 @@ module.exports = {
         host: '0.0.0.0',
         port: CONFIG.devServerPort,
         https: true,
-        key: fs.readFileSync(path.resolve("C:/Users/kevin/.office-addin-dev-certs/localhost.key")),
-        cert: fs.readFileSync(path.resolve("C:/Users/kevin//.office-addin-dev-certs/localhost.crt")),
-        ca: fs.readFileSync(path.resolve("C:/Users/kevin/.office-addin-dev-certs/ca.crt")),
+        key: "C:/Users/kevin/.office-addin-dev-certs/localhost.key",
+        cert: "C:/Users/kevin//.office-addin-dev-certs/localhost.crt",
+        ca: "C:/Users/kevin/.office-addin-dev-certs/ca.crt",
         proxy: CONFIG.devServerProxy,
         hot: true,
         inline: true
