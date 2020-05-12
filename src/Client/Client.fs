@@ -5,7 +5,10 @@ open Elmish.React
 open Fable.React
 open Fable.React.Props
 open Fulma
+open Fulma.Extensions.Wikiki
+open Fable.FontAwesome
 open Thoth.Json
+open Thoth.Elmish
 open Model
 open ExcelColors
 open Shared
@@ -14,10 +17,14 @@ open Shared
 // the state of the application changes *only* in reaction to these events
 type Msg =
     //=======================================================
+    //Debouncing
+    | DebouncerSelfMsg of Debouncer.SelfMessage<Msg>
+
+    //=======================================================
     //Office Api specific calls needed to keep models in sync
-    | Initialized           of (string*string)
-    | SyncContext           of string
-    | InSync                of string
+    | Initialized               of (string*string)
+    | SyncContext               of string
+    | InSync                    of string
 
     //=======================================================
     //Styling and general website behaviour
@@ -27,28 +34,31 @@ type Msg =
     //=======================================================
     //Debugging
     | LogTableMetadata
-    | GenericLog            of (string*string)
+    | GenericLog                of (string*string)
     //=======================================================
     //Error handling
-    | GenericError          of exn
+    | GenericError              of exn
     //=======================================================
     //UserInput
-    | FillSectionTextChange of string
-    | FillSuggestionUsed    of string
-    | AddColumnTextChange   of string
+    | FillSectionTextChange     of string
+    | FillSuggestionUsed        of string
+    | AddColumnTextChange       of string
 
     //=======================================================
     //App specific messages
-    | ExcelTestResponse     of string
+    | ExcelTestResponse         of string
     | TryExcel
-    | FillSelection         of string
-    | AddColumn             of string
+    | FillSelection             of string
+    | AddColumn                 of string
     | CreateAnnotationTable
     | FormatAnnotationTable
 
     //=======================================================
     //Server communication
-    | TestOntologyInsert    of (string*string*string*System.DateTime*string)
+    | TestOntologyInsert        of (string*string*string*System.DateTime*string)
+    | GetNewTermSuggestions     of string
+    | TermSuggestionResponse    of DbDomain.Term []
+
 
 module Server =
 
@@ -65,6 +75,7 @@ let initializeAddIn () =
     OfficeInterop.Office.onReady()
     
 let initialModel = {
+    Debouncer               = Debouncer.create()
     LastFullError           = None
     Log                     = []
     DisplayMessage          = "Initializing AddIn ..."
@@ -72,13 +83,11 @@ let initialModel = {
     IsDarkMode              = false
     ColorMode               = (ExcelColors.colorfullMode)
     FillSelectionText       = ""
-    FillSuggestions         = [|
-        "Some";"Random";"Text";"IDK";"IsThiSCasEsEnsItIve?";"ISTHISCASESENSITIVE?";
-        "isthiscasesensitive?";"Lena";"Kevin";"Schneider";"Hallo";"Halli";"allo";"sup";
-        "AWD";"EFEWTGWE";"AWDfFGRGH";"erte_EWh";"wAWWWWW";"EGSWRH";"EHRJJJJJJJJJJJJJ";"AWgGRSHSR"
-    |]
+    TermSuggestions         = [||]
     ShowFillSuggestions     = false
     ShowFillSuggestionUsed  = false
+    HadFirstSuggestion      = false
+    HasSuggestionsLoading   = false
     AddColumnText           = ""
     }
 
@@ -100,6 +109,12 @@ let init2 () : Model * Cmd<Msg> =
 // these commands in turn, can dispatch messages to which the update function will react.
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
+    //=======================================================
+    //Debouncing
+    | DebouncerSelfMsg debouncerMsg ->
+        let (debouncerModel, debouncerCmd) = Debouncer.update debouncerMsg currentModel.Debouncer
+        { currentModel with Debouncer = debouncerModel }, debouncerCmd
+
 
     //=======================================================
     //Office Api specific calls needed to keep models in sync
@@ -175,13 +190,32 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     //=======================================================
     //UserInput
     | FillSectionTextChange newText ->
+
+
+        let triggerNewSearch =
+            newText.Length > 2
+            
+        let (debouncerModel, debouncerCmd) =
+            currentModel.Debouncer
+            |> Debouncer.bounce (System.TimeSpan.FromSeconds 0.35) "FillSectionTextChange" (GetNewTermSuggestions newText)
+
+
         let nextModel = {
             currentModel with
+                Debouncer = debouncerModel
                 FillSelectionText = newText
-                ShowFillSuggestions = newText.Length > 2
+                ShowFillSuggestions = true
                 ShowFillSuggestionUsed = false
+                HasSuggestionsLoading = true
             }
-        nextModel, Cmd.none
+
+        //let suggestionCmd =
+        //    if triggerNewSearch then
+        //        Cmd.ofMsg (GetNewTermSuggestions newText)
+        //    else
+        //        Cmd.none
+
+        nextModel, Cmd.batch [ Cmd.map DebouncerSelfMsg debouncerCmd ]
 
     | FillSuggestionUsed suggestion ->
         let nextModel = {
@@ -249,6 +283,26 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             (fun x -> GenericLog ("Debug",sprintf "Successfully created %A" x))
             GenericError
 
+    | GetNewTermSuggestions queryString ->
+        let nextModel = {
+            currentModel with
+                HadFirstSuggestion      = true
+                HasSuggestionsLoading   = true
+        }
+        nextModel,
+        Cmd.OfAsync.either
+            Server.api.getTermSuggestions
+            (5,queryString)
+            TermSuggestionResponse
+            GenericError
+
+    | TermSuggestionResponse termSuggestions ->
+        let nextModel = {
+            currentModel with
+                TermSuggestions         = termSuggestions
+                HasSuggestionsLoading   = false
+            }
+        nextModel,Cmd.none
     //| _ -> currentModel, Cmd.none
 
 
@@ -265,33 +319,62 @@ let button (colorMode: ExcelColors.ColorMode) (isActive:bool) txt onClick =
         str txt
     ]
 
-let inline sorensenDice (x : Set<'T>) (y : Set<'T>) =
-    match  (x.Count, y.Count) with
-    | (0,0) -> 1.
-    | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
-
-
-let createBigrams (s:string) =
-    s
-        .ToUpperInvariant()
-        .ToCharArray()
-    |> Array.windowed 2
-    |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
-    |> set
 
 let getBestSuggestions (model:Model)  =
-    let searchSet = model.FillSelectionText |> createBigrams
-    model.FillSuggestions
-    |> Array.sortByDescending (fun sugg ->
-        sorensenDice (createBigrams sugg) searchSet
-    )
-    |> Array.take 5
+
+    let takeAmnt = if model.TermSuggestions.Length > 5 then 5 else model.TermSuggestions.Length
+
+    model.TermSuggestions
+
+    |> Array.take takeAmnt
 
 let createSuggestions model dispatch =
-    getBestSuggestions model
-    |> Array.map (fun sugg ->
-        Dropdown.Item.div [Dropdown.Item.Props [ OnClick (fun _ -> (sugg |> FillSuggestionUsed) |> dispatch); colorControl model.ColorMode]] [str sugg      ]
-    )
+        //Dropdown.Item.div [
+        //    Dropdown.Item.CustomClass "TermSuggestion"
+        //    Dropdown.Item.Props [
+        //        OnClick (fun _ -> (sugg.Name |> FillSuggestionUsed) |> dispatch);
+        //        colorControl model.ColorMode
+        //    ]
+        //] [
+        Table.table [Table.IsFullWidth] [
+            if model.HasSuggestionsLoading then
+                yield tr [] [
+                    td [Style [TextAlign TextAlignOptions.Center]] [
+                        Fa.i [
+                            Fa.Solid.Spinner
+                            Fa.Pulse
+                            Fa.Size Fa.Fa4x
+                        ] []
+                        br []
+                    ]
+                ]
+            else
+                //yield
+
+                //    tr [] [
+                //        th [] [str "Info"]
+                //        th [] [str "Term name"]
+                //        th [] [str ""]
+                //        th [] [str "REF"]
+                //    ]
+
+                yield!
+                    getBestSuggestions model
+                    |> Array.map (fun sugg ->
+                        tr [OnClick (fun _ -> (sugg.Name |> FillSuggestionUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
+                            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+                                Fa.i [Fa.Solid.InfoCircle] []
+                            ]
+                            td [] [
+                                b [] [str sugg.Name]
+                            ]
+                            td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+                            td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+                        ])
+        ]
+
+            
+        //]
 
 let mainForm (model : Model) (dispatch : Msg -> unit) =
     form [
@@ -300,9 +383,12 @@ let mainForm (model : Model) (dispatch : Msg -> unit) =
         Field.div [] [
             Label.label [   Label.Size Size.IsLarge
                             Label.Props [Style [Color model.ColorMode.Accent]]
+                            
             ][
                 str "Fill Selection"
+                
             ]
+            a [] [str "Advanced search"]
             Control.div [] [
 
 
@@ -321,7 +407,7 @@ let mainForm (model : Model) (dispatch : Msg -> unit) =
                             BorderColor     model.ColorMode.ControlForeground
                         ]]
                     ] [
-                        yield! createSuggestions model dispatch
+                        if model.TermSuggestions.Length > 0 then createSuggestions model dispatch
                     ]
                 ]
                 

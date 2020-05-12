@@ -9,6 +9,7 @@
         "@fortawesome/fontawesome-free": "^5.11.2",
         "babel-loader": "^8.0.5",
         "bulma": "^0.8.0",
+        "bulma-tooltip": "^3.0.2",
         "copy-webpack-plugin": "^5.1.1",
         "core-js": "^3.3.2",
         "css-loader": "^2.0.1",

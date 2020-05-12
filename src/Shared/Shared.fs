@@ -55,4 +55,5 @@ module DbDomain =
 
 type IAnnotatorAPI = {
     testOntologyInsert: (string*string*string*System.DateTime*string) -> Async<DbDomain.Ontology>
+    getTermSuggestions: (int*string) -> Async<DbDomain.Term []>
 }

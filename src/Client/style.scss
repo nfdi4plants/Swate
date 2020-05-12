@@ -14,3 +14,8 @@ $family-primary: 'Open Sans';
 
 // Bulma
 @import "~bulma/bulma";
+@import "~bulma-tooltip";
+
+.suggestion :hover{
+    cursor: pointer;
+}

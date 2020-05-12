@@ -18,6 +18,22 @@ let publicPath = Path.GetFullPath "../Client/public"
 
 let port = 8080us
 
+module Suggestion =
+    
+    let inline sorensenDice (x : Set<'T>) (y : Set<'T>) =
+        match  (x.Count, y.Count) with
+        | (0,0) -> 1.
+        | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
+    
+    
+    let createBigrams (s:string) =
+        s
+            .ToUpperInvariant()
+            .ToCharArray()
+        |> Array.windowed 2
+        |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
+        |> set
+
 let annotatorApi = {
     testOntologyInsert =
         fun (name,version,definition,created,user) ->
@@ -26,6 +42,20 @@ let annotatorApi = {
                 printfn "created ontology entry: \t%A" createdEntry
                 return createdEntry
             }
+
+    getTermSuggestions =
+        fun (max:int,typedSoFar:string) -> async {
+            let like = OntologyDB.getTermSuggestions typedSoFar
+            let searchSet = typedSoFar |> Suggestion.createBigrams
+
+            return
+                like
+                |> Array.sortByDescending (fun sugg ->
+                        Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                )
+                
+                |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+        }
 }
 
 let docs = Docs.createFor<IAnnotatorAPI>()
@@ -46,7 +76,7 @@ let webApp =
     |> Remoting.withDocs "/api/docs" apiDocumentation
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[ERROR]: %A @ %A" x y))
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
     )
     |> Remoting.buildHttpHandler
 
@@ -62,7 +92,7 @@ let app = application {
     memory_cache
     use_static publicPath
     use_gzip
-    //logging (fun (builder: ILoggingBuilder) -> builder.SetMinimumLevel(LogLevel.Trace) |> ignore)
+    logging (fun (builder: ILoggingBuilder) -> builder.SetMinimumLevel(LogLevel.Warning) |> ignore)
 }
 
 run app

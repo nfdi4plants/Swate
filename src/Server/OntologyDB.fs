@@ -99,3 +99,31 @@ SELECT max(ID) FROM Term"""
             xrefvaluetype
             isObsolete
     | false -> failwith "Inserting term failed."
+
+let getTermSuggestions (query:string) =
+    
+    use connection = establishConnection()
+    connection.Open()
+    use getTermSuggestionsCmd = new SqlCommand("getTermSuggestions",connection)
+    getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
+
+    let queryParam      = getTermSuggestionsCmd.Parameters.Add("query",SqlDbType.NVarChar)
+
+    queryParam      .Value <- query
+
+    use reader = getTermSuggestionsCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]

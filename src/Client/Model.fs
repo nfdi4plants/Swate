@@ -3,6 +3,8 @@ module Model
 open Fable.React
 open Fable.React.Props
 open Fulma
+open Shared
+open Thoth.Elmish
 
 type LogItem =
     | Debug of (System.DateTime*string)
@@ -40,9 +42,12 @@ type LogItem =
 // we mark it as optional, because initially it will not be available from the client
 // the initial value will be requested from server
 type Model = {
+    //Debouncing
+    Debouncer               : Debouncer.State
+
     //Error handling
-    LastFullError       : System.Exception option
-    Log                 : LogItem list
+    LastFullError           : System.Exception option
+    Log                     : LogItem list
 
     //Site Meta Options (Styling etc)
     DisplayMessage          : string
@@ -51,9 +56,11 @@ type Model = {
     ColorMode               : ExcelColors.ColorMode
     ShowFillSuggestions     : bool
     ShowFillSuggestionUsed  : bool
+    HadFirstSuggestion      : bool
+    HasSuggestionsLoading   : bool
 
     //Data for the App
-    FillSelectionText   : string
-    FillSuggestions     : string []
-    AddColumnText       : string
+    FillSelectionText       : string
+    TermSuggestions         : DbDomain.Term []
+    AddColumnText           : string
     }

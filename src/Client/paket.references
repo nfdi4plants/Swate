@@ -6,5 +6,7 @@ group Client
     Fable.Elmish.HMR
     Fable.Remoting.Client
     Fulma
+    Fulma.Extensions.Wikiki.Tooltip
     Fable.FontAwesome.Free
+    Thoth.Elmish.Debouncer
 
