@@ -127,3 +127,24 @@ let getTermSuggestions (query:string) =
                         Some (reader.GetString(5)))
                     (reader.GetBoolean(6))
     |]
+
+
+let getAllOntologies () =
+    
+    use connection = establishConnection()
+    connection.Open()
+    use getAllOntologiesCmd = new SqlCommand("getAllOntologies",connection)
+    getAllOntologiesCmd.CommandType <- CommandType.StoredProcedure
+
+    use reader = getAllOntologiesCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createOntology
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetString(2))
+                    (reader.GetString(3))
+                    (reader.GetDateTimeOffset(4)).UtcDateTime
+                    (reader.GetString(5))
+    |]

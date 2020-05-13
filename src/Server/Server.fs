@@ -18,33 +18,25 @@ let publicPath = Path.GetFullPath "../Client/public"
 
 let port = 8080us
 
-module Suggestion =
-    
-    let inline sorensenDice (x : Set<'T>) (y : Set<'T>) =
-        match  (x.Count, y.Count) with
-        | (0,0) -> 1.
-        | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
-    
-    
-    let createBigrams (s:string) =
-        s
-            .ToUpperInvariant()
-            .ToCharArray()
-        |> Array.windowed 2
-        |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
-        |> set
-
 let annotatorApi = {
-    testOntologyInsert =
-        fun (name,version,definition,created,user) ->
-            async {
-                let createdEntry = OntologyDB.insertOntology name version definition created user
-                printfn "created ontology entry: \t%A" createdEntry
-                return createdEntry
-            }
 
-    getTermSuggestions =
-        fun (max:int,typedSoFar:string) -> async {
+    //Ontology related requests
+    testOntologyInsert = fun (name,version,definition,created,user) ->
+        async {
+            let createdEntry = OntologyDB.insertOntology name version definition created user
+            printfn "created ontology entry: \t%A" createdEntry
+            return createdEntry
+        }
+
+    getAllOntologies = fun () ->
+        async {
+            let results = OntologyDB.getAllOntologies ()
+            return results
+        }
+
+    // Term related requests
+    getTermSuggestions = fun (max:int,typedSoFar:string) ->
+        async {
             let like = OntologyDB.getTermSuggestions typedSoFar
             let searchSet = typedSoFar |> Suggestion.createBigrams
 
@@ -55,6 +47,11 @@ let annotatorApi = {
                 )
                 
                 |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+        }
+
+    getTermsForAdvancedSearch = fun (ont,mustContain,keepObsolete) ->
+        async {
+            return [||]
         }
 }
 

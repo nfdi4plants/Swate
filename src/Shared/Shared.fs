@@ -7,6 +7,23 @@ module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
+
+module Suggestion =
+    
+    let inline sorensenDice (x : Set<'T>) (y : Set<'T>) =
+        match  (x.Count, y.Count) with
+        | (0,0) -> 1.
+        | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
+    
+    
+    let createBigrams (s:string) =
+        s
+            .ToUpperInvariant()
+            .ToCharArray()
+        |> Array.windowed 2
+        |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
+        |> set
+
 module DbDomain =
     
     type Ontology = {
@@ -54,6 +71,12 @@ module DbDomain =
     }
 
 type IAnnotatorAPI = {
-    testOntologyInsert: (string*string*string*System.DateTime*string) -> Async<DbDomain.Ontology>
-    getTermSuggestions: (int*string) -> Async<DbDomain.Term []>
+
+    // Ontology related requests
+    testOntologyInsert          : (string*string*string*System.DateTime*string) -> Async<DbDomain.Ontology>
+    getAllOntologies            : unit                                          -> Async<DbDomain.Ontology []>
+
+    // Term related requests
+    getTermSuggestions          : (int*string)                                  -> Async<DbDomain.Term []>
+    getTermsForAdvancedSearch   : (DbDomain.Ontology*string*bool)               -> Async<DbDomain.Term []>
 }

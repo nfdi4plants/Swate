@@ -18,13 +18,14 @@ open Shared
 type Msg =
     //=======================================================
     //Debouncing
-    | DebouncerSelfMsg of Debouncer.SelfMessage<Msg>
+    | DebouncerSelfMsg                          of Debouncer.SelfMessage<Msg>
+    | DoNothing
 
     //=======================================================
     //Office Api specific calls needed to keep models in sync
-    | Initialized               of (string*string)
-    | SyncContext               of string
-    | InSync                    of string
+    | Initialized                               of (string*string)
+    | SyncContext                               of string
+    | InSync                                    of string
 
     //=======================================================
     //Styling and general website behaviour
@@ -34,30 +35,39 @@ type Msg =
     //=======================================================
     //Debugging
     | LogTableMetadata
-    | GenericLog                of (string*string)
+    | GenericLog                                of (string*string)
     //=======================================================
     //Error handling
-    | GenericError              of exn
+    | GenericError                              of exn
     //=======================================================
     //UserInput
-    | FillSectionTextChange     of string
-    | FillSuggestionUsed        of string
-    | AddColumnTextChange       of string
+    //---------------------
+    //FillSelection related
+    | FillSelectionSearchTermChange             of string
+    | FillSelectionSearchOntologyChange         of string
+    | FillTermSuggestionUsed                    of string
+    | FillOntologySuggestionUsed                of string
+    | SwitchFillSearchMode
+    | FillSelectionAdvancedSearchOptionsChange  of FillSelectionAdvancedSearchOptions
+    //---------------------
+    //insert column related
+    | AddColumnTextChange                       of string
 
     //=======================================================
     //App specific messages
-    | ExcelTestResponse         of string
+    | ExcelTestResponse                         of string
     | TryExcel
-    | FillSelection             of string
-    | AddColumn                 of string
+    | FillSelection                             of string
+    | AddColumn                                 of string
     | CreateAnnotationTable
-    | FormatAnnotationTable
 
     //=======================================================
     //Server communication
-    | TestOntologyInsert        of (string*string*string*System.DateTime*string)
-    | GetNewTermSuggestions     of string
-    | TermSuggestionResponse    of DbDomain.Term []
+    | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
+    | GetNewTermSuggestions                     of string
+    | TermSuggestionResponse                    of DbDomain.Term []
+    | FetchAllOntologies
+    | FetchAllOntologiesResponse                of DbDomain.Ontology []
 
 
 module Server =
@@ -75,34 +85,61 @@ let initializeAddIn () =
     OfficeInterop.Office.onReady()
     
 let initialModel = {
-    Debouncer               = Debouncer.create()
-    LastFullError           = None
-    Log                     = []
-    DisplayMessage          = "Initializing AddIn ..."
-    BurgerVisible           = false
-    IsDarkMode              = false
-    ColorMode               = (ExcelColors.colorfullMode)
-    FillSelectionText       = ""
-    TermSuggestions         = [||]
-    ShowFillSuggestions     = false
-    ShowFillSuggestionUsed  = false
-    HadFirstSuggestion      = false
-    HasSuggestionsLoading   = false
+    //One time sync with server
+    SearchableOntologies                = [||]
+    HasOntologiesLoaded                 = false
+
+    //Debouncing
+    Debouncer                           = Debouncer.create()
+
+    //Error handling
+    LastFullError                       = None
+    Log                                 = []
+
+    //Site Meta Options (Styling etc)
+    DisplayMessage                      = "Initializing AddIn ..."
+    BurgerVisible                       = false
+    IsDarkMode                          = false
+    ColorMode                           = (ExcelColors.colorfullMode)
+
+    //Fill Selection term search
+    FillSearchMode                      = Autocomplete
+
+    //simple term search
+    FillSelectionTermSearchText         = ""
+    FillSelectionOntologySearchText     = ""
+    TermSuggestions                     = [||]
+    ShowFillSuggestions                 = false
+    ShowFillSuggestionUsed              = false
+    HadFirstSuggestion                  = false
+    HasSuggestionsLoading               = false
+
+    //Advanced term search
+    FillSelectionAdvancedSearchOptions  = {
+        Ontology                = None
+        StartsWith              = ""
+        MustContain             = ""
+        EndsWith                = ""
+        DefinitionMustContain   = ""
+        KeepObsolete            = false
+    }
+
+    //Column insert
     AddColumnText           = ""
     }
 
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> =
     let loadCountCmd =
-        Cmd.OfPromise.either
-            initializeAddIn
-            ()
-            (fun x -> Initialized (x.host.ToString(),x.platform.ToString()))
-            GenericError
+        Cmd.batch [
+            Cmd.OfPromise.either
+                initializeAddIn
+                ()
+                (fun x -> Initialized (x.host.ToString(),x.platform.ToString()))
+                GenericError
+            Cmd.ofMsg FetchAllOntologies
+        ]
     initialModel, loadCountCmd
-
-let init2 () : Model * Cmd<Msg> =
-    initialModel, Cmd.none
 
 // The update function computes the next state of the application based on the current state and the incoming events/messages
 // It can also run side-effects (encoded as commands) like calling the server via Http.
@@ -110,11 +147,32 @@ let init2 () : Model * Cmd<Msg> =
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     //=======================================================
+    //One-time Messages to be processed when initializing 
+    | FetchAllOntologies ->
+        let fetchOntologiesCmd =
+            Cmd.OfAsync.either
+                Server.api.getAllOntologies
+                ()
+                FetchAllOntologiesResponse
+                GenericError
+        currentModel,fetchOntologiesCmd
+
+    | FetchAllOntologiesResponse ontologies ->
+        let nextModel = {
+            currentModel with
+                SearchableOntologies    = ontologies |> Array.map (fun ont -> ont.Name |> Suggestion.createBigrams, ont)
+                HasOntologiesLoaded     = true
+        }
+        nextModel, Cmd.none
+
+    //=======================================================
     //Debouncing
     | DebouncerSelfMsg debouncerMsg ->
         let (debouncerModel, debouncerCmd) = Debouncer.update debouncerMsg currentModel.Debouncer
         { currentModel with Debouncer = debouncerModel }, debouncerCmd
 
+    | DoNothing ->
+        currentModel,Cmd.none
 
     //=======================================================
     //Office Api specific calls needed to keep models in sync
@@ -189,43 +247,91 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
 
     //=======================================================
     //UserInput
-    | FillSectionTextChange newText ->
-
-
-        let triggerNewSearch =
-            newText.Length > 2
-            
-        let (debouncerModel, debouncerCmd) =
-            currentModel.Debouncer
-            |> Debouncer.bounce (System.TimeSpan.FromSeconds 0.35) "FillSectionTextChange" (GetNewTermSuggestions newText)
-
+    //---------------------
+    //FillSelection related
+    | FillSelectionSearchOntologyChange newOntology ->
 
         let nextModel = {
             currentModel with
-                Debouncer = debouncerModel
-                FillSelectionText = newText
-                ShowFillSuggestions = true
-                ShowFillSuggestionUsed = false
-                HasSuggestionsLoading = true
-            }
+                FillSelectionOntologySearchText = newOntology
+                ShowFillSuggestions         = newOntology.Length > 0
+                ShowFillSuggestionUsed      = false
+                HasSuggestionsLoading       = false
+        }
+        nextModel,Cmd.none
 
-        //let suggestionCmd =
-        //    if triggerNewSearch then
-        //        Cmd.ofMsg (GetNewTermSuggestions newText)
-        //    else
-        //        Cmd.none
+    | FillSelectionSearchTermChange newTerm ->
+
+        let triggerNewSearch =
+            newTerm.Length > 2
+           
+        let (debouncerModel, debouncerCmd) =
+            currentModel.Debouncer
+            |> Debouncer.bounce
+                (System.TimeSpan.FromSeconds 0.35)
+                "FillSectionTextChange"
+                (
+                    if triggerNewSearch then
+                        GetNewTermSuggestions newTerm
+                    else
+                        DoNothing
+                )
+
+        let nextModel = {
+            currentModel with
+                Debouncer                   = debouncerModel
+                FillSelectionTermSearchText = newTerm
+                ShowFillSuggestions         = triggerNewSearch
+                ShowFillSuggestionUsed      = false
+                HasSuggestionsLoading       = true
+            }
 
         nextModel, Cmd.batch [ Cmd.map DebouncerSelfMsg debouncerCmd ]
 
-    | FillSuggestionUsed suggestion ->
+    | FillTermSuggestionUsed suggestion ->
         let nextModel = {
             currentModel with
-                FillSelectionText = suggestion
-                ShowFillSuggestions = false
-                ShowFillSuggestionUsed = true
+                FillSelectionTermSearchText = suggestion
+                ShowFillSuggestions         = false
+                ShowFillSuggestionUsed      = true
             }
         nextModel, Cmd.none
 
+    | FillOntologySuggestionUsed suggestion ->
+        let nextModel = {
+            currentModel with
+                FillSelectionOntologySearchText = suggestion
+                ShowFillSuggestions             = false
+                ShowFillSuggestionUsed          = true
+            }
+        nextModel, Cmd.none
+
+    | SwitchFillSearchMode ->
+
+        let nextSearchMode =
+            match currentModel.FillSearchMode with
+            | Autocomplete  -> Advanced
+            | Advanced      -> Autocomplete
+
+        let nextModel = {
+            currentModel with
+                FillSelectionOntologySearchText = ""
+                FillSelectionTermSearchText = ""
+                FillSearchMode = nextSearchMode
+                ShowFillSuggestions = false
+        }
+
+        nextModel,Cmd.none
+
+    | FillSelectionAdvancedSearchOptionsChange options ->
+        let nextModel = {
+            currentModel with
+                FillSelectionAdvancedSearchOptions = options
+        }
+        nextModel,Cmd.none
+
+    //---------------------
+    //insert column related
     | AddColumnTextChange newText ->
         let nextModel = {
             currentModel with
@@ -319,104 +425,244 @@ let button (colorMode: ExcelColors.ColorMode) (isActive:bool) txt onClick =
         str txt
     ]
 
+module GenericCustomComponents =
 
-let getBestSuggestions (model:Model)  =
+    let loading =
+        Fa.i [
+            Fa.Solid.Spinner
+            Fa.Pulse
+            Fa.Size Fa.Fa4x
+        ] []
 
-    let takeAmnt = if model.TermSuggestions.Length > 5 then 5 else model.TermSuggestions.Length
-
-    model.TermSuggestions
-
-    |> Array.take takeAmnt
-
-let createSuggestions model dispatch =
-        //Dropdown.Item.div [
-        //    Dropdown.Item.CustomClass "TermSuggestion"
-        //    Dropdown.Item.Props [
-        //        OnClick (fun _ -> (sugg.Name |> FillSuggestionUsed) |> dispatch);
-        //        colorControl model.ColorMode
-        //    ]
-        //] [
-        Table.table [Table.IsFullWidth] [
-            if model.HasSuggestionsLoading then
-                yield tr [] [
-                    td [Style [TextAlign TextAlignOptions.Center]] [
-                        Fa.i [
-                            Fa.Solid.Spinner
-                            Fa.Pulse
-                            Fa.Size Fa.Fa4x
-                        ] []
-                        br []
-                    ]
-                ]
-            else
-                //yield
-
-                //    tr [] [
-                //        th [] [str "Info"]
-                //        th [] [str "Term name"]
-                //        th [] [str ""]
-                //        th [] [str "REF"]
-                //    ]
-
-                yield!
-                    getBestSuggestions model
-                    |> Array.map (fun sugg ->
-                        tr [OnClick (fun _ -> (sugg.Name |> FillSuggestionUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
-                            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
-                                Fa.i [Fa.Solid.InfoCircle] []
+    let autocompleteDropdown (model:Model) (dispatch: Msg -> unit) (isVisible: bool) (isLoading:bool) (suggestions: ReactElement list)  =
+        Container.container[] [
+            Dropdown.content [Props [
+                Style [
+                    if isVisible then Display DisplayOptions.Block else Display DisplayOptions.None
+                    //if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
+                    BackgroundColor model.ColorMode.ControlBackground
+                    BorderColor     model.ColorMode.ControlForeground
+                ]]
+            ] [
+                Table.table [Table.IsFullWidth] (
+                    if isLoading then
+                        [
+                            tr [] [
+                                td [Style [TextAlign TextAlignOptions.Center]] [
+                                    loading
+                                    br []
+                                ]
                             ]
-                            td [] [
-                                b [] [str sugg.Name]
-                            ]
-                            td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
-                            td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
-                        ])
+                        ]
+                    else
+                        suggestions
+                )
+
+                
+            ]
         ]
 
+let createTermSuggestions model dispatch =
+    model.TermSuggestions
+    |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
+    |> Array.map (fun sugg ->
+        tr [OnClick (fun _ -> (sugg.Name |> FillTermSuggestionUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
+            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+                Fa.i [Fa.Solid.InfoCircle] []
+            ]
+            td [] [
+                b [] [str sugg.Name]
+            ]
+            td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+            td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+        ])
+    |> List.ofArray
+
+let createOntologySuggestions (model:Model) (dispatch: Msg -> unit) =
+    model.SearchableOntologies
+    |> Array.sortByDescending (fun (bigrams,_) ->
+        Suggestion.sorensenDice (model.FillSelectionOntologySearchText |> Suggestion.createBigrams) bigrams 
+    )
+    |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
+    |> Array.map (fun (_,sugg) ->
+        tr [OnClick (fun _ -> (sugg.Name |> FillOntologySuggestionUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
+            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+                Fa.i [Fa.Solid.InfoCircle] []
+            ]
+            td [] [
+                b [] [str sugg.Name]
+            ]
+            td [Style [FontWeight "light"]] [small [] [str sugg.CurrentVersion]]
+        ])
+    |> List.ofArray
+        
+//let createAdvancedTermSearchResultList (model:Model) (dispatch: Msg -> unit) =
+//    model.AdvancedSearchTermResults
+//    |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
+//    |> Array.map (fun sugg ->
+//        tr [OnClick (fun _ -> (sugg.Name |> FillTermSuggestionUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
+//            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+//                Fa.i [Fa.Solid.InfoCircle] []
+//            ]
+//            td [] [
+//                b [] [str sugg.Name]
+//            ]
+//            td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+//            td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+//        ])
+//    |> List.ofArray
             
         //]
+
+module FillSelectionComponents =
+
+    let autocompleteSearch (model:Model) (dispatch: Msg -> unit) =
+        Field.div [] [
+            Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.ColorMode.Accent]]][ str "Fill Selection"]
+            a [OnClick (fun _ -> SwitchFillSearchMode |> dispatch)] [str "Use advanced search"]
+            Control.div [] [
+                Input.input [   Input.Placeholder ""
+                                Input.Size Size.IsLarge
+                                Input.Props [ExcelColors.colorControl model.ColorMode]
+                                Input.OnChange (fun e -> FillSelectionSearchTermChange e.Value |> dispatch)
+                                Input.Value model.FillSelectionTermSearchText
+                            ]   
+                GenericCustomComponents.autocompleteDropdown
+                    model
+                    dispatch
+                    model.ShowFillSuggestions
+                    model.HasSuggestionsLoading
+                    (createTermSuggestions model dispatch)
+            ]
+            Help.help [] [str "When applicable, search for an ontology term to fill into the selected field(s)"]
+        ]
+
+    let advancedSearch (model:Model) (dispatch: Msg -> unit) =
+        [
+            Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.ColorMode.Accent]]][ str "Fill Selection"]
+            a [OnClick (fun _ -> SwitchFillSearchMode |> dispatch)] [str "Use simple search"]
+            br []
+            Field.div [] [
+                Label.label [] [ str "Ontology"]
+                Help.help [] [str "Only search terms in the selected ontology"]
+                Field.div [] [
+                    Control.div [] [
+                        Input.input [   Input.Placeholder ""
+                                        Input.Size Size.IsMedium
+                                        Input.Props [ExcelColors.colorControl model.ColorMode]
+                                        Input.OnChange (fun e -> FillSelectionSearchOntologyChange e.Value |> dispatch)
+                                        Input.Value model.FillSelectionOntologySearchText
+                                    ]   
+                        GenericCustomComponents.autocompleteDropdown
+                            model
+                            dispatch
+                            model.ShowFillSuggestions
+                            model.HasSuggestionsLoading
+                            (createOntologySuggestions model dispatch)
+                    ]
+                ]
+            ]
+            Field.div [] [
+                Label.label [] [ str "Starts with:"]
+                Help.help [] [str "The term name must start with this string"]
+                Field.div [] [
+                    Control.div [] [
+                        Input.input [
+                            Input.Placeholder ""
+                            Input.Size IsSmall
+                            Input.Props [ExcelColors.colorControl model.ColorMode]
+                            Input.OnChange (fun e -> FillSelectionAdvancedSearchOptionsChange {model.FillSelectionAdvancedSearchOptions with StartsWith = e.Value} |> dispatch)
+                            Input.Value model.FillSelectionAdvancedSearchOptions.StartsWith
+                        ] 
+                    ]
+                ]
+            ]
+            Field.div [] [
+                Label.label [] [ str "Must contain:"]
+                Help.help [] [str "The term name must contain this string (at any position)"]
+                Field.div [] [
+                    Control.div [] [
+                        Input.input [
+                            Input.Placeholder ""
+                            Input.Size IsSmall
+                            Input.Props [ExcelColors.colorControl model.ColorMode]
+                            Input.OnChange (fun e -> FillSelectionAdvancedSearchOptionsChange {model.FillSelectionAdvancedSearchOptions with MustContain = e.Value} |> dispatch)
+                            Input.Value model.FillSelectionAdvancedSearchOptions.MustContain
+                        ] 
+                    ]
+                ]
+            ]
+            Field.div [] [
+                Label.label [] [ str "Ends with:"]
+                Help.help [] [str "The term must end with this string"]
+                Field.div [] [
+                    Control.div [] [
+                        Input.input [
+                            Input.Placeholder ""
+                            Input.Size IsSmall
+                            Input.Props [ExcelColors.colorControl model.ColorMode]
+                            Input.OnChange (fun e -> FillSelectionAdvancedSearchOptionsChange {model.FillSelectionAdvancedSearchOptions with EndsWith = e.Value} |> dispatch)
+                            Input.Value model.FillSelectionAdvancedSearchOptions.EndsWith
+                        ] 
+                    ]
+                ] 
+            ]
+            Field.div [] [
+                Label.label [] [ str "Definition must contain:"]
+                Help.help [] [str "The definition of the term must contain this string (at any position)"]
+                Field.body [] [
+                    Field.div [] [
+                        Control.div [] [
+                            Input.input [
+                                Input.Placeholder ""
+                                Input.Size IsSmall
+                                Input.Props [ExcelColors.colorControl model.ColorMode]
+                                Input.OnChange (fun e -> FillSelectionAdvancedSearchOptionsChange {model.FillSelectionAdvancedSearchOptions with DefinitionMustContain = e.Value} |> dispatch)
+                                Input.Value model.FillSelectionAdvancedSearchOptions.DefinitionMustContain
+                            ] 
+                        ]
+                    ]
+                ]
+            ]
+            Field.div [] [
+                Control.div [] [
+                    Button.button   [
+                        let hasText = model.FillSelectionTermSearchText.Length > 0
+                        if hasText then
+                            Button.CustomClass "is-success"
+                            Button.IsActive true
+                        else
+                            Button.CustomClass "is-danger"
+                            Button.Props [Disabled true]
+                        Button.IsFullWidth
+                        Button.OnClick (fun _ -> FillSelection model.FillSelectionTermSearchText |> dispatch)
+                    ] [ str "Start advanced search"]
+                ]
+            ]
+            Field.div [Field.Props [] ] [
+                Label.label [] [str "Results:"]
+                GenericCustomComponents.autocompleteDropdown
+                    model
+                    dispatch
+                    true
+                    false
+                    [str "meeem"]
+            ]
+        ]
 
 let mainForm (model : Model) (dispatch : Msg -> unit) =
     form [
         OnSubmit (fun e -> e.preventDefault())
     ] [
-        Field.div [] [
-            Label.label [   Label.Size Size.IsLarge
-                            Label.Props [Style [Color model.ColorMode.Accent]]
-                            
-            ][
-                str "Fill Selection"
-                
-            ]
-            a [] [str "Advanced search"]
-            Control.div [] [
+        // Fill selection components with two search modes
+        match model.FillSearchMode with
+        | Autocomplete  -> FillSelectionComponents.autocompleteSearch model dispatch
+        | Advanced      -> yield! FillSelectionComponents.advancedSearch model dispatch
 
-
-                Input.input [   Input.Placeholder ""
-                                Input.Size Size.IsLarge
-                                Input.Props [ExcelColors.colorControl model.ColorMode]
-                                Input.OnChange (fun e -> FillSectionTextChange e.Value |> dispatch)
-                                if model.ShowFillSuggestionUsed then Input.Value model.FillSelectionText
-                            ]   
-
-                Container.container[] [
-                    Dropdown.content [Props [
-                        Style [
-                            if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
-                            BackgroundColor model.ColorMode.ControlBackground
-                            BorderColor     model.ColorMode.ControlForeground
-                        ]]
-                    ] [
-                        if model.TermSuggestions.Length > 0 then createSuggestions model dispatch
-                    ]
-                ]
-                
-            ]
-            Help.help [] [str "When applicable, search for an ontology item to fill into the selected field(s)"]
-        ]
+        // Fill selection confirmation
         Field.div [] [
             Control.div [] [
-                Button.button   [   let hasText = model.FillSelectionText.Length > 0
+                Button.button   [   let hasText = model.FillSelectionTermSearchText.Length > 0
                                     if hasText then
                                         Button.CustomClass "is-success"
                                         Button.IsActive true
@@ -424,7 +670,7 @@ let mainForm (model : Model) (dispatch : Msg -> unit) =
                                         Button.CustomClass "is-danger"
                                         Button.Props [Disabled true]
                                     Button.IsFullWidth
-                                    Button.OnClick (fun _ -> FillSelection model.FillSelectionText |> dispatch)
+                                    Button.OnClick (fun _ -> FillSelection model.FillSelectionTermSearchText |> dispatch)
 
                                 ] [
                     str "Fill"
@@ -432,39 +678,39 @@ let mainForm (model : Model) (dispatch : Msg -> unit) =
                 ]
             ]
         ]
-        Field.div [] [
-            Label.label [   Label.Size Size.IsLarge
-                            Label.Props [Style [Color model.ColorMode.Accent]]
-            ][
-                str "Add Column"
-            ]
-            Control.div [] [
-                Input.input [   Input.Placeholder ""
-                                Input.Size Size.IsLarge
-                                Input.Props [ExcelColors.colorControl model.ColorMode]
-                                Input.OnChange (fun e -> AddColumnTextChange e.Value |> dispatch)
-                            ]
-            ]
-            Help.help [] [str "Search annotation columns to add to the annotation table"]
-        ]
-        Field.div [] [
-            Control.div [] [
-                Button.button   [   let hasText = model.AddColumnText.Length > 0
-                                    if hasText then
-                                        Button.CustomClass "is-success"
-                                        Button.IsActive true
-                                    else
-                                        Button.CustomClass "is-danger"
-                                        Button.Props [Disabled true]
-                                    Button.IsFullWidth
-                                    Button.OnClick (fun _ -> AddColumn model.AddColumnText |> dispatch)
+        //Field.div [] [
+        //    Label.label [   Label.Size Size.IsLarge
+        //                    Label.Props [Style [Color model.ColorMode.Accent]]
+        //    ][
+        //        str "Add Column"
+        //    ]
+        //    Control.div [] [
+        //        Input.input [   Input.Placeholder ""
+        //                        Input.Size Size.IsLarge
+        //                        Input.Props [ExcelColors.colorControl model.ColorMode]
+        //                        Input.OnChange (fun e -> AddColumnTextChange e.Value |> dispatch)
+        //                    ]
+        //    ]
+        //    Help.help [] [str "Search annotation columns to add to the annotation table"]
+        //]
+        //Field.div [] [
+        //    Control.div [] [
+        //        Button.button   [   let hasText = model.AddColumnText.Length > 0
+        //                            if hasText then
+        //                                Button.CustomClass "is-success"
+        //                                Button.IsActive true
+        //                            else
+        //                                Button.CustomClass "is-danger"
+        //                                Button.Props [Disabled true]
+        //                            Button.IsFullWidth
+        //                            Button.OnClick (fun _ -> AddColumn model.AddColumnText |> dispatch)
 
-                                ] [
-                    str "Add"
+        //                        ] [
+        //            str "Add"
                     
-                ]
-            ]
-        ]
+        //        ]
+        //    ]
+        //]
     ]
 
 let navbar (model : Model) (dispatch : Msg -> unit) =
@@ -494,10 +740,12 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
             ]
             Navbar.End.div [] [
                 Navbar.Item.div [Navbar.Item.Props [ Style [if model.IsDarkMode then Color model.ColorMode.Text else Color model.ColorMode.Fade]]] [
-                    Checkbox.checkbox [] [
-                        Checkbox.input [Props [OnClick (fun _ -> ToggleColorMode |> dispatch); Checked model.IsDarkMode]]
-                        str "Dark Mode"
-                    ]
+                    Switch.switchInline [
+                        Switch.Id "DarkModeSwitch"
+                        Switch.IsOutlined
+                        Switch.Color IsSuccess
+                        Switch.OnChange (fun _ -> ToggleColorMode |> dispatch)
+                    ] [str "DarkMode"]
                 ]
                 Navbar.Item.a [Navbar.Item.Props [Style [ Color model.ColorMode.Text]]] [
                     str "Contact"

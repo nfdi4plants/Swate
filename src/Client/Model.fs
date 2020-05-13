@@ -37,30 +37,55 @@ type LogItem =
         | "Info"  -> Info (System.DateTime.UtcNow,message)
         | "Error" -> Error(System.DateTime.UtcNow,message)
 
+type FillSelectionSearchMode =
+    | Autocomplete
+    | Advanced
+
+type FillSelectionAdvancedSearchOptions = {
+    Ontology                : DbDomain.Ontology option
+    StartsWith              : string
+    MustContain             : string 
+    EndsWith                : string
+    DefinitionMustContain   : string
+    KeepObsolete            : bool
+}
+
 // The model holds data that you want to keep track of while the application is running
 // in this case, we are keeping track of a counter
 // we mark it as optional, because initially it will not be available from the client
 // the initial value will be requested from server
 type Model = {
+    //One time sync with server
+    SearchableOntologies                : (Set<string>*DbDomain.Ontology) []
+    HasOntologiesLoaded                 : bool 
     //Debouncing
-    Debouncer               : Debouncer.State
+    Debouncer                           : Debouncer.State
 
     //Error handling
-    LastFullError           : System.Exception option
-    Log                     : LogItem list
+    LastFullError                       : System.Exception option
+    Log                                 : LogItem list
 
     //Site Meta Options (Styling etc)
-    DisplayMessage          : string
-    BurgerVisible           : bool
-    IsDarkMode              : bool
-    ColorMode               : ExcelColors.ColorMode
-    ShowFillSuggestions     : bool
-    ShowFillSuggestionUsed  : bool
-    HadFirstSuggestion      : bool
-    HasSuggestionsLoading   : bool
+    DisplayMessage                      : string
+    BurgerVisible                       : bool
+    IsDarkMode                          : bool
+    ColorMode                           : ExcelColors.ColorMode
 
-    //Data for the App
-    FillSelectionText       : string
-    TermSuggestions         : DbDomain.Term []
+    //Fill Selection term search
+    FillSearchMode                      : FillSelectionSearchMode
+
+    //simple term search
+    FillSelectionTermSearchText         : string
+    TermSuggestions                     : DbDomain.Term []
+    ShowFillSuggestions                 : bool
+    ShowFillSuggestionUsed              : bool
+    HadFirstSuggestion                  : bool
+    HasSuggestionsLoading               : bool
+
+    //Advanced term search
+    FillSelectionOntologySearchText     : string
+    FillSelectionAdvancedSearchOptions  : FillSelectionAdvancedSearchOptions
+
+    //Column insert
     AddColumnText           : string
     }
