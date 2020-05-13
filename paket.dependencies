@@ -25,6 +25,7 @@ group Client
     nuget Fable.Remoting.Client ~> 5
     nuget Fulma ~> 2
     nuget Fulma.Extensions.Wikiki.Tooltip
+    nuget Fulma.Extensions.Wikiki.Switch
     nuget Fable.FontAwesome.Free ~> 2
     nuget Thoth.Elmish.Debouncer
 

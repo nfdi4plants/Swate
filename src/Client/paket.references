@@ -7,6 +7,7 @@ group Client
     Fable.Remoting.Client
     Fulma
     Fulma.Extensions.Wikiki.Tooltip
+    Fulma.Extensions.Wikiki.Switch
     Fable.FontAwesome.Free
     Thoth.Elmish.Debouncer
 
