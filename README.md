@@ -39,4 +39,6 @@ the Excel window. You can circumvent this issue by additionally testing in Excel
  - create a blank new workbook (or use any workbook, but be warned that you can't undo stuff done via Office.js) 
  - Go to Insert > Office-Add-Ins and upload the manifest.xml file contained in this repo
     ![Add In Upload](docsrc/files/img/AddInUpload.png)
- - You will now have the full debug experience in your browser de tools.
+ - You will now have the full debug experience in your browser dev tools.
+
+Alternatively, you can debug all functionality that does not use Excel Interop in your normal browser (the app runs on port 3000 via https)
