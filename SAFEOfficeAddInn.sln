@@ -10,6 +10,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{08CCFCF6-2248-43ED-A6EF-E972A2DA0E6A}"
 	ProjectSection(SolutionItems) = preProject
 		build.fsx = build.fsx
+		.config\dotnet-tools.json = .config\dotnet-tools.json
 		manifest.xml = manifest.xml
 		package.json = package.json
 		paket.dependencies = paket.dependencies
@@ -28,6 +29,30 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "assets", "assets", "{A21844
 		src\Client\public\assets\logo-filled.png = src\Client\public\assets\logo-filled.png
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{DB2C5A73-BF7F-45D5-AEC8-D36539C5C019}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "style", "style", "{6582B3C0-9FA1-4B5A-8481-CC883DBCE875}"
+	ProjectSection(SolutionItems) = preProject
+		docsrc\style\style.css = docsrc\style\style.css
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "loaders", "loaders", "{C43438E1-AEFF-42AC-8654-BDDDE750DA30}"
+	ProjectSection(SolutionItems) = preProject
+		docsrc\loaders\globalloader.fsx = docsrc\loaders\globalloader.fsx
+		docsrc\loaders\pageloader.fsx = docsrc\loaders\pageloader.fsx
+		docsrc\loaders\postloader.fsx = docsrc\loaders\postloader.fsx
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "generators", "generators", "{77E06322-256F-4517-B342-C52C80FC5E0D}"
+	ProjectSection(SolutionItems) = preProject
+		docsrc\generators\about.fsx = docsrc\generators\about.fsx
+		docsrc\generators\contact.fsx = docsrc\generators\contact.fsx
+		docsrc\generators\index.fsx = docsrc\generators\index.fsx
+		docsrc\generators\layout.fsx = docsrc\generators\layout.fsx
+		docsrc\generators\post.fsx = docsrc\generators\post.fsx
+		docsrc\generators\staticfile.fsx = docsrc\generators\staticfile.fsx
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,6 +68,11 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6582B3C0-9FA1-4B5A-8481-CC883DBCE875} = {DB2C5A73-BF7F-45D5-AEC8-D36539C5C019}
+		{C43438E1-AEFF-42AC-8654-BDDDE750DA30} = {DB2C5A73-BF7F-45D5-AEC8-D36539C5C019}
+		{77E06322-256F-4517-B342-C52C80FC5E0D} = {DB2C5A73-BF7F-45D5-AEC8-D36539C5C019}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7A0AA30E-4CD9-4359-9513-BA68E2E85245}
