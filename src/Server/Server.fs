@@ -49,9 +49,11 @@ let annotatorApi = {
                 |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
         }
 
-    getTermsForAdvancedSearch = fun (ont,mustContain,keepObsolete) ->
+    getTermsForAdvancedSearch = fun (ont,startsWith,mustContain,endsWith,keepObsolete,definitionMustContain) ->
         async {
-            return [||]
+            let result =
+                OntologyDB.getAdvancedTermSearchResults ont startsWith mustContain endsWith keepObsolete definitionMustContain
+            return result
         }
 }
 
@@ -64,7 +66,6 @@ let apiDocumentation =
         |> docs.description "I dont know i just want to test xd"
         |> docs.example<@ fun api -> api.testOntologyInsert ("Name","SooSOSO","FIIIF",System.DateTime.UtcNow,"MEEM") @>
     ]
-
 
 let webApp =
     Remoting.createApi()

@@ -73,10 +73,10 @@ module DbDomain =
 type IAnnotatorAPI = {
 
     // Ontology related requests
-    testOntologyInsert          : (string*string*string*System.DateTime*string) -> Async<DbDomain.Ontology>
-    getAllOntologies            : unit                                          -> Async<DbDomain.Ontology []>
+    testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>
+    getAllOntologies            : unit                                                  -> Async<DbDomain.Ontology []>
 
     // Term related requests
-    getTermSuggestions          : (int*string)                                  -> Async<DbDomain.Term []>
-    getTermsForAdvancedSearch   : (DbDomain.Ontology*string*bool)               -> Async<DbDomain.Term []>
+    getTermSuggestions          : (int*string)                                          -> Async<DbDomain.Term []>
+    getTermsForAdvancedSearch   : ((DbDomain.Ontology option)*string*string*string*bool*string)-> Async<DbDomain.Term []>
 }

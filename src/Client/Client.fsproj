@@ -14,6 +14,7 @@
         <Compile Include="OfficeJS.fs" />
         <Compile Include="OfficeInterop.fs" />
         <Compile Include="Model.fs" />
+        <Compile Include="Messages.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />

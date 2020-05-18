@@ -50,6 +50,25 @@ type FillSelectionAdvancedSearchOptions = {
     KeepObsolete            : bool
 }
 
+//TO-DO refactor model to different types as it already has become quite complicated
+
+type SimpleTermSearchState = {
+    TermSearchText          : string
+    TermSuggestions         : DbDomain.Term []
+    ShowSuggestions         : bool
+    SuggestionUsed          : bool
+    HadFirstSuggestion      : bool
+    HasSuggestionsLoading   : bool
+}
+
+type AdvancedTermSearchState = {
+    FillSelectionOntologySearchText     : string
+    FillSelectionAdvancedSearchOptions  : FillSelectionAdvancedSearchOptions
+    AdvancedSearchTermResults           : DbDomain.Term []
+    HasAdvancedSearchResultsLoading     : bool
+    ShowAdvancedSearchResults           : bool
+}
+
 // The model holds data that you want to keep track of while the application is running
 // in this case, we are keeping track of a counter
 // we mark it as optional, because initially it will not be available from the client
@@ -85,6 +104,9 @@ type Model = {
     //Advanced term search
     FillSelectionOntologySearchText     : string
     FillSelectionAdvancedSearchOptions  : FillSelectionAdvancedSearchOptions
+    AdvancedSearchTermResults           : DbDomain.Term []
+    HasAdvancedSearchResultsLoading     : bool
+    ShowAdvancedSearchResults           : bool
 
     //Column insert
     AddColumnText           : string

@@ -129,10 +129,11 @@ module.exports = {
         contentBase: resolve(CONFIG.assetsDir),
         host: '0.0.0.0',
         port: CONFIG.devServerPort,
-        https: true,
-        key: "C:/Users/kevin/.office-addin-dev-certs/localhost.key",
-        cert: "C:/Users/kevin//.office-addin-dev-certs/localhost.crt",
-        ca: "C:/Users/kevin/.office-addin-dev-certs/ca.crt",
+        https: {
+            key: "C:/Users/kevin/.office-addin-dev-certs/localhost.key",
+            cert: "C:/Users/kevin//.office-addin-dev-certs/localhost.crt",
+            ca: "C:/Users/kevin/.office-addin-dev-certs/ca.crt"
+        },
         proxy: CONFIG.devServerProxy,
         hot: true,
         inline: true

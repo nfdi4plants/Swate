@@ -148,3 +148,49 @@ let getAllOntologies () =
                     (reader.GetDateTimeOffset(4)).UtcDateTime
                     (reader.GetString(5))
     |]
+
+let getAdvancedTermSearchResults (ont : DbDomain.Ontology option) (startsWith : string) (mustContain:string) (endsWith:string) (keepObsolete:bool) (definitionMustContain:string) =
+    
+    use connection = establishConnection()
+    connection.Open()
+    use advancedTermSearchCmd = new SqlCommand("advancedTermSearch",connection)
+    advancedTermSearchCmd.CommandType <- CommandType.StoredProcedure
+
+    let ontIdParam                  = advancedTermSearchCmd.Parameters.Add("ontologyId",SqlDbType.BigInt)
+    let startsWithParam             = advancedTermSearchCmd.Parameters.Add("startsWith",SqlDbType.NVarChar)
+    let endsWithParam               = advancedTermSearchCmd.Parameters.Add("endsWith",SqlDbType.NVarChar)
+    let mustContainParam            = advancedTermSearchCmd.Parameters.Add("mustContain",SqlDbType.NVarChar)
+    let definitionMustContainParam  = advancedTermSearchCmd.Parameters.Add("definitionMustContain",SqlDbType.NVarChar)
+
+    if ont.IsSome then
+        ontIdParam              .Value <- ont.Value.ID
+    else
+        ontIdParam              .Value <- DBNull.Value
+ 
+    startsWithParam             .Value <- startsWith
+    endsWithParam               .Value <- endsWith
+    mustContainParam            .Value <- mustContain
+    definitionMustContainParam  .Value <- definitionMustContain
+
+    use reader = advancedTermSearchCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+    |> fun res ->
+        if keepObsolete then
+            res
+        else
+            res
+            |> Array.filter (fun r -> not r.IsObsolete)

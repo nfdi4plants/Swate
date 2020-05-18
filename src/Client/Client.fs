@@ -46,7 +46,8 @@ type Msg =
     | FillSelectionSearchTermChange             of string
     | FillSelectionSearchOntologyChange         of string
     | FillTermSuggestionUsed                    of string
-    | FillOntologySuggestionUsed                of string
+    | FillOntologySuggestionUsed                of DbDomain.Ontology
+    | AdvancedSearchResultUsed                  of string
     | SwitchFillSearchMode
     | FillSelectionAdvancedSearchOptionsChange  of FillSelectionAdvancedSearchOptions
     //---------------------
@@ -66,6 +67,8 @@ type Msg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
     | TermSuggestionResponse                    of DbDomain.Term []
+    | GetNewAdvancedTermSearchResults           of FillSelectionAdvancedSearchOptions
+    | GetNewAdvancedTermSearchResultsResponse   of DbDomain.Term []
     | FetchAllOntologies
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
 
@@ -123,6 +126,9 @@ let initialModel = {
         DefinitionMustContain   = ""
         KeepObsolete            = false
     }
+    AdvancedSearchTermResults           = [||]
+    HasAdvancedSearchResultsLoading     = false
+    ShowAdvancedSearchResults           = false
 
     //Column insert
     AddColumnText           = ""
@@ -300,11 +306,26 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | FillOntologySuggestionUsed suggestion ->
         let nextModel = {
             currentModel with
-                FillSelectionOntologySearchText = suggestion
-                ShowFillSuggestions             = false
-                ShowFillSuggestionUsed          = true
+                FillSelectionOntologySearchText     = suggestion.Name
+                FillSelectionAdvancedSearchOptions  =
+                    {currentModel.FillSelectionAdvancedSearchOptions with
+                        Ontology = Some suggestion
+                    }
+                ShowFillSuggestions                 = false
+                ShowFillSuggestionUsed              = true
             }
         nextModel, Cmd.none
+
+    | AdvancedSearchResultUsed result ->
+        let nextModel = {
+            currentModel with
+                FillSelectionTermSearchText     = result
+                ShowFillSuggestions             = false
+                ShowFillSuggestionUsed          = true
+
+        }
+        nextModel, Cmd.none
+        
 
     | SwitchFillSearchMode ->
 
@@ -409,6 +430,28 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 HasSuggestionsLoading   = false
             }
         nextModel,Cmd.none
+
+    | GetNewAdvancedTermSearchResults options ->
+        let nextModel = {
+            currentModel with
+                HasAdvancedSearchResultsLoading = true
+                ShowAdvancedSearchResults       = true
+        }
+        nextModel,
+        Cmd.OfAsync.either
+            Server.api.getTermsForAdvancedSearch
+            (options.Ontology,options.StartsWith,options.MustContain,options.EndsWith,options.KeepObsolete,options.DefinitionMustContain)
+            GetNewAdvancedTermSearchResultsResponse
+            GenericError
+
+    | GetNewAdvancedTermSearchResultsResponse termResults ->
+        let nextModel = {
+            currentModel with
+                HasAdvancedSearchResultsLoading = false
+                AdvancedSearchTermResults = termResults
+        }
+        nextModel,Cmd.none
+        
     //| _ -> currentModel, Cmd.none
 
 
@@ -485,7 +528,7 @@ let createOntologySuggestions (model:Model) (dispatch: Msg -> unit) =
     )
     |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
     |> Array.map (fun (_,sugg) ->
-        tr [OnClick (fun _ -> (sugg.Name |> FillOntologySuggestionUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
+        tr [OnClick (fun _ -> (sugg |> FillOntologySuggestionUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
             td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
                 Fa.i [Fa.Solid.InfoCircle] []
             ]
@@ -496,30 +539,39 @@ let createOntologySuggestions (model:Model) (dispatch: Msg -> unit) =
         ])
     |> List.ofArray
         
-//let createAdvancedTermSearchResultList (model:Model) (dispatch: Msg -> unit) =
-//    model.AdvancedSearchTermResults
-//    |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
-//    |> Array.map (fun sugg ->
-//        tr [OnClick (fun _ -> (sugg.Name |> FillTermSuggestionUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
-//            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
-//                Fa.i [Fa.Solid.InfoCircle] []
-//            ]
-//            td [] [
-//                b [] [str sugg.Name]
-//            ]
-//            td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
-//            td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
-//        ])
-//    |> List.ofArray
+let createAdvancedTermSearchResultList (model:Model) (dispatch: Msg -> unit) =
+    model.AdvancedSearchTermResults
+    |> Array.map (fun sugg ->
+        tr [OnClick (fun _ -> (sugg.Name |> AdvancedSearchResultUsed) |> dispatch); colorControl model.ColorMode; Class "suggestion"] [
+            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+                Fa.i [Fa.Solid.InfoCircle] []
+            ]
+            td [] [
+                b [] [str sugg.Name]
+            ]
+            td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+            td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+        ])
+    |> List.ofArray
             
-        //]
+        
+let isValidAdancedSearchOptions (opt:FillSelectionAdvancedSearchOptions) =
+    ((
+        opt.DefinitionMustContain.Length
+        + opt.EndsWith.Length
+        + opt.MustContain.Length
+        + opt.DefinitionMustContain.Length
+    ) > 0)
+    || opt.Ontology.IsSome
 
 module FillSelectionComponents =
 
     let autocompleteSearch (model:Model) (dispatch: Msg -> unit) =
         Field.div [] [
-            Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.ColorMode.Accent]]][ str "Fill Selection"]
+
+            Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.ColorMode.Accent]]][ str "Ontology term search"]
             a [OnClick (fun _ -> SwitchFillSearchMode |> dispatch)] [str "Use advanced search"]
+            br []
             Control.div [] [
                 Input.input [   Input.Placeholder ""
                                 Input.Size Size.IsLarge
@@ -539,7 +591,7 @@ module FillSelectionComponents =
 
     let advancedSearch (model:Model) (dispatch: Msg -> unit) =
         [
-            Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.ColorMode.Accent]]][ str "Fill Selection"]
+            Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.ColorMode.Accent]]][ str "Ontology term search"]
             a [OnClick (fun _ -> SwitchFillSearchMode |> dispatch)] [str "Use simple search"]
             br []
             Field.div [] [
@@ -569,7 +621,7 @@ module FillSelectionComponents =
                     Control.div [] [
                         Input.input [
                             Input.Placeholder ""
-                            Input.Size IsSmall
+                            Input.Size IsMedium
                             Input.Props [ExcelColors.colorControl model.ColorMode]
                             Input.OnChange (fun e -> FillSelectionAdvancedSearchOptionsChange {model.FillSelectionAdvancedSearchOptions with StartsWith = e.Value} |> dispatch)
                             Input.Value model.FillSelectionAdvancedSearchOptions.StartsWith
@@ -579,12 +631,12 @@ module FillSelectionComponents =
             ]
             Field.div [] [
                 Label.label [] [ str "Must contain:"]
-                Help.help [] [str "The term name must contain this string (at any position)"]
+                Help.help [] [str "The term name must contain any of these space-separated words (at any position)"]
                 Field.div [] [
                     Control.div [] [
                         Input.input [
                             Input.Placeholder ""
-                            Input.Size IsSmall
+                            Input.Size IsMedium
                             Input.Props [ExcelColors.colorControl model.ColorMode]
                             Input.OnChange (fun e -> FillSelectionAdvancedSearchOptionsChange {model.FillSelectionAdvancedSearchOptions with MustContain = e.Value} |> dispatch)
                             Input.Value model.FillSelectionAdvancedSearchOptions.MustContain
@@ -599,7 +651,7 @@ module FillSelectionComponents =
                     Control.div [] [
                         Input.input [
                             Input.Placeholder ""
-                            Input.Size IsSmall
+                            Input.Size IsMedium
                             Input.Props [ExcelColors.colorControl model.ColorMode]
                             Input.OnChange (fun e -> FillSelectionAdvancedSearchOptionsChange {model.FillSelectionAdvancedSearchOptions with EndsWith = e.Value} |> dispatch)
                             Input.Value model.FillSelectionAdvancedSearchOptions.EndsWith
@@ -609,13 +661,13 @@ module FillSelectionComponents =
             ]
             Field.div [] [
                 Label.label [] [ str "Definition must contain:"]
-                Help.help [] [str "The definition of the term must contain this string (at any position)"]
+                Help.help [] [str "The definition of the term must contain any of these space-separated words (at any position)"]
                 Field.body [] [
                     Field.div [] [
                         Control.div [] [
                             Input.input [
                                 Input.Placeholder ""
-                                Input.Size IsSmall
+                                Input.Size IsMedium
                                 Input.Props [ExcelColors.colorControl model.ColorMode]
                                 Input.OnChange (fun e -> FillSelectionAdvancedSearchOptionsChange {model.FillSelectionAdvancedSearchOptions with DefinitionMustContain = e.Value} |> dispatch)
                                 Input.Value model.FillSelectionAdvancedSearchOptions.DefinitionMustContain
@@ -627,15 +679,15 @@ module FillSelectionComponents =
             Field.div [] [
                 Control.div [] [
                     Button.button   [
-                        let hasText = model.FillSelectionTermSearchText.Length > 0
-                        if hasText then
+                        let isValid = isValidAdancedSearchOptions model.FillSelectionAdvancedSearchOptions
+                        if isValid then
                             Button.CustomClass "is-success"
                             Button.IsActive true
                         else
                             Button.CustomClass "is-danger"
-                            Button.Props [Disabled true]
+                            Button.Props [Disabled (not isValid)]
                         Button.IsFullWidth
-                        Button.OnClick (fun _ -> FillSelection model.FillSelectionTermSearchText |> dispatch)
+                        Button.OnClick (fun _ -> GetNewAdvancedTermSearchResults model.FillSelectionAdvancedSearchOptions |> dispatch)
                     ] [ str "Start advanced search"]
                 ]
             ]
@@ -644,9 +696,9 @@ module FillSelectionComponents =
                 GenericCustomComponents.autocompleteDropdown
                     model
                     dispatch
-                    true
-                    false
-                    [str "meeem"]
+                    model.ShowAdvancedSearchResults
+                    model.HasAdvancedSearchResultsLoading
+                    (createAdvancedTermSearchResultList model dispatch)
             ]
         ]
 
@@ -673,7 +725,7 @@ let mainForm (model : Model) (dispatch : Msg -> unit) =
                                     Button.OnClick (fun _ -> FillSelection model.FillSelectionTermSearchText |> dispatch)
 
                                 ] [
-                    str "Fill"
+                    str "Fill selected cells with this term"
                     
                 ]
             ]
