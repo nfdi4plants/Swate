@@ -15,7 +15,6 @@ module Suggestion =
         | (0,0) -> 1.
         | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
     
-    
     let createBigrams (s:string) =
         s
             .ToUpperInvariant()

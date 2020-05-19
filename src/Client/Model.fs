@@ -37,11 +37,11 @@ type LogItem =
         | "Info"  -> Info (System.DateTime.UtcNow,message)
         | "Error" -> Error(System.DateTime.UtcNow,message)
 
-type FillSelectionSearchMode =
-    | Autocomplete
+type TermSearchMode =
+    | Simple
     | Advanced
 
-type FillSelectionAdvancedSearchOptions = {
+type AdvancedTermSearchOptions = {
     Ontology                : DbDomain.Ontology option
     StartsWith              : string
     MustContain             : string 
@@ -50,64 +50,165 @@ type FillSelectionAdvancedSearchOptions = {
     KeepObsolete            : bool
 }
 
+let initAdvancedTermSearchOptions () = {
+    Ontology                = None
+    StartsWith              = ""
+    MustContain             = "" 
+    EndsWith                = ""
+    DefinitionMustContain   = ""
+    KeepObsolete            = true
+}
+
 //TO-DO refactor model to different types as it already has become quite complicated
 
 type SimpleTermSearchState = {
+    Debouncer               : Debouncer.State
     TermSearchText          : string
     TermSuggestions         : DbDomain.Term []
-    ShowSuggestions         : bool
-    SuggestionUsed          : bool
-    HadFirstSuggestion      : bool
     HasSuggestionsLoading   : bool
+    ShowSuggestions         : bool
+}
+
+let initSimpleTermSearchState () = {
+    Debouncer               = Debouncer.create()
+    TermSearchText          = ""
+    TermSuggestions         = [||]
+    HasSuggestionsLoading   = false
+    ShowSuggestions         = false
 }
 
 type AdvancedTermSearchState = {
-    FillSelectionOntologySearchText     : string
-    FillSelectionAdvancedSearchOptions  : FillSelectionAdvancedSearchOptions
-    AdvancedSearchTermResults           : DbDomain.Term []
-    HasAdvancedSearchResultsLoading     : bool
-    ShowAdvancedSearchResults           : bool
+    OntologySearchText              : string
+    HasOntologySuggestionsLoading   : bool
+    ShowOntologySuggestions         : bool
+    AdvancedSearchOptions           : AdvancedTermSearchOptions
+    AdvancedSearchTermResults       : DbDomain.Term []
+    HasAdvancedSearchResultsLoading : bool
+    ShowAdvancedSearchResults       : bool
 }
 
-// The model holds data that you want to keep track of while the application is running
-// in this case, we are keeping track of a counter
-// we mark it as optional, because initially it will not be available from the client
-// the initial value will be requested from server
-type Model = {
-    //One time sync with server
-    SearchableOntologies                : (Set<string>*DbDomain.Ontology) []
-    HasOntologiesLoaded                 : bool 
-    //Debouncing
-    Debouncer                           : Debouncer.State
+let initAdvancedTermSearchState () = {
+    OntologySearchText              = ""
+    HasOntologySuggestionsLoading   = false
+    ShowOntologySuggestions         = false
+    AdvancedSearchOptions           = initAdvancedTermSearchOptions ()
+    AdvancedSearchTermResults       = [||]
+    HasAdvancedSearchResultsLoading = false
+    ShowAdvancedSearchResults       = false
+}
 
-    //Error handling
+type TermSearchState = {
+    Advanced    : AdvancedTermSearchState
+    Simple      : SimpleTermSearchState
+    SearchMode  : TermSearchMode
+}
+
+let initTermSearchState() = {
+    Advanced    = initAdvancedTermSearchState()
+    Simple      = initSimpleTermSearchState()
+    SearchMode  = TermSearchMode.Simple
+}
+
+type SiteStyleState = {
+    BurgerVisible   : bool
+    IsDarkMode      : bool
+    ColorMode       : ExcelColors.ColorMode
+}
+
+let initSiteStyleState () = {
+    BurgerVisible   = false
+    IsDarkMode      = false
+    ColorMode       = ExcelColors.colorfullMode
+}
+
+type DevState = {
     LastFullError                       : System.Exception option
     Log                                 : LogItem list
+}
+
+let initDevState () = {
+    LastFullError   = None
+    Log             = []
+}
+
+type PersistentStorageState = {
+    SearchableOntologies    : (Set<string>*DbDomain.Ontology) []
+    HasOntologiesLoaded     : bool 
+}
+
+let initPersistentStorageState () = {
+    SearchableOntologies    = [||]
+    HasOntologiesLoaded     = false
+}
+
+type ExcelState = {
+    Placeholder: string
+}
+
+let initExcelState() = {
+    Placeholder = ""
+}
+
+type ApiCallStatus =
+    | IsNone
+    | Pending
+    | Successfull
+    | Failed of string
+
+type ApiCallHistoryItem = {
+    FunctionName   : string
+    Status         : ApiCallStatus
+}
+
+let noCall = {
+    FunctionName = "None"
+    Status = IsNone
+}
+
+type ApiState = {
+    currentCall : ApiCallHistoryItem
+    callHistory : ApiCallHistoryItem list
+}
+
+let initApiState () = {
+    currentCall = noCall
+    callHistory = []
+}
+
+type Model = {
+    //One time sync with server
+    PersistentStorageState  : PersistentStorageState
+ 
+    //Debouncing
+    DebouncerState          : Debouncer.State
+
+    //Error handling, Logging, etc.
+    DevState                : DevState
 
     //Site Meta Options (Styling etc)
-    DisplayMessage                      : string
-    BurgerVisible                       : bool
-    IsDarkMode                          : bool
-    ColorMode                           : ExcelColors.ColorMode
+    SiteStyleState          : SiteStyleState
 
-    //Fill Selection term search
-    FillSearchMode                      : FillSelectionSearchMode
+    //States regarding term search
+    TermSearchState         : TermSearchState
 
-    //simple term search
-    FillSelectionTermSearchText         : string
-    TermSuggestions                     : DbDomain.Term []
-    ShowFillSuggestions                 : bool
-    ShowFillSuggestionUsed              : bool
-    HadFirstSuggestion                  : bool
-    HasSuggestionsLoading               : bool
+    //Use this in the future to model excel stuff like table data
+    ExcelState              : ExcelState
 
-    //Advanced term search
-    FillSelectionOntologySearchText     : string
-    FillSelectionAdvancedSearchOptions  : FillSelectionAdvancedSearchOptions
-    AdvancedSearchTermResults           : DbDomain.Term []
-    HasAdvancedSearchResultsLoading     : bool
-    ShowAdvancedSearchResults           : bool
+    //Use this to log Api calls and maybe handle them better
+    ApiState                : ApiState
 
     //Column insert
     AddColumnText           : string
     }
+
+
+let initializeModel () = {
+    PersistentStorageState  = initPersistentStorageState()
+    DebouncerState          = Debouncer.create()
+    DevState                = initDevState()
+    SiteStyleState          = initSiteStyleState()
+    TermSearchState         = initTermSearchState()
+    ExcelState              = initExcelState()
+    ApiState                = initApiState()
+    AddColumnText           = ""
+}
