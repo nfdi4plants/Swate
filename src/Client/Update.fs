@@ -147,7 +147,9 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedTermSearchMsg) (
     | NewAdvancedSearchResults results ->
         let nextState = {
             currentState with
-                AdvancedSearchTermResults = results
+                AdvancedSearchTermResults       = results
+                ShowAdvancedSearchResults       = true
+                HasAdvancedSearchResultsLoading = false
         }
 
         nextState,Cmd.none
