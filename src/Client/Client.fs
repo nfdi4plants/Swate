@@ -93,23 +93,30 @@ module GenericCustomComponents =
         ]
 
 let createTermSuggestions (model:Model) (dispatch: Msg -> unit) =
-    model.TermSearchState.Simple.TermSuggestions
-    |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
-    |> Array.map (fun sugg ->
-        tr [OnClick (fun _ -> sugg.Name |> TermSuggestionUsed |> Simple |> TermSearch |> dispatch)
-            colorControl model.SiteStyleState.ColorMode
-            Class "suggestion"
-        ] [
-            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
-                Fa.i [Fa.Solid.InfoCircle] []
+    if model.TermSearchState.Simple.TermSuggestions.Length > 0 then
+        model.TermSearchState.Simple.TermSuggestions
+        |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
+        |> Array.map (fun sugg ->
+            tr [OnClick (fun _ -> sugg.Name |> TermSuggestionUsed |> Simple |> TermSearch |> dispatch)
+                colorControl model.SiteStyleState.ColorMode
+                Class "suggestion"
+            ] [
+                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+                    Fa.i [Fa.Solid.InfoCircle] []
+                ]
+                td [] [
+                    b [] [str sugg.Name]
+                ]
+                td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+            ])
+        |> List.ofArray
+    else
+        [
+            tr [] [
+                td [] [str "No terms found matching your input."]
             ]
-            td [] [
-                b [] [str sugg.Name]
-            ]
-            td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
-            td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
-        ])
-    |> List.ofArray
+        ]
 
 let createOntologySuggestions (model:Model) (dispatch: Msg -> unit) =
     model.PersistentStorageState.SearchableOntologies
@@ -133,22 +140,29 @@ let createOntologySuggestions (model:Model) (dispatch: Msg -> unit) =
     |> List.ofArray
         
 let createAdvancedTermSearchResultList (model:Model) (dispatch: Msg -> unit) =
-    model.TermSearchState.Advanced.AdvancedSearchTermResults
-    |> Array.map (fun sugg ->
-        tr [OnClick (fun _ -> sugg.Name |> AdvancedSearchResultUsed |> Advanced |> TermSearch |> dispatch)
-            colorControl model.SiteStyleState.ColorMode
-            Class "suggestion"
-        ] [
-            td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
-                Fa.i [Fa.Solid.InfoCircle] []
+    if model.TermSearchState.Advanced.AdvancedSearchTermResults.Length > 0 then
+        model.TermSearchState.Advanced.AdvancedSearchTermResults
+        |> Array.map (fun sugg ->
+            tr [OnClick (fun _ -> sugg.Name |> AdvancedSearchResultUsed |> Advanced |> TermSearch |> dispatch)
+                colorControl model.SiteStyleState.ColorMode
+                Class "suggestion"
+            ] [
+                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+                    Fa.i [Fa.Solid.InfoCircle] []
+                ]
+                td [] [
+                    b [] [str sugg.Name]
+                ]
+                td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+            ])
+        |> List.ofArray
+    else
+        [
+            tr [] [
+                td [] [str "No terms found matching your input."]
             ]
-            td [] [
-                b [] [str sugg.Name]
-            ]
-            td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
-            td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
-        ])
-    |> List.ofArray
+        ]
             
         
 let isValidAdancedSearchOptions (opt:AdvancedTermSearchOptions) =
@@ -174,7 +188,7 @@ module TermSearchComponents =
                                 Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                                 Input.OnChange (fun e ->  e.Value |> SearchTermTextChange |> Simple |> TermSearch |> dispatch)
                                 Input.Value model.TermSearchState.Simple.TermSearchText
-                            ]   
+                            ]
                 GenericCustomComponents.autocompleteDropdown
                     model
                     dispatch
