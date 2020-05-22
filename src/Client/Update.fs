@@ -1,10 +1,41 @@
 module Update
 
 open Shared
+open Routing
 open Model
 open Messages
 open Elmish
+open Elmish.Navigation
 open Thoth.Elmish
+
+let urlUpdate (result:Option<Page>) (currentModel:Model) : Model * Cmd<Msg> =
+    match result with
+    | Some page ->
+
+        let nextPageState = {
+            currentModel.PageState with
+                CurrentPage = page
+                CurrentUrl  = Page.toPath page
+        }
+
+        let nextModel = {
+            currentModel with
+                PageState = nextPageState
+        }
+        nextModel,Cmd.none
+
+    | None ->
+        //Browser.console.error("Error parsing url")
+        let nextPageState = {
+            currentModel.PageState with
+                CurrentPage = Page.NotFound
+        }
+
+        let nextModel = {
+            currentModel with
+                PageState = nextPageState
+        }
+        nextModel,Cmd.none
 
 let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:ExcelState) : ExcelState * Cmd<Msg> =
     match excelInteropMsg with

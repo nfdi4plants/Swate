@@ -5,6 +5,7 @@ open Fable.React.Props
 open Fulma
 open Shared
 open Thoth.Elmish
+open Routing
 
 type LogItem =
     | Debug of (System.DateTime*string)
@@ -175,8 +176,29 @@ let initApiState () = {
     callHistory = []
 }
 
+type PageState = {
+    CurrentPage : Routing.Page
+    CurrentUrl  : string
+}
+
+let initPageState (pageOpt:Page option) = 
+    match pageOpt with
+    | Some page -> {
+        CurrentPage = page
+        CurrentUrl = Page.toPath page
+        }
+    | None -> {
+        CurrentPage = Page.Home
+        CurrentUrl = ""
+        }
+
+
 type Model = {
-    //One time sync with server
+
+    //PageState
+    PageState               : PageState
+
+    //Data that needs to be persistent once loaded
     PersistentStorageState  : PersistentStorageState
  
     //Debouncing
@@ -202,7 +224,8 @@ type Model = {
     }
 
 
-let initializeModel () = {
+let initializeModel (pageOpt: Page option) = {
+    PageState               = initPageState pageOpt
     PersistentStorageState  = initPersistentStorageState()
     DebouncerState          = Debouncer.create()
     DevState                = initDevState()

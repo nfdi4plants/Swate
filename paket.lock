@@ -640,7 +640,7 @@ NUGET
       Fable.Browser.Dom (>= 1.0)
       Fable.Core (>= 3.0)
       FSharp.Core (>= 4.7)
-    Fable.Remoting.Client (5.11)
+    Fable.Remoting.Client (5.12)
       Fable.Browser.XMLHttpRequest (>= 1.0)
       Fable.Core (>= 3.1.5)
       Fable.SimpleJson (>= 3.9)

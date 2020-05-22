@@ -27,7 +27,8 @@ group Client
     nuget Fulma.Extensions.Wikiki.Tooltip
     nuget Fulma.Extensions.Wikiki.Switch
     nuget Fable.FontAwesome.Free ~> 2
-    nuget Thoth.Elmish.Debouncer
+    nuget Thoth.Elmish.Debouncer ~> 1
+    nuget Fable.Elmish.Browser ~> 3
 
 group Build
     source https://api.nuget.org/v3/index.json
