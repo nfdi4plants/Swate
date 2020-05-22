@@ -119,7 +119,7 @@ let handleSimpleTermSearchMsg (simpleTermSearchMsg: SimpleTermSearchMsg) (curren
     | TermSuggestionUsed suggestion ->
 
         let nextState = {
-            initSimpleTermSearchState() with
+            SimpleTermSearchState.init() with
                 TermSearchText = suggestion
         }
         nextState, Cmd.none
@@ -171,7 +171,7 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedTermSearchMsg) (
         nextState,Cmd.none
 
     | AdvancedSearchResultUsed (res) ->
-        let nextState = initAdvancedTermSearchState()
+        let nextState = AdvancedTermSearchState.init()
             
         nextState,Cmd.ofMsg (res |> TermSuggestionUsed |> Simple  |> TermSearch)
 
@@ -211,9 +211,9 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
 
         let nextState = {
             currentState with
-                Advanced = initAdvancedTermSearchState()
-                Simple = initSimpleTermSearchState()
-                SearchMode = nextSearchMode
+                Advanced    = AdvancedTermSearchState   .init()
+                Simple      = SimpleTermSearchState     .init()
+                SearchMode  = nextSearchMode
         }
         nextState,Cmd.none
 

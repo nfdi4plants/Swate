@@ -3,7 +3,6 @@ module BaseView
 open Fable.React
 open Fable.React.Props
 open Fulma
-open Fulma.Extensions.Wikiki
 open ExcelColors
 open Model
 open Messages

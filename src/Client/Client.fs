@@ -46,28 +46,6 @@ let init (pageOpt: Routing.Page option) : Model * Cmd<Msg> =
         ]
     initializeModel pageOpt , loadCountCmd
 
-let button (colorMode: ExcelColors.ColorMode) (isActive:bool) txt onClick =
-
-    Button.button [
-        Button.IsFullWidth
-        Button.IsActive isActive
-        Button.Props [Style [BackgroundColor colorMode.BodyForeground; Color colorMode.Text]]
-        Button.OnClick onClick
-        ][
-        str txt
-    ]
-
-
-
-let renderActivityLog (model:Model) =
-    Table.table [
-        Table.IsFullWidth
-        Table.Props [ExcelColors.colorBackground model.SiteStyleState.ColorMode]
-    ] (
-        model.DevState.Log
-        |> List.map LogItem.toTableRow
-    )
-    
 
 let view (model : Model) (dispatch : Msg -> unit) =
     match model.PageState.CurrentPage with
@@ -85,6 +63,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
             str "Footer content"
         ]
         
+    | Routing.Page.ActivityLog ->
+        BaseView.baseViewComponent model dispatch [
+            ActivityLogView.activityLogComponent model
+        ] [
+            str "Footer content"
+        ]
+
     | Routing.Page.NotFound ->
         BaseView.baseViewComponent model dispatch [
             NotFoundView.notFoundComponent model dispatch
@@ -92,30 +77,29 @@ let view (model : Model) (dispatch : Msg -> unit) =
             str "Footer content"
         ]
 
-
-
     | _ ->
         div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
             ] [
             Container.container [Container.IsFluid] [
                 br []
                 br []
-                button model.SiteStyleState.ColorMode true "make a test db insert xd" (fun _ -> ((sprintf "Me am test %A" (System.Guid.NewGuid())),"1","Me is testerino",System.DateTime.UtcNow,"MEEEMuser") |> TestOntologyInsert |> Request |> Api|> dispatch)
-                button model.SiteStyleState.ColorMode true "idk man=(" (fun _ -> TryExcel |> ExcelInterop |> dispatch)
-                button model.SiteStyleState.ColorMode true "create annoation table" (fun _ -> model.SiteStyleState.IsDarkMode |> CreateAnnotationTable |> ExcelInterop |> dispatch)
-                button model.SiteStyleState.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> Dev |> dispatch)
-                button model.SiteStyleState.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> Dev |> dispatch)
+                Button.buttonComponent model.SiteStyleState.ColorMode true "make a test db insert xd" (fun _ -> ((sprintf "Me am test %A" (System.Guid.NewGuid())),"1","Me is testerino",System.DateTime.UtcNow,"MEEEMuser") |> TestOntologyInsert |> Request |> Api|> dispatch)
+                Button.buttonComponent model.SiteStyleState.ColorMode true "idk man=(" (fun _ -> TryExcel |> ExcelInterop |> dispatch)
+                Button.buttonComponent model.SiteStyleState.ColorMode true "create annoation table" (fun _ -> model.SiteStyleState.IsDarkMode |> CreateAnnotationTable |> ExcelInterop |> dispatch)
+                Button.buttonComponent model.SiteStyleState.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> Dev |> dispatch)
+                Button.buttonComponent model.SiteStyleState.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> Dev |> dispatch)
 
                 Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
                     Content.content [
                         Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
                         Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
                     ][
-                        renderActivityLog model
+
                     ]
                 ] 
             ]
         ]
+
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR

@@ -18,13 +18,15 @@
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
         <Compile Include="Update.fs" />
+        <Compile Include="CustomComponents\Footer.fs" />
+        <Compile Include="CustomComponents\Button.fs" />
         <Compile Include="CustomComponents\Navbar.fs" />
         <Compile Include="CustomComponents\Loading.fs" />
         <Compile Include="CustomComponents\AutocompleteDropdown.fs" />
         <Compile Include="Views\BaseView.fs" />
         <Compile Include="Views\TermSearchView.fs" />
         <Compile Include="Views\FilePickerView.fs" />
-        <Compile Include="Views\LogView.fs" />
+        <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>

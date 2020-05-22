@@ -49,16 +49,15 @@ type AdvancedTermSearchOptions = {
     EndsWith                : string
     DefinitionMustContain   : string
     KeepObsolete            : bool
-}
-
-let initAdvancedTermSearchOptions () = {
-    Ontology                = None
-    StartsWith              = ""
-    MustContain             = "" 
-    EndsWith                = ""
-    DefinitionMustContain   = ""
-    KeepObsolete            = true
-}
+    } with
+        static member init() = {
+            Ontology                = None
+            StartsWith              = ""
+            MustContain             = "" 
+            EndsWith                = ""
+            DefinitionMustContain   = ""
+            KeepObsolete            = true
+        }
 
 //TO-DO refactor model to different types as it already has become quite complicated
 
@@ -68,15 +67,14 @@ type SimpleTermSearchState = {
     TermSuggestions         : DbDomain.Term []
     HasSuggestionsLoading   : bool
     ShowSuggestions         : bool
-}
-
-let initSimpleTermSearchState () = {
-    Debouncer               = Debouncer.create()
-    TermSearchText          = ""
-    TermSuggestions         = [||]
-    HasSuggestionsLoading   = false
-    ShowSuggestions         = false
-}
+} with
+    static member init () = {
+        Debouncer               = Debouncer.create()
+        TermSearchText          = ""
+        TermSuggestions         = [||]
+        HasSuggestionsLoading   = false
+        ShowSuggestions         = false
+    }
 
 type AdvancedTermSearchState = {
     OntologySearchText              : string
@@ -86,69 +84,63 @@ type AdvancedTermSearchState = {
     AdvancedSearchTermResults       : DbDomain.Term []
     HasAdvancedSearchResultsLoading : bool
     ShowAdvancedSearchResults       : bool
-}
-
-let initAdvancedTermSearchState () = {
-    OntologySearchText              = ""
-    HasOntologySuggestionsLoading   = false
-    ShowOntologySuggestions         = false
-    AdvancedSearchOptions           = initAdvancedTermSearchOptions ()
-    AdvancedSearchTermResults       = [||]
-    HasAdvancedSearchResultsLoading = false
-    ShowAdvancedSearchResults       = false
-}
+} with
+    static member init () = {
+        OntologySearchText              = ""
+        HasOntologySuggestionsLoading   = false
+        ShowOntologySuggestions         = false
+        AdvancedSearchOptions           = AdvancedTermSearchOptions.init ()
+        AdvancedSearchTermResults       = [||]
+        HasAdvancedSearchResultsLoading = false
+        ShowAdvancedSearchResults       = false
+    }
 
 type TermSearchState = {
     Advanced    : AdvancedTermSearchState
     Simple      : SimpleTermSearchState
     SearchMode  : TermSearchMode
-}
-
-let initTermSearchState() = {
-    Advanced    = initAdvancedTermSearchState()
-    Simple      = initSimpleTermSearchState()
-    SearchMode  = TermSearchMode.Simple
-}
+} with
+    static member init () = {
+        Advanced    = AdvancedTermSearchState.init()
+        Simple      = SimpleTermSearchState  .init()
+        SearchMode  = TermSearchMode.Simple
+    }
 
 type SiteStyleState = {
     BurgerVisible   : bool
     IsDarkMode      : bool
     ColorMode       : ExcelColors.ColorMode
-}
-
-let initSiteStyleState () = {
-    BurgerVisible   = false
-    IsDarkMode      = false
-    ColorMode       = ExcelColors.colorfullMode
-}
+} with
+    static member init () = {
+        BurgerVisible   = false
+        IsDarkMode      = false
+        ColorMode       = ExcelColors.colorfullMode
+    }
 
 type DevState = {
     LastFullError                       : System.Exception option
     Log                                 : LogItem list
-}
-
-let initDevState () = {
-    LastFullError   = None
-    Log             = []
-}
+} with
+    static member init () = {
+        LastFullError   = None
+        Log             = []
+    }
 
 type PersistentStorageState = {
     SearchableOntologies    : (Set<string>*DbDomain.Ontology) []
     HasOntologiesLoaded     : bool 
-}
-
-let initPersistentStorageState () = {
-    SearchableOntologies    = [||]
-    HasOntologiesLoaded     = false
-}
+} with
+    static member init () = {
+        SearchableOntologies    = [||]
+        HasOntologiesLoaded     = false
+    }
 
 type ExcelState = {
     Placeholder: string
-}
-
-let initExcelState() = {
-    Placeholder = ""
-}
+} with
+    static member init () = {
+        Placeholder = ""
+    }
 
 type ApiCallStatus =
     | IsNone
@@ -169,29 +161,33 @@ let noCall = {
 type ApiState = {
     currentCall : ApiCallHistoryItem
     callHistory : ApiCallHistoryItem list
-}
-
-let initApiState () = {
-    currentCall = noCall
-    callHistory = []
-}
+} with
+    static member init() = {
+        currentCall = noCall
+        callHistory = []
+    }
 
 type PageState = {
     CurrentPage : Routing.Page
     CurrentUrl  : string
-}
+} with
+    static member init (pageOpt:Page option) = 
+        match pageOpt with
+        | Some page -> {
+            CurrentPage = page
+            CurrentUrl = Page.toPath page
+            }
+        | None -> {
+            CurrentPage = Page.Home
+            CurrentUrl = ""
+            }
 
-let initPageState (pageOpt:Page option) = 
-    match pageOpt with
-    | Some page -> {
-        CurrentPage = page
-        CurrentUrl = Page.toPath page
-        }
-    | None -> {
-        CurrentPage = Page.Home
-        CurrentUrl = ""
-        }
-
+type FilePickerState = {
+    FileNames : string list
+} with
+    static member init () = {
+        FileNames = []
+    }
 
 type Model = {
 
@@ -219,19 +215,23 @@ type Model = {
     //Use this to log Api calls and maybe handle them better
     ApiState                : ApiState
 
+    //States regarding File picker functionality
+    FilePicker              : FilePickerState
+
     //Column insert
     AddColumnText           : string
     }
 
 
 let initializeModel (pageOpt: Page option) = {
-    PageState               = initPageState pageOpt
-    PersistentStorageState  = initPersistentStorageState()
-    DebouncerState          = Debouncer.create()
-    DevState                = initDevState()
-    SiteStyleState          = initSiteStyleState()
-    TermSearchState         = initTermSearchState()
-    ExcelState              = initExcelState()
-    ApiState                = initApiState()
+    DebouncerState          = Debouncer             .create()
+    PageState               = PageState             .init pageOpt
+    PersistentStorageState  = PersistentStorageState.init ()
+    DevState                = DevState              .init ()
+    SiteStyleState          = SiteStyleState        .init ()
+    TermSearchState         = TermSearchState       .init ()
+    ExcelState              = ExcelState            .init ()
+    ApiState                = ApiState              .init ()
+    FilePicker              = FilePickerState       .init ()
     AddColumnText           = ""
 }
