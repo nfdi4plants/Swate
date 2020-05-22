@@ -433,6 +433,26 @@ let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyle
         }
         nextState,Cmd.none
 
+let handleFilePickerMsg (filePickerMsg:FilePickerMsg) (currentState: FilePickerState) : FilePickerState * Cmd<Msg> =
+    match filePickerMsg with
+    | NewFilesLoaded fileNames ->
+        let nextState = {
+            currentState with
+                FileNames = fileNames
+        }
+
+        nextState, Cmd.none
+
+    | RemoveFileFromFileList fileName ->
+        let nextState = {
+            currentState with
+                FileNames =
+                    currentState.FileNames
+                    |> List.filter (fun fn -> not (fn = fileName))
+        }
+
+        nextState, Cmd.none
+
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
@@ -523,6 +543,18 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel = {
             currentModel with
                 SiteStyleState = nextSiteStyleState
+        }
+
+        nextModel,nextCmd
+
+    | FilePicker filePickerMsg ->
+        let nextFilePickerState,nextCmd =
+            currentModel.FilePickerState
+            |> handleFilePickerMsg filePickerMsg
+
+        let nextModel = {
+            currentModel with
+                FilePickerState = nextFilePickerState
         }
 
         nextModel,nextCmd

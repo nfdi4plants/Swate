@@ -21,6 +21,10 @@ $family-primary: 'Open Sans';
     cursor: pointer;
 }
 
+.delete :hover {
+    cursor: pointer;
+}
+
 input::-ms-clear {
     display: none;
 }

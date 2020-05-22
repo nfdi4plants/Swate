@@ -216,7 +216,7 @@ type Model = {
     ApiState                : ApiState
 
     //States regarding File picker functionality
-    FilePicker              : FilePickerState
+    FilePickerState         : FilePickerState
 
     //Column insert
     AddColumnText           : string
@@ -232,6 +232,6 @@ let initializeModel (pageOpt: Page option) = {
     TermSearchState         = TermSearchState       .init ()
     ExcelState              = ExcelState            .init ()
     ApiState                = ApiState              .init ()
-    FilePicker              = FilePickerState       .init ()
+    FilePickerState         = FilePickerState       .init ()
     AddColumnText           = ""
 }

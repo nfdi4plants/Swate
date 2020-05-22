@@ -62,6 +62,10 @@ type StyleChangeMsg =
 type PersistentStorageMsg =
     | NewSearchableOntologies of DbDomain.Ontology []
 
+type FilePickerMsg =
+    | NewFilesLoaded            of string list
+    | RemoveFileFromFileList    of string
+
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
     | Api                   of ApiMsg
@@ -71,5 +75,6 @@ type Msg =
     | ExcelInterop          of ExcelInteropMsg
     | StyleChange           of StyleChangeMsg
     | PersistentStorage     of PersistentStorageMsg
+    | FilePicker            of FilePickerMsg
     | DoNothing
     | AddColumnTextChange   of string
