@@ -136,10 +136,12 @@ type PersistentStorageState = {
     }
 
 type ExcelState = {
-    Placeholder: string
+    Host        : string
+    Platform    : string
 } with
     static member init () = {
-        Placeholder = ""
+        Host        = ""
+        Platform    = ""
     }
 
 type ApiCallStatus =
@@ -189,6 +191,49 @@ type FilePickerState = {
         FileNames = []
     }
 
+type AnnotationBuildingBlockType =
+    | NoneSelected
+    | Parameter         
+    | Factor            
+    | Characteristics   
+    | Sample            
+    | Data              
+
+    static member toString = function
+        | NoneSelected      -> "NoneSelected"
+        | Parameter       _ -> "Parameter"
+        | Factor          _ -> "Factor"
+        | Characteristics _ -> "Characteristics"
+        | Sample            -> "Sample"
+        | Data              -> "Data"
+
+type AnnotationBuildingBlock = {
+    Type : AnnotationBuildingBlockType
+    Name : string
+} with
+    static member init (t : AnnotationBuildingBlockType) = {
+        Type = t
+        Name = ""
+    }
+
+    static member toAnnotationTableHeader (block : AnnotationBuildingBlock) =
+        match block.Type with
+        | Parameter         -> sprintf "Parameter [%s]" block.Name
+        | Factor            -> sprintf "Factor [%s]" block.Name
+        | Characteristics   -> sprintf "Characteristics [%s]" block.Name
+        | Sample            -> "Sample Name"
+        | Data              -> "Data File Name"
+        | _                 -> ""
+
+type AddBuildingBlockState = {
+    CurrentBuildingBlock        : AnnotationBuildingBlock
+    ShowBuildingBlockSelection  : bool
+} with
+    static member init () = {
+        CurrentBuildingBlock        = AnnotationBuildingBlock.init NoneSelected
+        ShowBuildingBlockSelection  = false
+    }
+
 type Model = {
 
     //PageState
@@ -218,8 +263,8 @@ type Model = {
     //States regarding File picker functionality
     FilePickerState         : FilePickerState
 
-    //Column insert
-    AddColumnText           : string
+    //Insert annotation columns
+    AddBuildingBlockState   : AddBuildingBlockState
     }
 
 
@@ -233,5 +278,5 @@ let initializeModel (pageOpt: Page option) = {
     ExcelState              = ExcelState            .init ()
     ApiState                = ApiState              .init ()
     FilePickerState         = FilePickerState       .init ()
-    AddColumnText           = ""
+    AddBuildingBlockState   = AddBuildingBlockState .init ()
 }

@@ -7,7 +7,7 @@ open Elmish.UrlParser
 type Page =
     | Home
     | TermSearch
-    | AddAnnotationColumn
+    | AddBuildingBlock
     | FilePicker
     | ActivityLog
     | NotFound
@@ -15,7 +15,7 @@ type Page =
     static member toPath = function
         | Page.Home                 -> "/"
         | Page.TermSearch           -> "/#TermSearch"
-        | Page.AddAnnotationColumn  -> "/#AddAnnotationColumn"
+        | Page.AddBuildingBlock     -> "/#AddBuildingBlock"
         | Page.FilePicker           -> "/#FilePicker"
         | Page.ActivityLog          -> "/#ActivityLog"
         | Page.NotFound             -> "/#NotFound"
@@ -23,11 +23,12 @@ type Page =
 /// The URL is turned into a Result.
 let pageParser : Parser<Page -> Page,_> =
     oneOf [
-        map Page.Home                   (s "")
-        map Page.TermSearch             (s "TermSearch")
-        map Page.AddAnnotationColumn    (s "AddAnnotationColumn")
-        map Page.FilePicker             (s "FilePicker")
-        map Page.NotFound               (s "NotFound")
+        map Page.Home               (s "")
+        map Page.TermSearch         (s "TermSearch")
+        map Page.AddBuildingBlock   (s "AddBuildingBlock")
+        map Page.FilePicker         (s "FilePicker")
+        map Page.ActivityLog        (s "ActivityLog")
+        map Page.NotFound           (s "NotFound")
     ]
 
 //this would be the way to got if we would use push based routing, but i decided to use hash based routing. Ill leave this here for now as a note.

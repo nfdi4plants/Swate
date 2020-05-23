@@ -66,6 +66,11 @@ type FilePickerMsg =
     | NewFilesLoaded            of string list
     | RemoveFileFromFileList    of string
 
+type AddBuildingBlockMsg =
+    | NewBuildingBlockSelected  of AnnotationBuildingBlock
+    | BuildingBlockNameChange   of string
+    | ToggleSelectionDropdown
+
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
     | Api                   of ApiMsg
@@ -76,5 +81,5 @@ type Msg =
     | StyleChange           of StyleChangeMsg
     | PersistentStorage     of PersistentStorageMsg
     | FilePicker            of FilePickerMsg
+    | AddBuildingBlock      of AddBuildingBlockMsg
     | DoNothing
-    | AddColumnTextChange   of string

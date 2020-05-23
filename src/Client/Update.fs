@@ -42,7 +42,14 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
     | Initialized (h,p) ->
         let welcomeMsg = sprintf "Ready to go in %s running on %s" h p
-        currentState, Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
+
+        let nextState = {
+            currentState with
+                Host        = h
+                Platform    = p
+        }
+
+        nextState, Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
         
     | SyncContext passthroughMessage ->
         currentState,
@@ -453,6 +460,38 @@ let handleFilePickerMsg (filePickerMsg:FilePickerMsg) (currentState: FilePickerS
 
         nextState, Cmd.none
 
+let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (currentState: AddBuildingBlockState) : AddBuildingBlockState * Cmd<Msg> =
+    match addBuildingBlockMsg with
+    | NewBuildingBlockSelected nextBB ->
+        let nextState = {
+            currentState with
+                CurrentBuildingBlock        = nextBB
+                ShowBuildingBlockSelection  = false
+        }
+
+        nextState,Cmd.none
+
+    | BuildingBlockNameChange newText ->
+        let nextBB = {
+            currentState.CurrentBuildingBlock with
+                Name = newText
+        }
+
+        let nextState = {
+            currentState with
+                CurrentBuildingBlock = nextBB
+        }
+
+        nextState,Cmd.none
+
+    | ToggleSelectionDropdown ->
+        let nextState = {
+            currentState with
+                ShowBuildingBlockSelection = not currentState.ShowBuildingBlockSelection
+        }
+
+        nextState,Cmd.none
+
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
@@ -559,9 +598,13 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
 
         nextModel,nextCmd
 
-    | AddColumnTextChange newText ->
+    | AddBuildingBlock addBuildingBlockMsg ->
+        let nextAddBuildingBlockState,nextCmd = 
+            currentModel.AddBuildingBlockState
+            |> handleAddBuildingBlockMsg addBuildingBlockMsg
+
         let nextModel = {
             currentModel with
-                AddColumnText = newText
+                AddBuildingBlockState = nextAddBuildingBlockState
             }
-        nextModel, Cmd.none
+        nextModel, nextCmd

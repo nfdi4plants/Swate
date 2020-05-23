@@ -25,6 +25,7 @@
         <Compile Include="CustomComponents\AutocompleteDropdown.fs" />
         <Compile Include="Views\BaseView.fs" />
         <Compile Include="Views\TermSearchView.fs" />
+        <Compile Include="Views\AddBuildingBlockView.fs" />
         <Compile Include="Views\FilePickerView.fs" />
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
