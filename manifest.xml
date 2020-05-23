@@ -43,11 +43,11 @@
                   <bt:Image size="80" resid="Icon.80x80"/>
                   <bt:Image size="96" resid="Icon.96x96"/>
                 </Icon>
-                <Control xsi:type="Button" id="TaskpaneButton">
-                  <Label resid="TaskpaneButton.Label"/>
+                <Control xsi:type="Button" id="TermSearch">
+                  <Label resid="TermSearch.Label"/>
                   <Supertip>
-                    <Title resid="TaskpaneButton.Label"/>
-                    <Description resid="TaskpaneButton.Tooltip"/>
+                    <Title resid="TermSearch.Label"/>
+                    <Description resid="TermSearch.Tooltip"/>
                   </Supertip>
                   <Icon>
                     <bt:Image size="16" resid="Icon.16x16"/>
@@ -62,8 +62,30 @@
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <TaskpaneId>ButtonId1</TaskpaneId>
-                    <SourceLocation resid="Taskpane.Url"/>
+                    <SourceLocation resid="TermSearch.Url"/>
                   </Action>
+                </Control>
+                <Control xsi:type="Button" id="AddBuildingBlock">
+                    <Label resid="AddBuildingBlock.Label"/>
+                    <Supertip>
+                        <Title resid="AddBuildingBlock.Label"/>
+                        <Description resid="AddBuildingBlock.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                        <bt:Image size="16" resid="Icon.16x16"/>
+                        <bt:Image size="20" resid="Icon.20x20"/>
+                        <bt:Image size="24" resid="Icon.24x24"/>
+                        <bt:Image size="32" resid="Icon.32x32"/>
+                        <bt:Image size="40" resid="Icon.40x40"/>
+                        <bt:Image size="48" resid="Icon.48x48"/>
+                        <bt:Image size="64" resid="Icon.64x64"/>
+                        <bt:Image size="80" resid="Icon.80x80"/>
+                        <bt:Image size="96" resid="Icon.96x96"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                        <TaskpaneId>ButtonId2</TaskpaneId>
+                        <SourceLocation resid="AddBuildingBlock.Url"/>
+                    </Action>
                 </Control>
               </Group>
             </OfficeTab>
@@ -85,16 +107,19 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/#TermSearch"/>
+        <bt:Url id="TermSearch.Url" DefaultValue="https://localhost:3000/#TermSearch"/>
+        <bt:Url id="AddBuildingBlock.Url" DefaultValue="https://localhost:3000/#AddBuildingBlock"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>
         <bt:String id="CSBAnnotatorCommands.Label" DefaultValue="CSBAnnotator Commands"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Annotate"/>
+        <bt:String id="TermSearch.Label" DefaultValue="Insert Ontology Term"/>
+        <bt:String id="AddBuildingBlock.Label" DefaultValue="Add Annotation Building Block"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="CSBAnnotator succesfully. Go to the DATA tab and click the 'Show Annotation Pane' button to get started."/>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Click to Show Annotation Pane"/>
+        <bt:String id="TermSearch.Tooltip" DefaultValue="open a taskpane where you can search for ontology terms in multiple ways and fill the results into your sheet."/>
+        <bt:String id="AddBuildingBlock.Tooltip" DefaultValue="open a taskpane where you can select annotation building block and add them to yourt anotation table."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
