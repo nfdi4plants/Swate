@@ -60,7 +60,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
         BaseView.baseViewComponent model dispatch [
             AddBuildingBlockView.addBuildingBlockComponent model dispatch
         ] [
-            str "Footer content"
+            AddBuildingBlockView.addBuildingBlockFooterComponent model dispatch
         ]
 
     | Routing.Page.FilePicker ->

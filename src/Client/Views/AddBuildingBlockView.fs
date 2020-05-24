@@ -19,6 +19,37 @@ let isValidBuildingBlock (block : AnnotationBuildingBlock) =
         true
     | _ -> false
 
+let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block: AnnotationBuildingBlockType )  =
+    Dropdown.Item.a [
+        Dropdown.Item.Props [
+            OnClick (fun _ -> AnnotationBuildingBlock.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
+            colorControl model.SiteStyleState.ColorMode
+        ]
+
+    ][
+        Text.span [
+            CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
+            Props [
+                Tooltip.dataTooltip (block |> AnnotationBuildingBlockType.toShortExplanation)
+                Style [PaddingRight "10px"]
+            ]
+        ] [
+            Fa.i [Fa.Solid.InfoCircle] []
+        ]
+        
+        Text.span [] [block |> AnnotationBuildingBlockType.toString |> str]
+    ]
+
+let addBuildingBlockFooterComponent (model:Model) (dispatch:Msg -> unit) =
+    Content.content [] [
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ 
+            str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString))
+        ]
+        Text.p [] [
+            model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toLongExplanation |> str
+        ]
+    ]
+
 let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
     form [
         OnSubmit (fun e -> e.preventDefault())
@@ -26,7 +57,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
 
         Field.div [] [
-            Label.label [] [ str "Building block"]
+            Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Building block"]
             Help.help [] [str "Select the type of annotation building block (column) to add to the annotation table"]
             Field.div [Field.HasAddons] [
                 Control.div [] [
@@ -37,14 +68,15 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                                 Fa.i [Fa.Solid.AngleDown] []
                             ]
                         ]
-                        Dropdown.menu [] [
-                            Dropdown.content [] [
-                                Dropdown.Item.a [Dropdown.Item.Props [OnClick (fun _ -> AnnotationBuildingBlock.init Characteristics |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)]] [str "Characteristics"]
-                                Dropdown.Item.a [Dropdown.Item.Props [OnClick (fun _ -> AnnotationBuildingBlock.init Parameter       |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)]] [str "Parameter"]
-                                Dropdown.Item.a [Dropdown.Item.Props [OnClick (fun _ -> AnnotationBuildingBlock.init Factor          |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)]] [str "Factor"]
-                                Dropdown.Item.a [Dropdown.Item.Props [OnClick (fun _ -> AnnotationBuildingBlock.init Sample          |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)]] [str "Sample"]
-                                Dropdown.Item.a [Dropdown.Item.Props [OnClick (fun _ -> AnnotationBuildingBlock.init Data            |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)]] [str "Data"]
-                            ]
+                        Dropdown.menu [Props[colorControl model.SiteStyleState.ColorMode]] [
+                            Dropdown.content [] ([
+                                Parameter       
+                                Factor          
+                                Characteristics 
+                                Sample          
+                                Data            
+                                Source          
+                            ]  |> List.map (createBuildingBlockDropdownItem model dispatch))
                         ]
                     ]
                 ]
@@ -52,11 +84,41 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                     match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
                     | Parameter | Characteristics | Factor ->
                         Input.input [
+                            Input.Placeholder (sprintf "Enter %s Name" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString))
+                            Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                             Input.OnChange (fun ev -> ev.Value |> BuildingBlockNameChange |> AddBuildingBlock |> dispatch)
                         ]
                     | _ -> ()
                 ]
             ]
+            match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
+            | Parameter | Characteristics | Factor ->
+                Field.div [Field.HasAddons] [
+                    Control.div [] [
+                        Button.button [] [ 
+                            Checkbox.checkbox [] [
+                                Checkbox.input []
+                            ]
+                        ]
+                    ]
+                    Control.p [] [
+                        Button.button [Button.IsStatic true] [
+                            str (sprintf "This %s has a unit:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString ))
+                        ]
+                    ]
+                    Control.div [Control.IsExpanded] [
+                        Input.input [   Input.Placeholder "Start typing to start search"
+                                        Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
+                                    ]
+                        AutocompleteDropdown.autocompleteDropdownComponent
+                            model
+                            dispatch
+                            true
+                            true
+                            []
+                    ]
+                ]
+            | _ -> ()
         ]
 
         // Fill selection confirmation

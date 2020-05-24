@@ -136,12 +136,14 @@ type PersistentStorageState = {
     }
 
 type ExcelState = {
-    Host        : string
-    Platform    : string
+    Host                : string
+    Platform            : string
+    HasAnnotationTable  : bool
 } with
     static member init () = {
-        Host        = ""
-        Platform    = ""
+        Host                = ""
+        Platform            = ""
+        HasAnnotationTable  = false
     }
 
 type ApiCallStatus =
@@ -195,17 +197,37 @@ type AnnotationBuildingBlockType =
     | NoneSelected
     | Parameter         
     | Factor            
-    | Characteristics   
+    | Characteristics
+    | Source
     | Sample            
     | Data              
 
     static member toString = function
         | NoneSelected      -> "NoneSelected"
-        | Parameter       _ -> "Parameter"
-        | Factor          _ -> "Factor"
-        | Characteristics _ -> "Characteristics"
+        | Parameter         -> "Parameter"
+        | Factor            -> "Factor"
+        | Characteristics   -> "Characteristics"
         | Sample            -> "Sample"
         | Data              -> "Data"
+        | Source            -> "Source"
+
+    static member toShortExplanation = function
+        | Parameter         -> "Use parameter columns to annotate your experimental workflow. multiple parameters form a protocol. Example: centrifugation time, precipitate agent, ..."
+        | Factor            -> "Use factor columns to track the experimental conditions that govern your study. Example: temperature,light,..."
+        | Characteristics   -> "Use characteristics columns to annotate interesting properties of your organism. Example: strain,phenotype,... "
+        | Sample            -> "Use sample columns to mark the name of the sample that your experimental workflow produced."
+        | Data              -> "Use data columns to mark the data file name that your computational analysis produced"
+        | Source            -> "Attention: you normally dont have to add this manually if you initialize an annotation table. The Source column defines the organism that is subject to your study. It is the first column of every study file."
+        | _                 -> "You should not be able to see this text."
+
+    static member toLongExplanation = function
+        | Parameter         -> "Placeholder pls ignore"
+        | Factor            -> "Placeholder pls ignore"
+        | Characteristics   -> "Placeholder pls ignore"
+        | Sample            -> "Placeholder pls ignore"
+        | Data              -> "Placeholder pls ignore"
+        | Source            -> "Placeholder pls ignore"
+        | _                 -> "You should not be able to see this text."
 
 type AnnotationBuildingBlock = {
     Type : AnnotationBuildingBlockType

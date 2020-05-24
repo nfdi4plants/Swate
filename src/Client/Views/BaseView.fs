@@ -14,9 +14,14 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
     div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
     ] [
         Navbar.navbarComponent model dispatch
-        Container.container [Container.IsFluid] [
+        Container.container [
+            Container.IsFluid
+        ] [
+            br []
 
             yield! bodyChildren
+
+            br []
 
             Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
                 Content.content [

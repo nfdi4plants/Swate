@@ -102,7 +102,7 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
         a [OnClick (fun _ -> SwitchSearchMode |> TermSearch |> dispatch)] [str "Use advanced search"]
         br []
         Control.div [] [
-            Input.input [   Input.Placeholder ""
+            Input.input [   Input.Placeholder "Start typing to start search"
                             Input.Size Size.IsLarge
                             Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                             Input.OnChange (fun e ->  e.Value |> SearchTermTextChange |> Simple |> TermSearch |> dispatch)
@@ -128,7 +128,7 @@ let advancedSearchComponent (model:Model) (dispatch: Msg -> unit) =
             Help.help [] [str "Only search terms in the selected ontology"]
             Field.div [] [
                 Control.div [] [
-                    Input.input [   Input.Placeholder ""
+                    Input.input [   Input.Placeholder "Start typing to start search"
                                     Input.Size Size.IsMedium
                                     Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                                     Input.OnChange (fun e -> e.Value |> SearchOntologyTextChange |> Advanced |> TermSearch |> dispatch)
@@ -149,7 +149,7 @@ let advancedSearchComponent (model:Model) (dispatch: Msg -> unit) =
             Field.div [] [
                 Control.div [] [
                     Input.input [
-                        Input.Placeholder ""
+                        Input.Placeholder "Enter starts with text"
                         Input.Size IsMedium
                         Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                         Input.OnChange (fun e ->
@@ -171,7 +171,7 @@ let advancedSearchComponent (model:Model) (dispatch: Msg -> unit) =
             Field.div [] [
                 Control.div [] [
                     Input.input [
-                        Input.Placeholder ""
+                        Input.Placeholder "Enter contains text"
                         Input.Size IsMedium
                         Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                         Input.OnChange (fun e ->
@@ -193,7 +193,7 @@ let advancedSearchComponent (model:Model) (dispatch: Msg -> unit) =
             Field.div [] [
                 Control.div [] [
                     Input.input [
-                        Input.Placeholder ""
+                        Input.Placeholder "enter ends with text"
                         Input.Size IsMedium
                         Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                         Input.OnChange (fun e ->
@@ -216,7 +216,7 @@ let advancedSearchComponent (model:Model) (dispatch: Msg -> unit) =
                 Field.div [] [
                     Control.div [] [
                         Input.input [
-                            Input.Placeholder ""
+                            Input.Placeholder "enter definition must contain text"
                             Input.Size IsMedium
                             Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                             Input.OnChange (fun e ->
