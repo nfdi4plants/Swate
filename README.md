@@ -1,16 +1,29 @@
-CSBAnnotatorAddIn
-=================
+Swate
+=====
+
+> **Swate** - something or someone that gets you absolutely joyed([Urban dictionary](https://www.urbandictionary.com/define.php?term=swate))
+
+**Swate** is a **S**wate **W**orkflow **A**nnotation **T**ool for **E**xcel.
 
 _This project is in an exerimental state._
 
-Excel AddIn for annotation of experimental data and computational workflows.
 
-The aims of this AddIn are:
+
+The aims of Swate are:
 
 1. Provide an easy way to annotate experimental data in an application (excel) that every wet lab scientist is familiar with
 2. Provide a way to create computational workflows that start from raw data and end with results.
 3. Create ISA and CWL compatible data models from the input
 4. Provide an interface for remote execution of the defined workflows
+
+Check the state of the [minimal POC milestone ](https://github.com/nfdi4plants/Swate/milestone/1) for the current state of features.
+
+Discuss
+-------
+
+Extensive documentation of Swate will be setup when the [development process of a minimal POC]() is complete.
+
+Please use Github issues to track problems, feature requests, questions, and discussions. Additionally, you can get in touch with us on [Twitter](https://twitter.com/nfdi4plants)
 
 Develop
 -------
