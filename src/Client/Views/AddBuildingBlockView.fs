@@ -19,6 +19,32 @@ let isValidBuildingBlock (block : AnnotationBuildingBlock) =
         true
     | _ -> false
 
+let createUnitTermSuggestions (model:Model) (dispatch: Msg -> unit) =
+    if model.AddBuildingBlockState.UnitTermSuggestions.Length > 0 then
+        model.AddBuildingBlockState.UnitTermSuggestions
+        |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
+        |> Array.map (fun sugg ->
+            tr [OnClick (fun _ -> sugg |> UnitTermSuggestionUsed |> AddBuildingBlock |> dispatch)
+                colorControl model.SiteStyleState.ColorMode
+                Class "suggestion"
+            ] [
+                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+                    Fa.i [Fa.Solid.InfoCircle] []
+                ]
+                td [] [
+                    b [] [str sugg.Name]
+                ]
+                td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+            ])
+        |> List.ofArray
+    else
+        [
+            tr [] [
+                td [] [str "No terms found matching your input."]
+            ]
+        ]
+
 let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block: AnnotationBuildingBlockType )  =
     Dropdown.Item.a [
         Dropdown.Item.Props [
@@ -95,9 +121,14 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
             | Parameter | Characteristics | Factor ->
                 Field.div [Field.HasAddons] [
                     Control.div [] [
-                        Button.button [] [ 
+                        Button.button [ Button.OnClick (fun _ -> BuildingBlockHasUnitSwitch |> AddBuildingBlock |> dispatch)] [ 
                             Checkbox.checkbox [] [
-                                Checkbox.input []
+                                Checkbox.input [
+                                    Props [
+                                        Checked model.AddBuildingBlockState.BuildingBlockHasUnit
+                                        
+                                    ]
+                                ]
                             ]
                         ]
                     ]
@@ -107,15 +138,24 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                         ]
                     ]
                     Control.div [Control.IsExpanded] [
-                        Input.input [   Input.Placeholder "Start typing to start search"
+                        Input.input [
+                                        Input.Disabled (not model.AddBuildingBlockState.BuildingBlockHasUnit)
+                                        Input.Placeholder "Start typing to start search"
                                         Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
+                                        Input.OnChange (fun e ->  e.Value |> SearchUnitTermTextChange |> AddBuildingBlock |> dispatch)
+                                        Input.Value(
+                                            if model.AddBuildingBlockState.BuildingBlockHasUnit then 
+                                                model.AddBuildingBlockState.UnitTermSearchText
+                                            else
+                                                ""
+                                        )
                                     ]
                         AutocompleteDropdown.autocompleteDropdownComponent
                             model
                             dispatch
-                            true
-                            true
-                            []
+                            model.AddBuildingBlockState.ShowUnitTermSuggestions
+                            model.AddBuildingBlockState.HasUnitTermSuggestionsLoading
+                            (createUnitTermSuggestions model dispatch)
                     ]
                 ]
             | _ -> ()

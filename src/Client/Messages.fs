@@ -41,12 +41,14 @@ type DevMsg =
 type ApiRequestMsg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
+    | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
     | FetchAllOntologies
 
 type ApiResponseMsg =
     | TermSuggestionResponse                    of DbDomain.Term []
-    | GetNewAdvancedTermSearchResultsResponse   of DbDomain.Term []
+    | AdvancedTermSearchResultsResponse         of DbDomain.Term []
+    | UnitTermSuggestionResponse                of DbDomain.Term []
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
 
 type ApiMsg =
@@ -70,6 +72,10 @@ type AddBuildingBlockMsg =
     | NewBuildingBlockSelected  of AnnotationBuildingBlock
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown
+    | SearchUnitTermTextChange  of string
+    | UnitTermSuggestionUsed    of DbDomain.Term
+    | NewUnitTermSuggestions    of DbDomain.Term []
+    | BuildingBlockHasUnitSwitch 
 
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)

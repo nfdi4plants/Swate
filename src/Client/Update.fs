@@ -289,6 +289,24 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             (TermSuggestionResponse >> Response >> Api)
             (ApiError >> Api)
 
+    | GetNewUnitTermSuggestions queryString ->
+        let currentCall = {
+                FunctionName = "getUnitTermSuggestions"
+                Status = Pending
+        }
+
+        let nextState = {
+            currentState with
+                currentCall = currentCall
+        }
+
+        nextState,
+        Cmd.OfAsync.either
+            Api.api.getUnitTermSuggestions
+            (5,queryString)
+            (UnitTermSuggestionResponse >> Response >> Api)
+            (ApiError >> Api)
+
     | GetNewAdvancedTermSearchResults options ->
         let currentCall = {
                 FunctionName = "getTermsForAdvancedSearch"
@@ -304,7 +322,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         Cmd.OfAsync.either
             Api.api.getTermsForAdvancedSearch
             (options.Ontology,options.StartsWith,options.MustContain,options.EndsWith,options.KeepObsolete,options.DefinitionMustContain)
-            (GetNewAdvancedTermSearchResultsResponse >> Response >> Api)
+            (AdvancedTermSearchResultsResponse >> Response >> Api)
             (ApiError >> Api)
 
     | FetchAllOntologies ->
@@ -346,7 +364,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-    | GetNewAdvancedTermSearchResultsResponse results ->
+    | AdvancedTermSearchResultsResponse results ->
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -361,6 +379,25 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         let cmds = Cmd.batch [
             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
             results |> NewAdvancedSearchResults |> Advanced |> TermSearch |> Cmd.ofMsg
+        ]
+
+        nextState, cmds
+
+    | UnitTermSuggestionResponse suggestions ->
+        let finishedCall = {
+            currentState.currentCall with
+                Status = Successfull
+        }
+
+        let nextState = {
+            currentState with
+                currentCall = noCall
+                callHistory = finishedCall::currentState.callHistory
+        }
+
+        let cmds = Cmd.batch [
+            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
+            suggestions |> NewUnitTermSuggestions |> AddBuildingBlock |> Cmd.ofMsg
         ]
 
         nextState, cmds
@@ -491,6 +528,74 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
         }
 
         nextState,Cmd.none
+
+    | SearchUnitTermTextChange newTerm ->
+
+        let triggerNewSearch =
+            newTerm.Length > 2
+       
+        let (delay, bounceId, msgToBounce) =
+            (System.TimeSpan.FromSeconds 0.5),
+            "GetNewUnitTermSuggestions",
+            (
+                if triggerNewSearch then
+                    newTerm  |> (GetNewUnitTermSuggestions >> Request >> Api)
+                else
+                    DoNothing
+            )
+
+        let nextState = {
+            currentState with
+                UnitTermSearchText              = newTerm
+                ShowUnitTermSuggestions         = triggerNewSearch
+                HasUnitTermSuggestionsLoading   = true
+        }
+
+        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
+
+    | NewUnitTermSuggestions suggestions ->
+    
+        let nextState = {
+            currentState with
+                UnitTermSuggestions             = suggestions
+                ShowUnitTermSuggestions         = true
+                HasUnitTermSuggestionsLoading   = false
+        }
+
+        nextState,Cmd.none
+
+    | UnitTermSuggestionUsed suggestion ->
+
+        let nextState = {
+            currentState with
+                UnitTermSearchText              = suggestion.Name
+                UnitTerm                        = Some suggestion
+                ShowUnitTermSuggestions         = false
+                HasUnitTermSuggestionsLoading   = false
+        }
+        nextState, Cmd.none
+
+    | BuildingBlockHasUnitSwitch ->
+
+        let hasUnit = not currentState.BuildingBlockHasUnit
+
+        let nextState =
+            if hasUnit then
+                {
+                    currentState with
+                        BuildingBlockHasUnit = hasUnit
+                }
+            else
+                {
+                currentState with
+                    BuildingBlockHasUnit = hasUnit
+                    UnitTerm = None
+                    UnitTermSearchText = ""
+                    UnitTermSuggestions = [||]
+                    ShowUnitTermSuggestions = false
+                    HasUnitTermSuggestionsLoading = false
+                }
+        nextState, Cmd.none
 
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with

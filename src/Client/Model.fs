@@ -37,6 +37,7 @@ type LogItem =
         | "Debug" -> Debug(System.DateTime.UtcNow,message)
         | "Info"  -> Info (System.DateTime.UtcNow,message)
         | "Error" -> Error(System.DateTime.UtcNow,message)
+        | _ -> Error(System.DateTime.UtcNow,"wut?")
 
 type TermSearchMode =
     | Simple
@@ -247,13 +248,29 @@ type AnnotationBuildingBlock = {
         | Data              -> "Data File Name"
         | _                 -> ""
 
+
 type AddBuildingBlockState = {
-    CurrentBuildingBlock        : AnnotationBuildingBlock
-    ShowBuildingBlockSelection  : bool
+    CurrentBuildingBlock            : AnnotationBuildingBlock
+    ShowBuildingBlockSelection      : bool
+    BuildingBlockHasUnit            : bool
+    UnitTerm                        : DbDomain.Term option
+    UnitTermSearchText              : string
+    UnitTermSuggestions             : DbDomain.Term []
+    HasUnitTermSuggestionsLoading   : bool
+    ShowUnitTermSuggestions         : bool
+    UnitFormat                      : string
+
 } with
     static member init () = {
-        CurrentBuildingBlock        = AnnotationBuildingBlock.init NoneSelected
-        ShowBuildingBlockSelection  = false
+        CurrentBuildingBlock            = AnnotationBuildingBlock.init NoneSelected
+        ShowBuildingBlockSelection      = false
+        BuildingBlockHasUnit            = false
+        UnitTerm                        = None
+        UnitTermSearchText              = ""
+        UnitTermSuggestions             = [||]
+        HasUnitTermSuggestionsLoading   = false
+        ShowUnitTermSuggestions         = false
+        UnitFormat                      = ""
     }
 
 type Model = {

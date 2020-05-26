@@ -55,6 +55,21 @@ let annotatorApi = {
                 OntologyDB.getAdvancedTermSearchResults ont startsWith mustContain endsWith keepObsolete definitionMustContain
             return result
         }
+
+    getUnitTermSuggestions = fun (max:int,typedSoFar:string) ->
+        async {
+            let like = OntologyDB.getUnitTermSuggestions typedSoFar
+            let searchSet = typedSoFar |> Suggestion.createBigrams
+
+            return
+                like
+                |> Array.sortByDescending (fun sugg ->
+                        Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                )
+                
+                |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+        }
+
 }
 
 let docs = Docs.createFor<IAnnotatorAPI>()

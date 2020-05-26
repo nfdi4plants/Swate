@@ -78,4 +78,6 @@ type IAnnotatorAPI = {
     // Term related requests
     getTermSuggestions          : (int*string)                                          -> Async<DbDomain.Term []>
     getTermsForAdvancedSearch   : ((DbDomain.Ontology option)*string*string*string*bool*string)-> Async<DbDomain.Term []>
+
+    getUnitTermSuggestions      : (int*string)                                          -> Async<DbDomain.Term []>
 }
