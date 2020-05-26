@@ -14,6 +14,7 @@ open Fake.IO
 
 Target.initEnvironment ()
 
+
 let serverPath = Path.getFullName "./src/Server"
 let clientPath = Path.getFullName "./src/Client"
 let clientDeployPath = Path.combine clientPath "deploy"
@@ -36,6 +37,7 @@ let nodeTool = platformTool "node" "node.exe"
 let npmTool = platformTool "npm" "npm.cmd"
 let npxTool = platformTool "npx" "npx.cmd"
 
+
 let runTool cmd args workingDir =
     let arguments = args |> String.split ' ' |> Arguments.OfArgs
     Command.RawCommand (cmd, arguments)
@@ -47,7 +49,7 @@ let runTool cmd args workingDir =
 
 let runDotNet cmd workingDir =
     let result =
-        DotNet.exec (DotNet.Options.withWorkingDirectory workingDir) cmd ""
+        Fake.DotNet.DotNet.exec (Fake.DotNet.DotNet.Options.withWorkingDirectory workingDir) cmd ""
     if result.ExitCode <> 0 then failwithf "'dotnet %s' failed in %s" cmd workingDir
 
 let openBrowser url =
@@ -134,6 +136,30 @@ Target.create "OfficeDebug" (fun _ ->
     |> Async.Parallel
     |> Async.RunSynchronously
     |> ignore
+)
+
+Target.create "InstallOfficeAddinTooling" (fun _ ->
+
+    printfn "Installing office addin tooling"
+
+    runTool npmTool "install -g office-dev-certs" __SOURCE_DIRECTORY__
+    runTool npmTool "install -g office-addin-debugging" __SOURCE_DIRECTORY__
+    runTool npmTool "install -g office-addin-manifest" __SOURCE_DIRECTORY__
+
+)
+
+Target.create "CreateDevCerts" (fun _ ->
+    runTool npxTool "office-addin-dev-certs install --days 365" __SOURCE_DIRECTORY__
+
+    let certPath =
+        Path.combine
+            (Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+            ".office-addin-dev-certs/ca.crt"
+        
+
+    let psi = new System.Diagnostics.ProcessStartInfo(FileName = certPath, UseShellExecute = true)
+    System.Diagnostics.Process.Start(psi) |> ignore
+
 )
 
 

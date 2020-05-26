@@ -32,8 +32,19 @@ Develop
 
  - .NET Core SDK at of at least the version in [the global.json file](global.json)
  - Node.js with npm/npx
- - connections from excel to localhost need to be via https, so you need a certificate and trust it. [office-addin-dev-certs](https://www.npmjs.com/package/office-addin-dev-certs?activeTab=versions) does that for you (should be a fake target pretty soon (TM))
- - You may need a loopback exemption for Edge/IE (whatever is run in your excel version)
+ - connections from excel to localhost need to be via https, so you need a certificate and trust it. [office-addin-dev-certs](https://www.npmjs.com/package/office-addin-dev-certs?activeTab=versions) does that for you.
+
+    you can also use the fake build target for certificate creation and installation by using `fake build -t createdevcerts`.
+
+    This will use office-addin-dev-certs to create the necessary certificates, and open the installation dialogue for you:
+
+![File](docsrc/files/img/file.png)
+
+installing this ca certificate under your trusted root certification authorities will enable you to use httpss via localhost.
+
+ - You may need a loopback exemption for Edge/IE (whatever is run in your excel version): 
+
+    `CheckNetIsolation LoopbackExempt -a -n="microsoft.win32webviewhost_cw5n1h2txyewy"`
 
 This project uses the [SAFE Stack](https://github.com/SAFE-Stack) to create a website that uses [office.js](https://github.com/OfficeDev/office-js) to interop with Excel.
 
