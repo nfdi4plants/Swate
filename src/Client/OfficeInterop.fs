@@ -37,6 +37,14 @@ let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
                     |] :> IList<U3<bool,string,float>>
     |] :> IList<IList<U3<bool,string,float>>>
 
+
+let createValueMatrix (colCount:int) (rowCount:int) value =
+    ResizeArray([
+        for outer in 0 .. rowCount-1 do
+            let tmp = Array.zeroCreate colCount |> Seq.map (fun _ -> Some (value |> box))
+            ResizeArray(tmp)
+    ])
+
 let createAnnotationTable (isDark:bool) =
     Excel.run(fun context ->
         let tableRange = context.workbook.getSelectedRange()
@@ -62,31 +70,28 @@ let createAnnotationTable (isDark:bool) =
 
                 annotationTable.style <- style
 
-                if tableRange.columnCount < 2. then // only one column there, so add data col to end.
+                (annotationTable.columns.getItemAt 0.).name <- "Source Name"
 
-                    let dataCol = createEmptyMatrixForTables 1 (int tableRange.rowCount) ""
+                sheet.getUsedRange().format.autofitColumns()
+                sheet.getUsedRange().format.autofitRows()
 
-                    (annotationTable.columns.getItemAt 0.).name <- "Sample Name"
-                    annotationTable.columns.add(-1.,U4.Case1 dataCol, "Data File Name") |> ignore
+                sprintf "Annotation Table created in [%s] with dimensions %.0f c x (%.0f + 1h)r" tableRange.address tableRange.columnCount (tableRange.rowCount - 1.) 
 
-                    sheet.getUsedRange().format.autofitColumns()
-                    sheet.getUsedRange().format.autofitRows()
-
-                    sprintf "Annotation Table created in [%s] with dimensions %.0f + 1 mandatory c x (%.0f + 1h)r" tableRange.address tableRange.columnCount (tableRange.rowCount - 1.) 
-                else
-
-                    (annotationTable.columns.getItemAt 0.).name <- "Sample Name"
-                    (annotationTable.columns.getItemAt (tableRange.columnCount - 1.)).name <- "Data File Name"
-
-                    sheet.getUsedRange().format.autofitColumns()
-                    sheet.getUsedRange().format.autofitRows()
-
-                    sprintf "Annotation Table created in [%s] with dimensions %.0fc x (%.0f + 1h)r. Adapted style to %s" tableRange.address tableRange.columnCount (tableRange.rowCount - 1.) style
-                        
                 )
             //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
     )
 
+let checkIfAnnotationTableIsPresent () =
+    Excel.run(fun context ->
+        let tableRange = context.workbook.getSelectedRange()
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        //delete table with the same name if present because there can only be one chosen one <3
+        let table = sheet.tables.getItemOrNullObject("annotationTable")
+        context.sync()
+            .``then``( fun _ ->
+                not table.isNullObject
+        )
+    )
 
 
 let addAnnotationColumn (colName:string) =
@@ -100,16 +105,37 @@ let addAnnotationColumn (colName:string) =
         context.sync().``then``( fun _ ->
             let colCount = tableRange.columnCount
             let rowCount = tableRange.rowCount |> int
+            //create an empty column to insert
             let testCol = createEmptyMatrixForTables 1 rowCount ""
 
             let _ =
                 annotationTable.columns.add(
-                    colCount - 1., //last column should always be the predefined results column
+                    colCount,
                     values = U4.Case1 testCol, name=colName
                 )
             sprintf "%s column was added." colName
         )
     )
+
+let changeTableColumnFormat (colName:string) (format:string) =
+    Excel.run(fun context ->
+           let sheet = context.workbook.worksheets.getActiveWorksheet()
+           let annotationTable = sheet.tables.getItem("annotationTable")
+
+           let colRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
+           colRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
+           
+           context.sync().``then``( fun _ ->
+               let rowCount = colRange.rowCount |> int
+               //create an empty column to insert
+               let formats = createValueMatrix 1 rowCount format
+
+               colRange.numberFormat <- formats
+
+               sprintf "format of %s was changed to %s" colName format
+           )
+    )
+
 
 let fillValue (v:string) =
     Excel.run(fun context ->

@@ -163,12 +163,23 @@ Target.create "CreateDevCerts" (fun _ ->
 )
 
 
+Target.create "Bundle" (fun _ ->
+    let serverDir = Path.combine deployDir "Server"
+    let clientDir = Path.combine deployDir "Client"
+    let publicDir = Path.combine clientDir "public"
+    let publishArgs = sprintf "publish -c Release -o \"%s\"" serverDir
+    runDotNet publishArgs serverPath
+
+    Shell.copyDir publicDir clientDeployPath FileFilter.allFiles
+)
+
+Target.create "Setup" ignore 
+
 open Fake.Core.TargetOperators
 
 "Clean"
     ==> "InstallClient"
     ==> "Build"
-
 
 "Clean"
     ==> "InstallClient"
@@ -176,6 +187,15 @@ open Fake.Core.TargetOperators
 
 "Clean"
 ==> "InstallClient"
+==> "Build"
+==> "Bundle"
+
+"Clean"
+==> "InstallClient"
 ==> "OfficeDebug"
+
+"InstallOfficeAddinTooling"
+==> "CreateDevCerts"
+==> "Setup"
 
 Target.runOrDefaultWithArguments "Build"

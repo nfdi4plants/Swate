@@ -84,6 +84,9 @@ let view (model : Model) (dispatch : Msg -> unit) =
             str "Footer content"
         ]
 
+    | Routing.Page.Home ->
+        div [] [str "soos"]
+
     | _ ->
         div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
             ] [

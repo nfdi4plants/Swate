@@ -20,6 +20,7 @@
         <Compile Include="Update.fs" />
         <Compile Include="CustomComponents\Footer.fs" />
         <Compile Include="CustomComponents\Button.fs" />
+        <Compile Include="CustomComponents\AnnotationTableMissingWarning.fs" />
         <Compile Include="CustomComponents\Navbar.fs" />
         <Compile Include="CustomComponents\Loading.fs" />
         <Compile Include="CustomComponents\AutocompleteDropdown.fs" />

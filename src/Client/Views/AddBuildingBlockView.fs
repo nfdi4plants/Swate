@@ -173,7 +173,15 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                                         Button.Props [Disabled true]
                                     Button.IsFullWidth
                                     //TODO: add fill support via Excel interop here
-                                    //Button.OnClick (fun _ -> model.TermSearchState.Simple.TermSearchText |> FillSelection |> ExcelInterop |> dispatch)
+                                    Button.OnClick (
+                                        let format =
+                                            match model.AddBuildingBlockState.UnitTerm with
+                                            | Some unit ->
+                                                sprintf "0.00 \"%s\"" unit.Name
+                                            | _ -> "0.00"
+                                        let colName = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
+                                        fun _ -> (colName,format) |> AddColumn |> ExcelInterop |> dispatch
+                                    )
 
                                 ] [
                     str "Insert this annotation building block"

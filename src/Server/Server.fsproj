@@ -3,6 +3,7 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>netcoreapp3.0</TargetFramework>
+        <UserSecretsId>6de80bdf-2a05-4cf7-a1a8-d08581dfa887</UserSecretsId>
     </PropertyGroup>
     <ItemGroup>
         <None Include="paket.references" />

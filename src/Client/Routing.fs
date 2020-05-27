@@ -20,6 +20,14 @@ type Page =
         | Page.ActivityLog          -> "/#ActivityLog"
         | Page.NotFound             -> "/#NotFound"
 
+    static member toString = function
+        | Page.Home                 -> ""
+        | Page.TermSearch           -> "TermSearch"
+        | Page.AddBuildingBlock     -> "AddBuildingBlock"
+        | Page.FilePicker           -> "FilePicker"
+        | Page.ActivityLog          -> "ActivityLog"
+        | Page.NotFound             -> "NotFound"
+
 /// The URL is turned into a Result.
 let pageParser : Parser<Page -> Page,_> =
     oneOf [

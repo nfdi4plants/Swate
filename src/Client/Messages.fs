@@ -13,8 +13,11 @@ type ExcelInteropMsg =
     | InSync                    of string
     | TryExcel
     | FillSelection             of string
-    | AddColumn                 of string
+    | AddColumn                 of colname:string * formatString:string
+    | FormatColumn              of colname:string * formatString:string
     | CreateAnnotationTable     of bool
+    | AnnotationtableCreated    of string
+    | AnnotationTableExists     of bool
 
 type SimpleTermSearchMsg =
     | SearchTermTextChange      of string

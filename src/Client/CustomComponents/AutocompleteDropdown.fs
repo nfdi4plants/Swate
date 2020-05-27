@@ -24,9 +24,9 @@ let autocompleteDropdownComponent (model:Model) (dispatch: Msg -> unit) (isVisib
                 BorderColor     model.SiteStyleState.ColorMode.ControlForeground
             ]]
         ] [
-            Table.table [Table.IsFullWidth] (
+            Table.table [Table.IsFullWidth] [
                 if isLoading then
-                    [
+                    tbody [] [
                         tr [] [
                             td [Style [TextAlign TextAlignOptions.Center]] [
                                 Loading.loadingComponent
@@ -35,8 +35,8 @@ let autocompleteDropdownComponent (model:Model) (dispatch: Msg -> unit) (isVisib
                         ]
                     ]
                 else
-                    suggestions
-            )
+                    tbody [] suggestions
+            ]
 
             
         ]

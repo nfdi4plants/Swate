@@ -53,11 +53,26 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         
     | SyncContext passthroughMessage ->
         currentState,
-        Cmd.OfPromise.either
-            OfficeInterop.syncContext
-            passthroughMessage
-            (fun _ -> ExcelInterop (InSync passthroughMessage))
-            (GenericError >> Dev)
+        Cmd.batch [
+            Cmd.OfPromise.either
+                OfficeInterop.checkIfAnnotationTableIsPresent
+                ()
+                (AnnotationTableExists >> ExcelInterop)
+                (GenericError >> Dev)
+            Cmd.OfPromise.either
+                OfficeInterop.syncContext
+                passthroughMessage
+                (fun _ -> ExcelInterop (InSync passthroughMessage))
+                (GenericError >> Dev)
+        ]
+
+    | AnnotationTableExists exists ->
+        let nextState = {
+            currentState with
+                HasAnnotationTable = exists
+        }
+
+        nextState,Cmd.none
 
     | InSync passthroughMessage ->
         currentState,
@@ -81,11 +96,20 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             (SyncContext >> ExcelInterop)
             (GenericError >> Dev)
 
-    | AddColumn columnValue ->
+    | AddColumn (colName,format) ->
         currentState,
+
         Cmd.OfPromise.either
             OfficeInterop.addAnnotationColumn  
-            columnValue
+            colName
+            (fun _  -> (colName,format) |> FormatColumn |> ExcelInterop)
+            (GenericError >> Dev)
+
+    | FormatColumn (colName,format) ->
+        currentState,
+        Cmd.OfPromise.either
+            (OfficeInterop.changeTableColumnFormat colName)
+            format
             (SyncContext >> ExcelInterop)
             (GenericError >> Dev)
 
@@ -94,8 +118,17 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         Cmd.OfPromise.either
             OfficeInterop.createAnnotationTable  
             isDark
-            (SyncContext >> ExcelInterop)
+            (AnnotationtableCreated >> ExcelInterop)
             (GenericError >> Dev)
+
+    | AnnotationtableCreated range ->
+        let nextState = {
+            currentState with
+                HasAnnotationTable = true
+        }
+
+        nextState,Cmd.ofMsg(range |> SyncContext |> ExcelInterop)
+        
 
 let handleSimpleTermSearchMsg (simpleTermSearchMsg: SimpleTermSearchMsg) (currentState:SimpleTermSearchState) : SimpleTermSearchState * Cmd<Msg> =
     match simpleTermSearchMsg with

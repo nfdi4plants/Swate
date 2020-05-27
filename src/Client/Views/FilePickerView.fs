@@ -49,7 +49,7 @@ let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
                 File.input [
                     Props [
                         Multiple true
-                        OnInput (fun ev ->
+                        OnChange (fun ev ->
                             let files : FileList = ev.target?files
                             
                             let fileNames =
@@ -72,7 +72,8 @@ let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
                 ]
             ]
         ]
-        Table.table [Table.IsFullWidth] (
-            createFileList model dispatch)
+        Table.table [Table.IsFullWidth] [
+            tbody [] (createFileList model dispatch)
+        ]
         
     ]
