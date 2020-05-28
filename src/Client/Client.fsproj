@@ -23,9 +23,10 @@
         <Compile Include="CustomComponents\AnnotationTableMissingWarning.fs" />
         <Compile Include="CustomComponents\Navbar.fs" />
         <Compile Include="CustomComponents\Loading.fs" />
-        <Compile Include="CustomComponents\AutocompleteDropdown.fs" />
+        <Compile Include="CustomComponents\AutocompleteSearch.fs" />
         <Compile Include="Views\BaseView.fs" />
         <Compile Include="Views\TermSearchView.fs" />
+        <Compile Include="Views\AdvancedTermSearchView.fs" />
         <Compile Include="Views\AddBuildingBlockView.fs" />
         <Compile Include="Views\FilePickerView.fs" />
         <Compile Include="Views\ActivityLogView.fs" />

@@ -43,6 +43,11 @@ let init (pageOpt: Routing.Page option) : Model * Cmd<Msg> =
                 (fun x -> (x.host.ToString(),x.platform.ToString()) |> Initialized |> ExcelInterop )
                 (fun x -> x |> GenericError |> Dev)
             Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
+            Cmd.OfPromise.either
+                OfficeInterop.checkIfAnnotationTableIsPresent
+                ()
+                (AnnotationTableExists >> ExcelInterop)
+                (GenericError >> Dev)
         ]
     initializeModel pageOpt , loadCountCmd
 

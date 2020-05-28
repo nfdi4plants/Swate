@@ -19,22 +19,17 @@ type ExcelInteropMsg =
     | AnnotationtableCreated    of string
     | AnnotationTableExists     of bool
 
-type SimpleTermSearchMsg =
+type TermSearchMsg =
     | SearchTermTextChange      of string
     | TermSuggestionUsed        of string
     | NewSuggestions            of DbDomain.Term []
 
-type AdvancedTermSearchMsg =
+type AdvancedSearchMsg =
     | SearchOntologyTextChange      of string
     | AdvancedSearchOptionsChange   of AdvancedTermSearchOptions
     | AdvancedSearchResultUsed      of string
     | OntologySuggestionUsed        of DbDomain.Ontology
     | NewAdvancedSearchResults      of DbDomain.Term []
-    
-type TermSearchMsg =
-    | SwitchSearchMode
-    | Simple    of SimpleTermSearchMsg
-    | Advanced  of AdvancedTermSearchMsg
 
 type DevMsg =
     | LogTableMetadata
@@ -44,6 +39,7 @@ type DevMsg =
 type ApiRequestMsg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
+    | GetNewBuildingBlockNameSuggestions        of string
     | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
     | FetchAllOntologies
@@ -51,6 +47,7 @@ type ApiRequestMsg =
 type ApiResponseMsg =
     | TermSuggestionResponse                    of DbDomain.Term []
     | AdvancedTermSearchResultsResponse         of DbDomain.Term []
+    | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
     | UnitTermSuggestionResponse                of DbDomain.Term []
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
 
@@ -75,8 +72,12 @@ type AddBuildingBlockMsg =
     | NewBuildingBlockSelected  of AnnotationBuildingBlock
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown
+
+    | BuildingBlockNameSuggestionUsed   of string
+    | NewBuildingBlockNameSuggestions   of DbDomain.Term []
+
     | SearchUnitTermTextChange  of string
-    | UnitTermSuggestionUsed    of DbDomain.Term
+    | UnitTermSuggestionUsed    of string
     | NewUnitTermSuggestions    of DbDomain.Term []
     | BuildingBlockHasUnitSwitch 
 
@@ -85,6 +86,7 @@ type Msg =
     | Api                   of ApiMsg
     | Dev                   of DevMsg
     | TermSearch            of TermSearchMsg
+    | AdvancedSearch        of AdvancedSearchMsg
     | DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
     | ExcelInterop          of ExcelInteropMsg
     | StyleChange           of StyleChangeMsg

@@ -62,22 +62,20 @@ type AdvancedTermSearchOptions = {
 
 //TO-DO refactor model to different types as it already has become quite complicated
 
-type SimpleTermSearchState = {
-    Debouncer               : Debouncer.State
+type TermSearchState = {
     TermSearchText          : string
     TermSuggestions         : DbDomain.Term []
     HasSuggestionsLoading   : bool
     ShowSuggestions         : bool
 } with
     static member init () = {
-        Debouncer               = Debouncer.create()
         TermSearchText          = ""
         TermSuggestions         = [||]
         HasSuggestionsLoading   = false
         ShowSuggestions         = false
     }
 
-type AdvancedTermSearchState = {
+type AdvancedSearchState = {
     OntologySearchText              : string
     HasOntologySuggestionsLoading   : bool
     ShowOntologySuggestions         : bool
@@ -94,17 +92,6 @@ type AdvancedTermSearchState = {
         AdvancedSearchTermResults       = [||]
         HasAdvancedSearchResultsLoading = false
         ShowAdvancedSearchResults       = false
-    }
-
-type TermSearchState = {
-    Advanced    : AdvancedTermSearchState
-    Simple      : SimpleTermSearchState
-    SearchMode  : TermSearchMode
-} with
-    static member init () = {
-        Advanced    = AdvancedTermSearchState.init()
-        Simple      = SimpleTermSearchState  .init()
-        SearchMode  = TermSearchMode.Simple
     }
 
 type SiteStyleState = {
@@ -250,27 +237,35 @@ type AnnotationBuildingBlock = {
 
 
 type AddBuildingBlockState = {
-    CurrentBuildingBlock            : AnnotationBuildingBlock
-    ShowBuildingBlockSelection      : bool
-    BuildingBlockHasUnit            : bool
-    UnitTerm                        : DbDomain.Term option
-    UnitTermSearchText              : string
-    UnitTermSuggestions             : DbDomain.Term []
-    HasUnitTermSuggestionsLoading   : bool
-    ShowUnitTermSuggestions         : bool
-    UnitFormat                      : string
+    CurrentBuildingBlock                    : AnnotationBuildingBlock
+
+    BuildingBlockNameSuggestions            : DbDomain.Term []
+    ShowBuildingBlockSelection              : bool
+    BuildingBlockHasUnit                    : bool
+    ShowBuildingBlockNameSuggestions        : bool
+    HasBuildingBlockNameSuggestionsLoading  : bool
+
+    UnitTermSearchText                      : string
+    UnitTermSuggestions                     : DbDomain.Term []
+    HasUnitTermSuggestionsLoading           : bool
+    ShowUnitTermSuggestions                 : bool
+    UnitFormat                              : string
 
 } with
     static member init () = {
-        CurrentBuildingBlock            = AnnotationBuildingBlock.init NoneSelected
-        ShowBuildingBlockSelection      = false
-        BuildingBlockHasUnit            = false
-        UnitTerm                        = None
-        UnitTermSearchText              = ""
-        UnitTermSuggestions             = [||]
-        HasUnitTermSuggestionsLoading   = false
-        ShowUnitTermSuggestions         = false
-        UnitFormat                      = ""
+        CurrentBuildingBlock                    = AnnotationBuildingBlock.init NoneSelected
+
+        BuildingBlockNameSuggestions            = [||]
+        ShowBuildingBlockSelection              = false
+        BuildingBlockHasUnit                    = false
+        ShowBuildingBlockNameSuggestions        = false
+        HasBuildingBlockNameSuggestionsLoading  = false
+
+        UnitTermSearchText                      = ""
+        UnitTermSuggestions                     = [||]
+        HasUnitTermSuggestionsLoading           = false
+        ShowUnitTermSuggestions                 = false
+        UnitFormat                              = ""
     }
 
 type Model = {
@@ -293,6 +288,8 @@ type Model = {
     //States regarding term search
     TermSearchState         : TermSearchState
 
+    AdvancedSearchState     : AdvancedSearchState
+
     //Use this in the future to model excel stuff like table data
     ExcelState              : ExcelState
 
@@ -314,6 +311,7 @@ let initializeModel (pageOpt: Page option) = {
     DevState                = DevState              .init ()
     SiteStyleState          = SiteStyleState        .init ()
     TermSearchState         = TermSearchState       .init ()
+    AdvancedSearchState     = AdvancedSearchState   .init ()
     ExcelState              = ExcelState            .init ()
     ApiState                = ApiState              .init ()
     FilePickerState         = FilePickerState       .init ()

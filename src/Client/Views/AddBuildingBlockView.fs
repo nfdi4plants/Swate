@@ -10,6 +10,7 @@ open Model
 open Messages
 open Shared
 open CustomComponents
+open Fable.Core
 
 let isValidBuildingBlock (block : AnnotationBuildingBlock) =
     match block.Type with
@@ -19,31 +20,32 @@ let isValidBuildingBlock (block : AnnotationBuildingBlock) =
         true
     | _ -> false
 
-let createUnitTermSuggestions (model:Model) (dispatch: Msg -> unit) =
-    if model.AddBuildingBlockState.UnitTermSuggestions.Length > 0 then
-        model.AddBuildingBlockState.UnitTermSuggestions
-        |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
-        |> Array.map (fun sugg ->
-            tr [OnClick (fun _ -> sugg |> UnitTermSuggestionUsed |> AddBuildingBlock |> dispatch)
-                colorControl model.SiteStyleState.ColorMode
-                Class "suggestion"
-            ] [
-                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
-                    Fa.i [Fa.Solid.InfoCircle] []
-                ]
-                td [] [
-                    b [] [str sugg.Name]
-                ]
-                td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
-                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
-            ])
-        |> List.ofArray
-    else
-        [
-            tr [] [
-                td [] [str "No terms found matching your input."]
-            ]
-        ]
+//let createUnitTermSuggestions (model:Model) (dispatch: Msg -> unit) =
+//    if model.AddBuildingBlockState.UnitTermSuggestions.Length > 0 then
+//        model.AddBuildingBlockState.UnitTermSuggestions
+//        |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
+//        |> Array.map (fun sugg ->
+//            tr [OnClick (fun _ -> sugg |> UnitTermSuggestionUsed |> AddBuildingBlock |> dispatch)
+//                colorControl model.SiteStyleState.ColorMode
+//                Class "suggestion"
+//            ] [
+//                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+//                    Fa.i [Fa.Solid.InfoCircle] []
+//                ]
+//                td [] [
+//                    b [] [str sugg.Name]
+//                ]
+//                td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+//                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+//            ])
+//        |> List.ofArray
+//    else
+//        [
+//            tr [] [
+//                td [] [str "No terms found matching your input."]
+//            ]
+//        ]
+
 
 let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block: AnnotationBuildingBlockType )  =
     Dropdown.Item.a [
@@ -109,11 +111,13 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                 Control.div [Control.IsExpanded] [
                     match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
                     | Parameter | Characteristics | Factor ->
-                        Input.input [
-                            Input.Placeholder (sprintf "Enter %s Name" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString))
-                            Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
-                            Input.OnChange (fun ev -> ev.Value |> BuildingBlockNameChange |> AddBuildingBlock |> dispatch)
-                        ]
+                        AutocompleteSearch.autocompleteSearchComponent
+                            dispatch
+                            model.SiteStyleState.ColorMode
+                            "Start typing to search"
+                            None
+                            (AutocompleteSearch.AutocompleteParameters.ofAddBuildingBlockState model.AddBuildingBlockState)
+                        
                     | _ -> ()
                 ]
             ]
@@ -137,26 +141,14 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                             str (sprintf "This %s has a unit:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString ))
                         ]
                     ]
-                    Control.div [Control.IsExpanded] [
-                        Input.input [
-                                        Input.Disabled (not model.AddBuildingBlockState.BuildingBlockHasUnit)
-                                        Input.Placeholder "Start typing to start search"
-                                        Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
-                                        Input.OnChange (fun e ->  e.Value |> SearchUnitTermTextChange |> AddBuildingBlock |> dispatch)
-                                        Input.Value(
-                                            if model.AddBuildingBlockState.BuildingBlockHasUnit then 
-                                                model.AddBuildingBlockState.UnitTermSearchText
-                                            else
-                                                ""
-                                        )
-                                    ]
-                        AutocompleteDropdown.autocompleteDropdownComponent
-                            model
-                            dispatch
-                            model.AddBuildingBlockState.ShowUnitTermSuggestions
-                            model.AddBuildingBlockState.HasUnitTermSuggestionsLoading
-                            (createUnitTermSuggestions model dispatch)
-                    ]
+                    AutocompleteSearch.autocompleteSearchComponent
+                        dispatch
+                        model.SiteStyleState.ColorMode
+                        "Start typing to search"
+                        None
+                        (AutocompleteSearch.AutocompleteParameters.ofAddBuildingBlockUnitState model.AddBuildingBlockState)
+
+
                 ]
             | _ -> ()
         ]
@@ -172,17 +164,15 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                                         Button.CustomClass "is-danger"
                                         Button.Props [Disabled true]
                                     Button.IsFullWidth
-                                    //TODO: add fill support via Excel interop here
                                     Button.OnClick (
                                         let format =
-                                            match model.AddBuildingBlockState.UnitTerm with
-                                            | Some unit ->
-                                                sprintf "0.00 \"%s\"" unit.Name
-                                            | _ -> "0.00"
+                                            match model.AddBuildingBlockState.UnitTermSearchText with
+                                            | "" -> "0.00"
+                                            | str ->
+                                                sprintf "0.00 \"%s\"" str
                                         let colName = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
                                         fun _ -> (colName,format) |> AddColumn |> ExcelInterop |> dispatch
                                     )
-
                                 ] [
                     str "Insert this annotation building block"
                 ]
