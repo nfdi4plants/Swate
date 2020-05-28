@@ -175,7 +175,7 @@ let autocompleteSearchComponent
     (autocompleteParams     : AutocompleteParameters)
 
     = 
-    Control.div [] [
+    Control.div [Control.IsExpanded] [
         Input.input [   Input.Placeholder inputPlaceholderText
                         match inputSize with
                         | Some size -> Input.Size size

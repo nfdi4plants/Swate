@@ -16,7 +16,7 @@ let isValidBuildingBlock (block : AnnotationBuildingBlock) =
     match block.Type with
     | Parameter | Characteristics | Factor ->
         block.Name.Length > 0
-    | Sample | Data ->
+    | Sample | Data | Source ->
         true
     | _ -> false
 
@@ -50,7 +50,9 @@ let isValidBuildingBlock (block : AnnotationBuildingBlock) =
 let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block: AnnotationBuildingBlockType )  =
     Dropdown.Item.a [
         Dropdown.Item.Props [
+            TabIndex 0
             OnClick (fun _ -> AnnotationBuildingBlock.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
+            OnKeyDown (fun k -> if (int k.keyCode) = 13 then AnnotationBuildingBlock.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
             colorControl model.SiteStyleState.ColorMode
         ]
 
