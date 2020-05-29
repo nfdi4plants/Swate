@@ -83,6 +83,7 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Msg -> unit) =
 let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
     form [
         OnSubmit (fun e -> e.preventDefault())
+        OnKeyDown (fun k -> if (int k.keyCode) = 13 then k.preventDefault())
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
 
@@ -113,12 +114,13 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                 Control.div [Control.IsExpanded] [
                     match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
                     | Parameter | Characteristics | Factor ->
-                        AutocompleteSearch.autocompleteSearchComponent
+                        AutocompleteSearch.autocompleteTermSearchComponent
                             dispatch
                             model.SiteStyleState.ColorMode
+                            model
                             "Start typing to search"
                             None
-                            (AutocompleteSearch.AutocompleteParameters.ofAddBuildingBlockState model.AddBuildingBlockState)
+                            (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockState model.AddBuildingBlockState)
                         
                     | _ -> ()
                 ]
@@ -143,12 +145,13 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                             str (sprintf "This %s has a unit:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString ))
                         ]
                     ]
-                    AutocompleteSearch.autocompleteSearchComponent
+                    AutocompleteSearch.autocompleteTermSearchComponent
                         dispatch
                         model.SiteStyleState.ColorMode
+                        model
                         "Start typing to search"
                         None
-                        (AutocompleteSearch.AutocompleteParameters.ofAddBuildingBlockUnitState model.AddBuildingBlockState)
+                        (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState)
 
 
                 ]

@@ -53,6 +53,7 @@ let init (pageOpt: Routing.Page option) : Model * Cmd<Msg> =
 
 
 let view (model : Model) (dispatch : Msg -> unit) =
+
     match model.PageState.CurrentPage with
     | Routing.Page.TermSearch ->
         BaseView.baseViewComponent model dispatch [

@@ -44,12 +44,13 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
         br []
 
-        AutocompleteSearch.autocompleteSearchComponent
+        AutocompleteSearch.autocompleteTermSearchComponent
             dispatch
             model.SiteStyleState.ColorMode
+            model
             "Start typing to search for terms"
             (Some Size.IsLarge)
-            (AutocompleteSearch.AutocompleteParameters.ofTermSearchState model.TermSearchState)
+            (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
 
         //Control.div [] [
             
@@ -73,7 +74,8 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
 
 let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
     form [
-        OnSubmit (fun e -> e.preventDefault())
+        OnSubmit    (fun e -> e.preventDefault())
+        OnKeyDown   (fun k -> if (int k.keyCode) = 13 then k.preventDefault())
     ] [
         simpleSearchComponent model dispatch
 

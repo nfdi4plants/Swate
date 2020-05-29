@@ -177,15 +177,21 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
 
 let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (currentState:AdvancedSearchState) : AdvancedSearchState * Cmd<Msg> =
     match advancedTermSearchMsg with
-    |SearchOntologyTextChange newOntology ->
+    | ToggleModal ->
         let nextState = {
             currentState with
-                ShowOntologySuggestions = newOntology.Length > 0
-                OntologySearchText = newOntology
+                HasModalVisible = (not currentState.HasModalVisible)
         }
 
         nextState,Cmd.none
 
+    | ToggleOntologyDropdown ->
+        let nextState = {
+            currentState with
+                HasOntologyDropdownVisible = (not currentState.HasOntologyDropdownVisible)
+        }
+
+        nextState,Cmd.none
     | OntologySuggestionUsed suggestion ->
 
         let nextAdvancedSearchOptions = {
@@ -195,11 +201,9 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
 
         let nextState = {
             currentState with
-                OntologySearchText      = suggestion.Name
                 AdvancedSearchOptions   = nextAdvancedSearchOptions
-                ShowOntologySuggestions = false
             }
-        nextState, Cmd.none
+        nextState, Cmd.ofMsg (AdvancedSearch ToggleOntologyDropdown)
 
     | AdvancedSearchOptionsChange opts ->
 

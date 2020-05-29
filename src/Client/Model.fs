@@ -60,8 +60,6 @@ type AdvancedTermSearchOptions = {
             KeepObsolete            = true
         }
 
-//TO-DO refactor model to different types as it already has become quite complicated
-
 type TermSearchState = {
     TermSearchText          : string
     TermSuggestions         : DbDomain.Term []
@@ -76,22 +74,22 @@ type TermSearchState = {
     }
 
 type AdvancedSearchState = {
-    OntologySearchText              : string
-    HasOntologySuggestionsLoading   : bool
-    ShowOntologySuggestions         : bool
+    HasModalVisible                 : bool
+    HasOntologyDropdownVisible      : bool
     AdvancedSearchOptions           : AdvancedTermSearchOptions
     AdvancedSearchTermResults       : DbDomain.Term []
     HasAdvancedSearchResultsLoading : bool
     ShowAdvancedSearchResults       : bool
+    SelectedResult                  : DbDomain.Term option
 } with
     static member init () = {
-        OntologySearchText              = ""
-        HasOntologySuggestionsLoading   = false
-        ShowOntologySuggestions         = false
+        HasModalVisible                 = false
+        HasOntologyDropdownVisible      = false
         AdvancedSearchOptions           = AdvancedTermSearchOptions.init ()
         AdvancedSearchTermResults       = [||]
         HasAdvancedSearchResultsLoading = false
         ShowAdvancedSearchResults       = false
+        SelectedResult                  = None
     }
 
 type SiteStyleState = {
@@ -206,7 +204,7 @@ type AnnotationBuildingBlockType =
         | Sample            -> "Use sample columns to mark the name of the sample that your experimental workflow produced."
         | Data              -> "Use data columns to mark the data file name that your computational analysis produced"
         | Source            -> "Attention: you normally dont have to add this manually if you initialize an annotation table. The Source column defines the organism that is subject to your study. It is the first column of every study file."
-        | _                 -> "You should not be able to see this text."
+        | _                 -> "Please select an annotation building block."
 
     static member toLongExplanation = function
         | Parameter         -> "Placeholder pls ignore"

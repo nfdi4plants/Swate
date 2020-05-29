@@ -14,83 +14,111 @@ open Update
 open Shared
 open Fable.Core
 
-type AutocompleteSuggestion = {
+type AutocompleteSuggestion<'SearchResult> = {
     Name            : string
     ID              : string
     TooltipText     : string
     Status          : string
     StatusIsWarning : bool
+    Data            : 'SearchResult 
 }
 with
-    static member ofTerm (term:DbDomain.Term) = {
+    static member ofTerm (term:DbDomain.Term) : AutocompleteSuggestion<DbDomain.Term> = {
         Name            = term.Name
         ID              = term.Accession
         TooltipText     = term.Definition
         Status          = if term.IsObsolete then "obsolete" else ""
         StatusIsWarning = term.IsObsolete
+        Data            = term
     }
 
-    static member ofOntology (ont:DbDomain.Ontology) = {
+    static member ofOntology (ont:DbDomain.Ontology) : AutocompleteSuggestion<DbDomain.Ontology> = {
         Name            = ont.Name
         ID              = ont.CurrentVersion
         TooltipText     = ont.Definition
         Status          = ""
         StatusIsWarning = false
+        Data            = ont
     }
         
 
-type AutocompleteParameters = {
+type AutocompleteParameters<'SearchResult> = {
     StateBinding            : string
-    Suggestions             : AutocompleteSuggestion []
+    Suggestions             : AutocompleteSuggestion<'SearchResult> []
     MaxItems                : int
     DropDownIsVisible       : bool
     DropDownIsLoading       : bool
-    AlternativeSearchText   : string
+
     OnInputChangeMsg        : (string -> Msg)
-    OnSuggestionSelect      : (AutocompleteSuggestion -> Msg)
-    OnAlternativeSearch     : Msg
+    OnSuggestionSelect      : ('SearchResult -> Msg)
+
+    HasAdvancedSearch       : bool
+    AdvancedSearchLinkText  : string
+    OnAdvancedSearch        : ('SearchResult -> Msg)
 }
 with
-    static member ofTermSearchState (state:TermSearchState) = {
+    static member ofTermSearchState (state:TermSearchState) : AutocompleteParameters<DbDomain.Term> = {
         StateBinding            = state.TermSearchText
-        Suggestions             = state.TermSuggestions |> Array.map AutocompleteSuggestion.ofTerm
+        Suggestions             = state.TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowSuggestions
         DropDownIsLoading       = state.HasSuggestionsLoading
-        AlternativeSearchText   = "Cant find the Term you are looking for?"
+
         OnInputChangeMsg        = (SearchTermTextChange >> TermSearch )
-        OnSuggestionSelect      = (fun sugg -> sugg.Name |> TermSuggestionUsed |> TermSearch)
-        OnAlternativeSearch     = DoNothing
+        OnSuggestionSelect      = (fun (term:DbDomain.Term) -> term.Name |> TermSuggestionUsed |> TermSearch)
+
+        HasAdvancedSearch       = true
+        AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
+        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term.Name |> SearchTermTextChange |> TermSearch )
     }
 
-    static member ofAddBuildingBlockState (state:AddBuildingBlockState) = {
+    //static member ofAdvancedSearchStateWithStorage (searchState:AdvancedSearchState) (storageState : PersistentStorageState) : AutocompleteParameters<DbDomain.Ontology> = {
+    //    StateBinding            = searchState.OntologySearchText
+    //    Suggestions             = storageState.SearchableOntologies |> Array.map (snd >> AutocompleteSuggestion<DbDomain.Ontology>.ofOntology)
+    //    MaxItems                = 5
+    //    DropDownIsVisible       = searchState.ShowOntologySuggestions
+    //    DropDownIsLoading       = searchState.HasOntologySuggestionsLoading
+
+    //    OnInputChangeMsg        = (SearchOntologyTextChange >> AdvancedSearch )
+    //    OnSuggestionSelect      = (fun sugg -> sugg.Name |> TermSuggestionUsed |> TermSearch)
+
+    //    HasAdvancedSearch       = false
+    //    AdvancedSearchLinkText  = "Seems like the ontology you are looking for is not in our database."
+    //    OnAdvancedSearch        = (fun _ -> DoNothing)
+    //}
+
+    static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
         StateBinding            = state.CurrentBuildingBlock.Name
-        Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion.ofTerm
+        Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowBuildingBlockNameSuggestions
         DropDownIsLoading       = state.HasBuildingBlockNameSuggestionsLoading
-        AlternativeSearchText   = "Cant find the Term you are looking for?"
+
         OnInputChangeMsg        = (BuildingBlockNameChange >> AddBuildingBlock)
         OnSuggestionSelect      = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
-        OnAlternativeSearch     = DoNothing
+
+        HasAdvancedSearch       = true
+        AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
+        OnAdvancedSearch        = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
     }
 
-    static member ofAddBuildingBlockUnitState (state:AddBuildingBlockState) = {
+    static member ofAddBuildingBlockUnitState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
         StateBinding            = state.UnitTermSearchText
-        Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion.ofTerm
+        Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowUnitTermSuggestions
         DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
-        AlternativeSearchText   = "Can't find the unit you are looking for?"
+        AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
         OnInputChangeMsg        = (SearchUnitTermTextChange >> AddBuildingBlock)
         OnSuggestionSelect      = (fun sugg -> sugg.Name |> UnitTermSuggestionUsed |> AddBuildingBlock)
-        OnAlternativeSearch     = DoNothing
+        HasAdvancedSearch       = true
+        OnAdvancedSearch        = (fun sugg -> sugg.Name |> UnitTermSuggestionUsed |> AddBuildingBlock)
     }
 
 let createAutocompleteSuggestions
     (dispatch: Msg -> unit)
     (colorMode:ColorMode)
-    (autocompleteParams: AutocompleteParameters)
+    (autocompleteParams: AutocompleteParameters<'SearchResult>)
     =
 
     let suggestions = 
@@ -99,8 +127,8 @@ let createAutocompleteSuggestions
             |> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
             |> Array.map (fun sugg ->
                 tr [
-                    OnClick (fun _ -> sugg |> autocompleteParams.OnSuggestionSelect |> dispatch)
-                    OnKeyDown (fun k -> if (int k.keyCode) = 13 then sugg |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                    OnClick (fun _ -> sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                    OnKeyDown (fun k -> if (int k.keyCode) = 13 then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
                     TabIndex 0
                     colorControl colorMode
                     Class "suggestion"
@@ -127,9 +155,9 @@ let createAutocompleteSuggestions
             colorControl colorMode
             Class "suggestion"
         ][
-            td [] [
-                str autocompleteParams.AlternativeSearchText
-                a [OnClick (fun _ -> autocompleteParams.OnAlternativeSearch |> dispatch)] [
+            td [ColSpan 4] [
+                str (sprintf "%s " autocompleteParams.AdvancedSearchLinkText)
+                a [OnClick (fun _ -> ToggleModal |> AdvancedSearch |> dispatch)] [
                     str "Use Advanced Search"
                 ] 
             ]
@@ -167,15 +195,17 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
         ]
     ]
 
-let autocompleteSearchComponent 
+let autocompleteTermSearchComponent
     (dispatch: Msg -> unit)
     (colorMode:ColorMode)
+    (model:Model)
     (inputPlaceholderText   : string)
     (inputSize              : ISize option)
-    (autocompleteParams     : AutocompleteParameters)
+    (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
 
     = 
     Control.div [Control.IsExpanded] [
+        AdvancedSearch.advancedSearchModal model dispatch autocompleteParams.OnAdvancedSearch
         Input.input [   Input.Placeholder inputPlaceholderText
                         match inputSize with
                         | Some size -> Input.Size size

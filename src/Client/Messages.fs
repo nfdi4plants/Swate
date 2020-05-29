@@ -25,7 +25,8 @@ type TermSearchMsg =
     | NewSuggestions            of DbDomain.Term []
 
 type AdvancedSearchMsg =
-    | SearchOntologyTextChange      of string
+    | ToggleModal
+    | ToggleOntologyDropdown
     | AdvancedSearchOptionsChange   of AdvancedTermSearchOptions
     | AdvancedSearchResultUsed      of string
     | OntologySuggestionUsed        of DbDomain.Ontology
