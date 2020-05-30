@@ -16,6 +16,7 @@ group Client
     framework: netstandard2.0
     storage: none
 
+    nuget Fable.Browser.MediaQueryList
     nuget Fable.Core ~> 3
     nuget Fable.Elmish ~> 3
     nuget Fable.Elmish.Debugger ~> 3

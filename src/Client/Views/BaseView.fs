@@ -6,6 +6,9 @@ open Fulma
 open ExcelColors
 open Model
 open Messages
+open Browser
+open Browser.MediaQueryList
+open Browser.MediaQueryListExtensions
 
 open CustomComponents
 
@@ -22,7 +25,14 @@ let createNavigationTab (pageLink: Routing.Page) (model:Model) (dispatch:Msg-> u
                     BorderBottomColor model.SiteStyleState.ColorMode.Accent
             ]
         ] [
-            Text.span [] [str (Routing.Page.toString pageLink)]
+            Text.span [] [
+                let mediaQuery = window.matchMedia("(min-width:575px)")
+                if mediaQuery.matches then
+                    str (pageLink |> Routing.Page.toString)
+                else
+                    pageLink |> Routing.Page.toIcon
+            ]
+
         ]
     ]
 
@@ -40,6 +50,7 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                 Tabs.Props [
                     Style [
                         BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
+                        OverflowX OverflowOptions.Hidden
                     ]
                 ]
             ] [

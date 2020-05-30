@@ -10,4 +10,4 @@ group Client
     Fulma.Extensions.Wikiki.Switch
     Fable.FontAwesome.Free
     Thoth.Elmish.Debouncer
-
+    Fable.Browser.MediaQueryList
