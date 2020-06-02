@@ -108,11 +108,15 @@ let addAnnotationColumn (colName:string) =
             //create an empty column to insert
             let testCol = createEmptyMatrixForTables 1 rowCount ""
 
-            let _ =
+            let createdCol =
                 annotationTable.columns.add(
                     colCount,
                     values = U4.Case1 testCol, name=colName
                 )
+            let autofitRange = createdCol.getRange()
+
+            autofitRange.format.autofitColumns()
+            autofitRange.format.autofitRows()
             sprintf "%s column was added." colName
         )
     )

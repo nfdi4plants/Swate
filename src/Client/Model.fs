@@ -74,22 +74,26 @@ type TermSearchState = {
     }
 
 type AdvancedSearchState = {
-    HasModalVisible                 : bool
-    HasOntologyDropdownVisible      : bool
-    AdvancedSearchOptions           : AdvancedTermSearchOptions
-    AdvancedSearchTermResults       : DbDomain.Term []
-    HasAdvancedSearchResultsLoading : bool
-    ShowAdvancedSearchResults       : bool
-    SelectedResult                  : DbDomain.Term option
+    ModalId                             : string
+    HasModalVisible                     : bool
+    HasOntologyDropdownVisible          : bool
+    AdvancedSearchOptions               : AdvancedTermSearchOptions
+    AdvancedSearchTermResults           : DbDomain.Term []
+    HasAdvancedSearchResultsLoading     : bool
+    ShowAdvancedSearchResults           : bool
+    AdvancedSearchResultPageinationIndex: int
+    SelectedResult                      : DbDomain.Term option
 } with
     static member init () = {
-        HasModalVisible                 = false
-        HasOntologyDropdownVisible      = false
-        AdvancedSearchOptions           = AdvancedTermSearchOptions.init ()
-        AdvancedSearchTermResults       = [||]
-        HasAdvancedSearchResultsLoading = false
-        ShowAdvancedSearchResults       = false
-        SelectedResult                  = None
+        ModalId                             = ""
+        HasModalVisible                     = false
+        HasOntologyDropdownVisible          = false
+        AdvancedSearchOptions               = AdvancedTermSearchOptions.init ()
+        AdvancedSearchTermResults           = [||]
+        HasAdvancedSearchResultsLoading     = false
+        ShowAdvancedSearchResults           = false
+        AdvancedSearchResultPageinationIndex= 0
+        SelectedResult                      = None
     }
 
 type SiteStyleState = {

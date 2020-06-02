@@ -23,9 +23,9 @@
         <Compile Include="CustomComponents\AnnotationTableMissingWarning.fs" />
         <Compile Include="CustomComponents\Navbar.fs" />
         <Compile Include="CustomComponents\Loading.fs" />
+        <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
-        <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="Views\BaseView.fs" />
         <Compile Include="Views\LandingPageView.fs" />
         <Compile Include="Views\AdvancedSearchView.fs" />

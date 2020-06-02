@@ -25,12 +25,16 @@ type TermSearchMsg =
     | NewSuggestions            of DbDomain.Term []
 
 type AdvancedSearchMsg =
-    | ToggleModal
+    | ResetAdvancedSearchState
+    | ResetAdvancedSearchOptions
+    | ToggleModal                   of string
     | ToggleOntologyDropdown
     | AdvancedSearchOptionsChange   of AdvancedTermSearchOptions
-    | AdvancedSearchResultUsed      of string
+    | AdvancedSearchResultSelected  of DbDomain.Term
     | OntologySuggestionUsed        of DbDomain.Ontology
+    | StartAdvancedSearch
     | NewAdvancedSearchResults      of DbDomain.Term []
+    | ChangePageinationIndex        of int
 
 type DevMsg =
     | LogTableMetadata

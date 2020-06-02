@@ -14,13 +14,14 @@ open CustomComponents
 
 let createNavigationTab (pageLink: Routing.Page) (model:Model) (dispatch:Msg-> unit) =
     let isActive = (model.PageState.CurrentPage = pageLink)
-    Tabs.tab [Tabs.Tab.IsActive isActive] [
+    Tabs.tab [Tabs.Tab.IsActive isActive;] [
         a [ Href (Routing.Page.toPath pageLink)
             Style [
                 if isActive then
                     BorderColor model.SiteStyleState.ColorMode.Accent
                     BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
                     Color model.SiteStyleState.ColorMode.Accent
+                    BorderBottomColor model.SiteStyleState.ColorMode.BodyBackground
                 else
                     BorderBottomColor model.SiteStyleState.ColorMode.Accent
             ]

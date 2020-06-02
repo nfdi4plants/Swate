@@ -177,9 +177,27 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
 
 let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (currentState:AdvancedSearchState) : AdvancedSearchState * Cmd<Msg> =
     match advancedTermSearchMsg with
-    | ToggleModal ->
+    | ResetAdvancedSearchOptions ->
         let nextState = {
             currentState with
+                AdvancedSearchOptions = AdvancedTermSearchOptions.init()
+                ShowAdvancedSearchResults = false
+        }
+
+        nextState,Cmd.none
+
+    | AdvancedSearchResultSelected selectedTerm ->
+        let nextState = {
+            currentState with
+                SelectedResult = Some selectedTerm     
+        }
+
+        nextState,Cmd.none
+
+    | ToggleModal modalId ->
+        let nextState = {
+            currentState with
+                ModalId = modalId
                 HasModalVisible = (not currentState.HasModalVisible)
         }
 
@@ -192,6 +210,7 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
         }
 
         nextState,Cmd.none
+
     | OntologySuggestionUsed suggestion ->
 
         let nextAdvancedSearchOptions = {
@@ -214,10 +233,28 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
 
         nextState,Cmd.none
 
-    | AdvancedSearchResultUsed (res) ->
-        let nextState = AdvancedSearchState.init()
+    | StartAdvancedSearch ->
+
+        let nextState = {
+            currentState with
+                ShowAdvancedSearchResults       = true
+                HasAdvancedSearchResultsLoading = true
             
-        nextState,Cmd.ofMsg (res |> TermSuggestionUsed |> TermSearch)
+        }
+
+        let nextCmd =
+            currentState.AdvancedSearchOptions
+            |> GetNewAdvancedTermSearchResults
+            |> Request
+            |> Api
+            |> Cmd.ofMsg
+
+        nextState,nextCmd
+
+    | ResetAdvancedSearchState ->
+        let nextState = AdvancedSearchState.init()
+
+        nextState,Cmd.none
 
     | NewAdvancedSearchResults results ->
         let nextState = {
@@ -225,6 +262,14 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
                 AdvancedSearchTermResults       = results
                 ShowAdvancedSearchResults       = true
                 HasAdvancedSearchResultsLoading = false
+        }
+
+        nextState,Cmd.none
+
+    | ChangePageinationIndex index ->
+        let nextState = {
+            currentState with
+                AdvancedSearchResultPageinationIndex = index
         }
 
         nextState,Cmd.none
@@ -642,7 +687,7 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
         nextState,Cmd.none
 
     | BuildingBlockNameSuggestionUsed nameSuggestion ->
-
+        
         let nextBB = {
             currentState.CurrentBuildingBlock with
                 Name = nameSuggestion
