@@ -142,10 +142,35 @@ Target.create "InstallOfficeAddinTooling" (fun _ ->
 
     printfn "Installing office addin tooling"
 
-    runTool npmTool "install -g office-dev-certs" __SOURCE_DIRECTORY__
+    runTool npmTool "install -g office-addin-dev-certs" __SOURCE_DIRECTORY__
     runTool npmTool "install -g office-addin-debugging" __SOURCE_DIRECTORY__
     runTool npmTool "install -g office-addin-manifest" __SOURCE_DIRECTORY__
 
+)
+
+Target.create "WebpackConfigSetup" (fun _ ->
+    let userPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+
+    Shell.replaceInFiles
+        [
+            "{USERFOLDER}",userPath.Replace("\\","/")
+        ]
+        [
+            (Path.combine __SOURCE_DIRECTORY__ "webpack.config.js")
+        ]
+
+)
+
+
+Target.create "SetLoopbackExempt" (fun _ ->
+    Command.RawCommand("CheckNetIsolation.exe",Arguments.ofList [
+        "LoopbackExempt"
+        "-a"
+        "-n=\"microsoft.win32webviewhost_cw5n1h2txyewy\""
+    ])
+    |> CreateProcess.fromCommand
+    |> Proc.run
+    |> ignore
 )
 
 Target.create "CreateDevCerts" (fun _ ->
@@ -195,7 +220,9 @@ open Fake.Core.TargetOperators
 ==> "OfficeDebug"
 
 "InstallOfficeAddinTooling"
+==> "WebpackConfigSetup"
 ==> "CreateDevCerts"
+==> "SetLoopbackExempt"
 ==> "Setup"
 
 Target.runOrDefaultWithArguments "Build"
