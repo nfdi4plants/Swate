@@ -1,23 +1,14 @@
 module OntologyDB
 
 
-open System.Data.SqlClient
+open Microsoft.Data.SqlClient
 open System.Data
 open System
+
 open Shared
 
 let establishConnection () = 
     let connectionString = @"Data Source=localhost;Initial Catalog=AnnotatorTest;Integrated Security=True"
-        
-        //let cStringPath =
-        //    ServerPath.resolve ["."; "connectionstring.txt"]
-        //seq {
-        //    use sr = new System.IO.StreamReader (cStringPath)
-        //    while not sr.EndOfStream do
-        //        yield sr.ReadLine ()
-        //}
-        //|> String.concat ""
-    //printfn "establishing connection?"
     new SqlConnection(connectionString)
 
 let insertOntology (name:string) (currentVersion:string) (definition:string) (dateCreated:System.DateTime) (userID:string)=

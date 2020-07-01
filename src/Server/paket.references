@@ -2,4 +2,4 @@ group Server
     FSharp.Core
     Saturn
     Fable.Remoting.Giraffe
-    System.Data.SqlClient
+    Microsoft.Data.SqlClient

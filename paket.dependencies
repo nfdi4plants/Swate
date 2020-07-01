@@ -2,18 +2,19 @@ source https://www.nuget.org/api/v2
 
 group Server
     source https://api.nuget.org/v3/index.json
-    framework: netcoreapp3.0
+    framework: netcoreapp3.1
     storage: none
 
     nuget FSharp.Core
-    nuget Saturn
-    nuget Microsoft.AspNetCore.Authentication.JwtBearer 3.0.2 // pin for netcoreapp30
+    nuget Saturn >= 0.14.1
+    nuget Microsoft.AspNetCore.Authentication.JwtBearer
     nuget Fable.Remoting.Giraffe ~> 3
-    nuget System.Data.SqlClient
+    nuget Microsoft.Data.SqlClient
+    nuget Microsoft.Extensions.Configuration.UserSecrets
 
 group Client
     source https://api.nuget.org/v3/index.json
-    framework: netstandard2.0
+    framework: netstandard2.1
     storage: none
 
     nuget Fable.Browser.MediaQueryList
@@ -33,7 +34,7 @@ group Client
 
 group Build
     source https://api.nuget.org/v3/index.json
-    framework: netstandard2.0
+    framework: netstandard2.1
     storage: none
 
     nuget FSharp.Core
