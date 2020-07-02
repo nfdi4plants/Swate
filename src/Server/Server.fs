@@ -11,6 +11,9 @@ open Shared
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Microsoft.Extensions.Logging
+open Microsoft.Extensions.Configuration
+open Microsoft.Extensions.Configuration.UserSecrets
+open Microsoft.AspNetCore.Hosting
 
 let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" -> None | x -> Some x
 
@@ -18,26 +21,28 @@ let publicPath = Path.GetFullPath "../Client/public"
 
 let port = 8080us
 
-let annotatorApi = {
+let connectionString = System.Environment.GetEnvironmentVariable("AnnotatorTestDbCS")
+
+let annotatorApi cString = {
 
     //Ontology related requests
     testOntologyInsert = fun (name,version,definition,created,user) ->
         async {
-            let createdEntry = OntologyDB.insertOntology name version definition created user
+            let createdEntry = OntologyDB.insertOntology cString name version definition created user
             printfn "created ontology entry: \t%A" createdEntry
             return createdEntry
         }
 
     getAllOntologies = fun () ->
         async {
-            let results = OntologyDB.getAllOntologies ()
+            let results = OntologyDB.getAllOntologies cString ()
             return results
         }
 
     // Term related requests
     getTermSuggestions = fun (max:int,typedSoFar:string) ->
         async {
-            let like = OntologyDB.getTermSuggestions typedSoFar
+            let like = OntologyDB.getTermSuggestions cString typedSoFar
             let searchSet = typedSoFar |> Suggestion.createBigrams
 
             return
@@ -52,13 +57,13 @@ let annotatorApi = {
     getTermsForAdvancedSearch = fun (ont,startsWith,mustContain,endsWith,keepObsolete,definitionMustContain) ->
         async {
             let result =
-                OntologyDB.getAdvancedTermSearchResults ont startsWith mustContain endsWith keepObsolete definitionMustContain
+                OntologyDB.getAdvancedTermSearchResults cString ont startsWith mustContain endsWith keepObsolete definitionMustContain
             return result
         }
 
     getUnitTermSuggestions = fun (max:int,typedSoFar:string) ->
         async {
-            let like = OntologyDB.getUnitTermSuggestions typedSoFar
+            let like = OntologyDB.getUnitTermSuggestions cString typedSoFar
             let searchSet = typedSoFar |> Suggestion.createBigrams
 
             return
@@ -82,10 +87,10 @@ let apiDocumentation =
         |> docs.example<@ fun api -> api.testOntologyInsert ("Name","SooSOSO","FIIIF",System.DateTime.UtcNow,"MEEM") @>
     ]
 
-let webApp =
+let webApp cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue annotatorApi
+    |> Remoting.fromValue (annotatorApi cString)
     |> Remoting.withDocs "/api/docs" apiDocumentation
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
@@ -95,7 +100,22 @@ let webApp =
 
 let topLevelRouter = router {
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
-    forward "/api" webApp
+    //Never ever use this in production lol
+    //get "/test/test2" (fun next ctx ->
+        
+    //    let settings = ctx.GetService<IConfiguration>()
+    //    let cString = settings.["Swate:ConnectionString"]
+
+    //    htmlString (sprintf "<h1>Here is a secret: %s</h1>" cString) next ctx
+    //)
+    forward "/api" (fun next ctx ->
+
+        let settings = ctx.GetService<IConfiguration>()
+        let cString = settings.["Swate:ConnectionString"]
+
+        webApp cString next ctx
+
+    )
 
 }
 
@@ -109,4 +129,14 @@ let app = application {
     logging (fun (builder: ILoggingBuilder) -> builder.SetMinimumLevel(LogLevel.Warning) |> ignore)
 }
 
-run app
+
+
+
+app
+    .ConfigureAppConfiguration(
+        System.Action<Microsoft.Extensions.Hosting.HostBuilderContext,IConfigurationBuilder> ( fun ctx config ->
+            config.AddUserSecrets("6de80bdf-2a05-4cf7-a1a8-d08581dfa887") |> ignore
+        )
+)
+|> run
+

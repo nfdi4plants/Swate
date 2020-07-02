@@ -7,13 +7,12 @@ open System
 
 open Shared
 
-let establishConnection () = 
-    let connectionString = @"Data Source=localhost;Initial Catalog=AnnotatorTest;Integrated Security=True"
-    new SqlConnection(connectionString)
+let establishConnection cString = 
+    new SqlConnection(cString)
 
-let insertOntology (name:string) (currentVersion:string) (definition:string) (dateCreated:System.DateTime) (userID:string)=
+let insertOntology cString (name:string) (currentVersion:string) (definition:string) (dateCreated:System.DateTime) (userID:string)=
 
-    use connection = establishConnection()
+    use connection = establishConnection cString
     connection.Open()
     use insertOntologyCmd = connection.CreateCommand()
 
@@ -49,9 +48,9 @@ SELECT max(ID) FROM Ontology"""
     | false -> failwith "Inserting ontology failed."
 
 
-let insertTerm (accession:string) (ontologyID:int64) (name:string) (definition:string) (xrefvaluetype: string option) (isObsolete:bool) =
+let insertTerm cString (accession:string) (ontologyID:int64) (name:string) (definition:string) (xrefvaluetype: string option) (isObsolete:bool) =
     
-    use connection = establishConnection()
+    use connection = establishConnection cString
     connection.Open()
     use insertTermCmd = connection.CreateCommand()
 
@@ -91,9 +90,9 @@ SELECT max(ID) FROM Term"""
             isObsolete
     | false -> failwith "Inserting term failed."
 
-let getTermSuggestions (query:string) =
+let getTermSuggestions cString (query:string) =
     
-    use connection = establishConnection()
+    use connection = establishConnection cString
     connection.Open()
     use getTermSuggestionsCmd = new SqlCommand("getTermSuggestions",connection)
     getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
@@ -119,9 +118,9 @@ let getTermSuggestions (query:string) =
                     (reader.GetBoolean(6))
     |]
 
-let getUnitTermSuggestions (query:string) =
+let getUnitTermSuggestions cString (query:string) =
     
-    use connection = establishConnection()
+    use connection = establishConnection cString
     connection.Open()
     use getTermSuggestionsCmd = new SqlCommand("getUnitTermSuggestions",connection)
     getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
@@ -148,9 +147,9 @@ let getUnitTermSuggestions (query:string) =
     |]
 
 
-let getAllOntologies () =
+let getAllOntologies cString () =
     
-    use connection = establishConnection()
+    use connection = establishConnection cString
     connection.Open()
     use getAllOntologiesCmd = new SqlCommand("getAllOntologies",connection)
     getAllOntologiesCmd.CommandType <- CommandType.StoredProcedure
@@ -168,9 +167,9 @@ let getAllOntologies () =
                     (reader.GetString(5))
     |]
 
-let getAdvancedTermSearchResults (ont : DbDomain.Ontology option) (startsWith : string) (mustContain:string) (endsWith:string) (keepObsolete:bool) (definitionMustContain:string) =
+let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (startsWith : string) (mustContain:string) (endsWith:string) (keepObsolete:bool) (definitionMustContain:string) =
     
-    use connection = establishConnection()
+    use connection = establishConnection cString
     connection.Open()
     use advancedTermSearchCmd = new SqlCommand("advancedTermSearch",connection)
     advancedTermSearchCmd.CommandType <- CommandType.StoredProcedure
