@@ -83,13 +83,12 @@ let createAnnotationTable (isDark:bool) =
 
 let checkIfAnnotationTableIsPresent () =
     Excel.run(fun context ->
-        let tableRange = context.workbook.getSelectedRange()
         let sheet = context.workbook.worksheets.getActiveWorksheet()
-        //delete table with the same name if present because there can only be one chosen one <3
-        let table = sheet.tables.getItemOrNullObject("annotationTable")
+        let t = sheet.load(U2.Case1 "tables")
+        let table = t.tables.getItemOrNullObject("annotationTable")
         context.sync()
             .``then``( fun _ ->
-                not table.isNullObject
+                not table.isNullObject 
         )
     )
 
