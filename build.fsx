@@ -1,19 +1,27 @@
-#r "paket: groupref build //"
-#load "./.fake/build.fsx/intellisense.fsx"
+#r "paket:
+nuget BlackFox.Fake.BuildTask
+nuget Fake.Core.Target
+nuget Fake.Core.Process
+nuget Fake.Core.ReleaseNotes
+nuget Fake.IO.FileSystem
+nuget Fake.DotNet.Cli
+nuget Fake.DotNet.MSBuild
+nuget Fake.DotNet.AssemblyInfoFile
+nuget Fake.DotNet.Paket
+nuget Fake.DotNet.FSFormatting
+nuget Fake.DotNet.Fsi
+nuget Fake.DotNet.NuGet
+nuget Fake.Api.Github
+nuget Fake.DotNet.Testing.Expecto //"
 
-#if !FAKE
-#r "netstandard"
-#r "Facades/netstandard" // https://github.com/ionide/ionide-vscode-fsharp/issues/839#issuecomment-396296095
-#endif
+#load ".fake/build.fsx/intellisense.fsx"
 
 open System
-
 open Fake.Core
 open Fake.DotNet
 open Fake.IO
 
 Target.initEnvironment ()
-
 
 let serverPath = Path.getFullName "./src/Server"
 let clientPath = Path.getFullName "./src/Client"

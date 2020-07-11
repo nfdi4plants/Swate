@@ -31,15 +31,3 @@ group Client
     nuget Fable.FontAwesome.Free ~> 2
     nuget Thoth.Elmish.Debouncer ~> 1
     nuget Fable.Elmish.Browser ~> 3
-
-group Build
-    source https://api.nuget.org/v3/index.json
-    framework: netstandard2.1
-    storage: none
-
-    nuget FSharp.Core
-    nuget Fake.Core.ReleaseNotes
-    nuget Fake.Core.Target
-    nuget Fake.DotNet.Cli
-    nuget Fake.IO.FileSystem
-    nuget Fake.Core.Process
