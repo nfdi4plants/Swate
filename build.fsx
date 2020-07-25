@@ -146,6 +146,18 @@ Target.create "OfficeDebug" (fun _ ->
     |> ignore
 )
 
+
+Target.create "OfficeDebugRemote" (fun _ ->
+   
+    let officeDebug = async {
+         runTool npxTool "office-addin-debugging start tests/manifest.xml desktop --debug-method web" __SOURCE_DIRECTORY__
+    }
+
+    officeDebug 
+    |> Async.RunSynchronously
+    |> ignore
+)
+
 Target.create "InstallOfficeAddinTooling" (fun _ ->
 
     printfn "Installing office addin tooling"
