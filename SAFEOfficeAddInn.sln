@@ -60,6 +60,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{494903F3
 		tools\testDbSetup.fsx = tools\testDbSetup.fsx
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{A7CCC606-3646-4F94-9F59-79C75E413344}"
+	ProjectSection(SolutionItems) = preProject
+		tests\manifest.xml = tests\manifest.xml
+		tests\test.cmd = tests\test.cmd
+		tests\test.sh = tests\test.sh
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
