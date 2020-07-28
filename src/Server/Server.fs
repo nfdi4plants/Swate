@@ -12,6 +12,7 @@ open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Configuration
+open Microsoft.Extensions.Configuration.Json
 open Microsoft.Extensions.Configuration.UserSecrets
 open Microsoft.AspNetCore.Hosting
 
@@ -109,10 +110,9 @@ let topLevelRouter = router {
     //    htmlString (sprintf "<h1>Here is a secret: %s</h1>" cString) next ctx
     //)
     forward "/api" (fun next ctx ->
-
-        let settings = ctx.GetService<IConfiguration>()
-        let cString = settings.["Swate:ConnectionString"]
-
+        let cString = 
+            let settings = ctx.GetService<IConfiguration>()
+            settings.["Swate:ConnectionString"]
         webApp cString next ctx
 
     )
@@ -129,13 +129,11 @@ let app = application {
     logging (fun (builder: ILoggingBuilder) -> builder.SetMinimumLevel(LogLevel.Warning) |> ignore)
 }
 
-
-
-
 app
     .ConfigureAppConfiguration(
         System.Action<Microsoft.Extensions.Hosting.HostBuilderContext,IConfigurationBuilder> ( fun ctx config ->
             config.AddUserSecrets("6de80bdf-2a05-4cf7-a1a8-d08581dfa887") |> ignore
+            config.AddJsonFile("./Properties/production.json",true,true)  |> ignore
         )
 )
 |> run

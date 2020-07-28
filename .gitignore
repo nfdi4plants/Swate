@@ -14,3 +14,5 @@ release.sh
 *.DotSettings.user
 deploy
 .ionide/
+/SWATE_0.0.1-alpha_test_release.zip
+/src/Server/Properties/production.json
