@@ -28,17 +28,19 @@ You can also search existing issues for solutions for your questions and/or disc
 **Here are the necessary steps to use SWATE:**
 
 - Excel (rightfully) enforces https on all addins. We currently have only a self-signed certificate. 
-This means that you will have to install our certificate under Trusted Root Authorities. You will need to do this for either of the following methods.
+This means that you will have to install our certificate under `Trusted Root Certification Authorities`. You will need to do this for either of the following methods.
 You can find the .cert file in the test release archive.
 We recommend you to remove this certificate from your trusted sources when SWATE has an own certificate. 
 
  - **If you use Excel locally**:
    - Install [node.js LTS](https://nodejs.org/en/) (needed for office addin related tooling)
    - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
+   - If not done already, install `Swate_SelfSigned_Certificate.cer` under `Trusted Root Certification Authorities`
    - Execute the test.cmd (windows) or test.sh (macOS, you will need to make it executable via chmod a+x) script.
 
  - **If you use Excel in the browser**:
    - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
+   - If not done already, install `Swate_SelfSigned_Certificate.cer` under `Trusted Root Certification Authorities`
    - Launch Excel online, open a (blank) workbook 
    - Under the `Insert` tab, select `Add-Ins`
    - Go to `Manage my Add-Ins` and select `Upload my Add-In`
