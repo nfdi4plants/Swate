@@ -36,7 +36,7 @@ We recommend you to remove this certificate from your trusted sources when SWATE
    - Install [node.js LTS](https://nodejs.org/en/) (needed for office addin related tooling)
    - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
    - If not done already, install `Swate_SelfSigned_Certificate.cer` under `Trusted Root Certification Authorities`
-   - Execute the test.cmd (windows) or test.sh (macOS, you will need to make it executable via chmod a+x) script.
+   - Execute the test.cmd (windows, as administrator) or test.sh (macOS, you will need to make it executable via chmod a+x) script.
 
  - **If you use Excel in the browser**:
    - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
