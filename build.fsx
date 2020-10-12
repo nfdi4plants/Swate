@@ -1,32 +1,24 @@
-#r "paket:
-nuget BlackFox.Fake.BuildTask
-nuget Fake.Core.Target
-nuget Fake.Core.Process
-nuget Fake.Core.ReleaseNotes
-nuget Fake.IO.FileSystem
-nuget Fake.DotNet.Cli
-nuget Fake.DotNet.MSBuild
-nuget Fake.DotNet.AssemblyInfoFile
-nuget Fake.DotNet.Paket
-nuget Fake.DotNet.FSFormatting
-nuget Fake.DotNet.Fsi
-nuget Fake.DotNet.NuGet
-nuget Fake.Api.Github
-nuget Fake.DotNet.Testing.Expecto //"
+#r "paket: groupref build //"
+#load "./.fake/build.fsx/intellisense.fsx"
+#r "netstandard"
 
-#load ".fake/build.fsx/intellisense.fsx"
 
 open System
 open Fake.Core
 open Fake.DotNet
 open Fake.IO
+open Farmer
+open Farmer.Builders
 
 Target.initEnvironment ()
 
+let sharedPath = Path.getFullName "./src/Shared"
 let serverPath = Path.getFullName "./src/Server"
+let deployDir = Path.getFullName "./deploy"
 let clientPath = Path.getFullName "./src/Client"
 let clientDeployPath = Path.combine clientPath "deploy"
-let deployDir = Path.getFullName "./deploy"
+let sharedTestsPath = Path.getFullName "./tests/Shared"
+let serverTestsPath = Path.getFullName "./tests/Server"
 
 let release = ReleaseNotes.load "RELEASE_NOTES.md"
 
@@ -44,7 +36,8 @@ let platformTool tool winTool =
 let nodeTool = platformTool "node" "node.exe"
 let npmTool = platformTool "npm" "npm.cmd"
 let npxTool = platformTool "npx" "npx.cmd"
-
+let dockerComposeTool = platformTool "docker-compose" "docker-compose.exe"
+let dotnetUserSecretTool = "dotnet user-secrets"
 
 let runTool cmd args workingDir =
     let arguments = args |> String.split ' ' |> Arguments.OfArgs
@@ -55,10 +48,23 @@ let runTool cmd args workingDir =
     |> Proc.run
     |> ignore
 
-let runDotNet cmd workingDir =
-    let result =
-        Fake.DotNet.DotNet.exec (Fake.DotNet.DotNet.Options.withWorkingDirectory workingDir) cmd ""
-    if result.ExitCode <> 0 then failwithf "'dotnet %s' failed in %s" cmd workingDir
+let npm args workingDir =
+    let npmPath =
+        match ProcessUtils.tryFindFileOnPath "npm" with
+        | Some path -> path
+        | None ->
+            "npm was not found in path. Please install it and make sure it's available from your path. " +
+            "See https://safe-stack.github.io/docs/quickstart/#install-pre-requisites for more info"
+            |> failwith
+
+    let arguments = args |> String.split ' ' |> Arguments.OfArgs
+
+    Command.RawCommand (npmPath, arguments)
+    |> CreateProcess.fromCommand
+    |> CreateProcess.withWorkingDirectory workingDir
+    |> CreateProcess.ensureExitCode
+    |> Proc.run
+    |> ignore
 
 let openBrowser url =
     //https://github.com/dotnet/corefx/issues/10361
@@ -68,6 +74,9 @@ let openBrowser url =
     |> Proc.run
     |> ignore
 
+let runDotNet cmd workingDir =
+    let result = Fake.DotNet.DotNet.exec (Fake.DotNet.DotNet.Options.withWorkingDirectory workingDir) cmd ""
+    if result.ExitCode <> 0 then failwithf "'dotnet %s' failed in %s" cmd workingDir
 
 Target.create "Clean" (fun _ ->
     [ deployDir
@@ -119,6 +128,20 @@ Target.create "Run" (fun _ ->
     |> ignore
 )
 
+Target.create "StartMySqlDocker" (fun _ ->
+    runTool dockerComposeTool "-f .db\docker-compose.yml up" __SOURCE_DIRECTORY__
+)
+
+// not used yet. Errors with "Cannot access dotnet user-secret"
+Target.create "AddUserSecret" (fun _ ->
+    runTool
+        dotnetUserSecretTool
+        (sprintf
+            "set \"Swate:LocalConnectionString\" \"server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True\" --project \"%s\""
+            serverPath
+        )
+        __SOURCE_DIRECTORY__
+)
 
 Target.create "OfficeDebug" (fun _ ->
     let server = async {
@@ -131,6 +154,10 @@ Target.create "OfficeDebug" (fun _ ->
         runTool npxTool "webpack-dev-server" __SOURCE_DIRECTORY__
     }
 
+    let mySqlDocker = async {
+        runTool dockerComposeTool "-f .db\docker-compose.yml up" __SOURCE_DIRECTORY__
+    }
+
     let vsCodeSession = Environment.hasEnvironVar "vsCodeSession"
     let safeClientOnly = Environment.hasEnvironVar "safeClientOnly"
 
@@ -138,6 +165,7 @@ Target.create "OfficeDebug" (fun _ ->
         [
           yield officeDebug 
           yield client
+          yield mySqlDocker
           if not safeClientOnly then yield server
           ]
     tasks
@@ -145,7 +173,6 @@ Target.create "OfficeDebug" (fun _ ->
     |> Async.RunSynchronously
     |> ignore
 )
-
 
 Target.create "OfficeDebugRemote" (fun _ ->
    
@@ -165,7 +192,6 @@ Target.create "InstallOfficeAddinTooling" (fun _ ->
     runTool npmTool "install -g office-addin-dev-certs" __SOURCE_DIRECTORY__
     runTool npmTool "install -g office-addin-debugging" __SOURCE_DIRECTORY__
     runTool npmTool "install -g office-addin-manifest" __SOURCE_DIRECTORY__
-
 )
 
 Target.create "WebpackConfigSetup" (fun _ ->
@@ -181,7 +207,6 @@ Target.create "WebpackConfigSetup" (fun _ ->
 
 )
 
-
 Target.create "SetLoopbackExempt" (fun _ ->
     Command.RawCommand("CheckNetIsolation.exe",Arguments.ofList [
         "LoopbackExempt"
@@ -192,6 +217,7 @@ Target.create "SetLoopbackExempt" (fun _ ->
     |> Proc.run
     |> ignore
 )
+
 
 Target.create "CreateDevCerts" (fun _ ->
     runTool npxTool "office-addin-dev-certs install --days 365" __SOURCE_DIRECTORY__
@@ -207,7 +233,6 @@ Target.create "CreateDevCerts" (fun _ ->
 
 )
 
-
 Target.create "Bundle" (fun _ ->
     let serverDir = Path.combine deployDir "Server"
     let clientDir = Path.combine deployDir "Client"
@@ -220,6 +245,15 @@ Target.create "Bundle" (fun _ ->
 
 Target.create "Setup" ignore 
 
+Target.create "RunTests" (fun _ ->
+    runDotNet "build" sharedTestsPath
+    [ async { runDotNet "watch run" serverTestsPath }
+      async { npm "run test:live" "." } ]
+    |> Async.Parallel
+    |> Async.RunSynchronously
+    |> ignore
+)
+
 open Fake.Core.TargetOperators
 
 "Clean"
@@ -228,21 +262,26 @@ open Fake.Core.TargetOperators
 
 "Clean"
     ==> "InstallClient"
+    ==> "Build"
+    ==> "Bundle"
+
+"Clean"
+    ==> "InstallClient"
     ==> "Run"
 
 "Clean"
-==> "InstallClient"
-==> "Build"
-==> "Bundle"
+    ==> "InstallClient"
+    ==> "OfficeDebug"
 
-"Clean"
-==> "InstallClient"
-==> "OfficeDebug"
 
 "InstallOfficeAddinTooling"
-==> "WebpackConfigSetup"
-==> "CreateDevCerts"
-==> "SetLoopbackExempt"
-==> "Setup"
+    ==> "WebpackConfigSetup"
+    ==> "CreateDevCerts"
+    ==> "SetLoopbackExempt"
+    ==> "Setup"
 
-Target.runOrDefaultWithArguments "Build"
+"Clean"
+    ==> "InstallClient"
+    ==> "RunTests"
+
+Target.runOrDefaultWithArguments "Bundle"

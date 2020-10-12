@@ -1,13 +1,12 @@
-group Client
-    FSharp.Core
-    Fable.Core
-    Fable.Elmish.Debugger
-    Fable.Elmish.React
-    Fable.Elmish.HMR
-    Fable.Remoting.Client
-    Fulma
-    Fulma.Extensions.Wikiki.Tooltip
-    Fulma.Extensions.Wikiki.Switch
-    Fable.FontAwesome.Free
-    Thoth.Elmish.Debouncer
-    Fable.Browser.MediaQueryList
+Fable.Core
+Fable.Elmish.Debugger
+Fable.Elmish.React
+Fable.Elmish.HMR
+Fable.Remoting.Client
+Fulma
+Fulma.Extensions.Wikiki.Tooltip
+Fulma.Extensions.Wikiki.Switch
+Fable.FontAwesome.Free
+Thoth.Elmish.Debouncer
+Fable.Browser.MediaQueryList
+Fable.SimpleJson

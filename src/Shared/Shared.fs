@@ -71,6 +71,9 @@ module DbDomain =
 
 type IAnnotatorAPI = {
 
+    // Development
+    getTestNumber               : unit                                                  -> Async<int>
+
     // Ontology related requests
     testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>
     getAllOntologies            : unit                                                  -> Async<DbDomain.Ontology []>

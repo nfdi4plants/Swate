@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>netstandard2.1</TargetFramework>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
         <DefineConstants>FABLE_COMPILER</DefineConstants>
+        <UserSecretsId>e7195dc5-ba8f-42b7-9e0a-b7e66d09fe73</UserSecretsId>
     </PropertyGroup>
     <ItemGroup>
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
-        <Compile Include="..\Shared\Shared.fs" />
         <Compile Include="Version.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="ExcelColors.fs" />
@@ -35,6 +35,12 @@
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="3.1.0" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\Shared\Shared.fsproj" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

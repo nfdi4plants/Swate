@@ -59,6 +59,7 @@ Develop
 #### Prerequisites:
 
  - .NET Core SDK at of at least the version in [the global.json file](global.json)
+ - Docker with Docker-compose
  - Node.js with npm/npx
  - To setup all dev dependencies, you can run the following commands:
 
@@ -88,7 +89,9 @@ to debug the AddIn locally, use the build target `OfficeDebug`:
 
 `fake build -t OfficeDebug`
 
-this will launch an Excel instance with the AddIn sideloaded.
+this will launch an Excel instance with the AddIn sideloaded, while also running docker with a MySql- and a Adminer instance.
+The MySql user/password will be root/example and can be set in .db/docker-compose.yml.
+Adminer cam be accessed at localhost:8085, MySql at localhost:42333, and the app runs at localhost:3000 for client and localhost:8080 for the server.
 
 However it is currently pretty hard to attach a debugger to the instance of edge that runs in
 the Excel window (update: you can now use [EdgeDevToolsPreview](https://www.microsoft.com/en-us/p/microsoft-edge-devtools-preview/9mzbfrmz0mnj?activetab=pivot:overviewtab) for that aswell). You can circumvent this issue by additionally testing in Excel online:
