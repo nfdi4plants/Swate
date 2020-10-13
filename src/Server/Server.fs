@@ -17,6 +17,9 @@ open Microsoft.Extensions.Configuration.UserSecrets
 open Microsoft.AspNetCore.Hosting
 
 //let connectionString = System.Environment.GetEnvironmentVariable("AnnotatorTestDbCS")
+[<Literal>]
+let DevLocalConnectionString = "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
+
 
 let annotatorApi cString = {
 
@@ -96,10 +99,12 @@ let topLevelRouter = router {
     //    htmlString (sprintf "<h1>Here is a secret: %s</h1>" cString) next ctx
     //)
     forward "/api" (fun next ctx ->
+        // user secret part for production
         let cString = 
             let settings = ctx.GetService<IConfiguration>()
-            settings.["Swate:LocalConnectionString"]
-        webApp cString next ctx
+            settings.["Swate:ConnectionString"]
+        let devCString = DevLocalConnectionString
+        webApp devCString next ctx
 
     )
 

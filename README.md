@@ -65,7 +65,9 @@ Develop
 
     `dotnet tool restore` (to restore local dotnet tools)
 
-    `dotnet fake build -t setup`, which will take care of installing necessary certificates and loopback exempts for your browser. Here are the steps if you want to execute them by yourself:
+    `dotnet fake build -t setup pw:example`, which will take care of installing necessary certificates and loopback exempts for your browser. Here are the steps if you want to execute them by yourself:
+
+    - 'pw:example' is an optional parameter for the setup target to use a custom password for the local MySql docker instance. If this argument is not passed the instance will be created with the password 'example'.
 
     - connections from excel to localhost need to be via https, so you need a certificate and trust it. [office-addin-dev-certs](https://www.npmjs.com/package/office-addin-dev-certs?activeTab=versions) does that for you.
 
@@ -75,7 +77,9 @@ Develop
 
         ![File](docsrc/files/img/file.png)
 
-        installing this ca certificate under your trusted root certification authorities will enable you to use httpss via localhost.
+        installing this ca certificate under your trusted root certification authorities will enable you to use https via localhost.
+
+        The paths to these certificates are then added to your webpack.config file.
 
      - You may need a loopback exemption for Edge/IE (whatever is run in your excel version): 
 
@@ -91,7 +95,7 @@ to debug the AddIn locally, use the build target `OfficeDebug`:
 
 this will launch an Excel instance with the AddIn sideloaded, while also running docker with a MySql- and a Adminer instance.
 The MySql user/password will be root/example and can be set in .db/docker-compose.yml.
-Adminer cam be accessed at localhost:8085, MySql at localhost:42333, and the app runs at localhost:3000 for client and localhost:8080 for the server.
+Adminer can be accessed at localhost:8085, MySql at localhost:42333, and the app runs at localhost:3000 for client and localhost:8080 for the server.
 
 However it is currently pretty hard to attach a debugger to the instance of edge that runs in
 the Excel window (update: you can now use [EdgeDevToolsPreview](https://www.microsoft.com/en-us/p/microsoft-edge-devtools-preview/9mzbfrmz0mnj?activetab=pivot:overviewtab) for that aswell). You can circumvent this issue by additionally testing in Excel online:

@@ -1,4 +1,20 @@
-#r "paket: groupref build //"
+#r "paket:
+nuget FSharp.Core
+nuget BlackFox.Fake.BuildTask
+nuget Fake.Core.Target
+nuget Fake.Core.Process
+nuget Fake.Core.ReleaseNotes
+nuget Fake.IO.FileSystem
+nuget Farmer
+nuget Fake.DotNet.Cli
+nuget Fake.DotNet.MSBuild
+nuget Fake.DotNet.AssemblyInfoFile
+nuget Fake.DotNet.Paket
+nuget Fake.DotNet.FSFormatting
+nuget Fake.DotNet.Fsi
+nuget Fake.DotNet.NuGet
+nuget Fake.Api.Github
+nuget Fake.DotNet.Testing.Expecto //"
 #load "./.fake/build.fsx/intellisense.fsx"
 #r "netstandard"
 
@@ -37,7 +53,6 @@ let nodeTool = platformTool "node" "node.exe"
 let npmTool = platformTool "npm" "npm.cmd"
 let npxTool = platformTool "npx" "npx.cmd"
 let dockerComposeTool = platformTool "docker-compose" "docker-compose.exe"
-let dotnetUserSecretTool = "dotnet user-secrets"
 
 let runTool cmd args workingDir =
     let arguments = args |> String.split ' ' |> Arguments.OfArgs
@@ -132,16 +147,6 @@ Target.create "StartMySqlDocker" (fun _ ->
     runTool dockerComposeTool "-f .db\docker-compose.yml up" __SOURCE_DIRECTORY__
 )
 
-// not used yet. Errors with "Cannot access dotnet user-secret"
-Target.create "AddUserSecret" (fun _ ->
-    runTool
-        dotnetUserSecretTool
-        (sprintf
-            "set \"Swate:LocalConnectionString\" \"server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True\" --project \"%s\""
-            serverPath
-        )
-        __SOURCE_DIRECTORY__
-)
 
 Target.create "OfficeDebug" (fun _ ->
     let server = async {
@@ -205,6 +210,31 @@ Target.create "WebpackConfigSetup" (fun _ ->
             (Path.combine __SOURCE_DIRECTORY__ "webpack.config.js")
         ]
 
+)
+
+// https://fake.build/core-targets.html#Targets-with-arguments
+Target.create "LocalConnectionStringSetup" (fun conf ->
+
+    let pwOpt =
+        conf.Context.Arguments
+        |> List.tryFind (fun x -> x.StartsWith "pw:")
+
+    let msg =
+        if pwOpt.IsNone then "Default MySql password set" else "Custom MySql password set."
+
+    let pw =
+        if pwOpt.IsNone then "example" else pwOpt.Value.Replace("pw:","").Trim()
+
+    Shell.replaceInFiles
+        [
+            "{PASSWORD}",pw
+        ]
+        [
+            (Path.combine __SOURCE_DIRECTORY__ ".db/docker-compose.yml")
+            (Path.combine __SOURCE_DIRECTORY__ "src/Server/Server.fs")
+        ]
+
+    Trace.trace msg
 )
 
 Target.create "SetLoopbackExempt" (fun _ ->
@@ -273,9 +303,9 @@ open Fake.Core.TargetOperators
     ==> "InstallClient"
     ==> "OfficeDebug"
 
-
 "InstallOfficeAddinTooling"
     ==> "WebpackConfigSetup"
+    ==> "LocalConnectionStringSetup"
     ==> "CreateDevCerts"
     ==> "SetLoopbackExempt"
     ==> "Setup"

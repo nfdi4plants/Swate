@@ -3,7 +3,6 @@
     <PropertyGroup>
         <TargetFramework>netcoreapp3.1</TargetFramework>
         <DefineConstants>FABLE_COMPILER</DefineConstants>
-        <UserSecretsId>e7195dc5-ba8f-42b7-9e0a-b7e66d09fe73</UserSecretsId>
     </PropertyGroup>
     <ItemGroup>
         <None Include="index.html" />
