@@ -56,6 +56,27 @@ Please use Github issues to track problems, feature requests, questions, and dis
 Develop
 -------
 
+#### Contribute:
+
+Before you contribute to the project remember to return all placeholders to your project:
+
+-   webpack.config.js    
+    ```
+    https: {
+        key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
+        cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
+        ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
+    },
+    ```
+-   .db/docker-compose.yml
+    ```
+    MYSQL_ROOT_PASSWORD: {PASSWORD}
+    ```
+-   Server/Server.fs
+    ```
+    let DevLocalConnectionString = "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
+    ```
+
 #### Prerequisites:
 
  - .NET Core SDK at of at least the version in [the global.json file](global.json)
@@ -107,3 +128,4 @@ the Excel window (update: you can now use [EdgeDevToolsPreview](https://www.micr
  - You will now have the full debug experience in your browser dev tools.
 
 Alternatively, you can debug all functionality that does not use Excel Interop in your normal browser (the app runs on port 3000 via https)
+
