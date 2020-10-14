@@ -20,11 +20,16 @@ open Microsoft.AspNetCore.Hosting
 [<Literal>]
 let DevLocalConnectionString = "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
 
+let testApi = {
+    //Development
+    getTestNumber = fun () -> async { return 42 }
+}
 
 let annotatorApi cString = {
 
     //Development
     getTestNumber = fun () -> async { return 42 }
+    getTestString = fun () -> async { return "test string" }
 
     //Ontology related requests
     testOntologyInsert = fun (name,version,definition,created,user) ->
@@ -78,6 +83,17 @@ let annotatorApi cString = {
 
 }
 
+let testWebApp =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue (testApi)
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler(
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+    )
+    |> Remoting.buildHttpHandler
+
+
 let webApp cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
@@ -98,15 +114,18 @@ let topLevelRouter = router {
 
     //    htmlString (sprintf "<h1>Here is a secret: %s</h1>" cString) next ctx
     //)
-    forward "/api" (fun next ctx ->
+    forward @"/api/IAnnotatorAPI" (fun next ctx ->
         // user secret part for production
         let cString = 
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
         let devCString = DevLocalConnectionString
         webApp devCString next ctx
-
     )
+    forward @"/api/ITestAPI" (fun next ctx ->
+        testWebApp next ctx
+    )
+
 
 }
 

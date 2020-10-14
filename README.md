@@ -82,7 +82,7 @@ Before you contribute to the project remember to return all placeholders to your
  - .NET Core SDK at of at least the version in [the global.json file](global.json)
  - Docker with Docker-compose
  - Node.js with npm/npx
- - To setup all dev dependencies, you can run the following commands:
+ - To setup all dev dependencies, you can run the following commands or the install.cmd file (explained further below). The first run will take some time to import the database from the .sql file:
 
     `dotnet tool restore` (to restore local dotnet tools)
 
@@ -105,6 +105,16 @@ Before you contribute to the project remember to return all placeholders to your
      - You may need a loopback exemption for Edge/IE (whatever is run in your excel version): 
 
         `CheckNetIsolation LoopbackExempt -a -n="microsoft.win32webviewhost_cw5n1h2txyewy"`
+
+### use install.cmd
+
+The install.cmd executes several console commands for one of which it needs adminstratorial rights (dotnet fake build -t setup) to install the certificate mentioned above.
+Open powershell as adminstrator and navigate to the Swate-folder ```cd your\folder\path\Swate``` then use ```.\install.cmd``` to initialize the setup.
+While running a installation dialogue for the certificate will open and can be handled as described above.
+
+By installing this repo via the install.cmd file the MySql password will default to 'example'.
+
+### Project Decription
 
 This project uses the [SAFE Stack](https://github.com/SAFE-Stack) to create a website that uses [office.js](https://github.com/OfficeDev/office-js) to interop with Excel.
 

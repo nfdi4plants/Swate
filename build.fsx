@@ -1,20 +1,4 @@
-#r "paket:
-nuget FSharp.Core
-nuget BlackFox.Fake.BuildTask
-nuget Fake.Core.Target
-nuget Fake.Core.Process
-nuget Fake.Core.ReleaseNotes
-nuget Fake.IO.FileSystem
-nuget Farmer
-nuget Fake.DotNet.Cli
-nuget Fake.DotNet.MSBuild
-nuget Fake.DotNet.AssemblyInfoFile
-nuget Fake.DotNet.Paket
-nuget Fake.DotNet.FSFormatting
-nuget Fake.DotNet.Fsi
-nuget Fake.DotNet.NuGet
-nuget Fake.Api.Github
-nuget Fake.DotNet.Testing.Expecto //"
+#r "paket: groupref build //"
 #load "./.fake/build.fsx/intellisense.fsx"
 #r "netstandard"
 
@@ -160,6 +144,7 @@ Target.create "OfficeDebug" (fun _ ->
     }
 
     let mySqlDocker = async {
+        Trace.trace "Start MySql+Adminer Docker"
         runTool dockerComposeTool "-f .db\docker-compose.yml up" __SOURCE_DIRECTORY__
     }
 

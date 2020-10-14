@@ -28,14 +28,14 @@ nuget Fulma.Extensions.Wikiki.Tooltip
 nuget Fulma.Extensions.Wikiki.Switch
 nuget Thoth.Elmish.Debouncer
 
-//group Build
-//    source https://api.nuget.org/v3/index.json
-//    framework: netstandard2.0
-//    storage: none
-//
-//    nuget FSharp.Core
-//    nuget Fake.Core.ReleaseNotes
-//    nuget Fake.Core.Target
-//    nuget Fake.DotNet.Cli
-//    nuget Fake.IO.FileSystem
-//    nuget Farmer
+group Build
+    source https://api.nuget.org/v3/index.json
+    framework: netstandard2.0
+    storage: none
+
+    nuget FSharp.Core
+    nuget Fake.Core.ReleaseNotes
+    nuget Fake.Core.Target
+    nuget Fake.DotNet.Cli
+    nuget Fake.IO.FileSystem
+    nuget Farmer

@@ -1,12 +1,13 @@
 Fable.Core
-Fable.Elmish.Debugger
+Fable.Elmish
 Fable.Elmish.React
+Fable.Elmish.Debugger
 Fable.Elmish.HMR
+Fable.FontAwesome.Free
 Fable.Remoting.Client
 Fulma
 Fulma.Extensions.Wikiki.Tooltip
 Fulma.Extensions.Wikiki.Switch
-Fable.FontAwesome.Free
 Thoth.Elmish.Debouncer
 Fable.Browser.MediaQueryList
 Fable.SimpleJson
