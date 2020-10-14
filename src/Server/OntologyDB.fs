@@ -1,14 +1,14 @@
 module OntologyDB
 
-
-open Microsoft.Data.SqlClient
+open MySql.Data
+open MySql.Data.MySqlClient
 open System.Data
 open System
 
 open Shared
 
 let establishConnection cString = 
-    new SqlConnection(cString)
+    new MySqlConnection(cString)
 
 let insertOntology cString (name:string) (currentVersion:string) (definition:string) (dateCreated:System.DateTime) (userID:string)=
 
@@ -22,11 +22,11 @@ INSERT INTO Ontology (Name,CurrentVersion,Definition,DateCreated,UserID)
 VALUES (@name,@cv,@def,@dc,@uid);
 SELECT max(ID) FROM Ontology"""
 
-    let nameParam           = insertOntologyCmd.Parameters.Add("name",SqlDbType.NVarChar)
-    let currentVersionParam = insertOntologyCmd.Parameters.Add("cv",SqlDbType.NVarChar)
-    let definitionParam     = insertOntologyCmd.Parameters.Add("def",SqlDbType.NVarChar)
-    let dateCreatedParam    = insertOntologyCmd.Parameters.Add("dc",SqlDbType.DateTimeOffset)
-    let userIDParam         = insertOntologyCmd.Parameters.Add("uid",SqlDbType.NVarChar)
+    let nameParam           = insertOntologyCmd.Parameters.Add("name",MySqlDbType.VarChar)
+    let currentVersionParam = insertOntologyCmd.Parameters.Add("cv",MySqlDbType.VarChar)
+    let definitionParam     = insertOntologyCmd.Parameters.Add("def",MySqlDbType.VarChar)
+    let dateCreatedParam    = insertOntologyCmd.Parameters.Add("dc",MySqlDbType.DateTime)
+    let userIDParam         = insertOntologyCmd.Parameters.Add("uid",MySqlDbType.VarChar)
 
     nameParam           .Value <- name
     currentVersionParam .Value <- currentVersion
@@ -60,12 +60,12 @@ INSERT INTO Term (Accession,OntologyID,Name,Definition,XRefValueType,IsObsolete)
 VALUES (@acc,@ontId,@name,@def,@xrv,@iO);
 SELECT max(ID) FROM Term"""
 
-    let accessionParam      = insertTermCmd.Parameters.Add("acc",SqlDbType.NVarChar)
-    let ontologyIDParam     = insertTermCmd.Parameters.Add("ontId",SqlDbType.BigInt)
-    let nameParam           = insertTermCmd.Parameters.Add("name",SqlDbType.NVarChar)
-    let definitionParam     = insertTermCmd.Parameters.Add("def",SqlDbType.NVarChar)
-    let xRefValueTypeParam  = insertTermCmd.Parameters.Add("xrv",SqlDbType.NVarChar)
-    let isObsoleteParam     = insertTermCmd.Parameters.Add("iO",SqlDbType.Bit)
+    let accessionParam      = insertTermCmd.Parameters.Add("acc",MySqlDbType.VarChar)
+    let ontologyIDParam     = insertTermCmd.Parameters.Add("ontId",MySqlDbType.Int64)
+    let nameParam           = insertTermCmd.Parameters.Add("name",MySqlDbType.VarChar)
+    let definitionParam     = insertTermCmd.Parameters.Add("def",MySqlDbType.VarChar)
+    let xRefValueTypeParam  = insertTermCmd.Parameters.Add("xrv",MySqlDbType.VarChar)
+    let isObsoleteParam     = insertTermCmd.Parameters.Add("iO",MySqlDbType.Bit)
 
     accessionParam      .Value <- accession
     ontologyIDParam     .Value <- ontologyID
@@ -94,10 +94,10 @@ let getTermSuggestions cString (query:string) =
     
     use connection = establishConnection cString
     connection.Open()
-    use getTermSuggestionsCmd = new SqlCommand("getTermSuggestions",connection)
+    use getTermSuggestionsCmd = new MySqlCommand("getTermSuggestions",connection)
     getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
 
-    let queryParam      = getTermSuggestionsCmd.Parameters.Add("query",SqlDbType.NVarChar)
+    let queryParam      = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
 
     queryParam      .Value <- query
 
@@ -122,10 +122,10 @@ let getUnitTermSuggestions cString (query:string) =
     
     use connection = establishConnection cString
     connection.Open()
-    use getTermSuggestionsCmd = new SqlCommand("getUnitTermSuggestions",connection)
+    use getTermSuggestionsCmd = new MySqlCommand("getUnitTermSuggestions",connection)
     getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
 
-    let queryParam      = getTermSuggestionsCmd.Parameters.Add("query",SqlDbType.NVarChar)
+    let queryParam      = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
 
     queryParam .Value <- query
 
@@ -151,7 +151,7 @@ let getAllOntologies cString () =
     
     use connection = establishConnection cString
     connection.Open()
-    use getAllOntologiesCmd = new SqlCommand("getAllOntologies",connection)
+    use getAllOntologiesCmd = new MySqlCommand("getAllOntologies",connection)
     getAllOntologiesCmd.CommandType <- CommandType.StoredProcedure
 
     use reader = getAllOntologiesCmd.ExecuteReader()
@@ -163,7 +163,7 @@ let getAllOntologies cString () =
                     (reader.GetString(1))
                     (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetDateTimeOffset(4)).UtcDateTime
+                    (reader.GetDateTime(4)) // TODO:
                     (reader.GetString(5))
     |]
 
@@ -171,14 +171,14 @@ let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (start
     
     use connection = establishConnection cString
     connection.Open()
-    use advancedTermSearchCmd = new SqlCommand("advancedTermSearch",connection)
+    use advancedTermSearchCmd = new MySqlCommand("advancedTermSearch",connection)
     advancedTermSearchCmd.CommandType <- CommandType.StoredProcedure
 
-    let ontIdParam                  = advancedTermSearchCmd.Parameters.Add("ontologyId",SqlDbType.BigInt)
-    let startsWithParam             = advancedTermSearchCmd.Parameters.Add("startsWith",SqlDbType.NVarChar)
-    let endsWithParam               = advancedTermSearchCmd.Parameters.Add("endsWith",SqlDbType.NVarChar)
-    let mustContainParam            = advancedTermSearchCmd.Parameters.Add("mustContain",SqlDbType.NVarChar)
-    let definitionMustContainParam  = advancedTermSearchCmd.Parameters.Add("definitionMustContain",SqlDbType.NVarChar)
+    let ontIdParam                  = advancedTermSearchCmd.Parameters.Add("ontologyId",MySqlDbType.Int64)
+    let startsWithParam             = advancedTermSearchCmd.Parameters.Add("startsWith",MySqlDbType.VarChar)
+    let endsWithParam               = advancedTermSearchCmd.Parameters.Add("endsWith",MySqlDbType.VarChar)
+    let mustContainParam            = advancedTermSearchCmd.Parameters.Add("mustContain",MySqlDbType.VarChar)
+    let definitionMustContainParam  = advancedTermSearchCmd.Parameters.Add("definitionMustContain",MySqlDbType.VarChar)
 
     if ont.IsSome then
         ontIdParam              .Value <- ont.Value.ID

@@ -10,8 +10,7 @@ var path = require('path');
 var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var CopyWebpackPlugin = require('copy-webpack-plugin');
-var MiniCssExtractPlugin = require('mini-css-extract-plugin');
-//var fs = require("fs");
+var MiniCssExtractPlugin = require('mini-css-extract-plugin')
 
 var CONFIG = {
     // The tags to include the generated JS and CSS will be automatically injected in the HTML template
@@ -19,7 +18,7 @@ var CONFIG = {
     indexHtmlTemplate: './src/Client/index.html',
     fsharpEntry: './src/Client/Client.fsproj',
     cssEntry: './src/Client/style.scss',
-    outputDir: './src/Client/deploy',
+    outputDir: './deploy/public',
     assetsDir: './src/Client/public',
     devServerPort: 3000,
     // When using webpack-dev-server, you may need to redirect some calls
@@ -47,8 +46,6 @@ var CONFIG = {
             ignorePath: false
            }
        },
-    // Use babel-preset-env to generate JS compatible with most-used browsers.
-    // More info at https://babeljs.io/docs/en/next/babel-preset-env.html
     babel: {
         presets: [
             ['@babel/preset-env', {
@@ -65,7 +62,9 @@ var CONFIG = {
 
 // If we're running the webpack-dev-server, assume we're in development mode
 var isProduction = !process.argv.find(v => v.indexOf('webpack-dev-server') !== -1);
-console.log('Bundling for ' + (isProduction ? 'production' : 'development') + '...');
+var environment = isProduction ? 'production' : 'development';
+process.env.NODE_ENV = environment;
+console.log('Bundling for ' + environment + '...');
 
 // The HtmlWebpackPlugin allows us to use a template for the index.html page
 // and automatically injects <script> or <link> tags for generated bundles.
@@ -74,7 +73,6 @@ var commonPlugins = [
         filename: 'index.html',
         template: resolve(CONFIG.indexHtmlTemplate)
     })
-    //new CopyWebpackPlugin([{ from: resolve("./node_modules/@microsoft/office - js/dist") }]),
 ];
 
 module.exports = {
@@ -85,9 +83,9 @@ module.exports = {
     entry: isProduction ? {
         app: [resolve(CONFIG.fsharpEntry), resolve(CONFIG.cssEntry)]
     } : {
-            app: [resolve(CONFIG.fsharpEntry)],
-            style: [resolve(CONFIG.cssEntry)]
-        },
+            app: resolve(CONFIG.fsharpEntry),
+            style: resolve(CONFIG.cssEntry)
+    },
     // Add a hash to the output file name in production
     // to prevent browser caching if code changes
     output: {
@@ -104,22 +102,22 @@ module.exports = {
     // Besides the HtmlPlugin, we use the following plugins:
     // PRODUCTION
     //      - MiniCssExtractPlugin: Extracts CSS from bundle to a different file
-    //          To minify CSS, see https://github.com/webpack-contrib/mini-css-extract-plugin#minimizing-for-production    
+    //          To minify CSS, see https://github.com/webpack-contrib/mini-css-extract-plugin#minimizing-for-production
     //      - CopyWebpackPlugin: Copies static assets to output directory
     // DEVELOPMENT
     //      - HotModuleReplacementPlugin: Enables hot reloading when code changes without refreshing
     plugins: isProduction ?
         commonPlugins.concat([
-            new MiniCssExtractPlugin({ filename: 'style.[hash].css' }),
-            new CopyWebpackPlugin([{ from: resolve(CONFIG.assetsDir) }]),
+            new MiniCssExtractPlugin({ filename: 'style.[name].[hash].css' }),
+            new CopyWebpackPlugin({ patterns: [{ from: resolve(CONFIG.assetsDir) }]}),
         ])
         : commonPlugins.concat([
             new webpack.HotModuleReplacementPlugin(),
         ]),
     externals: {
-        officejs : 'Office.js',
+        officejs: 'Office.js',
     },
-        resolve: {
+    resolve: {
         // See https://github.com/fable-compiler/Fable/issues/1490
         symlinks: false
     },
@@ -169,11 +167,8 @@ module.exports = {
                         : 'style-loader',
                     'css-loader',
                     {
-                        loader: 'resolve-url-loader',
-                    },
-                    {
-                      loader: 'sass-loader',
-                      options: { implementation: require('sass') }
+                        loader: 'sass-loader',
+                        options: { implementation: require('sass') }
                     }
                 ],
             },

@@ -69,8 +69,16 @@ module DbDomain =
         RelatedTermID       : int64
     }
 
+type ITestAPI = {
+    // Development
+    getTestNumber               : unit                                                  -> Async<int>
+}
+
 type IAnnotatorAPI = {
 
+    // Development
+    getTestNumber               : unit                                                  -> Async<int>
+    getTestString               : unit                                                  -> Async<string>
     // Ontology related requests
     testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>
     getAllOntologies            : unit                                                  -> Async<DbDomain.Ontology []>

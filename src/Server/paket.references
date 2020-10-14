@@ -1,5 +1,5 @@
-group Server
-    FSharp.Core
-    Saturn
-    Fable.Remoting.Giraffe
-    Microsoft.Data.SqlClient
+Saturn
+Fable.Remoting.Giraffe
+Microsoft.Data.SqlClient
+MySql.Data
+Microsoft.Extensions.Configuration.UserSecrets
