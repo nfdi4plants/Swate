@@ -161,11 +161,11 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
             "GetNewTermSuggestions",
             (
                 if triggerNewSearch then
-                    match currentState.ParentOntology with
-                    | None ->
-                        newTerm  |> (GetNewTermSuggestions >> Request >> Api)
-                    | Some parentOntology ->
+                    match currentState.ParentOntology, currentState.SearchByParentOntology with
+                    | Some parentOntology, true ->
                         (newTerm,parentOntology) |> (GetNewTermSuggestionsByParentOntology >> Request >> Api)
+                    | None,_ | _, false ->
+                        newTerm  |> (GetNewTermSuggestions >> Request >> Api)
                 else
                     DoNothing
             )

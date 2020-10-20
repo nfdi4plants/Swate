@@ -245,7 +245,7 @@ let autocompleteTermSearchComponentOfParentOntology
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
         Field.div [Field.HasAddons][
-            if model.TermSearchState.ParentOntology.IsSome then parentOntologyNotificationElement
+            if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology then parentOntologyNotificationElement
             Control.p [Control.IsExpanded][
                 Input.input [
                     Input.Placeholder inputPlaceholderText

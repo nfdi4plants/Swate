@@ -53,7 +53,17 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
             (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
 
         Field.div [][
-            Switch.switch [ Switch.Id "switch-1" ] [ str "One" ]
+            Switch.switch [
+                Switch.Color IsSuccess
+                Switch.IsOutlined
+                Switch.Id "switch-1"
+                Switch.Checked model.TermSearchState.SearchByParentOntology
+                Switch.OnChange (fun e ->
+                    ToggleSearchByParentOntology |> TermSearch |> dispatch
+                    // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
+                    ((AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
+                )
+            ] [ str "Use related term directed search." ]
         ]
 
         //Control.div [] [
@@ -103,16 +113,16 @@ let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
             ]
         ]
 
-        Button.button [
-            Button.OnClick (fun e ->
-                GetParentOntology |> ExcelInterop |> dispatch
-            )
-        ][
-            str "GetParentOntology"
-        ]
+        //Button.button [
+        //    Button.OnClick (fun e ->
+        //        GetParentOntology |> ExcelInterop |> dispatch
+        //    )
+        //][
+        //    str "GetParentOntology"
+        //]
 
-        if model.TermSearchState.ParentOntology.IsNone then
-            str "No Parent Ontology selected"
-        else
-            str model.TermSearchState.ParentOntology.Value
+        //if model.TermSearchState.ParentOntology.IsNone then
+        //    str "No Parent Ontology selected"
+        //else
+        //    str model.TermSearchState.ParentOntology.Value
     ]
