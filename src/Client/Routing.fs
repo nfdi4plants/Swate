@@ -8,24 +8,24 @@ open Fulma.Extensions.Wikiki
 [<RequireQualifiedAccess>]
 type Page =
     | Home
-    | TermSearch
     | AddBuildingBlock
+    | TermSearch
     | FilePicker
     | ActivityLog
     | NotFound
 
     static member toPath = function
         | Page.Home                 -> "/"
-        | Page.TermSearch           -> "/#TermSearch"
         | Page.AddBuildingBlock     -> "/#AddBuildingBlock"
+        | Page.TermSearch           -> "/#TermSearch"
         | Page.FilePicker           -> "/#FilePicker"
         | Page.ActivityLog          -> "/#ActivityLog"
         | Page.NotFound             -> "/#NotFound"
 
     static member toString = function
         | Page.Home                 -> ""
-        | Page.TermSearch           -> "TermSearch"
         | Page.AddBuildingBlock     -> "AddBuildingBlock"
+        | Page.TermSearch           -> "TermSearch"
         | Page.FilePicker           -> "FilePicker"
         | Page.ActivityLog          -> "ActivityLog"
         | Page.NotFound             -> "NotFound"
@@ -45,11 +45,11 @@ type Page =
 
         fun (p: Page) ->
             match p with
-            | p when p = Page.Home             -> createElem [Fa.Solid.Home    ] (p |> Page.toString)
-            | p when p = Page.TermSearch       -> createElem [Fa.Solid.SearchPlus   ] (p |> Page.toString)
-            | p when p = Page.AddBuildingBlock -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle ] (p |> Page.toString)
-            | p when p = Page.FilePicker       -> createElem [Fa.Solid.FileUpload; ] (p |> Page.toString)
-            | p when p = Page.ActivityLog      -> createElem [Fa.Solid.History   ] (p |> Page.toString)
+            | Page.Home             -> createElem [Fa.Solid.Home    ] (p |> Page.toString)
+            | Page.TermSearch       -> createElem [Fa.Solid.SearchPlus   ] (p |> Page.toString)
+            | Page.AddBuildingBlock -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle ] (p |> Page.toString)
+            | Page.FilePicker       -> createElem [Fa.Solid.FileUpload; ] (p |> Page.toString)
+            | Page.ActivityLog      -> createElem [Fa.Solid.History   ] (p |> Page.toString)
             | _  -> Fa.i [Fa.Solid.QuestionCircle]   []
 
 /// The URL is turned into a Result.

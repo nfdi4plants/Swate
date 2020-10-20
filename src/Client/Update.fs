@@ -8,6 +8,8 @@ open Elmish
 open Elmish.Navigation
 open Thoth.Elmish
 
+open System.Text.RegularExpressions
+
 let urlUpdate (result:Option<Page>) (currentModel:Model) : Model * Cmd<Msg> =
     match result with
     | Some page ->
@@ -128,10 +130,27 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         }
 
         nextState,Cmd.ofMsg(range |> SyncContext |> ExcelInterop)
-        
 
+    | GetParentOntology ->
+        currentState,
+        Cmd.OfPromise.either
+            OfficeInterop.getParentOntology
+            ()
+            (StoreParentOntologyFromOfficeInterop >> TermSearch)
+            (GenericError >> Dev)
+
+        
 let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchState) : TermSearchState * Cmd<Msg> =
     match termSearchMsg with
+    /// Toggle the search by parent ontology option on/off by clicking on a checkbox
+    | ToggleSearchByParentOntology ->
+        let nextState = {
+            currentState with
+                SearchByParentOntology = currentState.SearchByParentOntology |> not
+        }
+
+        nextState, Cmd.none
+
     | SearchTermTextChange newTerm ->
 
         let triggerNewSearch =
@@ -142,7 +161,11 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
             "GetNewTermSuggestions",
             (
                 if triggerNewSearch then
-                    newTerm  |> (GetNewTermSuggestions >> Request >> Api)
+                    match currentState.ParentOntology with
+                    | None ->
+                        newTerm  |> (GetNewTermSuggestions >> Request >> Api)
+                    | Some parentOntology ->
+                        (newTerm,parentOntology) |> (GetNewTermSuggestionsByParentOntology >> Request >> Api)
                 else
                     DoNothing
             )
@@ -174,6 +197,36 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
         }
 
         nextState,Cmd.none
+
+    | StoreParentOntologyFromOfficeInterop parentOntology ->
+        let pOnt =
+            // if none, no parentOntology was found by office.js.
+            // this happens e.g. if a field outside the table is selected
+            if parentOntology.IsNone
+            then None
+            else
+                let s = (string parentOntology.Value)
+                // REGEX NOT WORKING! ALWAYS RETURNS UNDEFINED ALTOUGH IN .fxs IT WORKS.
+                // check for parent ontology pattern, example: "Parameter [mass spectrometer]"
+                // the regex pattern matches everything after '[', as long as there is a ']' ahead.
+                //let pattern = @"(?<=[[]).*(?=[]])"
+                //let regexRes =
+                //    if Regex.IsMatch(s, pattern) then Regex.Match(s, pattern).Value |> Some else None
+                let res =
+                    let indOfStart = s.IndexOf "["
+                    let sub1 = s.Substring (indOfStart+1)
+                    let isCorrectEnding,sub2 =
+                        let b = sub1.EndsWith "]"
+                        let indOfEnd = sub1.IndexOf "]"
+                        let s2 = sub1.Remove indOfEnd
+                        b, s2
+                    if isCorrectEnding then Some sub2 else None
+                res
+        let nextState = {
+            currentState with
+                ParentOntology = pOnt
+        }
+        nextState, Cmd.none
 
 let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (currentState:AdvancedSearchState) : AdvancedSearchState * Cmd<Msg> =
     match advancedTermSearchMsg with
@@ -321,6 +374,25 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
+    let handleTermSuggestionByParentOntologyRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString parentOntology =
+        let currentCall = {
+            FunctionName = apiFunctionname
+            Status = Pending
+        }
+
+        let nextState = {
+            currentState with
+                currentCall = currentCall
+        }
+        let nextCmd = 
+            Cmd.OfAsync.either
+                Api.api.getTermSuggestionsByParentOntology
+                (5,queryString,parentOntology)
+                (responseHandler >> Api)
+                (ApiError >> Api)
+
+        nextState,nextCmd
+
     match reqMsg with
     | TestOntologyInsert (a,b,c,d,e) ->
 
@@ -363,6 +435,13 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             "getTermSuggestions"
             (TermSuggestionResponse >> Response)
             queryString
+
+    | GetNewTermSuggestionsByParentOntology (queryString,parentOntology) ->
+        handleTermSuggestionByParentOntologyRequest
+            "getTermSuggestionsByParentOntology"
+            (TermSuggestionResponse >> Response)
+            queryString
+            parentOntology
 
     | GetNewUnitTermSuggestions queryString ->
         handleTermSuggestionRequest

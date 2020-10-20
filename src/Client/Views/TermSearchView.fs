@@ -44,13 +44,17 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
         br []
 
-        AutocompleteSearch.autocompleteTermSearchComponent
+        AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
             dispatch
             model.SiteStyleState.ColorMode
             model
             "Start typing to search for terms"
             (Some Size.IsLarge)
             (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
+
+        Field.div [][
+            Switch.switch [ Switch.Id "switch-1" ] [ str "One" ]
+        ]
 
         //Control.div [] [
             
@@ -82,20 +86,33 @@ let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
         // Fill selection confirmation
         Field.div [] [
             Control.div [] [
-                Button.button   [   let hasText = model.TermSearchState.TermSearchText.Length > 0
-                                    if hasText then
-                                        Button.CustomClass "is-success"
-                                        Button.IsActive true
-                                    else
-                                        Button.CustomClass "is-danger"
-                                        Button.Props [Disabled true]
-                                    Button.IsFullWidth
-                                    Button.OnClick (fun _ -> model.TermSearchState.TermSearchText |> FillSelection |> ExcelInterop |> dispatch)
-
-                                ] [
+                Button.button   [
+                    let hasText = model.TermSearchState.TermSearchText.Length > 0
+                    if hasText then
+                        Button.CustomClass "is-success"
+                        Button.IsActive true
+                    else
+                        Button.CustomClass "is-danger"
+                        Button.Props [Disabled true]
+                    Button.IsFullWidth
+                    Button.OnClick (fun _ -> model.TermSearchState.TermSearchText |> FillSelection |> ExcelInterop |> dispatch)
+                ] [
                     str "Fill selected cells with this term"
                     
                 ]
             ]
         ]
+
+        Button.button [
+            Button.OnClick (fun e ->
+                GetParentOntology |> ExcelInterop |> dispatch
+            )
+        ][
+            str "GetParentOntology"
+        ]
+
+        if model.TermSearchState.ParentOntology.IsNone then
+            str "No Parent Ontology selected"
+        else
+            str model.TermSearchState.ParentOntology.Value
     ]

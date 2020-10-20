@@ -92,7 +92,6 @@ let checkIfAnnotationTableIsPresent () =
         )
     )
 
-
 let addAnnotationColumn (colName:string) =
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
@@ -122,21 +121,21 @@ let addAnnotationColumn (colName:string) =
 
 let changeTableColumnFormat (colName:string) (format:string) =
     Excel.run(fun context ->
-           let sheet = context.workbook.worksheets.getActiveWorksheet()
-           let annotationTable = sheet.tables.getItem("annotationTable")
+       let sheet = context.workbook.worksheets.getActiveWorksheet()
+       let annotationTable = sheet.tables.getItem("annotationTable")
 
-           let colRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
-           colRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
-           
-           context.sync().``then``( fun _ ->
-               let rowCount = colRange.rowCount |> int
-               //create an empty column to insert
-               let formats = createValueMatrix 1 rowCount format
+       let colRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
+       colRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
+       
+       context.sync().``then``( fun _ ->
+           let rowCount = colRange.rowCount |> int
+           //create an empty column to insert
+           let formats = createValueMatrix 1 rowCount format
 
-               colRange.numberFormat <- formats
+           colRange.numberFormat <- formats
 
-               sprintf "format of %s was changed to %s" colName format
-           )
+           sprintf "format of %s was changed to %s" colName format
+       )
     )
 
 
@@ -184,6 +183,43 @@ let getTableMetaData () =
                 (headerRangeRowCount |> int)
         )
     )
+
+// Reform this to onSelectionChanged
+let getParentOntology () =
+    Excel.run (fun context ->
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let annotationTable = sheet.tables.getItem("annotationTable")
+        let tables = annotationTable.columns.load(propertyNames = U2.Case1 "items")
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let range = context.workbook.getSelectedRange()
+        annoHeaderRange.load(U2.Case1 "columnIndex") |> ignore
+        range.load(U2.Case1 "columnIndex") |> ignore
+        context.sync()
+            .``then``( fun _ ->
+                let tableHeaderRangeColIndex = annoHeaderRange.columnIndex
+                let selectColIndex = range.columnIndex
+                let diff = selectColIndex - tableHeaderRangeColIndex |> int
+                let vals =
+                    tables.items
+                let maxLength = vals.Count-1
+                let value =
+                    if diff < 0 || diff > maxLength then
+                        None
+                    else
+                        let value1 = (vals.[diff].values.Item 0)
+                        value1.Item 0
+                //sprintf "%A::> %A : %A : %A" value diff tableHeaderRangeColIndex selectColIndex
+                value
+            )
+    )
+
+//let autoGetSelectedHeader () =
+//    Excel.run (fun context ->
+//        let sheet = context.workbook.worksheets.getActiveWorksheet()
+//        let annotationTable = sheet.tables.getItem("annotationTable")
+//        annotationTable.onSelectionChanged.add(fun e -> getParentOntology())
+//        context.sync()
+//    )
 
 let syncContext (passthroughMessage : string) =
     Excel.run (fun context -> context.sync(passthroughMessage))

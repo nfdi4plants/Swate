@@ -55,6 +55,14 @@ let init (pageOpt: Routing.Page option) : Model * Cmd<Msg> =
 let view (model : Model) (dispatch : Msg -> unit) =
 
     match model.PageState.CurrentPage with
+    | Routing.Page.AddBuildingBlock ->
+        BaseView.baseViewComponent model dispatch [
+            AddBuildingBlockView.addBuildingBlockComponent model dispatch
+        ] [
+            AddBuildingBlockView.addBuildingBlockFooterComponent model dispatch
+        ]
+
+
     | Routing.Page.TermSearch ->
         BaseView.baseViewComponent model dispatch [
             TermSearchView.termSearchComponent model dispatch
@@ -62,12 +70,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
             str "Footer content"
         ]
 
-    | Routing.Page.AddBuildingBlock ->
-        BaseView.baseViewComponent model dispatch [
-            AddBuildingBlockView.addBuildingBlockComponent model dispatch
-        ] [
-            AddBuildingBlockView.addBuildingBlockFooterComponent model dispatch
-        ]
 
     | Routing.Page.FilePicker ->
         BaseView.baseViewComponent model dispatch [

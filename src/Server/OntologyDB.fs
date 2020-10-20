@@ -118,6 +118,36 @@ let getTermSuggestions cString (query:string) =
                     (reader.GetBoolean(6))
     |]
 
+let getTermSuggestionsByParentOntology cString (query:string, parentOntology:string) =
+    
+    use connection = establishConnection cString
+    connection.Open()
+    use getTermSuggestionsCmd = new MySqlCommand("getTermSuggestionsByParentOntology",connection)
+    getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
+
+    let queryParam              = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
+    let parentOntologyParam     = getTermSuggestionsCmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+
+    queryParam              .Value <- query
+    parentOntologyParam     .Value <- parentOntology
+
+    use reader = getTermSuggestionsCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+
 let getUnitTermSuggestions cString (query:string) =
     
     use connection = establishConnection cString

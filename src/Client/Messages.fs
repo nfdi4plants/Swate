@@ -18,11 +18,14 @@ type ExcelInteropMsg =
     | CreateAnnotationTable     of bool
     | AnnotationtableCreated    of string
     | AnnotationTableExists     of bool
+    | GetParentOntology
 
 type TermSearchMsg =
+    | ToggleSearchByParentOntology
     | SearchTermTextChange      of string
     | TermSuggestionUsed        of string
     | NewSuggestions            of DbDomain.Term []
+    | StoreParentOntologyFromOfficeInterop  of obj option
 
 type AdvancedSearchMsg =
     | ResetAdvancedSearchState
@@ -44,6 +47,7 @@ type DevMsg =
 type ApiRequestMsg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
+    | GetNewTermSuggestionsByParentOntology     of string*string
     | GetNewBuildingBlockNameSuggestions        of string
     | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
