@@ -123,7 +123,7 @@ let createAutocompleteSuggestions
             |> Array.map (fun sugg ->
                 tr [
                     OnClick (fun _ -> sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
-                    OnKeyDown (fun k -> if (int k.keyCode) = 13 then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                    OnKeyDown (fun k -> if k.key = "Enter" then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
                     TabIndex 0
                     colorControl colorMode
                     Class "suggestion"

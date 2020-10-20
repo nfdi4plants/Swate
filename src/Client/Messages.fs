@@ -14,7 +14,7 @@ type ExcelInteropMsg =
     | TryExcel
     | FillSelection             of string
     | AddColumn                 of colname:string * formatString:string
-    | FormatColumn              of colname:string * formatString:string
+    | FormatColumn              of colname:string * cloind:float * formatString:string
     | CreateAnnotationTable     of bool
     | AnnotationtableCreated    of string
     | AnnotationTableExists     of bool

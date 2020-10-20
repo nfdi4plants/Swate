@@ -37,6 +37,23 @@ let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
                     |] :> IList<U3<bool,string,float>>
     |] :> IList<IList<U3<bool,string,float>>>
 
+let createEmptyAnnotationMatrixForTables (rowCount:int) value (header:string) =
+    [|
+        for ind in 0 .. rowCount-1 do
+            yield   [|
+                for i in 0 .. 2 do
+                    yield
+                        match ind, i with
+                        | 0, 0 ->
+                            U3<bool,string,float>.Case2 header
+                        | 0, 1 ->
+                            U3<bool,string,float>.Case2 "Term Source REF"
+                        | 0, 2 ->
+                            U3<bool,string,float>.Case2 "Term Accession Number"
+                        | _, _ ->
+                            U3<bool,string,float>.Case2 value
+            |] :> IList<U3<bool,string,float>>
+    |] :> IList<IList<U3<bool,string,float>>>
 
 let createValueMatrix (colCount:int) (rowCount:int) value =
     ResizeArray([
@@ -119,20 +136,77 @@ let addAnnotationColumn (colName:string) =
         )
     )
 
-let changeTableColumnFormat (colName:string) (format:string) =
+
+let addThreeAnnotationColumns (colName:string) =
+    Excel.run(fun context ->
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let annotationTable = sheet.tables.getItem("annotationTable")
+
+        let tableRange = annotationTable.getRange()
+        tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
+
+        context.sync().``then``( fun _ ->
+            let colCount = tableRange.columnCount
+            let rowCount = tableRange.rowCount |> int
+            //create an empty column to insert
+            let col =
+                createEmptyMatrixForTables 1 rowCount ""
+
+            let createdCol1 =
+                annotationTable.columns.add(
+                    index = colCount,
+                    values = U4.Case1 col,
+                    name = colName
+                )
+            let autofitRange1 = createdCol1.getRange()
+            autofitRange1.format.autofitColumns()
+            autofitRange1.format.autofitRows()
+
+            let createdCol2 =
+                annotationTable.columns.add(
+                    index = colCount+1.,
+                    values = U4.Case1 col,
+                    name = sprintf "%s %.0f" "Term Source REF" (colCount+1.)
+                )
+            let autofitRange2 = createdCol2.getRange()
+            autofitRange2.format.autofitColumns()
+            autofitRange2.format.autofitRows()
+
+            let createdCol3 =
+                annotationTable.columns.add(
+                    index = colCount+2.,
+                    values = U4.Case1 col,
+                    name = sprintf "%s %.0f" "Term Accession Number" (colCount+2.)
+                )
+            let autofitRange3 = createdCol3.getRange()
+            autofitRange3.format.autofitColumns()
+            autofitRange3.format.autofitRows()
+
+            colCount,sprintf "%s column was added in range: %A." colName (autofitRange3.ToString())
+        )
+    )
+
+
+let changeTableColumnFormat (colName:string) (colInd:float) (format:string) =
     Excel.run(fun context ->
        let sheet = context.workbook.worksheets.getActiveWorksheet()
        let annotationTable = sheet.tables.getItem("annotationTable")
 
-       let colRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
-       colRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
+       // (colInd+2.)/(colInd+3.), because +1/+2 hid the columns one too early. Not sure why though. Seems like a strange interaction between count vs indices
+       let sndColRange = (annotationTable.columns.getItem (U2.Case1 (colInd+2.))).getRange()
+       let thrdColRange = (annotationTable.columns.getItem (U2.Case1 (colInd+3.))).getRange()
+       let colBodyRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
+       colBodyRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
+
+       sndColRange.columnHidden <- true
+       thrdColRange.columnHidden <- true
        
        context.sync().``then``( fun _ ->
-           let rowCount = colRange.rowCount |> int
+           let rowCount = colBodyRange.rowCount |> int
            //create an empty column to insert
            let formats = createValueMatrix 1 rowCount format
 
-           colRange.numberFormat <- formats
+           colBodyRange.numberFormat <- formats
 
            sprintf "format of %s was changed to %s" colName format
        )

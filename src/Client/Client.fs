@@ -95,28 +95,28 @@ let view (model : Model) (dispatch : Msg -> unit) =
     | Routing.Page.Home ->
         div [] [str "soos"]
 
-    | _ ->
-        div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
-            ] [
-            Container.container [Container.IsFluid] [
-                br []
-                br []
-                Button.buttonComponent model.SiteStyleState.ColorMode true "make a test db insert xd" (fun _ -> ((sprintf "Me am test %A" (System.Guid.NewGuid())),"1","Me is testerino",System.DateTime.UtcNow,"MEEEMuser") |> TestOntologyInsert |> Request |> Api|> dispatch)
-                Button.buttonComponent model.SiteStyleState.ColorMode true "idk man=(" (fun _ -> TryExcel |> ExcelInterop |> dispatch)
-                Button.buttonComponent model.SiteStyleState.ColorMode true "create annoation table" (fun _ -> model.SiteStyleState.IsDarkMode |> CreateAnnotationTable |> ExcelInterop |> dispatch)
-                Button.buttonComponent model.SiteStyleState.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> Dev |> dispatch)
-                Button.buttonComponent model.SiteStyleState.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> Dev |> dispatch)
+    //| _ ->
+    //    div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
+    //        ] [
+    //        Container.container [Container.IsFluid] [
+    //            br []
+    //            br []
+    //            Button.buttonComponent model.SiteStyleState.ColorMode true "make a test db insert xd" (fun _ -> ((sprintf "Me am test %A" (System.Guid.NewGuid())),"1","Me is testerino",System.DateTime.UtcNow,"MEEEMuser") |> TestOntologyInsert |> Request |> Api|> dispatch)
+    //            Button.buttonComponent model.SiteStyleState.ColorMode true "idk man=(" (fun _ -> TryExcel |> ExcelInterop |> dispatch)
+    //            Button.buttonComponent model.SiteStyleState.ColorMode true "create annoation table" (fun _ -> model.SiteStyleState.IsDarkMode |> CreateAnnotationTable |> ExcelInterop |> dispatch)
+    //            Button.buttonComponent model.SiteStyleState.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> Dev |> dispatch)
+    //            Button.buttonComponent model.SiteStyleState.ColorMode true "Log table metadata" (fun _ -> LogTableMetadata |> Dev |> dispatch)
 
-                Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
-                    Content.content [
-                        Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
-                        Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
-                    ][
+    //            Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
+    //                Content.content [
+    //                    Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
+    //                    Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
+    //                ][
 
-                    ]
-                ] 
-            ]
-        ]
+    //                ]
+    //            ] 
+        //    ]
+        //]
 
 #if DEBUG
 open Elmish.Debug

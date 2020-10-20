@@ -89,7 +89,7 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
 let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
     form [
         OnSubmit    (fun e -> e.preventDefault())
-        OnKeyDown   (fun k -> if (int k.keyCode) = 13 then k.preventDefault())
+        OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [
         simpleSearchComponent model dispatch
 

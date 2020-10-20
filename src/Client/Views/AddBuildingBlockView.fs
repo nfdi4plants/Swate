@@ -52,7 +52,7 @@ let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block:
         Dropdown.Item.Props [
             TabIndex 0
             OnClick (fun _ -> AnnotationBuildingBlock.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
-            OnKeyDown (fun k -> if (int k.keyCode) = 13 then AnnotationBuildingBlock.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
+            OnKeyDown (fun k -> if (int k.which) = 13 then AnnotationBuildingBlock.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
             colorControl model.SiteStyleState.ColorMode
         ]
 
@@ -83,7 +83,8 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Msg -> unit) =
 let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
     form [
         OnSubmit (fun e -> e.preventDefault())
-        OnKeyDown (fun k -> if (int k.keyCode) = 13 then k.preventDefault())
+        // https://keycode.info/
+        OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
 

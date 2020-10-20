@@ -100,17 +100,17 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
     | AddColumn (colName,format) ->
         currentState,
-
         Cmd.OfPromise.either
-            OfficeInterop.addAnnotationColumn  
+            //OfficeInterop.addAnnotationColumn
+            OfficeInterop.addThreeAnnotationColumns  
             colName
-            (fun _  -> (colName,format) |> FormatColumn |> ExcelInterop)
+            (fun (colInd,msg) -> (colName,colInd,format) |> FormatColumn |> ExcelInterop)
             (GenericError >> Dev)
 
-    | FormatColumn (colName,format) ->
+    | FormatColumn (colName,colInd,format) ->
         currentState,
         Cmd.OfPromise.either
-            (OfficeInterop.changeTableColumnFormat colName)
+            (OfficeInterop.changeTableColumnFormat colName colInd)
             format
             (SyncContext >> ExcelInterop)
             (GenericError >> Dev)
