@@ -1,5 +1,10 @@
 namespace Shared
 
+module URLs =
+
+    [<LiteralAttribute>]
+    let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
+
 type Counter = { Value : int }
 
 module Route =
@@ -86,7 +91,7 @@ type IAnnotatorAPI = {
     // Term related requests
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentOntology  : (int*string*string)                                           -> Async<DbDomain.Term []>
+    getTermSuggestionsByParentTerm  : (int*string*string)                                           -> Async<DbDomain.Term []>
     getTermsForAdvancedSearch           : ((DbDomain.Ontology option)*string*string*string*bool*string) -> Async<DbDomain.Term []>
 
     getUnitTermSuggestions              : (int*string)                                                  -> Async<DbDomain.Term []>

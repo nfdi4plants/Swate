@@ -62,6 +62,7 @@ type AdvancedTermSearchOptions = {
 
 type TermSearchState = {
     TermSearchText          : string
+    SelectedTerm            : DbDomain.Term option
     TermSuggestions         : DbDomain.Term []
     ParentOntology          : string option
     SearchByParentOntology  : bool
@@ -70,6 +71,7 @@ type TermSearchState = {
 } with
     static member init () = {
         TermSearchText              = ""
+        SelectedTerm                = None
         TermSuggestions             = [||]
         ParentOntology              = None
         SearchByParentOntology      = true

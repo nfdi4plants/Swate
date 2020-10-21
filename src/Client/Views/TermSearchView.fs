@@ -105,13 +105,18 @@ let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
                         Button.CustomClass "is-danger"
                         Button.Props [Disabled true]
                     Button.IsFullWidth
-                    Button.OnClick (fun _ -> model.TermSearchState.TermSearchText |> FillSelection |> ExcelInterop |> dispatch)
+                    Button.OnClick (fun _ -> (model.TermSearchState.TermSearchText,model.TermSearchState.SelectedTerm) |> FillSelection |> ExcelInterop |> dispatch)
                 ] [
                     str "Fill selected cells with this term"
                     
                 ]
             ]
         ]
+
+        if model.TermSearchState.SelectedTerm.IsNone then
+            str "No Term Selected"
+        else
+            str (sprintf "%A" model.TermSearchState.SelectedTerm.Value)
 
         //Button.button [
         //    Button.OnClick (fun e ->

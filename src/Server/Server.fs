@@ -17,8 +17,8 @@ open Microsoft.Extensions.Configuration.UserSecrets
 open Microsoft.AspNetCore.Hosting
 
 //let connectionString = System.Environment.GetEnvironmentVariable("AnnotatorTestDbCS")
-[<Literal>]
-let DevLocalConnectionString = "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
+//[<Literal>]
+//let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
 
 let testApi = {
     //Development
@@ -60,9 +60,9 @@ let annotatorApi cString = {
                 |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
         }
 
-    getTermSuggestionsByParentOntology = fun (max:int,typedSoFar:string,parentOntology:string) ->
+    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:string) ->
         async {
-            let like = OntologyDB.getTermSuggestionsByParentOntology cString (typedSoFar,parentOntology)
+            let like = OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm)
             let searchSet = typedSoFar |> Suggestion.createBigrams
 
             return
@@ -116,10 +116,10 @@ let annotatorApiDocs =
         |> annotatorDocs.alias "Get Test String"
         |> annotatorDocs.description "This is used during development to check connection between client and server."
 
-        annotatorDocs.route <@ fun api -> api.getTermSuggestionsByParentOntology @>
+        annotatorDocs.route <@ fun api -> api.getTermSuggestionsByParentTerm @>
         |> annotatorDocs.alias "Get Terms By Parent Ontology"
         |> annotatorDocs.description "This is used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the parent ontology (written at the top of the column)."
-        |> annotatorDocs.example <@ fun api -> api.getTermSuggestionsByParentOntology (5,"bruker","instrument model") @>
+        |> annotatorDocs.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q","instrument model") @>
     ]
 
 let webApp cString =
@@ -148,7 +148,7 @@ let topLevelRouter = router {
         let cString = 
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
-        let devCString = DevLocalConnectionString
+        let devCString = DevelopmentConnectionString.DevLocalConnectionString
         webApp devCString next ctx
     )
     forward @"/api/ITestAPI" (fun next ctx ->

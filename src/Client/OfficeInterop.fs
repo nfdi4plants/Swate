@@ -138,6 +138,10 @@ let addAnnotationColumn (colName:string) =
 
 
 let addThreeAnnotationColumns (colName:string) =
+    let parentTerm =
+        let indOfStart = colName.IndexOf "["
+        let sub1 = colName.Substring (indOfStart)
+        sub1
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let annotationTable = sheet.tables.getItem("annotationTable")
@@ -166,7 +170,7 @@ let addThreeAnnotationColumns (colName:string) =
                 annotationTable.columns.add(
                     index = colCount+1.,
                     values = U4.Case1 col,
-                    name = sprintf "%s %.0f" "Term Source REF" (colCount+1.)
+                    name = sprintf "%s %s" "Term Source REF" (parentTerm)
                 )
             let autofitRange2 = createdCol2.getRange()
             autofitRange2.format.autofitColumns()
@@ -176,7 +180,7 @@ let addThreeAnnotationColumns (colName:string) =
                 annotationTable.columns.add(
                     index = colCount+2.,
                     values = U4.Case1 col,
-                    name = sprintf "%s %.0f" "Term Accession Number" (colCount+2.)
+                    name = sprintf "%s %s" "Term Accession Number" (parentTerm)
                 )
             let autofitRange3 = createdCol3.getRange()
             autofitRange3.format.autofitColumns()
@@ -213,20 +217,50 @@ let changeTableColumnFormat (colName:string) (colInd:float) (format:string) =
     )
 
 
-let fillValue (v:string) =
+let fillValue (v,fillTerm:Shared.DbDomain.Term option) =
     Excel.run(fun context ->
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let annotationTable = sheet.tables.getItem("annotationTable")
+        //let annoRange = annotationTable.getDataBodyRange()
+        //let _ = annoRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
         let range = context.workbook.getSelectedRange()
-        let _ = range.load(U2.Case2 (ResizeArray(["address";"values"])))
-
+        let _ = range.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
+        let nextColsRange = range.getColumnsAfter 2.
+        let _ = nextColsRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex";"columnCount"])))
         //sync with proxy objects after loading values from excel
         context.sync().``then``( fun _ ->
+            if range.columnCount > 1. then failwith "Cannot insert Terms in more than one column at a time."
             let newVals = ResizeArray([
                 for arr in range.values do
                     let tmp = arr |> Seq.map (fun _ -> Some (v |> box))
                     ResizeArray(tmp)
             ])
+
+            let nextNewVals = ResizeArray([
+                for ind in 0 .. nextColsRange.values.Count-1 do
+                    let tmp =
+                        nextColsRange.values.[ind]
+                        |> Seq.mapi (fun i _ ->
+                            match i, fillTerm with
+                            | 0, None | 1, None ->
+                                Some ("user-specific" |> box)
+                            | 1, Some term ->
+                                //add "Term Accession Number"
+                                let replace = Shared.URLs.TermAccessionBaseUrl + "/" + term.Accession.Replace(@":",@"_")
+                                Some ( replace |> box )
+                            | 0, Some term ->
+                                //add "Term Source REF"
+                                Some (term.Accession.Split(@":").[0] |> box)
+                            | _, _ ->
+                                failwith "The insert should never add more than two extra columns."
+                        )
+                    ResizeArray(tmp)
+            ])
+
             range.values <- newVals
-            sprintf "%s filled with %s" range.address v
+            nextColsRange.values <- nextNewVals
+            //sprintf "%s filled with %s; ExtraCols: %s" range.address v nextColsRange.address
+            sprintf "%A, %A" nextColsRange.values.Count nextNewVals
         )
     )
 
@@ -259,7 +293,7 @@ let getTableMetaData () =
     )
 
 // Reform this to onSelectionChanged
-let getParentOntology () =
+let getParentTerm () =
     Excel.run (fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let annotationTable = sheet.tables.getItem("annotationTable")

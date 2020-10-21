@@ -69,11 +69,11 @@ with
         DropDownIsLoading       = state.HasSuggestionsLoading
 
         OnInputChangeMsg        = (SearchTermTextChange >> TermSearch )
-        OnSuggestionSelect      = (fun (term:DbDomain.Term) -> term.Name |> TermSuggestionUsed |> TermSearch)
+        OnSuggestionSelect      = (fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term.Name |> TermSuggestionUsed |> TermSearch )
+        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch )
     }
 
     static member ofAddBuildingBlockUnitState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
@@ -258,7 +258,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         //OnBlur  (fun e -> alert "focusin")
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
-                            GetParentOntology |> ExcelInterop |> dispatch
+                            GetParentTerm |> ExcelInterop |> dispatch
                         )
                     ]           
                     Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
