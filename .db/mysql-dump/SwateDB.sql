@@ -149,31 +149,72 @@ BEGIN
 			AND OntologyID = ontId;
 END;;
 
-DROP PROCEDURE IF EXISTS `getTermSuggestionsByParentOntology`;;
-CREATE PROCEDURE `getTermSuggestionsByParentOntology`(
+DROP PROCEDURE IF EXISTS `getTermSuggestionsByParentTerm`;;
+CREATE PROCEDURE `getTermSuggestionsByParentTerm`(
 	IN query varchar(512),
 	IN parentOntology varchar(512)
 )
 BEGIN
-	IF parentOntology = '' THEN SET parentOntology = NULL; END IF;
-	SELECT * 
-	FROM Term t
-	INNER JOIN TermRelationship AS trt ON(
-		t.Id = trt.FK_TermID
+	WITH RECURSIVE previous (id, accession, fk_ontologyid, name, definition, xrefvaluetype, isobsolete, fk_termid, relationshiptype, fk_termid_related, depth_level) AS (
+		SELECT 
+			t.id, 
+			t.accession, 
+			t.fk_ontologyid, 
+			t.name, 
+			t.definition, 
+			t.xrefvaluetype, 
+			t.isobsolete, 
+			trt.fk_termid, 
+			trt.relationshiptype, 
+			trt.fk_termid_related,
+			0 depth_level
+		FROM Term t
+		INNER JOIN (TermRelationship AS trt, Term AS ref) ON(
+			t.Id = trt.FK_TermID
+			AND trt.FK_TermID_Related = ref.ID
+			AND
+				( 
+					trt.FK_TermID_Related = ref.ID
+					AND ref.Name = parentOntology
+				)
+		)
+		UNION All
+		SELECT 
+			t2.id, 
+			t2.accession, 
+			t2.fk_ontologyid, 
+			t2.name, 
+			t2.definition, 
+			t2.xrefvaluetype, 
+			t2.isobsolete, 
+			trt2.fk_termid, 
+			trt2.relationshiptype, 
+			trt2.fk_termid_related,
+			(previous.depth_level+1) depth_level
+		FROM Term t2
+		INNER JOIN (TermRelationship AS trt2, previous) ON(
+			t2.Id = trt2.FK_TermID
+			AND trt2.FK_TermID_Related = previous.ID
+		)
+	)
+	SELECT 
+		t.ID,
+		t.Accession,
+		t.FK_OntologyID,
+		t.Name,
+		t.Definition,
+		t.xRefValueType,
+		t.IsObsolete,
+		p.depth_level
+	FROM previous p
+	Inner JOIN Term AS t ON (
+		p.id = t.id
 		AND
 			(
 				Match(t.Name) AGAINST(Concat(query,'*') IN BOOLEAN MODE) 
 				OR INSTR(t.Name,query) > 0
 			)
-		AND EXISTS
-			( 
-				SELECT Term.ID 
-				FROM Term
-				WHERE
-					trt.FK_TermID_Related = Term.ID
-					AND Term.Name = parentOntology
-			)
-);
+	);
 END;;
 
 DROP PROCEDURE IF EXISTS `getUnitTermSuggestions`;;
@@ -20752,4 +20793,4 @@ INSERT INTO `TermRelationship` (`ID`, `FK_TermID`, `RelationshipType`, `FK_TermI
 (10894,	13843,	'is_a',	13842),
 (10897,	13846,	'is_a',	13459);
 
--- 2020-10-21 06:43:55
+-- 2020-10-21 14:57:46
