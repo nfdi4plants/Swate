@@ -4,6 +4,7 @@
 
 
 open System
+open Fake
 open Fake.Core
 open Fake.DotNet
 open Fake.IO
@@ -110,7 +111,7 @@ Target.create "Run" (fun _ ->
     }
     let browser = async {
         do! Async.Sleep 5000
-        openBrowser "https://localhost:3000"
+        openBrowser "https://localhost:5000"
     }
 
     let vsCodeSession = Environment.hasEnvironVar "vsCodeSession"
@@ -248,14 +249,24 @@ Target.create "CreateDevCerts" (fun _ ->
 
 )
 
-Target.create "Bundle" (fun _ ->
-    let serverDir = Path.combine deployDir "Server"
-    let clientDir = Path.combine deployDir "Client"
-    let publicDir = Path.combine clientDir "public"
-    let publishArgs = sprintf "publish -c Release -o \"%s\"" serverDir
-    runDotNet publishArgs serverPath
+//Target.create "Bundle" (fun _ ->
+//    let serverDir = Path.combine deployDir "Server"
+//    let clientDir = Path.combine deployDir "Client"
+//    let publicDir = Path.combine clientDir "public"
+//    let publishArgs = sprintf "publish -c Release -o \"%s\"" serverDir
+//    runDotNet publishArgs serverPath
 
-    Shell.copyDir publicDir clientDeployPath FileFilter.allFiles
+//    Shell.copyDir publicDir clientDeployPath FileFilter.allFiles
+//)
+
+Target.create "Bundle" (fun _ ->
+    runDotNet (sprintf "publish -c Release -o \"%s\"" deployDir) serverPath
+    npm "run build" "."
+)
+
+Target.create "Bundle-Linux" (fun _ ->
+    runDotNet (sprintf "publish -c Release -r linux-x64 -o \"%s\"" deployDir) serverPath
+    npm "run build" "."
 )
 
 Target.create "Setup" ignore 

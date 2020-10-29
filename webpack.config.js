@@ -20,26 +20,26 @@ var CONFIG = {
     cssEntry: './src/Client/style.scss',
     outputDir: './deploy/public',
     assetsDir: './src/Client/public',
-    devServerPort: 3000,
+    devServerPort: 5000,
     // When using webpack-dev-server, you may need to redirect some calls
     // to a external API server. See https://webpack.js.org/configuration/dev-server/#devserver-proxy
     devServerProxy: {
         // redirect requests that start with /api/ to the server on port 8085
         '/api': {
-            target: 'https://localhost:8080',
+            target: 'https://localhost:443',
             secure: false,
             changeOrigin: true,
             ignorePath: false
         },
         '/test': {
-            target: 'https://localhost:8080',
+            target: 'https://localhost:443',
             secure: false,
             changeOrigin: true,
             ignorePath: false
         },
         // redirect websocket requests that start with /socket/ to the server on the port 8085
         '/socket': {
-            target: 'https://localhost:8080',
+            target: 'https://localhost:443',
             ws: true,
             secure: false,
             changeOrigin: true,
