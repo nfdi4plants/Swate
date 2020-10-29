@@ -1,3 +1,4 @@
-dotnet tool restore
+@ECHO OFF
+echo "Starting Excel instance with the SWATE manifest ..."
 
-dotnet fake build
+npx office-addin-debugging start manifest.xml desktop --debug-method web
