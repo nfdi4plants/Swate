@@ -69,11 +69,11 @@ with
         DropDownIsLoading       = state.HasSuggestionsLoading
 
         OnInputChangeMsg        = (SearchTermTextChange >> TermSearch )
-        OnSuggestionSelect      = (fun (term:DbDomain.Term) -> term.Name |> TermSuggestionUsed |> TermSearch)
+        OnSuggestionSelect      = (fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term.Name |> TermSuggestionUsed |> TermSearch )
+        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch )
     }
 
     static member ofAddBuildingBlockUnitState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
@@ -123,7 +123,7 @@ let createAutocompleteSuggestions
             |> Array.map (fun sugg ->
                 tr [
                     OnClick (fun _ -> sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
-                    OnKeyDown (fun k -> if (int k.keyCode) = 13 then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                    OnKeyDown (fun k -> if k.key = "Enter" then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
                     TabIndex 0
                     colorControl colorMode
                     Class "suggestion"
@@ -201,19 +201,71 @@ let autocompleteTermSearchComponent
     = 
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
-        Input.input [   Input.Placeholder inputPlaceholderText
-                        match inputSize with
-                        | Some size -> Input.Size size
-                        | _ -> ()
-                        Input.Props [
-                            ExcelColors.colorControl colorMode
-                            //OnFocus (fun e -> alert "focusout")
-                            //OnBlur  (fun e -> alert "focusin")
-                        ]           
-                        Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
-                        Input.Value autocompleteParams.StateBinding
+        Input.input [
+            Input.Placeholder inputPlaceholderText
+            match inputSize with
+            | Some size -> Input.Size size
+            | _ -> ()
+            Input.Props [
+                ExcelColors.colorControl colorMode
+                //OnFocus (fun e -> alert "focusout")
+                //OnBlur  (fun e -> alert "focusin")
+            ]           
+            Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
+            Input.Value autocompleteParams.StateBinding
                         
-                    ]
+        ]
+        autocompleteDropdownComponent
+            dispatch
+            colorMode
+            autocompleteParams.DropDownIsVisible
+            autocompleteParams.DropDownIsLoading
+            (createAutocompleteSuggestions dispatch colorMode autocompleteParams)
+    ]
+
+let autocompleteTermSearchComponentOfParentOntology
+    (dispatch: Msg -> unit)
+    (colorMode:ColorMode)
+    (model:Model)
+    (inputPlaceholderText   : string)
+    (inputSize              : ISize option)
+    (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
+
+    =
+    let parentOntologyNotificationElement =
+        Control.p [][
+            Button.button [
+                Button.IsStatic true
+                match inputSize with
+                | Some size -> Button.Size size
+                | _ -> ()
+            ] [str (sprintf "%A" model.TermSearchState.ParentOntology.Value)]
+        ]
+
+    Control.div [Control.IsExpanded] [
+        AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
+        Field.div [Field.HasAddons][
+            if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology then parentOntologyNotificationElement
+            Control.p [Control.IsExpanded][
+                Input.input [
+                    Input.Placeholder inputPlaceholderText
+                    match inputSize with
+                    | Some size -> Input.Size size
+                    | _ -> ()
+                    Input.Props [
+                        ExcelColors.colorControl colorMode
+                        //OnFocus (fun e -> alert "focusout")
+                        //OnBlur  (fun e -> alert "focusin")
+                        OnFocus (fun e ->
+                            //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
+                            GetParentTerm |> ExcelInterop |> dispatch
+                        )
+                    ]           
+                    Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
+                    Input.Value autocompleteParams.StateBinding
+                ]
+            ]
+        ]
         autocompleteDropdownComponent
             dispatch
             colorMode

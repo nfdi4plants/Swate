@@ -44,13 +44,27 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
         br []
 
-        AutocompleteSearch.autocompleteTermSearchComponent
+        AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
             dispatch
             model.SiteStyleState.ColorMode
             model
             "Start typing to search for terms"
             (Some Size.IsLarge)
             (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
+
+        Field.div [][
+            Switch.switch [
+                Switch.Color IsSuccess
+                Switch.IsOutlined
+                Switch.Id "switch-1"
+                Switch.Checked model.TermSearchState.SearchByParentOntology
+                Switch.OnChange (fun e ->
+                    ToggleSearchByParentOntology |> TermSearch |> dispatch
+                    // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
+                    ((AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
+                )
+            ] [ str "Use related term directed search." ]
+        ]
 
         //Control.div [] [
             
@@ -75,27 +89,45 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
 let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
     form [
         OnSubmit    (fun e -> e.preventDefault())
-        OnKeyDown   (fun k -> if (int k.keyCode) = 13 then k.preventDefault())
+        OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [
         simpleSearchComponent model dispatch
 
         // Fill selection confirmation
         Field.div [] [
             Control.div [] [
-                Button.button   [   let hasText = model.TermSearchState.TermSearchText.Length > 0
-                                    if hasText then
-                                        Button.CustomClass "is-success"
-                                        Button.IsActive true
-                                    else
-                                        Button.CustomClass "is-danger"
-                                        Button.Props [Disabled true]
-                                    Button.IsFullWidth
-                                    Button.OnClick (fun _ -> model.TermSearchState.TermSearchText |> FillSelection |> ExcelInterop |> dispatch)
-
-                                ] [
+                Button.button   [
+                    let hasText = model.TermSearchState.TermSearchText.Length > 0
+                    if hasText then
+                        Button.CustomClass "is-success"
+                        Button.IsActive true
+                    else
+                        Button.CustomClass "is-danger"
+                        Button.Props [Disabled true]
+                    Button.IsFullWidth
+                    Button.OnClick (fun _ -> (model.TermSearchState.TermSearchText,model.TermSearchState.SelectedTerm) |> FillSelection |> ExcelInterop |> dispatch)
+                ] [
                     str "Fill selected cells with this term"
                     
                 ]
             ]
         ]
+
+        if model.TermSearchState.SelectedTerm.IsNone then
+            str "No Term Selected"
+        else
+            str (sprintf "%A" model.TermSearchState.SelectedTerm.Value)
+
+        //Button.button [
+        //    Button.OnClick (fun e ->
+        //        GetParentOntology |> ExcelInterop |> dispatch
+        //    )
+        //][
+        //    str "GetParentOntology"
+        //]
+
+        //if model.TermSearchState.ParentOntology.IsNone then
+        //    str "No Parent Ontology selected"
+        //else
+        //    str model.TermSearchState.ParentOntology.Value
     ]

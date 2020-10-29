@@ -27,6 +27,7 @@ let createNavigationTab (pageLink: Routing.Page) (model:Model) (dispatch:Msg-> u
             ]
         ] [
             Text.span [] [
+                /// does not work for me in excel, and in excel online i have a fixed width that always shows the icon
                 let mediaQuery = window.matchMedia("(min-width:575px)")
                 if mediaQuery.matches then
                     str (pageLink |> Routing.Page.toString)

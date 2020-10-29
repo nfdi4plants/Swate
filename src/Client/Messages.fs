@@ -12,17 +12,20 @@ type ExcelInteropMsg =
     | SyncContext               of string
     | InSync                    of string
     | TryExcel
-    | FillSelection             of string
+    | FillSelection             of string * (DbDomain.Term option)
     | AddColumn                 of colname:string * formatString:string
-    | FormatColumn              of colname:string * formatString:string
+    | FormatColumn              of colname:string * cloind:float * formatString:string
     | CreateAnnotationTable     of bool
     | AnnotationtableCreated    of string
     | AnnotationTableExists     of bool
+    | GetParentTerm
 
 type TermSearchMsg =
+    | ToggleSearchByParentOntology
     | SearchTermTextChange      of string
-    | TermSuggestionUsed        of string
+    | TermSuggestionUsed        of DbDomain.Term
     | NewSuggestions            of DbDomain.Term []
+    | StoreParentOntologyFromOfficeInterop  of obj option
 
 type AdvancedSearchMsg =
     | ResetAdvancedSearchState
@@ -44,6 +47,7 @@ type DevMsg =
 type ApiRequestMsg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
+    | GetNewTermSuggestionsByParentTerm         of string*string
     | GetNewBuildingBlockNameSuggestions        of string
     | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions

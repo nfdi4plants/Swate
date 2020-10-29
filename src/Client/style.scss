@@ -6,10 +6,11 @@ $family-primary: 'Open Sans';
 
 
 // Bulma
-/*@import "~bulma/bulma";*/
-/*@import "~bulma-tooltip";
+@import "~bulma/bulma";
 @import "~bulma-switch";
-*/
+@import "~bulma-tooltip";
+
+
 .suggestion :hover{
     cursor: pointer;
 }

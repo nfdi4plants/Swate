@@ -17,8 +17,8 @@ open Microsoft.Extensions.Configuration.UserSecrets
 open Microsoft.AspNetCore.Hosting
 
 //let connectionString = System.Environment.GetEnvironmentVariable("AnnotatorTestDbCS")
-[<Literal>]
-let DevLocalConnectionString = "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
+//[<Literal>]
+//let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
 
 let testApi = {
     //Development
@@ -49,6 +49,20 @@ let annotatorApi cString = {
     getTermSuggestions = fun (max:int,typedSoFar:string) ->
         async {
             let like = OntologyDB.getTermSuggestions cString typedSoFar
+            let searchSet = typedSoFar |> Suggestion.createBigrams
+
+            return
+                like
+                |> Array.sortByDescending (fun sugg ->
+                        Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                )
+                
+                |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+        }
+
+    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:string) ->
+        async {
+            let like = OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm)
             let searchSet = typedSoFar |> Suggestion.createBigrams
 
             return
@@ -94,10 +108,25 @@ let testWebApp =
     |> Remoting.buildHttpHandler
 
 
+let annotatorDocs = Docs.createFor<IAnnotatorAPI>()
+
+let annotatorApiDocs =
+    Remoting.documentation "Annotation API" [
+        annotatorDocs.route <@ fun api -> api.getTestString @>
+        |> annotatorDocs.alias "Get Test String"
+        |> annotatorDocs.description "This is used during development to check connection between client and server."
+
+        annotatorDocs.route <@ fun api -> api.getTermSuggestionsByParentTerm @>
+        |> annotatorDocs.alias "Get Terms By Parent Ontology"
+        |> annotatorDocs.description "This is used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the parent ontology (written at the top of the column)."
+        |> annotatorDocs.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q","instrument model") @>
+    ]
+
 let webApp cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue (annotatorApi cString)
+    |> Remoting.withDocs "/api/IAnnotatorAPI/docs" annotatorApiDocs
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
         (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
@@ -119,7 +148,7 @@ let topLevelRouter = router {
         let cString = 
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
-        let devCString = DevLocalConnectionString
+        let devCString = DevelopmentConnectionString.DevLocalConnectionString
         webApp devCString next ctx
     )
     forward @"/api/ITestAPI" (fun next ctx ->

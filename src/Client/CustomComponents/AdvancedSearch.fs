@@ -26,7 +26,7 @@ let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ont: DbDoma
         Dropdown.Item.Props [
             TabIndex 0
             OnClick (fun _ -> ont |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
-            OnKeyDown (fun k -> if (int k.keyCode) = 13 then ont |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
+            OnKeyDown (fun k -> if k.key = "Enter" then ont |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
             colorControl model.SiteStyleState.ColorMode
         ]
 
@@ -72,7 +72,7 @@ let createAdvancedTermSearchResultRows (model:Model) (dispatch: Msg -> unit) (su
 let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
     form [
         OnSubmit    (fun e -> e.preventDefault())
-        OnKeyDown   (fun k -> if (int k.keyCode) = 13 then k.preventDefault())
+        OnKeyDown   (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
         Field.div [] [
             Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Ontology"]
@@ -261,7 +261,7 @@ let advancedSearchModal (model:Model) (id:string) (dispatch: Msg -> unit) (resul
             Modal.Card.foot [] [
                 form [
                     OnSubmit    (fun e -> e.preventDefault())
-                    OnKeyDown   (fun k -> if (int k.keyCode) = 13 then k.preventDefault())
+                    OnKeyDown   (fun k -> if k.key = "Enter" then k.preventDefault())
                 ] [
                     Field.div [Field.HasAddons;Field.IsExpanded] [
                         Control.div [Control.IsExpanded] [
