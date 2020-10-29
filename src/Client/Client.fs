@@ -93,7 +93,10 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ]
 
     | Routing.Page.Home ->
-        div [] [str "soos"]
+        Container.container [][
+            div [][ str "This is the Swate web host. For a preview click on the following link." ]
+            a [ Href "/#termsearch"] [str "Termsearch"]
+        ]
 
     //| _ ->
     //    div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]

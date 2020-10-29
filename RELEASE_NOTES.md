@@ -1,3 +1,10 @@
+### 0.0.2-alpha - 2020-10-29
+* First step on the way to the Minimal POC milestone. Rough feature set:
+    * Add fulltext searches for advanced and simple search queries.
+    * Upgrade simple search to use a "is_a directed search". This means the search used subterms to already chosen building blocks as default field of search.
+    * AddBuildingBlock automatically adds 2 additional hidden terms in which "Term Source REF" and "Term Accession Number" are automatically inserted.
+    * For Developers: We added a docker-compose file to generate a local docker mysql database with adminer for an easier developing process. This feature is initialized as part of ```dotnet fake build -t OfficeDebug```
+
 ### 0.0.1-alpha - 2020-07-27
 * First open alpha release of Swate. Rough feature set:
     * Create annotation tables from existing data

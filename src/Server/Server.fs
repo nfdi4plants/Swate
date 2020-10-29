@@ -159,7 +159,7 @@ let topLevelRouter = router {
 }
 
 let app = application {
-    url "https://0.0.0.0:8080"
+    url "https://localhost:443/"
     force_ssl
     use_router topLevelRouter
     memory_cache
