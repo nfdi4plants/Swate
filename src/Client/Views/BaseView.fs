@@ -15,7 +15,7 @@ open CustomComponents
 let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
     let isActive = (model.PageState.CurrentPage = pageLink)
     Tabs.tab [Tabs.Tab.IsActive isActive;] [
-        a [ Href (Routing.Route.toRouteUrl pageLink)
+        a [ //Href (Routing.Route.toRouteUrl pageLink)
             Style [
                 if isActive then
                     BorderColor model.SiteStyleState.ColorMode.Accent
@@ -25,6 +25,7 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
                 else
                     BorderBottomColor model.SiteStyleState.ColorMode.Accent
             ]
+            OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
         ] [
             Text.span [] [
                 /// does not work for me in excel, and in excel online i have a fixed width that always shows the icon

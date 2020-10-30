@@ -102,4 +102,5 @@ type Msg =
     | PersistentStorage     of PersistentStorageMsg
     | FilePicker            of FilePickerMsg
     | AddBuildingBlock      of AddBuildingBlockMsg
+    | UpdatePageState of Routing.Route option
     | DoNothing
