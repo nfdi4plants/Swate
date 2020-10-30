@@ -6,8 +6,8 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="CSBAnnotator"/>
   <Description DefaultValue="Utility functions to annotate data in a fast and safe way"/>
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+  <IconUrl DefaultValue="https://localhost:5000/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:5000/assets/icon-80.png"/>
   <SupportUrl DefaultValue="https://csb.bio.uni-kl.de/"/>
   <AppDomains>
     <AppDomain>bio.uni-kl.de</AppDomain>
@@ -16,7 +16,7 @@
     <Host Name="Workbook"/>
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/"/>
+    <SourceLocation DefaultValue="https://localhost:5000/"/>
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
@@ -95,20 +95,20 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-        <bt:Image id="Icon.20x20" DefaultValue="https://localhost:3000/assets/icon-20.png"/>
-        <bt:Image id="Icon.24x24" DefaultValue="https://localhost:3000/assets/icon-24.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-        <bt:Image id="Icon.40x40" DefaultValue="https://localhost:3000/assets/icon-40.png"/>
-        <bt:Image id="Icon.48x48" DefaultValue="https://localhost:3000/assets/icon-48.png"/>
-        <bt:Image id="Icon.64x64" DefaultValue="https://localhost:3000/assets/icon-64.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
-        <bt:Image id="Icon.96x96" DefaultValue="https://localhost:3000/assets/icon-96.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:5000/assets/icon-16.png"/>
+        <bt:Image id="Icon.20x20" DefaultValue="https://localhost:5000/assets/icon-20.png"/>
+        <bt:Image id="Icon.24x24" DefaultValue="https://localhost:5000/assets/icon-24.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:5000/assets/icon-32.png"/>
+        <bt:Image id="Icon.40x40" DefaultValue="https://localhost:5000/assets/icon-40.png"/>
+        <bt:Image id="Icon.48x48" DefaultValue="https://localhost:5000/assets/icon-48.png"/>
+        <bt:Image id="Icon.64x64" DefaultValue="https://localhost:5000/assets/icon-64.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:5000/assets/icon-80.png"/>
+        <bt:Image id="Icon.96x96" DefaultValue="https://localhost:5000/assets/icon-96.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
-        <bt:Url id="TermSearch.Url" DefaultValue="https://localhost:3000/#TermSearch"/>
-        <bt:Url id="AddBuildingBlock.Url" DefaultValue="https://localhost:3000/#AddBuildingBlock"/>
+        <bt:Url id="TermSearch.Url" DefaultValue="https://localhost:5000/#TermSearch"/>
+        <bt:Url id="AddBuildingBlock.Url" DefaultValue="https://localhost:5000/#AddBuildingBlock"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>

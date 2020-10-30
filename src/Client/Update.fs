@@ -10,14 +10,13 @@ open Thoth.Elmish
 
 open System.Text.RegularExpressions
 
-let urlUpdate (result:Option<Page>) (currentModel:Model) : Model * Cmd<Msg> =
-    match result with
+let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
+    match route with
     | Some page ->
-
         let nextPageState = {
             currentModel.PageState with
                 CurrentPage = page
-                CurrentUrl  = Page.toPath page
+                CurrentUrl  = Route.toRouteUrl page
         }
 
         let nextModel = {
@@ -25,12 +24,11 @@ let urlUpdate (result:Option<Page>) (currentModel:Model) : Model * Cmd<Msg> =
                 PageState = nextPageState
         }
         nextModel,Cmd.none
-
     | None ->
         //Browser.console.error("Error parsing url")
         let nextPageState = {
             currentModel.PageState with
-                CurrentPage = Page.NotFound
+                CurrentPage = Route.NotFound
         }
 
         let nextModel = {
@@ -808,6 +806,10 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
+    /// does not work due to office.js ->
+    /// https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
+    //| Navigate route ->
+    //    currentModel, Navigation.newUrl (Routing.Route.toRouteUrl route)
     | Bounce (delay, bounceId, msgToBounce) ->
 
         let (debouncerModel, debouncerCmd) =
