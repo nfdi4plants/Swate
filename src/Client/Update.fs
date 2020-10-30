@@ -49,7 +49,18 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 Platform    = p
         }
 
-        nextState, Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
+        let cmd =
+            Cmd.batch [
+                Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
+                Cmd.OfPromise.either
+                    OfficeInterop.checkIfAnnotationTableIsPresent
+                    ()
+                    (AnnotationTableExists >> ExcelInterop)
+                    (GenericError >> Dev)
+                Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
+            ]
+
+        nextState, cmd
         
     | SyncContext passthroughMessage ->
         currentState,

@@ -35,6 +35,10 @@ let initializeAddIn () =
 
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
+    let initialModel = initializeModel pageOpt
+    let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
+    // The initial command from urlUpdate is not needed yet. As we use a reduced variant of subModels with no own Msg system.
+    let model, _ = urlUpdate route initialModel
     let initialCmd =
         Cmd.batch [
             Cmd.OfPromise.either
@@ -42,17 +46,7 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
                 ()
                 (fun x -> (x.host.ToString(),x.platform.ToString()) |> Initialized |> ExcelInterop )
                 (fun x -> x |> GenericError |> Dev)
-            Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
-            Cmd.OfPromise.either
-                OfficeInterop.checkIfAnnotationTableIsPresent
-                ()
-                (AnnotationTableExists >> ExcelInterop)
-                (GenericError >> Dev)
         ]
-    let initialModel = initializeModel pageOpt
-    let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
-    // The initial command from urlUpdate is not needed yet. As we use a reduced variant of subModels with no own Msg system.
-    let model, _ = urlUpdate route initialModel
     model, initialCmd
 
 
