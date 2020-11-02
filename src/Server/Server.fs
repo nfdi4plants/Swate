@@ -148,8 +148,7 @@ let topLevelRouter = router {
         let cString = 
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
-        let devCString = DevelopmentConnectionString.DevLocalConnectionString
-        webApp devCString next ctx
+        webApp cString next ctx
     )
     forward @"/api/ITestAPI" (fun next ctx ->
         testWebApp next ctx
@@ -173,6 +172,7 @@ app
         System.Action<Microsoft.Extensions.Hosting.HostBuilderContext,IConfigurationBuilder> ( fun ctx config ->
             config.AddUserSecrets("6de80bdf-2a05-4cf7-a1a8-d08581dfa887") |> ignore
             config.AddJsonFile("production.json",true,true)  |> ignore
+            config.AddJsonFile("dev.json",true,true)  |> ignore
         )
 )
 |> run
