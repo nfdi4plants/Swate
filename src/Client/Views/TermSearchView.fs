@@ -113,10 +113,10 @@ let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
             ]
         ]
 
-        if model.TermSearchState.SelectedTerm.IsNone then
-            str "No Term Selected"
-        else
-            str (sprintf "%A" model.TermSearchState.SelectedTerm.Value)
+        //if model.TermSearchState.SelectedTerm.IsNone then
+        //    str "No Term Selected"
+        //else
+        //    str (sprintf "%A" model.TermSearchState.SelectedTerm.Value)
 
         //Button.button [
         //    Button.OnClick (fun e ->

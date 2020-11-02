@@ -1,3 +1,9 @@
+### 0.0.2-alpha - Work In Progress
+* Release of Minimal POC milestone. Rough feature set:
+    * Bug fixes:
+	    * Responsive design should now render immediatly upon window size change
+	    * Add-in should not reload after navigating to a new tab for the first time.
+
 ### 0.0.2-alpha - 2020-10-29
 * First step on the way to the Minimal POC milestone. Rough feature set:
     * Add fulltext searches for advanced and simple search queries.

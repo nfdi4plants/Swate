@@ -7,7 +7,6 @@
     </PropertyGroup>
     <ItemGroup>
         <None Include="paket.references" />
-        <Compile Include="DevelopmentConnectionString.fs" />
         <Compile Include="OntologyDB.fs" />
         <Compile Include="Server.fs" />
     </ItemGroup>

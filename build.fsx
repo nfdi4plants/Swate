@@ -217,9 +217,8 @@ Target.create "LocalConnectionStringSetup" (fun conf ->
         ]
         [
             (Path.combine __SOURCE_DIRECTORY__ ".db/docker-compose.yml")
-            (Path.combine __SOURCE_DIRECTORY__ "src/Server/DevelopmentConnectionString.fs")
+            (Path.combine __SOURCE_DIRECTORY__ "src/Server/dev.json")
         ]
-
     Trace.trace msg
 )
 
