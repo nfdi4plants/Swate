@@ -168,17 +168,17 @@ type ApiState = {
     }
 
 type PageState = {
-    CurrentPage : Routing.Page
+    CurrentPage : Routing.Route
     CurrentUrl  : string
 } with
-    static member init (pageOpt:Page option) = 
+    static member init (pageOpt:Route option) = 
         match pageOpt with
         | Some page -> {
             CurrentPage = page
-            CurrentUrl = Page.toPath page
+            CurrentUrl = Route.toRouteUrl page
             }
         | None -> {
-            CurrentPage = Page.Home
+            CurrentPage = Route.Home
             CurrentUrl = ""
             }
 
@@ -312,7 +312,7 @@ type Model = {
     }
 
 
-let initializeModel (pageOpt: Page option) = {
+let initializeModel (pageOpt: Route option) = {
     DebouncerState          = Debouncer             .create()
     PageState               = PageState             .init pageOpt
     PersistentStorageState  = PersistentStorageState.init ()

@@ -12,10 +12,10 @@ open Browser.MediaQueryListExtensions
 
 open CustomComponents
 
-let createNavigationTab (pageLink: Routing.Page) (model:Model) (dispatch:Msg-> unit) =
+let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
     let isActive = (model.PageState.CurrentPage = pageLink)
     Tabs.tab [Tabs.Tab.IsActive isActive;] [
-        a [ Href (Routing.Page.toPath pageLink)
+        a [ //Href (Routing.Route.toRouteUrl pageLink)
             Style [
                 if isActive then
                     BorderColor model.SiteStyleState.ColorMode.Accent
@@ -25,14 +25,17 @@ let createNavigationTab (pageLink: Routing.Page) (model:Model) (dispatch:Msg-> u
                 else
                     BorderBottomColor model.SiteStyleState.ColorMode.Accent
             ]
+            OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
         ] [
             Text.span [] [
                 /// does not work for me in excel, and in excel online i have a fixed width that always shows the icon
-                let mediaQuery = window.matchMedia("(min-width:575px)")
-                if mediaQuery.matches then
-                    str (pageLink |> Routing.Page.toString)
-                else
-                    pageLink |> Routing.Page.toIcon
+                //let mediaQuery = window.matchMedia("(min-width:575px)")
+                //if mediaQuery.matches then
+                //    str (pageLink |> Routing.Route.toString)
+                //else
+                //    pageLink |> Routing.Route.toIcon
+                span [Class "hideUnder575px"][str (pageLink |> Routing.Route.toString)]
+                span [Class "hideOver575px"][pageLink |> Routing.Route.toIcon]
             ]
 
         ]
@@ -56,10 +59,10 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                     ]
                 ]
             ] [
-                createNavigationTab Routing.Page.AddBuildingBlock   model dispatch
-                createNavigationTab Routing.Page.TermSearch         model dispatch
-                createNavigationTab Routing.Page.FilePicker         model dispatch
-                createNavigationTab Routing.Page.ActivityLog        model dispatch
+                createNavigationTab Routing.Route.AddBuildingBlock   model dispatch
+                createNavigationTab Routing.Route.TermSearch         model dispatch
+                createNavigationTab Routing.Route.FilePicker         model dispatch
+                createNavigationTab Routing.Route.ActivityLog        model dispatch
             ]
             br []
 

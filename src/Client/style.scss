@@ -22,3 +22,21 @@ $family-primary: 'Open Sans';
 input::-ms-clear {
     display: none;
 }
+
+.hideOver575px {
+    display: none
+}
+
+.hideUnder575px {
+    display: unset
+}
+
+@media only screen and (max-width: 575px) {
+    .hideOver575px {
+        display: unset
+    }
+
+    .hideUnder575px {
+        display: none
+    }
+}

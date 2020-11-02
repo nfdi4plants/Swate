@@ -34,28 +34,26 @@ let initializeAddIn () =
    
 
 // defines the initial state and initial command (= side-effect) of the application
-let init (pageOpt: Routing.Page option) : Model * Cmd<Msg> =
-    let loadCountCmd =
+let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
+    let initialModel = initializeModel pageOpt
+    let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
+    // The initial command from urlUpdate is not needed yet. As we use a reduced variant of subModels with no own Msg system.
+    let model, _ = urlUpdate route initialModel
+    let initialCmd =
         Cmd.batch [
             Cmd.OfPromise.either
                 initializeAddIn
                 ()
                 (fun x -> (x.host.ToString(),x.platform.ToString()) |> Initialized |> ExcelInterop )
                 (fun x -> x |> GenericError |> Dev)
-            Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
-            Cmd.OfPromise.either
-                OfficeInterop.checkIfAnnotationTableIsPresent
-                ()
-                (AnnotationTableExists >> ExcelInterop)
-                (GenericError >> Dev)
         ]
-    initializeModel pageOpt , loadCountCmd
+    model, initialCmd
 
 
 let view (model : Model) (dispatch : Msg -> unit) =
 
     match model.PageState.CurrentPage with
-    | Routing.Page.AddBuildingBlock ->
+    | Routing.Route.AddBuildingBlock ->
         BaseView.baseViewComponent model dispatch [
             AddBuildingBlockView.addBuildingBlockComponent model dispatch
         ] [
@@ -63,7 +61,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ]
 
 
-    | Routing.Page.TermSearch ->
+    | Routing.Route.TermSearch ->
         BaseView.baseViewComponent model dispatch [
             TermSearchView.termSearchComponent model dispatch
         ] [
@@ -71,31 +69,31 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ]
 
 
-    | Routing.Page.FilePicker ->
+    | Routing.Route.FilePicker ->
         BaseView.baseViewComponent model dispatch [
             FilePickerView.filePickerComponent model dispatch
         ] [
             str "Footer content"
         ]
 
-    | Routing.Page.ActivityLog ->
+    | Routing.Route.ActivityLog ->
         BaseView.baseViewComponent model dispatch [
             ActivityLogView.activityLogComponent model
         ] [
             str "Footer content"
         ]
 
-    | Routing.Page.NotFound ->
+    | Routing.Route.NotFound ->
         BaseView.baseViewComponent model dispatch [
             NotFoundView.notFoundComponent model dispatch
         ] [
             str "Footer content"
         ]
 
-    | Routing.Page.Home ->
+    | Routing.Route.Home ->
         Container.container [][
             div [][ str "This is the Swate web host. For a preview click on the following link." ]
-            a [ Href "/#termsearch"] [str "Termsearch"]
+            a [ Href (Routing.Route.toRouteUrl Routing.Route.TermSearch) ] [ str "Termsearch" ]
         ]
 
     //| _ ->
@@ -121,16 +119,17 @@ let view (model : Model) (dispatch : Msg -> unit) =
         //    ]
         //]
 
+
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
 #endif
 
 Program.mkProgram init Update.update view
-|> Program.toNavigable (parseHash Routing.pageParser) Update.urlUpdate
 #if DEBUG
 |> Program.withConsoleTrace
 #endif
+|> Program.toNavigable (parseHash Routing.Routing.route) Update.urlUpdate
 |> Program.withReactBatched "elmish-app"
 #if DEBUG
 |> Program.withDebugger
