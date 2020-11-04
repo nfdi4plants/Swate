@@ -45,18 +45,18 @@ type TermSearchMode =
 
 type AdvancedTermSearchOptions = {
     Ontology                : DbDomain.Ontology option
-    StartsWith              : string
-    MustContain             : string 
-    EndsWith                : string
-    DefinitionMustContain   : string
+    SearchTermName          : string
+    MustContainName         : string 
+    SearchTermDefinition    : string
+    MustContainDefinition   : string
     KeepObsolete            : bool
     } with
         static member init() = {
             Ontology                = None
-            StartsWith              = ""
-            MustContain             = "" 
-            EndsWith                = ""
-            DefinitionMustContain   = ""
+            SearchTermName          = ""
+            MustContainName         = "" 
+            SearchTermDefinition    = ""
+            MustContainDefinition   = ""
             KeepObsolete            = true
         }
 
@@ -79,16 +79,23 @@ type TermSearchState = {
         ShowSuggestions             = false
     }
 
+type AdvancedTermSearchSubpages =
+| InputForm
+| Results
+| SelectedResult of DbDomain.Term
+
 type AdvancedSearchState = {
     ModalId                             : string
-    HasModalVisible                     : bool
-    HasOntologyDropdownVisible          : bool
+    ///
     AdvancedSearchOptions               : AdvancedTermSearchOptions
     AdvancedSearchTermResults           : DbDomain.Term []
-    HasAdvancedSearchResultsLoading     : bool
-    ShowAdvancedSearchResults           : bool
-    AdvancedSearchResultPageinationIndex: int
     SelectedResult                      : DbDomain.Term option
+    // Client visual design
+    AdvancedTermSearchSubpage           : AdvancedTermSearchSubpages
+    HasModalVisible                     : bool
+    HasOntologyDropdownVisible          : bool
+    HasAdvancedSearchResultsLoading     : bool
+    AdvancedSearchResultPageinationIndex: int
 } with
     static member init () = {
         ModalId                             = ""
@@ -97,7 +104,7 @@ type AdvancedSearchState = {
         AdvancedSearchOptions               = AdvancedTermSearchOptions.init ()
         AdvancedSearchTermResults           = [||]
         HasAdvancedSearchResultsLoading     = false
-        ShowAdvancedSearchResults           = false
+        AdvancedTermSearchSubpage           = InputForm
         AdvancedSearchResultPageinationIndex= 0
         SelectedResult                      = None
     }

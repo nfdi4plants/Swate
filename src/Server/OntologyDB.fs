@@ -197,28 +197,28 @@ let getAllOntologies cString () =
                     (reader.GetString(5))
     |]
 
-let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (startsWith : string) (mustContain:string) (endsWith:string) (keepObsolete:bool) (definitionMustContain:string) =
+let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (searchName : string) (mustContainName:string) (searchDef:string) (mustContainDef:string) (keepObsolete:bool) =
     
     use connection = establishConnection cString
     connection.Open()
     use advancedTermSearchCmd = new MySqlCommand("advancedTermSearch",connection)
     advancedTermSearchCmd.CommandType <- CommandType.StoredProcedure
 
-    let ontIdParam                  = advancedTermSearchCmd.Parameters.Add("ontologyId",MySqlDbType.Int64)
-    let startsWithParam             = advancedTermSearchCmd.Parameters.Add("startsWith",MySqlDbType.VarChar)
-    let endsWithParam               = advancedTermSearchCmd.Parameters.Add("endsWith",MySqlDbType.VarChar)
-    let mustContainParam            = advancedTermSearchCmd.Parameters.Add("mustContain",MySqlDbType.VarChar)
-    let definitionMustContainParam  = advancedTermSearchCmd.Parameters.Add("definitionMustContain",MySqlDbType.VarChar)
+    let ontIdParam                  = advancedTermSearchCmd.Parameters.Add("ontologyID",MySqlDbType.Int64)
+    let searchNameParam             = advancedTermSearchCmd.Parameters.Add("searchTermName",MySqlDbType.VarChar)
+    let mustContainNameParam        = advancedTermSearchCmd.Parameters.Add("mustContainName",MySqlDbType.VarChar)
+    let searchDefParam              = advancedTermSearchCmd.Parameters.Add("searchTermDefinition",MySqlDbType.VarChar)
+    let mustContainDefParam         = advancedTermSearchCmd.Parameters.Add("mustContainDefinition",MySqlDbType.VarChar)
 
     if ont.IsSome then
         ontIdParam              .Value <- ont.Value.ID
     else
         ontIdParam              .Value <- DBNull.Value
  
-    startsWithParam             .Value <- startsWith
-    endsWithParam               .Value <- endsWith
-    mustContainParam            .Value <- mustContain
-    definitionMustContainParam  .Value <- definitionMustContain
+    searchNameParam             .Value <- searchName
+    mustContainNameParam        .Value <- mustContainName
+    searchDefParam              .Value <- searchDef
+    mustContainDefParam         .Value <- mustContainDef
 
     use reader = advancedTermSearchCmd.ExecuteReader()
     [|

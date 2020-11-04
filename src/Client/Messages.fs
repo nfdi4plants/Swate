@@ -28,16 +28,19 @@ type TermSearchMsg =
     | StoreParentOntologyFromOfficeInterop  of obj option
 
 type AdvancedSearchMsg =
+    // Client
     | ResetAdvancedSearchState
     | ResetAdvancedSearchOptions
-    | ToggleModal                   of string
+    | UpdateAdvancedTermSearchSubpage   of AdvancedTermSearchSubpages
+    | ToggleModal                       of string
     | ToggleOntologyDropdown
-    | AdvancedSearchOptionsChange   of AdvancedTermSearchOptions
-    | AdvancedSearchResultSelected  of DbDomain.Term
-    | OntologySuggestionUsed        of DbDomain.Ontology
+    | UpdateAdvancedTermSearchOptions   of AdvancedTermSearchOptions
+    | OntologySuggestionUsed            of DbDomain.Ontology
+    | ChangePageinationIndex            of int
+    // Server
+    /// Main function. Forward request to Request Api -> Server.
     | StartAdvancedSearch
-    | NewAdvancedSearchResults      of DbDomain.Term []
-    | ChangePageinationIndex        of int
+    | NewAdvancedSearchResults          of DbDomain.Term []
 
 type DevMsg =
     | LogTableMetadata

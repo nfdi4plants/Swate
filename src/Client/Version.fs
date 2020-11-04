@@ -2,4 +2,4 @@
 
 let template = "1.22.4"
 
-let app = "0.0.1-alpha"
+let app = "0.0.2-alpha"

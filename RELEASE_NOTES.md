@@ -1,8 +1,10 @@
 ### 0.0.2-alpha - Work In Progress
 * Release of Minimal POC milestone. Rough feature set:
+    * Update advanced term search to use stored procedure introduced in 0.0.2-alpha.
     * Bug fixes:
 	    * Responsive design should now render immediatly upon window size change
 	    * Add-in should not reload after navigating to a new tab for the first time.
+        * Term search input field no longer looses focus after clicking into it.
 
 ### 0.0.2-alpha - 2020-10-29
 * First step on the way to the Minimal POC milestone. Rough feature set:

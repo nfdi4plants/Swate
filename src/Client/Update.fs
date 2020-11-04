@@ -246,18 +246,16 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
         let nextState = {
             currentState with
                 AdvancedSearchOptions = AdvancedTermSearchOptions.init()
-                ShowAdvancedSearchResults = false
+                AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.InputForm
         }
 
         nextState,Cmd.none
-
-    | AdvancedSearchResultSelected selectedTerm ->
+    | UpdateAdvancedTermSearchSubpage subpage ->
         let nextState = {
             currentState with
-                SelectedResult = Some selectedTerm     
+                AdvancedTermSearchSubpage = subpage
         }
-
-        nextState,Cmd.none
+        nextState, Cmd.none
 
     | ToggleModal modalId ->
         let nextState = {
@@ -289,7 +287,7 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
             }
         nextState, Cmd.ofMsg (AdvancedSearch ToggleOntologyDropdown)
 
-    | AdvancedSearchOptionsChange opts ->
+    | UpdateAdvancedTermSearchOptions opts ->
 
         let nextState = {
             currentState with
@@ -302,7 +300,7 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
 
         let nextState = {
             currentState with
-                ShowAdvancedSearchResults       = true
+                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.Results
                 HasAdvancedSearchResultsLoading = true
             
         }
@@ -325,7 +323,7 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
         let nextState = {
             currentState with
                 AdvancedSearchTermResults       = results
-                ShowAdvancedSearchResults       = true
+                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.Results
                 HasAdvancedSearchResultsLoading = false
         }
 
@@ -481,7 +479,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         nextState,
         Cmd.OfAsync.either
             Api.api.getTermsForAdvancedSearch
-            (options.Ontology,options.StartsWith,options.MustContain,options.EndsWith,options.KeepObsolete,options.DefinitionMustContain)
+            (options.Ontology,options.SearchTermName,options.MustContainName,options.SearchTermDefinition,options.MustContainDefinition,options.KeepObsolete)
             (AdvancedTermSearchResultsResponse >> Response >> Api)
             (ApiError >> Api)
 
