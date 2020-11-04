@@ -92,7 +92,7 @@ type IAnnotatorAPI = {
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
     getTermSuggestionsByParentTerm  : (int*string*string)                                           -> Async<DbDomain.Term []>
-    getTermsForAdvancedSearch           : ((DbDomain.Ontology option)*string*string*string*bool*string) -> Async<DbDomain.Term []>
+    getTermsForAdvancedSearch           : ((DbDomain.Ontology option)*string*string*string*string*bool) -> Async<DbDomain.Term []>
 
     getUnitTermSuggestions              : (int*string)                                                  -> Async<DbDomain.Term []>
 }

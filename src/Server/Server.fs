@@ -74,10 +74,10 @@ let annotatorApi cString = {
                 |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
         }
 
-    getTermsForAdvancedSearch = fun (ont,startsWith,mustContain,endsWith,keepObsolete,definitionMustContain) ->
+    getTermsForAdvancedSearch = fun (ont,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
         async {
             let result =
-                OntologyDB.getAdvancedTermSearchResults cString ont startsWith mustContain endsWith keepObsolete definitionMustContain
+                OntologyDB.getAdvancedTermSearchResults cString ont searchName mustContainName searchDefinition mustContainDefinition keepObsolete
             return result
         }
 
@@ -153,13 +153,11 @@ let topLevelRouter = router {
     forward @"/api/ITestAPI" (fun next ctx ->
         testWebApp next ctx
     )
-
-
 }
 
 let app = application {
-    url "https://localhost:443/"
-    force_ssl
+    url "http://localhost:5000/"
+    //force_ssl
     use_router topLevelRouter
     memory_cache
     use_static "public"

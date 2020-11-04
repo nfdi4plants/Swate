@@ -8,7 +8,6 @@ let buttonComponent (colorMode: ExcelColors.ColorMode) (isActive:bool) txt onCli
 
     Button.button [
         Button.IsFullWidth
-        Button.IsActive isActive
         Button.Props [Style [BackgroundColor colorMode.BodyForeground; Color colorMode.Text]]
         Button.OnClick onClick
         ][

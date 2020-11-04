@@ -232,8 +232,8 @@ let autocompleteTermSearchComponentOfParentOntology
     (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
 
     =
-    let parentOntologyNotificationElement =
-        Control.p [][
+    let parentOntologyNotificationElement show =
+        Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]][
             Button.button [
                 Button.IsStatic true
                 match inputSize with
@@ -245,9 +245,10 @@ let autocompleteTermSearchComponentOfParentOntology
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
         Field.div [Field.HasAddons][
-            if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology then parentOntologyNotificationElement
+            parentOntologyNotificationElement ((model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology) |> not)
             Control.p [Control.IsExpanded][
                 Input.input [
+                    Input.Props [Id "TermSearchInput"]
                     Input.Placeholder inputPlaceholderText
                     match inputSize with
                     | Some size -> Input.Size size
@@ -259,6 +260,8 @@ let autocompleteTermSearchComponentOfParentOntology
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
                             GetParentTerm |> ExcelInterop |> dispatch
+                            let el = Browser.Dom.document.getElementById "TermSearchInput"
+                            el.focus()
                         )
                     ]           
                     Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)

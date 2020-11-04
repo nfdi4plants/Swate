@@ -28,7 +28,7 @@ let createPaginationLinkFromIndex (dispatch:Msg->unit) (pageIndex:int) (currentP
 
 let pageinateDynamic (dispatch:Msg->unit) (currentPageinationIndex: int) (pageCount:int)  = 
     (*[0 .. pageCount-1].*)
-    [(max 1 (currentPageinationIndex-2)) .. (min (currentPageinationIndex+2) (pageCount-2)) ]
+    [(max 1 (currentPageinationIndex-2)) .. (min (currentPageinationIndex+2) (pageCount-1)) ]
     |> List.map (
         fun index -> createPaginationLinkFromIndex dispatch index currentPageinationIndex
     ) 
@@ -43,22 +43,23 @@ let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elements:Reac
         let len = chunked.Length 
     
         Container.container [] [
-            Pagination.pagination [Pagination.IsCentered] [
-                Pagination.previous [Props [OnClick (fun _ -> (max (currentPageinationIndex - 1) 0) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )]] [str "Prev"]
-                Pagination.list [] [
-                    yield createPaginationLinkFromIndex dispatch 0 currentPageinationIndex
-                    if len > 5 then yield Pagination.ellipsis []
-                    yield! pageinateDynamic dispatch currentPageinationIndex (len - 1)
-                    if len > 5 then yield Pagination.ellipsis []
-                    yield createPaginationLinkFromIndex dispatch (len-1) currentPageinationIndex
-                ]
-                Pagination.next [Props [OnClick (fun _ -> (min (currentPageinationIndex + 1) (len - 1)) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )]] [str "Next"]
-            ]
             Table.table [Table.IsFullWidth] [
                 thead [] []
                 tbody [] (
                     chunked.[currentPageinationIndex] |> Array.toList
                 )
             ]
+            Pagination.pagination [Pagination.IsCentered] [
+                Pagination.previous [Props [OnClick (fun _ -> (max (currentPageinationIndex - 1) 0) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )]] [str "Prev"]
+                Pagination.list [] [
+                    yield createPaginationLinkFromIndex dispatch 0 currentPageinationIndex
+                    if len > 5 && currentPageinationIndex > 3 then yield Pagination.ellipsis []
+                    yield! pageinateDynamic dispatch currentPageinationIndex (len - 1)
+                    if len > 5 && currentPageinationIndex < len-4 then yield Pagination.ellipsis []
+                    yield createPaginationLinkFromIndex dispatch (len-1) currentPageinationIndex
+                ]
+                Pagination.next [Props [OnClick (fun _ -> (min (currentPageinationIndex + 1) (len - 1)) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )]] [str "Next"]
+            ]
         ]
-    else div [] []
+    else
+        div [] []
