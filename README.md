@@ -13,7 +13,7 @@ The aims of Swate are:
 
 1. Provide an easy way to annotate experimental data in an application (excel) that every wet lab scientist is familiar with
 2. Provide a way to create computational workflows that start from raw data and end with results.
-3. Create ISA and CWL compatible data models from the input
+3. ~~Create ISA and CWL compatible data models from the input~~ (moved to the [ARC commander project](https://github.com/nfdi4plants/arcCommander))
 4. Provide an interface for remote execution of the defined workflows
 
 Check the state of the [minimal POC milestone ](https://github.com/nfdi4plants/Swate/milestone/1) for the current state of features.
@@ -21,26 +21,19 @@ Check the state of the [minimal POC milestone ](https://github.com/nfdi4plants/S
 Test
 ----
 
-We are excited to announce that you can now test SWATE in a very early alpha preview version.
-If you decide to do so, please take the time to set up a Github account to report your issues and suggestions [here](https://github.com/nfdi4plants/Swate/issues).
+You can test swate by following the steps below. If you decide to do so, please take the time to set up a Github account to report your issues and suggestions [here](https://github.com/nfdi4plants/Swate/issues).
 You can also search existing issues for solutions for your questions and/or discussions about your suggestions.
 
 **Here are the necessary steps to use SWATE:**
 
-- Excel (rightfully) enforces https on all addins. We currently have only a self-signed certificate. 
-This means that you will have to install our certificate under `Trusted Root Certification Authorities`. You will need to do this for either of the following methods.
-You can find the .cert file in the test release archive.
-We recommend you to remove this certificate from your trusted sources when SWATE has an own certificate. 
 
  - **If you use Excel locally**:
    - Install [node.js LTS](https://nodejs.org/en/) (needed for office addin related tooling)
    - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
-   - If not done already, install `Swate_SelfSigned_Certificate.cer` under `Trusted Root Certification Authorities`
    - Execute the test.cmd (windows, as administrator) or test.sh (macOS, you will need to make it executable via chmod a+x) script.
 
  - **If you use Excel in the browser**:
    - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
-   - If not done already, install `Swate_SelfSigned_Certificate.cer` under `Trusted Root Certification Authorities`
    - Launch Excel online, open a (blank) workbook 
    - Under the `Insert` tab, select `Add-Ins`
    - Go to `Manage my Add-Ins` and select `Upload my Add-In`
@@ -49,7 +42,7 @@ We recommend you to remove this certificate from your trusted sources when SWATE
 Discuss
 -------
 
-Extensive documentation of Swate will be setup when the [development process of a minimal POC](https://github.com/nfdi4plants/Swate/milestone/1) is complete.
+Documentation of the features is now a top priority as we completed the POC stage :rocket:. You can discuss needed docs and the available ones [here](https://github.com/nfdi4plants/Swate/issues/47)
 
 Please use Github issues to track problems, feature requests, questions, and discussions. Additionally, you can get in touch with us on [Twitter](https://twitter.com/nfdi4plants)
 
