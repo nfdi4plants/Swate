@@ -41,6 +41,12 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
         ]
     ]
 
+let footerContentStatic model dispatch =
+    div [][
+        str "Swate Release Version "
+        a [Href "https://github.com/nfdi4plants/Swate/releases"][str (Version.app)]
+    ]
+
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
     div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
@@ -77,9 +83,13 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                 Content.content [
                     Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
                     Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
+                ] [
+                    yield! footerChildren
                 ]
-                    footerChildren
-                
-            ] 
+            ]
+        ]
+
+        div [Style [Position PositionOptions.Absolute; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"]][
+            footerContentStatic model dispatch
         ]
     ]

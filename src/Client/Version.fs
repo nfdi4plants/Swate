@@ -1,5 +1,5 @@
-﻿module Version
+module Version
 
 let template = "1.22.4"
 
-let app = "0.0.2-alpha"
+let app = "v0.1-beta"

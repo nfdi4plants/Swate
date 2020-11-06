@@ -49,7 +49,6 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
         ]
     model, initialCmd
 
-
 let view (model : Model) (dispatch : Msg -> unit) =
 
     match model.PageState.CurrentPage with
@@ -59,7 +58,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ] [
             AddBuildingBlockView.addBuildingBlockFooterComponent model dispatch
         ]
-
 
     | Routing.Route.TermSearch ->
         BaseView.baseViewComponent model dispatch [
