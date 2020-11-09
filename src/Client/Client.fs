@@ -24,10 +24,10 @@ module Server =
     open Fable.Remoting.Client
 
     /// A proxy you can use to talk to server directly
-    let api : IAnnotatorAPI =
+    let api : IAnnotatorAPIv1 =
       Remoting.createApi()
       |> Remoting.withRouteBuilder Route.builder
-      |> Remoting.buildProxy<IAnnotatorAPI>
+      |> Remoting.buildProxy<IAnnotatorAPIv1>
 
 let initializeAddIn () =
     OfficeInterop.Office.onReady()

@@ -85,11 +85,12 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                     Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
                 ] [
                     yield! footerChildren
+                    Button.button [Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )] [str "test"]
                 ]
             ]
         ]
 
-        div [Style [Position PositionOptions.Absolute; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"]][
+        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"]][
             footerContentStatic model dispatch
         ]
     ]

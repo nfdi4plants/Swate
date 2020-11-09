@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open OfficeJS
 open Excel
 open System.Collections.Generic
-    
+
 [<Global>]
 let Office : Office.IExports = jsNative
 
@@ -18,14 +18,72 @@ let RangeLoadOptions : Interfaces.RangeLoadOptions = jsNative
 
 [<Emit("console.log($0)")>]
 let consoleLog (message: string): unit = jsNative
-    
+        //ranges.format.fill.color <- "red"
+        //let ranges = context.workbook.getSelectedRanges()
+        //let x = ranges.load(U2.Case1 "address")
+
+open System
+
+let findBrackets (str:string) =
+    let indOpen = str.IndexOf "["
+    let indClose = str.IndexOf "]"
+    let dif = indClose - indOpen
+    str.Substring (indOpen+1,dif-1)
+
+let parseColHeader (headerStr:string) =
+    /// check if correct number of brackets exist
+    let isParsable =
+        let a = headerStr.ToCharArray()
+        let isOpen,isClosed = Array.contains '[' a, Array.contains ']' a
+        let filterForBrackets = Array.filter (fun x -> x = '[' || x = ']') a
+        match isOpen, isClosed, filterForBrackets.Length with
+        | true, true, 2 -> true
+        | _, _, _ -> false
+    let parsableStr() = findBrackets headerStr
+    if isParsable then Some (parsableStr().Split([|"; "|], StringSplitOptions.None)) else None
+
 let exampleExcelFunction () =
     Excel.run(fun context ->
-        let ranges = context.workbook.getSelectedRanges()
-        ranges.format.fill.color <- "red"
-        let x = ranges.load(U2.Case1 "address")
-        context.sync().``then``(
-            fun _ -> x.address
+    let sheet = context.workbook.worksheets.getActiveWorksheet()
+    let annotationTable = sheet.tables.getItem("annotationTable")
+    let allCols = annotationTable.columns.load(propertyNames = U2.Case1 "items")
+
+    let annoHeaderRange = annotationTable.getHeaderRowRange()
+    let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
+    context.sync().``then``(
+        fun _ ->
+            let allCols = allCols.items |> Array.ofSeq
+            let _ =
+                allCols
+                |> Array.map (fun col -> col.getRange())
+                |> Array.map (fun x ->
+                    x.columnHidden <- false
+                    x.format.autofitColumns()
+                    x.format.autofitRows()
+                )
+            let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+            let indexedHeaderArr =
+                headerVals
+                //|> Array.indexed
+                |> Array.choose id |> Array.map string
+                //(fun (i,x) ->
+                //    if x.IsSome then Some (i, string x) else None
+                //)
+            let parsedHeaderArr =
+                indexedHeaderArr
+                |> Array.choose (fun (x) ->
+                    let parsableHeader = parseColHeader x
+                    if parsableHeader.IsSome then Some (x, parsableHeader.Value) else None
+                )
+            let colsToHide =
+                parsedHeaderArr
+                |> Array.filter (fun (ind,arr) -> Array.contains "#h" arr)
+                |> Array.map fst
+            let ranges =
+                colsToHide
+                |> Array.map (fun ind -> (annotationTable.columns.getItem (U2.Case2 ind)).getRange())
+            let hideCols = ranges |> Array.map (fun x -> x.columnHidden <- true)
+            "Autoformat Table"
         )
     )
 
@@ -75,7 +133,7 @@ let createAnnotationTable (isDark:bool) =
         tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount";"address"]))) |> ignore
         annotationTable.load(U2.Case1 "style") |> ignore
 
-        //sync with proxy objects after loading values from excel   
+        //sync with proxy objects after loading values from excel
         context.sync()
             .``then``( fun _ ->
 
@@ -88,14 +146,60 @@ let createAnnotationTable (isDark:bool) =
                 annotationTable.style <- style
 
                 (annotationTable.columns.getItemAt 0.).name <- "Source Name"
+                //(annotationTable.columns.getItemAt 0.).set
 
                 sheet.getUsedRange().format.autofitColumns()
                 sheet.getUsedRange().format.autofitRows()
 
-                sprintf "Annotation Table created in [%s] with dimensions %.0f c x (%.0f + 1h)r" tableRange.address tableRange.columnCount (tableRange.rowCount - 1.) 
+                sprintf "Annotation Table created in [%s] with dimensions %.0f c x (%.0f + 1h)r" tableRange.address tableRange.columnCount (tableRange.rowCount - 1.)
 
-                )
+            )
             //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
+    )
+
+let autoFitTable () =
+    Excel.run(fun context ->
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let annotationTable = sheet.tables.getItem("annotationTable")
+        let allCols = annotationTable.columns.load(propertyNames = U2.Case1 "items")
+    
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
+        context.sync().``then``(
+            fun _ ->
+                let allCols = allCols.items |> Array.ofSeq
+                let _ =
+                    allCols
+                    |> Array.map (fun col -> col.getRange())
+                    |> Array.map (fun x ->
+                        x.columnHidden <- false
+                        x.format.autofitColumns()
+                        x.format.autofitRows()
+                    )
+                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+                let indexedHeaderArr =
+                    headerVals
+                    //|> Array.indexed
+                    |> Array.choose id |> Array.map string
+                    //(fun (i,x) ->
+                    //    if x.IsSome then Some (i, string x) else None
+                    //)
+                let parsedHeaderArr =
+                    indexedHeaderArr
+                    |> Array.choose (fun (x) ->
+                        let parsableHeader = parseColHeader x
+                        if parsableHeader.IsSome then Some (x, parsableHeader.Value) else None
+                    )
+                let colsToHide =
+                    parsedHeaderArr
+                    |> Array.filter (fun (ind,arr) -> Array.contains "#h" arr)
+                    |> Array.map fst
+                let ranges =
+                    colsToHide
+                    |> Array.map (fun ind -> (annotationTable.columns.getItem (U2.Case2 ind)).getRange())
+                let hideCols = ranges |> Array.map (fun x -> x.columnHidden <- true)
+                "Autoformat Table"
+            )
     )
 
 let checkIfAnnotationTableIsPresent () =
@@ -105,7 +209,7 @@ let checkIfAnnotationTableIsPresent () =
         let table = t.tables.getItemOrNullObject("annotationTable")
         context.sync()
             .``then``( fun _ ->
-                not table.isNullObject 
+                not table.isNullObject
         )
     )
 
@@ -136,75 +240,111 @@ let addAnnotationColumn (colName:string) =
         )
     )
 
-
 let addThreeAnnotationColumns (colName:string) =
     let parentTerm =
-        let indOfStart = colName.IndexOf "["
-        let sub1 = colName.Substring (indOfStart)
-        sub1
+        let parsedHeader = parseColHeader colName
+        if parsedHeader.IsSome then
+            (sprintf "[%s; #h]" parsedHeader.Value.[0])
+        else
+            ""
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let annotationTable = sheet.tables.getItem("annotationTable")
 
+        /// This is necessary to place new columns next to selected col
+        let tables = annotationTable.columns.load(propertyNames = U2.Case1 "items")
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let range = context.workbook.getSelectedRange()
+        annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"|])) |> ignore
+        range.load(U2.Case1 "columnIndex") |> ignore
+
+        ///
         let tableRange = annotationTable.getRange()
         tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
 
         context.sync().``then``( fun _ ->
-            let colCount = tableRange.columnCount
+
+            /// This is necessary to place new columns next to selected col
+            let tableHeaderRangeColIndex = annoHeaderRange.columnIndex
+            let selectColIndex = range.columnIndex
+            let diff = selectColIndex - tableHeaderRangeColIndex |> int
+            let vals =
+                tables.items
+            let maxLength = vals.Count-1
+            let newBaseColIndex =
+                if diff <= 0 then
+                    maxLength+1
+                elif diff > maxLength then
+                    maxLength+1
+                else
+                    diff+1
+                |> float
+
+            // This is necessary to skip over hidden cols
+            /// Get an array of the headers
+            let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+            let indexedHeaderArr =
+                headerVals
+                |> Array.indexed
+                |> Array.choose (fun (i,x) ->
+                    let prep = parseColHeader (string x.Value) 
+                    if x.IsSome && prep.IsSome then
+                        Some (i+1 |> float,prep.Value)
+                    else
+                        None
+                )
+                |> Array.filter (fun (i,x) -> Array.contains "#h" x)
+            let rec loopingCheckSkip (newInd:float) =
+                let nextIsHidden =
+                    Array.exists (fun (i,x) -> i = newInd+1.) indexedHeaderArr
+                if nextIsHidden then
+                    loopingCheckSkip (newInd+1.)
+                else
+                    newInd
+            let showindexedHeaderArr =
+                indexedHeaderArr
+                |> Array.map (fun (i,x) -> sprintf "%.0f, %A" i x)
+                |> String.concat "; "
+                |> fun x -> ("||" + x)
+
             let rowCount = tableRange.rowCount |> int
             //create an empty column to insert
             let col =
                 createEmptyMatrixForTables 1 rowCount ""
-
+            /// Here is the next col index, which is not hidden, calculated.
+            let newBaseColIndex' = loopingCheckSkip newBaseColIndex
             let createdCol1 =
                 annotationTable.columns.add(
-                    index = colCount,
+                    index = newBaseColIndex',
                     values = U4.Case1 col,
                     name = colName
                 )
-            let autofitRange1 = createdCol1.getRange()
-            autofitRange1.format.autofitColumns()
-            autofitRange1.format.autofitRows()
 
             let createdCol2 =
                 annotationTable.columns.add(
-                    index = colCount+1.,
+                    index = newBaseColIndex'+1.,
                     values = U4.Case1 col,
-                    name = sprintf "%s %s" "Term Source REF" (parentTerm)
+                    name = sprintf "%s %s" "Term Source REF" parentTerm
                 )
-            let autofitRange2 = createdCol2.getRange()
-            autofitRange2.format.autofitColumns()
-            autofitRange2.format.autofitRows()
-
             let createdCol3 =
                 annotationTable.columns.add(
-                    index = colCount+2.,
+                    index = newBaseColIndex'+2.,
                     values = U4.Case1 col,
-                    name = sprintf "%s %s" "Term Accession Number" (parentTerm)
+                    name = sprintf "%s %s" "Term Accession Number" parentTerm
                 )
-            let autofitRange3 = createdCol3.getRange()
-            autofitRange3.format.autofitColumns()
-            autofitRange3.format.autofitRows()
 
-            colCount,sprintf "%s column was added in range: %A." colName (autofitRange3.ToString())
+            sprintf "%s column was added. base = %A, recalc = %A; headerVals %A" colName newBaseColIndex newBaseColIndex' showindexedHeaderArr
         )
     )
 
-
-let changeTableColumnFormat (colName:string) (colInd:float) (format:string) =
+let changeTableColumnFormat (colName:string) (format:string) =
     Excel.run(fun context ->
        let sheet = context.workbook.worksheets.getActiveWorksheet()
        let annotationTable = sheet.tables.getItem("annotationTable")
 
-       // (colInd+2.)/(colInd+3.), because +1/+2 hid the columns one too early. Not sure why though. Seems like a strange interaction between count vs indices
-       let sndColRange = (annotationTable.columns.getItem (U2.Case1 (colInd+2.))).getRange()
-       let thrdColRange = (annotationTable.columns.getItem (U2.Case1 (colInd+3.))).getRange()
        let colBodyRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
        colBodyRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
 
-       sndColRange.columnHidden <- true
-       thrdColRange.columnHidden <- true
-       
        context.sync().``then``( fun _ ->
            let rowCount = colBodyRange.rowCount |> int
            //create an empty column to insert
@@ -215,7 +355,6 @@ let changeTableColumnFormat (colName:string) (colInd:float) (format:string) =
            sprintf "format of %s was changed to %s" colName format
        )
     )
-
 
 let fillValue (v,fillTerm:Shared.DbDomain.Term option) =
     Excel.run(fun context ->

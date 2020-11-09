@@ -14,11 +14,12 @@ type ExcelInteropMsg =
     | TryExcel
     | FillSelection             of string * (DbDomain.Term option)
     | AddColumn                 of colname:string * formatString:string
-    | FormatColumn              of colname:string * cloind:float * formatString:string
+    | FormatColumn              of colname:string * formatString:string * prevmsg:string
     | CreateAnnotationTable     of bool
     | AnnotationtableCreated    of string
     | AnnotationTableExists     of bool
     | GetParentTerm
+    | AutoFitTable
 
 type TermSearchMsg =
     | ToggleSearchByParentOntology

@@ -40,6 +40,15 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
 let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:ExcelState) : ExcelState * Cmd<Msg> =
     match excelInteropMsg with
 
+    | AutoFitTable ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.autoFitTable
+                ()
+                (fun msg -> InSync msg |> ExcelInterop)
+                (GenericError >> Dev)
+        currentState, cmd
+
     | Initialized (h,p) ->
         let welcomeMsg = sprintf "Ready to go in %s running on %s" h p
 
@@ -65,6 +74,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
     | SyncContext passthroughMessage ->
         currentState,
         Cmd.batch [
+            Cmd.ofMsg (AutoFitTable |> ExcelInterop)
             Cmd.OfPromise.either
                 OfficeInterop.checkIfAnnotationTableIsPresent
                 ()
@@ -113,16 +123,21 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             //OfficeInterop.addAnnotationColumn
             OfficeInterop.addThreeAnnotationColumns  
             colName
-            (fun (colInd,msg) -> (colName,colInd,format) |> FormatColumn |> ExcelInterop)
+            (fun (msg) ->
+                
+                (colName,format,msg) |> FormatColumn |> ExcelInterop)
             (GenericError >> Dev)
 
-    | FormatColumn (colName,colInd,format) ->
+    | FormatColumn (colName,format,msg) ->
         currentState,
-        Cmd.OfPromise.either
-            (OfficeInterop.changeTableColumnFormat colName colInd)
-            format
-            (SyncContext >> ExcelInterop)
-            (GenericError >> Dev)
+        Cmd.batch [
+            Cmd.ofMsg (InSync msg |> ExcelInterop)
+            Cmd.OfPromise.either
+                (OfficeInterop.changeTableColumnFormat colName)
+                format
+                (SyncContext >> ExcelInterop)
+                (GenericError >> Dev)
+        ]
 
     | CreateAnnotationTable isDark ->
         currentState,
