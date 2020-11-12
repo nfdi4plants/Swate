@@ -5,6 +5,23 @@ open Fable.Core.JsInterop
 open OfficeJS
 open Excel
 open System.Collections.Generic
+open System.Text.RegularExpressions
+
+/// (|Regex|_|) pattern input
+let (|Regex|_|) pattern input =
+    let m = Regex.Match(input, pattern)
+    if m.Success then Some(m.Value)
+    else None
+
+[<LiteralAttribute>]
+/// Not used for now
+let hashGuidPattern = "#([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})"
+
+[<LiteralAttribute>]
+let hashNumberPattern = "#\d+"
+
+[<LiteralAttribute>]
+let squaredBracketsPattern = "\[[^\]]*\]"
 
 [<Global>]
 let Office : Office.IExports = jsNative
@@ -24,23 +41,20 @@ let consoleLog (message: string): unit = jsNative
 
 open System
 
-let findBrackets (str:string) =
-    let indOpen = str.IndexOf "["
-    let indClose = str.IndexOf "]"
-    let dif = indClose - indOpen
-    str.Substring (indOpen+1,dif-1)
-
 let parseColHeader (headerStr:string) =
-    /// check if correct number of brackets exist
-    let isParsable =
-        let a = headerStr.ToCharArray()
-        let isOpen,isClosed = Array.contains '[' a, Array.contains ']' a
-        let filterForBrackets = Array.filter (fun x -> x = '[' || x = ']') a
-        match isOpen, isClosed, filterForBrackets.Length with
-        | true, true, 2 -> true
-        | _, _, _ -> false
-    let parsableStr() = findBrackets headerStr
-    if isParsable then Some (parsableStr().Split([|"; "|], StringSplitOptions.None)) else None
+    let reg =
+        match headerStr with
+        | Regex squaredBracketsPattern value ->
+            value
+                // remove brackets
+                .[1..value.Length-2]
+                // split by separator to get information array
+                // can consist of e.g. #h, #guid, parentOntology
+                .Split([|"; "|], StringSplitOptions.None)
+            |> Some
+        | _ ->
+            None
+    reg
 
 let exampleExcelFunction () =
     Excel.run(fun context ->
@@ -213,40 +227,27 @@ let checkIfAnnotationTableIsPresent () =
         )
     )
 
-let addAnnotationColumn (colName:string) =
-    Excel.run(fun context ->
-        let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem("annotationTable")
-
-        let tableRange = annotationTable.getRange()
-        tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
-
-        context.sync().``then``( fun _ ->
-            let colCount = tableRange.columnCount
-            let rowCount = tableRange.rowCount |> int
-            //create an empty column to insert
-            let testCol = createEmptyMatrixForTables 1 rowCount ""
-
-            let createdCol =
-                annotationTable.columns.add(
-                    colCount,
-                    values = U4.Case1 testCol, name=colName
-                )
-            let autofitRange = createdCol.getRange()
-
-            autofitRange.format.autofitColumns()
-            autofitRange.format.autofitRows()
-            sprintf "%s column was added." colName
-        )
-    )
-
 let addThreeAnnotationColumns (colName:string) =
-    let parentTerm =
-        let parsedHeader = parseColHeader colName
-        if parsedHeader.IsSome then
-            (sprintf "[%s; #h]" parsedHeader.Value.[0])
-        else
-            ""
+
+    let mainColName (id:int) =
+        let parsedBaseHeader = parseColHeader colName
+        match parsedBaseHeader.IsSome, id with
+        | true, 0 ->
+            Regex.Replace (colName, squaredBracketsPattern, (sprintf "[%s]" parsedBaseHeader.Value.[0]))
+        | true, _ ->
+            Regex.Replace (colName, squaredBracketsPattern, (sprintf "[%s; #%i]" parsedBaseHeader.Value.[0] id))
+        | false, 0 ->
+            sprintf "%s" colName
+        | false, _ ->
+            sprintf "%s [#%i]" colName id
+    let hiddenColAttributes (id:int) =
+        let parsedBaseHeader = parseColHeader colName
+        let coreName = if parsedBaseHeader.IsSome then parsedBaseHeader.Value.[0] else colName
+        match id with
+        | 0 ->
+            (sprintf "[%s; #h]" coreName)
+        | _ ->
+            (sprintf "[%s; #%i; #h]" coreName id)
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let annotationTable = sheet.tables.getItem("annotationTable")
@@ -301,39 +302,60 @@ let addThreeAnnotationColumns (colName:string) =
                     loopingCheckSkip (newInd+1.)
                 else
                     newInd
-            let showindexedHeaderArr =
-                indexedHeaderArr
-                |> Array.map (fun (i,x) -> sprintf "%.0f, %A" i x)
-                |> String.concat "; "
-                |> fun x -> ("||" + x)
+            /// Here is the next col index, which is not hidden, calculated.
+            let newBaseColIndex' = loopingCheckSkip newBaseColIndex
+
+            // This is necessary to prevent trying to create a column with an already existing name
+            let findNewIdForName() =
+                let prepArr =
+                    headerVals
+                    |> Array.choose id
+                    |> Array.map string
+                let rec loopingCheck int =
+                    let isExisting =
+                        prepArr
+                        // Should a column with the same name already exist, then count up the id tag.
+                        |> Array.exists (fun existingHeader ->
+                            existingHeader = mainColName int
+                            // i think it is necessary to also check for "T S REF" and "T A N" because of the following possibilities
+                            // Parameter [instrument model] | "Term Source REF [instrument model; #h] | ...
+                            // Factor [instrument model] | "Term Source REF [instrument model; #h] | ...
+                            // in the example above the mainColName is different but "T S REF" and "T A N" would be the same.
+                            || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes int)
+                            || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes int)
+                        )
+                    if isExisting then
+                        loopingCheck (int+1)
+                    else
+                        int
+                loopingCheck 0
+            let newId = findNewIdForName()
 
             let rowCount = tableRange.rowCount |> int
             //create an empty column to insert
             let col =
                 createEmptyMatrixForTables 1 rowCount ""
-            /// Here is the next col index, which is not hidden, calculated.
-            let newBaseColIndex' = loopingCheckSkip newBaseColIndex
             let createdCol1 =
                 annotationTable.columns.add(
                     index = newBaseColIndex',
                     values = U4.Case1 col,
-                    name = colName
+                    name = mainColName newId
                 )
 
             let createdCol2 =
                 annotationTable.columns.add(
                     index = newBaseColIndex'+1.,
                     values = U4.Case1 col,
-                    name = sprintf "%s %s" "Term Source REF" parentTerm
+                    name = sprintf "Term Source REF %s" (hiddenColAttributes newId)
                 )
             let createdCol3 =
                 annotationTable.columns.add(
                     index = newBaseColIndex'+2.,
                     values = U4.Case1 col,
-                    name = sprintf "%s %s" "Term Accession Number" parentTerm
+                    name = sprintf "Term Accession Number %s" (hiddenColAttributes newId)
                 )
 
-            sprintf "%s column was added. base = %A, recalc = %A; headerVals %A" colName newBaseColIndex newBaseColIndex' showindexedHeaderArr
+            mainColName newId, sprintf "%s column was added. %A" colName headerVals
         )
     )
 

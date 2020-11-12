@@ -123,9 +123,9 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             //OfficeInterop.addAnnotationColumn
             OfficeInterop.addThreeAnnotationColumns  
             colName
-            (fun (msg) ->
+            (fun (newColName,msg) ->
                 
-                (colName,format,msg) |> FormatColumn |> ExcelInterop)
+                (newColName,format,msg) |> FormatColumn |> ExcelInterop)
             (GenericError >> Dev)
 
     | FormatColumn (colName,format,msg) ->
@@ -233,22 +233,13 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
             then None
             else
                 let s = (string parentTerm.Value)
-                // REGEX NOT WORKING! ALWAYS RETURNS UNDEFINED ALTOUGH IN .fxs IT WORKS.
-                // check for parent ontology pattern, example: "Parameter [mass spectrometer]"
-                // the regex pattern matches everything after '[', as long as there is a ']' ahead.
-                //let pattern = @"(?<=[[]).*(?=[]])"
-                //let regexRes =
-                //    if Regex.IsMatch(s, pattern) then Regex.Match(s, pattern).Value |> Some else None
                 let res =
-                    let indOfStart = s.IndexOf "["
-                    let sub1 = s.Substring (indOfStart+1)
-                    let isCorrectEnding,sub2 =
-                        let b = sub1.EndsWith "]"
-                        let indOfEnd = sub1.IndexOf "]"
-                        let s2 = sub1.Remove indOfEnd
-                        b, s2
-                    if isCorrectEnding then Some sub2 else None
-                res
+                    OfficeInterop.parseColHeader s
+                if res.IsSome && res.Value.[0].StartsWith "#" |> not then
+                    Some res.Value.[0]
+                else
+                    None
+
         let nextState = {
             currentState with
                 ParentOntology = pOnt

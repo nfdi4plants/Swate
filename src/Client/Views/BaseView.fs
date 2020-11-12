@@ -47,6 +47,8 @@ let footerContentStatic model dispatch =
         a [Href "https://github.com/nfdi4plants/Swate/releases"][str (Version.app)]
     ]
 
+open System.Text.RegularExpressions
+
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
     div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
@@ -85,7 +87,20 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                     Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
                 ] [
                     yield! footerChildren
-                    Button.button [Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )] [str "test"]
+                    Button.button [Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )] [str "FIT"]
+                    Button.button [
+                        Button.OnClick (fun e ->
+                            let pattern = "\[[^\]]*\]"
+                            let hashedGuidPattern = "#[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}"
+                            let hashedGuidPattern2 = "#([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})"
+                            let input = "Parameter [instrument model; #009ac4cf-72ad-4499-a90c-5bec5cce58f0]"
+                            let m = Regex.Match(input, hashedGuidPattern2)
+                            let r = if m.Success then m.Value else sprintf "Could not match: %s with pattern: %s" input hashedGuidPattern2
+                            printfn "%A" m.Value
+                            GenericLog ("Debug",r) |> Dev |> dispatch
+                            
+                        )
+                    ] [str "Regex"]
                 ]
             ]
         ]

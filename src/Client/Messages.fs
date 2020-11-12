@@ -26,7 +26,7 @@ type TermSearchMsg =
     | SearchTermTextChange      of string
     | TermSuggestionUsed        of DbDomain.Term
     | NewSuggestions            of DbDomain.Term []
-    | StoreParentOntologyFromOfficeInterop  of obj option
+    | StoreParentOntologyFromOfficeInterop of obj option
 
 type AdvancedSearchMsg =
     // Client
