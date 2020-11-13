@@ -96,6 +96,9 @@ type AddBuildingBlockMsg =
     | BuildingBlockHasUnitSwitch 
 
 type ValidationMsg =
+    // Client
+    | UpdateDisplayedOptionsId of int option
+    // OfficeInterop
     | StoreTableRepresentationFromOfficeInterop of msg:string * OfficeInterop.ColumnRepresentation []
 
 type Msg =

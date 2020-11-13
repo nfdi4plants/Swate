@@ -285,14 +285,18 @@ type AddBuildingBlockState = {
 
 /// User can define what kind of input a column should have
 type ContentType =
+    | OntologyTerm of string
+    | Text
+    | Url
+    | Boolean
     | Number
-    | String
-    | ParentOntology of string
+    | Int
+    | Decimal
 
     member this.toString =
         match this with
-        | ParentOntology po ->
-            sprintf "ParentOntology [%s]" po
+        | OntologyTerm po ->
+            sprintf "Ontology [%s]" po
         | _ ->
             string this
 
@@ -312,10 +316,12 @@ type ValidationFormat = {
 type ValidationState = {
     TableRepresentation     : OfficeInterop.ColumnRepresentation []
     TableValidationScheme   : ValidationFormat []
+    DisplayedOptionsId      : int option
 } with
     static member init () = {
         TableRepresentation     = Array.empty
         TableValidationScheme   = Array.empty
+        DisplayedOptionsId      = None
     }
 
 type Model = {

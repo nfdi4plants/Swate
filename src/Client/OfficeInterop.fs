@@ -311,15 +311,6 @@ let addThreeAnnotationColumns (colName:string) =
             colName
         | _ ->
             sprintf "%s (#%i)" colName id
-        //match parsedBaseHeader, id with
-        //| true, 0 ->
-        //    Regex.Replace (colName, squaredBracketsPattern, (sprintf "[%s]" parsedBaseHeader.Value.[0]))
-        //| true, _ ->
-        //    Regex.Replace (colName, squaredBracketsPattern, (sprintf "[%s; #%i]" parsedBaseHeader.Value.[0] id))
-        //| false, 0 ->
-        //    sprintf "%s" colName
-        //| false, _ ->
-        //    sprintf "%s [#%i]" colName id
     let hiddenColAttributes (parsedColHeader:ColHeader) (id:int) =
         let coreName =
             match parsedColHeader.Ontology, parsedColHeader.CoreName with
@@ -356,7 +347,7 @@ let addThreeAnnotationColumns (colName:string) =
                 tables.items
             let maxLength = vals.Count-1
             let newBaseColIndex =
-                if diff <= 0 then
+                if diff < 0 then
                     maxLength+1
                 elif diff > maxLength then
                     maxLength+1

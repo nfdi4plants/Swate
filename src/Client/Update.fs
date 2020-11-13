@@ -826,21 +826,27 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
 
 let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
     match validationMsg with
+    /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
+    /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
     | StoreTableRepresentationFromOfficeInterop (msg,colReps) ->
         let updateValFormat (prevValFormats: ValidationFormat []) (newColReps:OfficeInterop.ColumnRepresentation []) =
             newColReps
             |> Array.map (fun colRep ->
+                // create ValidationFormat from ColumnRepresentation
                 let newValFormat = ValidationFormat.init(header=colRep.Header)
+                // check if the column was already existing
                 let existingValFormatOpt= prevValFormats |> Array.tryFind (fun valFormat -> valFormat.ColumnHeader = colRep.Header)
                 match existingValFormatOpt with
                 | Some prevValFormat ->
+                    // if the column was existing fill the new ValidationFormat with the previousValidationFormat information about
+                    // content type and importance.
                     {newValFormat with
                         Importance = prevValFormat.Importance
                         ContentType =
                             match prevValFormat.ContentType with
-                            | Some (ParentOntology po) ->
+                            | Some (OntologyTerm po) ->
                                 if colRep.ParentOntology.IsSome then
-                                    Some (ParentOntology colRep.ParentOntology.Value)
+                                    Some (OntologyTerm colRep.ParentOntology.Value)
                                 else
                                     None
                             | _ ->
@@ -858,6 +864,13 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
                 TableValidationScheme = updateValFormat currentState.TableValidationScheme colReps
         }
         nextState, nextCmd
+
+    | UpdateDisplayedOptionsId intOpt ->
+        let nextState = {
+            currentState with
+                DisplayedOptionsId = intOpt
+        }
+        nextState, Cmd.none
 
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with

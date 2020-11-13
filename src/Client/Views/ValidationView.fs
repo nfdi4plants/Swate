@@ -12,8 +12,27 @@ open Browser.MediaQueryListExtensions
 
 open CustomComponents
 
-let columnListElement (format:ValidationFormat) dispatch =
-    tr [][
+let columnListElement ind (format:ValidationFormat) (model:Model) dispatch =
+    let isActive =
+        match model.ValidationState.DisplayedOptionsId with
+        | Some id when id = ind ->
+            true
+        | _ ->
+            false
+    tr [
+        Class "nonSelectText"
+        Style [
+            Cursor "pointer"
+            UserSelect UserSelectOptions.None
+        ]
+        OnClick (fun e ->
+            e.preventDefault()
+            if isActive then
+                UpdateDisplayedOptionsId None |> Validation |> dispatch
+            else
+                UpdateDisplayedOptionsId (Some ind) |> Validation |> dispatch
+        )
+    ][
         td [][str format.ColumnHeader]
         td [][
             if format.Importance.IsSome then
@@ -26,6 +45,34 @@ let columnListElement (format:ValidationFormat) dispatch =
                 str format.ContentType.Value.toString
             else
                 str "X"
+        ]
+    ]
+
+let optionsElement ind (format:ValidationFormat) (model:Model) dispatch =
+    let isVisible =
+        match model.ValidationState.DisplayedOptionsId with
+        | Some id when id = ind ->
+            DisplayOptions.Block
+        | _ ->
+            DisplayOptions.None
+    tr [][
+        td [
+            ColSpan 3
+            Style [Padding "0"]
+        ][
+            Box.box' [
+                Props [
+                    ColSpan 3
+                    Style [
+                        Display isVisible
+                        Width "100%"
+                    ]
+                ]
+            ][
+                Column.column [ ] [
+
+                ]
+            ]
         ]
     ]
 
@@ -49,8 +96,13 @@ let validationComponent model dispatch =
                     ]
                 ]
                 tbody [ ] [
-                    for col in model.ValidationState.TableValidationScheme do
-                        yield columnListElement col dispatch
+                    for i in 0 .. model.ValidationState.TableValidationScheme.Length-1 do
+                        let f = model.ValidationState.TableValidationScheme.[i]
+                        yield
+                            columnListElement i f model dispatch
+                        yield
+                            optionsElement i f model dispatch
+                        
                 ]
             ]
         ]
