@@ -40,6 +40,15 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
 let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:ExcelState) : ExcelState * Cmd<Msg> =
     match excelInteropMsg with
 
+    | GetTableRepresentation ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getTableRepresentation
+                ()
+                (fun (colReps,msg) -> StoreTableRepresentationFromOfficeInterop (msg,colReps) |> Validation)
+                (GenericError >> Dev)
+        currentState, cmd
+
     | AutoFitTable ->
         let cmd =
             Cmd.OfPromise.either
@@ -235,10 +244,7 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
                 let s = (string parentTerm.Value)
                 let res =
                     OfficeInterop.parseColHeader s
-                if res.IsSome && res.Value.[0].StartsWith "#" |> not then
-                    Some res.Value.[0]
-                else
-                    None
+                res.Ontology
 
         let nextState = {
             currentState with
@@ -818,10 +824,51 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
                 }
         nextState, Cmd.none
 
+let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
+    match validationMsg with
+    | StoreTableRepresentationFromOfficeInterop (msg,colReps) ->
+        let updateValFormat (prevValFormats: ValidationFormat []) (newColReps:OfficeInterop.ColumnRepresentation []) =
+            newColReps
+            |> Array.map (fun colRep ->
+                let newValFormat = ValidationFormat.init(header=colRep.Header)
+                let existingValFormatOpt= prevValFormats |> Array.tryFind (fun valFormat -> valFormat.ColumnHeader = colRep.Header)
+                match existingValFormatOpt with
+                | Some prevValFormat ->
+                    {newValFormat with
+                        Importance = prevValFormat.Importance
+                        ContentType =
+                            match prevValFormat.ContentType with
+                            | Some (ParentOntology po) ->
+                                if colRep.ParentOntology.IsSome then
+                                    Some (ParentOntology colRep.ParentOntology.Value)
+                                else
+                                    None
+                            | _ ->
+                                prevValFormat.ContentType
+                    }
+                | None ->
+                    newValFormat
+            )
+
+        let nextCmd =
+            GenericLog ("Info", msg) |> Dev |> Cmd.ofMsg
+        let nextState = {
+            currentState with
+                TableRepresentation = colReps
+                TableValidationScheme = updateValFormat currentState.TableValidationScheme colReps
+        }
+        nextState, nextCmd
+
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
     | UpdatePageState (pageOpt:Route option) ->
+        let nextCmd =
+            match pageOpt with
+            | Some Routing.Route.Validation ->
+                GetTableRepresentation |> ExcelInterop |> Cmd.ofMsg
+            | _ ->
+                Cmd.none
         let nextPageState =
             match pageOpt with
             | Some page -> {
@@ -836,7 +883,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             currentModel with
                 PageState = nextPageState
         }
-        nextModel, Cmd.none
+        nextModel, nextCmd
     /// does not work due to office.js ->
     /// https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
     //| Navigate route ->
@@ -962,5 +1009,16 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel = {
             currentModel with
                 AddBuildingBlockState = nextAddBuildingBlockState
+            }
+        nextModel, nextCmd
+
+    | Validation validationMsg ->
+        let nextValidationState, nextCmd =
+            currentModel.ValidationState
+            |> handleValidationMsg validationMsg
+
+        let nextModel = {
+            currentModel with
+                ValidationState = nextValidationState
             }
         nextModel, nextCmd

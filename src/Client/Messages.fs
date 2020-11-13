@@ -20,6 +20,7 @@ type ExcelInteropMsg =
     | AnnotationTableExists     of bool
     | GetParentTerm
     | AutoFitTable
+    | GetTableRepresentation
 
 type TermSearchMsg =
     | ToggleSearchByParentOntology
@@ -94,6 +95,9 @@ type AddBuildingBlockMsg =
     | NewUnitTermSuggestions    of DbDomain.Term []
     | BuildingBlockHasUnitSwitch 
 
+type ValidationMsg =
+    | StoreTableRepresentationFromOfficeInterop of msg:string * OfficeInterop.ColumnRepresentation []
+
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
     | Api                   of ApiMsg
@@ -106,5 +110,6 @@ type Msg =
     | PersistentStorage     of PersistentStorageMsg
     | FilePicker            of FilePickerMsg
     | AddBuildingBlock      of AddBuildingBlockMsg
-    | UpdatePageState of Routing.Route option
+    | Validation            of ValidationMsg
+    | UpdatePageState       of Routing.Route option
     | DoNothing

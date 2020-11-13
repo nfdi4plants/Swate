@@ -66,6 +66,12 @@ let view (model : Model) (dispatch : Msg -> unit) =
             str "Footer content"
         ]
 
+    | Routing.Route.Validation ->
+        BaseView.baseViewComponent model dispatch [
+            ValidationView.validationComponent model dispatch
+        ] [
+            str "Footer content"
+        ]
 
     | Routing.Route.FilePicker ->
         BaseView.baseViewComponent model dispatch [

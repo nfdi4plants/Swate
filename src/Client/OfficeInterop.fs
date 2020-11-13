@@ -7,6 +7,20 @@ open Excel
 open System.Collections.Generic
 open System.Text.RegularExpressions
 
+type ColumnRepresentation = {
+    Header          : string
+    /// TODO: this is meant for future application and should be implemented together with separate unit columns
+    Unit            : string option
+    TagArray        : string []
+    ParentOntology  : string option
+} with
+    static member init (?header) = {
+        Header          = if header.IsSome then header.Value else ""
+        Unit            = None
+        TagArray        = [||]
+        ParentOntology  = None
+    }
+
 /// (|Regex|_|) pattern input
 let (|Regex|_|) pattern input =
     let m = Regex.Match(input, pattern)
@@ -14,14 +28,16 @@ let (|Regex|_|) pattern input =
     else None
 
 [<LiteralAttribute>]
-/// Not used for now
-let hashGuidPattern = "#([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})"
+let HashNumberPattern = "#\d+"
 
 [<LiteralAttribute>]
-let hashNumberPattern = "#\d+"
+let SquaredBracketsPattern = "\[[^\]]*\]"
 
 [<LiteralAttribute>]
-let squaredBracketsPattern = "\[[^\]]*\]"
+let BracketsPattern = "\([^\]]*\)"
+
+[<LiteralAttribute>]
+let CoreNamePattern = "^[^[(]*"
 
 [<Global>]
 let Office : Office.IExports = jsNative
@@ -41,63 +57,97 @@ let consoleLog (message: string): unit = jsNative
 
 open System
 
+type ColHeader = {
+    Header  : string
+    CoreName: string option
+    Ontology: string option
+    TagArr: string [] option
+}
+
+let parseSquaredBrackets (headerStr:string) =
+    match headerStr with
+    | Regex SquaredBracketsPattern value ->
+        // remove brackets
+        value.[1..value.Length-2]
+        |> Some
+    | _ ->
+        None
+
+let parseBrackets (headerStr:string) =
+    match headerStr with
+    | Regex BracketsPattern value ->
+        value
+            // remove brackets
+            .[1..value.Length-2]
+            // split by separator to get information array
+            // can consist of e.g. #h, #id, parentOntology
+            .Split([|"; "|], StringSplitOptions.None)
+        |> Some
+    | _ ->
+        None
+
+let parseCoreName (headerStr:string) =
+    match headerStr with
+    | Regex BracketsPattern value ->
+        value.Trim()
+        |> Some
+    | _ ->
+        None
+
 let parseColHeader (headerStr:string) =
-    let reg =
-        match headerStr with
-        | Regex squaredBracketsPattern value ->
-            value
-                // remove brackets
-                .[1..value.Length-2]
-                // split by separator to get information array
-                // can consist of e.g. #h, #guid, parentOntology
-                .Split([|"; "|], StringSplitOptions.None)
-            |> Some
-        | _ ->
-            None
-    reg
+    {
+        Header      = headerStr
+        CoreName    = parseCoreName headerStr
+        Ontology    = parseSquaredBrackets headerStr
+        TagArr      = parseBrackets headerStr
+    }
 
 let exampleExcelFunction () =
     Excel.run(fun context ->
     let sheet = context.workbook.worksheets.getActiveWorksheet()
     let annotationTable = sheet.tables.getItem("annotationTable")
-    let allCols = annotationTable.columns.load(propertyNames = U2.Case1 "items")
-
     let annoHeaderRange = annotationTable.getHeaderRowRange()
     let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
     context.sync().``then``(
         fun _ ->
-            let allCols = allCols.items |> Array.ofSeq
-            let _ =
-                allCols
-                |> Array.map (fun col -> col.getRange())
-                |> Array.map (fun x ->
-                    x.columnHidden <- false
-                    x.format.autofitColumns()
-                    x.format.autofitRows()
-                )
             let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-            let indexedHeaderArr =
+            let baseColRepresentation =
                 headerVals
-                //|> Array.indexed
-                |> Array.choose id |> Array.map string
-                //(fun (i,x) ->
-                //    if x.IsSome then Some (i, string x) else None
-                //)
-            let parsedHeaderArr =
-                indexedHeaderArr
-                |> Array.choose (fun (x) ->
-                    let parsableHeader = parseColHeader x
-                    if parsableHeader.IsSome then Some (x, parsableHeader.Value) else None
+                |> Array.choose id
+                |> Array.map string
+                |> Array.map (fun header -> ColumnRepresentation.init(header=header))
+            let addTagArr (colRepArr:ColumnRepresentation []) =
+                colRepArr
+                |> Array.map (fun col ->
+                    let parseHeader = parseColHeader col.Header
+                    let tagArr =
+                        match parseHeader.TagArr with
+                        | Some strArr ->
+                            // hidden columns are not meant to be represented
+                            strArr 
+                        | None ->
+                            [||]
+                    {col with TagArray = tagArr}
                 )
-            let colsToHide =
-                parsedHeaderArr
-                |> Array.filter (fun (ind,arr) -> Array.contains "#h" arr)
-                |> Array.map fst
-            let ranges =
-                colsToHide
-                |> Array.map (fun ind -> (annotationTable.columns.getItem (U2.Case2 ind)).getRange())
-            let hideCols = ranges |> Array.map (fun x -> x.columnHidden <- true)
-            "Autoformat Table"
+            let addParentOntOption (colRepArr:ColumnRepresentation []) =
+                colRepArr
+                |> Array.map (fun col ->
+                    let poOpt = col.TagArray |> Array.tryFind (fun tag -> tag.StartsWith "#" |> not)
+                    match poOpt with
+                    | Some parentOntology ->
+                        {col with ParentOntology = Some parentOntology}
+                    | None ->
+                        {col with ParentOntology = None}
+                )
+            let filterOutHiddenCols (colRepArr:ColumnRepresentation []) =
+                colRepArr
+                |> Array.filter (fun x -> x.TagArray |> ((Array.contains "#h") >> not)  )
+            let colReps =
+                baseColRepresentation
+                |> addTagArr
+                |> addParentOntOption
+                |> filterOutHiddenCols
+            sprintf "Test: %A" colReps
         )
     )
 
@@ -190,30 +240,56 @@ let autoFitTable () =
                         x.format.autofitColumns()
                         x.format.autofitRows()
                     )
+                // get all column headers
                 let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-                let indexedHeaderArr =
-                    headerVals
-                    //|> Array.indexed
-                    |> Array.choose id |> Array.map string
-                    //(fun (i,x) ->
-                    //    if x.IsSome then Some (i, string x) else None
-                    //)
-                let parsedHeaderArr =
-                    indexedHeaderArr
-                    |> Array.choose (fun (x) ->
-                        let parsableHeader = parseColHeader x
-                        if parsableHeader.IsSome then Some (x, parsableHeader.Value) else None
-                    )
+                // get only column headers with values inside and map object to string
+                let headerArr = headerVals |> Array.choose id |> Array.map string
+                // parse header elements into record type
+                let parsedHeaderArr = headerArr |> Array.map parseColHeader
+                // find all columns to hide
                 let colsToHide =
                     parsedHeaderArr
-                    |> Array.filter (fun (ind,arr) -> Array.contains "#h" arr)
-                    |> Array.map fst
+                    |> Array.filter (fun header -> header.TagArr.IsSome && Array.contains "#h" header.TagArr.Value)
                 let ranges =
                     colsToHide
-                    |> Array.map (fun ind -> (annotationTable.columns.getItem (U2.Case2 ind)).getRange())
+                    |> Array.map (fun header -> (annotationTable.columns.getItem (U2.Case2 header.Header)).getRange())
                 let hideCols = ranges |> Array.map (fun x -> x.columnHidden <- true)
                 "Autoformat Table"
             )
+    )
+
+let getTableRepresentation() =
+    Excel.run(fun context ->
+    let sheet = context.workbook.worksheets.getActiveWorksheet()
+    let annotationTable = sheet.tables.getItem("annotationTable")
+    let annoHeaderRange = annotationTable.getHeaderRowRange()
+    let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
+    context.sync().``then``(
+        fun _ ->
+            let headerVals =
+                annoHeaderRange.values.[0]
+                |> Array.ofSeq
+                |> Array.choose id
+                |> Array.map string
+            let parsedHeaders =
+                headerVals |> Array.map parseColHeader
+            let baseColRepresentation =
+                parsedHeaders
+                |> Array.map (fun header ->
+                    let nColRep = ColumnRepresentation.init(header=header.Header)
+                    { nColRep with
+                        ParentOntology = header.Ontology
+                        TagArray = if header.TagArr.IsSome then header.TagArr.Value else [||]
+                    }
+                )
+            let filterOutHiddenCols (colRepArr:ColumnRepresentation []) =
+                colRepArr
+                |> Array.filter (fun x -> x.TagArray |> ((Array.contains "#h") >> not)  )
+            let colReps =
+                baseColRepresentation
+                |> filterOutHiddenCols
+            colReps, "Update table representation."
+        )
     )
 
 let checkIfAnnotationTableIsPresent () =
@@ -229,25 +305,32 @@ let checkIfAnnotationTableIsPresent () =
 
 let addThreeAnnotationColumns (colName:string) =
 
-    let mainColName (id:int) =
-        let parsedBaseHeader = parseColHeader colName
-        match parsedBaseHeader.IsSome, id with
-        | true, 0 ->
-            Regex.Replace (colName, squaredBracketsPattern, (sprintf "[%s]" parsedBaseHeader.Value.[0]))
-        | true, _ ->
-            Regex.Replace (colName, squaredBracketsPattern, (sprintf "[%s; #%i]" parsedBaseHeader.Value.[0] id))
-        | false, 0 ->
-            sprintf "%s" colName
-        | false, _ ->
-            sprintf "%s [#%i]" colName id
-    let hiddenColAttributes (id:int) =
-        let parsedBaseHeader = parseColHeader colName
-        let coreName = if parsedBaseHeader.IsSome then parsedBaseHeader.Value.[0] else colName
+    let mainColName (parsedColHeader:ColHeader) (id:int) =
         match id with
-        | 0 ->
-            (sprintf "[%s; #h]" coreName)
+        | 1 ->
+            colName
         | _ ->
-            (sprintf "[%s; #%i; #h]" coreName id)
+            sprintf "%s (#%i)" colName id
+        //match parsedBaseHeader, id with
+        //| true, 0 ->
+        //    Regex.Replace (colName, squaredBracketsPattern, (sprintf "[%s]" parsedBaseHeader.Value.[0]))
+        //| true, _ ->
+        //    Regex.Replace (colName, squaredBracketsPattern, (sprintf "[%s; #%i]" parsedBaseHeader.Value.[0] id))
+        //| false, 0 ->
+        //    sprintf "%s" colName
+        //| false, _ ->
+        //    sprintf "%s [#%i]" colName id
+    let hiddenColAttributes (parsedColHeader:ColHeader) (id:int) =
+        let coreName =
+            match parsedColHeader.Ontology, parsedColHeader.CoreName with
+            | Some o , _ -> o
+            | None, Some cn -> cn
+            | _ -> parsedColHeader.Header
+        match id with
+        | 1 ->
+            (sprintf "[%s] (#h)" coreName)
+        | _ ->
+            (sprintf "[%s] (#%i; #h)" coreName id)
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let annotationTable = sheet.tables.getItem("annotationTable")
@@ -284,20 +367,25 @@ let addThreeAnnotationColumns (colName:string) =
             // This is necessary to skip over hidden cols
             /// Get an array of the headers
             let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-            let indexedHeaderArr =
+            let indexedHiddenCols =
                 headerVals
                 |> Array.indexed
                 |> Array.choose (fun (i,x) ->
                     let prep = parseColHeader (string x.Value) 
-                    if x.IsSome && prep.IsSome then
-                        Some (i+1 |> float,prep.Value)
+                    if x.IsSome && prep.TagArr.IsSome then
+                        let checkIsHidden =
+                            prep.TagArr.Value |> Array.contains "#h"
+                        if checkIsHidden then 
+                            Some (i+1 |> float)
+                        else
+                            None
                     else
                         None
                 )
-                |> Array.filter (fun (i,x) -> Array.contains "#h" x)
+                //|> Array.filter (fun (i,x) -> x.TagArr.IsSome && Array.contains "#h" x.TagArr.Value)
             let rec loopingCheckSkip (newInd:float) =
                 let nextIsHidden =
-                    Array.exists (fun (i,x) -> i = newInd+1.) indexedHeaderArr
+                    Array.exists (fun i -> i = newInd+1.) indexedHiddenCols
                 if nextIsHidden then
                     loopingCheckSkip (newInd+1.)
                 else
@@ -306,6 +394,7 @@ let addThreeAnnotationColumns (colName:string) =
             let newBaseColIndex' = loopingCheckSkip newBaseColIndex
 
             // This is necessary to prevent trying to create a column with an already existing name
+            let parsedBaseHeader = parseColHeader colName
             let findNewIdForName() =
                 let prepArr =
                     headerVals
@@ -316,19 +405,19 @@ let addThreeAnnotationColumns (colName:string) =
                         prepArr
                         // Should a column with the same name already exist, then count up the id tag.
                         |> Array.exists (fun existingHeader ->
-                            existingHeader = mainColName int
+                            existingHeader = mainColName parsedBaseHeader int
                             // i think it is necessary to also check for "T S REF" and "T A N" because of the following possibilities
-                            // Parameter [instrument model] | "Term Source REF [instrument model; #h] | ...
-                            // Factor [instrument model] | "Term Source REF [instrument model; #h] | ...
-                            // in the example above the mainColName is different but "T S REF" and "T A N" would be the same.
-                            || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes int)
-                            || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes int)
+                            // Parameter [instrument model] | "Term Source REF [instrument model] (#h) | ...
+                            // Factor [instrument model] | "Term Source REF [instrument model] (#h) | ...
+                            // in the example above the coreColName is different but "T S REF" and "T A N" would be the same.
+                            || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader int)
+                            || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader int)
                         )
                     if isExisting then
                         loopingCheck (int+1)
                     else
                         int
-                loopingCheck 0
+                loopingCheck 1
             let newId = findNewIdForName()
 
             let rowCount = tableRange.rowCount |> int
@@ -339,23 +428,23 @@ let addThreeAnnotationColumns (colName:string) =
                 annotationTable.columns.add(
                     index = newBaseColIndex',
                     values = U4.Case1 col,
-                    name = mainColName newId
+                    name = mainColName parsedBaseHeader newId
                 )
 
             let createdCol2 =
                 annotationTable.columns.add(
                     index = newBaseColIndex'+1.,
                     values = U4.Case1 col,
-                    name = sprintf "Term Source REF %s" (hiddenColAttributes newId)
+                    name = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader newId)
                 )
             let createdCol3 =
                 annotationTable.columns.add(
                     index = newBaseColIndex'+2.,
                     values = U4.Case1 col,
-                    name = sprintf "Term Accession Number %s" (hiddenColAttributes newId)
+                    name = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader newId)
                 )
 
-            mainColName newId, sprintf "%s column was added. %A" colName headerVals
+            mainColName parsedBaseHeader newId, sprintf "%s column was added. %A" colName headerVals
         )
     )
 

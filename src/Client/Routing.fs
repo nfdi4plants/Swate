@@ -10,27 +10,30 @@ type Route =
 | Home
 | AddBuildingBlock
 | TermSearch
+| Validation
 | FilePicker
 | ActivityLog
 | NotFound
 
     static member toRouteUrl (route:Route) =
         match route with
-        | Route.Home                 -> "/"
-        | Route.AddBuildingBlock     -> "/#AddBuildingBlock"
-        | Route.TermSearch           -> "/#TermSearch"
-        | Route.FilePicker           -> "/#FilePicker"
-        | Route.ActivityLog          -> "/#ActivityLog"
-        | Route.NotFound             -> "/#NotFound"
+        | Route.Home                -> "/"
+        | Route.AddBuildingBlock    -> "/#AddBuildingBlock"
+        | Route.TermSearch          -> "/#TermSearch"
+        | Route.Validation          -> "/#Validation"   
+        | Route.FilePicker          -> "/#FilePicker"
+        | Route.ActivityLog         -> "/#ActivityLog"
+        | Route.NotFound            -> "/#NotFound"
 
     static member toString (route:Route) =
         match route with
-        | Route.Home                 -> ""
-        | Route.AddBuildingBlock     -> "AddBuildingBlock"
-        | Route.TermSearch           -> "TermSearch"
-        | Route.FilePicker           -> "FilePicker"
-        | Route.ActivityLog          -> "ActivityLog"
-        | Route.NotFound             -> "NotFound"
+        | Route.Home                -> ""
+        | Route.AddBuildingBlock    -> "AddBuildingBlock"
+        | Route.TermSearch          -> "TermSearch"
+        | Route.Validation          -> "Validation"
+        | Route.FilePicker          -> "FilePicker"
+        | Route.ActivityLog         -> "ActivityLog"
+        | Route.NotFound            -> "NotFound"
 
     static member toIcon (p: Route)=
         let createElem icons name =
@@ -46,11 +49,12 @@ type Route =
             )
 
         match p with
-        | Route.Home             -> createElem [Fa.Solid.Home    ] (p |> Route.toString)
-        | Route.TermSearch       -> createElem [Fa.Solid.SearchPlus   ] (p |> Route.toString)
+        | Route.Home             -> createElem [Fa.Solid.Home           ] (p |> Route.toString)
+        | Route.TermSearch       -> createElem [Fa.Solid.SearchPlus     ] (p |> Route.toString)
+        | Route.Validation       -> createElem [Fa.Solid.ClipboardCheck ] (p |> Route.toString)
         | Route.AddBuildingBlock -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle ] (p |> Route.toString)
-        | Route.FilePicker       -> createElem [Fa.Solid.FileUpload; ] (p |> Route.toString)
-        | Route.ActivityLog      -> createElem [Fa.Solid.History   ] (p |> Route.toString)
+        | Route.FilePicker       -> createElem [Fa.Solid.FileUpload     ] (p |> Route.toString)
+        | Route.ActivityLog      -> createElem [Fa.Solid.History        ] (p |> Route.toString)
         | _  -> Fa.i [Fa.Solid.QuestionCircle]   []
 
 ///explained here: https://elmish.github.io/browser/routing.html
@@ -67,6 +71,7 @@ module Routing =
             map Route.Home               (s "")
             map Route.TermSearch         (s "TermSearch")
             map Route.AddBuildingBlock   (s "AddBuildingBlock")
+            map Route.Validation         (s "Validation")   
             map Route.FilePicker         (s "FilePicker")
             map Route.ActivityLog        (s "ActivityLog")
             map Route.NotFound           (s "NotFound")

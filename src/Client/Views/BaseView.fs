@@ -69,6 +69,7 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
             ] [
                 createNavigationTab Routing.Route.AddBuildingBlock   model dispatch
                 createNavigationTab Routing.Route.TermSearch         model dispatch
+                createNavigationTab Routing.Route.Validation         model dispatch
                 createNavigationTab Routing.Route.FilePicker         model dispatch
                 createNavigationTab Routing.Route.ActivityLog        model dispatch
             ]
@@ -87,7 +88,7 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                     Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
                 ] [
                     yield! footerChildren
-                    Button.button [Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )] [str "FIT"]
+                    Button.button [Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )] [str "Try Excel"]
                     Button.button [
                         Button.OnClick (fun e ->
                             let pattern = "\[[^\]]*\]"
@@ -100,7 +101,7 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                             GenericLog ("Debug",r) |> Dev |> dispatch
                             
                         )
-                    ] [str "Regex"]
+                    ] [str "Try Regex"]
                 ]
             ]
         ]

@@ -14,6 +14,13 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"]] [
                 img [Props.Src "../assets/CSB_Logo.png"]
             ]
+            Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Button.button [
+                    Button.OnClick (fun e -> AutoFitTable |> ExcelInterop |> dispatch )
+                ] [
+                    str "FIT"
+                ]
+            ]
             Navbar.burger [ Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible
                             Navbar.Burger.OnClick (fun e -> ToggleBurger |> StyleChange |> dispatch)
                             Navbar.Burger.Props[
