@@ -1,3 +1,10 @@
+### v0.2-beta - WIP
+* Release of [0.2-beta](https://github.com/nfdi4plants/Swate/milestone/3). Rough feature set:
+    * Allow for multiples of the same column
+    * Implement basic validation system for current worksheet. (WIP)
+    * Bug fixes:
+	    * 
+
 ### v0.1-beta - 2020-11-05
 * Release of [Minimal POC milestone](https://github.com/nfdi4plants/Swate/milestone/1?closed=1). Rough feature set:
     * Update advanced term search to use stored procedure introduced in 0.0.2-alpha.

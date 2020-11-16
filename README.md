@@ -65,9 +65,9 @@ Before you contribute to the project remember to return all placeholders to your
     ```
     MYSQL_ROOT_PASSWORD: {PASSWORD}
     ```
--   Server/Server.fs
+-   Server/dev.json
     ```
-    let DevLocalConnectionString = "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
+    "Swate:ConnectionString": "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
     ```
 
 #### Prerequisites:
