@@ -162,24 +162,25 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
         // Fill selection confirmation
         Field.div [] [
             Control.div [] [
-                Button.button   [   let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> isValidBuildingBlock
-                                    if isValid then
-                                        Button.CustomClass "is-success"
-                                        Button.IsActive true
-                                    else
-                                        Button.CustomClass "is-danger"
-                                        Button.Props [Disabled true]
-                                    Button.IsFullWidth
-                                    Button.OnClick (
-                                        let format =
-                                            match model.AddBuildingBlockState.UnitTermSearchText with
-                                            | "" -> "0.00"
-                                            | str ->
-                                                sprintf "0.00 \"%s\"" str
-                                        let colName = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
-                                        fun _ -> (colName,format) |> AddColumn |> ExcelInterop |> dispatch
-                                    )
-                                ] [
+                Button.button   [
+                    let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> isValidBuildingBlock
+                    if isValid then
+                        Button.CustomClass "is-success"
+                        Button.IsActive true
+                    else
+                        Button.CustomClass "is-danger"
+                        Button.Props [Disabled true]
+                    Button.IsFullWidth
+                    Button.OnClick (
+                        let format =
+                            match model.AddBuildingBlockState.UnitTermSearchText with
+                            | "" -> "0.00"
+                            | str ->
+                                sprintf "0.00 \"%s\"" str
+                        let colName = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
+                        fun _ -> (colName,format) |> AddColumn |> ExcelInterop |> dispatch
+                    )
+                ] [
                     str "Insert this annotation building block"
                 ]
             ]

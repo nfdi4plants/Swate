@@ -21,12 +21,6 @@ type ColumnRepresentation = {
         ParentOntology  = None
     }
 
-/// (|Regex|_|) pattern input
-let (|Regex|_|) pattern input =
-    let m = Regex.Match(input, pattern)
-    if m.Success then Some(m.Value)
-    else None
-
 [<LiteralAttribute>]
 let HashNumberPattern = "#\d+"
 
@@ -66,7 +60,7 @@ type ColHeader = {
 
 let parseSquaredBrackets (headerStr:string) =
     match headerStr with
-    | Regex SquaredBracketsPattern value ->
+    | AuxFunctions.Regex SquaredBracketsPattern value ->
         // remove brackets
         value.[1..value.Length-2]
         |> Some
@@ -75,7 +69,7 @@ let parseSquaredBrackets (headerStr:string) =
 
 let parseBrackets (headerStr:string) =
     match headerStr with
-    | Regex BracketsPattern value ->
+    | AuxFunctions.Regex BracketsPattern value ->
         value
             // remove brackets
             .[1..value.Length-2]
@@ -88,7 +82,7 @@ let parseBrackets (headerStr:string) =
 
 let parseCoreName (headerStr:string) =
     match headerStr with
-    | Regex BracketsPattern value ->
+    | AuxFunctions.Regex BracketsPattern value ->
         value.Trim()
         |> Some
     | _ ->

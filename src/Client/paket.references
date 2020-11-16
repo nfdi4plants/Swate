@@ -8,6 +8,8 @@ Fable.Remoting.Client
 Fulma
 Fulma.Extensions.Wikiki.Tooltip
 Fulma.Extensions.Wikiki.Switch
+Fulma.Extensions.Wikiki.Checkradio
+Fulma.Extensions.Wikiki.Slider
 Thoth.Elmish.Debouncer
 Fable.Browser.MediaQueryList
 Fable.SimpleJson

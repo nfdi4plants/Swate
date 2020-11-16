@@ -4,6 +4,8 @@ storage: none
 
 nuget Fable.Remoting.Giraffe
 nuget Fable.SimpleJson 3.11.0
+nuget Fulma.Extensions.Wikiki.Checkradio
+nuget Fulma.Extensions.Wikiki.Slider
 nuget Saturn
 nuget Expecto
 nuget MySql.Data 8.0.21

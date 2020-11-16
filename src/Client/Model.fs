@@ -316,6 +316,7 @@ type ValidationFormat = {
 type ValidationState = {
     TableRepresentation     : OfficeInterop.ColumnRepresentation []
     TableValidationScheme   : ValidationFormat []
+    // Client view related
     DisplayedOptionsId      : int option
 } with
     static member init () = {

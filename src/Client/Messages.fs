@@ -98,6 +98,9 @@ type AddBuildingBlockMsg =
 type ValidationMsg =
     // Client
     | UpdateDisplayedOptionsId of int option
+    /// UpdateValidationFormat of (oldValidationFormat * newValidationFormat)
+    | UpdateValidationFormat of (ValidationFormat*ValidationFormat)
+
     // OfficeInterop
     | StoreTableRepresentationFromOfficeInterop of msg:string * OfficeInterop.ColumnRepresentation []
 

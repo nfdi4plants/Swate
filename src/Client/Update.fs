@@ -872,6 +872,20 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
         }
         nextState, Cmd.none
 
+    | UpdateValidationFormat (oldValFormat,newValFormat) ->
+        let newFormatArr =
+            currentState.TableValidationScheme
+            |> Array.map (fun x -> if x = oldValFormat then newValFormat else x)
+        let nextState = {
+            currentState with
+                TableValidationScheme = newFormatArr
+        }
+        // Creates a LOT of log
+        //let cmd =
+        //    let t = sprintf "Changed Validation Format: %s to: Importance: %A, Content Type: %A" oldValFormat.ColumnHeader oldValFormat.Importance oldValFormat.ContentType
+        //    GenericLog ("Debug",t) |> Dev |> Cmd.ofMsg 
+        nextState, Cmd.none
+
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
