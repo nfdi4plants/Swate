@@ -27,6 +27,9 @@ let columnListElement ind (format:ValidationFormat) (model:Model) dispatch =
         Style [
             Cursor "pointer"
             UserSelect UserSelectOptions.None
+            if model.ValidationState.DisplayedOptionsId.IsSome && model.ValidationState.DisplayedOptionsId.Value = ind then
+                BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
+                Color "white"
         ]
         OnClick (fun e ->
             e.preventDefault()

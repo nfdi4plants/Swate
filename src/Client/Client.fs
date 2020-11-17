@@ -82,8 +82,15 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.ActivityLog ->
         BaseView.baseViewComponent model dispatch [
-            ActivityLogView.activityLogComponent model
+            ActivityLogView.activityLogComponent model dispatch
         ] [
+            str "Footer content"
+        ]
+
+    | Routing.Route.Info ->
+        BaseView.baseViewComponent model dispatch [
+            InfoView.infoComponent model dispatch
+        ][
             str "Footer content"
         ]
 

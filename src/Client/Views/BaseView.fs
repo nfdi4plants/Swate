@@ -71,9 +71,8 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                 createNavigationTab Routing.Route.TermSearch         model dispatch
                 createNavigationTab Routing.Route.Validation         model dispatch
                 createNavigationTab Routing.Route.FilePicker         model dispatch
-                createNavigationTab Routing.Route.ActivityLog        model dispatch
+                createNavigationTab Routing.Route.Info               model dispatch
             ]
-            br []
 
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch

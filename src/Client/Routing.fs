@@ -12,6 +12,7 @@ type Route =
 | TermSearch
 | Validation
 | FilePicker
+| Info
 | ActivityLog
 | NotFound
 
@@ -22,6 +23,7 @@ type Route =
         | Route.TermSearch          -> "/#TermSearch"
         | Route.Validation          -> "/#Validation"   
         | Route.FilePicker          -> "/#FilePicker"
+        | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.NotFound            -> "/#NotFound"
 
@@ -31,6 +33,7 @@ type Route =
         | Route.AddBuildingBlock    -> "AddBuildingBlock"
         | Route.TermSearch          -> "TermSearch"
         | Route.Validation          -> "Validation"
+        | Route.Info                -> "Info"
         | Route.FilePicker          -> "FilePicker"
         | Route.ActivityLog         -> "ActivityLog"
         | Route.NotFound            -> "NotFound"
@@ -68,13 +71,14 @@ module Routing =
     /// The URL is turned into a Result.
     let route : Parser<Route -> Route,_> =
         oneOf [
-            map Route.Home               (s "")
-            map Route.TermSearch         (s "TermSearch")
-            map Route.AddBuildingBlock   (s "AddBuildingBlock")
-            map Route.Validation         (s "Validation")   
-            map Route.FilePicker         (s "FilePicker")
-            map Route.ActivityLog        (s "ActivityLog")
-            map Route.NotFound           (s "NotFound")
+            map Route.Home              (s "")
+            map Route.TermSearch        (s "TermSearch")
+            map Route.AddBuildingBlock  (s "AddBuildingBlock")
+            map Route.Validation        (s "Validation")   
+            map Route.FilePicker        (s "FilePicker")
+            map Route.Info              (s "Info")
+            map Route.ActivityLog       (s "ActivityLog")
+            map Route.NotFound          (s "NotFound")
         ]
 
     //this would be the way to got if we would use push based routing, but i decided to use hash based routing. Ill leave this here for now as a note.

@@ -5,6 +5,18 @@ module URLs =
     [<LiteralAttribute>]
     let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
 
+    [<LiteralAttribute>]
+    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate#swate"
+
+    [<LiteralAttribute>]
+    let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
+
+    [<LiteralAttribute>]
+    let CSBTwitterUrl = @"https://twitter.com/cs_biology"
+
+    [<LiteralAttribute>]
+    let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
+
 type Counter = { Value : int }
 
 module Route =

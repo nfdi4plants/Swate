@@ -8,17 +8,22 @@ open ExcelColors
 open Model
 open Messages
 
+open Fable.FontAwesome
+
 let navbarComponent (model : Model) (dispatch : Msg -> unit) =
     Navbar.navbar [Navbar.Props [Props.Role "navigation"; AriaLabel "main navigation" ; ExcelColors.colorElement model.SiteStyleState.ColorMode]] [
         Navbar.Brand.a [] [
             Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"]] [
                 img [Props.Src "../assets/CSB_Logo.png"]
             ]
-            Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                Button.button [
+            Navbar.Item.a [Navbar.Item.Props [Title "Autoformat Table"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Button.a [
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
                     Button.OnClick (fun e -> AutoFitTable |> ExcelInterop |> dispatch )
+                    Button.Color Color.IsWhite
+                    Button.IsInverted
                 ] [
-                    str "FIT"
+                    Fa.i [Fa.Solid.SyncAlt][]
                 ]
             ]
             Navbar.burger [ Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible
@@ -47,10 +52,19 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                         Switch.IsOutlined
                         Switch.Color IsSuccess
                         Switch.OnChange (fun _ -> ToggleColorMode |> StyleChange |> dispatch)
-                    ] [str "DarkMode"]
+                    ] [span [Class "nonSelectText"][str "DarkMode"]]
                 ]
                 Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                     str "Contact"
+                ]
+                Navbar.Item.a [Navbar.Item.Props [
+                    Style [ Color model.SiteStyleState.ColorMode.Text];
+                    OnClick (fun e ->
+                        ToggleBurger |> StyleChange |> dispatch
+                        UpdatePageState (Some Routing.Route.ActivityLog) |> dispatch
+                    )
+                ]] [
+                    str "Activity Log"
                 ]
             ]
         ]
