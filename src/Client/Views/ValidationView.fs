@@ -203,6 +203,12 @@ let validationComponent model dispatch =
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Table Validation"]
 
+        Help.help [Help.Color IsDanger] [
+            str "This is currently a preview feature and is still missing a lot of features. See "
+            a [Href "https://github.com/nfdi4plants/Swate/issues/45"; Target "_Blank"][str "here"]
+            str " for the newst updates on this feature."
+        ]
+
         Field.div [Field.Props [Style [
             Width "100%"
         ]]] [
