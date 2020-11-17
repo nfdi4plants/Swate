@@ -155,7 +155,7 @@ let getUnitTermSuggestions cString (query:string) =
     use getTermSuggestionsCmd = new MySqlCommand("getUnitTermSuggestions",connection)
     getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
 
-    let queryParam      = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
+    let queryParam      = getTermSuggestionsCmd.Parameters.Add("queryParam",MySqlDbType.VarChar)
 
     queryParam .Value <- query
 

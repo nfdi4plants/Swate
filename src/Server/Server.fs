@@ -31,14 +31,23 @@ let annotatorApi cString = {
 
     //Development
     getTestNumber = fun () -> async { return 42 }
-    getTestString = fun () -> async { return "test string" }
+    getTestString = fun strOpt -> async { return sprintf "Test string: %A" strOpt }
 
     //Ontology related requests
     testOntologyInsert = fun (name,version,definition,created,user) ->
         async {
-            let createdEntry = OntologyDB.insertOntology cString name version definition created user
-            printfn "created ontology entry: \t%A" createdEntry
-            return createdEntry
+            /// Don't allow users to access this part!! At least for now
+            //let createdEntry = OntologyDB.insertOntology cString name version definition created user
+            let onto =
+                DbDomain.createOntology 
+                    0L
+                    name
+                    version
+                    definition
+                    created
+                    user
+            printfn "created ontology entry: \t%A" onto
+            return onto
         }
 
     getAllOntologies = fun () ->
@@ -76,10 +85,10 @@ let annotatorApi cString = {
                 |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
         }
 
-    getTermsForAdvancedSearch = fun (ont,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
+    getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
         async {
             let result =
-                OntologyDB.getAdvancedTermSearchResults cString ont searchName mustContainName searchDefinition mustContainDefinition keepObsolete
+                OntologyDB.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
             return result
         }
 
@@ -109,25 +118,11 @@ let testWebApp =
     |> Remoting.buildHttpHandler
 
 
-let annotatorDocsv1 = Docs.createFor<IAnnotatorAPIv1>()
-
-let annotatorApiDocsv1 =
-    Remoting.documentation (sprintf "Annotation API v1") [
-        annotatorDocsv1.route <@ fun api -> api.getTestString @>
-        |> annotatorDocsv1.alias "Get Test String"
-        |> annotatorDocsv1.description "This is used during development to check connection between client and server."
-
-        annotatorDocsv1.route <@ fun api -> api.getTermSuggestionsByParentTerm @>
-        |> annotatorDocsv1.alias "Get Terms By Parent Ontology"
-        |> annotatorDocsv1.description "This is used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the parent ontology (written at the top of the column)."
-        |> annotatorDocsv1.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q","instrument model") @>
-    ]
-
 let createIAnnotatorApiWithVersion cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue (annotatorApi cString)
-    |> Remoting.withDocs "/api/IAnnotatorAPIv1/docs" annotatorApiDocsv1
+    |> Remoting.withDocs "/api/IAnnotatorAPIv1/docs" DocsAnnotationAPIvs1.annotatorApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
         (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))

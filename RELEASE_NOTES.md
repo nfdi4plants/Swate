@@ -1,9 +1,11 @@
 ### v0.2-beta - WIP
 * Release of [0.2-beta](https://github.com/nfdi4plants/Swate/milestone/3). Rough feature set:
-    * Allow for multiples of the same column
+    * Allow for multiples of the same column.
     * Implement basic validation system for current worksheet. (WIP)
+    * Add info page with social media links and contact.
+    * Add extensive api docs.
     * Bug fixes:
-	    * 
+	    * Unit Term Search broke due to a change in naming conventions in the stored procedures. Fixed it!
 
 ### v0.1-beta - 2020-11-05
 * Release of [Minimal POC milestone](https://github.com/nfdi4plants/Swate/milestone/1?closed=1). Rough feature set:

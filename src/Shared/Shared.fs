@@ -98,16 +98,18 @@ type ITestAPI = {
 type IAnnotatorAPIv1 = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>
-    getTestString               : unit                                                  -> Async<string>
+    getTestString               : string option                                         -> Async<string>
     // Ontology related requests
+    /// (name,version,definition,created,user)
     testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>
     getAllOntologies            : unit                                                  -> Async<DbDomain.Ontology []>
 
     // Term related requests
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm  : (int*string*string)                                           -> Async<DbDomain.Term []>
-    getTermsForAdvancedSearch           : ((DbDomain.Ontology option)*string*string*string*string*bool) -> Async<DbDomain.Term []>
+    getTermSuggestionsByParentTerm      : (int*string*string)                                           -> Async<DbDomain.Term []>
+    /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
+    getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
 
     getUnitTermSuggestions              : (int*string)                                                  -> Async<DbDomain.Term []>
 }
