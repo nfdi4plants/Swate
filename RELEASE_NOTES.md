@@ -1,5 +1,5 @@
-### v0.2-beta - WIP
-* Release of [0.2-beta](https://github.com/nfdi4plants/Swate/milestone/3). Rough feature set:
+### v0.1.1 - 2020-11-18
+* Rough feature set:
     * Allow for multiples of the same column.
     * Implement basic validation system for current worksheet. (WIP)
     * Add info page with social media links and contact.
