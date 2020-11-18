@@ -292,6 +292,11 @@ open Fake.Core.TargetOperators
 
 "Clean"
     ==> "InstallClient"
+    ==> "Build"
+    ==> "Bundle-Linux"
+
+"Clean"
+    ==> "InstallClient"
     ==> "Run"
 
 "Clean"
