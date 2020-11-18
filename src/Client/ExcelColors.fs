@@ -93,8 +93,19 @@ let colorElement (mode:ColorMode) =
         Color           mode.Text
     ]
 
+/// This color control element can be used to assign multiple css props at once.
+/// If used as html element this will be overwritten by any other used Style [].
+/// If you want to use additional Style [], then use "Style [... yield! colorControlInArray mode]".
 let colorControl (mode:ColorMode) =
     Style [
+        BackgroundColor mode.ControlBackground
+        BorderColor     mode.ControlForeground
+        Color           mode.Text
+    ]
+
+/// Use this as "Style [... yield! colorControlInArray mode]" to quickly assign excel directed color control to an element.
+let colorControlInArray (mode:ColorMode) =
+    [
         BackgroundColor mode.ControlBackground
         BorderColor     mode.ControlForeground
         Color           mode.Text

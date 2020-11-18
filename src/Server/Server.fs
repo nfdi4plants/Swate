@@ -20,23 +20,34 @@ open Microsoft.AspNetCore.Hosting
 //[<Literal>]
 //let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
 
+
+/// Showcase of how versioning could work
 let testApi = {
-    //Development
-    getTestNumber = fun () -> async { return 42 }
-}
+        //Development
+        getTestNumber = fun () -> async { return 42 }
+    }
 
 let annotatorApi cString = {
 
     //Development
     getTestNumber = fun () -> async { return 42 }
-    getTestString = fun () -> async { return "test string" }
+    getTestString = fun strOpt -> async { return sprintf "Test string: %A" strOpt }
 
     //Ontology related requests
     testOntologyInsert = fun (name,version,definition,created,user) ->
         async {
-            let createdEntry = OntologyDB.insertOntology cString name version definition created user
-            printfn "created ontology entry: \t%A" createdEntry
-            return createdEntry
+            /// Don't allow users to access this part!! At least for now
+            //let createdEntry = OntologyDB.insertOntology cString name version definition created user
+            let onto =
+                DbDomain.createOntology 
+                    0L
+                    name
+                    version
+                    definition
+                    created
+                    user
+            printfn "created ontology entry: \t%A" onto
+            return onto
         }
 
     getAllOntologies = fun () ->
@@ -74,10 +85,10 @@ let annotatorApi cString = {
                 |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
         }
 
-    getTermsForAdvancedSearch = fun (ont,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
+    getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
         async {
             let result =
-                OntologyDB.getAdvancedTermSearchResults cString ont searchName mustContainName searchDefinition mustContainDefinition keepObsolete
+                OntologyDB.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
             return result
         }
 
@@ -94,13 +105,12 @@ let annotatorApi cString = {
                 
                 |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
         }
-
 }
 
 let testWebApp =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (testApi)
+    |> Remoting.fromValue testApi
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
         (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
@@ -108,51 +118,35 @@ let testWebApp =
     |> Remoting.buildHttpHandler
 
 
-let annotatorDocs = Docs.createFor<IAnnotatorAPI>()
-
-let annotatorApiDocs =
-    Remoting.documentation "Annotation API" [
-        annotatorDocs.route <@ fun api -> api.getTestString @>
-        |> annotatorDocs.alias "Get Test String"
-        |> annotatorDocs.description "This is used during development to check connection between client and server."
-
-        annotatorDocs.route <@ fun api -> api.getTermSuggestionsByParentTerm @>
-        |> annotatorDocs.alias "Get Terms By Parent Ontology"
-        |> annotatorDocs.description "This is used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the parent ontology (written at the top of the column)."
-        |> annotatorDocs.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q","instrument model") @>
-    ]
-
-let webApp cString =
+let createIAnnotatorApiWithVersion cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue (annotatorApi cString)
-    |> Remoting.withDocs "/api/IAnnotatorAPI/docs" annotatorApiDocs
+    |> Remoting.withDocs "/api/IAnnotatorAPIv1/docs" DocsAnnotationAPIvs1.annotatorApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
         (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
     )
     |> Remoting.buildHttpHandler
 
-let topLevelRouter = router {
-    get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
-    // Never ever use this in production lol
-    //get "/test/test2" (fun next ctx ->
-        
-    //    let settings = ctx.GetService<IConfiguration>()
-    //    let cString = settings.["Swate:ConnectionString"]
-
-    //    htmlString (sprintf "<h1>Here is a secret: %s</h1>" cString) next ctx
-    //)
-    forward @"/api/IAnnotatorAPI" (fun next ctx ->
-        // user secret part for production
+let mainApiController = router {
+    forward @"/IAnnotatorAPI" (fun next ctx ->
+        // check if the version in the path exists for the api
         let cString = 
+            // user secret part for production
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
-        webApp cString next ctx
+        createIAnnotatorApiWithVersion cString next ctx
     )
-    forward @"/api/ITestAPI" (fun next ctx ->
+    forward @"/ITestAPI" (fun next ctx ->
+        // check if the version in the path exists for the api
         testWebApp next ctx
     )
+}
+
+let topLevelRouter = router {
+    get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
+    forward "/api" mainApiController
 }
 
 let app = application {

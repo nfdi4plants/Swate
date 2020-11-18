@@ -8,6 +8,7 @@
     <ItemGroup>
         <None Include="paket.references" />
         <Compile Include="OntologyDB.fs" />
+        <Compile Include="Docs\DocsAnnotationAPIvs1.fs" />
         <Compile Include="Server.fs" />
     </ItemGroup>
     <ItemGroup>

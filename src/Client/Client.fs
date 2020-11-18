@@ -24,10 +24,10 @@ module Server =
     open Fable.Remoting.Client
 
     /// A proxy you can use to talk to server directly
-    let api : IAnnotatorAPI =
+    let api : IAnnotatorAPIv1 =
       Remoting.createApi()
       |> Remoting.withRouteBuilder Route.builder
-      |> Remoting.buildProxy<IAnnotatorAPI>
+      |> Remoting.buildProxy<IAnnotatorAPIv1>
 
 let initializeAddIn () =
     OfficeInterop.Office.onReady()
@@ -49,7 +49,6 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
         ]
     model, initialCmd
 
-
 let view (model : Model) (dispatch : Msg -> unit) =
 
     match model.PageState.CurrentPage with
@@ -60,7 +59,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
             AddBuildingBlockView.addBuildingBlockFooterComponent model dispatch
         ]
 
-
     | Routing.Route.TermSearch ->
         BaseView.baseViewComponent model dispatch [
             TermSearchView.termSearchComponent model dispatch
@@ -68,6 +66,12 @@ let view (model : Model) (dispatch : Msg -> unit) =
             str "Footer content"
         ]
 
+    | Routing.Route.Validation ->
+        BaseView.baseViewComponent model dispatch [
+            ValidationView.validationComponent model dispatch
+        ] [
+            str "Footer content"
+        ]
 
     | Routing.Route.FilePicker ->
         BaseView.baseViewComponent model dispatch [
@@ -78,8 +82,15 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.ActivityLog ->
         BaseView.baseViewComponent model dispatch [
-            ActivityLogView.activityLogComponent model
+            ActivityLogView.activityLogComponent model dispatch
         ] [
+            str "Footer content"
+        ]
+
+    | Routing.Route.Info ->
+        BaseView.baseViewComponent model dispatch [
+            InfoView.infoComponent model dispatch
+        ][
             str "Footer content"
         ]
 

@@ -41,6 +41,14 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
         ]
     ]
 
+let footerContentStatic model dispatch =
+    div [][
+        str "Swate Release Version "
+        a [Href "https://github.com/nfdi4plants/Swate/releases"][str (Version.app)]
+    ]
+
+open System.Text.RegularExpressions
+
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
     div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
@@ -61,10 +69,10 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
             ] [
                 createNavigationTab Routing.Route.AddBuildingBlock   model dispatch
                 createNavigationTab Routing.Route.TermSearch         model dispatch
+                createNavigationTab Routing.Route.Validation         model dispatch
                 createNavigationTab Routing.Route.FilePicker         model dispatch
-                createNavigationTab Routing.Route.ActivityLog        model dispatch
+                createNavigationTab Routing.Route.Info               model dispatch
             ]
-            br []
 
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
@@ -77,9 +85,14 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                 Content.content [
                     Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
                     Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
+                ] [
+                    yield! footerChildren
+                    //Button.button [Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )] [str "Try Excel"]
                 ]
-                    footerChildren
-                
-            ] 
+            ]
+        ]
+
+        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"]][
+            footerContentStatic model dispatch
         ]
     ]

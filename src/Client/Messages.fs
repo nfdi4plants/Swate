@@ -14,18 +14,20 @@ type ExcelInteropMsg =
     | TryExcel
     | FillSelection             of string * (DbDomain.Term option)
     | AddColumn                 of colname:string * formatString:string
-    | FormatColumn              of colname:string * cloind:float * formatString:string
+    | FormatColumn              of colname:string * formatString:string * prevmsg:string
     | CreateAnnotationTable     of bool
     | AnnotationtableCreated    of string
     | AnnotationTableExists     of bool
     | GetParentTerm
+    | AutoFitTable
+    | GetTableRepresentation
 
 type TermSearchMsg =
     | ToggleSearchByParentOntology
     | SearchTermTextChange      of string
     | TermSuggestionUsed        of DbDomain.Term
     | NewSuggestions            of DbDomain.Term []
-    | StoreParentOntologyFromOfficeInterop  of obj option
+    | StoreParentOntologyFromOfficeInterop of obj option
 
 type AdvancedSearchMsg =
     // Client
@@ -93,6 +95,15 @@ type AddBuildingBlockMsg =
     | NewUnitTermSuggestions    of DbDomain.Term []
     | BuildingBlockHasUnitSwitch 
 
+type ValidationMsg =
+    // Client
+    | UpdateDisplayedOptionsId of int option
+    /// UpdateValidationFormat of (oldValidationFormat * newValidationFormat)
+    | UpdateValidationFormat of (ValidationFormat*ValidationFormat)
+
+    // OfficeInterop
+    | StoreTableRepresentationFromOfficeInterop of msg:string * OfficeInterop.ColumnRepresentation []
+
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
     | Api                   of ApiMsg
@@ -105,5 +116,6 @@ type Msg =
     | PersistentStorage     of PersistentStorageMsg
     | FilePicker            of FilePickerMsg
     | AddBuildingBlock      of AddBuildingBlockMsg
-    | UpdatePageState of Routing.Route option
+    | Validation            of ValidationMsg
+    | UpdatePageState       of Routing.Route option
     | DoNothing

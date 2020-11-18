@@ -5,11 +5,27 @@ module URLs =
     [<LiteralAttribute>]
     let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
 
+    [<LiteralAttribute>]
+    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate#swate"
+
+    [<LiteralAttribute>]
+    let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
+
+    [<LiteralAttribute>]
+    let CSBTwitterUrl = @"https://twitter.com/cs_biology"
+
+    [<LiteralAttribute>]
+    let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
+
 type Counter = { Value : int }
 
 module Route =
     /// Defines how routes are generated on server and mapped from client
+    //let builder typeName methodName =
+    //    sprintf "/api/%s/%s" typeName methodName
+
     let builder typeName methodName =
+
         sprintf "/api/%s/%s" typeName methodName
 
 
@@ -79,20 +95,23 @@ type ITestAPI = {
     getTestNumber               : unit                                                  -> Async<int>
 }
 
-type IAnnotatorAPI = {
-
+type IAnnotatorAPIv1 = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>
-    getTestString               : unit                                                  -> Async<string>
+    getTestString               : string option                                         -> Async<string>
     // Ontology related requests
+    /// (name,version,definition,created,user)
     testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>
     getAllOntologies            : unit                                                  -> Async<DbDomain.Ontology []>
 
     // Term related requests
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm  : (int*string*string)                                           -> Async<DbDomain.Term []>
-    getTermsForAdvancedSearch           : ((DbDomain.Ontology option)*string*string*string*string*bool) -> Async<DbDomain.Term []>
+    getTermSuggestionsByParentTerm      : (int*string*string)                                           -> Async<DbDomain.Term []>
+    /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
+    getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
 
     getUnitTermSuggestions              : (int*string)                                                  -> Async<DbDomain.Term []>
 }
+
+        

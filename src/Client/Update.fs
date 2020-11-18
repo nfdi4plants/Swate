@@ -40,6 +40,24 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
 let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:ExcelState) : ExcelState * Cmd<Msg> =
     match excelInteropMsg with
 
+    | GetTableRepresentation ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getTableRepresentation
+                ()
+                (fun (colReps,msg) -> StoreTableRepresentationFromOfficeInterop (msg,colReps) |> Validation)
+                (GenericError >> Dev)
+        currentState, cmd
+
+    | AutoFitTable ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.autoFitTable
+                ()
+                (fun msg -> InSync msg |> ExcelInterop)
+                (GenericError >> Dev)
+        currentState, cmd
+
     | Initialized (h,p) ->
         let welcomeMsg = sprintf "Ready to go in %s running on %s" h p
 
@@ -65,6 +83,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
     | SyncContext passthroughMessage ->
         currentState,
         Cmd.batch [
+            Cmd.ofMsg (AutoFitTable |> ExcelInterop)
             Cmd.OfPromise.either
                 OfficeInterop.checkIfAnnotationTableIsPresent
                 ()
@@ -113,16 +132,21 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             //OfficeInterop.addAnnotationColumn
             OfficeInterop.addThreeAnnotationColumns  
             colName
-            (fun (colInd,msg) -> (colName,colInd,format) |> FormatColumn |> ExcelInterop)
+            (fun (newColName,msg) ->
+                
+                (newColName,format,msg) |> FormatColumn |> ExcelInterop)
             (GenericError >> Dev)
 
-    | FormatColumn (colName,colInd,format) ->
+    | FormatColumn (colName,format,msg) ->
         currentState,
-        Cmd.OfPromise.either
-            (OfficeInterop.changeTableColumnFormat colName colInd)
-            format
-            (SyncContext >> ExcelInterop)
-            (GenericError >> Dev)
+        Cmd.batch [
+            Cmd.ofMsg (InSync msg |> ExcelInterop)
+            Cmd.OfPromise.either
+                (OfficeInterop.changeTableColumnFormat colName)
+                format
+                (SyncContext >> ExcelInterop)
+                (GenericError >> Dev)
+        ]
 
     | CreateAnnotationTable isDark ->
         currentState,
@@ -218,22 +242,10 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
             then None
             else
                 let s = (string parentTerm.Value)
-                // REGEX NOT WORKING! ALWAYS RETURNS UNDEFINED ALTOUGH IN .fxs IT WORKS.
-                // check for parent ontology pattern, example: "Parameter [mass spectrometer]"
-                // the regex pattern matches everything after '[', as long as there is a ']' ahead.
-                //let pattern = @"(?<=[[]).*(?=[]])"
-                //let regexRes =
-                //    if Regex.IsMatch(s, pattern) then Regex.Match(s, pattern).Value |> Some else None
                 let res =
-                    let indOfStart = s.IndexOf "["
-                    let sub1 = s.Substring (indOfStart+1)
-                    let isCorrectEnding,sub2 =
-                        let b = sub1.EndsWith "]"
-                        let indOfEnd = sub1.IndexOf "]"
-                        let s2 = sub1.Remove indOfEnd
-                        b, s2
-                    if isCorrectEnding then Some sub2 else None
-                res
+                    OfficeInterop.parseColHeader s
+                res.Ontology
+
         let nextState = {
             currentState with
                 ParentOntology = pOnt
@@ -812,10 +824,78 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
                 }
         nextState, Cmd.none
 
+let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
+    match validationMsg with
+    /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
+    /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
+    | StoreTableRepresentationFromOfficeInterop (msg,colReps) ->
+        let updateValFormat (prevValFormats: ValidationFormat []) (newColReps:OfficeInterop.ColumnRepresentation []) =
+            newColReps
+            |> Array.map (fun colRep ->
+                // create ValidationFormat from ColumnRepresentation
+                let newValFormat = ValidationFormat.init(header=colRep.Header)
+                // check if the column was already existing
+                let existingValFormatOpt= prevValFormats |> Array.tryFind (fun valFormat -> valFormat.ColumnHeader = colRep.Header)
+                match existingValFormatOpt with
+                | Some prevValFormat ->
+                    // if the column was existing fill the new ValidationFormat with the previousValidationFormat information about
+                    // content type and importance.
+                    {newValFormat with
+                        Importance = prevValFormat.Importance
+                        ContentType =
+                            match prevValFormat.ContentType with
+                            | Some (OntologyTerm po) ->
+                                if colRep.ParentOntology.IsSome then
+                                    Some (OntologyTerm colRep.ParentOntology.Value)
+                                else
+                                    None
+                            | _ ->
+                                prevValFormat.ContentType
+                    }
+                | None ->
+                    newValFormat
+            )
+
+        let nextCmd =
+            GenericLog ("Info", msg) |> Dev |> Cmd.ofMsg
+        let nextState = {
+            currentState with
+                TableRepresentation = colReps
+                TableValidationScheme = updateValFormat currentState.TableValidationScheme colReps
+        }
+        nextState, nextCmd
+
+    | UpdateDisplayedOptionsId intOpt ->
+        let nextState = {
+            currentState with
+                DisplayedOptionsId = intOpt
+        }
+        nextState, Cmd.none
+
+    | UpdateValidationFormat (oldValFormat,newValFormat) ->
+        let newFormatArr =
+            currentState.TableValidationScheme
+            |> Array.map (fun x -> if x = oldValFormat then newValFormat else x)
+        let nextState = {
+            currentState with
+                TableValidationScheme = newFormatArr
+        }
+        // Creates a LOT of log
+        //let cmd =
+        //    let t = sprintf "Changed Validation Format: %s to: Importance: %A, Content Type: %A" oldValFormat.ColumnHeader oldValFormat.Importance oldValFormat.ContentType
+        //    GenericLog ("Debug",t) |> Dev |> Cmd.ofMsg 
+        nextState, Cmd.none
+
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
     | UpdatePageState (pageOpt:Route option) ->
+        let nextCmd =
+            match pageOpt with
+            | Some Routing.Route.Validation ->
+                GetTableRepresentation |> ExcelInterop |> Cmd.ofMsg
+            | _ ->
+                Cmd.none
         let nextPageState =
             match pageOpt with
             | Some page -> {
@@ -830,7 +910,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             currentModel with
                 PageState = nextPageState
         }
-        nextModel, Cmd.none
+        nextModel, nextCmd
     /// does not work due to office.js ->
     /// https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
     //| Navigate route ->
@@ -956,5 +1036,16 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel = {
             currentModel with
                 AddBuildingBlockState = nextAddBuildingBlockState
+            }
+        nextModel, nextCmd
+
+    | Validation validationMsg ->
+        let nextValidationState, nextCmd =
+            currentModel.ValidationState
+            |> handleValidationMsg validationMsg
+
+        let nextModel = {
+            currentModel with
+                ValidationState = nextValidationState
             }
         nextModel, nextCmd

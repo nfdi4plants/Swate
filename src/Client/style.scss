@@ -9,6 +9,8 @@ $family-primary: 'Open Sans';
 @import "~bulma/bulma";
 @import "~bulma-switch";
 @import "~bulma-tooltip";
+@import "~bulma-checkradio";
+@import "~bulma-slider";
 
 
 .suggestion :hover{
@@ -19,6 +21,14 @@ $family-primary: 'Open Sans';
     cursor: pointer;
 }
 
+.nonSelectText {
+    user-select: none; /* standard syntax */
+    -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+    -moz-user-select: none; /* mozilla browsers */
+    -khtml-user-select: none; /* webkit (konqueror) browsers */
+    -ms-user-select: none; /* IE10+ */
+}
+
 input::-ms-clear {
     display: none;
 }
@@ -27,8 +37,78 @@ input::-ms-clear {
     display: none
 }
 
+.hideOver775px {
+    display: none
+}
+
 .hideUnder575px {
     display: unset
+}
+
+.hideUnder775px {
+    display: unset
+}
+
+.flexToCentered {
+}
+
+.myFlexText {
+    text-align: justify;
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+
+/// Brands
+
+.myFaBrand  {
+    padding: 13px;
+    font-size: 30px;
+/*    width: 50px;*/
+    text-align: center;
+    text-decoration: none;
+    margin: 2px 1px;
+}
+
+.myFaBrand:hover {
+    opacity: 0.7;
+}
+
+.myFaTwitter {
+    background: #55ACEE;
+    color: white;
+}
+
+.myFaCSB {
+    background: #ed7d31;
+    color: white;
+}
+
+.myFaGithub {
+    background: #24292e;
+    color: white
+}
+
+@media only screen and (max-width: 768px) {
+
+    .myFlexText {
+        font-size: 1rem;
+        width: 90%;
+        margin: auto;
+        margin-bottom: 0.5rem;
+    }
+
+    .hideUnder775px {
+        display: none
+    }
+
+    .hideOver775px {
+        display: unset
+    }
+
+    .flexToCentered {
+        text-align: center
+    }
+
 }
 
 @media only screen and (max-width: 575px) {
@@ -38,5 +118,10 @@ input::-ms-clear {
 
     .hideUnder575px {
         display: none
+    }
+
+    .myFlexText {
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
     }
 }

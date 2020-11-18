@@ -283,6 +283,48 @@ type AddBuildingBlockState = {
         UnitFormat                              = ""
     }
 
+/// User can define what kind of input a column should have
+type ContentType =
+    | OntologyTerm of string
+    | Text
+    | Url
+    | Boolean
+    | Number
+    | Int
+    | Decimal
+
+    member this.toString =
+        match this with
+        | OntologyTerm po ->
+            sprintf "Ontology [%s]" po
+        | _ ->
+            string this
+
+/// User can add a defined input to a column with header "ColumnHeader" and with a certain importance.
+type ValidationFormat = {
+    ColumnHeader    : string
+    Importance      : int option
+    ContentType     : ContentType option
+} with
+    static member init (?header) = {
+        ColumnHeader    = if header.IsSome then header.Value else ""
+        Importance      = None
+        ContentType     = None
+    }
+
+/// Validation scheme for Table
+type ValidationState = {
+    TableRepresentation     : OfficeInterop.ColumnRepresentation []
+    TableValidationScheme   : ValidationFormat []
+    // Client view related
+    DisplayedOptionsId      : int option
+} with
+    static member init () = {
+        TableRepresentation     = Array.empty
+        TableValidationScheme   = Array.empty
+        DisplayedOptionsId      = None
+    }
+
 type Model = {
 
     //PageState
@@ -316,7 +358,11 @@ type Model = {
 
     //Insert annotation columns
     AddBuildingBlockState   : AddBuildingBlockState
-    }
+
+    //Create Validation scheme for Table
+    ValidationState         : ValidationState
+
+}
 
 
 let initializeModel (pageOpt: Route option) = {
@@ -331,4 +377,5 @@ let initializeModel (pageOpt: Route option) = {
     ApiState                = ApiState              .init ()
     FilePickerState         = FilePickerState       .init ()
     AddBuildingBlockState   = AddBuildingBlockState .init ()
+    ValidationState         = ValidationState       .init ()
 }
