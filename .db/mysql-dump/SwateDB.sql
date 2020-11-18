@@ -58,13 +58,7 @@ BEGIN
 END;;
 
 DROP PROCEDURE IF EXISTS `advancedTermSearchByOntIDByNameByDefinition`;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `advancedTermSearchByOntIDByNameByDefinition`(
-	IN ontologyID bigint,
-	IN searchTermName varchar(512),
-    IN mustContainName varchar(512),
-    IN searchTermDefinition varchar(512),
-    IN mustContainDefinition varchar(512)
-)
+CREATE PROCEDURE `advancedTermSearchByOntIDByNameByDefinition`(IN `ontologyID` bigint, IN `searchTermName` varchar(512), IN `mustContainName` varchar(512), IN `searchTermDefinition` varchar(512), IN `mustContainDefinition` varchar(512))
 BEGIN
 	SELECT * 
 		FROM Term
@@ -81,7 +75,7 @@ BEGIN
             AND (ISNULL(mustContainDefinition) 
 				OR INSTR(Term.Definition,mustContainDefinition) > 0
 			)
-            AND Term.OntologyID = ontologyID;
+            AND Term.FK_OntologyID = ontologyID;
 END;;
 
 DROP PROCEDURE IF EXISTS `getAllOntologies`;;
@@ -135,7 +129,7 @@ WHERE
 END;;
 
 DROP PROCEDURE IF EXISTS `getTermSuggestionsByOntology`;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `getTermSuggestionsByOntology`(IN `queryParam` varchar(512), IN `ontologyParam` varchar(512))
+CREATE PROCEDURE `getTermSuggestionsByOntology`(IN `queryParam` varchar(512), IN `ontologyParam` varchar(512))
 BEGIN
 	DECLARE ontId bigint;
 	SELECT ID INTO ontId FROM Ontology WHERE Name = ontologyParam;
@@ -146,7 +140,7 @@ BEGIN
 				INSTR(Term.Name,queryParam) > 0
 				OR Match(Term.Name) AGAINST(Concat(queryParam,'*') IN BOOLEAN MODE)
 			)
-			AND OntologyID = ontId;
+			AND FK_OntologyID = ontId;
 END;;
 
 DROP PROCEDURE IF EXISTS `getTermSuggestionsByParentTerm`;;
@@ -20793,4 +20787,4 @@ INSERT INTO `TermRelationship` (`ID`, `FK_TermID`, `RelationshipType`, `FK_TermI
 (10894,	13843,	'is_a',	13842),
 (10897,	13846,	'is_a',	13459);
 
--- 2020-10-21 14:57:46
+-- 2020-11-18 07:07:05
