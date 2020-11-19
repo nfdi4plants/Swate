@@ -1,6 +1,6 @@
-### 0.1.2+99a427 (Released 19.11.2020)
+### 0.1.2+9a3ea60 (Released 2020-11-19)
 * Additions:
-    * #199a427
+    * #9a3ea60
     * Add automated Versioning and release note creation (Issue #44).
     * Update Sql dump
 

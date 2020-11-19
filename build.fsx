@@ -38,7 +38,9 @@ let npmTool = platformTool "npm" "npm.cmd"
 let npxTool = platformTool "npx" "npx.cmd"
 let dockerComposeTool = platformTool "docker-compose" "docker-compose.exe"
 
-let currentDateString = System.DateTime.Now.ToShortDateString()
+let currentDateString =
+    let n = System.DateTime.Now
+    sprintf "%i-%i-%i" n.Year n.Month n.Day
 
 let runTool cmd args workingDir =
     let arguments = args |> String.split ' ' |> Arguments.OfArgs
