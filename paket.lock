@@ -583,7 +583,7 @@ NUGET
       System.Threading.Tasks.Extensions (>= 4.4)
       System.ValueTuple (>= 4.4)
 
-GROUP build
+GROUP Build
 STORAGE: NONE
 RESTRICTION: == netstandard2.0
 NUGET
@@ -637,6 +637,12 @@ NUGET
     Fake.Core.Xml (5.20.3)
       Fake.Core.String (>= 5.20.3)
       FSharp.Core (>= 4.7.2)
+    Fake.DotNet.AssemblyInfoFile (5.20.3)
+      Fake.Core.Environment (>= 5.20.3)
+      Fake.Core.String (>= 5.20.3)
+      Fake.Core.Trace (>= 5.20.3)
+      Fake.IO.FileSystem (>= 5.20.3)
+      FSharp.Core (>= 4.7.2)
     Fake.DotNet.Cli (5.20.3)
       Fake.Core.Environment (>= 5.20.3)
       Fake.Core.Process (>= 5.20.3)
@@ -675,6 +681,14 @@ NUGET
       FSharp.Core (>= 4.7.2)
     Fake.Net.Http (5.20.3)
       Fake.Core.Trace (>= 5.20.3)
+      FSharp.Core (>= 4.7.2)
+    Fake.Tools.Git (5.20.3)
+      Fake.Core.Environment (>= 5.20.3)
+      Fake.Core.Process (>= 5.20.3)
+      Fake.Core.SemVer (>= 5.20.3)
+      Fake.Core.String (>= 5.20.3)
+      Fake.Core.Trace (>= 5.20.3)
+      Fake.IO.FileSystem (>= 5.20.3)
       FSharp.Core (>= 4.7.2)
     Farmer (1.1.1)
       FSharp.Core (>= 4.7.1)

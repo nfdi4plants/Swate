@@ -27,6 +27,10 @@ let testApi = {
         getTestNumber = fun () -> async { return 42 }
     }
 
+let serviceApi = {
+    getAppVersion = fun () -> async {return System.AssemblyVersionInformation.AssemblyVersion}
+}
+
 let annotatorApi cString = {
 
     //Development
@@ -117,8 +121,18 @@ let testWebApp =
     )
     |> Remoting.buildHttpHandler
 
+let createIServiceAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue serviceApi
+    |> Remoting.withDocs "/api/IServiceAPIv1/docs" DocsServiceAPIvs1.serviceApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler(
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+    )
+    |> Remoting.buildHttpHandler
 
-let createIAnnotatorApiWithVersion cString =
+let createIAnnotatorApiv1 cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue (annotatorApi cString)
@@ -130,17 +144,23 @@ let createIAnnotatorApiWithVersion cString =
     |> Remoting.buildHttpHandler
 
 let mainApiController = router {
-    forward @"/IAnnotatorAPI" (fun next ctx ->
-        // check if the version in the path exists for the api
+
+    //
+    forward @"/IAnnotatorAPIv1" (fun next ctx ->
         let cString = 
-            // user secret part for production
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
-        createIAnnotatorApiWithVersion cString next ctx
+        createIAnnotatorApiv1 cString next ctx
     )
+
+    //
     forward @"/ITestAPI" (fun next ctx ->
-        // check if the version in the path exists for the api
         testWebApp next ctx
+    )
+
+    //
+    forward @"/IServiceAPIv1" (fun next ctx ->
+        createIServiceAPIv1 next ctx
     )
 }
 

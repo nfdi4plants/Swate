@@ -69,6 +69,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
         let cmd =
             Cmd.batch [
+                Cmd.ofMsg (GetAppVersion |> Request |> Api)
                 Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
                 Cmd.OfPromise.either
                     OfficeInterop.checkIfAnnotationTableIsPresent
@@ -512,6 +513,26 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             ()
             (FetchAllOntologiesResponse >> Response >> Api)
             (ApiError >> Api)
+    | GetAppVersion ->
+        let currentCall = {
+            FunctionName = "getAppVersion"
+            Status = Pending
+        }
+
+        let nextState = {
+            currentState with
+                currentCall = currentCall
+        }
+
+        let cmd =
+            Cmd.OfAsync.either
+                Api.serviceApi.getAppVersion
+                ()
+                (GetAppVersionResponse >> Response >> Api)
+                (ApiError >> Api)
+            
+        nextState, cmd
+        
 
 let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : ApiState * Cmd<Msg> =
 
@@ -606,6 +627,24 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         ]
 
         nextState, cmds
+    | GetAppVersionResponse appVersion ->
+        let finishedCall = {
+            currentState.currentCall with
+                Status = Successfull
+        }
+
+        let nextState = {
+            currentState with
+                currentCall = noCall
+                callHistory = finishedCall::currentState.callHistory
+        }
+
+        let cmds = Cmd.batch [
+            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
+            appVersion |> UpdateAppVersion |> PersistentStorage |> Cmd.ofMsg
+        ]
+
+        nextState, cmds
 
 let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Msg> =
     match apiMsg with
@@ -642,6 +681,12 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorageMsg) (curr
                 HasOntologiesLoaded     = true
         }
 
+        nextState,Cmd.none
+    | UpdateAppVersion appVersion ->
+        let nextState = {
+            currentState with
+                AppVersion = appVersion
+        }
         nextState,Cmd.none
 
 let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyleState) : SiteStyleState * Cmd<Msg> =

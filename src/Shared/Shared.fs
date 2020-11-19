@@ -11,6 +11,11 @@ module URLs =
     [<LiteralAttribute>]
     let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
 
+    /// This will only be needed as long there is no documentation on where to find all api docs.
+    /// As soon as that link exists it will replace DocsApiUrl and DocsApiUrl2
+    [<LiteralAttribute>]
+    let DocsApiUrl2 = @"/api/IServiceAPIv1/docs"
+
     [<LiteralAttribute>]
     let CSBTwitterUrl = @"https://twitter.com/cs_biology"
 
@@ -95,10 +100,14 @@ type ITestAPI = {
     getTestNumber               : unit                                                  -> Async<int>
 }
 
+type IServiceAPIv1 = {
+    getAppVersion : unit -> Async<string>
+}
+
 type IAnnotatorAPIv1 = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>
-    getTestString               : string option                                         -> Async<string>
+    getTestString               : System.DateTime                                       -> Async<string>
     // Ontology related requests
     /// (name,version,definition,created,user)
     testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>

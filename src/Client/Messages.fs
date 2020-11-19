@@ -57,6 +57,7 @@ type ApiRequestMsg =
     | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
     | FetchAllOntologies
+    | GetAppVersion
 
 type ApiResponseMsg =
     | TermSuggestionResponse                    of DbDomain.Term []
@@ -64,6 +65,7 @@ type ApiResponseMsg =
     | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
     | UnitTermSuggestionResponse                of DbDomain.Term []
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
+    | GetAppVersionResponse                     of string
 
 type ApiMsg =
     | Request    of ApiRequestMsg
@@ -77,6 +79,7 @@ type StyleChangeMsg =
 
 type PersistentStorageMsg =
     | NewSearchableOntologies of DbDomain.Ontology []
+    | UpdateAppVersion of string
 
 type FilePickerMsg =
     | NewFilesLoaded            of string list

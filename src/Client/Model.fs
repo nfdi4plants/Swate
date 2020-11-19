@@ -131,10 +131,12 @@ type DevState = {
 
 type PersistentStorageState = {
     SearchableOntologies    : (Set<string>*DbDomain.Ontology) []
+    AppVersion              : string
     HasOntologiesLoaded     : bool 
 } with
     static member init () = {
         SearchableOntologies    = [||]
+        AppVersion              = ""
         HasOntologiesLoaded     = false
     }
 
