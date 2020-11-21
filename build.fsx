@@ -8,6 +8,7 @@ open Fake
 open Fake.Core
 open Fake.DotNet
 open Fake.IO
+open Fake.Api
 open Fake.Tools.Git
 open Farmer
 open Farmer.Builders
@@ -285,10 +286,10 @@ let createNewSemVer (semVerReleaseType:SemVerRelease) (newestCommitHash:string) 
 
 // This is later used to try and sort the commit messages to the three fields additions, bugs and deletions.
 let rec sortCommitsByKeyWords (all:string list) (additions:string list) (deletions:string list) (bugs:string list) =
-    let bugKeyWords = [|"bug"; "problem"|] |> Array.map String.toLower
+    let bugKeyWords = [|"bug"; "problem"; "fix"|] |> Array.map String.toLower
     let deleteKeyWords = [|"delete"; "remove"|] |> Array.map String.toLower
-    let isHeadBugKeyWord (head:string) = Array.exists (fun x -> x = head.ToLower()) bugKeyWords
-    let isHeadDeleteKeyWord (head:string) = Array.exists (fun x -> x = head.ToLower()) deleteKeyWords
+    let isHeadBugKeyWord (head:string) = Array.exists (fun x -> head.ToLower().Contains x) bugKeyWords
+    let isHeadDeleteKeyWord (head:string) = Array.exists (fun x -> head.ToLower().Contains x) deleteKeyWords
     match all with
     | head::rest when isHeadBugKeyWord head
             -> sortCommitsByKeyWords rest additions deletions (head::bugs)
@@ -379,8 +380,6 @@ Target.create "Release" (fun config ->
 
     let release = ReleaseNotes.load "RELEASE_NOTES.md"
 
-    Trace.trace (sprintf "%A" release.Notes)
-
     // REMOVE this line as soon as parsing of semver metadata is fixed.
     // This should be in release.SemVer.MetaData
     let (tryFindPreviousReleaseCommitHash: string option) =
@@ -394,7 +393,7 @@ Target.create "Release" (fun config ->
 
     //https://git-scm.com/book/en/v2/Git-Basics-Viewing-the-Commit-History#pretty_format
     let allGitCommits =
-        Fake.Tools.Git.CommandHelper.runGitCommand "" ("log -" + nOfLastCommitsToCheck + " --pretty=format:\"%h;%s\"" )
+        Fake.Tools.Git.CommandHelper.runGitCommand "" ("log -" + nOfLastCommitsToCheck + " --pretty=format:\"%H;%h;%s\"" )
 
     let cutCommitsAtPreviousReleaseCommit =
         allGitCommits
@@ -425,14 +424,20 @@ Target.create "Release" (fun config ->
         // This should be in release.SemVer.MetaData
         let latestCommitHash =
             let newCommit = if tryFindPreviousReleaseCommitHash.IsSome then tryFindPreviousReleaseCommitHash.Value else ""
-            if Array.isEmpty commitNoteArr then newCommit else sprintf "#%s" commitNoteArr.[0].[0]
+            if Array.isEmpty commitNoteArr then newCommit else sprintf "#%s" commitNoteArr.[0].[1]
         let newSemVer =
             createNewSemVer semVer latestCommitHash.[1..] release.SemVer
         /// This will be used to directly create the release notes
         let formattedCommitNoteList =
             commitNoteArr
+            |> Array.filter (fun x ->
+                match x.[2].ToLower().Contains with
+                | x when x "update release_notes.md" || x "update release notes" ->
+                    false
+                | _ -> true
+            )
             |> Array.map (fun x ->
-                sprintf "    * %s" x.[1]
+                sprintf "    * [[#%s](https://github.com/nfdi4plants/Swate/commit/%s)] %s" x.[1] x.[0] x.[2]
             )
             |> List.ofArray
         let additions, deletions, bugs = sortCommitsByKeyWords formattedCommitNoteList [] [] []
@@ -441,11 +446,11 @@ Target.create "Release" (fun config ->
             if semVer <> WIP then
                 [
                     sprintf "### %s (Released %s)" newSemVer currentDateString
-                    if List.isEmpty additions |> not then
-                        "* Additions:"
-                        // REMOVE this line as soon as parsing of semver metadata is fixed.
-                        sprintf "    * %s" latestCommitHash
-                        yield! additions
+                    // Additions will not need to be checked, as in the current version the latest commit hash needs to be th first entry here.
+                    "* Additions:"
+                    // REMOVE this line as soon as parsing of semver metadata is fixed.
+                    sprintf "    * %s" latestCommitHash
+                    yield! additions
                     if List.isEmpty deletions |> not then
                         "* Deletions:"
                         yield! deletions
@@ -509,6 +514,122 @@ Target.create "Release" (fun config ->
     Trace.trace "Update Version.fs done!"
 )
 
+Target.create "GithubDraft" (fun config ->
+
+    let prevReleaseNotes =
+        Fake.IO.File.read "RELEASE_NOTES.md"
+    let takeLastOfReleaseNotes =
+        let findInd =
+            prevReleaseNotes
+            |> Seq.indexed
+            |> Seq.choose (fun (i,x) -> if x.StartsWith "###" then Some i else None)
+        match Seq.length findInd with
+        | 1 ->
+            prevReleaseNotes
+        | x when x >= 2 ->
+            let indOfSecondLastRN = findInd|> Seq.item 1
+            Seq.take (indOfSecondLastRN - 1) prevReleaseNotes
+        | _ ->
+            failwith "Previous RELEASE_NOTES.md not found or in wrong formatting"
+
+    let bodyText =
+        [
+            ""
+            "The latest release features:"
+            yield! takeLastOfReleaseNotes
+            ""
+            "You can check our [release notes](https://github.com/nfdi4plants/Swate/blob/developer/RELEASE_NOTES.md) to see a list of all new features."
+            "If you decide to test Swate in the current state, please take the time to set up a Github account to report your issues and suggestions here."
+            ""
+            "You can also search existing issues for solutions for your questions and/or discussions about your suggestions."
+            ""
+            "Here are the necessary steps to use SWATE:"
+            ""
+            "#### If you use the excel desktop application locally:"
+            "    - Install node.js LTS (needed for office add-in related tooling)"
+            "    - Download the release archive (.zip file) below and extract it"
+            "    - Execute the swate.cmd (windows) or swate.sh (macOS, you will need to make it executable via chmod a+x) script."
+            ""
+            "#### If you use Excel in the browser:"
+            "    - Download the release archive (.zip file) below and extract it"
+            "    - Launch Excel online, open a (blank) workbook"
+            "    - Under the Insert tab, select Add-Ins"
+            "    - Go to Manage my Add-Ins and select Upload my Add-In"
+            "    - select and upload the manifest.xml file contained in the archive."
+            ""
+            ""
+        ]
+
+    let tokenOpt =
+        config.Context.Arguments
+        |> List.tryFind (fun x -> x.StartsWith "token:")
+
+    let release = ReleaseNotes.load "RELEASE_NOTES.md"
+    let semVer = (sprintf "v%i.%i.%i" release.SemVer.Major release.SemVer.Minor release.SemVer.Patch)
+
+
+    let token =
+        match Environment.environVarOrDefault "github_token" "", tokenOpt with
+        | s, None when System.String.IsNullOrWhiteSpace s |> not -> s
+        | s, Some token when System.String.IsNullOrWhiteSpace s |> not ->
+            Trace.traceImportant "Environment variable for token and token argument found. Will proceed with token passed as argument 'token:my-github-token'"
+            token.Replace("token:","")
+        | _, Some token ->
+            token.Replace("token:","")
+        | _, None ->
+            failwith "please set the github_token environment variable to a github personal access token with repro access or pass the github personal access token as argument as in 'dotnet fake build -target githubdraft token:my-github-token'."
+
+    let files =
+        let assetPath = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets")
+        let assetDir = Fake.IO.DirectoryInfo.ofPath assetPath
+        let assetsPaths = Fake.IO.DirectoryInfo.getFiles assetDir
+        assetsPaths |> Array.map (fun x -> x.FullName)
+
+    let gitOwner = "nfdi4plants"
+
+    let gitName = "Swate"
+
+    let _ =
+        GitHub.createClientWithToken token
+        |> GitHub.draftNewRelease gitOwner gitName semVer (release.SemVer.PreRelease <> None) bodyText
+        |> GitHub.uploadFiles files
+        |> Async.RunSynchronously
+
+    Trace.trace "Draft successfully created!"
+    //let responseCreate = 
+    //    FSharp.Data.Http.RequestString
+    //        (   "https://api.github.com/repos/nfdi4plants/Swate/releases", 
+    //            headers = [ 
+    //                "accept", "application/vnd.github.v3+json"; 
+    //                "User-Agent", "Swate";
+    //                "Authorization", sprintf "token 5da68a1d1bdd09413f47b4ecdfd6911d641d7a93"
+    //            ],
+    //            body = FSharp.Data.HttpRequestBody.TextRequest textRequestBody
+    //        )
+    //Trace.trace "Draft successfully created!"
+
+    //let upLink = 
+    //    let pattern = "\"upload_url\":\"[a-z]+://[a-zA-Z./0-9]+"
+    //    System.Text.RegularExpressions.Regex.Match(responseCreate,pattern)
+    //    |> fun x -> x.Value.Replace("\"upload_url\":","").Replace("\"","")
+
+    //let uploadResponse =
+    //    let readInZipAsBinary = 
+    //        let path = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets\swate.zip")
+    //        System.IO.File.ReadAllBytes(path)
+    //    FSharp.Data.Http.RequestString
+    //        (   upLink, 
+    //            query = ["name","swate.zip"; "label","Swate"],
+    //            headers = [ 
+    //                "accept", "application/vnd.github.v3+json"; 
+    //                "User-Agent", "Swate";
+    //                "Authorization", sprintf "token 5da68a1d1bdd09413f47b4ecdfd6911d641d7a93"
+    //                "Content-Type", "application\zip"
+    //            ],
+    //            body = FSharp.Data.HttpRequestBody.BinaryUpload readInZipAsBinary
+    //        )
+)
+
 Target.create "Bundle" (fun _ ->
     runDotNet (sprintf "publish -c Release -o \"%s\"" deployDir) serverPath
     npm "run build" "."
@@ -528,6 +649,10 @@ Target.create "RunTests" (fun _ ->
     |> Async.Parallel
     |> Async.RunSynchronously
     |> ignore
+)
+
+Target.create "testfake" (fun _ ->
+    Trace.trace "Finish test"
 )
 
 open Fake.Core.TargetOperators

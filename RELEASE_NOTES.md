@@ -1,8 +1,9 @@
-### 0.1.2+9a3ea60 (Released 2020-11-19)
+### 0.1.2+fd82de (Released 2020-11-21)
 * Additions:
-    * #9a3ea60
-    * Add automated Versioning and release note creation (Issue #44).
-    * Update Sql dump
+    * #ffd82de
+    * [[#1765d9d](https://github.com/nfdi4plants/Swate/commit/1765d9d1adfbc75220624e607178e943c850e11f)] Update Sql dump
+    * [[#9a3ea60](https://github.com/nfdi4plants/Swate/commit/9a3ea60476baccdf49d0bd7c4839b00b6b52627f)] Add automated Versioning and release note creation (Issue #44).
+    * [[#ffd82de](https://github.com/nfdi4plants/Swate/commit/ffd82de928528179f05ba88e5a45a55894af66ac)] Add fake target to draft github release from RELEASE_NOTES.md (Issue #44)
 
 ### 0.1.1+7c567fd (Released 2020-11-18)
 * Additions:
