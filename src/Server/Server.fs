@@ -166,7 +166,23 @@ let mainApiController = router {
 
 let topLevelRouter = router {
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
-    forward "/api" mainApiController
+    //forward "/api" mainApiController
+    forward @"" (fun next ctx ->
+        let cString = 
+            let settings = ctx.GetService<IConfiguration>()
+            settings.["Swate:ConnectionString"]
+        createIAnnotatorApiv1 cString next ctx
+    )
+
+    //
+    forward @"" (fun next ctx ->
+        testWebApp next ctx
+    )
+
+    //
+    forward @"" (fun next ctx ->
+        createIServiceAPIv1 next ctx
+    )
 }
 
 let app = application {
