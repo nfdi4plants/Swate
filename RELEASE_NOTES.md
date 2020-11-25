@@ -1,9 +1,11 @@
-### 0.1.2+fd82de (Released 2020-11-21)
+### 0.1.2+402c70 (Released 2020-11-25)
 * Additions:
-    * #ffd82de
+    * #c402c70
     * [[#1765d9d](https://github.com/nfdi4plants/Swate/commit/1765d9d1adfbc75220624e607178e943c850e11f)] Update Sql dump
     * [[#9a3ea60](https://github.com/nfdi4plants/Swate/commit/9a3ea60476baccdf49d0bd7c4839b00b6b52627f)] Add automated Versioning and release note creation (Issue #44).
-    * [[#ffd82de](https://github.com/nfdi4plants/Swate/commit/ffd82de928528179f05ba88e5a45a55894af66ac)] Add fake target to draft github release from RELEASE_NOTES.md (Issue #44)
+    * [[#40000ef5](https://github.com/nfdi4plants/Swate/commit/ffd82de928528179f05ba88e5a45a55894af66ac)] Add fake target to draft github release from RELEASE_NOTES.md (Issue #44)
+* Bugfixes:
+    * [[#c402c70](https://github.com/nfdi4plants/Swate/commit/c402c7022bf120ae6b6a25822799aec8d80b2e7b)] Fix api docs not showing examples with DateTime (Issue #55).
 
 ### 0.1.1+7c567fd (Released 2020-11-18)
 * Additions:
