@@ -197,11 +197,12 @@ let autocompleteTermSearchComponent
     (inputPlaceholderText   : string)
     (inputSize              : ISize option)
     (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
-
+    (isDisabled:bool)
     = 
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
+            Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
             match inputSize with
             | Some size -> Input.Size size

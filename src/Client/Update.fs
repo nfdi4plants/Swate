@@ -847,7 +847,7 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
         }
         nextState, Cmd.none
 
-    | BuildingBlockHasUnitSwitch ->
+    | ToggleBuildingBlockHasUnit ->
 
         let hasUnit = not currentState.BuildingBlockHasUnit
 

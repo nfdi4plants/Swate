@@ -122,7 +122,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                             "Start typing to search"
                             None
                             (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockState model.AddBuildingBlockState)
-                        
+                            false
                     | _ -> ()
                 ]
             ]
@@ -130,14 +130,11 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
             | Parameter | Characteristics | Factor ->
                 Field.div [Field.HasAddons] [
                     Control.div [] [
-                        Button.button [ Button.OnClick (fun _ -> BuildingBlockHasUnitSwitch |> AddBuildingBlock |> dispatch)] [ 
-                            Checkbox.checkbox [] [
-                                Checkbox.input [
-                                    Props [
-                                        Checked model.AddBuildingBlockState.BuildingBlockHasUnit
-                                        
-                                    ]
-                                ]
+                        Button.a [ Button.OnClick (fun _ -> ToggleBuildingBlockHasUnit |> AddBuildingBlock |> dispatch)] [ 
+                            Fa.stack [Fa.Stack.Size Fa.FaSmall; Fa.Stack.Props [Style [ Color "#666666"]]][
+                                Fa.i [Fa.Regular.Square; Fa.Stack2x][]
+                                if model.AddBuildingBlockState.BuildingBlockHasUnit then
+                                    Fa.i [Fa.Solid.Check; Fa.Stack1x][]
                             ]
                         ]
                     ]
@@ -153,8 +150,8 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                         "Start typing to search"
                         None
                         (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState)
-
-
+                        // if BuildingBlockHasUnit = false then disabled = true
+                        (model.AddBuildingBlockState.BuildingBlockHasUnit |> not)
                 ]
             | _ -> ()
         ]
@@ -173,9 +170,10 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                     Button.IsFullWidth
                     Button.OnClick (
                         let format =
-                            match model.AddBuildingBlockState.UnitTermSearchText with
-                            | "" -> "0.00"
-                            | str ->
+                            match model.AddBuildingBlockState.BuildingBlockHasUnit, model.AddBuildingBlockState.UnitTermSearchText with
+                            | _,"" -> "0.00"
+                            | false, _ -> "0.00"
+                            | true, str ->
                                 sprintf "0.00 \"%s\"" str
                         let colName = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
                         fun _ -> (colName,format) |> AddColumn |> ExcelInterop |> dispatch

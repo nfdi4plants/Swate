@@ -96,7 +96,7 @@ type AddBuildingBlockMsg =
     | SearchUnitTermTextChange  of string
     | UnitTermSuggestionUsed    of string
     | NewUnitTermSuggestions    of DbDomain.Term []
-    | BuildingBlockHasUnitSwitch 
+    | ToggleBuildingBlockHasUnit
 
 type ValidationMsg =
     // Client
