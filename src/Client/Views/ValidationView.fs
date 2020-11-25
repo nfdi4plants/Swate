@@ -61,22 +61,51 @@ let columnListElement ind (format:ValidationFormat) (model:Model) dispatch =
 
 let checkradioElement (id:int) (contentTypeOpt:ContentType option) (format:ValidationFormat) dispatch =
     let contentType = if contentTypeOpt.IsSome then contentTypeOpt.Value.toString else "None"
-    Checkradio.radio [
-        Checkradio.Id (sprintf "checkradio%i%s" id contentType)
-        Checkradio.Disabled (contentType = "Ontology [None]")
-        Checkradio.Name (sprintf "ContentType%i" id)
-        Checkradio.OnChange (fun e ->
-            let newFormat = {
-                format with
-                    ContentType = contentTypeOpt
-            }
-            UpdateValidationFormat (format,newFormat) |> Validation |> dispatch
-        )
-        Checkradio.Checked (contentTypeOpt = format.ContentType)
-        Checkradio.LabelProps [Class "nonSelectText"]
-        Checkradio.Color IsSuccess
-    ][
-        str contentType
+    /// See issue #54
+    //Checkradio.radio [
+    //    //Checkradio.InputProps [Style [Border "1px solid red"]]
+    //    Checkradio.Id (sprintf "checkradio%i%s" id contentType)
+    //    Checkradio.Disabled (contentType = "Ontology [None]")
+    //    Checkradio.Name (sprintf "ContentType%i" id)
+    //    Checkradio.OnChange (fun e ->
+    //        let newFormat = {
+    //            format with
+    //                ContentType = contentTypeOpt
+    //        }
+    //        UpdateValidationFormat (format,newFormat) |> Validation |> dispatch
+    //    )
+    //    Checkradio.Checked (contentTypeOpt = format.ContentType)
+    //    Checkradio.LabelProps [Class "nonSelectText"]
+    //    Checkradio.Color IsSuccess
+    //][
+    //    str contentType
+    //]
+    let isDisabled = (contentType = "Ontology [None]")
+    div [Style [Position PositionOptions.Relative]] [
+        input [
+            Type "checkbox";
+            Class "checkbox-input"
+            Id (sprintf "checkradio%i%s" id contentType)
+            Name (sprintf "ContentType%i" id)
+            Disabled isDisabled
+            OnChange (fun e ->
+                let newFormat = {
+                    format with
+                        ContentType = contentTypeOpt
+                }
+                UpdateValidationFormat (format,newFormat) |> Validation |> dispatch
+            )
+            Checked (contentTypeOpt = format.ContentType)
+
+        ]
+        label [
+            Class "checkbox-label"
+            HtmlFor (sprintf "checkradio%i%s" id contentType)
+        ][str contentType]
+        label [
+            Class "checkbox-checkmark";
+            HtmlFor (sprintf "checkradio%i%s" id contentType)
+        ][]
     ]
 
 let checkradioList (ind:int) (hasOntology:string option) format dispatch=
