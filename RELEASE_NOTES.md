@@ -1,4 +1,4 @@
-### 0.1.2+f67a92 (Released 2020-11-26)
+### 0.1.2+af67a92 (Released 2020-11-26)
 * Additions:
     * latest commit #af67a92
     * [[#af67a92](https://github.com/nfdi4plants/Swate/commit/af67a924a0ec5593573e1f7a5a830f0beb7cf0cd)] Replace footer placeholder.
