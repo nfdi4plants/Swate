@@ -19,11 +19,28 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.a [Navbar.Item.Props [Title "Autoformat Table"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
                     Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
-                    Button.OnClick (fun e -> AutoFitTable |> ExcelInterop |> dispatch )
+                    Button.OnClick (fun e -> PipeActiveAnnotationTable AutoFitTable |> ExcelInterop |> dispatch )
                     Button.Color Color.IsWhite
                     Button.IsInverted
                 ] [
                     Fa.i [Fa.Solid.SyncAlt][]
+                ]
+            ]
+            Navbar.Item.a [Navbar.Item.Props [Title "Add New Annotation Table"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Button.a [
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
+                    Button.OnClick (fun _ ->
+                        (fun (allNames) ->
+                            CreateAnnotationTable (allNames,model.SiteStyleState.IsDarkMode))
+                            |> PipeCreateAnnotationTableInfo
+                            |> ExcelInterop
+                            |> dispatch
+                    )
+                    Button.Color Color.IsWhite
+                    Button.IsInverted
+                ] [
+                    Fa.span [Fa.Solid.Plus][]
+                    Fa.span [Fa.Solid.Table][]
                 ]
             ]
             Navbar.burger [ Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible

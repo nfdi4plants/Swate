@@ -137,8 +137,10 @@ let infoComponent (model : Model) (dispatch : Msg -> unit) =
 
         div [Style [Color model.SiteStyleState.ColorMode.Text; Margin "0 auto"; MaxWidth "80%"]][
             div [Class "myflexText"][
-                str "To make it easier for developers to start working with Swate, we provide a documentation of our APIs. These can be viewed under this "
-                a [Href Shared.URLs.DocsApiUrl; Target "_Blank"][str "link"]
+                str "To make it easier for developers to start working with Swate, we provide a documentation of our APIs. These can be viewed  "
+                a [Href Shared.URLs.DocsApiUrl; Target "_Blank"][str "here"]
+                str " and "
+                a [Href Shared.URLs.DocsApiUrl2; Target "_Blank"][str "here"]
                 str "."
             ]
         ]

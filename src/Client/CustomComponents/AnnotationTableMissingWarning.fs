@@ -23,6 +23,13 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
         Button.buttonComponent
             model.SiteStyleState.ColorMode
             true
-            "create annoation table"
-            (fun _ -> model.SiteStyleState.IsDarkMode |> CreateAnnotationTable |> ExcelInterop |> dispatch)
+            "create annotation table"
+            (fun _ ->
+                (fun (allNames) ->
+                    CreateAnnotationTable (allNames,model.SiteStyleState.IsDarkMode))
+                    |> PipeCreateAnnotationTableInfo
+                    |> ExcelInterop
+                    |> dispatch
+            )
+            //(fun _ -> pipeNameTuple CreateAnnotationTable model.SiteStyleState.IsDarkMode |> ExcelInterop |> dispatch)
     ]

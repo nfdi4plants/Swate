@@ -9,7 +9,7 @@ nuget Fulma.Extensions.Wikiki.Slider
 nuget Saturn
 nuget Expecto
 nuget MySql.Data 8.0.21
-nuget Microsoft.AspNetCore.Authentication.JwtBearer
+nuget Microsoft.AspNetCore.Authentication.JwtBearer 3.1.10
 nuget Microsoft.Extensions.Configuration.UserSecrets
 nuget Microsoft.Data.SqlClient
 
@@ -35,7 +35,10 @@ group Build
     framework: netstandard2.0
     storage: none
 
-    nuget FSharp.Core
+    nuget Fake.Api.GitHub
+    nuget Fake.DotNet.AssemblyInfoFile 5.20.3
+    nuget Fake.Tools.Git 5.20.3
+    nuget FSharp.Core 4.7.2
     nuget Fake.Core.ReleaseNotes
     nuget Fake.Core.Target
     nuget Fake.DotNet.Cli

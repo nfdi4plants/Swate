@@ -41,10 +41,10 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
         ]
     ]
 
-let footerContentStatic model dispatch =
+let footerContentStatic (model:Model) dispatch =
     div [][
         str "Swate Release Version "
-        a [Href "https://github.com/nfdi4plants/Swate/releases"][str (Version.app)]
+        a [Href "https://github.com/nfdi4plants/Swate/releases"][str model.PersistentStorageState.AppVersion]
     ]
 
 open System.Text.RegularExpressions

@@ -63,42 +63,42 @@ let view (model : Model) (dispatch : Msg -> unit) =
         BaseView.baseViewComponent model dispatch [
             TermSearchView.termSearchComponent model dispatch
         ] [
-            str "Footer content"
+            Text.p [] [str ""]
         ]
 
     | Routing.Route.Validation ->
         BaseView.baseViewComponent model dispatch [
             ValidationView.validationComponent model dispatch
         ] [
-            str "Footer content"
+            Text.p [] [str ""]
         ]
 
     | Routing.Route.FilePicker ->
         BaseView.baseViewComponent model dispatch [
             FilePickerView.filePickerComponent model dispatch
         ] [
-            str "Footer content"
+            Text.p [] [str ""]
         ]
 
     | Routing.Route.ActivityLog ->
         BaseView.baseViewComponent model dispatch [
             ActivityLogView.activityLogComponent model dispatch
         ] [
-            str "Footer content"
+            Text.p [] [str ""]
         ]
 
     | Routing.Route.Info ->
         BaseView.baseViewComponent model dispatch [
             InfoView.infoComponent model dispatch
         ][
-            str "Footer content"
+            Text.p [] [str ""]
         ]
 
     | Routing.Route.NotFound ->
         BaseView.baseViewComponent model dispatch [
             NotFoundView.notFoundComponent model dispatch
         ] [
-            str "Footer content"
+            Text.p [] [str ""]
         ]
 
     | Routing.Route.Home ->

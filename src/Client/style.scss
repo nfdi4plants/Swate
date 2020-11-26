@@ -12,6 +12,102 @@ $family-primary: 'Open Sans';
 @import "~bulma-checkradio";
 @import "~bulma-slider";
 
+html, body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    background: #F0F2F4;
+}
+
+.button {
+    @extend .button;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.input {
+    @extend .input;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+/////////// Custom simple checkbox, due to issue #54 ///////////////////
+.checkbox-label {
+    display: inline-block;
+    position: relative;
+    padding-left: 35px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    font-size: 1rem;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    width: auto;
+}
+
+/* Hide the browser's default checkbox */
+.checkbox-input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+/* Create a custom checkbox */
+.checkbox-checkmark {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    height: 20px;
+    width: 20px;
+    background-color: #eee;
+    border: 0.1px solid #dbdbdb;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.checkbox-input[disabled] ~ .checkbox-label, .checkbox-input[disabled] ~ .checkbox-checkmark {
+    color: lightgrey;
+    cursor: not-allowed;
+}
+
+/* On mouse-over, add a grey background color */
+.checkbox-label:hover ~ .checkbox-checkmark, .checkbox-checkmark:hover {
+    background-color: #ccc;
+}
+
+/* On mouse-over on a disabled input, add a grey background color */
+.checkbox-input[disabled] ~ .checkbox-checkmark:hover, .checkbox-input[disabled] ~ .checkbox-label:hover ~ .checkbox-checkmark {
+    background-color: unset;
+}
+
+/* When the checkbox is checked, add a green background */
+.checkbox-input:checked ~ .checkbox-checkmark {
+    background-color: #3f8159;
+    border: none;
+}
+
+/* Create the checkmark/indicator (hidden when not checked) */
+.checkbox-checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+/* Show the indicator when checked */
+.checkbox-input:checked ~ .checkbox-checkmark:after {
+    display: block;
+}
+
+/* Style the checkmark/indicator */
+.checkbox-checkmark:after {
+    top: 6px;
+    left: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+}
+////////////////// End of custom checkbox /////////////////////////
 
 .suggestion :hover{
     cursor: pointer;

@@ -197,11 +197,12 @@ let autocompleteTermSearchComponent
     (inputPlaceholderText   : string)
     (inputSize              : ISize option)
     (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
-
+    (isDisabled:bool)
     = 
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
+            Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
             match inputSize with
             | Some size -> Input.Size size
@@ -259,7 +260,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         //OnBlur  (fun e -> alert "focusin")
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
-                            GetParentTerm |> ExcelInterop |> dispatch
+                            PipeActiveAnnotationTable GetParentTerm |> ExcelInterop |> dispatch
                             let el = Browser.Dom.document.getElementById "TermSearchInput"
                             el.focus()
                         )

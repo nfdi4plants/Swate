@@ -1,5 +1,5 @@
 module Version
 
+/// This is the base SAFE stack version used for this app
 let template = "1.22.4"
 
-let app = "v0.1.1"
