@@ -1,10 +1,12 @@
-### 0.1.2+5f4c39 (Released 2020-11-25)
+### 0.1.2+a423b3 (Released 2020-11-26)
 * Additions:
-    * #05f4c39
+    * #6a423b3
+    * [[#6a423b3](https://github.com/nfdi4plants/Swate/commit/6a423b385b9b1590bd0bb97cb76afc6dedd4873d)] Add button to create a new annotation table.
     * [[#1765d9d](https://github.com/nfdi4plants/Swate/commit/1765d9d1adfbc75220624e607178e943c850e11f)] Update Sql dump
     * [[#9a3ea60](https://github.com/nfdi4plants/Swate/commit/9a3ea60476baccdf49d0bd7c4839b00b6b52627f)] Add automated Versioning and release note creation (Issue #44).
     * [[#40000ef5](https://github.com/nfdi4plants/Swate/commit/ffd82de928528179f05ba88e5a45a55894af66ac)] Add fake target to draft github release from RELEASE_NOTES.md (Issue #44)
 * Bugfixes:
+    * [[#648f8b6](https://github.com/nfdi4plants/Swate/commit/648f8b63526e16f4e155833d0504e0b415f666c5)] Fix multiple worksheets/annotation tables bug (Issue #58).
     * [[#05f4c39](https://github.com/nfdi4plants/Swate/commit/05f4c39a4eb19c19159d9782d56e9afad43f4286)] Fix font, as the correct scss was not loaded correctly.
     * [[#c6e543b](https://github.com/nfdi4plants/Swate/commit/c6e543bf3844b165f77f272aa6b38f6894da88cb)] Fix inconsistencies in building block has-unit functioniality.
     * [[#fadbea8](https://github.com/nfdi4plants/Swate/commit/fadbea8337eb6ae304085f6f1fbbd4df99d8003f)] Fix disappearing checkboxes (Issue #54).
