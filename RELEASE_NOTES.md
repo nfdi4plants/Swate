@@ -1,10 +1,10 @@
-### 0.1.2+a423b3 (Released 2020-11-26)
+### 0.1.2+f67a92 (Released 2020-11-26)
 * Additions:
-    * #6a423b3
+    * #af67a92
+    * [[#af67a92](https://github.com/nfdi4plants/Swate/commit/af67a924a0ec5593573e1f7a5a830f0beb7cf0cd)] Replace footer placeholder.
     * [[#6a423b3](https://github.com/nfdi4plants/Swate/commit/6a423b385b9b1590bd0bb97cb76afc6dedd4873d)] Add button to create a new annotation table.
-    * [[#1765d9d](https://github.com/nfdi4plants/Swate/commit/1765d9d1adfbc75220624e607178e943c850e11f)] Update Sql dump
     * [[#9a3ea60](https://github.com/nfdi4plants/Swate/commit/9a3ea60476baccdf49d0bd7c4839b00b6b52627f)] Add automated Versioning and release note creation (Issue #44).
-    * [[#40000ef5](https://github.com/nfdi4plants/Swate/commit/ffd82de928528179f05ba88e5a45a55894af66ac)] Add fake target to draft github release from RELEASE_NOTES.md (Issue #44)
+    * [[#40000ef5](https://github.com/nfdi4plants/Swate/commit/ffd82de928528179f05ba88e5a45a55894af66ac)] Add fake target to draft github release from RELEASE_NOTES.md (Issue #44).
 * Bugfixes:
     * [[#648f8b6](https://github.com/nfdi4plants/Swate/commit/648f8b63526e16f4e155833d0504e0b415f666c5)] Fix multiple worksheets/annotation tables bug (Issue #58).
     * [[#05f4c39](https://github.com/nfdi4plants/Swate/commit/05f4c39a4eb19c19159d9782d56e9afad43f4286)] Fix font, as the correct scss was not loaded correctly.
