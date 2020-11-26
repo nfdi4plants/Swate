@@ -8,19 +8,23 @@ open Elmish
 open Thoth.Elmish
 
 type ExcelInteropMsg =
-    | Initialized               of (string*string)
-    | SyncContext               of string
-    | InSync                    of string
+    | PipeActiveAnnotationTable     of (TryFindAnnoTableResult -> ExcelInteropMsg)
+    /// This is used to pipe (all table names * active annotation table option) to 'CreateAnnotationTable'. This is necessary to generate a new annotation table name.
+    | PipeCreateAnnotationTableInfo of (string [] -> ExcelInteropMsg)
+    | Initialized                   of (string*string)
+    | SyncContext                   of activeAnnotationTable:TryFindAnnoTableResult*string
+    | InSync                        of string
     | TryExcel
-    | FillSelection             of string * (DbDomain.Term option)
-    | AddColumn                 of colname:string * formatString:string
-    | FormatColumn              of colname:string * formatString:string * prevmsg:string
-    | CreateAnnotationTable     of bool
-    | AnnotationtableCreated    of string
-    | AnnotationTableExists     of bool
-    | GetParentTerm
-    | AutoFitTable
-    | GetTableRepresentation
+    | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
+    | AddColumn                     of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string
+    | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
+    /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
+    | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
+    | AnnotationtableCreated        of activeAnnotationTable:TryFindAnnoTableResult * string
+    | AnnotationTableExists         of activeAnnotationTable:TryFindAnnoTableResult
+    | GetParentTerm                 of activeAnnotationTable:TryFindAnnoTableResult
+    | AutoFitTable                  of activeAnnotationTable:TryFindAnnoTableResult
+    | GetTableRepresentation        of activeAnnotationTable:TryFindAnnoTableResult
 
 type TermSearchMsg =
     | ToggleSearchByParentOntology
@@ -45,7 +49,7 @@ type AdvancedSearchMsg =
     | NewAdvancedSearchResults          of DbDomain.Term []
 
 type DevMsg =
-    | LogTableMetadata
+    | LogTableMetadata  of activeAnnotationTable:TryFindAnnoTableResult
     | GenericLog        of (string*string)
     | GenericError      of exn
     
@@ -122,3 +126,31 @@ type Msg =
     | Validation            of ValidationMsg
     | UpdatePageState       of Routing.Route option
     | DoNothing
+
+/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1) other params.
+let pipeNameTuple msg param =
+    PipeActiveAnnotationTable
+        (fun annotationTableOpt ->
+            msg (annotationTableOpt,param)
+        )
+
+/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2) other params.
+/// Use this as: (x1,x2) |> pipeNameTuple2 msg
+let pipeNameTuple2 msg param =
+    PipeActiveAnnotationTable
+        (fun annotationTableOpt ->
+            let constructParam =
+                param |> fun (x,y) -> annotationTableOpt,x,y    
+            msg (constructParam)
+        )
+
+/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2,x3) other params.
+/// Use this as: (x1,x2,x3) |> pipeNameTuple3 msg
+let pipeNameTuple3 msg param =
+    PipeActiveAnnotationTable
+        (fun annotationTableOpt ->
+            let constructParam =
+                param |> fun (x,y,z) -> annotationTableOpt,x,y,z    
+            msg (constructParam)
+            |> PipeActiveAnnotationTable
+        )

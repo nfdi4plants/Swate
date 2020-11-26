@@ -176,7 +176,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                             | true, str ->
                                 sprintf "0.00 \"%s\"" str
                         let colName = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
-                        fun _ -> (colName,format) |> AddColumn |> ExcelInterop |> dispatch
+                        fun _ -> (colName,format) |> pipeNameTuple2 AddColumn |> ExcelInterop |> dispatch
                     )
                 ] [
                     str "Insert this annotation building block"

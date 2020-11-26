@@ -10,6 +10,16 @@ open Thoth.Elmish
 
 open System.Text.RegularExpressions
 
+/// This function matches a OfficeInterop.TryFindAnnoTableResult to either Success or Error
+/// If Success it will pipe the tableName on to the msg input paramter.
+/// If Error it will pipe the error message to GenericLog ("Error",errorMsg).
+let matchActiveTableResToMsg activeTableNameRes (msg:string -> Cmd<Msg>) =
+    match activeTableNameRes with
+    | OfficeInterop.Success tableName ->
+        msg tableName
+    | OfficeInterop.Error eMsg ->
+        GenericLog ("Error",eMsg) |> Dev |> Cmd.ofMsg
+
 let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
     match route with
     | Some page ->
@@ -38,24 +48,46 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
         nextModel,Cmd.none
 
 let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:ExcelState) : ExcelState * Cmd<Msg> =
+
     match excelInteropMsg with
 
-    | GetTableRepresentation ->
+    | PipeCreateAnnotationTableInfo createAnnotationTableMsg ->
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.getTableRepresentation
+                OfficeInterop.getTableInfoForAnnoTableCreation
                 ()
-                (fun (colReps,msg) -> StoreTableRepresentationFromOfficeInterop (msg,colReps) |> Validation)
+                (fun (allNames) -> createAnnotationTableMsg allNames |> ExcelInterop)
                 (GenericError >> Dev)
         currentState, cmd
 
-    | AutoFitTable ->
+    /// This message is necessary to find the annotation table name in the active worksheet. The name is then passed on to the message variable.
+    | PipeActiveAnnotationTable nextMsg ->
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.autoFitTable
+                OfficeInterop.tryFindActiveAnnotationTable
                 ()
+                (fun activeTableNameRes -> nextMsg activeTableNameRes |> ExcelInterop)
+                (GenericError >> Dev)
+        currentState, cmd
+
+    | GetTableRepresentation activeTableNameRes ->
+        let successCmd tableName =
+            Cmd.OfPromise.either
+                OfficeInterop.getTableRepresentation
+                (tableName)
+                (fun (colReps,msg) -> StoreTableRepresentationFromOfficeInterop (msg,colReps) |> Validation)
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes successCmd 
+        currentState, cmd
+
+    | AutoFitTable activeTableNameRes->
+        let cmd name =
+            Cmd.OfPromise.either
+                OfficeInterop.autoFitTable
+                (name)
                 (fun msg -> InSync msg |> ExcelInterop)
                 (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
 
     | Initialized (h,p) ->
@@ -72,7 +104,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 Cmd.ofMsg (GetAppVersion |> Request |> Api)
                 Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
                 Cmd.OfPromise.either
-                    OfficeInterop.checkIfAnnotationTableIsPresent
+                    OfficeInterop.tryFindActiveAnnotationTable
                     ()
                     (AnnotationTableExists >> ExcelInterop)
                     (GenericError >> Dev)
@@ -81,12 +113,12 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
         nextState, cmd
         
-    | SyncContext passthroughMessage ->
+    | SyncContext (activeTableNameRes,passthroughMessage) ->
         currentState,
         Cmd.batch [
-            Cmd.ofMsg (AutoFitTable |> ExcelInterop)
+            Cmd.ofMsg (AutoFitTable activeTableNameRes |> ExcelInterop)
             Cmd.OfPromise.either
-                OfficeInterop.checkIfAnnotationTableIsPresent
+                OfficeInterop.tryFindActiveAnnotationTable
                 ()
                 (AnnotationTableExists >> ExcelInterop)
                 (GenericError >> Dev)
@@ -97,7 +129,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (GenericError >> Dev)
         ]
 
-    | AnnotationTableExists exists ->
+    | AnnotationTableExists annoTableOpt ->
+        let exists =
+            match annoTableOpt with
+            | OfficeInterop.Success name -> true
+            | _ -> false
         let nextState = {
             currentState with
                 HasAnnotationTable = exists
@@ -116,62 +152,71 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         Cmd.OfPromise.either
             OfficeInterop.exampleExcelFunction 
             ()
-            (SyncContext >> ExcelInterop)
+            ((fun x -> ("Debug",x) |> GenericLog) >> Dev)
             (GenericError >> Dev)
 
-    | FillSelection (fillValue,fillTerm) ->
-        currentState,
-        Cmd.OfPromise.either
-            OfficeInterop.fillValue  
-            (fillValue,fillTerm)
-            (SyncContext >> ExcelInterop)
-            (GenericError >> Dev)
-
-    | AddColumn (colName,format) ->
-        currentState,
-        Cmd.OfPromise.either
-            //OfficeInterop.addAnnotationColumn
-            OfficeInterop.addThreeAnnotationColumns  
-            colName
-            (fun (newColName,msg) ->
-                
-                (newColName,format,msg) |> FormatColumn |> ExcelInterop)
-            (GenericError >> Dev)
-
-    | FormatColumn (colName,format,msg) ->
-        currentState,
-        Cmd.batch [
-            Cmd.ofMsg (InSync msg |> ExcelInterop)
+    | FillSelection (activeTableNameRes,fillValue,fillTerm) ->
+        let cmd name =
             Cmd.OfPromise.either
-                (OfficeInterop.changeTableColumnFormat colName)
-                format
-                (SyncContext >> ExcelInterop)
+                OfficeInterop.fillValue  
+                (name,fillValue,fillTerm)
+                ((fun x -> SyncContext (activeTableNameRes,x)) >> ExcelInterop)
                 (GenericError >> Dev)
-        ]
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
+        currentState, cmd
 
-    | CreateAnnotationTable isDark ->
-        currentState,
-        Cmd.OfPromise.either
-            OfficeInterop.createAnnotationTable  
-            isDark
-            (AnnotationtableCreated >> ExcelInterop)
-            (GenericError >> Dev)
+    | AddColumn (activeTableNameRes,colName,format) ->
+        let cmd name=
+            Cmd.OfPromise.either
+                //OfficeInterop.addAnnotationColumn
+                OfficeInterop.addThreeAnnotationColumns  
+                (name,colName)
+                (fun (newColName,msg) ->
+                    FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
+                )
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
+        currentState, cmd
 
-    | AnnotationtableCreated range ->
+    | FormatColumn (activeTableNameRes,colName,format,msg) ->
+        let cmd name =
+            Cmd.batch [
+                Cmd.ofMsg (InSync msg |> ExcelInterop)
+                Cmd.OfPromise.either
+                    (OfficeInterop.changeTableColumnFormat name colName)
+                    format
+                    ((fun msg -> SyncContext (activeTableNameRes,msg)) >> ExcelInterop)
+                    (GenericError >> Dev)
+            ]
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
+        currentState,cmd
+
+    | CreateAnnotationTable (allTableNames,isDark) ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.createAnnotationTable  
+                (allTableNames,isDark)
+                (AnnotationtableCreated >> ExcelInterop)
+                (GenericError >> Dev)
+        currentState,cmd
+
+    | AnnotationtableCreated (activeTableNameRes,range) ->
         let nextState = {
             currentState with
                 HasAnnotationTable = true
         }
 
-        nextState,Cmd.ofMsg(range |> SyncContext |> ExcelInterop)
+        nextState,Cmd.ofMsg(SyncContext (activeTableNameRes,range)|> ExcelInterop)
 
-    | GetParentTerm ->
-        currentState,
-        Cmd.OfPromise.either
-            OfficeInterop.getParentTerm
-            ()
-            (StoreParentOntologyFromOfficeInterop >> TermSearch)
-            (GenericError >> Dev)
+    | GetParentTerm activeTableNameRes ->
+        let cmd name =
+            Cmd.OfPromise.either
+                OfficeInterop.getParentTerm
+                (name)
+                (StoreParentOntologyFromOfficeInterop >> TermSearch)
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
+        currentState, cmd
 
         
 let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchState) : TermSearchState * Cmd<Msg> =
@@ -368,13 +413,15 @@ let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> 
             }
         nextState, Cmd.none
 
-    | LogTableMetadata ->
-        currentState,
-        Cmd.OfPromise.either
-            OfficeInterop.getTableMetaData
-            ()
-            (SyncContext >> ExcelInterop)
-            (GenericError >> Dev)
+    | LogTableMetadata activeTableNameRes ->
+        let cmd name =
+            Cmd.OfPromise.either
+                OfficeInterop.getTableMetaData
+                (name)
+                ((fun msg -> SyncContext (activeTableNameRes,msg)) >> ExcelInterop)
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
+        currentState, cmd
 
 let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Msg> =
 
@@ -938,7 +985,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextCmd =
             match pageOpt with
             | Some Routing.Route.Validation ->
-                GetTableRepresentation |> ExcelInterop |> Cmd.ofMsg
+                PipeActiveAnnotationTable GetTableRepresentation |> ExcelInterop |> Cmd.ofMsg
             | _ ->
                 Cmd.none
         let nextPageState =

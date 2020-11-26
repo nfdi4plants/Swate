@@ -260,7 +260,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         //OnBlur  (fun e -> alert "focusin")
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
-                            GetParentTerm |> ExcelInterop |> dispatch
+                            PipeActiveAnnotationTable GetParentTerm |> ExcelInterop |> dispatch
                             let el = Browser.Dom.document.getElementById "TermSearchInput"
                             el.focus()
                         )

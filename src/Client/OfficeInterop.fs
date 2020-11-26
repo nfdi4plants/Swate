@@ -96,52 +96,41 @@ let parseColHeader (headerStr:string) =
         TagArr      = parseBrackets headerStr
     }
 
+type TryFindAnnoTableResult =
+| Success of string
+| Error of string 
+
+let exactlyOneAnnotationTable (annoTables:string [])=
+    match annoTables.Length with
+    | x when x < 1 ->
+        Error "Could not find annotationTable in active worksheet. Please create one before trying to execute this function."
+    | x when x > 1 ->
+        Error "The active worksheet contains more than one annotationTable. Please move one of them to another worksheet."
+    | 1 ->
+        annoTables |> Array.exactlyOne |> Success
+    | _ -> Error "Could not process message. Swate was not able to identify the given annotation tables with a known case."
+
 let exampleExcelFunction () =
     Excel.run(fun context ->
-    let sheet = context.workbook.worksheets.getActiveWorksheet()
-    let annotationTable = sheet.tables.getItem("annotationTable")
-    let annoHeaderRange = annotationTable.getHeaderRowRange()
-    let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
-    context.sync().``then``(
-        fun _ ->
-            let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-            let baseColRepresentation =
-                headerVals
-                |> Array.choose id
-                |> Array.map string
-                |> Array.map (fun header -> ColumnRepresentation.init(header=header))
-            let addTagArr (colRepArr:ColumnRepresentation []) =
-                colRepArr
-                |> Array.map (fun col ->
-                    let parseHeader = parseColHeader col.Header
-                    let tagArr =
-                        match parseHeader.TagArr with
-                        | Some strArr ->
-                            // hidden columns are not meant to be represented
-                            strArr 
-                        | None ->
-                            [||]
-                    {col with TagArray = tagArr}
-                )
-            let addParentOntOption (colRepArr:ColumnRepresentation []) =
-                colRepArr
-                |> Array.map (fun col ->
-                    let poOpt = col.TagArray |> Array.tryFind (fun tag -> tag.StartsWith "#" |> not)
-                    match poOpt with
-                    | Some parentOntology ->
-                        {col with ParentOntology = Some parentOntology}
-                    | None ->
-                        {col with ParentOntology = None}
-                )
-            let filterOutHiddenCols (colRepArr:ColumnRepresentation []) =
-                colRepArr
-                |> Array.filter (fun x -> x.TagArray |> ((Array.contains "#h") >> not)  )
-            let colReps =
-                baseColRepresentation
-                |> addTagArr
-                |> addParentOntOption
-                |> filterOutHiddenCols
-            sprintf "Test: %A" colReps
+        let tableCol = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let tables = tableCol.load(propertyNames = U2.Case1 "name")
+        let activeSheet = context.workbook.worksheets.getActiveWorksheet()
+        let t = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
+        let activeTables = t.tables.load(propertyNames=U2.Case1 "items")
+        context.sync()
+            .``then``( fun _ ->
+                let tableNames =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+                let annoTables =
+                    activeTables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+                    |> Array.filter (fun x -> x.StartsWith "annotationTable")
+                let activeAnnoTable =
+                    exactlyOneAnnotationTable annoTables
+                sprintf "%A || %A" tableNames activeAnnoTable
         )
     )
 
@@ -178,15 +167,24 @@ let createValueMatrix (colCount:int) (rowCount:int) value =
             ResizeArray(tmp)
     ])
 
-let createAnnotationTable (isDark:bool) =
+let createAnnotationTable ((allTableNames:String []),isDark:bool) =
     Excel.run(fun context ->
         let tableRange = context.workbook.getSelectedRange()
         let sheet = context.workbook.worksheets.getActiveWorksheet()
-        //delete table with the same name if present because there can only be one chosen one <3
-        sheet.tables.getItemOrNullObject("annotationTable").delete()
+
+        let rec findNewTableName ind =
+            let newTestName =
+                if ind = 0 then "annotationTable" else sprintf "annotationTable%i" ind
+            let existsAlready = allTableNames |> Array.exists (fun x -> x = newTestName)
+            if existsAlready then
+                findNewTableName (ind+1)
+            else
+                newTestName
+
+        let newName = findNewTableName 0
 
         let annotationTable = sheet.tables.add(U2.Case1 tableRange,true)
-        annotationTable.name <- "annotationTable"
+        annotationTable.name <- newName
 
         tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount";"address"]))) |> ignore
         annotationTable.load(U2.Case1 "style") |> ignore
@@ -209,16 +207,64 @@ let createAnnotationTable (isDark:bool) =
                 sheet.getUsedRange().format.autofitColumns()
                 sheet.getUsedRange().format.autofitRows()
 
-                sprintf "Annotation Table created in [%s] with dimensions %.0f c x (%.0f + 1h)r" tableRange.address tableRange.columnCount (tableRange.rowCount - 1.)
+                Success newName ,sprintf "Annotation Table created in [%s] with dimensions %.0f c x (%.0f + 1h)r" tableRange.address tableRange.columnCount (tableRange.rowCount - 1.)
 
             )
             //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
     )
 
-let autoFitTable () =
+let tryFindActiveAnnotationTable() =
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem("annotationTable")
+        let t = sheet.load(U2.Case2 (ResizeArray[|"tables"|]))
+        let tableItems = t.tables.load(propertyNames=U2.Case1 "items")
+        context.sync()
+            .``then``( fun _ ->
+                let annoTables =
+                    tableItems.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+                    |> Array.filter (fun x -> x.StartsWith "annotationTable")
+                exactlyOneAnnotationTable annoTables
+        )
+    )
+
+/// This function returns the names of all tables in all worksheets, plus a string option of the annotationTable in the active worksheet
+let getTableInfoForAnnoTableCreation() =
+    Excel.run(fun context ->
+        let tableCol = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let tables = tableCol.load(propertyNames = U2.Case1 "name")
+        let activeSheet = context.workbook.worksheets.getActiveWorksheet()
+        let t = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
+        let activeTables = t.tables.load(propertyNames=U2.Case1 "items")
+        context.sync()
+            .``then``( fun _ ->
+                let tableNames =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+                let annoTables =
+                    activeTables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+                    |> Array.filter (fun x -> x.StartsWith "annotationTable")
+                // fail the function if there are not exactly 0 annotation tables in the active worksheet
+                let _ =
+                    match annoTables.Length with
+                    | x when x > 0 ->
+                        failwith "The active worksheet contains more than zero annotationTables. Please move them to other worksheets."
+                    | 0 ->
+                        annoTables
+                    | _ ->
+                        failwith "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers."
+                tableNames
+        )
+    )
+
+let autoFitTable (annotationTable) =
+    Excel.run(fun context ->
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let annotationTable = sheet.tables.getItem(annotationTable)
         let allCols = annotationTable.columns.load(propertyNames = U2.Case1 "items")
     
         let annoHeaderRange = annotationTable.getHeaderRowRange()
@@ -252,10 +298,10 @@ let autoFitTable () =
             )
     )
 
-let getTableRepresentation() =
+let getTableRepresentation(annotationTable) =
     Excel.run(fun context ->
     let sheet = context.workbook.worksheets.getActiveWorksheet()
-    let annotationTable = sheet.tables.getItem("annotationTable")
+    let annotationTable = sheet.tables.getItem(annotationTable)
     let annoHeaderRange = annotationTable.getHeaderRowRange()
     let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
     context.sync().``then``(
@@ -286,18 +332,7 @@ let getTableRepresentation() =
         )
     )
 
-let checkIfAnnotationTableIsPresent () =
-    Excel.run(fun context ->
-        let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let t = sheet.load(U2.Case1 "tables")
-        let table = t.tables.getItemOrNullObject("annotationTable")
-        context.sync()
-            .``then``( fun _ ->
-                not table.isNullObject
-        )
-    )
-
-let addThreeAnnotationColumns (colName:string) =
+let addThreeAnnotationColumns (annotationTable,colName:string) =
 
     let mainColName (parsedColHeader:ColHeader) (id:int) =
         match id with
@@ -318,7 +353,7 @@ let addThreeAnnotationColumns (colName:string) =
             (sprintf "[%s] (#%i; #h)" coreName id)
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem("annotationTable")
+        let annotationTable = sheet.tables.getItem(annotationTable)
 
         /// This is necessary to place new columns next to selected col
         let tables = annotationTable.columns.load(propertyNames = U2.Case1 "items")
@@ -433,10 +468,10 @@ let addThreeAnnotationColumns (colName:string) =
         )
     )
 
-let changeTableColumnFormat (colName:string) (format:string) =
+let changeTableColumnFormat annotationTable (colName:string) (format:string) =
     Excel.run(fun context ->
        let sheet = context.workbook.worksheets.getActiveWorksheet()
-       let annotationTable = sheet.tables.getItem("annotationTable")
+       let annotationTable = sheet.tables.getItem(annotationTable)
 
        let colBodyRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
        colBodyRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"]))) |> ignore
@@ -452,10 +487,10 @@ let changeTableColumnFormat (colName:string) (format:string) =
        )
     )
 
-let fillValue (v,fillTerm:Shared.DbDomain.Term option) =
+let fillValue (annotationTable,v,fillTerm:Shared.DbDomain.Term option) =
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem("annotationTable")
+        let annotationTable = sheet.tables.getItem(annotationTable)
         //let annoRange = annotationTable.getDataBodyRange()
         //let _ = annoRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
         let range = context.workbook.getSelectedRange()
@@ -499,10 +534,10 @@ let fillValue (v,fillTerm:Shared.DbDomain.Term option) =
         )
     )
 
-let getTableMetaData () =
+let getTableMetaData (annotationTable) =
     Excel.run (fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem("annotationTable")
+        let annotationTable = sheet.tables.getItem(annotationTable)
         annotationTable.columns.load(propertyNames = U2.Case1 "count") |> ignore
         annotationTable.rows.load(propertyNames = U2.Case1 "count")    |> ignore
         let rowRange = annotationTable.getRange()
@@ -528,10 +563,10 @@ let getTableMetaData () =
     )
 
 // Reform this to onSelectionChanged
-let getParentTerm () =
+let getParentTerm (annotationTable) =
     Excel.run (fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem("annotationTable")
+        let annotationTable = sheet.tables.getItem(annotationTable)
         let tables = annotationTable.columns.load(propertyNames = U2.Case1 "items")
         let annoHeaderRange = annotationTable.getHeaderRowRange()
         let range = context.workbook.getSelectedRange()
