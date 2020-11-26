@@ -6,6 +6,9 @@ module URLs =
     let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
 
     [<LiteralAttribute>]
+    let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
+
+    [<LiteralAttribute>]
     let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate#swate"
 
     [<LiteralAttribute>]

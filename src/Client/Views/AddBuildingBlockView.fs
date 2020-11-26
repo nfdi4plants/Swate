@@ -75,8 +75,10 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Msg -> unit) =
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ 
             str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString))
         ]
-        Text.p [] [
-            model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toLongExplanation |> str
+        Text.p [Props [Style [TextAlign TextAlignOptions.Justify]]][
+            span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toLongExplanation |> str]
+            span [] [str " You can find more information on our "]
+            a [Href Shared.URLs.AnnotationPrinciplesUrl; Target "_blank"][str "website"]
         ]
     ]
 
