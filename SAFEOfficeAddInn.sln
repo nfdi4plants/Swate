@@ -72,6 +72,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E0FF3176-0B7
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Shared", "src\Shared\Shared.fsproj", "{E97808D3-5B49-47FB-8818-48AAA053C8AA}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ISSUE_TEMPLATE", "ISSUE_TEMPLATE", "{54B2B950-6393-4086-8AF4-3D211495433C}"
+	ProjectSection(SolutionItems) = preProject
+		.github\ISSUE_TEMPLATE\bug_report.md = .github\ISSUE_TEMPLATE\bug_report.md
+		.github\ISSUE_TEMPLATE\config.yml = .github\ISSUE_TEMPLATE\config.yml
+		.github\ISSUE_TEMPLATE\feature_request.md = .github\ISSUE_TEMPLATE\feature_request.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -99,6 +106,7 @@ Global
 		{C43438E1-AEFF-42AC-8654-BDDDE750DA30} = {DB2C5A73-BF7F-45D5-AEC8-D36539C5C019}
 		{77E06322-256F-4517-B342-C52C80FC5E0D} = {DB2C5A73-BF7F-45D5-AEC8-D36539C5C019}
 		{E97808D3-5B49-47FB-8818-48AAA053C8AA} = {E0FF3176-0B77-4662-A2A8-7233E5E59981}
+		{54B2B950-6393-4086-8AF4-3D211495433C} = {08CCFCF6-2248-43ED-A6EF-E972A2DA0E6A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7A0AA30E-4CD9-4359-9513-BA68E2E85245}
