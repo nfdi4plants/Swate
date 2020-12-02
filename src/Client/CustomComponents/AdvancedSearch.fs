@@ -295,63 +295,56 @@ let advancedSearchModal (model:Model) (id:string) (dispatch: Msg -> unit) (resul
                         Level.item [][
                             Level.level [Level.Level.Props [Style [Width "100%"]]][
                                 Level.item [][
-                                    Control.p [] [
-                                        Button.button   [   
-                                                            Button.CustomClass "is-danger"
-                                                            Button.IsFullWidth
-                                                            Button.OnClick (fun _ -> ResetAdvancedSearchOptions |> AdvancedSearch |> dispatch)
-
-                                                        ] [
-                                            str "Reset"
-                                        ]
+                                    Button.button   [   
+                                        Button.CustomClass "is-danger"
+                                        Button.IsFullWidth
+                                        Button.OnClick (fun _ -> ResetAdvancedSearchOptions |> AdvancedSearch |> dispatch)
+                                    ] [
+                                        str "Reset"
                                     ]
                                 ]
                                 Level.item [][
-                                    Control.p [Control.IsExpanded] [
-                                        Button.button   [   
-                                                            Button.CustomClass "is-danger"
-                                                            Button.IsFullWidth
-                                                            Button.OnClick (fun _ -> ResetAdvancedSearchState |> AdvancedSearch |> dispatch)
+                                    Button.button [   
+                                        Button.CustomClass "is-danger"
+                                        Button.IsFullWidth
+                                        Button.OnClick (fun _ -> ResetAdvancedSearchState |> AdvancedSearch |> dispatch)
 
-                                                        ] [
-                                            str "Cancel"
-                                        ]
+                                    ] [
+                                        str "Cancel"
                                     ]
                                 ]
                             ]
                         ]
                         Level.item [][
-                            Control.p [] [
-                                if (model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.Results |> not) then
-                                    Button.button   [
-                                        let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
-                                        if isValid then
-                                            Button.CustomClass "is-success"
-                                            Button.IsActive true
-                                        else
-                                            Button.CustomClass "is-danger"
-                                            Button.Props [Disabled (not isValid)]
-                                        Button.IsFullWidth
-                                        Button.OnClick (fun _ -> StartAdvancedSearch |> AdvancedSearch |> dispatch)
-                                    ] [ str "Start advanced search"]
-                                else
-                                    Button.button   [
-                                        let hasText = model.AdvancedSearchState.SelectedResult.IsSome
-                                        if hasText then
-                                            Button.CustomClass "is-success"
-                                            Button.IsActive true
-                                        else
-                                            Button.CustomClass "is-danger"
-                                            Button.Props [Disabled true]
-                                        Button.IsFullWidth
-                                        Button.OnClick (fun _ ->
-                                            ResetAdvancedSearchState |> AdvancedSearch |> dispatch;
-                                            model.AdvancedSearchState.SelectedResult.Value |> resultHandler |> dispatch)
-                                    ] [
-                                        str "Confirm"
-                                
-                                    ]
-                        ]
+                            if (model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.Results |> not) then
+                                Button.button   [
+                                    let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                    if isValid then
+                                        Button.CustomClass "is-success"
+                                        Button.IsActive true
+                                    else
+                                        Button.CustomClass "is-danger"
+                                        Button.Props [Disabled (not isValid)]
+                                    Button.IsFullWidth
+                                    Button.OnClick (fun _ -> StartAdvancedSearch |> AdvancedSearch |> dispatch)
+                                ] [ str "Start advanced search"]
+                            else
+                                Button.button   [
+                                    let hasText = model.AdvancedSearchState.SelectedResult.IsSome
+                                    if hasText then
+                                        Button.CustomClass "is-success"
+                                        Button.IsActive true
+                                    else
+                                        Button.CustomClass "is-danger"
+                                        Button.Props [Disabled true]
+                                    Button.IsFullWidth
+                                    Button.OnClick (fun _ ->
+                                        ResetAdvancedSearchState |> AdvancedSearch |> dispatch;
+                                        model.AdvancedSearchState.SelectedResult.Value |> resultHandler |> dispatch)
+                                ] [
+                                    str "Confirm"
+                            
+                                ]
                         ]
                     ]
                 ]
