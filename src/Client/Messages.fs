@@ -55,7 +55,7 @@ type AdvancedSearchMsg =
     | ToggleModal                       of string
     | ToggleOntologyDropdown
     | UpdateAdvancedTermSearchOptions   of AdvancedTermSearchOptions
-    | OntologySuggestionUsed            of DbDomain.Ontology
+    | OntologySuggestionUsed            of DbDomain.Ontology option
     | ChangePageinationIndex            of int
     // Server
     /// Main function. Forward request to Request Api -> Server.

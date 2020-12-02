@@ -431,7 +431,7 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
 
         let nextAdvancedSearchOptions = {
             currentState.AdvancedSearchOptions with
-                Ontology = Some suggestion
+                Ontology = suggestion
         }
 
         let nextState = {

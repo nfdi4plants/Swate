@@ -21,12 +21,12 @@ let isValidAdancedSearchOptions (opt:AdvancedTermSearchOptions) =
             ) > 0)
             || opt.Ontology.IsSome
 
-let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ont: DbDomain.Ontology)  =
+let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: DbDomain.Ontology option)  =
     Dropdown.Item.a [
         Dropdown.Item.Props [
             TabIndex 0
-            OnClick (fun _ -> ont |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
-            OnKeyDown (fun k -> if k.key = "Enter" then ont |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
+            OnClick (fun _ -> ontOpt |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
+            OnKeyDown (fun k -> if k.key = "Enter" then ontOpt |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
             colorControl model.SiteStyleState.ColorMode
         ]
 
@@ -34,14 +34,19 @@ let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ont: DbDoma
         Text.span [
             CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
             Props [
-                Tooltip.dataTooltip (ont.Definition)
+                if ontOpt.IsSome then Tooltip.dataTooltip (ontOpt.Value.Definition)
                 Style [PaddingRight "10px"]
             ]
         ] [
             Fa.i [Fa.Solid.InfoCircle] []
         ]
         
-        Text.span [] [ont.Name |> str]
+        Text.span [] [
+            if ontOpt.IsSome then
+                ontOpt.Value.Name |> str
+            else
+                "No Ontology" |> str
+        ]
     ]
 
 let createAdvancedTermSearchResultRows (model:Model) (dispatch: Msg -> unit) (suggestionUsedHandler: DbDomain.Term -> Msg) =
@@ -96,11 +101,16 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                         ]
                     ]
                     Dropdown.menu [Props[colorControl model.SiteStyleState.ColorMode];] [
-                        Dropdown.content [] (
-                            model.PersistentStorageState.SearchableOntologies
-                            |> Array.map snd
-                            |> Array.toList
-                            |> List.map (createOntologyDropdownItem model dispatch))
+                        Dropdown.content [] [
+                            // all ontologies found in database
+                            yield createOntologyDropdownItem model dispatch None
+                            yield! (
+                                model.PersistentStorageState.SearchableOntologies
+                                |> Array.map snd
+                                |> Array.toList
+                                |> List.map (fun ont -> createOntologyDropdownItem model dispatch (Some ont))
+                            )
+                        ]
                     ]
                 ]
             ]
