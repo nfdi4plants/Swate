@@ -276,13 +276,13 @@ type ReleaseNotesDescriptors =
 let createNewSemVer (semVerReleaseType:SemVerRelease) (newestCommitHash:string) (previousSemVer:SemVerInfo)=
     match semVerReleaseType with
     | Major ->
-        sprintf "%i.0.0+%s" (previousSemVer.Major+1u) newestCommitHash.[1..]
+        sprintf "%i.0.0+%s" (previousSemVer.Major+1u) newestCommitHash
     | Minor ->
-        sprintf "%i.%i.0+%s" (previousSemVer.Major) (previousSemVer.Minor+1u) newestCommitHash.[1..]
+        sprintf "%i.%i.0+%s" (previousSemVer.Major) (previousSemVer.Minor+1u) newestCommitHash
     | Patch ->
-        sprintf "%i.%i.%i+%s" (previousSemVer.Major) (previousSemVer.Minor) (previousSemVer.Patch+1u) newestCommitHash.[1..]
+        sprintf "%i.%i.%i+%s" (previousSemVer.Major) (previousSemVer.Minor) (previousSemVer.Patch+1u) newestCommitHash
     | WIP ->
-        sprintf "%i.%i.%i+%s" (previousSemVer.Major) (previousSemVer.Minor) (previousSemVer.Patch) newestCommitHash.[1..]
+        sprintf "%i.%i.%i+%s" (previousSemVer.Major) (previousSemVer.Minor) (previousSemVer.Patch) newestCommitHash
 
 // This is later used to try and sort the commit messages to the three fields additions, bugs and deletions.
 let rec sortCommitsByKeyWords (all:string list) (additions:string list) (deletions:string list) (bugs:string list) =
@@ -357,17 +357,23 @@ Target.create "Release" (fun config ->
             |> List.tryFind (fun x -> x.StartsWith "semver:")
         match opt with
         | Some "semver:major"| Some "semver:Major" ->
+            Trace.trace "Increase major for next release notes."
             Major
         | Some "semver:minor"| Some "semver:Minor" ->
+            Trace.trace "Increase minor for next release notes."
             Minor
         | Some "semver:Patch"| Some "semver:patch" ->
+            Trace.trace "Increase patch for next release notes."
             Patch
         | Some "semver:wip"| Some "semver:WIP" ->
+            Trace.trace "Add new commits to current release."
             WIP
         | Some x ->
             Trace.traceError (sprintf "Unrecognized argument: \"%s\". Default to \"semver:wip\"." x)
             WIP
-        | None -> WIP
+        | None ->
+            Trace.trace "Add new commits to current release."
+            WIP
 
     let nOfLastCommitsToCheck =
         let opt =
@@ -384,7 +390,9 @@ Target.create "Release" (fun config ->
     // This should be in release.SemVer.MetaData
     let (tryFindPreviousReleaseCommitHash: string option) =
         release.Notes
-        |> List.tryFind (fun x -> x.TrimStart([|' ';'*'|]).StartsWith "#")
+        |> List.tryFind (fun x -> x.TrimStart([|' ';'*'|]).StartsWith "latest commit #")
+        |> fun x ->
+            if x.IsSome then x.Value.Replace("latest commit ","") |> Some else None
 
     if tryFindPreviousReleaseCommitHash.IsSome then
         Trace.trace (sprintf "Found PreviousCommit: %s" tryFindPreviousReleaseCommitHash.Value)
@@ -449,7 +457,7 @@ Target.create "Release" (fun config ->
                     // Additions will not need to be checked, as in the current version the latest commit hash needs to be th first entry here.
                     "* Additions:"
                     // REMOVE this line as soon as parsing of semver metadata is fixed.
-                    sprintf "    * %s" latestCommitHash
+                    sprintf "    * latest commit %s" latestCommitHash
                     yield! additions
                     if List.isEmpty deletions |> not then
                         "* Deletions:"
@@ -501,14 +509,15 @@ Target.create "Release" (fun config ->
 
     Trace.trace "Update Version.fs"
 
+    let newRelease = ReleaseNotes.load "RELEASE_NOTES.md"
+
     let releaseDate =
-        if release.Date.IsSome then release.Date.Value.ToShortDateString() else "WIP"
+        if newRelease.Date.IsSome then newRelease.Date.Value.ToShortDateString() else "WIP"
 
     Fake.DotNet.AssemblyInfoFile.createFSharp  "src/Server/Version.fs"
         [   Fake.DotNet.AssemblyInfo.Title "SWATE"
-            Fake.DotNet.AssemblyInfo.Version release.AssemblyVersion
+            Fake.DotNet.AssemblyInfo.Version newRelease.AssemblyVersion
             Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
-            //Fake.DotNet.AssemblyInfo.FileVersion release.AssemblyVersion
         ]
 
     Trace.trace "Update Version.fs done!"

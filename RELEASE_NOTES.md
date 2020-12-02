@@ -1,3 +1,11 @@
+### 0.1.3+5abee29 (Released 2020-12-2)
+* Additions:
+    * latest commit #5abee29
+    * [[#13f3639](https://github.com/nfdi4plants/Swate/commit/13f3639c7181292ccc3764e2b31d5ae91f1f4dcf)] Create issue templates
+    * [[#5abee29](https://github.com/nfdi4plants/Swate/commit/5abee298f349005b609ebc21eaf70a0e76e5c5d8)] Add Unit Column when selecting a unit for a term (Issue #48).
+    * [[#5abee29](https://github.com/nfdi4plants/Swate/commit/5abee298f349005b609ebc21eaf70a0e76e5c5d8)] Add option to fill hidden cols according to main column (Issue #67).
+    * [[#5abee29](https://github.com/nfdi4plants/Swate/commit/5abee298f349005b609ebc21eaf70a0e76e5c5d8)] Add input assist to delete hidden col cells onChange of main col (Issue #68).
+
 ### 0.1.2+af67a92 (Released 2020-11-26)
 * Additions:
     * latest commit #af67a92
