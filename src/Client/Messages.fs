@@ -1,22 +1,25 @@
 module Messages
 
-open Shared
-open ExcelColors
-open OfficeInterop
-open Model
 open Elmish
 open Thoth.Elmish
 
+open Shared
+
+open ExcelColors
+open OfficeInterop
+open OfficeInterop.Types.SwateInteropTypes
+open Model
+
 type ExcelInteropMsg =
     | PipeActiveAnnotationTable     of (TryFindAnnoTableResult -> ExcelInteropMsg)
-    /// This is used to pipe (all table names * active annotation table option) to 'CreateAnnotationTable'. This is necessary to generate a new annotation table name.
+    /// This is used to pipe (all table names []) to a ExcelInteropMsg.
+    /// This is used to generate a new annotation table name.
     | PipeCreateAnnotationTableInfo of (string [] -> ExcelInteropMsg)
     | Initialized                   of (string*string)
     | SyncContext                   of activeAnnotationTable:TryFindAnnoTableResult*string
     | InSync                        of string
-    | TryExcel
     | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
-    | AddColumn                     of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string
+    | AddColumn                     of activeAnnotationTable:TryFindAnnoTableResult * colname:string * format:(string*string option) option
     | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
     | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
@@ -25,6 +28,17 @@ type ExcelInteropMsg =
     | GetParentTerm                 of activeAnnotationTable:TryFindAnnoTableResult
     | AutoFitTable                  of activeAnnotationTable:TryFindAnnoTableResult
     | GetTableRepresentation        of activeAnnotationTable:TryFindAnnoTableResult
+    //
+    | ToggleEventHandler
+    | UpdateTablesHaveAutoEditHandler
+    //
+    | FillHiddenColsRequest         of activeAnnotationTable:TryFindAnnoTableResult
+    | FillHiddenColumns             of tableName:string*InsertTerm []
+    | UpdateFillHiddenColsState     of FillHiddenColsState
+    // Development
+    | TryExcel
+    | TryExcel2
+    //| ExcelSubscriptionMsg          of OfficeInterop.Types.Subscription.Msg
 
 type TermSearchMsg =
     | ToggleSearchByParentOntology
@@ -61,6 +75,10 @@ type ApiRequestMsg =
     | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
     | FetchAllOntologies
+    /// This function is used to search for all values found in the table main columns.
+    /// InsertTerm [] is created by officeInterop and passed to server for db search.
+    | SearchForInsertTermsRequest              of tableName:string*InsertTerm []
+    //
     | GetAppVersion
 
 type ApiResponseMsg =
@@ -69,6 +87,8 @@ type ApiResponseMsg =
     | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
     | UnitTermSuggestionResponse                of DbDomain.Term []
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
+    | SearchForInsertTermsResponse              of tableName:string*InsertTerm []  
+    //
     | GetAppVersionResponse                     of string
 
 type ApiMsg =
@@ -98,7 +118,7 @@ type AddBuildingBlockMsg =
     | NewBuildingBlockNameSuggestions   of DbDomain.Term []
 
     | SearchUnitTermTextChange  of string
-    | UnitTermSuggestionUsed    of string
+    | UnitTermSuggestionUsed    of unitName:string*unitAccession:string
     | NewUnitTermSuggestions    of DbDomain.Term []
     | ToggleBuildingBlockHasUnit
 
@@ -109,7 +129,7 @@ type ValidationMsg =
     | UpdateValidationFormat of (ValidationFormat*ValidationFormat)
 
     // OfficeInterop
-    | StoreTableRepresentationFromOfficeInterop of msg:string * OfficeInterop.ColumnRepresentation []
+    | StoreTableRepresentationFromOfficeInterop of msg:string * OfficeInterop.Types.SwateInteropTypes.ColumnRepresentation []
 
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
@@ -125,6 +145,7 @@ type Msg =
     | AddBuildingBlock      of AddBuildingBlockMsg
     | Validation            of ValidationMsg
     | UpdatePageState       of Routing.Route option
+    | Batch                 of seq<Msg>
     | DoNothing
 
 /// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1) other params.

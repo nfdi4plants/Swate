@@ -87,10 +87,10 @@ with
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
         OnInputChangeMsg        = (SearchUnitTermTextChange >> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> sugg.Name |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> (sugg.Name,sugg.Accession) |> UnitTermSuggestionUsed |> AddBuildingBlock)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> sugg.Name |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg.Name,sugg.Accession) |> UnitTermSuggestionUsed |> AddBuildingBlock)
     }
 
     static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {

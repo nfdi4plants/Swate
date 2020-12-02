@@ -19,6 +19,22 @@ let activityLogComponent (model:Model) dispatch =
         ][
             str "Back to Term Search"
         ]
+        //Button.button [
+        //    Button.Color Color.IsInfo
+        //    Button.IsFullWidth
+        //    Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
+        //    Button.Props [Style [MarginBottom "1rem"]]
+        //] [
+        //    str "Try Excel"
+        //]
+        //Button.button [
+        //    Button.Color Color.IsInfo
+        //    Button.IsFullWidth
+        //    Button.OnClick (fun e -> TryExcel2 |> ExcelInterop |> dispatch )
+        //    Button.Props [Style [MarginBottom "1rem"]]
+        //] [
+        //    str "Try Excel2"
+        //]
         Help.help [][str "This page is used for development/debugging."]
         Table.table [
             Table.IsFullWidth

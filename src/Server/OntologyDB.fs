@@ -152,6 +152,7 @@ let getUnitTermSuggestions cString (query:string) =
     
     use connection = establishConnection cString
     connection.Open()
+
     use getTermSuggestionsCmd = new MySqlCommand("getUnitTermSuggestions",connection)
     getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
 
@@ -175,6 +176,42 @@ let getUnitTermSuggestions cString (query:string) =
                         Some (reader.GetString(5)))
                     (reader.GetBoolean(6))
     |]
+
+let getTermByName cString (query:InsertTerm) =
+    
+    use connection = establishConnection cString
+    connection.Open()
+
+    use getTermByNameCmd = new MySqlCommand("getUnitTermSuggestions",connection)
+    getTermByNameCmd
+        .CommandText <- """
+            SELECT * FROM Term WHERE Term.Name = @name
+        """
+
+    let queryParam = getTermByNameCmd.Parameters.Add("name",MySqlDbType.VarChar)
+
+    queryParam.Value    <- query.SearchString
+
+    use reader = getTermByNameCmd.ExecuteReader()
+    let termOpt =
+        match reader.Read() with
+        | true ->
+            DbDomain.createTerm
+                (reader.GetInt64(0))
+                (reader.GetString(1))
+                (reader.GetInt64(2))
+                (reader.GetString(3))
+                (reader.GetString(4))
+                (if (reader.IsDBNull(5)) then
+                    None
+                else
+                    Some (reader.GetString(5)))
+                (reader.GetBoolean(6))
+            |> Some
+        | false ->
+            None
+    {query with TermOpt = termOpt}
+
 
 
 let getAllOntologies cString () =

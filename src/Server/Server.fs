@@ -109,6 +109,12 @@ let annotatorApi cString = {
                 
                 |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
         }
+
+    getTermsByNames = fun (queryArr) ->
+        async {
+            let result = queryArr |> Array.map (OntologyDB.getTermByName cString)
+            return result
+        }
 }
 
 let testWebApp =

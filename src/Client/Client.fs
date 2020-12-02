@@ -30,8 +30,8 @@ module Server =
       |> Remoting.buildProxy<IAnnotatorAPIv1>
 
 let initializeAddIn () =
-    OfficeInterop.Office.onReady()
-   
+    OfficeInterop.Types.Office.onReady()
+
 
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
@@ -127,9 +127,8 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     //                ]
     //            ] 
-        //    ]
-        //]
-
+    //    ]
+    //]
 
 #if DEBUG
 open Elmish.Debug

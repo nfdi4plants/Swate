@@ -1,23 +1,25 @@
 module Update
 
+open Elmish
+open Elmish.Navigation
+open Thoth.Elmish
+open System.Text.RegularExpressions
+
 open Shared
 open Routing
 open Model
 open Messages
-open Elmish
-open Elmish.Navigation
-open Thoth.Elmish
-
-open System.Text.RegularExpressions
+open OfficeInterop
+open OfficeInterop.Types.SwateInteropTypes
 
 /// This function matches a OfficeInterop.TryFindAnnoTableResult to either Success or Error
 /// If Success it will pipe the tableName on to the msg input paramter.
 /// If Error it will pipe the error message to GenericLog ("Error",errorMsg).
 let matchActiveTableResToMsg activeTableNameRes (msg:string -> Cmd<Msg>) =
     match activeTableNameRes with
-    | OfficeInterop.Success tableName ->
+    | Success tableName ->
         msg tableName
-    | OfficeInterop.Error eMsg ->
+    | Error eMsg ->
         GenericLog ("Error",eMsg) |> Dev |> Cmd.ofMsg
 
 let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
@@ -108,6 +110,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ()
                     (AnnotationTableExists >> ExcelInterop)
                     (GenericError >> Dev)
+                Cmd.ofMsg (ToggleEventHandler |> ExcelInterop)
                 Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
             ]
 
@@ -132,7 +135,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
     | AnnotationTableExists annoTableOpt ->
         let exists =
             match annoTableOpt with
-            | OfficeInterop.Success name -> true
+            | Success name -> true
             | _ -> false
         let nextState = {
             currentState with
@@ -146,14 +149,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         ("Info",passthroughMessage)
         |> (GenericLog >> Dev)
         |> Cmd.ofMsg
-
-    | TryExcel ->
-        currentState,
-        Cmd.OfPromise.either
-            OfficeInterop.exampleExcelFunction 
-            ()
-            ((fun x -> ("Debug",x) |> GenericLog) >> Dev)
-            (GenericError >> Dev)
 
     | FillSelection (activeTableNameRes,fillValue,fillTerm) ->
         let cmd name =
@@ -169,9 +164,9 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd name=
             Cmd.OfPromise.either
                 //OfficeInterop.addAnnotationColumn
-                OfficeInterop.addThreeAnnotationColumns  
-                (name,colName)
-                (fun (newColName,msg) ->
+                OfficeInterop.addAnnotationBlock  
+                (name,colName,format)
+                (fun (newColName,format,msg) ->
                     FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
                 )
                 (GenericError >> Dev)
@@ -217,6 +212,106 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
+    | ToggleEventHandler ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.toggleAdaptHiddenColsEventHandler
+                ()
+                (fun msg ->
+                    let msg' = msg |> String.concat ", "
+                    Msg.Batch [
+                        GenericLog ("Info",msg') |> Dev
+                        UpdateTablesHaveAutoEditHandler |> ExcelInterop
+                    ]
+                )
+                (GenericError >> Dev)
+        currentState, cmd
+    | UpdateTablesHaveAutoEditHandler ->
+        let nextState = {
+            currentState with
+                TablesHaveAutoEditHandler = not OfficeInterop.EventHandlers.EventHandlerStates.adaptHiddenColsHandlerList.IsEmpty
+        }
+        nextState, Cmd.none
+    //
+    | FillHiddenColsRequest activeTableNameRes ->
+        let cmd name =
+            Cmd.OfPromise.either
+                OfficeInterop.getInsertTermsToFillHiddenCols 
+                (name)
+                (SearchForInsertTermsRequest >> Request >> Api)
+                (fun e ->
+                    Msg.Batch [
+                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+                        GenericError e |> Dev
+                    ] )
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
+        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> ExcelInterop |> Cmd.ofMsg
+        let cmds = Cmd.batch [cmd; cmd2]
+        currentState, cmds
+
+    | FillHiddenColumns (tableName,insertTerms) ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.fillHiddenColsByInsertTerm
+                (tableName,insertTerms)
+                (fun msg ->
+                    Msg.Batch [
+                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+                        GenericLog ("info",msg) |> Dev
+                    ]
+                )
+                (fun e ->
+                    Msg.Batch [
+                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+                        GenericError e |> Dev
+                    ] )
+        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelWriteFoundTerms |> ExcelInterop |> Cmd.ofMsg
+        let cmds = Cmd.batch [cmd; cmd2]
+        currentState, cmds
+
+
+    | UpdateFillHiddenColsState newState ->
+        let nextState = {
+            currentState with
+                FillHiddenColsStateStore = newState
+        }
+        nextState, Cmd.none
+    //
+
+
+    | TryExcel ->
+        let nextState = currentState
+        let cmd = 
+            Cmd.OfPromise.either
+                OfficeInterop.exampleExcelFunction 
+                ()
+                ((fun x -> 
+                    ("Debug",x) |> GenericLog) >> Dev
+                )
+                (GenericError >> Dev)
+        nextState, cmd
+    | TryExcel2 ->
+        let nextState = currentState
+        let cmd = 
+            Cmd.OfPromise.either
+                OfficeInterop.exampleExcelFunction2 
+                ()
+                ((fun x -> 
+                    ("Debug",x) |> GenericLog) >> Dev
+                )
+                (GenericError >> Dev)
+        nextState, cmd
+    //| _ ->
+    //    printfn "Hit currently non existing message"
+    //    currentState, Cmd.none
+
+    //| ExcelSubscriptionMsg msg ->
+    //    let m,cmd = OfficeInterop.Types.Subscription.update msg currentState.SubscriptionState
+    //    let nextState = {
+    //        currentState with
+    //            SubscriptionState = m
+    //    }
+    //    nextState, Cmd.map (ExcelSubscriptionMsg >> ExcelInterop) cmd
 
         
 let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchState) : TermSearchState * Cmd<Msg> =
@@ -289,7 +384,7 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
             else
                 let s = (string parentTerm.Value)
                 let res =
-                    OfficeInterop.parseColHeader s
+                    OfficeInterop.Regex.parseColHeader s
                 res.Ontology
 
         let nextState = {
@@ -560,6 +655,31 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             ()
             (FetchAllOntologiesResponse >> Response >> Api)
             (ApiError >> Api)
+
+    | SearchForInsertTermsRequest (tableName,insertTerms) ->
+        let currentCall = {
+            FunctionName = "getTermsByNames"
+            Status = Pending
+        }
+        let nextState = {
+            currentState with
+                currentCall = currentCall
+        }
+        let cmd =
+            Cmd.OfAsync.either
+                Api.api.getTermsByNames
+                insertTerms
+                ((fun newTerms -> SearchForInsertTermsResponse (tableName,newTerms) ) >> Response >> Api)
+                (fun e ->
+                    Msg.Batch [
+                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+                        ApiError e |> Api
+                    ] )
+        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ServerSearchDatabase |> ExcelInterop |> Cmd.ofMsg
+        //let cmd3 = GenericLog ("Debug", sprintf "%A" insertTerms) |> Dev |> Cmd.ofMsg
+        let cmds = Cmd.batch [cmd; cmd2; (*cmd3*)]
+        nextState, cmds
+    //
     | GetAppVersion ->
         let currentCall = {
             FunctionName = "getAppVersion"
@@ -674,6 +794,26 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         ]
 
         nextState, cmds
+
+    | SearchForInsertTermsResponse (tableName,insertTerms) ->
+        let finishedCall = {
+            currentState.currentCall with
+                Status = Successfull
+        }
+        let nextState = {
+            currentState with
+                currentCall = noCall
+                callHistory = finishedCall::currentState.callHistory
+        }
+        let cmd =
+            FillHiddenColumns (tableName,insertTerms) |> ExcelInterop |> Cmd.ofMsg
+        let cmd2 =
+             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
+        let cmds =
+            Cmd.batch [cmd; cmd2]
+        nextState, cmds
+
+    //
     | GetAppVersionResponse appVersion ->
         let finishedCall = {
             currentState.currentCall with
@@ -813,6 +953,7 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
                 UnitTermSearchText              = newTerm
                 ShowUnitTermSuggestions         = triggerNewSearch
                 HasUnitTermSuggestionsLoading   = true
+                UnitTermSearchTextHasTermAccession = None
         }
 
         nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
@@ -828,14 +969,15 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
 
         nextState,Cmd.none
 
-    | UnitTermSuggestionUsed suggestion ->
+    | UnitTermSuggestionUsed (suggestionName,suggestionAccession) ->
 
         let nextState = {
             currentState with
-                UnitTermSearchText              = suggestion
+                UnitTermSearchText              = suggestionName
                 //UnitTerm                        = Some suggestion
                 ShowUnitTermSuggestions         = false
                 HasUnitTermSuggestionsLoading   = false
+                UnitTermSearchTextHasTermAccession = Some suggestionAccession
         }
         nextState, Cmd.none
 
@@ -921,7 +1063,7 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
     /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
     /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
     | StoreTableRepresentationFromOfficeInterop (msg,colReps) ->
-        let updateValFormat (prevValFormats: ValidationFormat []) (newColReps:OfficeInterop.ColumnRepresentation []) =
+        let updateValFormat (prevValFormats: ValidationFormat []) (newColReps:OfficeInterop.Types.SwateInteropTypes.ColumnRepresentation []) =
             newColReps
             |> Array.map (fun colRep ->
                 // create ValidationFormat from ColumnRepresentation
@@ -981,6 +1123,13 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
+    | Batch msgSeq ->
+        let cmd =
+            Cmd.batch [
+                yield!
+                    msgSeq |> Seq.map Cmd.ofMsg
+            ]
+        currentModel, cmd
     | UpdatePageState (pageOpt:Route option) ->
         let nextCmd =
             match pageOpt with

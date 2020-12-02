@@ -16,16 +16,6 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"]] [
                 img [Props.Src "../assets/CSB_Logo.png"]
             ]
-            Navbar.Item.a [Navbar.Item.Props [Title "Autoformat Table"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                Button.a [
-                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
-                    Button.OnClick (fun e -> PipeActiveAnnotationTable AutoFitTable |> ExcelInterop |> dispatch )
-                    Button.Color Color.IsWhite
-                    Button.IsInverted
-                ] [
-                    Fa.i [Fa.Solid.SyncAlt][]
-                ]
-            ]
             Navbar.Item.a [Navbar.Item.Props [Title "Add New Annotation Table"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
                     Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
@@ -41,6 +31,46 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                 ] [
                     Fa.span [Fa.Solid.Plus][]
                     Fa.span [Fa.Solid.Table][]
+                ]
+            ]
+            Navbar.Item.a [Navbar.Item.Props [Title "Autoformat Table"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Button.a [
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
+                    Button.OnClick (fun e -> PipeActiveAnnotationTable AutoFitTable |> ExcelInterop |> dispatch )
+                    Button.Color Color.IsWhite
+                    Button.IsInverted
+                ] [
+                    Fa.i [Fa.Solid.SyncAlt][]
+                ]
+            ]
+            Navbar.Item.a [Navbar.Item.Props [Title "Toggle Reference Column Input Assist"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Button.a [
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
+                    Button.OnClick (fun _ ->
+                        ToggleEventHandler |> ExcelInterop |> dispatch
+                    )
+                    Button.Color Color.IsWhite
+                    Button.IsInverted
+                ] [
+                    Fa.span [Fa.Solid.Edit][]
+                    Fa.span [
+                        Fa.Solid.Sync
+                        if model.ExcelState.TablesHaveAutoEditHandler then Fa.Spin
+                    ][]
+                ]
+            ]
+            Navbar.Item.a [Navbar.Item.Props [Title "Fill Reference Columns"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Button.a [
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
+                    Button.OnClick (fun _ ->
+                        PipeActiveAnnotationTable FillHiddenColsRequest |> ExcelInterop |> dispatch
+                    )
+                    Button.Color Color.IsWhite
+                    Button.IsInverted
+                ] [
+                    Fa.span [Fa.Solid.EyeSlash][]
+                    span [][str model.ExcelState.FillHiddenColsStateStore.toReadableString]
+                    Fa.span [Fa.Solid.Pen][]
                 ]
             ]
             Navbar.burger [ Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible

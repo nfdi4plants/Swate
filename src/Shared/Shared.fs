@@ -98,6 +98,20 @@ module DbDomain =
         RelatedTermID       : int64
     }
 
+/// used in OfficeInterop to effectively find possible Term names and search for them in db
+type InsertTerm = {
+    ColIndices      : int []
+    SearchString    : string
+    RowIndices      : int []
+    TermOpt         : DbDomain.Term option
+} with
+    static member create colIndices searchString rowIndices = {
+        ColIndices      = colIndices
+        SearchString    = searchString
+        RowIndices      = rowIndices
+        TermOpt         = None
+    }
+
 type ITestAPI = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>
@@ -124,6 +138,8 @@ type IAnnotatorAPIv1 = {
     getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
 
     getUnitTermSuggestions              : (int*string)                                                  -> Async<DbDomain.Term []>
+
+    getTermsByNames                     : InsertTerm []                                                 -> Async<InsertTerm []>
 }
 
         
