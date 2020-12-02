@@ -327,7 +327,7 @@ let splitPreviousReleaseNotes releaseNotes =
     let prevAdditions = 
         findCommitsByDescriptor Additions addedDescriptors
         // REMOVE this line as soon as parsing of semver metadata is fixed.
-        |> List.filter (fun x -> x.StartsWith "    * #" |> not)
+        |> List.filter (fun x -> x.StartsWith "    * latest commit #" |> not)
     let prevDeletions = findCommitsByDescriptor Deletions addedDescriptors
     let prevBugs = findCommitsByDescriptor Bugfixes addedDescriptors
     prevAdditions, prevDeletions, prevBugs
@@ -485,7 +485,7 @@ Target.create "Release" (fun config ->
                     if List.isEmpty appendAdditions |> not then
                         "* Additions:"
                         // REMOVE this line as soon as parsing of semver metadata is fixed.
-                        sprintf "    * %s" latestCommitHash
+                        sprintf "    * latest commit %s" latestCommitHash
                         yield! appendAdditions
                     if List.isEmpty appendDeletions |> not then
                         "* Deletions:"

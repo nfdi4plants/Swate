@@ -1,10 +1,17 @@
-### 0.1.3+5abee29 (Released 2020-12-2)
+### 0.1.3+eb104fe (Released 2020-12-3)
 * Additions:
-    * latest commit #5abee29
+    * latest commit #eb104fe
+    * [[#e04e953](https://github.com/nfdi4plants/Swate/commit/e04e95345d473fd6b69b196c5e4b11939aa3b6df)] Add link to ontobee page for ontology in term search suggestions (Issue #69).
     * [[#13f3639](https://github.com/nfdi4plants/Swate/commit/13f3639c7181292ccc3764e2b31d5ae91f1f4dcf)] Create issue templates
     * [[#5abee29](https://github.com/nfdi4plants/Swate/commit/5abee298f349005b609ebc21eaf70a0e76e5c5d8)] Add Unit Column when selecting a unit for a term (Issue #48).
     * [[#5abee29](https://github.com/nfdi4plants/Swate/commit/5abee298f349005b609ebc21eaf70a0e76e5c5d8)] Add option to fill hidden cols according to main column (Issue #67).
     * [[#5abee29](https://github.com/nfdi4plants/Swate/commit/5abee298f349005b609ebc21eaf70a0e76e5c5d8)] Add input assist to delete hidden col cells onChange of main col (Issue #68).
+* Bugfixes:
+    * [[#eb104fe](https://github.com/nfdi4plants/Swate/commit/eb104fe72f8b253e8afdb24378836dfec55e0d6c)] Fix bug where search results from "Advanced Search" are not selectable (Issue #70).
+    * [[#63aa8ea](https://github.com/nfdi4plants/Swate/commit/63aa8ea3c0c36e2a821e92429331146a2a054b44)] Fix bug where cursor jumps to the end of search input field (Issue #66).
+    * [[#1847bf5](https://github.com/nfdi4plants/Swate/commit/1847bf5097bc8e87861ab431e05826c19f8fd3f4)] Fix (visual) pagination components for advanced term search (Issue #65).
+    * [[#d207770](https://github.com/nfdi4plants/Swate/commit/d207770a880261a2e293c721b90fc69925abc48a)] Fix not shown `No Ontology` option in advanced term search (Issue #64).
+    * [[#1fd3f67](https://github.com/nfdi4plants/Swate/commit/1fd3f6716b2a1f3fc5a1bdbefb7728ef862d4627)] Fix minor bug in release notes creation.
 
 ### 0.1.2+af67a92 (Released 2020-11-26)
 * Additions:
