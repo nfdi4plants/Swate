@@ -38,6 +38,10 @@ open CustomComponents
 //            ]
 //        ]
 
+
+open Fable.Core
+open Fable.Core.JsInterop
+
 let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
     Field.div [] [
 

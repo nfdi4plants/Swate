@@ -82,7 +82,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
         Field.div [] [
             Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Ontology"]
             Help.help [] [str "Only search terms in the selected ontology"]
-            Field.div [] [
+            Field.div [Field.Props [Style [BorderRadius "unset"]]] [
                 Dropdown.dropdown [
                     Dropdown.IsActive model.AdvancedSearchState.HasOntologyDropdownVisible
                 ] [
@@ -131,7 +131,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                             |> UpdateAdvancedTermSearchOptions
                             |> AdvancedSearch
                             |> dispatch)
-                        Input.Value model.AdvancedSearchState.AdvancedSearchOptions.SearchTermName
+                        Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.SearchTermName
                     ] 
                 ]
             ]
@@ -152,7 +152,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                             |> UpdateAdvancedTermSearchOptions
                             |> AdvancedSearch
                             |> dispatch)
-                        Input.Value model.AdvancedSearchState.AdvancedSearchOptions.MustContainName
+                        Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.MustContainName
                     ] 
                 ]
             ]
@@ -173,7 +173,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                             |> UpdateAdvancedTermSearchOptions
                             |> AdvancedSearch
                             |> dispatch)
-                        Input.Value model.AdvancedSearchState.AdvancedSearchOptions.SearchTermDefinition
+                        Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.SearchTermDefinition
                     ] 
                 ]
             ] 
@@ -195,7 +195,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                                 |> UpdateAdvancedTermSearchOptions
                                 |> AdvancedSearch
                                 |> dispatch)
-                            Input.Value model.AdvancedSearchState.AdvancedSearchOptions.MustContainDefinition
+                            Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.MustContainDefinition
                         ] 
                     ]
                 ]

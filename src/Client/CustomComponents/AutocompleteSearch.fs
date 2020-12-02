@@ -190,6 +190,8 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
         ]
     ]
 
+open Fable.Core.JsInterop
+
 let autocompleteTermSearchComponent
     (dispatch: Msg -> unit)
     (colorMode:ColorMode)
@@ -209,11 +211,16 @@ let autocompleteTermSearchComponent
             | _ -> ()
             Input.Props [
                 ExcelColors.colorControl colorMode
+                //OnLoad (fun e ->
+                //    let e = Browser.Dom.document.getElementById("TermSearchInputField")
+                //    e?value <- "Test"
+                //)
                 //OnFocus (fun e -> alert "focusout")
                 //OnBlur  (fun e -> alert "focusin")
             ]           
-            Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
-            Input.Value autocompleteParams.StateBinding
+            Input.OnChange (
+                fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
+            )
                         
         ]
         autocompleteDropdownComponent
@@ -251,6 +258,7 @@ let autocompleteTermSearchComponentOfParentOntology
                 Input.input [
                     Input.Props [Id "TermSearchInput"]
                     Input.Placeholder inputPlaceholderText
+                    Input.ValueOrDefault autocompleteParams.StateBinding
                     match inputSize with
                     | Some size -> Input.Size size
                     | _ -> ()
@@ -266,7 +274,6 @@ let autocompleteTermSearchComponentOfParentOntology
                         )
                     ]           
                     Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
-                    Input.Value autocompleteParams.StateBinding
                 ]
             ]
         ]
