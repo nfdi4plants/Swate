@@ -11,6 +11,14 @@ open Messages
 open Shared
 open CustomComponents
 
+let createLinkOfAccession (accession:string) =
+    a [
+        let link = accession |> URLs.termAccessionUrlOfAccessionStr
+        Href link
+        Target "_Blank"
+    ] [
+        str accession
+    ]
 
 let isValidAdancedSearchOptions (opt:AdvancedTermSearchOptions) =
     ((
@@ -29,7 +37,6 @@ let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: DbD
             OnKeyDown (fun k -> if k.key = "Enter" then ontOpt |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
             colorControl model.SiteStyleState.ColorMode
         ]
-
     ][
         Text.span [
             CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
@@ -65,7 +72,14 @@ let createAdvancedTermSearchResultRows (model:Model) (dispatch: Msg -> unit) (su
                     b [] [str sugg.Name]
                 ]
                 td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
-                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
+                td [
+                    OnClick (fun e -> e.stopPropagation())
+                    Style [FontWeight "light"]
+                ] [
+                    small [] [
+                        createLinkOfAccession sugg.Accession
+                    ]
+                ]
             ])
     else
         [|
@@ -208,10 +222,10 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
         div [
             Style [Margin "1rem"]
         ][
-            Button.buttonComponent model.SiteStyleState.ColorMode true "Change search options" (fun _ -> UpdateAdvancedTermSearchSubpage AdvancedTermSearchSubpages.InputForm |> AdvancedSearch |> dispatch)
+            Button.buttonComponent model.SiteStyleState.ColorMode true "Change search options" (fun _ -> UpdateAdvancedTermSearchSubpage AdvancedTermSearchSubpages.InputFormSubpage |> AdvancedSearch |> dispatch)
         ]
         Label.label [] [str "Results:"]
-        if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.Results then
+        if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.ResultsSubpage then
             if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
                 div [
                     Style [Width "100%"; Display DisplayOptions.Flex; JustifyContent "center"]
@@ -226,7 +240,9 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
                         model
                         dispatch
                         /// The following line defines which message is executed onClick on one of the terms in the result table.
-                        ((fun t -> UpdateAdvancedTermSearchSubpage <| AdvancedTermSearchSubpages.SelectedResult t) >> AdvancedSearch)
+                        ((fun t ->
+                            UpdateAdvancedTermSearchSubpage <| AdvancedTermSearchSubpages.SelectedResultSubpage t) >> AdvancedSearch
+                        )
                     )
     ]
 
@@ -253,32 +269,34 @@ let advancedSearchSelectedResultDisplay (model:Model) (result:DbDomain.Term) =
         ]
     ]
 
-let advancedSearchModal (model:Model) (id:string) (dispatch: Msg -> unit) (resultHandler: DbDomain.Term -> Msg) =
+open Fable.Core.JsInterop
+
+let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) (dispatch: Msg -> unit) (resultHandler: DbDomain.Term -> Msg) =
     Modal.modal [
         Modal.IsActive (
             model.AdvancedSearchState.HasModalVisible
-            && model.AdvancedSearchState.ModalId = id
+            && model.AdvancedSearchState.ModalId = modalId
         )
         Modal.Props [
             colorControl model.SiteStyleState.ColorMode
-            Id id
+            Id modalId
         ]
     ] [
         Modal.background [] []
         Modal.Card.card [Props [colorControl model.SiteStyleState.ColorMode]] [
             Modal.Card.head [Props [colorControl model.SiteStyleState.ColorMode]] [
-                Modal.close [Modal.Close.Size IsLarge; Modal.Close.OnClick (fun _ -> ToggleModal id |> AdvancedSearch |> dispatch)] []
+                Modal.close [Modal.Close.Size IsLarge; Modal.Close.OnClick (fun _ -> ToggleModal modalId |> AdvancedSearch |> dispatch)] []
                 Heading.h4 [Heading.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
                     str "Advanced Search"
                 ]
             ]
             Modal.Card.body [Props [colorControl model.SiteStyleState.ColorMode]] [
                 match model.AdvancedSearchState.AdvancedTermSearchSubpage with
-                | AdvancedTermSearchSubpages.InputForm ->
+                | AdvancedTermSearchSubpages.InputFormSubpage ->
                     advancedTermSearchComponent model dispatch
-                | AdvancedTermSearchSubpages.Results ->
+                | AdvancedTermSearchSubpages.ResultsSubpage ->
                     advancedSearchResultTable model dispatch
-                | AdvancedTermSearchSubpages.SelectedResult r ->
+                | AdvancedTermSearchSubpages.SelectedResultSubpage r ->
                     advancedSearchSelectedResultDisplay model r
                 //else
                 //    match model.AdvancedSearchState.SelectedResult with
@@ -316,7 +334,29 @@ let advancedSearchModal (model:Model) (id:string) (dispatch: Msg -> unit) (resul
                             ]
                         ]
                         Level.item [][
-                            if (model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.Results |> not) then
+                            match model.AdvancedSearchState.AdvancedTermSearchSubpage with
+                            | AdvancedTermSearchSubpages.SelectedResultSubpage sth ->
+                                Button.button   [
+                                    let hasText = model.AdvancedSearchState.SelectedResult.IsSome
+                                    if hasText then
+                                        Button.CustomClass "is-success"
+                                        Button.IsActive true
+                                    else
+                                        Button.CustomClass "is-danger"
+                                        Button.Props [Disabled true]
+                                    Button.IsFullWidth
+                                    Button.OnClick (fun _ ->
+                                        let e = Browser.Dom.document.getElementById(relatedInputId)
+                                        printfn "%A" (e?value)
+                                        sth |> resultHandler |> dispatch
+
+                                        e?value <- sth.Name
+                                        ResetAdvancedSearchState |> AdvancedSearch |> dispatch)
+                                ] [
+                                    str "Confirm"
+                            
+                                ]
+                            | _ ->
                                 Button.button   [
                                     let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
                                     if isValid then
@@ -328,23 +368,6 @@ let advancedSearchModal (model:Model) (id:string) (dispatch: Msg -> unit) (resul
                                     Button.IsFullWidth
                                     Button.OnClick (fun _ -> StartAdvancedSearch |> AdvancedSearch |> dispatch)
                                 ] [ str "Start advanced search"]
-                            else
-                                Button.button   [
-                                    let hasText = model.AdvancedSearchState.SelectedResult.IsSome
-                                    if hasText then
-                                        Button.CustomClass "is-success"
-                                        Button.IsActive true
-                                    else
-                                        Button.CustomClass "is-danger"
-                                        Button.Props [Disabled true]
-                                    Button.IsFullWidth
-                                    Button.OnClick (fun _ ->
-                                        ResetAdvancedSearchState |> AdvancedSearch |> dispatch;
-                                        model.AdvancedSearchState.SelectedResult.Value |> resultHandler |> dispatch)
-                                ] [
-                                    str "Confirm"
-                            
-                                ]
                         ]
                     ]
                 ]

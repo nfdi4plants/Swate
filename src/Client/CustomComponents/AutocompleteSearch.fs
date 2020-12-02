@@ -43,7 +43,8 @@ with
         
 
 type AutocompleteParameters<'SearchResult> = {
-    Id                      : string
+    ModalId                 : string
+    InputId                 : string
 
     StateBinding            : string
     Suggestions             : AutocompleteSuggestion<'SearchResult> []
@@ -60,7 +61,8 @@ type AutocompleteParameters<'SearchResult> = {
 }
 with
     static member ofTermSearchState (state:TermSearchState) : AutocompleteParameters<DbDomain.Term> = {
-        Id                      = "TermSearch"
+        ModalId                 = "TermSearch_ID"
+        InputId                 = "TermSearchInput_ID"
 
         StateBinding            = state.TermSearchText
         Suggestions             = state.TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
@@ -77,7 +79,8 @@ with
     }
 
     static member ofAddBuildingBlockUnitState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
-        Id                      = "UnitSearch"
+        ModalId                 = "UnitSearch_ID"
+        InputId                 = "UnitSearchInput_ID"
 
         StateBinding            = state.UnitTermSearchText
         Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
@@ -94,7 +97,8 @@ with
     }
 
     static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
-        Id                      = "BlockNameSearch"
+        ModalId                 = "BlockNameSearch_ID"
+        InputId                 = "BlockNameSearchInput_ID"
 
         StateBinding            = state.CurrentBuildingBlock.Name
         Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
@@ -107,7 +111,8 @@ with
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock
+        )
     }
 
 let createAutocompleteSuggestions
@@ -143,13 +148,7 @@ let createAutocompleteSuggestions
                         Style [FontWeight "light"]
                     ] [
                         small [] [
-                            a [
-                                let link = sugg.ID |> Shared.URLs.termAccessionUrlOfAccessionStr
-                                Href link
-                                Target "_Blank"
-                            ] [
-                                str sugg.ID
-                            ]
+                            AdvancedSearch.createLinkOfAccession sugg.ID
                     ] ]
                 ])
             |> List.ofArray
@@ -167,7 +166,7 @@ let createAutocompleteSuggestions
         ][
             td [ColSpan 4] [
                 str (sprintf "%s " autocompleteParams.AdvancedSearchLinkText)
-                a [OnClick (fun _ -> ToggleModal autocompleteParams.Id |> AdvancedSearch |> dispatch)] [
+                a [OnClick (fun _ -> ToggleModal autocompleteParams.ModalId |> AdvancedSearch |> dispatch)] [
                     str "Use Advanced Search"
                 ] 
             ]
@@ -217,7 +216,7 @@ let autocompleteTermSearchComponent
     (isDisabled:bool)
     = 
     Control.div [Control.IsExpanded] [
-        AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
+        AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
             Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
@@ -226,17 +225,11 @@ let autocompleteTermSearchComponent
             | _ -> ()
             Input.Props [
                 ExcelColors.colorControl colorMode
-                //OnLoad (fun e ->
-                //    let e = Browser.Dom.document.getElementById("TermSearchInputField")
-                //    e?value <- "Test"
-                //)
-                //OnFocus (fun e -> alert "focusout")
-                //OnBlur  (fun e -> alert "focusin")
             ]           
             Input.OnChange (
                 fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
             )
-                        
+            Input.Id autocompleteParams.InputId  
         ]
         autocompleteDropdownComponent
             dispatch
@@ -266,12 +259,12 @@ let autocompleteTermSearchComponentOfParentOntology
         ]
 
     Control.div [Control.IsExpanded] [
-        AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
+        AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Field.div [Field.HasAddons][
             parentOntologyNotificationElement ((model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology) |> not)
             Control.p [Control.IsExpanded][
                 Input.input [
-                    Input.Props [Id "TermSearchInput"]
+                    Input.Props [Id autocompleteParams.InputId]
                     Input.Placeholder inputPlaceholderText
                     Input.ValueOrDefault autocompleteParams.StateBinding
                     match inputSize with
@@ -284,7 +277,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
                             PipeActiveAnnotationTable GetParentTerm |> ExcelInterop |> dispatch
-                            let el = Browser.Dom.document.getElementById "TermSearchInput"
+                            let el = Browser.Dom.document.getElementById autocompleteParams.InputId
                             el.focus()
                         )
                     ]           

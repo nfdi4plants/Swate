@@ -82,9 +82,9 @@ type TermSearchState = {
     }
 
 type AdvancedTermSearchSubpages =
-| InputForm
-| Results
-| SelectedResult of DbDomain.Term
+| InputFormSubpage
+| ResultsSubpage
+| SelectedResultSubpage of DbDomain.Term
 
 type AdvancedSearchState = {
     ModalId                             : string
@@ -106,7 +106,7 @@ type AdvancedSearchState = {
         AdvancedSearchOptions               = AdvancedTermSearchOptions.init ()
         AdvancedSearchTermResults           = [||]
         HasAdvancedSearchResultsLoading     = false
-        AdvancedTermSearchSubpage           = InputForm
+        AdvancedTermSearchSubpage           = InputFormSubpage
         AdvancedSearchResultPageinationIndex= 0
         SelectedResult                      = None
     }

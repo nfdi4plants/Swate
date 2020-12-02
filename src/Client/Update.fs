@@ -399,13 +399,18 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
         let nextState = {
             currentState with
                 AdvancedSearchOptions = AdvancedTermSearchOptions.init()
-                AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.InputForm
+                AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.InputFormSubpage
         }
 
         nextState,Cmd.none
     | UpdateAdvancedTermSearchSubpage subpage ->
+        let tOpt =
+            match subpage with
+            |SelectedResultSubpage t   -> Some t
+            | _                 -> None
         let nextState = {
             currentState with
+                SelectedResult = tOpt
                 AdvancedTermSearchSubpage = subpage
         }
         nextState, Cmd.none
@@ -453,7 +458,7 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
 
         let nextState = {
             currentState with
-                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.Results
+                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.ResultsSubpage
                 HasAdvancedSearchResultsLoading = true
             
         }
@@ -476,7 +481,7 @@ let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (curr
         let nextState = {
             currentState with
                 AdvancedSearchTermResults       = results
-                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.Results
+                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.ResultsSubpage
                 HasAdvancedSearchResultsLoading = false
         }
 
