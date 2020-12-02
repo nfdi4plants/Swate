@@ -1,9 +1,16 @@
 namespace Shared
 
+open System
+
 module URLs =
 
     [<LiteralAttribute>]
     let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
+
+    /// accession string needs to have format: PO:0007131
+    let termAccessionUrlOfAccessionStr (accessionStr:string) =
+        let replaced = accessionStr.Replace(":","_")
+        TermAccessionBaseUrl + replaced
 
     [<LiteralAttribute>]
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"

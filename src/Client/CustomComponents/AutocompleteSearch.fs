@@ -135,7 +135,22 @@ let createAutocompleteSuggestions
                         b [] [str sugg.Name]
                     ]
                     td [if sugg.StatusIsWarning then Style [Color "red"]] [str sugg.Status]
-                    td [Style [FontWeight "light"]] [small [] [str sugg.ID]]
+                    td [
+                        OnClick (
+                            fun e ->
+                                e.stopPropagation()
+                        )
+                        Style [FontWeight "light"]
+                    ] [
+                        small [] [
+                            a [
+                                let link = sugg.ID |> Shared.URLs.termAccessionUrlOfAccessionStr
+                                Href link
+                                Target "_Blank"
+                            ] [
+                                str sugg.ID
+                            ]
+                    ] ]
                 ])
             |> List.ofArray
         else
