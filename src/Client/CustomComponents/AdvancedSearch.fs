@@ -347,7 +347,6 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                     Button.IsFullWidth
                                     Button.OnClick (fun _ ->
                                         let e = Browser.Dom.document.getElementById(relatedInputId)
-                                        printfn "%A" (e?value)
                                         sth |> resultHandler |> dispatch
 
                                         e?value <- sth.Name

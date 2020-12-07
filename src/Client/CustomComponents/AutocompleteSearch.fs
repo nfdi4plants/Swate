@@ -40,7 +40,8 @@ with
         StatusIsWarning = false
         Data            = ont
     }
-        
+
+open Fable.Core.JsInterop
 
 type AutocompleteParameters<'SearchResult> = {
     ModalId                 : string
@@ -71,7 +72,7 @@ with
         DropDownIsLoading       = state.HasSuggestionsLoading
 
         OnInputChangeMsg        = (SearchTermTextChange >> TermSearch )
-        OnSuggestionSelect      = (fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch)
+        OnSuggestionSelect      = ( fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
@@ -115,6 +116,8 @@ with
         )
     }
 
+
+
 let createAutocompleteSuggestions
     (dispatch: Msg -> unit)
     (colorMode:ColorMode)
@@ -127,7 +130,10 @@ let createAutocompleteSuggestions
             |> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
             |> Array.map (fun sugg ->
                 tr [
-                    OnClick (fun _ -> sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                    OnClick (fun _ ->
+                        let e = Browser.Dom.document.getElementById(autocompleteParams.InputId)
+                        e?value <- sugg.Name
+                        sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
                     OnKeyDown (fun k -> if k.key = "Enter" then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
                     TabIndex 0
                     colorControl colorMode
