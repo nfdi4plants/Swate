@@ -66,7 +66,7 @@ let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
                             Fa.Solid.Upload
                         ] []
                     ]
-                    File.name [] [
+                    File.name [Props [Style [BorderRight "none"]]] [
                         str "Chose one or multiple files"
                     ]
                 ]
