@@ -27,10 +27,204 @@ open Fable.Core
 
 let exampleExcelFunction () =
     Excel.run(fun context ->
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let annotationTable = sheet.tables.getItem("annotationTable")
+        let tables = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items";"count"|]))
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"|])) |> ignore
+        let annoBodyRange = annotationTable.getDataBodyRange()
+        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
         context.sync()
             .``then``( fun _ ->
-                
-                sprintf "Test output" 
+                let columnBodies =
+                    annoBodyRange.values
+                    |> viewRowsByColumns
+                let columns =
+                    [|
+                        for i = 0 to (int tables.count - 1) do
+                            yield (
+                                let ind = i
+                                let header =
+                                    annoHeaderRange.values.[0].[ind]
+                                    |> fun x -> if x.IsSome then parseColHeader (string annoHeaderRange.values.[0].[ind].Value) |> Some else None
+                                let cells =
+                                    columnBodies.[ind]
+                                    |> Array.mapi (fun i cellVal ->
+                                        let cellValue = if cellVal.IsSome then Some (string cellVal.Value) else None
+                                        Cell.create i cellValue
+                                    )
+                                Column.create ind header cells
+                            )
+                    |]
+
+                /// Failsafe (1): it should never happen, that the nextColumn is a hidden column without an existing building block.
+                let errorMsg1 (nextCol:Column) (buildingBlock:BuildingBlock option) =
+                    failwith (
+                        sprintf 
+                            "Swate encountered an error while processing the active annotation table.
+                            Swate found a hidden column (%s) without a prior main column (not hidden)."
+                            nextCol.Header.Value.Header
+                    )
+
+                /// Hidden columns do only come with certain core names. The acceptable names can be found in OfficeInterop.ColumnCoreNames.
+                let errorMsg2 (nextCol:Column) (buildingBlock:BuildingBlock option) =
+                    failwith (
+                        sprintf
+                            "Swate encountered an error while processing the active annotation table.
+                            Swate found a hidden column (%s) with an unknown core name: %A"
+                            nextCol.Header.Value.Header
+                            nextCol.Header.Value.CoreName
+                    )
+
+                /// If a columns core name already exists for the current building block, then the block is faulty and needs userinput to be corrected.
+                let errorMsg3 (nextCol:Column) (buildingBlock:BuildingBlock option) assignedCol =
+                    failwith (
+                        sprintf
+                            "Swate encountered an error while processing the active annotation table.
+                            Swate found a hidden column (%s) with a core name (%A) that is already assigned to the previous building block.
+                            Building block main column: %s, already assigned column: %s"
+                            nextCol.Header.Value.Header
+                            nextCol.Header.Value.CoreName
+                            buildingBlock.Value.MainColumn.Header.Value.Header
+                            assignedCol
+                    )
+
+                let checkForHiddenColType (currentBlock:BuildingBlock option) (nextCol:Column) =
+                    // Then we need to check if the nextCol is either a TSR or a TAN column
+                    match nextCol.Header.Value.CoreName.Value with
+                    | ColumnCoreNames.Hidden.TermAccessionNumber ->
+                        // Build in fail safes.
+                        if currentBlock.IsNone then errorMsg1 nextCol currentBlock
+                        if currentBlock.Value.TAN.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.TAN.Value.Header.Value.Header
+                        let updateCurrentBlock =
+                            { currentBlock.Value with
+                                TAN =  Some nextCol } |> Some
+                        updateCurrentBlock
+                    | ColumnCoreNames.Hidden.TermSourceREF ->
+                        // Build in fail safe.
+                        if currentBlock.IsNone then errorMsg1 nextCol currentBlock
+                        if currentBlock.Value.TSR.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.TSR.Value.Header.Value.Header
+                        let updateCurrentBlock =
+                            { currentBlock.Value with
+                                TSR =  Some nextCol } |> Some
+                        updateCurrentBlock
+                    | ColumnCoreNames.Hidden.Unit ->
+                        // Build in fail safe.
+                        if currentBlock.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.MainColumn.Header.Value.Header
+                        let newBlock = BuildingBlock.create nextCol None None None |> Some
+                        newBlock 
+                    | _ ->
+                        // Build in fail safe.
+                        errorMsg2 nextCol currentBlock
+
+                // building block are defined by one visuable column and an undefined number of hidden columns.
+                // Therefore we iterate through the columns array and use every column without an `#h` tag as the start of a new building block.
+                let rec sortColsIntoBuildingBlocks (index:int) (currentBlock:BuildingBlock option) (buildingBlockList:BuildingBlock list) =
+                    if index > (int tables.count - 1) then
+                        if currentBlock.IsSome then
+                            currentBlock.Value::buildingBlockList
+                        else
+                            buildingBlockList
+                    else
+                        let nextCol = columns.[index]
+                        // If the nextCol does not have an header it is empty and therefore skipped.
+                        if
+                            nextCol.Header.IsNone
+                        then
+                            sortColsIntoBuildingBlocks (index+1) currentBlock buildingBlockList
+                        // if the nextCol.Header has a tag array and it does NOT contain a hidden tag then it starts a new building block
+                        elif
+                            (nextCol.Header.Value.TagArr.IsSome && nextCol.Header.Value.TagArr.Value |> Array.contains ColumnTags.HiddenTag |> not)
+                            || (nextCol.Header.IsSome && nextCol.Header.Value.TagArr.IsNone)
+                        then
+                            let newBuildingBlock = BuildingBlock.create nextCol None None None |> Some
+                            // If there is a currentBlock we add it to the list of building blocks.
+                            if currentBlock.IsSome then
+                                sortColsIntoBuildingBlocks (index+1) newBuildingBlock (currentBlock.Value::buildingBlockList)
+                            // If there is no currentBuildingBlock, e.g. at the start of this function we replace the None with the first building block.
+                            else
+                                sortColsIntoBuildingBlocks (index+1) newBuildingBlock buildingBlockList
+                        // if the nextCol.Header has a tag array and it does contain a hidden tag then it is added to the currentBlock
+                        elif
+                            nextCol.Header.Value.TagArr.IsSome && nextCol.Header.Value.TagArr.Value |> Array.contains ColumnTags.HiddenTag
+                        then
+                            // There are multiple possibilities which column this is: TSR; TAN; Unit; Unit TSR; Unit TAN are the currently existing ones.
+                            // We first check if there is NO unit tag in the header tag array
+                            if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart) |> not then
+                                let updateCurrentBlock = checkForHiddenColType currentBlock nextCol
+                                sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
+                            /// Next we check for unit columns in the scheme of `Unit [Term] (#h; #u...) | TSR [Term] (#h; #u...) | TAN [Term] (#h; #u...)`
+                            elif nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart) then
+                                let updatedUnitBlock = checkForHiddenColType currentBlock.Value.Unit nextCol
+                                let updateCurrentBlock = {currentBlock.Value with Unit = updatedUnitBlock} |> Some
+                                sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
+                            else
+                                failwith "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' can only contain a '#u' tag or not."
+                        else
+                            failwith (sprintf "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' was not recognized as hidden or main column: %A." nextCol.Header)
+
+                // sort all columns into building blocks
+                let buildingBlocks =
+                    sortColsIntoBuildingBlocks 0 None []
+                    |> List.rev
+                    |> Array.ofList
+
+                let buildingBlocksWithOntology =
+                    buildingBlocks |> Array.filter (fun x -> x.TSR.IsSome && x.TAN.IsSome)
+
+                /// We need an array of all distinct cell.values and where they occur in col- and row-index
+                let terms =
+                    buildingBlocksWithOntology
+                    |> Array.collect (fun bBlock ->
+                        // get current col index
+                        let tsrTanColIndices = [|bBlock.TSR.Value.Index; bBlock.TAN.Value.Index|]
+                        let fillTermConstructsNoUnit bBlock=
+                            // group cells by value so we don't get doubles
+                            bBlock.MainColumn.Cells
+                            |> Array.groupBy (fun cell ->
+                                cell.Value.IsSome, cell.Value.Value
+                            )
+                            // only keep cells with value and create InsertTerm types that will be passed to the server to get filled with a term option.
+                            |> Array.choose (fun ((isSome,searchStr),cellArr) ->
+                                if isSome && searchStr <> "" then
+                                    let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
+                                    Shared.InsertTerm.create tsrTanColIndices searchStr rowIndices
+                                    |> Some
+                                else
+                                    None
+                            )
+                        let fillTermConstructsWithUnit (bBlock:BuildingBlock) =
+                            let searchStr = bBlock.MainColumn.Header.Value.Ontology.Value
+                            let rowIndices =
+                                bBlock.MainColumn.Cells
+                                |> Array.map (fun x ->
+                                   x.Index
+                                )
+                            [|Shared.InsertTerm.create tsrTanColIndices searchStr rowIndices|]
+                        if bBlock.Unit.IsSome then
+                            fillTermConstructsWithUnit bBlock
+                        else
+                            fillTermConstructsNoUnit bBlock
+                    )
+
+                let units =
+                    buildingBlocksWithOntology
+                    |> Array.filter (fun bBlock -> bBlock.Unit.IsSome)
+                    |> Array.map (
+                        fun bBlock ->
+                            let unit = bBlock.Unit.Value
+                            let searchString = unit.MainColumn.Header.Value.Ontology.Value
+                            let colIndices = [|unit.MainColumn.Index; unit.TSR.Value.Index; unit.TAN.Value.Index|]
+                            let rowIndices = unit.MainColumn.Cells |> Array.map (fun x -> x.Index)
+                            Shared.InsertTerm.create colIndices searchString rowIndices
+                    )
+
+                let allSearches = [|
+                    yield! terms
+                    yield! units
+                |]
+
+                sprintf "%A" terms
             )
     )
 
@@ -818,42 +1012,6 @@ let getInsertTermsToFillHiddenCols (annotationTable') =
             )
     )
 
-let insertFileNamesFromFilePicker (annotationTable, fileNameList:string list) =
-    Excel.run(fun context ->
-        let sheet = context.workbook.worksheets.getActiveWorksheet()
-        //let annotationTable = sheet.tables.getItem(annotationTable)
-        //let annoRange = annotationTable.getDataBodyRange()
-        //let _ = annoRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
-        let range = context.workbook.getSelectedRange()
-        let _ = range.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
-        //let nextColsRange = range.getColumnsAfter 2.
-        //let _ = nextColsRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex";"columnCount"])))
-
-        let r = context.runtime.load(U2.Case1 "enableEvents")
-
-        //sync with proxy objects after loading values from excel
-        context.sync().``then``( fun _ ->
-            if range.columnCount > 1. then failwith "Cannot insert Terms in more than one column at a time."
-
-            r.enableEvents <- false
-
-            let newVals = ResizeArray([
-                for rowInd in 0 .. range.values.Count-1 do
-                    let tmp =
-                        range.values.[rowInd] |> Seq.map (
-                            fun col ->
-                                let fileName = if fileNameList.Length-1 < rowInd then None else List.item rowInd fileNameList |> box |> Some
-                                fileName
-                        )
-                    ResizeArray(tmp)
-            ])
-
-            range.values <- newVals
-            r.enableEvents <- true
-            //sprintf "%s filled with %s; ExtraCols: %s" range.address v nextColsRange.address
-            sprintf "%A, %A" range.values.Count newVals
-        )
-    )
 
 let fillHiddenColsByInsertTerm (annotationTable,insertTerms:InsertTerm []) =
     Excel.run(fun context ->
@@ -896,9 +1054,15 @@ let fillHiddenColsByInsertTerm (annotationTable,insertTerms:InsertTerm []) =
                                     createCellValueInput ont
                                     createCellValueInput accession
                             |]
-                            printfn "insert term: %A, for cols: %A, for rows: %A" t insertTerm.ColIndices insertTerm.RowIndices
+
+                            /// ATTENTION!! The following seems to be a strange interaction between office.js and fable.
+                            /// In an example with 2 colIndices i had a mistake in the code to access: 'for i in 0 .. insertTerm.ColIndices.Length do'
+                            /// so i actually accessed 3 colIndices which should have led to the classic 'System.IndexOutOfRangeException', but it didnt.
+                            /// for 'inputVals.[2]' it returned 'undefined' and for 'insertTerm.ColIndices.[2]' it returned '0'.
+                            /// This led to the first column to be erased for the same rows that were found to be replaced.
+
                             // iterate over all columns (in this case in form of the index of their array. as we need the index to access the correct 'inputVal' value
-                            for i in 0 .. insertTerm.ColIndices.Length do
+                            for i in 0 .. insertTerm.ColIndices.Length-1 do
 
                                 // iterate over all rows and insert the correct inputVal
                                 for rowInd in insertTerm.RowIndices do
@@ -913,6 +1077,44 @@ let fillHiddenColsByInsertTerm (annotationTable,insertTerms:InsertTerm []) =
                 sprintf "Filled information for terms: %s" (foundTerms |> Array.map (fun x -> x.TermOpt.Value.Name) |> String.concat ", ")
             )
     )
+
+let insertFileNamesFromFilePicker (annotationTable, fileNameList:string list) =
+    Excel.run(fun context ->
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        //let annotationTable = sheet.tables.getItem(annotationTable)
+        //let annoRange = annotationTable.getDataBodyRange()
+        //let _ = annoRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
+        let range = context.workbook.getSelectedRange()
+        let _ = range.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
+        //let nextColsRange = range.getColumnsAfter 2.
+        //let _ = nextColsRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex";"columnCount"])))
+
+        let r = context.runtime.load(U2.Case1 "enableEvents")
+
+        //sync with proxy objects after loading values from excel
+        context.sync().``then``( fun _ ->
+            if range.columnCount > 1. then failwith "Cannot insert Terms in more than one column at a time."
+
+            r.enableEvents <- false
+
+            let newVals = ResizeArray([
+                for rowInd in 0 .. range.values.Count-1 do
+                    let tmp =
+                        range.values.[rowInd] |> Seq.map (
+                            fun col ->
+                                let fileName = if fileNameList.Length-1 < rowInd then None else List.item rowInd fileNameList |> box |> Some
+                                fileName
+                        )
+                    ResizeArray(tmp)
+            ])
+
+            range.values <- newVals
+            r.enableEvents <- true
+            //sprintf "%s filled with %s; ExtraCols: %s" range.address v nextColsRange.address
+            sprintf "%A, %A" range.values.Count newVals
+        )
+    )
+
 
 let getTableMetaData (annotationTable) =
     Excel.run (fun context ->
