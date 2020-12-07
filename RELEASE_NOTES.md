@@ -1,6 +1,7 @@
-### 0.1.3+6cb6ebf (Released 2020-12-7)
+### 0.1.3+c6ad5b7 (Released 2020-12-7)
 * Additions:
-    * latest commit #6cb6ebf
+    * latest commit #c6ad5b7
+    * [[#c6ad5b7](https://github.com/nfdi4plants/Swate/commit/c6ad5b7271ea5ff4ccc51f7022722bfc95b7b116)] Add error modal (Issue #73).
     * [[#6cb6ebf](https://github.com/nfdi4plants/Swate/commit/6cb6ebf718b6184a769b7eaa67e341331cb4c1b5)] Add core functionality to File Picker (Issue #13).
     * [[#e04e953](https://github.com/nfdi4plants/Swate/commit/e04e95345d473fd6b69b196c5e4b11939aa3b6df)] Add link to ontobee page for ontology in term search suggestions (Issue #69).
     * [[#13f3639](https://github.com/nfdi4plants/Swate/commit/13f3639c7181292ccc3764e2b31d5ae91f1f4dcf)] Create issue templates
@@ -8,6 +9,8 @@
     * [[#5abee29](https://github.com/nfdi4plants/Swate/commit/5abee298f349005b609ebc21eaf70a0e76e5c5d8)] Add option to fill hidden cols according to main column (Issue #67).
     * [[#5abee29](https://github.com/nfdi4plants/Swate/commit/5abee298f349005b609ebc21eaf70a0e76e5c5d8)] Add input assist to delete hidden col cells onChange of main col (Issue #68).
 * Bugfixes:
+    * [[#0a9ac89](https://github.com/nfdi4plants/Swate/commit/0a9ac899d5e5d1609b0dfdc0bd01a46e6e829735)] Fix bug of term input field not indicating change after using autocomplete suggestion.
+    * [[#c4befec](https://github.com/nfdi4plants/Swate/commit/c4befecbf4141066ce9aebb8b6014b1f81eaddea)] Fix bug where auto fill would delete some rows of first column.
     * [[#2498c0b](https://github.com/nfdi4plants/Swate/commit/2498c0beee9433e5a7a71cb7661956a6f0b6a609)] Fix file picker button view.
     * [[#eb104fe](https://github.com/nfdi4plants/Swate/commit/eb104fe72f8b253e8afdb24378836dfec55e0d6c)] Fix bug where search results from "Advanced Search" are not selectable (Issue #70).
     * [[#63aa8ea](https://github.com/nfdi4plants/Swate/commit/63aa8ea3c0c36e2a821e92429331146a2a054b44)] Fix bug where cursor jumps to the end of search input field (Issue #66).
