@@ -22,7 +22,8 @@ let activityLogComponent (model:Model) dispatch =
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth
-        //    Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
+        //    Button.OnClick (fun e ->
+        //        (fun tableName -> TryExcel (tableName, model.FilePickerState.FileNames))|> PipeActiveAnnotationTable |> ExcelInterop |> dispatch )
         //    Button.Props [Style [MarginBottom "1rem"]]
         //] [
         //    str "Try Excel"

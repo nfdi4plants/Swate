@@ -27,10 +27,10 @@ open Fable.Core
 
 let exampleExcelFunction () =
     Excel.run(fun context ->
-
-        context.sync().
-            ``then``(fun _ ->
-                sprintf "Current Event Handlers: %A" EventHandlerStates.adaptHiddenColsHandlerList 
+        context.sync()
+            .``then``( fun _ ->
+                
+                sprintf "Test output" 
             )
     )
 
@@ -816,6 +816,43 @@ let getInsertTermsToFillHiddenCols (annotationTable') =
 
                 annotationTable',allSearches
             )
+    )
+
+let insertFileNamesFromFilePicker (annotationTable, fileNameList:string list) =
+    Excel.run(fun context ->
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        //let annotationTable = sheet.tables.getItem(annotationTable)
+        //let annoRange = annotationTable.getDataBodyRange()
+        //let _ = annoRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
+        let range = context.workbook.getSelectedRange()
+        let _ = range.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex"; "columnCount"])))
+        //let nextColsRange = range.getColumnsAfter 2.
+        //let _ = nextColsRange.load(U2.Case2 (ResizeArray(["address";"values";"columnIndex";"columnCount"])))
+
+        let r = context.runtime.load(U2.Case1 "enableEvents")
+
+        //sync with proxy objects after loading values from excel
+        context.sync().``then``( fun _ ->
+            if range.columnCount > 1. then failwith "Cannot insert Terms in more than one column at a time."
+
+            r.enableEvents <- false
+
+            let newVals = ResizeArray([
+                for rowInd in 0 .. range.values.Count-1 do
+                    let tmp =
+                        range.values.[rowInd] |> Seq.map (
+                            fun col ->
+                                let fileName = if fileNameList.Length-1 < rowInd then None else List.item rowInd fileNameList |> box |> Some
+                                fileName
+                        )
+                    ResizeArray(tmp)
+            ])
+
+            range.values <- newVals
+            r.enableEvents <- true
+            //sprintf "%s filled with %s; ExtraCols: %s" range.address v nextColsRange.address
+            sprintf "%A, %A" range.values.Count newVals
+        )
     )
 
 let fillHiddenColsByInsertTerm (annotationTable,insertTerms:InsertTerm []) =

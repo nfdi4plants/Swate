@@ -87,15 +87,15 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                     Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
                 ] [
                     yield! footerChildren
-                    Button.button [
-                        Button.OnClick (fun e ->
-                            let e = Browser.Dom.document.getElementById("BlockNameSearch")
-                            let content = e.innerHTML
-                            e.innerHTML <- content
-                        )
-                    ][
-                        str "Test"
-                    ]
+                    //Button.button [
+                    //    Button.OnClick (fun e ->
+                    //        let e = Browser.Dom.document.getElementById("BlockNameSearch")
+                    //        let content = e.innerHTML
+                    //        e.innerHTML <- content
+                    //    )
+                    //][
+                    //    str "Test"
+                    //]
                 ]
             ]
         ]

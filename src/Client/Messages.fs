@@ -35,6 +35,8 @@ type ExcelInteropMsg =
     | FillHiddenColsRequest         of activeAnnotationTable:TryFindAnnoTableResult
     | FillHiddenColumns             of tableName:string*InsertTerm []
     | UpdateFillHiddenColsState     of FillHiddenColsState
+    //
+    | InsertFileNames               of activeAnnotationTable:TryFindAnnoTableResult*fileNameList:string list
     // Development
     | TryExcel
     | TryExcel2

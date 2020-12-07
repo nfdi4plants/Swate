@@ -277,9 +277,20 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         }
         nextState, Cmd.none
     //
+    | InsertFileNames (activeTableNameRes,fileNameList) ->
+        let nextState = currentState
+        let cmd name = 
+            Cmd.OfPromise.either
+                OfficeInterop.insertFileNamesFromFilePicker 
+                (name, fileNameList)
+                ((fun x -> 
+                    ("Debug",x) |> GenericLog) >> Dev
+                )
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
+        nextState, cmd
 
-
-    | TryExcel ->
+    | TryExcel  ->
         let nextState = currentState
         let cmd = 
             Cmd.OfPromise.either

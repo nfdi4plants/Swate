@@ -75,5 +75,22 @@ let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
         Table.table [Table.IsFullWidth] [
             tbody [] (createFileList model dispatch)
         ]
+        Button.button [
+            Button.IsFullWidth
+            if model.FilePickerState.FileNames |> List.isEmpty then
+                yield! [
+                    Button.Disabled true
+                    Button.IsActive false
+                    Button.Color Color.IsDanger
+                ]
+            else
+                Button.Color Color.IsSuccess
+            Button.OnClick (fun e ->
+                (fun tableName -> InsertFileNames (tableName, model.FilePickerState.FileNames)) |> PipeActiveAnnotationTable |> ExcelInterop |> dispatch 
+            )
+
+        ][
+            str "Insert File Names"
+        ]
         
     ]
