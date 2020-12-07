@@ -124,7 +124,7 @@ let checkradioList (ind:int) (hasOntology:string option) format dispatch=
             dispatch
     ]
 
-let findOntology (format:ValidationFormat) (colReps:OfficeInterop.ColumnRepresentation []) =
+let findOntology (format:ValidationFormat) (colReps:OfficeInterop.Types.SwateInteropTypes.ColumnRepresentation []) =
     colReps
     |> Array.find (fun x -> x.Header = format.ColumnHeader)
     |> fun x -> x.ParentOntology

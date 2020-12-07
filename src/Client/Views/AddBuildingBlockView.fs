@@ -172,11 +172,12 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                     Button.IsFullWidth
                     Button.OnClick (
                         let format =
-                            match model.AddBuildingBlockState.BuildingBlockHasUnit, model.AddBuildingBlockState.UnitTermSearchText with
-                            | _,"" -> "0.00"
-                            | false, _ -> "0.00"
-                            | true, str ->
-                                sprintf "0.00 \"%s\"" str
+                            match model.AddBuildingBlockState.BuildingBlockHasUnit, model.AddBuildingBlockState.UnitTermSearchText, model.AddBuildingBlockState.UnitTermSearchTextHasTermAccession with
+                            | _,"", _                   -> None //"0.00"
+                            | false, _, _               -> None//"0.00"
+                            | true, str, Some accession -> Some (str,Some accession)
+                            | true, str, None           -> Some (str,None)
+                                //sprintf "0.00 \"%s\"" str
                         let colName = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
                         fun _ -> (colName,format) |> pipeNameTuple2 AddColumn |> ExcelInterop |> dispatch
                     )

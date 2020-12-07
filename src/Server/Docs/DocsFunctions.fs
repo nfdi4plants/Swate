@@ -83,7 +83,7 @@ and Parameter = {
 
 module PredefinedParams =
 
-    let dbDomainTerm =
+    let TermType =
         let dbdomaniTermParamArr = [|
             Parameter.create "ID" ParamInteger ""
             Parameter.create "OntologyId" ParamInteger ""
@@ -96,7 +96,7 @@ module PredefinedParams =
         dbdomaniTermParamArr
         |> ParamRecordType
 
-    let dbDomainOntology =
+    let OntologyType =
         let dbdomaniOntologyParamArr = [|
             Parameter.create "ID" ParamInteger ""
             Parameter.create "Name" ParamString ""
@@ -108,16 +108,35 @@ module PredefinedParams =
         dbdomaniOntologyParamArr
         |> ParamRecordType
 
-    let unitOntology:DbDomain.Ontology = {
-        ID = 1L
-        Name = "uo"
-        CurrentVersion = "releases/2020-03-10"
-        Definition = "Unit Ontology"
-        DateCreated = System.DateTime(2014,9,4) //"2014-09-04 00:00:00.000000"
-        UserID = "gkoutos"
-    }
+    let InsertTermType =
+        let insertTermParamArr = [|
+            Parameter.create "ColIndices" (ParamArray ParamInteger) ""
+            Parameter.create "SearchString" (ParamString) ""
+            Parameter.create "RowIndices" (ParamArray ParamInteger) ""
+            Parameter.create "TermOpt" (TermType |> ParamOption) "This value is empty when created client side and will be filled by server after term search."
+        |]
+        insertTermParamArr
+        |> ParamRecordType
 
-    let test = System.DateTime(2020,11,17)
+    module Examples =
+
+        let unitOntologyExmp:DbDomain.Ontology = {
+            ID = 1L
+            Name = "uo"
+            CurrentVersion = "releases/2020-03-10"
+            Definition = "Unit Ontology"
+            DateCreated = System.DateTime(2014,9,4) //"2014-09-04 00:00:00.000000"
+            UserID = "gkoutos"
+        }
+
+        let insertTermExmp:InsertTerm = {
+            ColIndices = [|2; 3|]
+            SearchString = "Bruker Daltonics HCT Series"
+            RowIndices = [|0 .. 10|]
+            TermOpt = None
+        }
+
+        let test = System.DateTime(2020,11,17)
 
 
 let createDocumentationDescription functionDesc usageDesc (paramArr:Parameter [] option) resultDesc (resultType:Parameter) =

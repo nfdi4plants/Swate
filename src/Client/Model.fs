@@ -7,6 +7,8 @@ open Shared
 open Thoth.Elmish
 open Routing
 
+open OfficeInterop.Types.SwateInteropTypes
+
 type LogItem =
     | Debug of (System.DateTime*string)
     | Info  of (System.DateTime*string)
@@ -34,10 +36,10 @@ type LogItem =
 
     static member ofStringNow (level:string) (message: string) =
         match level with
-        | "Debug" -> Debug(System.DateTime.UtcNow,message)
-        | "Info"  -> Info (System.DateTime.UtcNow,message)
-        | "Error" -> Error(System.DateTime.UtcNow,message)
-        | _ -> Error(System.DateTime.UtcNow,"wut?")
+        | "Debug"| "debug" -> Debug(System.DateTime.UtcNow,message)
+        | "Info" | "info" -> Info (System.DateTime.UtcNow,message)
+        | "Error" | "error" -> Error(System.DateTime.UtcNow,message)
+        | others -> Error(System.DateTime.UtcNow,sprintf "Swate found an unexpected log identifier: %s" others)
 
 type TermSearchMode =
     | Simple
@@ -80,9 +82,9 @@ type TermSearchState = {
     }
 
 type AdvancedTermSearchSubpages =
-| InputForm
-| Results
-| SelectedResult of DbDomain.Term
+| InputFormSubpage
+| ResultsSubpage
+| SelectedResultSubpage of DbDomain.Term
 
 type AdvancedSearchState = {
     ModalId                             : string
@@ -104,7 +106,7 @@ type AdvancedSearchState = {
         AdvancedSearchOptions               = AdvancedTermSearchOptions.init ()
         AdvancedSearchTermResults           = [||]
         HasAdvancedSearchResultsLoading     = false
-        AdvancedTermSearchSubpage           = InputForm
+        AdvancedTermSearchSubpage           = InputFormSubpage
         AdvancedSearchResultPageinationIndex= 0
         SelectedResult                      = None
     }
@@ -140,15 +142,31 @@ type PersistentStorageState = {
         HasOntologiesLoaded     = false
     }
 
+type FillHiddenColsState =
+| Inactive
+| ExcelCheckHiddenCols
+| ServerSearchDatabase
+| ExcelWriteFoundTerms
+    member this.toReadableString =
+        match this with
+        | Inactive          -> ""
+        | ExcelCheckHiddenCols  -> "Check Hidden Cols"
+        | ServerSearchDatabase  -> "Search Database"
+        | ExcelWriteFoundTerms  -> "Write Terms"
+
 type ExcelState = {
-    Host                : string
-    Platform            : string
-    HasAnnotationTable  : bool
+    Host                        : string
+    Platform                    : string
+    HasAnnotationTable          : bool
+    TablesHaveAutoEditHandler   : bool
+    FillHiddenColsStateStore    : FillHiddenColsState
 } with
     static member init () = {
         Host                = ""
         Platform            = ""
         HasAnnotationTable  = false
+        TablesHaveAutoEditHandler = false
+        FillHiddenColsStateStore = Inactive
     }
 
 type ApiCallStatus =
@@ -198,6 +216,8 @@ type FilePickerState = {
         FileNames = []
     }
 
+
+/// If this is changed, see also OfficeInterop.Types.ColumnCoreNames
 type AnnotationBuildingBlockType =
     | NoneSelected
     | Parameter         
@@ -264,6 +284,7 @@ type AnnotationBuildingBlock = {
         | Characteristics   -> sprintf "Characteristics [%s]" block.Name
         | Sample            -> "Sample Name"
         | Data              -> "Data File Name"
+        | Source            -> "Source Name"
         | _                 -> ""
 
 
@@ -280,7 +301,10 @@ type AddBuildingBlockState = {
     UnitTermSuggestions                     : DbDomain.Term []
     HasUnitTermSuggestionsLoading           : bool
     ShowUnitTermSuggestions                 : bool
-    UnitFormat                              : string
+    /// This entry determines if the current UnitTermSearchText is a real term or if it is a customly typed unit.
+    /// If UnitTermSearchTextHasTermID.IsSome then the string is the Term.Accession else it is customely typed.
+    /// This is necessary to store the information about the Term.Accession for TAN in the unit columns.
+    UnitTermSearchTextHasTermAccession      : string option
 
 } with
     static member init () = {
@@ -296,7 +320,7 @@ type AddBuildingBlockState = {
         UnitTermSuggestions                     = [||]
         HasUnitTermSuggestionsLoading           = false
         ShowUnitTermSuggestions                 = false
-        UnitFormat                              = ""
+        UnitTermSearchTextHasTermAccession      = None
     }
 
 /// User can define what kind of input a column should have
@@ -330,7 +354,7 @@ type ValidationFormat = {
 
 /// Validation scheme for Table
 type ValidationState = {
-    TableRepresentation     : OfficeInterop.ColumnRepresentation []
+    TableRepresentation     : OfficeInterop.Types.SwateInteropTypes.ColumnRepresentation []
     TableValidationScheme   : ValidationFormat []
     // Client view related
     DisplayedOptionsId      : int option

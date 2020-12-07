@@ -40,10 +40,12 @@ with
         StatusIsWarning = false
         Data            = ont
     }
-        
+
+open Fable.Core.JsInterop
 
 type AutocompleteParameters<'SearchResult> = {
-    Id                      : string
+    ModalId                 : string
+    InputId                 : string
 
     StateBinding            : string
     Suggestions             : AutocompleteSuggestion<'SearchResult> []
@@ -60,7 +62,8 @@ type AutocompleteParameters<'SearchResult> = {
 }
 with
     static member ofTermSearchState (state:TermSearchState) : AutocompleteParameters<DbDomain.Term> = {
-        Id                      = "TermSearch"
+        ModalId                 = "TermSearch_ID"
+        InputId                 = "TermSearchInput_ID"
 
         StateBinding            = state.TermSearchText
         Suggestions             = state.TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
@@ -69,7 +72,7 @@ with
         DropDownIsLoading       = state.HasSuggestionsLoading
 
         OnInputChangeMsg        = (SearchTermTextChange >> TermSearch )
-        OnSuggestionSelect      = (fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch)
+        OnSuggestionSelect      = ( fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
@@ -77,7 +80,8 @@ with
     }
 
     static member ofAddBuildingBlockUnitState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
-        Id                      = "UnitSearch"
+        ModalId                 = "UnitSearch_ID"
+        InputId                 = "UnitSearchInput_ID"
 
         StateBinding            = state.UnitTermSearchText
         Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
@@ -87,14 +91,15 @@ with
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
         OnInputChangeMsg        = (SearchUnitTermTextChange >> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> sugg.Name |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> (sugg.Name,sugg.Accession) |> UnitTermSuggestionUsed |> AddBuildingBlock)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> sugg.Name |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg.Name,sugg.Accession) |> UnitTermSuggestionUsed |> AddBuildingBlock)
     }
 
     static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
-        Id                      = "BlockNameSearch"
+        ModalId                 = "BlockNameSearch_ID"
+        InputId                 = "BlockNameSearchInput_ID"
 
         StateBinding            = state.CurrentBuildingBlock.Name
         Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
@@ -107,8 +112,11 @@ with
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock
+        )
     }
+
+
 
 let createAutocompleteSuggestions
     (dispatch: Msg -> unit)
@@ -122,7 +130,10 @@ let createAutocompleteSuggestions
             |> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
             |> Array.map (fun sugg ->
                 tr [
-                    OnClick (fun _ -> sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                    OnClick (fun _ ->
+                        let e = Browser.Dom.document.getElementById(autocompleteParams.InputId)
+                        e?value <- sugg.Name
+                        sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
                     OnKeyDown (fun k -> if k.key = "Enter" then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
                     TabIndex 0
                     colorControl colorMode
@@ -135,7 +146,16 @@ let createAutocompleteSuggestions
                         b [] [str sugg.Name]
                     ]
                     td [if sugg.StatusIsWarning then Style [Color "red"]] [str sugg.Status]
-                    td [Style [FontWeight "light"]] [small [] [str sugg.ID]]
+                    td [
+                        OnClick (
+                            fun e ->
+                                e.stopPropagation()
+                        )
+                        Style [FontWeight "light"]
+                    ] [
+                        small [] [
+                            AdvancedSearch.createLinkOfAccession sugg.ID
+                    ] ]
                 ])
             |> List.ofArray
         else
@@ -152,7 +172,7 @@ let createAutocompleteSuggestions
         ][
             td [ColSpan 4] [
                 str (sprintf "%s " autocompleteParams.AdvancedSearchLinkText)
-                a [OnClick (fun _ -> ToggleModal autocompleteParams.Id |> AdvancedSearch |> dispatch)] [
+                a [OnClick (fun _ -> ToggleModal autocompleteParams.ModalId |> AdvancedSearch |> dispatch)] [
                     str "Use Advanced Search"
                 ] 
             ]
@@ -190,6 +210,8 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
         ]
     ]
 
+open Fable.Core.JsInterop
+
 let autocompleteTermSearchComponent
     (dispatch: Msg -> unit)
     (colorMode:ColorMode)
@@ -200,7 +222,7 @@ let autocompleteTermSearchComponent
     (isDisabled:bool)
     = 
     Control.div [Control.IsExpanded] [
-        AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
+        AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
             Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
@@ -209,12 +231,11 @@ let autocompleteTermSearchComponent
             | _ -> ()
             Input.Props [
                 ExcelColors.colorControl colorMode
-                //OnFocus (fun e -> alert "focusout")
-                //OnBlur  (fun e -> alert "focusin")
             ]           
-            Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
-            Input.Value autocompleteParams.StateBinding
-                        
+            Input.OnChange (
+                fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
+            )
+            Input.Id autocompleteParams.InputId  
         ]
         autocompleteDropdownComponent
             dispatch
@@ -244,13 +265,14 @@ let autocompleteTermSearchComponentOfParentOntology
         ]
 
     Control.div [Control.IsExpanded] [
-        AdvancedSearch.advancedSearchModal model autocompleteParams.Id dispatch autocompleteParams.OnAdvancedSearch
+        AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Field.div [Field.HasAddons][
             parentOntologyNotificationElement ((model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology) |> not)
             Control.p [Control.IsExpanded][
                 Input.input [
-                    Input.Props [Id "TermSearchInput"]
+                    Input.Props [Id autocompleteParams.InputId]
                     Input.Placeholder inputPlaceholderText
+                    Input.ValueOrDefault autocompleteParams.StateBinding
                     match inputSize with
                     | Some size -> Input.Size size
                     | _ -> ()
@@ -261,12 +283,11 @@ let autocompleteTermSearchComponentOfParentOntology
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
                             PipeActiveAnnotationTable GetParentTerm |> ExcelInterop |> dispatch
-                            let el = Browser.Dom.document.getElementById "TermSearchInput"
+                            let el = Browser.Dom.document.getElementById autocompleteParams.InputId
                             el.focus()
                         )
                     ]           
                     Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
-                    Input.Value autocompleteParams.StateBinding
                 ]
             ]
         ]

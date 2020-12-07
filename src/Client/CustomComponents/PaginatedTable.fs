@@ -50,15 +50,27 @@ let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elements:Reac
                 )
             ]
             Pagination.pagination [Pagination.IsCentered] [
-                Pagination.previous [Props [OnClick (fun _ -> (max (currentPageinationIndex - 1) 0) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )]] [str "Prev"]
+                Pagination.previous [
+                    Props [
+                        OnClick (fun _ -> (max (currentPageinationIndex - 1) 0) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )
+                        Disabled (currentPageinationIndex = 0)
+                    ]
+                ] [
+                    str "Prev"
+                ]
                 Pagination.list [] [
                     yield createPaginationLinkFromIndex dispatch 0 currentPageinationIndex
                     if len > 5 && currentPageinationIndex > 3 then yield Pagination.ellipsis []
                     yield! pageinateDynamic dispatch currentPageinationIndex (len - 1)
                     if len > 5 && currentPageinationIndex < len-4 then yield Pagination.ellipsis []
-                    yield createPaginationLinkFromIndex dispatch (len-1) currentPageinationIndex
+                    if len > 1 then yield createPaginationLinkFromIndex dispatch (len-1) currentPageinationIndex
                 ]
-                Pagination.next [Props [OnClick (fun _ -> (min (currentPageinationIndex + 1) (len - 1)) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )]] [str "Next"]
+                Pagination.next [
+                    Props [
+                        OnClick (fun _ -> (min (currentPageinationIndex + 1) (len - 1)) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )
+                        Disabled (currentPageinationIndex = len - 1)
+                    ]
+                ] [str "Next"]
             ]
         ]
     else

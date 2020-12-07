@@ -47,7 +47,7 @@ let footerContentStatic (model:Model) dispatch =
         a [Href "https://github.com/nfdi4plants/Swate/releases"][str model.PersistentStorageState.AppVersion]
     ]
 
-open System.Text.RegularExpressions
+open Fable.Core.JsInterop
 
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
@@ -77,6 +77,10 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
 
+            // Error Modal element, not shown when no lastFullEror
+            if model.DevState.LastFullError.IsSome then
+                CustomComponents.ErrorModal.errorModal model dispatch
+
             yield! bodyChildren
 
             br []
@@ -87,7 +91,15 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                     Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
                 ] [
                     yield! footerChildren
-                    //Button.button [Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )] [str "Try Excel"]
+                    //Button.button [
+                    //    Button.OnClick (fun e ->
+                    //        let e = Browser.Dom.document.getElementById("BlockNameSearch")
+                    //        let content = e.innerHTML
+                    //        e.innerHTML <- content
+                    //    )
+                    //][
+                    //    str "Test"
+                    //]
                 ]
             ]
         ]
