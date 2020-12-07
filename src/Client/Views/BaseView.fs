@@ -77,6 +77,10 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
 
+            // Error Modal element, not shown when no lastFullEror
+            if model.DevState.LastFullError.IsSome then
+                CustomComponents.ErrorModal.errorModal model dispatch
+
             yield! bodyChildren
 
             br []

@@ -65,9 +65,10 @@ type AdvancedSearchMsg =
     | NewAdvancedSearchResults          of DbDomain.Term []
 
 type DevMsg =
-    | LogTableMetadata  of activeAnnotationTable:TryFindAnnoTableResult
-    | GenericLog        of (string*string)
-    | GenericError      of exn
+    | LogTableMetadata      of activeAnnotationTable:TryFindAnnoTableResult
+    | GenericLog            of (string*string)
+    | GenericError          of exn
+    | UpdateLastFullError   of exn option
     
 type ApiRequestMsg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)

@@ -20,7 +20,11 @@ let matchActiveTableResToMsg activeTableNameRes (msg:string -> Cmd<Msg>) =
     | Success tableName ->
         msg tableName
     | Error eMsg ->
-        GenericLog ("Error",eMsg) |> Dev |> Cmd.ofMsg
+        Msg.Batch [
+            UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+            UpdateLastFullError (exn(eMsg) |> Some) |> Dev
+            GenericLog ("Error",eMsg) |> Dev
+        ] |> Cmd.ofMsg
 
 let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
     match route with
@@ -519,9 +523,15 @@ let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> 
         OfficeInterop.consoleLog (sprintf "GenericError occured: %s" e.Message)
         let nextState = {
             currentState with
-                LastFullError = Some e
                 Log = LogItem.Error(System.DateTime.Now,e.Message)::currentState.Log
             }
+        nextState, Cmd.ofMsg (UpdateLastFullError (Some e) |> Dev)
+
+    | UpdateLastFullError (eOpt) ->
+        let nextState = {
+            currentState with
+                LastFullError = eOpt
+        }
         nextState, Cmd.none
 
     | LogTableMetadata activeTableNameRes ->
