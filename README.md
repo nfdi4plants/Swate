@@ -1,55 +1,99 @@
-Swate
-=====
+# Swate
 
-> **Swate** - something or someone that gets you absolutely joyed([Urban dictionary](https://www.urbandictionary.com/define.php?term=swate))
+> **Swate** - something or someone that gets you absolutely joyed ([Urban dictionary](https://www.urbandictionary.com/define.php?term=swate))
 
 **Swate** is a **S**wate **W**orkflow **A**nnotation **T**ool for **E**xcel.
 
-_This project is in an exerimental state._
+Swate aims to provide a low-friction workflow annotation experience that makes the usage of controlled vocabularies (ontologies) as easy and intuitive as possible. It is designed to integrate in the familiar spreadsheet environment that is the center of many data-focused wetlab (and also computational) work.
+
+<!-- TOC -->
+
+- [Features](#features)
+- [Install/Use](#installuse)
+    - [Excel desktop](#excel-desktop)
+        - [Using the release archive](#using-the-release-archive)
+        - [Using a shared folder](#using-a-shared-folder)
+    - [Excel online](#excel-online)
+- [Discuss/Get help](#discussget-help)
+    - [Documentation](#documentation)
+        - [API docs](#api-docs)
+        - [Feature documentation](#feature-documentation)
+        - [Guides](#guides)
+    - [Report problems and request features](#report-problems-and-request-features)
+    - [(Beta) Discuss in the GitHub Discussion forum](#beta-discuss-in-the-github-discussion-forum)
+- [Develop](#develop)
+    - [Contribute](#contribute)
+    - [Prerequisites](#prerequisites)
+    - [use install.cmd](#use-installcmd)
+    - [Project Decription](#project-decription)
+
+<!-- /TOC -->
+
+## Features
+
+The base features of Swate are:
+
+- **Gradual workflow annotation table building** via the [basic annotation building blocks](https://nfdi4plants.github.io/AnnotationPrinciples/)
+- No-fuss **ontology term search**:
+    - search for ontology terms quickly via autocomplete
+    - use is-a **relational term search** (e.g. search all terms that are also a 'plant organ') to constrain your annotation column to a subset of ontologies
+    - use **Advanced term search** with multiple query parameters if quick search does not do it for you
+
+There are many more small and incremental features. Check the [latest release notes](https://github.com/nfdi4plants/Swate/releases) for the newest additions.
 
 
-
-The aims of Swate are:
-
-1. Provide an easy way to annotate experimental data in an application (excel) that every wet lab scientist is familiar with
-2. Provide a way to create computational workflows that start from raw data and end with results.
-3. ~~Create ISA and CWL compatible data models from the input~~ (moved to the [ARC commander project](https://github.com/nfdi4plants/arcCommander))
-4. Provide an interface for remote execution of the defined workflows
-
-Check the state of the [minimal POC milestone ](https://github.com/nfdi4plants/Swate/milestone/1) for the current state of features.
-
-Test
-----
+## Install/Use
 
 You can test swate by following the steps below. If you decide to do so, please take the time to set up a Github account to report your issues and suggestions [here](https://github.com/nfdi4plants/Swate/issues).
 You can also search existing issues for solutions for your questions and/or discussions about your suggestions.
 
-**Here are the necessary steps to use SWATE:**
+### Excel desktop
 
+#### Using the release archive
 
- - **If you use Excel locally**:
-   - Install [node.js LTS](https://nodejs.org/en/) (needed for office addin related tooling)
-   - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
-   - Execute the test.cmd (windows, as administrator) or test.sh (macOS, you will need to make it executable via chmod a+x) script.
+- Install [node.js LTS](https://nodejs.org/en/) (needed for office addin related tooling)
+- Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
+- Execute the test.cmd (windows, as administrator) or test.sh (macOS, you will need to make it executable via chmod a+x) script.
 
- - **If you use Excel in the browser**:
-   - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
-   - Launch Excel online, open a (blank) workbook 
-   - Under the `Insert` tab, select `Add-Ins`
-   - Go to `Manage my Add-Ins` and select `Upload my Add-In`
-   - select and upload the `manifest.xml` file contained in the test release archive.
+#### Using a shared folder 
 
-Discuss
--------
+If you have administrative access in your organization, you can create a network share folder and follow [this guide](https://github.com/OfficeDev/office-js-docs-pr/blob/master/docs/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins.md#:~:text=Sideload%20your%20add%2Din,-Put%20the%20manifest&text=Be%20sure%20to%20specify%20the,element%20of%20the%20manifest%20file.&text=In%20Excel%2C%20Word%2C%20or%20PowerPoint,Office%20Add%2Dins%20dialog%20box.) to make the addin available without any further downloads from your users
+
+### Excel online
+
+- Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
+- Launch Excel online, open a (blank) workbook 
+- Under the `Insert` tab, select `Add-Ins`
+- Go to `Manage my Add-Ins` and select `Upload my Add-In`
+- select and upload the `manifest.xml` file contained in the test release archive.
+
+## Discuss/Get help
+
+### Documentation
+
+#### API docs 
+
+The RPC API docs of Swate are available [here](https://swate.denbi.uni-tuebingen.de/api/IAnnotatorAPIv1/docs)
+
+#### Feature documentation
 
 Documentation of the features is now a top priority as we completed the POC stage :rocket:. You can discuss needed docs and the available ones [here](https://github.com/nfdi4plants/Swate/issues/47)
 
-Please use Github issues to track problems, feature requests, questions, and discussions. Additionally, you can get in touch with us on [Twitter](https://twitter.com/nfdi4plants)
+#### Guides
 
-Develop
--------
+Guides will be coming in the near future.
 
-#### Contribute:
+### Report problems and request features
+
+Please use [Github issues](https://github.com/nfdi4plants/Swate/issues/new/choose) to track problems, feature requests, questions, and discussions. Additionally, you can get in touch with us on [Twitter](https://twitter.com/nfdi4plants)
+
+### (Beta) Discuss in the GitHub Discussion forum
+
+GitHub recently added forum-like features to repositories, which makes it possible to discuss and share things you do with swate without creating issues. You are very welcome to post content [in the `Discussions` tab](), but please use issues for bug reports/feature requests (or, if some of those result from a discussion, create a new issue referencing the discussion)
+
+## Develop
+
+### Contribute
 
 Before you contribute to the project remember to return all placeholders to your project:
 
@@ -70,7 +114,7 @@ Before you contribute to the project remember to return all placeholders to your
     "Swate:ConnectionString": "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
     ```
 
-#### Prerequisites:
+### Prerequisites
 
  - .NET Core SDK at of at least the version in [the global.json file](global.json)
  - Docker with Docker-compose
