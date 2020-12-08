@@ -4,7 +4,7 @@
 
 **Swate** is a **S**wate **W**orkflow **A**nnotation **T**ool for **E**xcel.
 
-Swate aims to provide a low-friction workflow annotation experience that makes the usage of controlled vocabularies (ontologies) as easy and intuitive as possible. It is designed to integrate in the familiar spreadsheet environment that is the center of many data-focused wetlab (and also computational) work.
+Swate aims to provide a low-friction workflow annotation experience that makes the usage of controlled vocabularies (ontologies) as easy and intuitive as possible. It is designed to integrate in the familiar spreadsheet environment that is the center of a great deal of data-focused wetlab work.
 
 <!-- TOC -->
 
