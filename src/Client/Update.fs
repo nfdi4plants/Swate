@@ -240,7 +240,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
     | FillHiddenColsRequest activeTableNameRes ->
         let cmd name =
             Cmd.OfPromise.either
-                OfficeInterop.getInsertTermsToFillHiddenCols 
+                OfficeInterop.createSearchTermsFromTable 
                 (name)
                 (SearchForInsertTermsRequest >> Request >> Api)
                 (fun e ->
@@ -256,7 +256,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
     | FillHiddenColumns (tableName,insertTerms) ->
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.fillHiddenColsByInsertTerm
+                OfficeInterop.UpdateTableBySearchTerms
                 (tableName,insertTerms)
                 (fun msg ->
                     Msg.Batch [

@@ -21,25 +21,29 @@ let Excel : Excel.IExports = jsNative
 [<Global>]
 let RangeLoadOptions : Interfaces.RangeLoadOptions = jsNative
 
-module Subscription =
-    type Msg =
-    | TestSubscription of string
+
+// Testing Subscription
+// https://elmish.github.io/elmish/subscriptions.html                                           // elmish subscriptions
+// https://docs.microsoft.com/de-de/office/dev/add-ins/develop/dialog-api-in-office-add-ins     // office excel dialog
+//module Subscription =
+//    type Msg =
+//    | TestSubscription of string
     
-    type Model =  {
-        TestString : string
-    } 
+//    type Model =  {
+//        TestString : string
+//    } 
     
-    let init () = {
-        TestString = ""
-    }
+//    let init () = {
+//        TestString = ""
+//    }
     
-    let update msg currentModel =
-        match msg with
-        | TestSubscription str ->
-            let nextModel = {
-                currentModel with TestString = str
-            }
-            nextModel, Cmd.none
+//    let update msg currentModel =
+//        match msg with
+//        | TestSubscription str ->
+//            let nextModel = {
+//                currentModel with TestString = str
+//            }
+//            nextModel, Cmd.none
 
 module ColumnCoreNames =
 
@@ -85,6 +89,7 @@ module ColumnTags =
 
 module SwateInteropTypes =
 
+    /// Maybe this can be replaced with AutoFillTypes/ColUnit
     type ColumnRepresentation = {
         Header          : string
         /// TODO: this is meant for future application and should be implemented together with separate unit columns
@@ -105,6 +110,8 @@ module SwateInteropTypes =
 
         with
             static member
+                /// This function is used on an array of table names (string []). If the length of the array is <> 1 it will trough the correct error.
+                /// Only returns success if annoTables.Length = 1. Does not check if the existing table names are correct/okay.
                 exactlyOneAnnotationTable (annoTables:string [])=
                     match annoTables.Length with
                     | x when x < 1 ->
@@ -128,7 +135,7 @@ type ColHeader = {
 /// The types help to summarize and collect needed information about the column partitions (~ building block, e.g. 1 col for `Source Name`,
 /// 3 cols for standard `Parameter`, 6 cols for `Parameter` with unit). As excel allows to drag 'n drop values down for a column we need these types
 /// to find such occurrences and fill in the missing TSR, TAN and unit cols.
-module AutoFillTypes =
+module BuildingBlockTypes =
 
     type Cell = {
         Index: int

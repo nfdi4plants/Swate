@@ -9,8 +9,9 @@ open System.Text.RegularExpressions
 
 open OfficeInterop.Regex
 open OfficeInterop.Types
-open AutoFillTypes
+open BuildingBlockTypes
 
+/// Swaps 'Rows with column values' to 'Columns with row values'.
 let viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
     rows
     |> Seq.collect (fun x -> Seq.indexed x)
@@ -18,7 +19,7 @@ let viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
     |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
     |> Seq.toArray
 
-/// This function needs an array of the column headers as input. takes as such:
+/// This function needs an array of the column headers as input. Takes as such:
 /// `let annoHeaderRange = annotationTable.getHeaderRowRange()`
 /// `annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"|])) |> ignore`
 /// `let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq`
@@ -56,6 +57,13 @@ let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
             |] :> IList<U3<bool,string,float>>
     |] :> IList<IList<U3<bool,string,float>>>
 
+let createValueMatrix (colCount:int) (rowCount:int) value =
+    ResizeArray([
+        for outer in 0 .. rowCount-1 do
+            let tmp = Array.zeroCreate colCount |> Seq.map (fun _ -> Some (value |> box))
+            ResizeArray(tmp)
+    ])
+
 /// Not used currently
 let createEmptyAnnotationMatrixForTables (rowCount:int) value (header:string) =
     [|
@@ -75,9 +83,3 @@ let createEmptyAnnotationMatrixForTables (rowCount:int) value (header:string) =
             |] :> IList<U3<bool,string,float>>
     |] :> IList<IList<U3<bool,string,float>>>
 
-let createValueMatrix (colCount:int) (rowCount:int) value =
-    ResizeArray([
-        for outer in 0 .. rowCount-1 do
-            let tmp = Array.zeroCreate colCount |> Seq.map (fun _ -> Some (value |> box))
-            ResizeArray(tmp)
-    ])

@@ -33,7 +33,7 @@ type ExcelInteropMsg =
     | UpdateTablesHaveAutoEditHandler
     //
     | FillHiddenColsRequest         of activeAnnotationTable:TryFindAnnoTableResult
-    | FillHiddenColumns             of tableName:string*InsertTerm []
+    | FillHiddenColumns             of tableName:string*SearchTermI []
     | UpdateFillHiddenColsState     of FillHiddenColsState
     //
     | InsertFileNames               of activeAnnotationTable:TryFindAnnoTableResult*fileNameList:string list
@@ -80,7 +80,7 @@ type ApiRequestMsg =
     | FetchAllOntologies
     /// This function is used to search for all values found in the table main columns.
     /// InsertTerm [] is created by officeInterop and passed to server for db search.
-    | SearchForInsertTermsRequest              of tableName:string*InsertTerm []
+    | SearchForInsertTermsRequest              of tableName:string*SearchTermI []
     //
     | GetAppVersion
 
@@ -90,7 +90,7 @@ type ApiResponseMsg =
     | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
     | UnitTermSuggestionResponse                of DbDomain.Term []
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
-    | SearchForInsertTermsResponse              of tableName:string*InsertTerm []  
+    | SearchForInsertTermsResponse              of tableName:string*SearchTermI []  
     //
     | GetAppVersionResponse                     of string
 
