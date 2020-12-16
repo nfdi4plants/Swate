@@ -42,14 +42,17 @@ let createFileList (model:Model) (dispatch: Msg -> unit) =
         ]
 
 let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
+    let inputId = "filePicker_OnFilePickerMainFunc"
     Content.content [ Content.Props [colorControl model.SiteStyleState.ColorMode ]] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "File Picker"]
         File.file [] [
             File.label [] [
                 File.input [
                     Props [
+                        Id inputId
                         Multiple true
                         OnChange (fun ev ->
+
                             let files : FileList = ev.target?files
                             
                             let fileNames =
@@ -57,6 +60,10 @@ let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
                                 |> List.map (fun f -> f.name)
 
                             fileNames |> NewFilesLoaded |> FilePicker |> dispatch
+
+                            let picker = Browser.Dom.document.getElementById(inputId)
+                            // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
+                            picker?value <- null
                             )
                     ]
                 ]
