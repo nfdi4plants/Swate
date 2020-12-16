@@ -9,7 +9,6 @@
         <None Include="paket.references" />
         <None Include="style.scss" />
         <Compile Include="Version.fs" />
-        <Compile Include="AuxFunctions.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="ExcelColors.fs" />
         <Compile Include="OfficeJS.fs" />

@@ -32,7 +32,17 @@ module URLs =
     [<LiteralAttribute>]
     let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
 
-type Counter = { Value : int }
+module HelperFunctions =
+
+    open System.Text.RegularExpressions
+
+    /// (|Regex|_|) pattern input
+    let (|Regex|_|) pattern input =
+        let m = Regex.Match(input, pattern)
+        if m.Success then Some(m.Value)
+        else None
+
+    let isAccessionPattern = "^[a-zA-Z]+:[0-9]+$"
 
 module Route =
     /// Defines how routes are generated on server and mapped from client

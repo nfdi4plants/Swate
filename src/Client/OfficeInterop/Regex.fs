@@ -21,7 +21,7 @@ let UnitAccessionPattern = "#u.+?:\d+"
 
 let parseSquaredBrackets (headerStr:string) =
     match headerStr with
-    | AuxFunctions.Regex SquaredBracketsPattern value ->
+    | Shared.HelperFunctions.Regex SquaredBracketsPattern value ->
         // remove brackets
         value.[1..value.Length-2]
         |> Some
@@ -30,7 +30,7 @@ let parseSquaredBrackets (headerStr:string) =
 
 let parseBrackets (headerStr:string) =
     match headerStr with
-    | AuxFunctions.Regex BracketsPattern value ->
+    | Shared.HelperFunctions.Regex BracketsPattern value ->
         value
             // remove brackets
             .[1..value.Length-2]
@@ -43,7 +43,7 @@ let parseBrackets (headerStr:string) =
 
 let parseCoreName (headerStr:string) =
     match headerStr with
-    | AuxFunctions.Regex CoreNamePattern value ->
+    | Shared.HelperFunctions.Regex CoreNamePattern value ->
         value.Trim()
         |> Some
     | _ ->
@@ -51,7 +51,7 @@ let parseCoreName (headerStr:string) =
 
 let parseUnitAccession (tag:string) =
     match tag with
-    | AuxFunctions.Regex UnitAccessionPattern value ->
+    | Shared.HelperFunctions.Regex UnitAccessionPattern value ->
         value.Trim()
         |> Some
     | _ ->
