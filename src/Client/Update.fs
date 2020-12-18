@@ -923,22 +923,24 @@ let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyle
 
 let handleFilePickerMsg (filePickerMsg:FilePickerMsg) (currentState: FilePickerState) : FilePickerState * Cmd<Msg> =
     match filePickerMsg with
-    | NewFilesLoaded fileNames ->
+    | LoadNewFiles fileNames ->
+        let nextState = {
+            FilePickerState.init() with
+                FileNames = fileNames |> List.mapi (fun i x -> i+1,x)
+        }
+        let nextCmd = UpdatePageState (Some Routing.Route.FilePicker) |> Cmd.ofMsg
+        nextState, nextCmd
+    | UpdateFileNames newFileNames ->
         let nextState = {
             currentState with
-                FileNames = fileNames
+                FileNames = newFileNames
         }
-
         nextState, Cmd.none
-
-    | RemoveFileFromFileList fileName ->
+    | UpdateDNDDropped isDropped ->
         let nextState = {
             currentState with
-                FileNames =
-                    currentState.FileNames
-                    |> List.filter (fun fn -> not (fn = fileName))
+                DNDDropped = isDropped
         }
-
         nextState, Cmd.none
 
 let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (currentState: AddBuildingBlockState) : AddBuildingBlockState * Cmd<Msg> =

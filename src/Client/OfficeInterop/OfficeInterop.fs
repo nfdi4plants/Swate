@@ -1140,6 +1140,7 @@ let insertFileNamesFromFilePicker (annotationTable, fileNameList:string list) =
             ])
 
             range.values <- newVals
+            range.format.autofitColumns()
             r.enableEvents <- true
             //sprintf "%s filled with %s; ExtraCols: %s" range.address v nextColsRange.address
 

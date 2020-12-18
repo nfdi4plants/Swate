@@ -210,10 +210,15 @@ type PageState = {
             }
 
 type FilePickerState = {
-    FileNames : string list
+    FileNames : (int*string) list
+    /// Used for drag and drop, to determine if something is currently dragged or not.
+    /// Necessary to deactivate pointer events on children during drag.
+    DNDDropped : bool
 } with
     static member init () = {
         FileNames = []
+        /// This is used to deactivate pointerevents of drag and drop childs during drag and drop
+        DNDDropped = true
     }
 
 

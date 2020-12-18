@@ -109,8 +109,9 @@ type PersistentStorageMsg =
     | UpdateAppVersion of string
 
 type FilePickerMsg =
-    | NewFilesLoaded            of string list
-    | RemoveFileFromFileList    of string
+    | LoadNewFiles              of string list
+    | UpdateFileNames           of newFileNames:(int*string) list
+    | UpdateDNDDropped          of isDropped:bool
 
 type AddBuildingBlockMsg =
     | NewBuildingBlockSelected  of AnnotationBuildingBlock
