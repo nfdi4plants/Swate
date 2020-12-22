@@ -1,3 +1,14 @@
+### 0.1.4+d4a36f1 (Released 2020-12-22)
+* Additions:
+    * latest commit #d4a36f1
+    * [[#d4a36f1](https://github.com/nfdi4plants/Swate/commit/d4a36f1e3417f5e49c184392e30d95d353f54a07)] Provide validation information via XML metadata (Issue #45). :christmas_tree: :fireworks:
+    * [[#f3a11f0](https://github.com/nfdi4plants/Swate/commit/f3a11f0257f5d7d25a67dfdb85700903573d9ec1)] Update FilePicker with reordering functionality (Issue #13).
+    * [[#f6564d6](https://github.com/nfdi4plants/Swate/commit/f6564d65c9985c82cbad3b482792e94379a7b34b)] Add search term search by accession number (Issue #71).
+    * [[#bdba3ae](https://github.com/nfdi4plants/Swate/commit/bdba3ae061d4c0aa473eef19ab2c55586582c462)] Properly Document Office interop functions (Issue #75).
+    * [[#e958024](https://github.com/nfdi4plants/Swate/commit/e958024d7ac0f804107eaf55fb66e74e966acd63)] Improve readme :book:
+* Bugfixes:
+    * [[#889b86c](https://github.com/nfdi4plants/Swate/commit/889b86c466c454e736daf950ac0df4f77dcb6355)] Fix file picker not uploading reoccuring file names (Issue #80).
+
 ### 0.1.3+c6ad5b7 (Released 2020-12-7)
 * Additions:
     * latest commit #c6ad5b7
