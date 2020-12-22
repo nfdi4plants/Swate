@@ -3,19 +3,21 @@ module ValidationView
 open Fable.React
 open Fable.React.Props
 open Fulma
-open ExcelColors
-open Model
-open Messages
+open Fulma.Extensions.Wikiki
+open Fable.FontAwesome
 open Browser
 open Browser.MediaQueryList
 open Browser.MediaQueryListExtensions
 
+open ExcelColors
+open Model
+open Messages
+
 open CustomComponents
 
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
+open OfficeInterop.Types.XmlValidationTypes
 
-let columnListElement ind (format:ValidationFormat) (model:Model) dispatch =
+let columnListElement ind (columnValidation:ColumnValidation) (model:Model) dispatch =
     let isActive =
         match model.ValidationState.DisplayedOptionsId with
         | Some id when id = ind ->
@@ -39,16 +41,16 @@ let columnListElement ind (format:ValidationFormat) (model:Model) dispatch =
                 UpdateDisplayedOptionsId (Some ind) |> Validation |> dispatch
         )
     ][
-        td [][str format.ColumnHeader]
+        td [][str columnValidation.ColumnHeader]
         td [][
-            if format.Importance.IsSome then
-                str (string format.Importance.Value)
+            if columnValidation.Importance.IsSome then
+                str (string columnValidation.Importance)
             else
                 str "X"
         ]
         td [][
-            if format.ContentType.IsSome then
-                str format.ContentType.Value.toString
+            if columnValidation.ValidationFormat.IsSome then
+                str columnValidation.ValidationFormat.Value.toReadableString
             else
                 str "X"
         ]
@@ -59,8 +61,18 @@ let columnListElement ind (format:ValidationFormat) (model:Model) dispatch =
         ]
     ]
 
-let checkradioElement (id:int) (contentTypeOpt:ContentType option) (format:ValidationFormat) dispatch =
-    let contentType = if contentTypeOpt.IsSome then contentTypeOpt.Value.toString else "None"
+let updateTableValidationByColValidation (model:Model) (updatedColValidation:ColumnValidation) =
+    {
+        model.ValidationState.TableValidationScheme with
+            ColumnValidations =
+                model.ValidationState.TableValidationScheme.ColumnValidations
+                |> List.filter (fun x -> x.ColumnHeader <> updatedColValidation.ColumnHeader)
+                |> fun filteredList -> updatedColValidation::filteredList
+                |> List.sortBy (fun colVal -> colVal.ColumnAdress)
+    }
+
+let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValidation:ColumnValidation) (model:Model) dispatch =
+    let contentType = if contentTypeOpt.IsSome then contentTypeOpt.Value.toReadableString else "None"
     /// See issue #54
     //Checkradio.radio [
     //    //Checkradio.InputProps [Style [Border "1px solid red"]]
@@ -89,13 +101,15 @@ let checkradioElement (id:int) (contentTypeOpt:ContentType option) (format:Valid
             Name (sprintf "ContentType%i" id)
             Disabled isDisabled
             OnChange (fun e ->
-                let newFormat = {
-                    format with
-                        ContentType = contentTypeOpt
+                let nextColumnValidation = {
+                    columnValidation with
+                        ValidationFormat = contentTypeOpt
                 }
-                UpdateValidationFormat (format,newFormat) |> Validation |> dispatch
+                let nextTableValidation =
+                    updateTableValidationByColValidation model nextColumnValidation
+                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
             )
-            Checked (contentTypeOpt = format.ContentType)
+            Checked (contentTypeOpt = columnValidation.ValidationFormat)
 
         ]
         label [
@@ -108,26 +122,24 @@ let checkradioElement (id:int) (contentTypeOpt:ContentType option) (format:Valid
         ][]
     ]
 
-let checkradioList (ind:int) (hasOntology:string option) format dispatch=
+let checkradioList (ind:int) (hasOntology:string option) colVal model dispatch =
+    let ontologyContent = if hasOntology.IsSome then ContentType.OntologyTerm hasOntology.Value |> Some else ContentType.OntologyTerm "None" |> Some
     [
-        checkradioElement ind None format dispatch
+        checkradioElement ind   None                        colVal model dispatch
         
-        checkradioElement ind (Some ContentType.Number) format dispatch
-        checkradioElement ind (Some ContentType.Int) format dispatch
-        checkradioElement ind (Some ContentType.Decimal) format dispatch
-        checkradioElement ind (Some ContentType.Text) format dispatch
-        checkradioElement ind (Some ContentType.Url) format dispatch
-        checkradioElement ind (
-            if hasOntology.IsSome then ContentType.OntologyTerm hasOntology.Value |> Some else ContentType.OntologyTerm "None" |> Some
-            )
-            format
-            dispatch
+        checkradioElement ind   (Some ContentType.Number)   colVal model dispatch
+        checkradioElement ind   (Some ContentType.Int)      colVal model dispatch
+        checkradioElement ind   (Some ContentType.Decimal)  colVal model dispatch
+        checkradioElement ind   (Some ContentType.Text)     colVal model dispatch
+        checkradioElement ind   (Some ContentType.Url)      colVal model dispatch
+
+        checkradioElement ind   ontologyContent             colVal model dispatch
     ]
 
-let findOntology (format:ValidationFormat) (colReps:OfficeInterop.Types.SwateInteropTypes.ColumnRepresentation []) =
-    colReps
-    |> Array.find (fun x -> x.Header = format.ColumnHeader)
-    |> fun x -> x.ParentOntology
+let findOntology (columnValidation:ColumnValidation) (buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []) =
+    buildingBlocks
+    |> Array.find (fun x -> x.MainColumn.Header.Value.Header = columnValidation.ColumnHeader)
+    |> fun x -> x.MainColumn.Header.Value.Ontology
 
 let sliderElements id format dispatch =
     let defaultSliderVal = string (if format.Importance.IsSome then format.Importance.Value else 0)
@@ -159,7 +171,7 @@ let sliderElements id format dispatch =
 open Fable.Core.JsInterop
 
 /// Submit button to apply slider changes to model. If slider.OnChange would dispatch message the app would suffer from lag spikes.
-let submitButton ind format dispatch =
+let submitButton ind columnValidation (model:Model) dispatch =
     Button.span [
         Button.Color IsSuccess
         Button.IsOutlined
@@ -169,18 +181,20 @@ let submitButton ind format dispatch =
                 let sliderEle = Browser.Dom.document.getElementById(sliderId)
                 let impoValue = sliderEle?value
                 printfn "%s" impoValue
-                let newFormat = {
-                    format with
+                let nextColumnValidation = {
+                    columnValidation with
                         Importance = if impoValue = "0" then None else int impoValue |> Some
                 }
-                UpdateValidationFormat (format,newFormat) |> Validation |> dispatch
+                let nextTableValidation =
+                    updateTableValidationByColValidation model nextColumnValidation
+                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
         )
     ][
         str "Submit Importance"
     ]
 
-let optionsElement ind (format:ValidationFormat) (model:Model) dispatch =
-    let hasOntology = findOntology format model.ValidationState.TableRepresentation
+let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatch =
+    let hasOntology = findOntology columnValidation model.ValidationState.ActiveTableBuildingBlocks
     let isVisible =
         match model.ValidationState.DisplayedOptionsId with
         | Some id when id = ind ->
@@ -206,7 +220,7 @@ let optionsElement ind (format:ValidationFormat) (model:Model) dispatch =
 
                         Help.help [Help.Props [Style [MarginBottom "1rem"]]][str "Select the specific type of content for the selected column."]
                     
-                        yield! checkradioList ind hasOntology format dispatch
+                        yield! checkradioList ind hasOntology columnValidation model dispatch
 
                     ]
                     Column.column [][
@@ -214,9 +228,9 @@ let optionsElement ind (format:ValidationFormat) (model:Model) dispatch =
 
                         Help.help [][str "Define how important it is to fill in the column correctly."]
 
-                        yield! sliderElements ind format dispatch
+                        yield! sliderElements ind columnValidation dispatch
 
-                        submitButton ind format dispatch
+                        submitButton ind columnValidation model dispatch
                     ]
                 ]
             ]
@@ -232,15 +246,40 @@ let validationComponent model dispatch =
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Table Validation"]
 
-        Help.help [Help.Color IsDanger] [
-            str "This is currently a preview feature and is still missing a lot of features. See "
-            a [Href "https://github.com/nfdi4plants/Swate/issues/45"; Target "_Blank"][str "here"]
-            str " for the newst updates on this feature."
-        ]
+        //Help.help [Help.Color IsDanger] [
+        //    str "This is currently a preview feature and is still missing a lot of features. See "
+        //    a [Href "https://github.com/nfdi4plants/Swate/issues/45"; Target "_Blank"][str "here"]
+        //    str " for the newst updates on this feature."
+        //]
 
         Field.div [Field.Props [Style [
             Width "100%"
         ]]] [
+            Button.a [
+                Button.Color Color.IsInfo
+                Button.IsFullWidth
+                Button.OnClick (fun e -> PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop |> dispatch )
+                Button.Props [Style [MarginBottom "1rem"]]
+            ] [
+                str "Update Table Representation"
+            ]
+            // Worksheet - annotationTable name - DateTime of saving
+            div [
+                Id "TableRepresentationInfoHeader"
+                OnTransitionEnd (fun e ->
+                    let header = Browser.Dom.document.getElementById("TableRepresentationInfoHeader")
+                    header?style?opacity <- 1
+                    header?style?transition <- "unset"
+                )
+            ][
+                b [][
+                    str model.ValidationState.TableValidationScheme.WorksheetName
+                ]
+                str " - "
+                str model.ValidationState.TableValidationScheme.TableName
+                str " - "
+                str ( model.ValidationState.TableValidationScheme.DateTime.ToString("yyyy-MM-dd HH:mm") )
+            ]
             Table.table [ Table.IsHoverable; Table.IsFullWidth ] [
                 thead [ ] [
                     tr [ ] [
@@ -251,13 +290,27 @@ let validationComponent model dispatch =
                     ]
                 ]
                 tbody [ ] [
-                    for i in 0 .. model.ValidationState.TableValidationScheme.Length-1 do
-                        let f = model.ValidationState.TableValidationScheme.[i]
+                    for i in 0 .. model.ValidationState.TableValidationScheme.ColumnValidations.Length-1 do
+                        let colVal = model.ValidationState.TableValidationScheme.ColumnValidations.[i]
                         yield! [
-                            columnListElement i f model dispatch
-                            optionsElement i f model dispatch
+                            columnListElement i colVal model dispatch
+                            optionsElement i colVal model dispatch
                         ]
                 ]
+            ]
+            // Submit new validation scheme. This will write custom xml into the workbook.
+            Button.a [
+                Button.Color Color.IsSuccess
+                Button.IsFullWidth
+                Button.OnClick (fun e ->
+                    let header = Browser.Dom.document.getElementById("TableRepresentationInfoHeader")
+                    header?style?transition <- "0.3s ease"
+                    header?style?opacity <- 0
+                    WriteTableValidationToXml (model.ValidationState.TableValidationScheme, model.PersistentStorageState.AppVersion) |> ExcelInterop |> dispatch
+                )
+                Button.Props [Style [MarginBottom "1rem"]]
+            ] [
+                str "Add validation to workbook"
             ]
         ]
     ]

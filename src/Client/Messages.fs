@@ -7,7 +7,7 @@ open Shared
 
 open ExcelColors
 open OfficeInterop
-open OfficeInterop.Types.SwateInteropTypes
+open OfficeInterop.Types
 open Model
 
 type ExcelInteropMsg =
@@ -27,7 +27,11 @@ type ExcelInteropMsg =
     | AnnotationTableExists         of activeAnnotationTable:TryFindAnnoTableResult
     | GetParentTerm                 of activeAnnotationTable:TryFindAnnoTableResult
     | AutoFitTable                  of activeAnnotationTable:TryFindAnnoTableResult
-    | GetTableRepresentation        of activeAnnotationTable:TryFindAnnoTableResult
+    //
+    | GetTableValidationXml         of activeAnnotationTable:TryFindAnnoTableResult
+    | WriteTableValidationToXml     of newTableValidation:XmlValidationTypes.TableValidation * currentSwateVersion:string
+    | DeleteAllCustomXml
+    | GetSwateValidationXml
     //
     | ToggleEventHandler
     | UpdateTablesHaveAutoEditHandler
@@ -129,11 +133,9 @@ type AddBuildingBlockMsg =
 type ValidationMsg =
     // Client
     | UpdateDisplayedOptionsId of int option
-    /// UpdateValidationFormat of (oldValidationFormat * newValidationFormat)
-    | UpdateValidationFormat of (ValidationFormat*ValidationFormat)
-
+    | UpdateTableValidationScheme of XmlValidationTypes.TableValidation
     // OfficeInterop
-    | StoreTableRepresentationFromOfficeInterop of msg:string * OfficeInterop.Types.SwateInteropTypes.ColumnRepresentation []
+    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.XmlValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
 
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)

@@ -10,7 +10,8 @@ open Routing
 open Model
 open Messages
 open OfficeInterop
-open OfficeInterop.Types.SwateInteropTypes
+
+open OfficeInterop.Types
 
 /// This function matches a OfficeInterop.TryFindAnnoTableResult to either Success or Error
 /// If Success it will pipe the tableName on to the msg input paramter.
@@ -76,15 +77,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (GenericError >> Dev)
         currentState, cmd
 
-    | GetTableRepresentation activeTableNameRes ->
-        let successCmd tableName =
-            Cmd.OfPromise.either
-                OfficeInterop.getTableRepresentation
-                (tableName)
-                (fun (colReps,msg) -> StoreTableRepresentationFromOfficeInterop (msg,colReps) |> Validation)
-                (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes successCmd 
-        currentState, cmd
 
     | AutoFitTable activeTableNameRes->
         let cmd name =
@@ -207,6 +199,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
         nextState,Cmd.ofMsg(SyncContext (activeTableNameRes,range)|> ExcelInterop)
 
+
     | GetParentTerm activeTableNameRes ->
         let cmd name =
             Cmd.OfPromise.either
@@ -216,6 +209,48 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
+    //
+    | GetTableValidationXml activeTableNameRes ->
+        let successCmd tableName =
+            Cmd.OfPromise.either
+                OfficeInterop.getTableRepresentation
+                (tableName)
+                (fun (currentTableValidation, buildingBlocks,msg) ->
+                    StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks, msg) |> Validation)
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes successCmd 
+        currentState, cmd
+    | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.writeTableValidationToXml
+                (newTableValidation, currentSwateVersion)
+                (fun x ->
+                    Msg.Batch [
+                        GenericLog x |> Dev
+                        PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop
+                    ]
+                )
+                (GenericError >> Dev)
+
+        currentState, cmd
+    | DeleteAllCustomXml ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.deleteAllCustomXml
+                ()
+                (GenericLog >> Dev)
+                (GenericError >> Dev)
+        currentState, cmd
+    | GetSwateValidationXml ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getSwateValidationXml
+                ()
+                (GenericLog >> Dev)
+                (GenericError >> Dev)
+        currentState, cmd
+    //
     | ToggleEventHandler ->
         let cmd =
             Cmd.OfPromise.either
@@ -240,7 +275,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
     | FillHiddenColsRequest activeTableNameRes ->
         let cmd name =
             Cmd.OfPromise.either
-                OfficeInterop.createSearchTermsFromTable 
+                OfficeInterop.createSearchTermsIFromTable 
                 (name)
                 (SearchForInsertTermsRequest >> Request >> Api)
                 (fun e ->
@@ -256,7 +291,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
     | FillHiddenColumns (tableName,insertTerms) ->
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.UpdateTableBySearchTerms
+                OfficeInterop.UpdateTableBySearchTermsI
                 (tableName,insertTerms)
                 (fun msg ->
                     Msg.Batch [
@@ -1086,44 +1121,20 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
                 }
         nextState, Cmd.none
 
+open OfficeInterop.Types.XmlValidationTypes
+
 let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
     match validationMsg with
     /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
     /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
-    | StoreTableRepresentationFromOfficeInterop (msg,colReps) ->
-        let updateValFormat (prevValFormats: ValidationFormat []) (newColReps:OfficeInterop.Types.SwateInteropTypes.ColumnRepresentation []) =
-            newColReps
-            |> Array.map (fun colRep ->
-                // create ValidationFormat from ColumnRepresentation
-                let newValFormat = ValidationFormat.init(header=colRep.Header)
-                // check if the column was already existing
-                let existingValFormatOpt= prevValFormats |> Array.tryFind (fun valFormat -> valFormat.ColumnHeader = colRep.Header)
-                match existingValFormatOpt with
-                | Some prevValFormat ->
-                    // if the column was existing fill the new ValidationFormat with the previousValidationFormat information about
-                    // content type and importance.
-                    {newValFormat with
-                        Importance = prevValFormat.Importance
-                        ContentType =
-                            match prevValFormat.ContentType with
-                            | Some (OntologyTerm po) ->
-                                if colRep.ParentOntology.IsSome then
-                                    Some (OntologyTerm colRep.ParentOntology.Value)
-                                else
-                                    None
-                            | _ ->
-                                prevValFormat.ContentType
-                    }
-                | None ->
-                    newValFormat
-            )
+    | StoreTableRepresentationFromOfficeInterop (tableValidation:TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock [], msg) ->
 
         let nextCmd =
             GenericLog ("Info", msg) |> Dev |> Cmd.ofMsg
         let nextState = {
             currentState with
-                TableRepresentation = colReps
-                TableValidationScheme = updateValFormat currentState.TableValidationScheme colReps
+                ActiveTableBuildingBlocks = buildingBlocks
+                TableValidationScheme = tableValidation
         }
         nextState, nextCmd
 
@@ -1133,19 +1144,11 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
                 DisplayedOptionsId = intOpt
         }
         nextState, Cmd.none
-
-    | UpdateValidationFormat (oldValFormat,newValFormat) ->
-        let newFormatArr =
-            currentState.TableValidationScheme
-            |> Array.map (fun x -> if x = oldValFormat then newValFormat else x)
+    | UpdateTableValidationScheme tableValidation ->
         let nextState = {
             currentState with
-                TableValidationScheme = newFormatArr
+                TableValidationScheme   = tableValidation
         }
-        // Creates a LOT of log
-        //let cmd =
-        //    let t = sprintf "Changed Validation Format: %s to: Importance: %A, Content Type: %A" oldValFormat.ColumnHeader oldValFormat.Importance oldValFormat.ContentType
-        //    GenericLog ("Debug",t) |> Dev |> Cmd.ofMsg 
         nextState, Cmd.none
 
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
@@ -1162,7 +1165,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextCmd =
             match pageOpt with
             | Some Routing.Route.Validation ->
-                PipeActiveAnnotationTable GetTableRepresentation |> ExcelInterop |> Cmd.ofMsg
+                PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop |> Cmd.ofMsg
             | _ ->
                 Cmd.none
         let nextPageState =

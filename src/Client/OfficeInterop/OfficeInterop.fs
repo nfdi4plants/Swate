@@ -11,7 +11,7 @@ open Shared
 
 open OfficeInterop.Regex
 open OfficeInterop.Types
-open SwateInteropTypes
+open XmlValidationTypes
 open OfficeInterop.HelperFunctions
 open OfficeInterop.EventHandlers
 open BuildingBlockTypes
@@ -58,27 +58,41 @@ let consoleLog (message: string): unit = jsNative
 open System
 open Fable.Core
 
+open Fable.SimpleXml
+open Fable.SimpleXml.Generator
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction () =
     Excel.run(fun context ->
 
-        context.sync()
-            .``then``( fun _ ->
-                
-                sprintf "Test output" 
-            )
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        promise {
+            return "test"
+        }
     )
+
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction2 () =
     Excel.run(fun context ->
 
-        context.sync()
-            .``then``( fun _ ->
-                
-                sprintf "Test output 2" 
-            )
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        promise {
+
+            let! xmlParsed, currentSwateValidationXml = getCurrentValidationXml customXmlParts context
+
+            let currentSwateVersion = "0.1.3"
+            let currentSwateValidationXml' =
+                if currentSwateValidationXml.IsNone then SwateValidation.init (currentSwateVersion) else currentSwateValidationXml.Value
+
+            return sprintf "%A" currentSwateValidationXml'
+        }
     )
 
 /// This function is used to create a new annotation table.
@@ -178,7 +192,7 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
                 r.enableEvents <- true
 
                 /// Return info message
-                SwateInteropTypes.Success newName, sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r" tableRange.address (tableRange.rowCount - 1.)
+                TryFindAnnoTableResult.Success newName, sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r" tableRange.address (tableRange.rowCount - 1.)
             )
             //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
     )
@@ -206,7 +220,7 @@ let tryFindActiveAnnotationTable() =
                     tables
                     |> Array.filter (fun x -> x.StartsWith "annotationTable")
                 /// Get the correct error message if we have <> 1 annotation table. Only returns success and the table name if annoTables.Length = 1
-                let res = SwateInteropTypes.TryFindAnnoTableResult.exactlyOneAnnotationTable annoTables
+                let res = TryFindAnnoTableResult.exactlyOneAnnotationTable annoTables
 
                 // return result
                 res
@@ -378,39 +392,72 @@ let autoFitTable (annotationTable) =
 
 /// This is currently used to get information about the table for the table validation feature.
 /// Might be necessary to redesign this to use the newer 'BuildingBlock' or get completly replaced by parts of 'getInsertTermsToFillHiddenCols'
-/// As this function creates a complete representation of the table and then searches on it. Should we decide to keep the function then i will add more inline comments.
+/// As this function creates a complete representation of the table. Should we decide to keep the function then i will add more inline comments.
 let getTableRepresentation(annotationTable) =
     Excel.run(fun context ->
-    let sheet = context.workbook.worksheets.getActiveWorksheet()
-    let annotationTable = sheet.tables.getItem(annotationTable)
-    let annoHeaderRange = annotationTable.getHeaderRowRange()
-    let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
-    context.sync().``then``(
-        fun _ ->
-            let headerVals =
-                annoHeaderRange.values.[0]
-                |> Array.ofSeq
-                |> Array.choose id
-                |> Array.map string
-            let parsedHeaders =
-                headerVals |> Array.map parseColHeader
-            let baseColRepresentation =
-                parsedHeaders
-                |> Array.map (fun header ->
-                    let nColRep = SwateInteropTypes.ColumnRepresentation.init(header=header.Header)
-                    { nColRep with
-                        ParentOntology = header.Ontology
-                        TagArray = if header.TagArr.IsSome then header.TagArr.Value else [||]
-                    }
+
+        // Ref. 2
+        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "name")
+        let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
+
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        promise {
+            let! xmlParsed, currentSwateValidationXml = getCurrentValidationXml customXmlParts context
+
+            let! worksheetName, buildingBlocks =
+                context.sync().``then``( fun _ ->
+                    let buildingBlocks = getBuildingBlocks annoHeaderRange annoBodyRange
+
+                    let worksheetName = activeWorksheet.name
+                    worksheetName, buildingBlocks 
                 )
-            let filterOutHiddenCols (colRepArr:SwateInteropTypes.ColumnRepresentation []) =
-                colRepArr
-                |> Array.filter (fun x -> x.TagArray |> ((Array.contains ColumnTags.HiddenTag) >> not)  )
-            let colReps =
-                baseColRepresentation
-                |> filterOutHiddenCols
-            colReps, "Update table representation."
-        )
+
+            let currentTableValidation =
+                if currentSwateValidationXml.IsNone then
+                    None
+                else
+                    let tryFindActiveTableValidation =
+                        currentSwateValidationXml.Value.TableValidations
+                        |> List.tryFind (fun tableVal -> tableVal.TableName = annotationTable && tableVal.WorksheetName = worksheetName)
+                    tryFindActiveTableValidation
+
+            /// This function updates the current SwateValidation xml with all found building blocks.
+            let updateCurrentTableValidationXml =
+                /// We start by transforming all building blocks into ColumnValidations
+                let newColumnValidations = buildingBlocks |> Array.map (fun buildingBlock -> buildingBlock.toColumnValidation) |> List.ofArray
+                /// Map over all newColumnValidations and see if they exist in the currentTableValidation xml. If they do, then update them by their validation parameters.
+                let updateTableValidation =
+                    /// Check if a TableValidation for the active table AND worksheet exists, else return the newly build colValidations.
+                    if currentTableValidation.IsSome then
+                        let updatedNewColumnValidations =
+                            newColumnValidations
+                            |> List.map (fun newColVal ->
+                                let tryFindCurrentColVal = currentTableValidation.Value.ColumnValidations |> List.tryFind (fun x -> x.ColumnHeader = newColVal.ColumnHeader)
+                                if tryFindCurrentColVal.IsSome then
+                                    {newColVal with
+                                        Importance = tryFindCurrentColVal.Value.Importance
+                                        ValidationFormat = tryFindCurrentColVal.Value.ValidationFormat
+                                    }
+                                else
+                                    newColVal
+                            )
+                        /// Update TableValidation with updated ColumnValidations
+                        {currentTableValidation.Value with
+                            ColumnValidations = updatedNewColumnValidations}
+                    else
+                        /// Should no current TableValidation xml exist, create a new one
+                        TableValidation.create
+                            worksheetName
+                            annotationTable
+                            System.DateTime.Now
+                            []
+                            newColumnValidations
+                updateTableValidation
+
+            return updateCurrentTableValidationXml, buildingBlocks, "Update table representation."
+        }
     )
 
 /// This function is used to add a new building block to the active annotationTable.
@@ -726,7 +773,7 @@ let getParentTerm (annotationTable) =
             )
     )
 
-/// This is used to insert terms into.
+/// This is used to insert terms into selected cells.
 /// 'term' is the value that will be written into the main column.
 /// 'termBackground' needs to be spearate from 'term' in case the user uses the fill function for a custom term.
 /// Should the user write a real term with this function 'termBackground'.isSome and can be used to fill TSR and TAN.
@@ -794,167 +841,21 @@ let fillValue (annotationTable,term,termBackground:Shared.DbDomain.Term option) 
         )
     )
 
-/// This is used to create a full representation of all building blocks in the table and return it to the app.
+/// This is used to create a full representation of all building blocks in the table. This representation is then split into unit building blocks and regular building blocks.
+/// These are then filtered for search terms and aggregated into an 'SearchTermI []', which is used to search the database for missing values.
 /// 'annotationTable'' gets passed by 'tryFindActiveAnnotationTable'.
-let createSearchTermsFromTable (annotationTable') =
+let createSearchTermsIFromTable (annotationTable') =
     Excel.run(fun context ->
 
         // Ref. 2
-        let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem(annotationTable')
-        let annoHeaderRange = annotationTable.getHeaderRowRange()
-        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-        let annoBodyRange = annotationTable.getDataBodyRange()
-        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+        let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable'
 
         context.sync()
             .``then``( fun _ ->
-                /// Get the table by 'Columns [| Rows [|Values|] |]'
-                let columnBodies =
-                    annoBodyRange.values
-                    |> viewRowsByColumns
-
-                /// Write columns into 'BuildingBlockTypes.Column'
-                let columns =
-                    [|
-                        // iterate over n of columns
-                        for ind = 0 to (int annoHeaderRange.columnCount - 1) do
-                            yield (
-                                // Get column header and parse it
-                                let header =
-                                    annoHeaderRange.values.[0].[ind]
-                                    |> fun x -> if x.IsSome then parseColHeader (string annoHeaderRange.values.[0].[ind].Value) |> Some else None
-                                // Get column values and write them to 'BuildingBlockTypes.Cell'
-                                let cells =
-                                    columnBodies.[ind]
-                                    |> Array.mapi (fun i cellVal ->
-                                        let cellValue = if cellVal.IsSome then Some (string cellVal.Value) else None
-                                        Cell.create i cellValue
-                                    )
-                                // Create column
-                                Column.create ind header cells
-                            )
-                    |]
-
-                /// Failsafe (1): it should never happen, that the nextColumn is a hidden column without an existing building block.
-                let errorMsg1 (nextCol:Column) (buildingBlock:BuildingBlock option) =
-                    failwith (
-                        sprintf 
-                            "Swate encountered an error while processing the active annotation table.
-                            Swate found a hidden column (%s) without a prior main column (not hidden)."
-                            nextCol.Header.Value.Header
-                    )
-
-                /// Hidden columns do only come with certain core names. The acceptable names can be found in OfficeInterop.Types.ColumnCoreNames.
-                let errorMsg2 (nextCol:Column) (buildingBlock:BuildingBlock option) =
-                    failwith (
-                        sprintf
-                            "Swate encountered an error while processing the active annotation table.
-                            Swate found a hidden column (%s) with an unknown core name: %A"
-                            nextCol.Header.Value.Header
-                            nextCol.Header.Value.CoreName
-                    )
-
-                /// If a columns core name already exists for the current building block, then the block is faulty and needs userinput to be corrected.
-                let errorMsg3 (nextCol:Column) (buildingBlock:BuildingBlock option) assignedCol =
-                    failwith (
-                        sprintf
-                            "Swate encountered an error while processing the active annotation table.
-                            Swate found a hidden column (%s) with a core name (%A) that is already assigned to the previous building block.
-                            Building block main column: %s, already assigned column: %s"
-                            nextCol.Header.Value.Header
-                            nextCol.Header.Value.CoreName
-                            buildingBlock.Value.MainColumn.Header.Value.Header
-                            assignedCol
-                    )
-
-                /// Update current building block with new reference column. A ref col can be TSR, TAN and unit cols.
-                let checkForHiddenColType (currentBlock:BuildingBlock option) (nextCol:Column) =
-                    // Then we need to check if the nextCol is either a TSR, TAN or a unit column
-                    match nextCol.Header.Value.CoreName.Value with
-                    | ColumnCoreNames.Hidden.TermAccessionNumber ->
-                        // Build in fail safes.
-                        if currentBlock.IsNone then errorMsg1 nextCol currentBlock
-                        if currentBlock.Value.TAN.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.TAN.Value.Header.Value.Header
-                        // Update building block
-                        let updateCurrentBlock =
-                            { currentBlock.Value with
-                                TAN =  Some nextCol } |> Some
-                        updateCurrentBlock
-                    | ColumnCoreNames.Hidden.TermSourceREF ->
-                        // Build in fail safe.
-                        if currentBlock.IsNone then errorMsg1 nextCol currentBlock
-                        if currentBlock.Value.TSR.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.TSR.Value.Header.Value.Header
-                        // Update building block
-                        let updateCurrentBlock =
-                            { currentBlock.Value with
-                                TSR =  Some nextCol } |> Some
-                        updateCurrentBlock
-                    | ColumnCoreNames.Hidden.Unit ->
-                        // Build in fail safe.
-                        if currentBlock.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.MainColumn.Header.Value.Header
-                        // Create unit building block
-                        let newBlock = BuildingBlock.create nextCol None None None |> Some
-                        newBlock 
-                    | _ ->
-                        // Build in fail safe.
-                        errorMsg2 nextCol currentBlock
-
-                // Building blocks are defined by one visuable column and an undefined number of hidden columns.
-                // Therefore we iterate through the columns array and use every column without an `#h` tag as the start of a new building block.
-                let rec sortColsIntoBuildingBlocks (index:int) (currentBlock:BuildingBlock option) (buildingBlockList:BuildingBlock list) =
-                    // Exit case if we iterated through all columns
-                    if index > (int annoHeaderRange.columnCount - 1) then
-                        // Should we have a 'currentBuildingBlock' add it to the 'buildingBlockList' before returning it.
-                        if currentBlock.IsSome then
-                            currentBlock.Value::buildingBlockList
-                        else
-                            buildingBlockList
-                    else
-                        let nextCol = columns.[index]
-                        // If the nextCol does not have an header it is empty and therefore skipped.
-                        if
-                            nextCol.Header.IsNone
-                        then
-                            sortColsIntoBuildingBlocks (index+1) currentBlock buildingBlockList
-                        // If the nextCol.Header has no tag array or its tag array does NOT contain a hidden tag then it starts a new building block
-                        elif
-                            (nextCol.Header.Value.TagArr.IsSome && nextCol.Header.Value.TagArr.Value |> Array.contains ColumnTags.HiddenTag |> not)
-                            || (nextCol.Header.IsSome && nextCol.Header.Value.TagArr.IsNone)
-                        then
-                            let newBuildingBlock = BuildingBlock.create nextCol None None None |> Some
-                            // If there is a 'currentBlock' we add it to the list of building blocks ('buildingBlockList').
-                            if currentBlock.IsSome then
-                                sortColsIntoBuildingBlocks (index+1) newBuildingBlock (currentBlock.Value::buildingBlockList)
-                            // If there is no currentBuildingBlock, e.g. at the start of this function we replace the None with the first building block.
-                            else
-                                sortColsIntoBuildingBlocks (index+1) newBuildingBlock buildingBlockList
-                        // if the nextCol.Header has a tag array and it does contain a hidden tag then it is added to the currentBlock
-                        elif
-                            nextCol.Header.Value.TagArr.IsSome && nextCol.Header.Value.TagArr.Value |> Array.contains ColumnTags.HiddenTag
-                        then
-                            // There are multiple possibilities which column this is: TSR; TAN; Unit; Unit TSR; Unit TAN are the currently existing ones.
-                            // We first check if there is NO unit tag in the header tag array
-                            if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart) |> not then
-                                let updateCurrentBlock = checkForHiddenColType currentBlock nextCol
-                                sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
-                            /// Next we check for unit columns in the scheme of `Unit [Term] (#h; #u...) | TSR [Term] (#h; #u...) | TAN [Term] (#h; #u...)`
-                            elif nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart) then
-                                /// Please notice that we update the unit building block in the following function and not the core building block.
-                                let updatedUnitBlock = checkForHiddenColType currentBlock.Value.Unit nextCol
-                                /// Update the core building block with the updated unit building block.
-                                let updateCurrentBlock = {currentBlock.Value with Unit = updatedUnitBlock} |> Some
-                                sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
-                            else
-                                failwith "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' can only contain a '#u' tag or not."
-                        else
-                            failwith (sprintf "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' was not recognized as hidden or main column: %A." nextCol.Header)
-
+                
                 /// Sort all columns into building blocks.
                 let buildingBlocks =
-                    sortColsIntoBuildingBlocks 0 None []
-                    |> List.rev
-                    |> Array.ofList
+                    getBuildingBlocks annoHeaderRange annoBodyRange
 
                 /// Filter for only building blocks with ontology (indicated by having a TSR and TAN).
                 let buildingBlocksWithOntology =
@@ -1024,7 +925,7 @@ let createSearchTermsFromTable (annotationTable') =
 
 /// This function will be executed after the SearchTerm types from 'createSearchTermsFromTable' where send to the server to search the database for them.
 /// Here the results will be written into the table by the stored col and row indices.
-let UpdateTableBySearchTerms (annotationTable,insertTerms:SearchTermI []) =
+let UpdateTableBySearchTermsI (annotationTable,insertTerms:SearchTermI []) =
     Excel.run(fun context ->
 
         /// This will create a single cell value arr
@@ -1179,3 +1080,101 @@ let getTableMetaData (annotationTable) =
 
 let syncContext (passthroughMessage : string) =
     Excel.run (fun context -> context.sync(passthroughMessage))
+
+let deleteAllCustomXml() =
+    Excel.run(fun context ->
+    
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+        // https://docs.microsoft.com/en-us/javascript/api/excel/excel.customxmlpartcollection?view=excel-js-preview
+    
+        promise {
+    
+            let! getXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Seq.map (fun x -> x.delete() )
+    
+                    xmls |> Array.ofSeq
+                )
+    
+            return "Info","Deleted All Custom Xml!"
+        }
+    )
+
+let getSwateValidationXml() =
+    Excel.run(fun context ->
+
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        promise {
+
+            let! xmlParsed, currentSwateValidationXml = getCurrentValidationXml customXmlParts context
+
+            return "Info",sprintf "%A" currentSwateValidationXml
+        }
+    )
+
+let writeTableValidationToXml(tableValidation:TableValidation,currentSwateVersion:string) =
+    Excel.run(fun context ->
+
+        // Update DateTime 
+        let newTableValidation = {tableValidation with DateTime = System.DateTime.Now}
+
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+    
+        promise {
+    
+            let! xmlParsed, currentSwateValidationXml' = getCurrentValidationXml customXmlParts context
+    
+            let currentSwateValidationXml =
+                if currentSwateValidationXml'.IsNone then SwateValidation.init (currentSwateVersion) else currentSwateValidationXml'.Value
+    
+            let nextSwateValidationXml =
+                let newTableValidations =
+                    currentSwateValidationXml.TableValidations
+                    |> List.filter (fun x -> x.TableName <> newTableValidation.TableName || x.WorksheetName <> newTableValidation.WorksheetName)
+                    |> fun filteredValidations -> newTableValidation::filteredValidations
+                { currentSwateValidationXml with
+                    SwateVersion = currentSwateVersion
+                    TableValidations = newTableValidations
+                }
+    
+            let nextCustomXml =
+                let nextAsXmlFormat = nextSwateValidationXml.toXml |> SimpleXml.parseElement
+                let childrenWithoutValidation = xmlParsed.Children |> List.filter (fun child ->
+                    child.Name <> "Validation"
+                )
+                let nextChildren = nextAsXmlFormat::childrenWithoutValidation
+                {
+                    xmlParsed with
+                        Children = nextChildren
+                } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+                        
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Seq.map (fun x -> x.delete() )
+    
+                    xmls |> Array.ofSeq
+                )
+    
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    customXmlParts.add(nextCustomXml)
+                )
+
+            // This will be displayed in activity log
+            return
+                "Info",
+                sprintf
+                    "Update Validation Scheme with '%s - %s' @%s"
+                    newTableValidation.WorksheetName
+                    newTableValidation.TableName
+                    ( newTableValidation.DateTime.ToString("yyyy-MM-dd HH:mm") )
+        }
+    )

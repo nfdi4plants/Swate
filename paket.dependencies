@@ -4,14 +4,14 @@ storage: none
 
 nuget Fable.Remoting.Giraffe
 nuget Fable.SimpleJson 3.11.0
+nuget Fable.SimpleXml
 nuget Fulma.Extensions.Wikiki.Checkradio
 nuget Fulma.Extensions.Wikiki.Slider
 nuget Saturn
 nuget Expecto
 nuget MySql.Data 8.0.21
 nuget Microsoft.AspNetCore.Authentication.JwtBearer 3.1.10
-nuget Microsoft.Extensions.Configuration.UserSecrets
-nuget Microsoft.Data.SqlClient
+nuget Microsoft.Extensions.Configuration.UserSecrets 
 
 
 nuget Fable.Core

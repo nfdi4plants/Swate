@@ -7,8 +7,6 @@ open Shared
 open Thoth.Elmish
 open Routing
 
-open OfficeInterop.Types.SwateInteropTypes
-
 type LogItem =
     | Debug of (System.DateTime*string)
     | Info  of (System.DateTime*string)
@@ -328,46 +326,17 @@ type AddBuildingBlockState = {
         UnitTermSearchTextHasTermAccession      = None
     }
 
-/// User can define what kind of input a column should have
-type ContentType =
-    | OntologyTerm of string
-    | Text
-    | Url
-    | Boolean
-    | Number
-    | Int
-    | Decimal
-
-    member this.toString =
-        match this with
-        | OntologyTerm po ->
-            sprintf "Ontology [%s]" po
-        | _ ->
-            string this
-
-/// User can add a defined input to a column with header "ColumnHeader" and with a certain importance.
-type ValidationFormat = {
-    ColumnHeader    : string
-    Importance      : int option
-    ContentType     : ContentType option
-} with
-    static member init (?header) = {
-        ColumnHeader    = if header.IsSome then header.Value else ""
-        Importance      = None
-        ContentType     = None
-    }
-
 /// Validation scheme for Table
 type ValidationState = {
-    TableRepresentation     : OfficeInterop.Types.SwateInteropTypes.ColumnRepresentation []
-    TableValidationScheme   : ValidationFormat []
+    ActiveTableBuildingBlocks   : OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []
+    TableValidationScheme       : OfficeInterop.Types.XmlValidationTypes.TableValidation
     // Client view related
     DisplayedOptionsId      : int option
 } with
     static member init () = {
-        TableRepresentation     = Array.empty
-        TableValidationScheme   = Array.empty
-        DisplayedOptionsId      = None
+        ActiveTableBuildingBlocks   = [||]
+        TableValidationScheme       = OfficeInterop.Types.XmlValidationTypes.TableValidation.init()
+        DisplayedOptionsId          = None
     }
 
 type Model = {
