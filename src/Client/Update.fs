@@ -187,7 +187,12 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             Cmd.OfPromise.either
                 OfficeInterop.createAnnotationTable  
                 (allTableNames,isDark)
-                (AnnotationtableCreated >> ExcelInterop)
+                (fun (res,updateEventHandler,msg) ->
+                    Msg.Batch [
+                        AnnotationtableCreated (res,msg) |> ExcelInterop
+                        if updateEventHandler then UpdateTablesHaveAutoEditHandler |> ExcelInterop
+                    ]
+                )
                 (GenericError >> Dev)
         currentState,cmd
 

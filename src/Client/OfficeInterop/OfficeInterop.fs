@@ -181,18 +181,26 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
                 activeSheet.getUsedRange().format.autofitColumns()
                 activeSheet.getUsedRange().format.autofitRows()
 
+                let annoTableName = allTableNames |> Array.filter (fun x -> x.StartsWith "annotationTable")
+
                 /// Should event handlers be active, then add them to the new table, otherwise don't.
                 /// If the storage map is empty then eventhanderls should be deactivated.
-                if EventHandlerStates.adaptHiddenColsHandlerList.IsEmpty then
-                    ()
-                else
-                    EventHandlerStates.adaptHiddenColsHandlerList <-
-                        EventHandlerStates.adaptHiddenColsHandlerList.Add (newName, annotationTable.onChanged.add(fun eventArgs -> adaptHiddenColsHandler (eventArgs,newName)) )
+                let updateEventHandler =
+                    if EventHandlerStates.adaptHiddenColsHandlerList.IsEmpty |> not  then
+                        EventHandlerStates.adaptHiddenColsHandlerList <-
+                            EventHandlerStates.adaptHiddenColsHandlerList.Add (newName, annotationTable.onChanged.add(fun eventArgs -> adaptHiddenColsHandler (eventArgs,newName)) )
+                        false
+                    elif annoTableName |> Array.isEmpty then
+                        EventHandlerStates.adaptHiddenColsHandlerList <-
+                            EventHandlerStates.adaptHiddenColsHandlerList.Add (newName, annotationTable.onChanged.add(fun eventArgs -> adaptHiddenColsHandler (eventArgs,newName)) )
+                        true
+                    else
+                        false
 
                 r.enableEvents <- true
 
                 /// Return info message
-                TryFindAnnoTableResult.Success newName, sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r" tableRange.address (tableRange.rowCount - 1.)
+                TryFindAnnoTableResult.Success newName, updateEventHandler, sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r" tableRange.address (tableRange.rowCount - 1.)
             )
             //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
     )
