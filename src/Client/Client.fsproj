@@ -21,6 +21,7 @@
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
         <Compile Include="Update.fs" />
+        <Compile Include="CustomComponents\DwnButton.fs" />
         <Compile Include="CustomComponents\Footer.fs" />
         <Compile Include="CustomComponents\Button.fs" />
         <Compile Include="CustomComponents\AnnotationTableMissingWarning.fs" />
@@ -39,6 +40,7 @@
         <Compile Include="Views\ValidationView.fs" />
         <Compile Include="Views\InfoView.fs" />
         <Compile Include="Views\ActivityLogView.fs" />
+        <Compile Include="Views\SettingsView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
