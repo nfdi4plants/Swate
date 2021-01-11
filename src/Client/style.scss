@@ -28,6 +28,11 @@ html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
+.clone * {
+    pointer-events: none
+}
+
+
 /////////// Custom simple checkbox, due to issue #54 ///////////////////
 .checkbox-label {
     display: inline-block;

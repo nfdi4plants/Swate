@@ -3,7 +3,7 @@ module CustomComponents.Navbar
 open Fable.React
 open Fable.React.Props
 open Fulma
-open Fulma.Extensions.Wikiki
+
 open ExcelColors
 open Model
 open Messages
@@ -43,22 +43,6 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Fa.i [Fa.Solid.SyncAlt][]
                 ]
             ]
-            Navbar.Item.a [Navbar.Item.Props [Title "Toggle Reference Column Input Assist"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                Button.a [
-                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
-                    Button.OnClick (fun _ ->
-                        ToggleEventHandler |> ExcelInterop |> dispatch
-                    )
-                    Button.Color Color.IsWhite
-                    Button.IsInverted
-                ] [
-                    Fa.span [Fa.Solid.Edit][]
-                    Fa.span [
-                        Fa.Solid.Sync
-                        if model.ExcelState.TablesHaveAutoEditHandler then Fa.Spin
-                    ][]
-                ]
-            ]
             Navbar.Item.a [Navbar.Item.Props [Title "Fill Reference Columns"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
                     Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
@@ -87,22 +71,21 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
             ]
         ]
         Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu") ; ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
-            Navbar.Start.div [] [
+            Navbar.Dropdown.div [ ] [
                 Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                     str "How to use"
                 ]
-            ]
-            Navbar.End.div [] [
-                Navbar.Item.div [Navbar.Item.Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
-                    Switch.switchInline [
-                        Switch.Id "DarkModeSwitch"
-                        Switch.IsOutlined
-                        Switch.Color IsSuccess
-                        Switch.OnChange (fun _ -> ToggleColorMode |> StyleChange |> dispatch)
-                    ] [span [Class "nonSelectText"][str "DarkMode"]]
-                ]
                 Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                     str "Contact"
+                ]
+                Navbar.Item.a [Navbar.Item.Props [
+                    OnClick (fun e ->
+                        ToggleBurger |> StyleChange |> dispatch
+                        UpdatePageState (Some Routing.Route.Settings) |> dispatch
+                    )
+                    Style [ Color model.SiteStyleState.ColorMode.Text]
+                ]] [
+                    str "Settings"
                 ]
                 Navbar.Item.a [Navbar.Item.Props [
                     Style [ Color model.SiteStyleState.ColorMode.Text];

@@ -1,3 +1,17 @@
+### 0.2.0+899b535 (Released 2021-1-11)
+* Additions:
+    * latest commit #899b535
+    * [[#1182030](https://github.com/nfdi4plants/Swate/commit/1182030d57695643e9b333f0bfbdfe11e64ceab2)] Add Setting Page
+    * [[#d4a36f1](https://github.com/nfdi4plants/Swate/commit/d4a36f1e3417f5e49c184392e30d95d353f54a07)] Provide validation information via XML metadata (Issue #45). :christmas_tree: :fireworks:
+    * [[#f3a11f0](https://github.com/nfdi4plants/Swate/commit/f3a11f0257f5d7d25a67dfdb85700903573d9ec1)] Update FilePicker with reordering functionality (Issue #13).
+    * [[#f6564d6](https://github.com/nfdi4plants/Swate/commit/f6564d65c9985c82cbad3b482792e94379a7b34b)] Add search term search by accession number (Issue #71).
+    * [[#bdba3ae](https://github.com/nfdi4plants/Swate/commit/bdba3ae061d4c0aa473eef19ab2c55586582c462)] Properly Document Office interop functions (Issue #75).
+    * [[#aa870f1](https://github.com/nfdi4plants/Swate/commit/aa870f1c2d40a20f6dc71bb6fcc0a7d4ace49847)] Update README.md
+    * [[#e958024](https://github.com/nfdi4plants/Swate/commit/e958024d7ac0f804107eaf55fb66e74e966acd63)] Improve readme :book:
+* Bugfixes:
+    * [[#9c07338](https://github.com/nfdi4plants/Swate/commit/9c07338a624240d1f3119cee243164186c5203b2)] Fix input assistance is not added when first table is created (Issue #82).
+    * [[#889b86c](https://github.com/nfdi4plants/Swate/commit/889b86c466c454e736daf950ac0df4f77dcb6355)] Fix file picker not uploading reoccuring file names (Issue #80).
+
 ### 0.1.3+c6ad5b7 (Released 2020-12-7)
 * Additions:
     * latest commit #c6ad5b7

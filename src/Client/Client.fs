@@ -87,6 +87,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
             Text.p [] [str ""]
         ]
 
+    | Routing.Route.Settings ->
+        BaseView.baseViewComponent model dispatch [
+            SettingsView.settingsViewComponent model dispatch
+        ] [
+            Text.p [] [str ""]
+        ]
+
     | Routing.Route.Info ->
         BaseView.baseViewComponent model dispatch [
             InfoView.infoComponent model dispatch
@@ -106,7 +113,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
             div [][ str "This is the Swate web host. For a preview click on the following link." ]
             a [ Href (Routing.Route.toRouteUrl Routing.Route.TermSearch) ] [ str "Termsearch" ]
         ]
-
     //| _ ->
     //    div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
     //        ] [

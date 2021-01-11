@@ -108,7 +108,7 @@ module PredefinedParams =
         dbdomaniOntologyParamArr
         |> ParamRecordType
 
-    let InsertTermType =
+    let SearchTermType =
         let insertTermParamArr = [|
             Parameter.create "ColIndices" (ParamArray ParamInteger) ""
             Parameter.create "SearchString" (ParamString) ""
@@ -129,7 +129,7 @@ module PredefinedParams =
             UserID = "gkoutos"
         }
 
-        let insertTermExmp:InsertTerm = {
+        let searchTermExmp:SearchTermI = {
             ColIndices = [|2; 3|]
             SearchString = "Bruker Daltonics HCT Series"
             RowIndices = [|0 .. 10|]

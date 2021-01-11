@@ -177,12 +177,12 @@ let getUnitTermSuggestions cString (query:string) =
                     (reader.GetBoolean(6))
     |]
 
-let getTermByName cString (query:InsertTerm) =
+let getTermByName cString (queryStr:string) =
     
     use connection = establishConnection cString
     connection.Open()
 
-    use getTermByNameCmd = new MySqlCommand("getUnitTermSuggestions",connection)
+    use getTermByNameCmd = connection.CreateCommand()
     getTermByNameCmd
         .CommandText <- """
             SELECT * FROM Term WHERE Term.Name = @name
@@ -190,12 +190,11 @@ let getTermByName cString (query:InsertTerm) =
 
     let queryParam = getTermByNameCmd.Parameters.Add("name",MySqlDbType.VarChar)
 
-    queryParam.Value    <- query.SearchString
+    queryParam.Value    <- queryStr
 
     use reader = getTermByNameCmd.ExecuteReader()
-    let termOpt =
-        match reader.Read() with
-        | true ->
+    [|
+        while reader.Read() do
             DbDomain.createTerm
                 (reader.GetInt64(0))
                 (reader.GetString(1))
@@ -207,12 +206,39 @@ let getTermByName cString (query:InsertTerm) =
                 else
                     Some (reader.GetString(5)))
                 (reader.GetBoolean(6))
-            |> Some
-        | false ->
-            None
-    {query with TermOpt = termOpt}
+    |]
 
+let getTermByAccession cString (queryStr:string) =
+    
+    use connection = establishConnection cString
+    connection.Open()
 
+    use cmd = connection.CreateCommand()
+    cmd
+        .CommandText <- """
+            SELECT * FROM Term WHERE Term.Accession = @accession
+        """
+
+    let queryParam = cmd.Parameters.Add("accession",MySqlDbType.VarChar)
+
+    queryParam.Value    <- queryStr
+
+    use reader = cmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
 
 let getAllOntologies cString () =
     

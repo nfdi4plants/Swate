@@ -16,16 +16,9 @@ open Microsoft.Extensions.Configuration.Json
 open Microsoft.Extensions.Configuration.UserSecrets
 open Microsoft.AspNetCore.Hosting
 
-//let connectionString = System.Environment.GetEnvironmentVariable("AnnotatorTestDbCS")
+/// Was transferred into dev.json
 //[<Literal>]
 //let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
-
-
-/// Showcase of how versioning could work
-let testApi = {
-        //Development
-        getTestNumber = fun () -> async { return 42 }
-    }
 
 let serviceApi = {
     getAppVersion = fun () -> async {return System.AssemblyVersionInformation.AssemblyVersion}
@@ -63,30 +56,40 @@ let annotatorApi cString = {
     // Term related requests
     getTermSuggestions = fun (max:int,typedSoFar:string) ->
         async {
-            let like = OntologyDB.getTermSuggestions cString typedSoFar
-            let searchSet = typedSoFar |> Suggestion.createBigrams
-
-            return
-                like
-                |> Array.sortByDescending (fun sugg ->
-                        Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                )
+            let searchRes =
+                match typedSoFar with
+                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                    OntologyDB.getTermByAccession cString foundAccession
+                | _ ->
+                    let like = OntologyDB.getTermSuggestions cString typedSoFar
+                    let searchSet = typedSoFar |> Suggestion.createBigrams
+                    like
+                    |> Array.sortByDescending (fun sugg ->
+                            Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                    )
                 
-                |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+                    |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+            return searchRes
         }
 
     getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:string) ->
         async {
-            let like = OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm)
-            let searchSet = typedSoFar |> Suggestion.createBigrams
 
-            return
-                like
-                |> Array.sortByDescending (fun sugg ->
-                        Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                )
-                
-                |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+            let searchRes =
+                match typedSoFar with
+                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                    OntologyDB.getTermByAccession cString foundAccession
+                | _ ->
+                    let like = OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm)
+                    let searchSet = typedSoFar |> Suggestion.createBigrams
+                    like
+                    |> Array.sortByDescending (fun sugg ->
+                            Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                    )
+                    
+                    |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+
+            return searchRes
         }
 
     getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
@@ -98,34 +101,33 @@ let annotatorApi cString = {
 
     getUnitTermSuggestions = fun (max:int,typedSoFar:string) ->
         async {
-            let like = OntologyDB.getUnitTermSuggestions cString typedSoFar
-            let searchSet = typedSoFar |> Suggestion.createBigrams
-
-            return
-                like
-                |> Array.sortByDescending (fun sugg ->
-                        Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                )
+            let searchRes =
+                match typedSoFar with
+                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                    OntologyDB.getTermByAccession cString foundAccession
+                | _ ->
+                    let like = OntologyDB.getUnitTermSuggestions cString typedSoFar
+                    let searchSet = typedSoFar |> Suggestion.createBigrams
+                    like
+                    |> Array.sortByDescending (fun sugg ->
+                            Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                    )
                 
-                |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+                    |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+
+            return searchRes
         }
 
     getTermsByNames = fun (queryArr) ->
         async {
-            let result = queryArr |> Array.map (OntologyDB.getTermByName cString)
+            let result =
+                queryArr |> Array.map (fun searchTerm ->
+                    let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
+                    {searchTerm with TermOpt = if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some }
+                )
             return result
         }
 }
-
-let testWebApp =
-    Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue testApi
-    |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
-    )
-    |> Remoting.buildHttpHandler
 
 let createIServiceAPIv1 =
     Remoting.createApi()
@@ -149,6 +151,8 @@ let createIAnnotatorApiv1 cString =
     )
     |> Remoting.buildHttpHandler
 
+
+/// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
 let mainApiController = router {
 
     //
@@ -157,11 +161,6 @@ let mainApiController = router {
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
         createIAnnotatorApiv1 cString next ctx
-    )
-
-    //
-    forward @"/ITestAPI" (fun next ctx ->
-        testWebApp next ctx
     )
 
     //
@@ -178,11 +177,6 @@ let topLevelRouter = router {
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
         createIAnnotatorApiv1 cString next ctx
-    )
-
-    //
-    forward @"" (fun next ctx ->
-        testWebApp next ctx
     )
 
     //

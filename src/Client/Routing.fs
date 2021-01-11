@@ -14,6 +14,7 @@ type Route =
 | FilePicker
 | Info
 | ActivityLog
+| Settings
 | NotFound
 
     static member toRouteUrl (route:Route) =
@@ -25,6 +26,7 @@ type Route =
         | Route.FilePicker          -> "/#FilePicker"
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
+        | Route.Settings            -> "/#Settings"
         | Route.NotFound            -> "/#NotFound"
 
     static member toString (route:Route) =
@@ -36,6 +38,7 @@ type Route =
         | Route.Info                -> "Info"
         | Route.FilePicker          -> "FilePicker"
         | Route.ActivityLog         -> "ActivityLog"
+        | Route.Settings            -> "Settings"
         | Route.NotFound            -> "NotFound"
 
     static member toIcon (p: Route)=
@@ -74,10 +77,11 @@ module Routing =
             map Route.Home              (s "")
             map Route.TermSearch        (s "TermSearch")
             map Route.AddBuildingBlock  (s "AddBuildingBlock")
-            map Route.Validation        (s "Validation")   
+            map Route.Validation        (s "Validation")
             map Route.FilePicker        (s "FilePicker")
             map Route.Info              (s "Info")
             map Route.ActivityLog       (s "ActivityLog")
+            map Route.Settings          (s "Settings")
             map Route.NotFound          (s "NotFound")
         ]
 

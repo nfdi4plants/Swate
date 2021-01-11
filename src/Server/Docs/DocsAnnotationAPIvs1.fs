@@ -94,7 +94,9 @@ let annotatorApiDocsv1 =
                     |> ParamArray
                 createDocumentationDescription
                     "This function is used to search the Database for Terms by <b>querystring</b>'. It returns <b>n</b> results."
-                    "<code>getTermSuggestions</code> is used to search Terms without parent ontology, unit terms and AddBuildingBlock terms."
+                    "<code>getTermSuggestions</code> is used to search Terms without parent ontology and AddBuildingBlock terms.
+                    From release 0.1.4 onwards this function will try to parse the <b>querystring</b> to a <code>Term.Accession</code> value.
+                    If successful it will search the database for <code>Term.Accession</code> = <b>querystring</b>, allowing a search by accession number."
                     (Some [|
                         (Parameter.create "n" ParamInteger "This parameter sets the number of returned results."                        )
                         (Parameter.create "queryString" ParamString "This parameter is used to search the Term.Name Column for hits."   )
@@ -127,7 +129,7 @@ let annotatorApiDocsv1 =
         |> annotatorDocsv1.description
             (
                 createDocumentationDescription
-                    "This is a <code>getTermSuggestions</code> advanced search variant, which can be used to search for specific Terms that might not show up in the top 5 results of the normal term search."
+                    "<code>getTermsForAdvancedSearch</code>) can be used to search for specific Terms that might not show up in the top 5 results of the normal term search."
                     "Should a user not be able to find his term of interest, the term suggestions dropdown below the searchfield allows the user to switch to advanced term search."
                     (Some [|
                         Parameter.create "OntologyOption" (ParamOption PredefinedParams.OntologyType) "This parameter can be used to search only in a specific ontology."
@@ -170,16 +172,17 @@ let annotatorApiDocsv1 =
         |> annotatorDocsv1.alias "Get Unit Terms (<code>getTermsByNames</code>)"
         |> annotatorDocsv1.description (
             createDocumentationDescription
-                "This function uses the given <code>InsertTerm []</code> to try and find one search result for each member of <code>InsertTerm []</code> for the <code>InsertTerm.SearchString</code> on Term.Name in the database.
-                The search result is then passed into the same InsertTerm type as <code>InsertTerm.TermOpt</code> and returned to the client."
+                "This function uses the given <code>SearchTermI []</code> to try and find one search result for each member of <code>SearchTermI []</code> for the
+                <code>SearchTermI.SearchString</code> on Term.Name in the database.
+                The search result is then passed into the same SearchTerm type as <code>SearchTermI.TermOpt</code> and returned to the client."
                 "<code>getTermsByNames</code> is used to find Terms in the database that fit the entries in the excel annotation table. The necessary information (col-, row-index
-                is stored in the InsertTerm type. One array element for each distinct value found in the table."
+                is stored in the SearchTermI type. One array element for each distinct value found in the table."
                 (Some [|
-                    Parameter.create "InsertTerm []" (PredefinedParams.InsertTermType |> ParameterType.ParamArray) ""
+                    Parameter.create "SearchTermI []" (PredefinedParams.SearchTermType |> ParameterType.ParamArray) ""
                 |])
-                "Returns the parameter array posted to it with the search result in <code>InsertTerm.TermOpt</code>."
-                (Parameter.create "InsertTerm []" (PredefinedParams.InsertTermType |> ParameterType.ParamArray) "")
+                "Returns the parameter array posted to it with the search result in <code>SearchTerm.TermOpt</code>."
+                (Parameter.create "SearchTermI []" (PredefinedParams.SearchTermType |> ParameterType.ParamArray) "")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getTermsByNames ([|PredefinedParams.Examples.insertTermExmp|]) @>
+        |> annotatorDocsv1.example <@ fun api -> api.getTermsByNames ([|PredefinedParams.Examples.searchTermExmp|]) @>
     ]
 
