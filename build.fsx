@@ -2,8 +2,8 @@
 #load "./.fake/build.fsx/intellisense.fsx"
 #r "netstandard"
 
-
 open System
+open System.Text
 open Fake
 open Fake.Core
 open Fake.DotNet
@@ -521,6 +521,24 @@ Target.create "Release" (fun config ->
         ]
 
     Trace.trace "Update Version.fs done!"
+
+    /// Update maniefest.xmls
+
+    Trace.trace "Update manifest.xml"
+
+    let _ =
+        let newVer = sprintf "<Version>%i.%i.%i</Version>" newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch
+        Shell.regexReplaceInFilesWithEncoding
+            "<Version>[0-9]+.[0-9]+.[0-9]+</Version>"
+            newVer
+            Encoding.UTF8
+            [
+                (Path.combine __SOURCE_DIRECTORY__ ".assets\swate\manifest.xml")
+                (Path.combine __SOURCE_DIRECTORY__ "manifest.xml")
+                (Path.combine __SOURCE_DIRECTORY__ "tests\manifest.xml")
+            ]
+
+    Trace.trace "Update manifest.xml done!"
 )
 
 Target.create "GithubDraft" (fun config ->

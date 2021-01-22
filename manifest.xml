@@ -1,11 +1,11 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>5d6f5462-3401-48ec-9406-d12882e9ad83</Id>
-  <Version>1.0.0.0</Version>
+  <Version>0.2.1</Version>
   <ProviderName>Computational Systems Biology</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="CSBAnnotator"/>
-  <Description DefaultValue="Utility functions to annotate data in a fast and safe way"/>
+  <DisplayName DefaultValue="Swate"/>
+  <Description DefaultValue="Utility functions to annotate data in a fast and safe way."/>
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png"/>
   <SupportUrl DefaultValue="https://csb.bio.uni-kl.de/"/>
@@ -30,8 +30,8 @@
           </GetStarted>
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabData">
-              <Group id="CSBAnnotatorCommands">
-                <Label resid="CSBAnnotatorCommands.Label"/>
+              <Group id="SwateCommands">
+                <Label resid="SwateCommands.Label"/>
                 <Icon>
                   <bt:Image size="16" resid="Icon.16x16"/>
                   <bt:Image size="20" resid="Icon.20x20"/>
@@ -43,7 +43,7 @@
                   <bt:Image size="80" resid="Icon.80x80"/>
                   <bt:Image size="96" resid="Icon.96x96"/>
                 </Icon>
-                <Control xsi:type="Button" id="TermSearch">
+                <!--<Control xsi:type="Button" id="TermSearch">
                   <Label resid="TermSearch.Label"/>
                   <Supertip>
                     <Title resid="TermSearch.Label"/>
@@ -64,7 +64,7 @@
                     <TaskpaneId>ButtonId1</TaskpaneId>
                     <SourceLocation resid="TermSearch.Url"/>
                   </Action>
-                </Control>
+                </Control>-->
                 <Control xsi:type="Button" id="AddBuildingBlock">
                     <Label resid="AddBuildingBlock.Label"/>
                     <Supertip>
@@ -107,19 +107,19 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
-        <bt:Url id="TermSearch.Url" DefaultValue="https://localhost:3000/#TermSearch"/>
+        <!--<bt:Url id="TermSearch.Url" DefaultValue="https://localhost:3000/#TermSearch"/>-->
         <bt:Url id="AddBuildingBlock.Url" DefaultValue="https://localhost:3000/#AddBuildingBlock"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>
-        <bt:String id="CSBAnnotatorCommands.Label" DefaultValue="CSBAnnotator Commands"/>
-        <bt:String id="TermSearch.Label" DefaultValue="Insert Ontology Term"/>
-        <bt:String id="AddBuildingBlock.Label" DefaultValue="Add Annotation Building Block"/>
+        <bt:String id="SwateCommands.Label" DefaultValue="Swate"/>
+        <!--<bt:String id="TermSearch.Label" DefaultValue="Insert Ontology Term"/>-->
+        <bt:String id="AddBuildingBlock.Label" DefaultValue="Swate"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="CSBAnnotator succesfully. Go to the DATA tab and click the 'Show Annotation Pane' button to get started."/>
-        <bt:String id="TermSearch.Tooltip" DefaultValue="open a taskpane where you can search for ontology terms in multiple ways and fill the results into your sheet."/>
-        <bt:String id="AddBuildingBlock.Tooltip" DefaultValue="open a taskpane where you can select annotation building block and add them to yourt anotation table."/>
+        <bt:String id="GetStarted.Description" DefaultValue="Swate was loaded succesfully. Go to the DATA tab and click the 'Swate' button to get started."/>
+        <!--<bt:String id="TermSearch.Tooltip" DefaultValue="Open a taskpane where you can search for ontology terms in multiple ways and fill the results into your sheet."/>-->
+        <bt:String id="AddBuildingBlock.Tooltip" DefaultValue="Open a task pane to gain full access to the Swate functionality."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
