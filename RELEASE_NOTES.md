@@ -1,3 +1,8 @@
+### 0.2.1+67ad143 (Released 2021-1-22)
+* Additions:
+    * latest commit #67ad143
+    * [[#67ad143](https://github.com/nfdi4plants/Swate/commit/67ad14381ad8ac8bdbbaefd0ebfa82193c8f94b9)] Update manifest.xml (Issue #86).
+
 ### 0.2.0+899b535 (Released 2021-1-11)
 * Additions:
     * latest commit #899b535

@@ -541,6 +541,18 @@ Target.create "Release" (fun config ->
     Trace.trace "Update manifest.xml done!"
 )
 
+Target.create "ZipAssets" (fun _ ->
+
+    let assetPath = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets\assets")
+    let assetDir = Fake.IO.DirectoryInfo.ofPath assetPath
+
+    let files =
+        let assetsPaths = Fake.IO.DirectoryInfo.getFiles assetDir
+        assetsPaths |> Array.map (fun x -> x.FullName)
+
+    Zip.zip assetDir.FullName ".assets\swate.zip" files
+)
+
 Target.create "GithubDraft" (fun config ->
 
     let prevReleaseNotes =
@@ -594,7 +606,6 @@ Target.create "GithubDraft" (fun config ->
     let release = ReleaseNotes.load "RELEASE_NOTES.md"
     let semVer = (sprintf "v%i.%i.%i" release.SemVer.Major release.SemVer.Minor release.SemVer.Patch)
 
-
     let token =
         match Environment.environVarOrDefault "github_token" "", tokenOpt with
         | s, None when System.String.IsNullOrWhiteSpace s |> not -> s
@@ -609,6 +620,7 @@ Target.create "GithubDraft" (fun config ->
     let files =
         let assetPath = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets")
         let assetDir = Fake.IO.DirectoryInfo.ofPath assetPath
+        /// This only accesses files and not folders. So in this case it will only access the .zip file created by "ZipAssets"
         let assetsPaths = Fake.IO.DirectoryInfo.getFiles assetDir
         assetsPaths |> Array.map (fun x -> x.FullName)
 
@@ -708,6 +720,9 @@ open Fake.Core.TargetOperators
 
 "IsExistingReleaseNotes"
     ==> "Release"
+
+"ZipAssets"
+    ==> "GithubDraft"
 
 "InstallOfficeAddinTooling"
     ==> "WebpackConfigSetup"
