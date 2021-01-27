@@ -84,8 +84,7 @@ module ColumnTags =
     let HiddenTag = "#h"
 
     [<Literal>]
-    /// As for now, unit tags can contain a accession number if they are existing unit terms.
-    let UnitTagStart = "#u"
+    let UnitTag = "#u"
 
 open System
 open Fable.SimpleXml
@@ -274,12 +273,11 @@ type TryFindAnnoTableResult =
                     Error "Could not process message. Swate was not able to identify the given annotation tables with a known case."
 
 type ColHeader = {
-    Header  : string
-    CoreName: string option
-    Ontology: string option
-    TagArr: string [] option
-    HasUnitAccession : string option
-    IsUnitCol: bool
+    Header:     string
+    CoreName:   string option
+    Ontology:   string option
+    TagArr:     string [] option
+    IsUnitCol:  bool
 }
 
 /// This module contains types to handle value search for TSR and TAN columns.

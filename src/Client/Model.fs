@@ -297,33 +297,43 @@ type AddBuildingBlockState = {
     BuildingBlockNameSuggestions            : DbDomain.Term []
     ShowBuildingBlockSelection              : bool
     BuildingBlockHasUnit                    : bool
-    ShowBuildingBlockNameSuggestions        : bool
-    HasBuildingBlockNameSuggestionsLoading  : bool
+    ShowBuildingBlockTermSuggestions        : bool
+    HasBuildingBlockTermSuggestionsLoading  : bool
 
+    /// This section is used to add a unit directly to a freshly created building block.
     UnitTermSearchText                      : string
     UnitTermSuggestions                     : DbDomain.Term []
     HasUnitTermSuggestionsLoading           : bool
     ShowUnitTermSuggestions                 : bool
-    /// This entry determines if the current UnitTermSearchText is a real term or if it is a customly typed unit.
-    /// If UnitTermSearchTextHasTermID.IsSome then the string is the Term.Accession else it is customely typed.
-    /// This is necessary to store the information about the Term.Accession for TAN in the unit columns.
-    UnitTermSearchTextHasTermAccession      : string option
+
+    /// This section is used to add a unit directly to an already existing building block
+    Unit2TermSearchText                      : string
+    Unit2TermSuggestions                     : DbDomain.Term []
+    HasUnit2TermSuggestionsLoading           : bool
+    ShowUnit2TermSuggestions                 : bool
 
 } with
     static member init () = {
+        ShowBuildingBlockSelection              = false
+
         CurrentBuildingBlock                    = AnnotationBuildingBlock.init NoneSelected
 
         BuildingBlockNameSuggestions            = [||]
-        ShowBuildingBlockSelection              = false
+        ShowBuildingBlockTermSuggestions        = false
+        HasBuildingBlockTermSuggestionsLoading  = false
         BuildingBlockHasUnit                    = false
-        ShowBuildingBlockNameSuggestions        = false
-        HasBuildingBlockNameSuggestionsLoading  = false
 
+        /// This section is used to add a unit directly to a freshly created building block.
         UnitTermSearchText                      = ""
         UnitTermSuggestions                     = [||]
-        HasUnitTermSuggestionsLoading           = false
         ShowUnitTermSuggestions                 = false
-        UnitTermSearchTextHasTermAccession      = None
+        HasUnitTermSuggestionsLoading           = false
+
+        /// This section is used to add a unit directly to an already existing building block
+        Unit2TermSearchText                      = ""
+        Unit2TermSuggestions                     = [||]
+        ShowUnit2TermSuggestions                 = false
+        HasUnit2TermSuggestionsLoading           = false
     }
 
 /// Validation scheme for Table

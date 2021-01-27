@@ -90,11 +90,29 @@ with
         DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (SearchUnitTermTextChange >> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> (sugg.Name,sugg.Accession) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str, Unit1) |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> (sugg.Name, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg.Name,sugg.Accession) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg.Name, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+    }
+
+    static member ofAddBuildingBlockUnit2State (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
+        ModalId                 = "Unit2Search_ID"
+        InputId                 = "Unit2SearchInput_ID"
+
+        StateBinding            = state.Unit2TermSearchText
+        Suggestions             = state.Unit2TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        MaxItems                = 5
+        DropDownIsVisible       = state.ShowUnit2TermSuggestions
+        DropDownIsLoading       = state.HasUnit2TermSuggestionsLoading
+
+        AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
+        OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str,Unit2) |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> (sugg.Name, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+
+        HasAdvancedSearch       = true
+        OnAdvancedSearch        = (fun sugg -> (sugg.Name, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
     }
 
     static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
@@ -104,8 +122,8 @@ with
         StateBinding            = state.CurrentBuildingBlock.Name
         Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
         MaxItems                = 5
-        DropDownIsVisible       = state.ShowBuildingBlockNameSuggestions
-        DropDownIsLoading       = state.HasBuildingBlockNameSuggestionsLoading
+        DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
+        DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
 
         OnInputChangeMsg        = (BuildingBlockNameChange >> AddBuildingBlock)
         OnSuggestionSelect      = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)

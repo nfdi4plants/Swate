@@ -70,7 +70,7 @@ let exampleExcelFunction () =
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
         promise {
-            return "test"
+            return "test1"
         }
     )
 
@@ -84,14 +84,7 @@ let exampleExcelFunction2 () =
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
         promise {
-
-            let! xmlParsed, currentSwateValidationXml = getCurrentValidationXml customXmlParts context
-
-            let currentSwateVersion = "0.1.3"
-            let currentSwateValidationXml' =
-                if currentSwateValidationXml.IsNone then SwateValidation.init (currentSwateVersion) else currentSwateValidationXml.Value
-
-            return sprintf "%A" currentSwateValidationXml'
+            return "test2"
         }
     )
 
@@ -373,7 +366,7 @@ let getTableRepresentation(annotationTable) =
     )
 
 /// This function is used to add a new building block to the active annotationTable.
-let addAnnotationBlock (annotationTable,colName:string,format:(string*(string option)) option) =
+let addAnnotationBlock (annotationTable,colName:string,format:string option) =
 
     /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
     let isSingleCol =
@@ -404,18 +397,6 @@ let addAnnotationBlock (annotationTable,colName:string,format:(string*(string op
         | _ ->
             (sprintf "[%s] (#%i; #h)" coreName id)
 
-    /// This will create the column header attributes for a unit block.
-    /// as unit always has to be a term and cannot be for example "Source" or "Sample", both of which have a differen format than for exmaple "Parameter [TermName]",
-    /// we only need one function to generate id and attributes and bring the unit term in the right format.
-    let unitColAttributes (unitTermInfo:string*string option) (id:int) =
-        let unitTermName = fst unitTermInfo
-        let unitAccession = if (snd unitTermInfo).IsNone then "" else (snd unitTermInfo).Value
-        match id with
-        | 1 ->
-            sprintf "[%s] (#h; #u%s)" unitTermName unitAccession
-        | _ ->
-            sprintf "[%s] (#%i; #h; #u%s)" unitTermName id unitAccession
-
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let annotationTable = sheet.tables.getItem(annotationTable)
@@ -423,9 +404,8 @@ let addAnnotationBlock (annotationTable,colName:string,format:(string*(string op
         // Ref. 2
 
         // This is necessary to place new columns next to selected col
-        let tables = annotationTable.columns.load(propertyNames = U2.Case1 "items")
         let annoHeaderRange = annotationTable.getHeaderRowRange()
-        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"|]))
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"|]))
         let tableRange = annotationTable.getRange()
         let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
         let range = context.workbook.getSelectedRange()
@@ -446,8 +426,8 @@ let addAnnotationBlock (annotationTable,colName:string,format:(string*(string op
                 let tableHeaderRangeColIndex = annoHeaderRange.columnIndex
                 let selectColIndex = range.columnIndex
                 let diff = selectColIndex - tableHeaderRangeColIndex |> int
-                let vals = tables.items
-                let maxLength = vals.Count-1
+                let vals = annoHeaderRange.columnCount |> int
+                let maxLength = vals-1
                 if diff < 0 then
                     maxLength+1
                 elif diff > maxLength then
@@ -540,54 +520,7 @@ let addAnnotationBlock (annotationTable,colName:string,format:(string*(string op
             /// if format.isSome then we need to also add unit columns in the following scheme:
             /// Unit [UnitTermName] (#id; #h; #u) | Term Source REF [UnitTermName] (#id; #h; #u) | Term Accession Number [UnitTermName] (#id; #h; #u)
             let createUnitColsIfNeeded =
-                if format.IsSome then
-                    let findNewIdForUnit() =
-                        let rec loopingCheck int =
-                            let isExisting =
-                                allColHeaders
-                                // Should a column with the same name already exist, then count up the id tag.
-                                |> Array.exists (fun existingHeader ->
-                                    // We don't need to check TSR or TAN, because the main column always starts with "Unit"
-                                    existingHeader = sprintf "Unit %s" (unitColAttributes format.Value int)
-                                )
-                            if isExisting then
-                                loopingCheck (int+1)
-                            else
-                                int
-                        loopingCheck 1
-
-                    let newUnitId = findNewIdForUnit()
-
-                    /// create unit main column
-                    let createdUnitCol1 =
-                        annotationTable.columns.add(
-                            index = newBaseColIndex'+3.,
-                            values = U4.Case1 col,
-                            name = sprintf "Unit %s" (unitColAttributes format.Value newUnitId)
-                        )
-
-                    /// create unit TSR
-                    let createdUnitCol2 =
-                        annotationTable.columns.add(
-                            index = newBaseColIndex'+4.,
-                            values = U4.Case1 col,
-                            name = sprintf "Term Source REF %s" (unitColAttributes format.Value newUnitId)
-                        )
-
-                    /// create unit TAN
-                    let createdUnitCol3 =
-                        annotationTable.columns.add(
-                            index = newBaseColIndex'+5.,
-                            values = U4.Case1 col,
-                            name = sprintf "Term Accession Number %s" (unitColAttributes format.Value newUnitId)
-                        )
-
-                    Some (
-                        sprintf " Added specified unit: %s" (fst format.Value),
-                        sprintf "0.00 \"%s\"" (fst format.Value)
-                    )
-                else
-                    None
+                OfficeInterop.HelperFunctions.createUnitColumns allColHeaders annotationTable newBaseColIndex' rowCount format
 
             /// If unit block was added then return some msg information
             let unitColCreationMsg = if createUnitColsIfNeeded.IsSome then fst createUnitColsIfNeeded.Value else ""
@@ -595,7 +528,7 @@ let addAnnotationBlock (annotationTable,colName:string,format:(string*(string op
 
             r.enableEvents <- true
             /// return main col names, unit column format and a message. The first two params are used in a follow up message (executing 'changeTableColumnFormat')
-            mainColName colName newId, unitColFormat, sprintf "%s column was added.%s" colName unitColCreationMsg
+            mainColName colName newId, unitColFormat, sprintf "%s column was added. %s" colName unitColCreationMsg
         )
     )
 
@@ -1098,4 +1031,91 @@ let writeTableValidationToXml(tableValidation:TableValidation,currentSwateVersio
                     newTableValidation.TableName
                     ( newTableValidation.DateTime.ToString("yyyy-MM-dd HH:mm") )
         }
+    )
+
+/// This function is used to add unit reference columns to an existing building block without unit reference columns
+let addUnitToExistingBuildingBlock (annotationTable:string,format:string option) =
+    Excel.run(fun context ->
+
+        let annotationTableName = annotationTable
+
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let annotationTable = sheet.tables.getItem(annotationTableName)
+
+        // Ref. 2
+
+        // This is necessary to place new columns next to selected col
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"; "columnIndex"; "columnCount"|]))
+
+        let tableRange = annotationTable.getRange()
+        let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+
+        let selectedRange = context.workbook.getSelectedRange()
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+
+        // Ref. 2
+        let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTableName
+
+        context.sync()
+            .``then``( fun _ ->
+
+                if selectedRange.columnCount <> 1. then
+                    failwith "To add a unit please select a single column"
+
+                let newSelectedColIndex =
+                    // recalculate the selected range index based on table
+                    let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
+                    // if index is smaller 0 it is outside of table range
+                    if diff <= 0. then 0.
+                    // if index is bigger than columnCount-1 then it is outside of tableRange
+                    elif diff >= annoHeaderRange.columnCount-1. then annoHeaderRange.columnCount-1.
+                    else diff
+
+                /// Sort all columns into building blocks.
+                let buildingBlocks =
+                    getBuildingBlocks annoHeaderRange annoBodyRange
+
+                /// find building block with the closest main column index from left
+                let findLeftClosestBuildingBlock =
+                    buildingBlocks
+                    |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
+                    |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
+
+                if findLeftClosestBuildingBlock.TAN.IsNone || findLeftClosestBuildingBlock.TSR.IsNone then
+                    failwith (
+                        sprintf
+                            "Swate can only add a unit to columns of the type: %s, %s, %s."
+                            OfficeInterop.Types.ColumnCoreNames.Shown.Parameter
+                            OfficeInterop.Types.ColumnCoreNames.Shown.Characteristics
+                            OfficeInterop.Types.ColumnCoreNames.Shown.Factor
+                    )
+
+                if findLeftClosestBuildingBlock.Unit.IsSome then
+                    failwith (
+                        sprintf
+                            "Swate cannot add a unit to a building block already containing a unit: %A"
+                            findLeftClosestBuildingBlock.Unit.Value.MainColumn.Header.Value.CoreName
+                    )
+
+                // This is necessary to skip over hidden cols
+                /// Get an array of the headers
+                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+
+                let allColHeaders =
+                    headerVals
+                    |> Array.choose id
+                    |> Array.map string
+
+                let unitColumnResult =
+                    createUnitColumns allColHeaders annotationTable (float findLeftClosestBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format
+
+                let maincolName = findLeftClosestBuildingBlock.MainColumn.Header.Value.Header
+
+                /// If unit block was added then return some msg information
+                let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""
+                let unitColFormat = if unitColumnResult.IsSome then snd unitColumnResult.Value else "0.00"
+
+                maincolName, unitColFormat, unitColCreationMsg
+        )
     )

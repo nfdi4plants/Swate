@@ -154,10 +154,9 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
-    | AddColumn (activeTableNameRes,colName,format) ->
+    | AddAnnotationBlock (activeTableNameRes,colName,format) ->
         let cmd name=
             Cmd.OfPromise.either
-                //OfficeInterop.addAnnotationColumn
                 OfficeInterop.addAnnotationBlock  
                 (name,colName,format)
                 (fun (newColName,format,msg) ->
@@ -165,6 +164,18 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 )
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
+        currentState, cmd
+
+    | AddUnitToAnnotationBlock (activeTableNameRes, format) ->
+        let cmd name =
+            Cmd.OfPromise.either
+                OfficeInterop.addUnitToExistingBuildingBlock
+                (name,format)
+                (fun (newColName,format,msg) ->
+                    FormatColumn (activeTableNameRes, newColName, format, msg) |> ExcelInterop
+                )
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
     | FormatColumn (activeTableNameRes,colName,format,msg) ->
@@ -581,7 +592,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString =
+    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (DbDomain.Term [] * UnitSearchRequest) -> ApiMsg) queryString (relUnit:UnitSearchRequest) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -594,7 +605,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getUnitTermSuggestions
-                (5,queryString)
+                (5,queryString,relUnit)
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
@@ -669,11 +680,12 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             queryString
             parentOntology
 
-    | GetNewUnitTermSuggestions queryString ->
+    | GetNewUnitTermSuggestions (queryString,relUnit) ->
         handleUnitTermSuggestionRequest
             "getUnitTermSuggestions"
             (UnitTermSuggestionResponse >> Response)
             queryString
+            relUnit
 
     | GetNewBuildingBlockNameSuggestions queryString ->
         handleTermSuggestionRequest
@@ -783,6 +795,25 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
+    let handleUnitTermSuggestionResponse (responseHandler: DbDomain.Term [] * UnitSearchRequest -> Msg) (suggestions: DbDomain.Term[]) (relatedUnitSearch:UnitSearchRequest) =
+        let finishedCall = {
+            currentState.currentCall with
+                Status = Successfull
+        }
+
+        let nextState = {
+            currentState with
+                currentCall = noCall
+                callHistory = finishedCall::currentState.callHistory
+        }
+
+        let cmds = Cmd.batch [
+            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
+            (suggestions,relatedUnitSearch) |> responseHandler |> Cmd.ofMsg
+        ]
+
+        nextState, cmds
+
     match resMsg with
     | TermSuggestionResponse suggestions ->
         //let finishedCall = {
@@ -806,11 +837,13 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
             (NewSuggestions >> TermSearch)
             suggestions
 
-    | UnitTermSuggestionResponse suggestions ->
+    | UnitTermSuggestionResponse (suggestions,relUnit) ->
 
-        handleTermSuggestionResponse
+        handleUnitTermSuggestionResponse
             (NewUnitTermSuggestions >> AddBuildingBlock)
             suggestions
+            relUnit
+            
 
     | BuildingBlockNameSuggestionsResponse suggestions ->
 
@@ -996,7 +1029,7 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
 
         nextState,Cmd.none
 
-    | SearchUnitTermTextChange newTerm ->
+    | SearchUnitTermTextChange (newTerm,relUnit) ->
 
         let triggerNewSearch =
             newTerm.Length > 2
@@ -1006,42 +1039,65 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
             "GetNewUnitTermSuggestions",
             (
                 if triggerNewSearch then
-                    newTerm  |> (GetNewUnitTermSuggestions >> Request >> Api)
+                    (newTerm,relUnit) |> (GetNewUnitTermSuggestions >> Request >> Api)
                 else
                     DoNothing
             )
 
-        let nextState = {
-            currentState with
-                UnitTermSearchText              = newTerm
-                ShowUnitTermSuggestions         = triggerNewSearch
-                HasUnitTermSuggestionsLoading   = true
-                UnitTermSearchTextHasTermAccession = None
-        }
+        let nextState =
+            match relUnit with
+            | Unit1 ->
+                { currentState with
+                    UnitTermSearchText                  = newTerm
+                    ShowUnitTermSuggestions             = triggerNewSearch
+                    HasUnitTermSuggestionsLoading       = true
+                }
+            | Unit2 ->
+                { currentState with
+                    Unit2TermSearchText                  = newTerm
+                    ShowUnit2TermSuggestions             = triggerNewSearch
+                    HasUnit2TermSuggestionsLoading       = true
+                }
 
         nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
 
-    | NewUnitTermSuggestions suggestions ->
-    
-        let nextState = {
-            currentState with
-                UnitTermSuggestions             = suggestions
-                ShowUnitTermSuggestions         = true
-                HasUnitTermSuggestionsLoading   = false
-        }
+    | NewUnitTermSuggestions (suggestions,relUnit) ->
+
+        let nextState =
+            match relUnit with
+            | Unit1 ->
+                { currentState with
+                        UnitTermSuggestions             = suggestions
+                        ShowUnitTermSuggestions         = true
+                        HasUnitTermSuggestionsLoading   = false
+                }
+            | Unit2 ->
+                { currentState with
+                    Unit2TermSuggestions             = suggestions
+                    ShowUnit2TermSuggestions         = true
+                    HasUnit2TermSuggestionsLoading   = false
+                }
 
         nextState,Cmd.none
 
-    | UnitTermSuggestionUsed (suggestionName,suggestionAccession) ->
+    | UnitTermSuggestionUsed (suggestionName, relUnit) ->
 
-        let nextState = {
-            currentState with
-                UnitTermSearchText              = suggestionName
-                //UnitTerm                        = Some suggestion
-                ShowUnitTermSuggestions         = false
-                HasUnitTermSuggestionsLoading   = false
-                UnitTermSearchTextHasTermAccession = Some suggestionAccession
-        }
+        let nextState =
+            match relUnit with
+            | Unit1 ->
+                { currentState with
+                    UnitTermSearchText              = suggestionName
+                    //UnitTerm                        = Some suggestion
+                    ShowUnitTermSuggestions         = false
+                    HasUnitTermSuggestionsLoading   = false
+                }
+            | Unit2 ->
+                { currentState with
+                    Unit2TermSearchText              = suggestionName
+                    //UnitTerm                        = Some suggestion
+                    ShowUnit2TermSuggestions         = false
+                    HasUnit2TermSuggestionsLoading   = false
+                }
         nextState, Cmd.none
 
     | BuildingBlockNameChange newName ->
@@ -1067,8 +1123,8 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
         let nextState = {
             currentState with
                 CurrentBuildingBlock                    = nextBB
-                ShowBuildingBlockNameSuggestions        = triggerNewSearch
-                HasBuildingBlockNameSuggestionsLoading  = true
+                ShowBuildingBlockTermSuggestions        = triggerNewSearch
+                HasBuildingBlockTermSuggestionsLoading  = true
         }
 
         nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
@@ -1078,8 +1134,8 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
         let nextState = {
             currentState with
                 BuildingBlockNameSuggestions            = suggestions
-                ShowBuildingBlockNameSuggestions        = true
-                HasBuildingBlockNameSuggestionsLoading  = false
+                ShowBuildingBlockTermSuggestions        = true
+                HasBuildingBlockTermSuggestionsLoading  = false
         }
 
         nextState,Cmd.none
@@ -1094,8 +1150,8 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
         let nextState = {
             currentState with
                 CurrentBuildingBlock                    = nextBB
-                ShowBuildingBlockNameSuggestions        = false
-                HasBuildingBlockNameSuggestionsLoading  = false
+                ShowBuildingBlockTermSuggestions        = false
+                HasBuildingBlockTermSuggestionsLoading  = false
         }
         nextState, Cmd.none
 

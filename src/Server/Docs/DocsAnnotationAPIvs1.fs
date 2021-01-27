@@ -157,16 +157,18 @@ let annotatorApiDocsv1 =
                 |> ParamArray
             createDocumentationDescription
                 "This is a <code>getTermSuggestions</code> variant used specifically to find unit ontology terms."
-                "<code>getUnitTermSuggestions</code> is used to find a unit restriction during AddBuildingBlock."
+                "<code>getUnitTermSuggestions</code> is used to find a unit restriction during AddBuildingBlock and to add a unit to an already existing building block.
+                'f# Union type' parameter is only passed to server to later determine the origin search request in client. This value will pass through server unused."
                 (Some [|
                     Parameter.create "n" ParamInteger "This parameter sets the number of returned results."
                     Parameter.create "queryString" ParamString "This parameter is used to search the Term.Name Column for hits."
+                    Parameter.create "f# Union type" ParamString "This parameter is used to define the position at which is search for a unit term."
                 |])
                 "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>. The matching results are restricted to Term.FK_OntologyID = 1 (Unit Ontology)."
                 (Parameter.create "Term []" dbDomainTermArr "Array of database Term entries.")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getUnitTermSuggestions (5,"light") @>
-        |> annotatorDocsv1.example <@ fun api -> api.getUnitTermSuggestions (5,"temp") @>
+        |> annotatorDocsv1.example <@ fun api -> api.getUnitTermSuggestions (5,"light", Unit1) @>
+        |> annotatorDocsv1.example <@ fun api -> api.getUnitTermSuggestions (5,"temp", Unit1) @>
 
         annotatorDocsv1.route <@ fun api -> api.getTermsByNames @>
         |> annotatorDocsv1.alias "Get Unit Terms (<code>getTermsByNames</code>)"

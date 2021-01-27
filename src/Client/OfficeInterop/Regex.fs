@@ -61,21 +61,16 @@ let parseColHeader (headerStr:string) =
     let coreName = parseCoreName headerStr
     let ontology = parseSquaredBrackets headerStr
     let tagArr = parseBrackets headerStr
-    let isUnit, accessionOpt =
+    let isUnit =
         match tagArr with
-        | None ->
-            false, None
+        | None -> false
         | Some ta ->
-            let checkForAccession = ta |> Array.choose parseUnitAccession
-            let isUnit = ta |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart)
-            match checkForAccession.Length with
-            | 1 -> isUnit, checkForAccession.[0].Replace(ColumnTags.UnitTagStart,"") |> Some
-            | _ -> isUnit, None
+            let isUnit = ta |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag)
+            isUnit
     {
         Header              = headerStr
         CoreName            = coreName
         Ontology            = ontology
         TagArr              = tagArr
-        HasUnitAccession    = accessionOpt
         IsUnitCol           = isUnit
     }

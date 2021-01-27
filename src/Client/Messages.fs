@@ -21,7 +21,8 @@ type ExcelInteropMsg =
     | SyncContext                   of activeAnnotationTable:TryFindAnnoTableResult*string
     | InSync                        of string
     | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
-    | AddColumn                     of activeAnnotationTable:TryFindAnnoTableResult * colname:string * format:(string*string option) option
+    | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * colname:string * format:string option
+    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * format:string option
     | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
     | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
@@ -78,7 +79,7 @@ type ApiRequestMsg =
     | GetNewTermSuggestions                     of string
     | GetNewTermSuggestionsByParentTerm         of string*string
     | GetNewBuildingBlockNameSuggestions        of string
-    | GetNewUnitTermSuggestions                 of string
+    | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
     | FetchAllOntologies
     /// This function is used to search for all values found in the table main columns.
@@ -91,7 +92,7 @@ type ApiResponseMsg =
     | TermSuggestionResponse                    of DbDomain.Term []
     | AdvancedTermSearchResultsResponse         of DbDomain.Term []
     | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
-    | UnitTermSuggestionResponse                of DbDomain.Term []
+    | UnitTermSuggestionResponse                of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
     | SearchForInsertTermsResponse              of tableName:string*SearchTermI []  
     //
@@ -124,9 +125,9 @@ type AddBuildingBlockMsg =
     | BuildingBlockNameSuggestionUsed   of string
     | NewBuildingBlockNameSuggestions   of DbDomain.Term []
 
-    | SearchUnitTermTextChange  of string
-    | UnitTermSuggestionUsed    of unitName:string*unitAccession:string
-    | NewUnitTermSuggestions    of DbDomain.Term []
+    | SearchUnitTermTextChange  of searchString:string * relatedUnitSearch:UnitSearchRequest
+    | UnitTermSuggestionUsed    of unitName:string * relatedUnitSearch:UnitSearchRequest
+    | NewUnitTermSuggestions    of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | ToggleBuildingBlockHasUnit
 
 type ValidationMsg =

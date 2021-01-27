@@ -130,6 +130,11 @@ type SearchTermI = {
         TermOpt         = None
     }
 
+/// This type is used to define target for unit term search.
+type UnitSearchRequest =
+| Unit1
+| Unit2
+
 type ITestAPI = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>
@@ -142,6 +147,7 @@ type IISADotNetAPIv1 = {
 type IServiceAPIv1 = {
     getAppVersion : unit -> Async<string>
 }
+
 
 type IAnnotatorAPIv1 = {
     // Development
@@ -159,9 +165,9 @@ type IAnnotatorAPIv1 = {
     /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
     getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
 
-    getUnitTermSuggestions              : (int*string)                                                  -> Async<DbDomain.Term []>
+    getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<DbDomain.Term [] * UnitSearchRequest>
 
-    getTermsByNames                     : SearchTermI []                                                 -> Async<SearchTermI []>
+    getTermsByNames                     : SearchTermI []                                                -> Async<SearchTermI []>
 }
 
         

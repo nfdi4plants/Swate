@@ -110,7 +110,7 @@ let annotatorApi cString = {
             return result
         }
 
-    getUnitTermSuggestions = fun (max:int,typedSoFar:string) ->
+    getUnitTermSuggestions = fun (max:int,typedSoFar:string, unit:UnitSearchRequest) ->
         async {
             let searchRes =
                 match typedSoFar with
@@ -126,7 +126,7 @@ let annotatorApi cString = {
                 
                     |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
 
-            return searchRes
+            return (searchRes, unit)
         }
 
     getTermsByNames = fun (queryArr) ->

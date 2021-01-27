@@ -11,6 +11,76 @@ open OfficeInterop.Regex
 open OfficeInterop.Types
 open BuildingBlockTypes
 
+
+let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
+    [|
+        for i in 0 .. rowCount-1 do
+            yield   [|
+                for i in 0 .. colCount-1 do yield U3<bool,string,float>.Case2 value
+            |] :> IList<U3<bool,string,float>>
+    |] :> IList<IList<U3<bool,string,float>>>
+
+/// This will create the column header attributes for a unit block.
+/// as unit always has to be a term and cannot be for example "Source" or "Sample", both of which have a differen format than for exmaple "Parameter [TermName]",
+/// we only need one function to generate id and attributes and bring the unit term in the right format.
+let unitColAttributes (unitTermName:string) (id:int) =
+    match id with
+    | 1 ->
+        sprintf "[%s] (#h; #u)" unitTermName 
+    | _ ->
+        sprintf "[%s] (#%i; #h; #u)" unitTermName id
+
+let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) =
+    let col = createEmptyMatrixForTables 1 rowCount ""
+    if format.IsSome then
+        let findNewIdForUnit() =
+            let rec loopingCheck int =
+                let isExisting =
+                    allColHeaders
+                    // Should a column with the same name already exist, then count up the id tag.
+                    |> Array.exists (fun existingHeader ->
+                        // We don't need to check TSR or TAN, because the main column always starts with "Unit"
+                        existingHeader = sprintf "Unit %s" (unitColAttributes format.Value int)
+                    )
+                if isExisting then
+                    loopingCheck (int+1)
+                else
+                    int
+            loopingCheck 1
+
+        let newUnitId = findNewIdForUnit()
+
+        /// create unit main column
+        let createdUnitCol1 =
+            annotationTable.columns.add(
+                index = newBaseColIndex+3.,
+                values = U4.Case1 col,
+                name = sprintf "Unit %s" (unitColAttributes format.Value newUnitId)
+            )
+
+        /// create unit TSR
+        let createdUnitCol2 =
+            annotationTable.columns.add(
+                index = newBaseColIndex+4.,
+                values = U4.Case1 col,
+                name = sprintf "Term Source REF %s" (unitColAttributes format.Value newUnitId)
+            )
+
+        /// create unit TAN
+        let createdUnitCol3 =
+            annotationTable.columns.add(
+                index = newBaseColIndex+5.,
+                values = U4.Case1 col,
+                name = sprintf "Term Accession Number %s" (unitColAttributes format.Value newUnitId)
+            )
+
+        Some (
+            sprintf " Added specified unit: %s" (format.Value),
+            sprintf "0.00 \"%s\"" (format.Value)
+        )
+    else
+        None
+
 /// Swaps 'Rows with column values' to 'Columns with row values'.
 let viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
     rows
@@ -194,11 +264,13 @@ module BuildingBlockTypes =
                 then
                     // There are multiple possibilities which column this is: TSR; TAN; Unit; Unit TSR; Unit TAN are the currently existing ones.
                     // We first check if there is NO unit tag in the header tag array
-                    if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart) |> not then
+                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we once (>0.2.1) added accession number behind unit tag
+                    if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) |> not then
                         let updateCurrentBlock = checkForHiddenColType currentBlock nextCol
                         sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
                     /// Next we check for unit columns in the scheme of `Unit [Term] (#h; #u...) | TSR [Term] (#h; #u...) | TAN [Term] (#h; #u...)`
-                    elif nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart) then
+                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we once (>0.2.1) added accession number behind unit tag
+                    elif nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) then
                         /// Please notice that we update the unit building block in the following function and not the core building block.
                         let updatedUnitBlock = checkForHiddenColType currentBlock.Value.Unit nextCol
                         /// Update the core building block with the updated unit building block.
@@ -294,14 +366,6 @@ let getCurrentValidationXml (customXmlParts:CustomXmlPartCollection) (context:Re
 
         return xmlParsed, currentSwateValidationXml
     }
-
-let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
-    [|
-        for i in 0 .. rowCount-1 do
-            yield   [|
-                for i in 0 .. colCount-1 do yield U3<bool,string,float>.Case2 value
-            |] :> IList<U3<bool,string,float>>
-    |] :> IList<IList<U3<bool,string,float>>>
 
 let createValueMatrix (colCount:int) (rowCount:int) value =
     ResizeArray([
