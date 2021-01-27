@@ -89,10 +89,10 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
+        br []
 
         Field.div [] [
-            Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Building block"]
-            Help.help [] [str "Select the type of annotation building block (column) to add to the annotation table"]
+            Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Select the type of annotation building block (column) to add to the annotation table."]
             Field.div [Field.HasAddons] [
                 Control.div [] [
                     Dropdown.dropdown [Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection] [
@@ -155,8 +155,16 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                         // if BuildingBlockHasUnit = false then disabled = true
                         (model.AddBuildingBlockState.BuildingBlockHasUnit |> not)
                 ]
+
+                a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockState model.AddBuildingBlockState).ModalId |> AdvancedSearch |> dispatch)] [
+                    str "Use Advanced Search"
+                ]
+
             | _ -> ()
+
+            
         ]
+
 
         // Fill selection confirmation
         Field.div [] [

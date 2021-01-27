@@ -48,6 +48,7 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
         br []
 
+        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search for an ontology term to fill into the selected field(s)"]
         AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
             dispatch
             model.SiteStyleState.ColorMode
@@ -69,6 +70,9 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
                 )
             ] [ str "Use related term directed search." ]
         ]
+        a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearch |> dispatch)] [
+            str "Use Advanced Search"
+        ] 
 
         //Control.div [] [
             
@@ -85,7 +89,6 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
             //    model.TermSearchState.Simple.HasSuggestionsLoading
             //    (createTermSuggestions model dispatch)
         //]
-        Help.help [] [str "When applicable, search for an ontology term to fill into the selected field(s)"]
     ]
 
 
