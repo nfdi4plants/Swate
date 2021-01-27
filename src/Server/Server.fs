@@ -102,7 +102,11 @@ let annotatorApi cString = {
     getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
         async {
             let result =
+                let searchSet = searchName + mustContainName + searchDefinition + mustContainDefinition|> Suggestion.createBigrams
                 OntologyDB.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
+                |> Array.sortByDescending (fun sugg ->
+                    Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                    )
             return result
         }
 
