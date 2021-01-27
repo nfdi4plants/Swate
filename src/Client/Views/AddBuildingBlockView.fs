@@ -5,12 +5,15 @@ open Fable.React.Props
 open Fulma
 open Fulma.Extensions.Wikiki
 open Fable.FontAwesome
+open Fable.Core
+open Fable.Core.JsInterop
+
 open ExcelColors
 open Model
 open Messages
 open Shared
 open CustomComponents
-open Fable.Core
+
 
 let isValidBuildingBlock (block : AnnotationBuildingBlock) =
     match block.Type with
@@ -132,7 +135,15 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
             | Parameter | Characteristics | Factor ->
                 Field.div [Field.HasAddons] [
                     Control.div [] [
-                        Button.a [ Button.OnClick (fun _ -> ToggleBuildingBlockHasUnit |> AddBuildingBlock |> dispatch)] [ 
+                        Button.a [
+                            Button.OnClick (fun _ ->
+                                let inputId = (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).InputId
+                                if model.AddBuildingBlockState.BuildingBlockHasUnit = true then
+                                    let e = Browser.Dom.document.getElementById inputId
+                                    e?value <- null
+                                ToggleBuildingBlockHasUnit |> AddBuildingBlock |> dispatch
+                            )
+                        ] [ 
                             Fa.stack [Fa.Stack.Size Fa.FaSmall; Fa.Stack.Props [Style [ Color "#666666"]]][
                                 Fa.i [Fa.Regular.Square; Fa.Stack2x][]
                                 if model.AddBuildingBlockState.BuildingBlockHasUnit then
