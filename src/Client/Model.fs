@@ -339,6 +339,15 @@ type ValidationState = {
         DisplayedOptionsId          = None
     }
 
+type FileUploadJsonState = {
+    UploadData: string
+    ProcessModel: ISADotNet.Process option
+} with
+    static member init () = {
+        UploadData = ""
+        ProcessModel = None
+    }
+
 type Model = {
 
     //PageState
@@ -370,6 +379,8 @@ type Model = {
     //States regarding File picker functionality
     FilePickerState         : FilePickerState
 
+    FileUploadJsonState     : FileUploadJsonState
+
     //Insert annotation columns
     AddBuildingBlockState   : AddBuildingBlockState
 
@@ -392,4 +403,5 @@ let initializeModel (pageOpt: Route option) = {
     FilePickerState         = FilePickerState       .init ()
     AddBuildingBlockState   = AddBuildingBlockState .init ()
     ValidationState         = ValidationState       .init ()
+    FileUploadJsonState     = FileUploadJsonState   .init ()
 }

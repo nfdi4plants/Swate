@@ -13,6 +13,7 @@ type Route =
 | Validation
 | FilePicker
 | Info
+| FileUploadJson
 | ActivityLog
 | Settings
 | NotFound
@@ -24,6 +25,7 @@ type Route =
         | Route.TermSearch          -> "/#TermSearch"
         | Route.Validation          -> "/#Validation"   
         | Route.FilePicker          -> "/#FilePicker"
+        | Route.FileUploadJson      -> "/#FileUploadJson"
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
@@ -35,6 +37,7 @@ type Route =
         | Route.AddBuildingBlock    -> "AddBuildingBlock"
         | Route.TermSearch          -> "TermSearch"
         | Route.Validation          -> "Validation"
+        | Route.FileUploadJson      -> "FileUpload"
         | Route.Info                -> "Info"
         | Route.FilePicker          -> "FilePicker"
         | Route.ActivityLog         -> "ActivityLog"
@@ -60,6 +63,7 @@ type Route =
         | Route.Validation       -> createElem [Fa.Solid.ClipboardCheck ] (p |> Route.toString)
         | Route.AddBuildingBlock -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle ] (p |> Route.toString)
         | Route.FilePicker       -> createElem [Fa.Solid.FileUpload     ] (p |> Route.toString)
+        | Route.FileUploadJson   -> createElem [Fa.Solid.Upload         ] (p |> Route.toString)
         | Route.ActivityLog      -> createElem [Fa.Solid.History        ] (p |> Route.toString)
         | _  -> Fa.i [Fa.Solid.QuestionCircle]   []
 
@@ -80,6 +84,7 @@ module Routing =
             map Route.Validation        (s "Validation")
             map Route.FilePicker        (s "FilePicker")
             map Route.Info              (s "Info")
+            map Route.FileUploadJson    (s "FileUploadJson")
             map Route.ActivityLog       (s "ActivityLog")
             map Route.Settings          (s "Settings")
             map Route.NotFound          (s "NotFound")

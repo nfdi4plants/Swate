@@ -3,6 +3,8 @@ module Messages
 open Elmish
 open Thoth.Elmish
 
+open ISADotNet
+
 open Shared
 
 open ExcelColors
@@ -137,6 +139,12 @@ type ValidationMsg =
     // OfficeInterop
     | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.XmlValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
 
+type FileUploadJsonMsg =
+    // Client
+    | UpdateUploadData of string
+    | ParseJsonToProcessRequest of string
+    | ParseJsonToProcessResult of Result<Process,exn>
+
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
     | Api                   of ApiMsg
@@ -150,6 +158,7 @@ type Msg =
     | FilePicker            of FilePickerMsg
     | AddBuildingBlock      of AddBuildingBlockMsg
     | Validation            of ValidationMsg
+    | FileUploadJson        of FileUploadJsonMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>
     | DoNothing

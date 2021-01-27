@@ -9,7 +9,6 @@ open Shared
 open Routing
 open Model
 open Messages
-open OfficeInterop
 
 open OfficeInterop.Types
 
@@ -1156,6 +1155,34 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
         }
         nextState, Cmd.none
 
+let handleFileUploadJsonMsg (fujMsg:FileUploadJsonMsg) (currentState: FileUploadJsonState) : FileUploadJsonState * Cmd<Msg> =
+    match fujMsg with
+    // Client
+    | UpdateUploadData newDataString ->
+        let nextState = {
+            currentState with
+                UploadData = newDataString
+        }
+        nextState, Cmd.none
+    | ParseJsonToProcessRequest parsableString ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.isaDotNetApi.parseJsonToProcess
+                parsableString
+                (Ok >> ParseJsonToProcessResult)
+                (Result.Error >> ParseJsonToProcessResult)
+        currentState, Cmd.map FileUploadJson cmd 
+    | ParseJsonToProcessResult (Ok isaProcess) ->
+        let nextState = {
+            currentState with
+                ProcessModel = Some isaProcess 
+        }
+        nextState, Cmd.none
+    | ParseJsonToProcessResult (Result.Error e) ->
+        let cmd =
+            GenericError e |> Dev |> Cmd.ofMsg 
+        currentState, cmd
+
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
@@ -1324,5 +1351,16 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel = {
             currentModel with
                 ValidationState = nextValidationState
+            }
+        nextModel, nextCmd
+
+    | FileUploadJson fileUploadJsonMsg ->
+        let nextFileUploadJsonState, nextCmd =
+            currentModel.FileUploadJsonState
+            |> handleFileUploadJsonMsg fileUploadJsonMsg
+
+        let nextModel = {
+            currentModel with
+                FileUploadJsonState = nextFileUploadJsonState
             }
         nextModel, nextCmd

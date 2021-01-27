@@ -80,6 +80,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
             Text.p [] [str ""]
         ]
 
+    | Routing.Route.FileUploadJson ->
+        BaseView.baseViewComponent model dispatch [
+            FileUploadJsonView.fileUploadViewComponent model dispatch
+        ] [
+            Text.p [] [str ""]
+        ]
+
     | Routing.Route.ActivityLog ->
         BaseView.baseViewComponent model dispatch [
             ActivityLogView.activityLogComponent model dispatch

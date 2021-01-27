@@ -44,7 +44,7 @@ let annotatorApiDocsv1 =
                     "The result will contain the TestParam of some sort."
                     (Parameter.create "TestValue" ParamString "")
             )
-        |> annotatorDocsv1.example <@ fun api -> api.getTestString (System.DateTime(2020,11,17)) @>
+        |> annotatorDocsv1.example <@ fun api -> api.getTestString ("I am a small tester") @>
 
         ///////////////////////////////////////////////////////////// Ontology related requests /////////////////////////////////////////////////////////////
         ////////

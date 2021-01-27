@@ -1,6 +1,7 @@
 namespace Shared
 
 open System
+open ISADotNet
 
 module URLs =
 
@@ -134,6 +135,10 @@ type ITestAPI = {
     getTestNumber               : unit                                                  -> Async<int>
 }
 
+type IISADotNetAPIv1 = {
+    parseJsonToProcess :    string  -> Async<Process>
+}
+
 type IServiceAPIv1 = {
     getAppVersion : unit -> Async<string>
 }
@@ -141,7 +146,7 @@ type IServiceAPIv1 = {
 type IAnnotatorAPIv1 = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>
-    getTestString               : System.DateTime                                       -> Async<string>
+    getTestString               : string                                                -> Async<string>
     // Ontology related requests
     /// (name,version,definition,created,user)
     testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>

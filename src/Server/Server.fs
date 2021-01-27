@@ -21,7 +21,14 @@ open Microsoft.AspNetCore.Hosting
 //let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
 
 let serviceApi = {
-    getAppVersion = fun () -> async {return System.AssemblyVersionInformation.AssemblyVersion}
+    getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
+}
+
+let isaDotNetApi = {
+    parseJsonToProcess = fun jsonString -> async {
+        let parsedJson = ISADotNet.Json.Process.fromString jsonString
+        return parsedJson
+    }
 }
 
 let annotatorApi cString = {
@@ -43,7 +50,7 @@ let annotatorApi cString = {
                     definition
                     created
                     user
-            printfn "created ontology entry: \t%A" onto
+            printfn "created pseudo ontology entry: \t%A. No actual db insert has happened." onto
             return onto
         }
 
@@ -140,6 +147,17 @@ let createIServiceAPIv1 =
     )
     |> Remoting.buildHttpHandler
 
+let createISADotNetAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue isaDotNetApi
+    |> Remoting.withDocs "/api/IISADotNetAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler(
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+    )
+    |> Remoting.buildHttpHandler
+
 let createIAnnotatorApiv1 cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
@@ -182,6 +200,11 @@ let topLevelRouter = router {
     //
     forward @"" (fun next ctx ->
         createIServiceAPIv1 next ctx
+    )
+
+    //
+    forward @"" (fun next ctx ->
+        createISADotNetAPIv1 next ctx
     )
 }
 

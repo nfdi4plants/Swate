@@ -14,3 +14,5 @@ Thoth.Elmish.Debouncer
 Fable.Browser.MediaQueryList
 Fable.SimpleJson
 Fable.SimpleXml
+FSharp.Data
+ISADotNet

@@ -14,7 +14,7 @@ open CustomComponents
 
 let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
     let isActive = (model.PageState.CurrentPage = pageLink)
-    Tabs.tab [Tabs.Tab.IsActive isActive;] [
+    Tabs.tab [Tabs.Tab.IsActive isActive] [
         a [ //Href (Routing.Route.toRouteUrl pageLink)
             Style [
                 if isActive then
@@ -41,6 +41,34 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
         ]
     ]
 
+let tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
+    Tabs.tabs[
+        Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
+        Tabs.Props [
+            Style [
+                BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
+                OverflowX OverflowOptions.Hidden
+            ]
+        ]
+    ] [
+        yield! tabs
+    ]
+
+let firstRowTabs (model:Model) dispatch =
+    tabRow model dispatch [
+        createNavigationTab Routing.Route.AddBuildingBlock      model dispatch
+        createNavigationTab Routing.Route.TermSearch            model dispatch
+        createNavigationTab Routing.Route.Validation            model dispatch
+        createNavigationTab Routing.Route.FilePicker            model dispatch
+        createNavigationTab Routing.Route.FileUploadJson        model dispatch
+        createNavigationTab Routing.Route.Info                  model dispatch
+    ]
+
+let sndRowTabs (model:Model) dispatch =
+    tabRow model dispatch [
+        
+    ]
+
 let footerContentStatic (model:Model) dispatch =
     div [][
         str "Swate Release Version "
@@ -58,21 +86,8 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
             Container.IsFluid
         ] [
             br []
-            Tabs.tabs[
-                Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
-                Tabs.Props [
-                    Style [
-                        BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
-                        OverflowX OverflowOptions.Hidden
-                    ]
-                ]
-            ] [
-                createNavigationTab Routing.Route.AddBuildingBlock   model dispatch
-                createNavigationTab Routing.Route.TermSearch         model dispatch
-                createNavigationTab Routing.Route.Validation         model dispatch
-                createNavigationTab Routing.Route.FilePicker         model dispatch
-                createNavigationTab Routing.Route.Info               model dispatch
-            ]
+            firstRowTabs model dispatch
+            sndRowTabs model dispatch
 
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
