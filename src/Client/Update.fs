@@ -581,6 +581,25 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
+    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString =
+        let currentCall = {
+            FunctionName = apiFunctionname
+            Status = Pending
+        }
+
+        let nextState = {
+            currentState with
+                currentCall = currentCall
+        }
+        let nextCmd = 
+            Cmd.OfAsync.either
+                Api.api.getUnitTermSuggestions
+                (5,queryString)
+                (responseHandler >> Api)
+                (ApiError >> Api)
+
+        nextState,nextCmd
+
     let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString parentOntology =
         let currentCall = {
             FunctionName = apiFunctionname
@@ -651,7 +670,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             parentOntology
 
     | GetNewUnitTermSuggestions queryString ->
-        handleTermSuggestionRequest
+        handleUnitTermSuggestionRequest
             "getUnitTermSuggestions"
             (UnitTermSuggestionResponse >> Response)
             queryString
