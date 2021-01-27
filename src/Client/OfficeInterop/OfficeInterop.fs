@@ -128,7 +128,7 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
         let activeTables = activeSheet.tables.load(propertyNames=U2.Case1 "items")
 
         let tableRange = context.workbook.getSelectedRange()
-        let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; ])))
+        let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"])))
 
         let r = context.runtime.load(U2.Case1 "enableEvents")
 
@@ -160,7 +160,9 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
                 /// We do not want to create annotation tables of any size. The recommended workflow is to use the addBuildingBlock functionality.
                 /// Therefore we recreate the tableRange but with a columncount of 2. The 2 Basic columns in any annotation table.
                 /// "Source Name" | "Sample Name"
-                let adaptedRange = activeSheet.getRangeByIndexes(tableRange.rowIndex,tableRange.columnIndex,tableRange.rowCount,2.)
+                let adaptedRange =
+                    let rowCount = if tableRange.isEntireColumn then 21. else tableRange.rowCount
+                    activeSheet.getRangeByIndexes(tableRange.rowIndex,tableRange.columnIndex,rowCount,2.)
 
                 /// Create table in current worksheet
                 let annotationTable = activeSheet.tables.add(U2.Case1 adaptedRange,true)
