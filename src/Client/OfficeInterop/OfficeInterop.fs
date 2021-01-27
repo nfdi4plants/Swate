@@ -730,7 +730,7 @@ let fillValue (annotationTable,term,termBackground:Shared.DbDomain.Term option) 
                                 Some ("user-specific" |> box)
                             | 1, Some term ->
                                 //add "Term Accession Number"
-                                let replace = Shared.URLs.TermAccessionBaseUrl + "/" + term.Accession.Replace(@":",@"_")
+                                let replace = Shared.URLs.TermAccessionBaseUrl + term.Accession.Replace(@":",@"_")
                                 Some ( replace |> box )
                             | 0, Some term ->
                                 //add "Term Source REF"
