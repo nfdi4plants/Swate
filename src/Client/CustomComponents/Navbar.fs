@@ -43,7 +43,7 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Fa.i [Fa.Solid.SyncAlt][]
                 ]
             ]
-            Navbar.Item.a [Navbar.Item.Props [Title "Fill Reference Columns"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+            Navbar.Item.a [Navbar.Item.Props [Title "Update Reference Columns"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
                     Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
                     Button.OnClick (fun _ ->

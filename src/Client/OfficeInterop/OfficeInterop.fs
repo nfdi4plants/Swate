@@ -781,16 +781,12 @@ let createSearchTermsIFromTable (annotationTable') =
                             // group cells by value so we don't get doubles.
                             bBlock.MainColumn.Cells
                             |> Array.groupBy (fun cell ->
-                                cell.Value.IsSome, cell.Value.Value
+                                cell.Value.Value
                             )
-                            // only keep cells with value and create InsertTerm types that will be passed to the server to get filled with a term option.
-                            |> Array.choose (fun ((isSome,searchStr),cellArr) ->
-                                if isSome && searchStr <> "" then
-                                    let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
-                                    Shared.SearchTermI.create tsrTanColIndices searchStr rowIndices
-                                    |> Some
-                                else
-                                    None
+                            // create SearchTermI types that will be passed to the server to get filled with a term option.
+                            |> Array.map (fun (searchStr,cellArr) ->
+                                let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
+                                Shared.SearchTermI.create tsrTanColIndices searchStr rowIndices
                             )
                         /// We differentiate between building blocks with and without unit as unit building blocks will not contain terms as values but e.g. numbers.
                         /// In this case we do not want to search the database for the cell values but the parent ontology in the header.
@@ -835,7 +831,7 @@ let createSearchTermsIFromTable (annotationTable') =
 
 /// This function will be executed after the SearchTerm types from 'createSearchTermsFromTable' where send to the server to search the database for them.
 /// Here the results will be written into the table by the stored col and row indices.
-let UpdateTableBySearchTermsI (annotationTable,insertTerms:SearchTermI []) =
+let UpdateTableBySearchTermsI (annotationTable,terms:SearchTermI []) =
     Excel.run(fun context ->
 
         /// This will create a single cell value arr
@@ -846,13 +842,11 @@ let UpdateTableBySearchTermsI (annotationTable,insertTerms:SearchTermI []) =
                 ])
             ])
 
-
         // Ref. 2
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let annotationTable = sheet.tables.getItem(annotationTable)
         let annoBodyRange = annotationTable.getDataBodyRange()
         let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
-
 
         // Ref. 1
         let r = context.runtime.load(U2.Case1 "enableEvents")
@@ -861,30 +855,45 @@ let UpdateTableBySearchTermsI (annotationTable,insertTerms:SearchTermI []) =
             ``then``(fun _ ->
                 r.enableEvents <- false
                 /// Filter for only terms which returned a result and therefore were not custom user input.
-                let foundTerms = insertTerms |> Array.filter (fun x -> x.TermOpt.IsSome)
+                let foundTerms = terms |> Array.filter (fun x -> x.TermOpt.IsSome)
                 /// Insert terms into related cells for all stored row-/ col-indices
                 let insert() =
-                    foundTerms
+                    terms
                     // iterate over all found terms
                     |> Array.map (
-                        fun insertTerm ->
-                            /// Term search result from database
-                            let t = insertTerm.TermOpt.Value
-                            /// Get ontology and accession from Term.Accession
-                            let ont, accession =
-                                let a = t.Accession
-                                let splitA = a.Split":"
-                                let accession = Shared.URLs.TermAccessionBaseUrl + a.Replace(":","_")
-                                splitA.[0], accession
+                        fun term ->
+                            let t,ont,accession =
+                                if term.TermOpt.IsSome then
+                                    /// Term search result from database
+                                    let t = term.TermOpt.Value
+                                    /// Get ontology and accession from Term.Accession
+                                    let ont, accession =
+                                        let a = t.Accession
+                                        let splitA = a.Split":"
+                                        let accession = Shared.URLs.TermAccessionBaseUrl + a.Replace(":","_")
+                                        splitA.[0], accession
+                                    t.Name,ont,accession
+                                elif term.SearchString = "" then
+                                    let t = ""
+                                    let ont = ""
+                                    let accession = ""
+                                    t, ont, accession
+                                elif term.TermOpt = None then
+                                    let t = term.SearchString
+                                    let ont = "user-specific"
+                                    let accession = "user-specific"
+                                    t, ont, accession
+                                else
+                                    failwith "Swate encountered an error in (UpdateTableBySearchTermsI.insert()) trying to parse database search results to Swate table."
                             /// Distinguish between core building blocks and unit buildingblocks.
                             let inputVals = [|
                                 /// if the n of cols is 2 then it is a core building block.
-                                if insertTerm.ColIndices.Length = 2 then
+                                if term.ColIndices.Length = 2 then
                                     createCellValueInput ont
                                     createCellValueInput accession
                                 /// if the n of cols is 3 then it is a unit building block.
-                                elif insertTerm.ColIndices.Length = 3 then
-                                    createCellValueInput t.Name
+                                elif term.ColIndices.Length = 3 then
+                                    createCellValueInput t
                                     createCellValueInput ont
                                     createCellValueInput accession
                             |]
@@ -896,12 +905,12 @@ let UpdateTableBySearchTermsI (annotationTable,insertTerms:SearchTermI []) =
                             /// This led to the first column to be erased for the same rows that were found to be replaced.
 
                             // iterate over all columns (in this case in form of the index of their array. as we need the index to access the correct 'inputVal' value
-                            for i in 0 .. insertTerm.ColIndices.Length-1 do
+                            for i in 0 .. term.ColIndices.Length-1 do
 
                                 // iterate over all rows and insert the correct inputVal
-                                for rowInd in insertTerm.RowIndices do
+                                for rowInd in term.RowIndices do
 
-                                    let cell = annoBodyRange.getCell(float rowInd, float insertTerm.ColIndices.[i])
+                                    let cell = annoBodyRange.getCell(float rowInd, float term.ColIndices.[i])
                                     cell.values <- inputVals.[i]
                     )
 

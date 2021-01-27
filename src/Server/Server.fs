@@ -129,8 +129,14 @@ let annotatorApi cString = {
         async {
             let result =
                 queryArr |> Array.map (fun searchTerm ->
-                    let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
-                    {searchTerm with TermOpt = if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some }
+                    {searchTerm with
+                        TermOpt =
+                            // check if search string is empty. This case should delete TAN and TSR in table
+                            if searchTerm.SearchString = "" then None
+                            else
+                                let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
+                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                    }
                 )
             return result
         }
