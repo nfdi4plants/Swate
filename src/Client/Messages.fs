@@ -35,9 +35,6 @@ type ExcelInteropMsg =
     | DeleteAllCustomXml
     | GetSwateValidationXml
     //
-    | ToggleEventHandler
-    | UpdateTablesHaveAutoEditHandler
-    //
     | FillHiddenColsRequest         of activeAnnotationTable:TryFindAnnoTableResult
     | FillHiddenColumns             of tableName:string*SearchTermI []
     | UpdateFillHiddenColsState     of FillHiddenColsState

@@ -183,24 +183,10 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
 
                 let annoTableName = allTableNames |> Array.filter (fun x -> x.StartsWith "annotationTable")
 
-                /// Should event handlers be active, then add them to the new table, otherwise don't.
-                /// If the storage map is empty then eventhanderls should be deactivated.
-                let updateEventHandler =
-                    if EventHandlerStates.adaptHiddenColsHandlerList.IsEmpty |> not  then
-                        EventHandlerStates.adaptHiddenColsHandlerList <-
-                            EventHandlerStates.adaptHiddenColsHandlerList.Add (newName, annotationTable.onChanged.add(fun eventArgs -> adaptHiddenColsHandler (eventArgs,newName)) )
-                        false
-                    elif annoTableName |> Array.isEmpty then
-                        EventHandlerStates.adaptHiddenColsHandlerList <-
-                            EventHandlerStates.adaptHiddenColsHandlerList.Add (newName, annotationTable.onChanged.add(fun eventArgs -> adaptHiddenColsHandler (eventArgs,newName)) )
-                        true
-                    else
-                        false
-
                 r.enableEvents <- true
 
                 /// Return info message
-                TryFindAnnoTableResult.Success newName, updateEventHandler, sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r" tableRange.address (tableRange.rowCount - 1.)
+                TryFindAnnoTableResult.Success newName, sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r" tableRange.address (tableRange.rowCount - 1.)
             )
             //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
     )
@@ -257,90 +243,6 @@ let getTableInfoForAnnoTableCreation() =
                 tableNames
         )
     )
-
-/// This function is used to either add eventHandlers to all annotationTables or to remove all eventHanderls.
-let toggleAdaptHiddenColsEventHandler () =
-    /// Check if storage for eventHandlers is empty
-    let isEmpty = EventHandlerStates.adaptHiddenColsHandlerList.IsEmpty
-    /// If it is empty when the function is called then we want to add event handlers.
-    if isEmpty then
-        Excel.run(fun context ->
-
-            /// This function recursevly adds eventHandlers to all elements of the 'tables' [] and stores the reference to the event handler in 'map'
-            let rec addEventToTable (map:Map<string,OfficeExtension.EventHandlerResult<TableChangedEventArgs>>) ind (tables: Table []) =
-                if ind > tables.Length-1 then
-                    map
-                else
-                    let newMap = map.Add (tables.[ind].name, tables.[ind].onChanged.add(fun eventArgs -> adaptHiddenColsHandler (eventArgs,tables.[ind].name)))
-                    addEventToTable newMap (ind+1) tables
-
-            // Ref. 2
-
-            let tableCollection = context.workbook.tables.load(propertyNames = U2.Case1 "items")
-
-            context.sync()
-                .``then``(fun _ ->
-
-                    /// Get all annotationTables
-                    let annoTables =
-                        tableCollection.items
-                        |> Seq.filter (fun x -> x.name.StartsWith "annotationTable")
-                        |> Array.ofSeq
-
-                    /// Add eventHandlers to all of them ...
-                    let newHandlers = annoTables |> addEventToTable EventHandlerStates.adaptHiddenColsHandlerList 0
-                    /// ... and store reference in event handler storage.
-                    /// This is necessary as we need these objects to remove them (see 'removeHandler' below)
-                    EventHandlerStates.adaptHiddenColsHandlerList <- newHandlers
-
-                    /// Create message
-                    let tableMessageStr = annoTables |> Seq.map (fun x -> x.name) |> String.concat ", " 
-
-                    /// Return message in array due to how removing the handlers is structured.
-                    /// (if .. then .. else needs same output.)
-                    [|sprintf "Event handler added to tables: %s" tableMessageStr|]
-                )
-        )
-    else
-        /// creates a list of "Promises", which each remove one eventHandler and the reference from the event handler storage.
-        let rec removeHandler ind promises (handlerArr:(string*OfficeExtension.EventHandlerResult<TableChangedEventArgs>) [])  =
-
-            if ind > handlerArr.Length-1 then
-                promises
-            else
-                /// get current handler from event handler storage
-                let (name,handler):string*OfficeExtension.EventHandlerResult<TableChangedEventArgs> = handlerArr.[ind]
-
-                /// Give handler.context as input for 'Excel.run' and remove it from the table and the event handler storage.
-                let promise =
-                    Excel.run(handler.context, fun context ->
-
-                        let _ = handler.remove()
-
-                        let newMap = EventHandlerStates.adaptHiddenColsHandlerList.Remove(name)
-
-                        EventHandlerStates.adaptHiddenColsHandlerList <- newMap
-
-                        context.sync()
-                            .``then``(fun t ->
-                                // As we will 'String.concat' these messages later we want the first message to give more context ...
-                                if ind = 0 then
-                                    sprintf "Event handler removed from tables: %s" name
-                                // ... and every other message to just contain the table name.
-                                else
-                                    name
-                            )
-                    )
-
-                // iterate through the whole event handler storage
-                removeHandler (ind+1) (promise::promises) handlerArr
-
-        // create all promises to remove event handlers
-        removeHandler 0 [] (Map.toArray EventHandlerStates.adaptHiddenColsHandlerList)
-        // this is done to create readable output.
-        |> List.rev
-        // execute all promises
-        |> Promise.Parallel 
 
 /// This function is used to hide all '#h' tagged columns and to fit rows and columns to their values.
 /// The main goal is to improve readability of the table with this function.

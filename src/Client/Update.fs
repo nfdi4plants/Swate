@@ -105,7 +105,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ()
                     (AnnotationTableExists >> ExcelInterop)
                     (GenericError >> Dev)
-                Cmd.ofMsg (ToggleEventHandler |> ExcelInterop)
                 Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
             ]
 
@@ -186,10 +185,9 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             Cmd.OfPromise.either
                 OfficeInterop.createAnnotationTable  
                 (allTableNames,isDark)
-                (fun (res,updateEventHandler,msg) ->
+                (fun (res,msg) ->
                     Msg.Batch [
                         AnnotationtableCreated (res,msg) |> ExcelInterop
-                        if updateEventHandler then UpdateTablesHaveAutoEditHandler |> ExcelInterop
                     ]
                 )
                 (GenericError >> Dev)
@@ -254,27 +252,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
         currentState, cmd
-    //
-    | ToggleEventHandler ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.toggleAdaptHiddenColsEventHandler
-                ()
-                (fun msg ->
-                    let msg' = msg |> String.concat ", "
-                    Msg.Batch [
-                        GenericLog ("Info",msg') |> Dev
-                        UpdateTablesHaveAutoEditHandler |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentState, cmd
-    | UpdateTablesHaveAutoEditHandler ->
-        let nextState = {
-            currentState with
-                TablesHaveAutoEditHandler = not OfficeInterop.EventHandlers.EventHandlerStates.adaptHiddenColsHandlerList.IsEmpty
-        }
-        nextState, Cmd.none
     //
     | FillHiddenColsRequest activeTableNameRes ->
         let cmd name =
