@@ -34,8 +34,8 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
                 //    str (pageLink |> Routing.Route.toString)
                 //else
                 //    pageLink |> Routing.Route.toIcon
-                span [Class "hideUnder575px"][str (pageLink |> Routing.Route.toString)]
-                span [Class "hideOver575px"][pageLink |> Routing.Route.toIcon]
+                span [Class "hideUnder775px"][str (pageLink |> Routing.Route.toString)]
+                span [Class "hideOver775px"][pageLink |> Routing.Route.toIcon]
             ]
 
         ]

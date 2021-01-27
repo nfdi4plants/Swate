@@ -65,6 +65,7 @@ type Route =
         | Route.FilePicker       -> createElem [Fa.Solid.FileUpload     ] (p |> Route.toString)
         | Route.FileUploadJson   -> createElem [Fa.Solid.Upload         ] (p |> Route.toString)
         | Route.ActivityLog      -> createElem [Fa.Solid.History        ] (p |> Route.toString)
+        | Route.Info             -> createElem [Fa.Solid.Question       ] (p |> Route.toString)  
         | _  -> Fa.i [Fa.Solid.QuestionCircle]   []
 
 ///explained here: https://elmish.github.io/browser/routing.html
