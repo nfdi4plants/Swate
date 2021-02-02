@@ -228,7 +228,7 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             eve.target?style?borderBottom <- "0.5px solid darkgrey")
         OnDragLeave (fun eve ->
             eve.preventDefault()
-            eve.target?style?backgroundColor <- "white"
+            eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
             eve.target?style?borderBottom <- "0px solid darkgrey")
         OnDragEnd (fun eve ->
             // restore wrapper 
@@ -252,7 +252,7 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             eve.preventDefault()
             dropped <- true
             UpdateDNDDropped true |> FilePicker |> dispatch
-            eve.target?style?backgroundColor <- "white"
+            eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
             eve.target?style?borderBottom <- "0px solid darkgrey"
 
             let prevId      = eve.dataTransfer.getData("text")
@@ -350,10 +350,10 @@ let placeOnTopElement model dispatch =
             eve.target?style?borderBottom <- "2px solid darkgrey")
         OnDragLeave (fun eve ->
             eve.preventDefault()
-            eve.target?style?borderBottom <- "2px solid white")
+            eve.target?style?borderBottom <- "2px solid white" ) //(sprintf "2px solid %s" ExcelColors.colorfullMode.BodyBackground) )
         OnDrop (fun eve ->
             eve.preventDefault()
-            eve.target?style?borderBottom <- "2px solid white"
+            eve.target?style?borderBottom <- "2px solid white" //(sprintf "2px solid %s" ExcelColors.colorfullMode.BodyBackground)
             dropped <- true
             UpdateDNDDropped true |> FilePicker |> dispatch
             let prevId      = eve.dataTransfer.getData("text")
