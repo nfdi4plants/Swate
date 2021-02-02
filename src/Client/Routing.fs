@@ -44,10 +44,24 @@ type Route =
         | Route.Settings            -> "Settings"
         | Route.NotFound            -> "NotFound"
 
+    member this.toStringRdbl =
+        match this with
+        | Route.Home                -> ""
+        | Route.AddBuildingBlock    -> "Manage Building Blocks"
+        | Route.TermSearch          -> "Manage Terms"
+        | Route.Validation          -> "Validation"
+        | Route.FilePicker          -> "File Picker"
+        | Route.FileUploadJson      -> "File Upload"
+        | Route.Info                -> "Info"
+        | Route.ActivityLog         -> "Activity Log"
+        | Route.Settings            -> "Settings"
+        | Route.NotFound            -> "NotFound"
+
+
     static member toIcon (p: Route)=
         let createElem icons name =
             Fable.React.Standard.span [
-                Fable.React.Props.Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
+                Fable.React.Props.Class (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
                 Tooltip.dataTooltip (name)
             ] (
                 icons
@@ -58,15 +72,15 @@ type Route =
             )
 
         match p with
-        | Route.Home             -> createElem [Fa.Solid.Home           ] (p |> Route.toString)
-        | Route.TermSearch       -> createElem [Fa.Solid.SearchPlus     ] (p |> Route.toString)
-        | Route.Validation       -> createElem [Fa.Solid.ClipboardCheck ] (p |> Route.toString)
-        | Route.AddBuildingBlock -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle ] (p |> Route.toString)
-        | Route.FilePicker       -> createElem [Fa.Solid.FileUpload     ] (p |> Route.toString)
-        | Route.FileUploadJson   -> createElem [Fa.Solid.Upload         ] (p |> Route.toString)
-        | Route.ActivityLog      -> createElem [Fa.Solid.History        ] (p |> Route.toString)
-        | Route.Info             -> createElem [Fa.Solid.Question       ] (p |> Route.toString)  
-        | _  -> Fa.i [Fa.Solid.QuestionCircle]   []
+        | Route.Home                -> createElem [Fa.Solid.Home                           ]   (p.toStringRdbl)
+        | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                     ]   (p.toStringRdbl)
+        | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                 ]   (p.toStringRdbl)
+        | Route.AddBuildingBlock    -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle   ]   (p.toStringRdbl)
+        | Route.FilePicker          -> createElem [Fa.Solid.FileUpload                     ]   (p.toStringRdbl)
+        | Route.FileUploadJson      -> createElem [Fa.Solid.Upload                         ]   (p.toStringRdbl)
+        | Route.ActivityLog         -> createElem [Fa.Solid.History                        ]   (p.toStringRdbl)
+        | Route.Info                -> createElem [Fa.Solid.Question                       ]   (p.toStringRdbl)  
+        | _                         -> Fa.i [Fa.Solid.QuestionCircle]   []
 
 ///explained here: https://elmish.github.io/browser/routing.html
 //let curry f x y = f (x,y)

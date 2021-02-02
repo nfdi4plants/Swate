@@ -16,6 +16,8 @@ open Microsoft.Extensions.Configuration.Json
 open Microsoft.Extensions.Configuration.UserSecrets
 open Microsoft.AspNetCore.Hosting
 
+open ISADotNet
+
 /// Was transferred into dev.json
 //[<Literal>]
 //let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
@@ -27,7 +29,8 @@ let serviceApi = {
 let isaDotNetApi = {
     parseJsonToProcess = fun jsonString -> async {
         let parsedJson = ISADotNet.Json.Process.fromString jsonString
-        return parsedJson
+        let t = Process.empty
+        return t
     }
 }
 
@@ -35,7 +38,7 @@ let annotatorApi cString = {
 
     //Development
     getTestNumber = fun () -> async { return 42 }
-    getTestString = fun strOpt -> async { return sprintf "Test string: %A" strOpt }
+    getTestString = fun strOpt -> async { return None }
 
     //Ontology related requests
     testOntologyInsert = fun (name,version,definition,created,user) ->
@@ -68,7 +71,7 @@ let annotatorApi cString = {
                 | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
-                    let like = OntologyDB.getTermSuggestions cString typedSoFar
+                    let like = OntologyDB.getTermSuggestions cString (typedSoFar)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -117,7 +120,7 @@ let annotatorApi cString = {
                 | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
-                    let like = OntologyDB.getUnitTermSuggestions cString typedSoFar
+                    let like = OntologyDB.getUnitTermSuggestions cString (typedSoFar)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->

@@ -8,7 +8,8 @@ nuget Fable.SimpleXml
 nuget FSharp.Data
 nuget Fulma.Extensions.Wikiki.Checkradio
 nuget Fulma.Extensions.Wikiki.Slider
-nuget ISADotNet
+nuget ISADotNet 0.0.3
+nuget ISADotNet.XLSX 0.0.3
 nuget Saturn
 nuget Expecto
 nuget MySql.Data 8.0.21

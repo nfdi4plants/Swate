@@ -3,22 +3,24 @@ module CustomComponents.Navbar
 open Fable.React
 open Fable.React.Props
 open Fulma
+open Fable.FontAwesome
+open Fulma.Extensions.Wikiki
 
 open ExcelColors
 open Model
 open Messages
 
-open Fable.FontAwesome
 
 let navbarComponent (model : Model) (dispatch : Msg -> unit) =
     Navbar.navbar [Navbar.Props [Props.Role "navigation"; AriaLabel "main navigation" ; ExcelColors.colorElement model.SiteStyleState.ColorMode]] [
         Navbar.Brand.a [] [
             Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"]] [
-                img [Props.Src "../assets/CSB_Logo.png"]
+                img [Props.Src "../assets/Swate_logo_for_excel.svg"]
             ]
-            Navbar.Item.a [Navbar.Item.Props [Title "Add New Annotation Table"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+            Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
-                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
+                    Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
+                    Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]; Tooltip.dataTooltip ("Add Annotation Table") ]
                     Button.OnClick (fun _ ->
                         (fun (allNames) ->
                             CreateAnnotationTable (allNames,model.SiteStyleState.IsDarkMode))
@@ -33,9 +35,10 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Fa.span [Fa.Solid.Table][]
                 ]
             ]
-            Navbar.Item.a [Navbar.Item.Props [Title "Autoformat Table"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+            Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
-                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
+                    Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]; Tooltip.dataTooltip ("Autoformat Table")]
                     Button.OnClick (fun e -> PipeActiveAnnotationTable AutoFitTable |> ExcelInterop |> dispatch )
                     Button.Color Color.IsWhite
                     Button.IsInverted
@@ -43,9 +46,10 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Fa.i [Fa.Solid.SyncAlt][]
                 ]
             ]
-            Navbar.Item.a [Navbar.Item.Props [Title "Update Reference Columns"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+            Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
-                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]]
+                    Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]; Tooltip.dataTooltip ("Update Reference Columns")]
                     Button.OnClick (fun _ ->
                         PipeActiveAnnotationTable FillHiddenColsRequest |> ExcelInterop |> dispatch
                     )
@@ -57,13 +61,16 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Fa.span [Fa.Solid.Pen][]
                 ]
             ]
-            Navbar.burger [ Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible
-                            Navbar.Burger.OnClick (fun e -> ToggleBurger |> StyleChange |> dispatch)
-                            Navbar.Burger.Props[
-                                    Role "button"
-                                    AriaLabel "menu"
-                                    Props.AriaExpanded false
-                            ]
+            Navbar.burger [
+                Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible
+                Navbar.Burger.OnClick (fun e -> ToggleBurger |> StyleChange |> dispatch)
+                Navbar.Burger.Modifiers [Modifier.TextColor IsWhite]
+                Navbar.Burger.Props[
+                        Role "button"
+                        AriaLabel "menu"
+                        Props.AriaExpanded false
+
+                ]
             ] [
                 span [AriaHidden true] []
                 span [AriaHidden true] []
@@ -73,10 +80,10 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
         Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu") ; ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
             Navbar.Dropdown.div [ ] [
                 Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                    str "How to use"
+                    str "How to use (WIP)"
                 ]
                 Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                    str "Contact"
+                    str "Contact (WIP)"
                 ]
                 Navbar.Item.a [Navbar.Item.Props [
                     OnClick (fun e ->

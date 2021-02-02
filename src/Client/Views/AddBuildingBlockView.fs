@@ -38,7 +38,7 @@ let isValidBuildingBlock (block : AnnotationBuildingBlock) =
 //                td [] [
 //                    b [] [str sugg.Name]
 //                ]
-//                td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+//                td [Style [Color ""]] [if sugg.IsObsolete then str "obsolete"]
 //                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
 //            ])
 //        |> List.ofArray
@@ -86,14 +86,22 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Msg -> unit) =
     ]
 
 let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
-    [
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Select the type of annotation building block (column) to add to the annotation table."]
-        Field.div [Field.HasAddons] [
+    div [
+        Style [
+            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
+            //BorderRadius "15px 15px 0 0"
+            Padding "0.25rem 1rem"
+            MarginBottom "1rem"
+        ]
+    ] [
+        Field.div [
+            Field.HasAddons
+        ] [
             Control.div [] [
                 Dropdown.dropdown [Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection] [
                     Dropdown.trigger [] [
                         Button.button [Button.OnClick (fun _ -> ToggleSelectionDropdown |> AddBuildingBlock |> dispatch)] [
-                            span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString |> str]
+                            span [Style [MarginRight "5px"]] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString |> str]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
@@ -141,6 +149,9 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
             Field.div [Field.HasAddons] [
                 Control.div [] [
                     Button.a [
+                        Button.Props [Style [
+                            if model.AddBuildingBlockState.BuildingBlockHasUnit then Color NFDIColors.Mint.Base else Color NFDIColors.Red.Base
+                        ]]
                         Button.OnClick (fun _ ->
                             let inputId = (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).InputId
                             if model.AddBuildingBlockState.BuildingBlockHasUnit = true then
@@ -148,12 +159,16 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                                 e?value <- null
                             ToggleBuildingBlockHasUnit |> AddBuildingBlock |> dispatch
                         )
-                    ] [ 
-                        Fa.stack [Fa.Stack.Size Fa.FaSmall; Fa.Stack.Props [Style [ Color "#666666"]]][
-                            Fa.i [Fa.Regular.Square; Fa.Stack2x][]
-                            if model.AddBuildingBlockState.BuildingBlockHasUnit then
-                                Fa.i [Fa.Solid.Check; Fa.Stack1x][]
-                        ]
+                    ] [
+                        if model.AddBuildingBlockState.BuildingBlockHasUnit then
+                            Fa.i [ Fa.Size Fa.FaLarge; Fa.Solid.Check ][ ]
+                        else
+                            Fa.i [ Fa.Size Fa.FaLarge ; Fa.Solid.Ban ][ ]
+                        //Fa.stack [Fa.Stack.Size Fa.FaSmall; Fa.Stack.Props [Style [ Color "#666666"]]][
+                        //    Fa.i [Fa.Regular.Square; Fa.Stack2x][]
+                        //    if model.AddBuildingBlockState.BuildingBlockHasUnit then
+                        //        Fa.i [Fa.Solid.Check; Fa.Stack1x][]
+                        //]
                     ]
                 ]
                 Control.p [] [
@@ -172,60 +187,35 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                     (model.AddBuildingBlockState.BuildingBlockHasUnit |> not)
             ]
 
-            a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockState model.AddBuildingBlockState).ModalId |> AdvancedSearch |> dispatch)] [
-                str "Use Advanced Search"
+            div [][
+                Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
+                    a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockState model.AddBuildingBlockState).ModalId |> AdvancedSearch |> dispatch)] [
+                        str "Use advanced search building block"
+                    ]
+                ]
+                match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
+                | Parameter | Characteristics | Factor ->
+                    str " "
+
+                    Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
+                        a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).ModalId |> AdvancedSearch |> dispatch)] [
+                            str "Use advanced search unit"
+                        ]
+                    ]
+                | _ -> ()
             ]
 
         | _ -> ()
-    ]
 
-let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
-    [
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add unit reference columns to existing building block."]
-        Field.div [Field.HasAddons] [
-            Control.p [] [
-                Button.button [Button.IsStatic true] [
-                    str ("Add unit")
-                ]
-            ]
-            AutocompleteSearch.autocompleteTermSearchComponent
-                dispatch
-                model.SiteStyleState.ColorMode
-                model
-                "Start typing to search"
-                None
-                (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState)
-                // if BuildingBlockHasUnit = false then disabled = true
-                false
-        ]
-
-        a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState).ModalId |> AdvancedSearch |> dispatch)] [
-            str "Use Advanced Search"
-        ]
-    ]
-
-let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
-    form [
-        OnSubmit (fun e -> e.preventDefault())
-        // https://keycode.info/
-        OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-    ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
-        br []
-
-        // Input forms, etc related to add building block. Except submit button
-        yield! addBuildingBlockElements model dispatch
-
-        // Fill selection confirmation
         Field.div [] [
             Control.div [] [
                 Button.button   [
                     let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> isValidBuildingBlock
+                    Button.Color Color.IsSuccess
                     if isValid then
-                        Button.CustomClass "is-success"
                         Button.IsActive true
                     else
-                        Button.CustomClass "is-danger"
+                        Button.Color Color.IsDanger
                         Button.Props [Disabled true]
                     Button.IsFullWidth
                     Button.OnClick (
@@ -243,22 +233,46 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
                 ]
             ]
         ]
+    ]
 
-        hr []
-
-        // Input forms, etc related to add unit to existing building block. Except submit button
-
-        yield! addUnitToExistingBlockElements model dispatch
+let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
+    div [
+        Style [
+            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
+            //BorderRadius "0 0 15px 15px"
+            Padding "0.25rem 1rem"
+    ]] [
+        Field.div [Field.HasAddons] [
+            Control.p [] [
+                Button.button [Button.IsStatic true] [
+                    str ("Add unit")
+                ]
+            ]
+            AutocompleteSearch.autocompleteTermSearchComponent
+                dispatch
+                model.SiteStyleState.ColorMode
+                model
+                "Start typing to search"
+                None
+                (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState)
+                // if BuildingBlockHasUnit = false then disabled = true
+                false
+        ]
+        Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
+            a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState).ModalId |> AdvancedSearch |> dispatch)] [
+                str "Use advanced search"
+            ]
+        ]
 
         Field.div [] [
             Control.div [] [
                 Button.button   [
                     let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
+                    Button.Color Color.IsSuccess
                     if isValid then
-                        Button.CustomClass "is-success"
                         Button.IsActive true
                     else
-                        Button.CustomClass "is-danger"
+                        Button.Color Color.IsDanger
                         Button.Props [Disabled true]
                     Button.IsFullWidth
                     Button.OnClick (fun e ->
@@ -274,4 +288,21 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
             ]
         ]
 
+    ]
+
+let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
+    form [
+        OnSubmit (fun e -> e.preventDefault())
+        // https://keycode.info/
+        OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
+    ] [
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
+
+        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Select the type of annotation building block (column) to add to the annotation table."]
+        // Input forms, etc related to add building block.
+        addBuildingBlockElements model dispatch
+
+        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add unit reference columns to existing building block."]
+        // Input forms, etc related to add unit to existing building block.
+        addUnitToExistingBlockElements model dispatch
     ]

@@ -12,6 +12,8 @@ open OfficeInterop
 open OfficeInterop.Types
 open Model
 
+open ISADotNet
+
 type ExcelInteropMsg =
     | PipeActiveAnnotationTable     of (TryFindAnnoTableResult -> ExcelInteropMsg)
     /// This is used to pipe (all table names []) to a ExcelInteropMsg.
@@ -115,6 +117,7 @@ type PersistentStorageMsg =
 type FilePickerMsg =
     | LoadNewFiles              of string list
     | UpdateFileNames           of newFileNames:(int*string) list
+    ///
     | UpdateDNDDropped          of isDropped:bool
 
 type AddBuildingBlockMsg =
@@ -143,6 +146,9 @@ type FileUploadJsonMsg =
     | ParseJsonToProcessRequest of string
     | ParseJsonToProcessResult of Result<Process,exn>
 
+type TopLevelMsg =
+    | CloseSuggestions
+
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
     | Api                   of ApiMsg
@@ -157,6 +163,7 @@ type Msg =
     | AddBuildingBlock      of AddBuildingBlockMsg
     | Validation            of ValidationMsg
     | FileUploadJson        of FileUploadJsonMsg
+    | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>
     | DoNothing

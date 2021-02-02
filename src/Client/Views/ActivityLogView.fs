@@ -45,7 +45,7 @@ let activityLogComponent (model:Model) dispatch =
         Container.container [
             Container.Props [Style [
                 Padding "1rem"
-                Border "2.5px solid #f14668"
+                Border (sprintf "2.5px solid %s" NFDIColors.Red.Base)
                 BorderRadius "10px"
             ]]
         ][

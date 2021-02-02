@@ -354,6 +354,7 @@ let getTableRepresentation(annotationTable) =
                     else
                         /// Should no current TableValidation xml exist, create a new one
                         TableValidation.create
+                            ""
                             worksheetName
                             annotationTable
                             System.DateTime.Now
@@ -965,9 +966,27 @@ let getSwateValidationXml() =
 
         promise {
 
-            let! xmlParsed, currentSwateValidationXml = getCurrentValidationXml customXmlParts context
+            //let! xmlParsed, currentSwateValidationXml = getCurrentValidationXml customXmlParts context
 
-            return "Info",sprintf "%A" currentSwateValidationXml
+            let! getXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Seq.map (fun x -> x.getXml() )
+
+                    xmls |> Array.ofSeq
+                )
+
+            let! xml =
+                context.sync().``then``(fun e ->
+
+                    //let nOfItems = customXmlParts.items.Count
+                    let vals = getXml |> Array.map (fun x -> x.value)
+                    //sprintf "N = %A; items: %A" nOfItems vals
+                    let xml = vals |> String.concat Environment.NewLine
+                    xml
+                )
+
+            return "Info",sprintf "%A" xml
         }
     )
 
@@ -975,7 +994,12 @@ let writeTableValidationToXml(tableValidation:TableValidation,currentSwateVersio
     Excel.run(fun context ->
 
         // Update DateTime 
-        let newTableValidation = {tableValidation with DateTime = System.DateTime.Now}
+        let newTableValidation = {
+            tableValidation with
+                // This line is used to give freshly created TableValidations the current Swate Version
+                SwateVersion = if tableValidation.SwateVersion = "" then currentSwateVersion else tableValidation.SwateVersion
+                DateTime = System.DateTime.Now
+            }
 
         // The first part accesses current CustomXml
         let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))

@@ -19,18 +19,18 @@ let toggleDarkModeElement (model:Model) dispatch =
             str "Darkmode"
         ]
         Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
-            Switch.switchInline [
+            Switch.switch [
                 Switch.Id "DarkModeSwitch"
                 Switch.IsOutlined
                 Switch.Color IsSuccess
                 Switch.OnChange (fun _ -> ToggleColorMode |> StyleChange |> dispatch)
-            ] [span [Class "nonSelectText"][str "DarkMode"]]
+            ] []
         ]
     ]
 
 let settingsViewComponent (model:Model) dispatch =
     div [
-
+        Style [MaxWidth "500px"]
     ][
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Swate Settings"]
         Label.label [][str "Customize Swate"]

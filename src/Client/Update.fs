@@ -1187,6 +1187,7 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
 
         let nextCmd =
             GenericLog ("Info", msg) |> Dev |> Cmd.ofMsg
+
         let nextState = {
             currentState with
                 ActiveTableBuildingBlocks = buildingBlocks
@@ -1225,15 +1226,44 @@ let handleFileUploadJsonMsg (fujMsg:FileUploadJsonMsg) (currentState: FileUpload
                 (Result.Error >> ParseJsonToProcessResult)
         currentState, Cmd.map FileUploadJson cmd 
     | ParseJsonToProcessResult (Ok isaProcess) ->
+        printfn "THIS WAS DEPRECATED CHECK IN UPDATE.fs IN ParseJsonToProcessResult"
         let nextState = {
             currentState with
-                ProcessModel = Some isaProcess 
+                // TODO
+                ProcessModel = None
         }
         nextState, Cmd.none
     | ParseJsonToProcessResult (Result.Error e) ->
         let cmd =
             GenericError e |> Dev |> Cmd.ofMsg 
         currentState, cmd
+    //| SendJson ->
+    //    let cmd =
+    //        Cmd.OfAsync.perform
+    //            Api.isaDotNetApi.tryTestProcess
+    //            ISADotNet.Process.empty
+    //            (fun x -> GenericLog ("info", "sent process"))
+    //    currentState, Cmd.map Dev cmd 
+
+
+let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
+    match topLevelMsg with
+    // Client
+    | CloseSuggestions ->
+        let nextModel = {
+            currentModel with
+                TermSearchState = {
+                    currentModel.TermSearchState with
+                        ShowSuggestions = false
+                }
+                AddBuildingBlockState = {
+                    currentModel.AddBuildingBlockState with
+                        ShowBuildingBlockTermSuggestions = false
+                        ShowUnitTermSuggestions = false
+                        ShowUnit2TermSuggestions = false
+                }
+        }
+        nextModel, Cmd.none
 
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
@@ -1415,4 +1445,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             currentModel with
                 FileUploadJsonState = nextFileUploadJsonState
             }
+        nextModel, nextCmd
+
+    | TopLevelMsg topLevelMsg ->
+        let nextModel, nextCmd =
+            handleTopLevelMsg topLevelMsg currentModel
+
         nextModel, nextCmd

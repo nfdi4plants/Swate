@@ -111,6 +111,7 @@ module XmlValidationTypes =
     /// User can define what kind of input a column should have
     type ContentType =
         | OntologyTerm of string
+        | UnitTerm     of string
         | Text
         | Url
         | Boolean
@@ -122,6 +123,8 @@ module XmlValidationTypes =
             match this with
             | OntologyTerm po ->
                 sprintf "Ontology [%s]" po
+            | UnitTerm ut ->
+                sprintf "Unit [%s]" ut
             | _ ->
                 string this
     
@@ -130,6 +133,9 @@ module XmlValidationTypes =
             | ontology when str.StartsWith "OntologyTerm " ->
                 let s = ontology.Replace("OntologyTerm ","").Replace("\"","")
                 OntologyTerm s
+            | unit when str.StartsWith "UnitTerm " ->
+                let s = unit.Replace("UnitTerm ", "").Replace("\"","")
+                UnitTerm s
             | "Text"        -> Text
             | "Url"         -> Url
             | "Boolean"     -> Boolean
@@ -163,6 +169,7 @@ module XmlValidationTypes =
         }
             
     type TableValidation = {
+        SwateVersion    : string
         WorksheetName   : string
         TableName       : string
         DateTime        : DateTime
@@ -170,14 +177,16 @@ module XmlValidationTypes =
         Userlist        : string list
         ColumnValidations: ColumnValidation list
     } with
-        static member create worksheetName tableName dateTime userlist colValidations = {
+        static member create swateVersion worksheetName tableName dateTime userlist colValidations = {
+            SwateVersion        = swateVersion
             WorksheetName       = worksheetName
             TableName           = tableName
             DateTime            = dateTime
             Userlist            = userlist
             ColumnValidations   = colValidations
         }
-        static member init (?worksheetName,?tableName, (?dateTime:DateTime), ?userList) = {
+        static member init (?swateVersion, ?worksheetName,?tableName, (?dateTime:DateTime), ?userList) = {
+            SwateVersion        = if swateVersion.IsSome then swateVersion.Value else ""
             WorksheetName       = if worksheetName.IsSome then worksheetName.Value else ""
             TableName           = if tableName.IsSome then tableName.Value else ""
             DateTime            = if dateTime.IsSome then dateTime.Value else DateTime.Now
@@ -187,6 +196,7 @@ module XmlValidationTypes =
 
     /// This type is used to work on the CustomXml 'Validation' tag, which is used to store information on how to validate a specifc Swate table as correct.
     type SwateValidation = {
+        /// Used to show the last used Swate version to edit SwateValidation CustomXml
         SwateVersion        : string
         TableValidations    : TableValidation list
     } with
@@ -202,6 +212,7 @@ module XmlValidationTypes =
                 for table in this.TableValidations do
                     yield
                         node "TableValidation" [
+                            attr.value( "SwateVersion", table.SwateVersion )
                             attr.value( "WorksheetName", table.WorksheetName )
                             attr.value( "TableName", table.TableName )
                             attr.value( "DateTime", table.DateTime.ToString("yyyy-MM-dd HH:mm") )
@@ -230,6 +241,7 @@ module XmlValidationTypes =
             let tableValidationTypes =
                 tableValidations
                 |> List.map (fun table ->
+                    let swateVersion    = table.Attributes.["SwateVersion"]
                     let worksheetName   = table.Attributes.["WorksheetName"]
                     let tableName       = table.Attributes.["TableName"]
                     let dateTime        =
@@ -248,7 +260,7 @@ module XmlValidationTypes =
                             let unit                = column.Attributes.["Unit"] |> fun x -> if x = "None" then None else Some x
                             ColumnValidation.create columnHeader columnAdress importance validationFormat unit
                         )
-                    TableValidation.create worksheetName tableName dateTime userlist columnValidationTypes
+                    TableValidation.create swateVersion worksheetName tableName dateTime userlist columnValidationTypes
                 )
             { validationType with TableValidations = tableValidationTypes }
 

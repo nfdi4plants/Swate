@@ -31,6 +31,9 @@ module URLs =
     let CSBTwitterUrl = @"https://twitter.com/cs_biology"
 
     [<LiteralAttribute>]
+    let NFDITwitterUrl = @"https://twitter.com/nfdi4plants"
+
+    [<LiteralAttribute>]
     let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
 
 module HelperFunctions =
@@ -137,22 +140,22 @@ type UnitSearchRequest =
 
 type ITestAPI = {
     // Development
-    getTestNumber               : unit                                                  -> Async<int>
+    getTestNumber           : unit      -> Async<int>
 }
 
 type IISADotNetAPIv1 = {
-    parseJsonToProcess :    string  -> Async<Process>
+    parseJsonToProcess      : string                -> Async<ISADotNet.Process>
 }
 
 type IServiceAPIv1 = {
-    getAppVersion : unit -> Async<string>
+    getAppVersion           : unit      -> Async<string>
 }
 
 
 type IAnnotatorAPIv1 = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>
-    getTestString               : string                                                -> Async<string>
+    getTestString               : string                                                -> Async<string option>
     // Ontology related requests
     /// (name,version,definition,created,user)
     testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>

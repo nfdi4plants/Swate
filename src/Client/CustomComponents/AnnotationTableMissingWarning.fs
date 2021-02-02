@@ -8,14 +8,18 @@ open ExcelColors
 open Model
 open Messages
 
+
 let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) =
     Notification.notification [
         Notification.Color IsWarning
         Notification.Props [
-
         ]
     ] [
-        Notification.delete [] []
+        Notification.delete [ Props [
+            OnClick (fun e ->
+                AnnotationTableExists (OfficeInterop.Types.TryFindAnnoTableResult.Success "Remove Warning Notification") |> ExcelInterop |> dispatch
+            )
+        ]] [ ]
         Heading.h5 [] [str "Warning: No Annotation table found in worksheet"]
         Text.p [] [
             str "Your worksheet seems to contain no annotation table. You can create one by pressing the button below"

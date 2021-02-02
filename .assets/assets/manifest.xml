@@ -6,8 +6,8 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Swate"/>
   <Description DefaultValue="Utility functions to annotate data in a fast and safe way."/>
-  <IconUrl DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-80.png"/>
+  <IconUrl DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_32x32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_80x80.png"/>
   <SupportUrl DefaultValue="https://csb.bio.uni-kl.de/"/>
   <AppDomains>
     <AppDomain>bio.uni-kl.de</AppDomain>
@@ -95,15 +95,15 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-16.png"/>
-        <bt:Image id="Icon.20x20" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-20.png"/>
-        <bt:Image id="Icon.24x24" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-24.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-32.png"/>
-        <bt:Image id="Icon.40x40" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-40.png"/>
-        <bt:Image id="Icon.48x48" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-48.png"/>
-        <bt:Image id="Icon.64x64" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-64.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-80.png"/>
-        <bt:Image id="Icon.96x96" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-96.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_16x16.png"/>
+        <bt:Image id="Icon.20x20" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_20x20.png"/>
+        <bt:Image id="Icon.24x24" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_24x24.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_32x32.png"/>
+        <bt:Image id="Icon.40x40" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_40x40.png"/>
+        <bt:Image id="Icon.48x48" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_48x48.png"/>
+        <bt:Image id="Icon.64x64" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_64x64.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_80x80.png"/>
+        <bt:Image id="Icon.96x96" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_96x96.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>

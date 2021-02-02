@@ -1,7 +1,17 @@
-### 0.2.1+67ad143 (Released 2021-1-22)
+### 0.2.1+5c2e56a (Released 2021-2-2)
 * Additions:
-    * latest commit #67ad143
-    * [[#67ad143](https://github.com/nfdi4plants/Swate/commit/67ad14381ad8ac8bdbbaefd0ebfa82193c8f94b9)] Update manifest.xml (Issue #86).
+    * latest commit #5c2e56a
+    * [[#5c2e56a](https://github.com/nfdi4plants/Swate/commit/5c2e56a46b57fa627c5b37b7e8307ab633a4e12b)] Add option to add unit cols to existing building block (Issue #94).
+    * [[#9987184](https://github.com/nfdi4plants/Swate/commit/99871849bc83cfa4bd4fe7760c2f43dae524d76b)] Add sorensen dice sorting to advanced term search (Issue #95).
+    * [[#9158bb7](https://github.com/nfdi4plants/Swate/commit/9158bb75696399492050109ebb0d04be59eeb9b6)] Update unit search to only search UO ontology (Issue #93).
+    * [[#4e0d0c9](https://github.com/nfdi4plants/Swate/commit/4e0d0c9e32c5be606542f9ca0f05b74be6626e1d)] Add easy to access navigation option to advanced search (Issue #91).
+    * [[#374e326](https://github.com/nfdi4plants/Swate/commit/374e326f2123a2f61825f281bc4886b109d5261d)] Add features from #68 to Update Reference Columns (Issue 87#).
+* Deletions:
+    * [[#9da9c55](https://github.com/nfdi4plants/Swate/commit/9da9c55a23d737aa05ff7c12759446ce5387902f)] Remove event handlers (input assist, #87)
+* Bugfixes:
+    * [[#cc26e81](https://github.com/nfdi4plants/Swate/commit/cc26e81e895d7ec7fc7abef885e5d7afb4c0a7c2)] Fix bug overloading computers when creating an annotation table for whole rows (Issue #63).
+    * [[#1e5eb3d](https://github.com/nfdi4plants/Swate/commit/1e5eb3d6c2b0f2f0527d4843c8bc0addabdb0b04)] Fix reset of unit search input when unchecking (Issue #92).
+    * [[#474cf73](https://github.com/nfdi4plants/Swate/commit/474cf73cb48227d58e88d239e6e9e50e8676c78a)] Fix bug creating wrong TAN with insertTerm.
 
 ### 0.2.0+899b535 (Released 2021-1-11)
 * Additions:

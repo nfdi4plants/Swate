@@ -201,13 +201,17 @@ let createAutocompleteSuggestions
 
 
 let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (isVisible: bool) (isLoading:bool) (suggestions: ReactElement list)  =
-    Container.container[] [
+    Container.container[ ] [
         Dropdown.content [Props [
             Style [
                 if isVisible then Display DisplayOptions.Block else Display DisplayOptions.None
                 //if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
+                ZIndex "20"
+                Width "100%"
+                Position PositionOptions.Absolute
                 BackgroundColor colorMode.ControlBackground
                 BorderColor     colorMode.ControlForeground
+                MarginTop "-0.5rem"
             ]]
         ] [
             Table.table [Table.IsFullWidth] [
@@ -244,6 +248,7 @@ let autocompleteTermSearchComponent
         Input.input [
             Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
+            Input.ValueOrDefault autocompleteParams.StateBinding
             match inputSize with
             | Some size -> Input.Size size
             | _ -> ()
@@ -295,6 +300,7 @@ let autocompleteTermSearchComponentOfParentOntology
                     | Some size -> Input.Size size
                     | _ -> ()
                     Input.Props [
+                        
                         ExcelColors.colorControl colorMode
                         //OnFocus (fun e -> alert "focusout")
                         //OnBlur  (fun e -> alert "focusin")

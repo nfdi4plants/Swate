@@ -208,10 +208,10 @@ type PageState = {
             }
 
 type FilePickerState = {
-    FileNames : (int*string) list
+    FileNames       : (int*string) list
     /// Used for drag and drop, to determine if something is currently dragged or not.
     /// Necessary to deactivate pointer events on children during drag.
-    DNDDropped : bool
+    DNDDropped      : bool
 } with
     static member init () = {
         FileNames = []
@@ -316,7 +316,7 @@ type AddBuildingBlockState = {
     static member init () = {
         ShowBuildingBlockSelection              = false
 
-        CurrentBuildingBlock                    = AnnotationBuildingBlock.init NoneSelected
+        CurrentBuildingBlock                    = AnnotationBuildingBlock.init AnnotationBuildingBlockType.Parameter
 
         BuildingBlockNameSuggestions            = [||]
         ShowBuildingBlockTermSuggestions        = false
@@ -351,7 +351,7 @@ type ValidationState = {
 
 type FileUploadJsonState = {
     UploadData: string
-    ProcessModel: ISADotNet.Process option
+    ProcessModel: ISADotNet.OntologyAnnotation option
 } with
     static member init () = {
         UploadData = ""

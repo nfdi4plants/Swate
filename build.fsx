@@ -533,9 +533,8 @@ Target.create "Release" (fun config ->
             newVer
             Encoding.UTF8
             [
-                (Path.combine __SOURCE_DIRECTORY__ ".assets\swate\manifest.xml")
+                (Path.combine __SOURCE_DIRECTORY__ @".assets\assets\manifest.xml")
                 (Path.combine __SOURCE_DIRECTORY__ "manifest.xml")
-                (Path.combine __SOURCE_DIRECTORY__ "tests\manifest.xml")
             ]
 
     Trace.trace "Update manifest.xml done!"
