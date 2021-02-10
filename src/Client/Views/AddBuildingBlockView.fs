@@ -213,16 +213,17 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         Button.Props [Disabled true]
                     Button.IsFullWidth
                     Button.OnClick (
+                        let colName     = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
+                        let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome then Some model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value.Accession else None
                         let unitName =
                             match model.AddBuildingBlockState.BuildingBlockHasUnit, model.AddBuildingBlockState.UnitTermSearchText with
                             | _,""              -> None //"0.00"
-                            | false, _          -> None//"0.00"
+                            | false, _          -> None //"0.00"
                             | true, str         -> Some str
                                 //sprintf "0.00 \"%s\"" str
-                        let colName     = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
-                        let colTerm     = model.AddBuildingBlockState.BuildingBlockSelectedTerm
-                        let unitTerm    = model.AddBuildingBlockState.UnitSelectedTerm
-                        fun _ -> (colName,colTerm,unitName,unitTerm) |> pipeNameTuple4 AddAnnotationBlock |> ExcelInterop |> dispatch
+                        let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome then Some model.AddBuildingBlockState.UnitSelectedTerm.Value.Accession else None
+                        let minBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.create colName colTerm unitName unitTerm None
+                        fun _ -> minBuildingBlock |> pipeNameTuple AddAnnotationBlock |> ExcelInterop |> dispatch
                     )
                 ] [
                     str "Insert this annotation building block"
@@ -272,7 +273,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         Button.Props [Disabled true]
                     Button.IsFullWidth
                     Button.OnClick (fun e ->
-                        let unitTermOpt = model.AddBuildingBlockState.Unit2SelectedTerm
+                        let unitTermOpt = if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some model.AddBuildingBlockState.Unit2SelectedTerm.Value.Accession else None
                         match model.AddBuildingBlockState.Unit2TermSearchText with
                         | "" ->
                             GenericLog ("Error", "Cannot execute function with empty unit input") |> Dev |> dispatch
@@ -284,7 +285,6 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
                 ]
             ]
         ]
-
     ]
 
 let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =

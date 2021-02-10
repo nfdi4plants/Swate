@@ -363,7 +363,7 @@ type ProtocolInsertState = {
 } with
     static member init () = {
         UploadData = ""
-        ProcessModel = Some ISADotNet.Process.empty
+        ProcessModel = None
     }
 
 type Model = {

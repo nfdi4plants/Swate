@@ -24,19 +24,19 @@ let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
 /// This will create the column header attributes for a unit block.
 /// as unit always has to be a term and cannot be for example "Source" or "Sample", both of which have a differen format than for exmaple "Parameter [TermName]",
 /// we only need one function to generate id and attributes and bring the unit term in the right format.
-let unitColAttributes (unitTermName:string) (unitTermOpt:DbDomain.Term option) (id:int) =
+let unitColAttributes (unitTermName:string) (unitAccessionOptt:string option) (id:int) =
     match id with
     | 1 ->
-        match unitTermOpt with
-        | Some t    -> sprintf "[%s] (#h; #t%s; #u)" unitTermName t.Accession
-        | None      -> sprintf "[%s] (#h; #u)" unitTermName
+        match unitAccessionOptt with
+        | Some accession    -> sprintf "[%s] (#h; #t%s; #u)" unitTermName accession
+        | None              -> sprintf "[%s] (#h; #u)" unitTermName
     | _ ->
-        match unitTermOpt with
-        | Some t    -> sprintf "[%s] (#%i; #h; #t%s #u)" unitTermName id t.Accession
-        | None      -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
+        match unitAccessionOptt with
+        | Some accession    -> sprintf "[%s] (#%i; #h; #t%s #u)" unitTermName id accession
+        | None              -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
 
 
-let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitTermOpt:DbDomain.Term option) =
+let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
     let col = createEmptyMatrixForTables 1 rowCount ""
     if format.IsSome then
         let findNewIdForUnit() =
@@ -46,7 +46,7 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
                     // Should a column with the same name already exist, then count up the id tag.
                     |> Array.exists (fun existingHeader ->
                         // We don't need to check TSR or TAN, because the main column always starts with "Unit"
-                        existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitTermOpt int)
+                        existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt int)
                     )
                 if isExisting then
                     loopingCheck (int+1)
@@ -61,7 +61,7 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
             annotationTable.columns.add(
                 index = newBaseColIndex+3.,
                 values = U4.Case1 col,
-                name = sprintf "Unit %s" (unitColAttributes format.Value unitTermOpt newUnitId)
+                name = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
             )
 
         /// create unit TSR
@@ -69,7 +69,7 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
             annotationTable.columns.add(
                 index = newBaseColIndex+4.,
                 values = U4.Case1 col,
-                name = sprintf "Term Source REF %s" (unitColAttributes format.Value unitTermOpt newUnitId)
+                name = sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
             )
 
         /// create unit TAN
@@ -77,7 +77,7 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
             annotationTable.columns.add(
                 index = newBaseColIndex+5.,
                 values = U4.Case1 col,
-                name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitTermOpt newUnitId)
+                name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
             )
 
         Some (

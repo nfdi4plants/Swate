@@ -391,11 +391,11 @@ let getTableRepresentation(annotationTable) =
     )
 
 /// This function is used to add a new building block to the active annotationTable.
-let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term option,format:string option, unitTermOpt:DbDomain.Term option) =
+let addAnnotationBlock (annotationTable,buildingBlockInfo:MinimalBuildingBlock) =
 
     /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
     let isSingleCol =
-        match colName with
+        match buildingBlockInfo.MainColumnName with
         | ColumnCoreNames.Shown.Sample | ColumnCoreNames.Shown.Source | ColumnCoreNames.Shown.Data -> true
         | _ -> false
 
@@ -410,7 +410,7 @@ let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term 
 
     /// This is used to create the bracket information for reference (hidden) columns. Again this has two modi, one with id tag and one without.
     /// This time no core name is needed as this will always be TSR or TAN.
-    let hiddenColAttributes (parsedColHeader:ColHeader) (columnTermOption: DbDomain.Term option) (id:int) =
+    let hiddenColAttributes (parsedColHeader:ColHeader) (columnAccessionOpt: string option) (id:int) =
         let coreName =
             match parsedColHeader.Ontology, parsedColHeader.CoreName with
             | Some o , _ -> o.Name
@@ -418,13 +418,13 @@ let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term 
             | _ -> parsedColHeader.Header
         match id with
         | 1 ->
-            match columnTermOption with
-            | Some t        -> sprintf "[%s] (#h; #t%s)" coreName t.Accession
-            | None          -> sprintf "[%s] (#h)" coreName
+            match columnAccessionOpt with
+            | Some accession    -> sprintf "[%s] (#h; #t%s)" coreName accession
+            | None              -> sprintf "[%s] (#h)" coreName
         | _ ->
-            match columnTermOption with
-            | Some t        -> sprintf "[%s] (#%i; #h; #t%s)" coreName id t.Accession
-            | None          -> sprintf "[%s] (#%i; #h)" coreName id
+            match columnAccessionOpt with
+            | Some accession    -> sprintf "[%s] (#%i; #h; #t%s)" coreName id accession
+            | None              -> sprintf "[%s] (#%i; #h)" coreName id
 
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
@@ -506,7 +506,7 @@ let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term 
                     |> Array.map string
 
                 /// This is necessary to check if the would be created col name already exists, to then tick up the id tag.
-                let parsedBaseHeader = parseColHeader colName
+                let parsedBaseHeader = parseColHeader buildingBlockInfo.MainColumnName
                 /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
                 let findNewIdForName() =
                     let rec loopingCheck int =
@@ -515,15 +515,15 @@ let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term 
                             // Should a column with the same name already exist, then count up the id tag.
                             |> Array.exists (fun existingHeader ->
                                 if isSingleCol then
-                                    existingHeader = mainColName colName int
+                                    existingHeader = mainColName buildingBlockInfo.MainColumnName int
                                 else
-                                    existingHeader = mainColName colName int
+                                    existingHeader = mainColName buildingBlockInfo.MainColumnName int
                                     // i think it is necessary to also check for "TSR" and "TAN" because of the following possibilities
                                     // Parameter [instrument model] | "Term Source REF [instrument model] (#h) | ...
                                     // Factor [instrument model] | "Term Source REF [instrument model] (#h) | ...
                                     // in the example above the mainColumn name is different but "TSR" and "TAN" would be the same.
-                                    || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader colTermOpt int)
-                                    || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader colTermOpt int)
+                                    || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader buildingBlockInfo.MainColumnTermAccession int)
+                                    || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader buildingBlockInfo.MainColumnTermAccession int)
                             )
                         if isExisting then
                             loopingCheck (int+1)
@@ -537,30 +537,36 @@ let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term 
                 let rowCount = tableRange.rowCount |> int
 
                 //create an empty column to insert
-                let col = createEmptyMatrixForTables 1 rowCount ""
+                let col value = createEmptyMatrixForTables 1 rowCount value
+
+                printfn "%A" buildingBlockInfo.Values
 
                 // create main column
                 let createdCol1() =
+                    let mainColVal = if buildingBlockInfo.Values.IsSome then buildingBlockInfo.Values.Value.Name else ""
                     annotationTable.columns.add(
                         index = newBaseColIndex,
-                        values = U4.Case1 col,
-                        name = mainColName colName newId
+                        values = U4.Case1 (col mainColVal),
+                        name = mainColName buildingBlockInfo.MainColumnName newId
                     )
 
                 // create TSR
                 let createdCol2() =
+                    let tsrColVal = if buildingBlockInfo.Values.IsSome && buildingBlockInfo.Values.Value.TermAccession <> "" then buildingBlockInfo.Values.Value.TermAccession.Split([|":"|],StringSplitOptions.None).[0] else ""
                     annotationTable.columns.add(
                         index = newBaseColIndex+1.,
-                        values = U4.Case1 col,
-                        name = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader colTermOpt newId)
+                        values = U4.Case1 (col tsrColVal),
+                        name = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader buildingBlockInfo.MainColumnTermAccession newId)
                     )
 
                 // create TAN
                 let createdCol3() =
+                    let linkTermAccession() = buildingBlockInfo.Values.Value.TermAccession |> Shared.URLs.termAccessionUrlOfAccessionStr
+                    let tanColVal = if buildingBlockInfo.Values.IsSome && buildingBlockInfo.Values.Value.TermAccession <> "" then linkTermAccession() else ""
                     annotationTable.columns.add(
                         index = newBaseColIndex+2.,
-                        values = U4.Case1 col,
-                        name = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader colTermOpt newId)
+                        values = U4.Case1 (col tanColVal),
+                        name = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader buildingBlockInfo.MainColumnTermAccession newId)
                     )
 
                 // Should the column be Data, Source or Sample then we do not add TSR and TAN
@@ -577,7 +583,7 @@ let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term 
                 /// if format.isSome then we need to also add unit columns in the following scheme:
                 /// Unit [UnitTermName] (#id; #h; #u) | Term Source REF [UnitTermName] (#id; #h; #u) | Term Accession Number [UnitTermName] (#id; #h; #u)
                 let createUnitColsIfNeeded =
-                    OfficeInterop.HelperFunctions.createUnitColumns allColHeaders annotationTable newBaseColIndex rowCount format unitTermOpt
+                    OfficeInterop.HelperFunctions.createUnitColumns allColHeaders annotationTable newBaseColIndex rowCount buildingBlockInfo.UnitName buildingBlockInfo.UnitTermAccession
 
                 /// If unit block was added then return some msg information
                 let unitColCreationMsg = if createUnitColsIfNeeded.IsSome then fst createUnitColsIfNeeded.Value else ""
@@ -585,13 +591,13 @@ let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term 
 
                 r.enableEvents <- true
                 /// return main col names, unit column format and a message. The first two params are used in a follow up message (executing 'changeTableColumnFormat')
-                mainColName colName newId, unitColFormat, sprintf "%s column was added. %s" colName unitColCreationMsg
+                mainColName buildingBlockInfo.MainColumnName newId, unitColFormat, sprintf "%s column was added. %s" buildingBlockInfo.MainColumnName unitColCreationMsg
             )
 
             return res
         }
     )
-
+    
 let changeTableColumnFormat annotationTable (colName:string) (format:string) =
     Excel.run(fun context ->
 
@@ -1189,7 +1195,7 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
     )
 
 /// This function is used to add unit reference columns to an existing building block without unit reference columns
-let addUnitToExistingBuildingBlock (annotationTable:string,format:string option,unitTermOpt:DbDomain.Term option) =
+let addUnitToExistingBuildingBlock (annotationTable:string,format:string option,unitAccessionOpt:string option) =
     Excel.run(fun context ->
 
         let annotationTableName = annotationTable
@@ -1263,7 +1269,7 @@ let addUnitToExistingBuildingBlock (annotationTable:string,format:string option,
                     |> Array.map string
 
                 let unitColumnResult =
-                    createUnitColumns allColHeaders annotationTable (float findLeftClosestBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitTermOpt
+                    createUnitColumns allColHeaders annotationTable (float findLeftClosestBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
 
                 let maincolName = findLeftClosestBuildingBlock.MainColumn.Header.Value.Header
 

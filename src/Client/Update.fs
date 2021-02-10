@@ -154,17 +154,29 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
-    | AddAnnotationBlock (activeTableNameRes,colName,colTermOpt,unitOpt,unitTermOpt) ->
+    | AddAnnotationBlock (activeTableNameRes,minBuildingBlockInfo) ->
         let cmd tableName =
             Cmd.OfPromise.either
                 OfficeInterop.addAnnotationBlock  
-                (tableName,colName,colTermOpt,unitOpt,unitTermOpt)
+                (tableName,minBuildingBlockInfo)
                 (fun (newColName,format,msg) ->
                     FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
                 )
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
+
+    //| AddAnnotationBlocks (activeTableNameRes,minBuildingBlockInfos) ->
+    //    let cmd tableName =
+    //        Cmd.OfPromise.either
+    //            OfficeInterop.addAnnotationBlocks 
+    //            (tableName,minBuildingBlockInfos)
+    //            (fun (newColName,format,msg) ->
+    //                FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
+    //            )
+    //            (GenericError >> Dev)
+    //    let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
+    //    currentState, cmd
 
     | AddUnitToAnnotationBlock (activeTableNameRes, format, unitTermOpt) ->
         let cmd name =
@@ -1221,7 +1233,7 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
             currentState with
                 UploadData = newDataString
         }
-        nextState, Cmd.none
+        nextState, Cmd.ofMsg (ParseJsonToProcessRequest newDataString |> ProtocolInsert)
     | ParseJsonToProcessRequest parsableString ->
         let cmd =
             Cmd.OfAsync.either

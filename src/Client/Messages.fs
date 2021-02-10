@@ -20,8 +20,9 @@ type ExcelInteropMsg =
     | SyncContext                   of activeAnnotationTable:TryFindAnnoTableResult*string
     | InSync                        of string
     | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
-    | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * colname:string * colTermOpt:DbDomain.Term option * unitNameOpt:string option * unitTermOpt:DbDomain.Term option
-    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * format:string option * unitTermOpt:DbDomain.Term option
+    | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
+    //| AddAnnotationBlocks           of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list 
+    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * format:string option * unitTermAccession:string option
     | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
     | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
