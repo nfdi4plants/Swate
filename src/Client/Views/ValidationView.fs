@@ -9,6 +9,8 @@ open Browser
 open Browser.MediaQueryList
 open Browser.MediaQueryListExtensions
 
+open Shared
+
 open ExcelColors
 open Model
 open Messages
@@ -138,8 +140,7 @@ let checkradioList (ind:int) colVal model dispatch =
         if colVal.Unit.IsSome then ContentType.UnitTerm colVal.Unit.Value |> Some else ContentType.UnitTerm "None" |> Some
         
     let ontologyContent =
-        if hasOntology.IsSome then ContentType.OntologyTerm hasOntology.Value |> Some else ContentType.OntologyTerm "None" |> Some
-
+        if hasOntology.IsSome then ContentType.OntologyTerm hasOntology.Value.Name |> Some else ContentType.OntologyTerm "None" |> Some
 
     [
         checkradioElement ind   None                        colVal model dispatch

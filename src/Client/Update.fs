@@ -154,11 +154,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
-    | AddAnnotationBlock (activeTableNameRes,colName,format) ->
-        let cmd name=
+    | AddAnnotationBlock (activeTableNameRes,colName,colTermOpt,unitOpt,unitTermOpt) ->
+        let cmd tableName =
             Cmd.OfPromise.either
                 OfficeInterop.addAnnotationBlock  
-                (name,colName,format)
+                (tableName,colName,colTermOpt,unitOpt,unitTermOpt)
                 (fun (newColName,format,msg) ->
                     FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
                 )
@@ -166,11 +166,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
 
-    | AddUnitToAnnotationBlock (activeTableNameRes, format) ->
+    | AddUnitToAnnotationBlock (activeTableNameRes, format, unitTermOpt) ->
         let cmd name =
             Cmd.OfPromise.either
                 OfficeInterop.addUnitToExistingBuildingBlock
-                (name,format)
+                (name,format,unitTermOpt)
                 (fun (newColName,format,msg) ->
                     FormatColumn (activeTableNameRes, newColName, format, msg) |> ExcelInterop
                 )
@@ -611,7 +611,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString parentOntology =
+    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString (parentOntology:OntologyInfo) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -1049,12 +1049,14 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
             | Unit1 ->
                 { currentState with
                     UnitTermSearchText                  = newTerm
+                    UnitSelectedTerm                    = None
                     ShowUnitTermSuggestions             = triggerNewSearch
                     HasUnitTermSuggestionsLoading       = true
                 }
             | Unit2 ->
                 { currentState with
                     Unit2TermSearchText                  = newTerm
+                    Unit2SelectedTerm                    = None
                     ShowUnit2TermSuggestions             = triggerNewSearch
                     HasUnit2TermSuggestionsLoading       = true
                 }
@@ -1080,23 +1082,23 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
 
         nextState,Cmd.none
 
-    | UnitTermSuggestionUsed (suggestionName, relUnit) ->
+    | UnitTermSuggestionUsed (suggestion, relUnit) ->
 
         let nextState =
             match relUnit with
             | Unit1 ->
                 { currentState with
-                    UnitTermSearchText              = suggestionName
-                    //UnitTerm                        = Some suggestion
+                    UnitTermSearchText              = suggestion.Name
+                    UnitSelectedTerm                = Some suggestion
                     ShowUnitTermSuggestions         = false
                     HasUnitTermSuggestionsLoading   = false
                 }
             | Unit2 ->
                 { currentState with
-                    Unit2TermSearchText              = suggestionName
-                    //UnitTerm                        = Some suggestion
-                    ShowUnit2TermSuggestions         = false
-                    HasUnit2TermSuggestionsLoading   = false
+                    Unit2TermSearchText             = suggestion.Name
+                    Unit2SelectedTerm               = Some suggestion
+                    ShowUnit2TermSuggestions        = false
+                    HasUnit2TermSuggestionsLoading  = false
                 }
         nextState, Cmd.none
 
@@ -1123,6 +1125,7 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
         let nextState = {
             currentState with
                 CurrentBuildingBlock                    = nextBB
+                BuildingBlockSelectedTerm               = None
                 ShowBuildingBlockTermSuggestions        = triggerNewSearch
                 HasBuildingBlockTermSuggestionsLoading  = true
         }
@@ -1140,16 +1143,18 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
 
         nextState,Cmd.none
 
-    | BuildingBlockNameSuggestionUsed nameSuggestion ->
+    | BuildingBlockNameSuggestionUsed suggestion ->
         
         let nextBB = {
             currentState.CurrentBuildingBlock with
-                Name = nameSuggestion
+                Name = suggestion.Name
         }
 
         let nextState = {
             currentState with
                 CurrentBuildingBlock                    = nextBB
+
+                BuildingBlockSelectedTerm               = Some suggestion
                 ShowBuildingBlockTermSuggestions        = false
                 HasBuildingBlockTermSuggestionsLoading  = false
         }

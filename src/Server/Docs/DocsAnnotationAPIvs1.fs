@@ -121,7 +121,7 @@ let annotatorApiDocsv1 =
                 "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
                 (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q","instrument model") @>
+        |> annotatorDocsv1.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q",PredefinedParams.Examples.ontologyInfoExmp) @>
 
         ////////
         annotatorDocsv1.route <@ fun api -> api.getTermsForAdvancedSearch @>

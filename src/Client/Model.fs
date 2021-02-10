@@ -64,7 +64,7 @@ type TermSearchState = {
     TermSearchText          : string
     SelectedTerm            : DbDomain.Term option
     TermSuggestions         : DbDomain.Term []
-    ParentOntology          : string option
+    ParentOntology          : OntologyInfo option
     SearchByParentOntology  : bool
     HasSuggestionsLoading   : bool
     ShowSuggestions         : bool
@@ -294,6 +294,7 @@ type AnnotationBuildingBlock = {
 type AddBuildingBlockState = {
     CurrentBuildingBlock                    : AnnotationBuildingBlock
 
+    BuildingBlockSelectedTerm               : DbDomain.Term option
     BuildingBlockNameSuggestions            : DbDomain.Term []
     ShowBuildingBlockSelection              : bool
     BuildingBlockHasUnit                    : bool
@@ -302,22 +303,24 @@ type AddBuildingBlockState = {
 
     /// This section is used to add a unit directly to a freshly created building block.
     UnitTermSearchText                      : string
+    UnitSelectedTerm                        : DbDomain.Term option
     UnitTermSuggestions                     : DbDomain.Term []
     HasUnitTermSuggestionsLoading           : bool
     ShowUnitTermSuggestions                 : bool
 
     /// This section is used to add a unit directly to an already existing building block
-    Unit2TermSearchText                      : string
-    Unit2TermSuggestions                     : DbDomain.Term []
-    HasUnit2TermSuggestionsLoading           : bool
-    ShowUnit2TermSuggestions                 : bool
+    Unit2TermSearchText                     : string
+    Unit2SelectedTerm                       : DbDomain.Term option
+    Unit2TermSuggestions                    : DbDomain.Term []
+    HasUnit2TermSuggestionsLoading          : bool
+    ShowUnit2TermSuggestions                : bool
 
 } with
     static member init () = {
         ShowBuildingBlockSelection              = false
 
         CurrentBuildingBlock                    = AnnotationBuildingBlock.init AnnotationBuildingBlockType.Parameter
-
+        BuildingBlockSelectedTerm               = None
         BuildingBlockNameSuggestions            = [||]
         ShowBuildingBlockTermSuggestions        = false
         HasBuildingBlockTermSuggestionsLoading  = false
@@ -325,15 +328,17 @@ type AddBuildingBlockState = {
 
         /// This section is used to add a unit directly to a freshly created building block.
         UnitTermSearchText                      = ""
+        UnitSelectedTerm                        = None
         UnitTermSuggestions                     = [||]
         ShowUnitTermSuggestions                 = false
         HasUnitTermSuggestionsLoading           = false
 
         /// This section is used to add a unit directly to an already existing building block
-        Unit2TermSearchText                      = ""
-        Unit2TermSuggestions                     = [||]
-        ShowUnit2TermSuggestions                 = false
-        HasUnit2TermSuggestionsLoading           = false
+        Unit2TermSearchText                     = ""
+        Unit2SelectedTerm                       = None
+        Unit2TermSuggestions                    = [||]
+        ShowUnit2TermSuggestions                = false
+        HasUnit2TermSuggestionsLoading          = false
     }
 
 /// Validation scheme for Table

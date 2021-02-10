@@ -119,16 +119,31 @@ module DbDomain =
         RelatedTermID       : int64
     }
 
-/// used in OfficeInterop to effectively find possible Term names and search for them in db
+type OntologyInfo = {
+    Name            : string
+    TermAccession   : string
+} with
+    static member create name termAccession = {
+        Name            = name
+        TermAccession   = termAccession
+    }
+
+/// Used in OfficeInterop to effectively find possible Term names and search for them in db
 type SearchTermI = {
     ColIndices      : int []
+    /// This is the Ontology Name
     SearchString    : string
+    /// This is the Ontology Term Accession 'XX:aaaaaa'
+    TermAccession   : string
+    IsA             : OntologyInfo option
     RowIndices      : int []
     TermOpt         : DbDomain.Term option
 } with
-    static member create colIndices searchString rowIndices = {
+    static member create colIndices searchString termAccession ontologyInfoOpt rowIndices = {
         ColIndices      = colIndices
         SearchString    = searchString
+        TermAccession   = termAccession
+        IsA             = ontologyInfoOpt
         RowIndices      = rowIndices
         TermOpt         = None
     }
@@ -164,7 +179,7 @@ type IAnnotatorAPIv1 = {
     // Term related requests
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : (int*string*string)                                           -> Async<DbDomain.Term []>
+    getTermSuggestionsByParentTerm      : (int*string*OntologyInfo)                                     -> Async<DbDomain.Term []>
     /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
     getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
 

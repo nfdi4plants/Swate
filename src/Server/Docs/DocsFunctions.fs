@@ -108,10 +108,18 @@ module PredefinedParams =
         dbdomaniOntologyParamArr
         |> ParamRecordType
 
+    let OntologyInfoType =
+        [|
+            Parameter.create "Name" ParamString "The ontology term name"
+            Parameter.create "TermAccession" ParamString "The ontology term accession value"
+        |] |> ParamRecordType
+
     let SearchTermType =
         let insertTermParamArr = [|
             Parameter.create "ColIndices" (ParamArray ParamInteger) ""
             Parameter.create "SearchString" (ParamString) ""
+            Parameter.create "TermAccession" (ParamString) "If existing the term accession value"
+            Parameter.create "IsA" OntologyInfoType "If the term could be IsA related these values are written here."
             Parameter.create "RowIndices" (ParamArray ParamInteger) ""
             Parameter.create "TermOpt" (TermType |> ParamOption) "This value is empty when created client side and will be filled by server after term search."
         |]
@@ -120,6 +128,8 @@ module PredefinedParams =
 
     module Examples =
 
+        let ontologyInfoExmp:OntologyInfo = OntologyInfo.create "Instrument Model" "MS:1000031"
+        
         let unitOntologyExmp:DbDomain.Ontology = {
             ID = 1L
             Name = "uo"
@@ -132,6 +142,8 @@ module PredefinedParams =
         let searchTermExmp:SearchTermI = {
             ColIndices = [|2; 3|]
             SearchString = "Bruker Daltonics HCT Series"
+            TermAccession = ""
+            IsA = Some ontologyInfoExmp
             RowIndices = [|0 .. 10|]
             TermOpt = None
         }

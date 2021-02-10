@@ -20,8 +20,8 @@ type ExcelInteropMsg =
     | SyncContext                   of activeAnnotationTable:TryFindAnnoTableResult*string
     | InSync                        of string
     | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
-    | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * colname:string * format:string option
-    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * format:string option
+    | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * colname:string * colTermOpt:DbDomain.Term option * unitNameOpt:string option * unitTermOpt:DbDomain.Term option
+    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * format:string option * unitTermOpt:DbDomain.Term option
     | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
     | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
@@ -76,7 +76,7 @@ type DevMsg =
 type ApiRequestMsg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
-    | GetNewTermSuggestionsByParentTerm         of string*string
+    | GetNewTermSuggestionsByParentTerm         of string*OntologyInfo
     | GetNewBuildingBlockNameSuggestions        of string
     | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
@@ -122,11 +122,11 @@ type AddBuildingBlockMsg =
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown
 
-    | BuildingBlockNameSuggestionUsed   of string
+    | BuildingBlockNameSuggestionUsed   of DbDomain.Term
     | NewBuildingBlockNameSuggestions   of DbDomain.Term []
 
     | SearchUnitTermTextChange  of searchString:string * relatedUnitSearch:UnitSearchRequest
-    | UnitTermSuggestionUsed    of unitName:string * relatedUnitSearch:UnitSearchRequest
+    | UnitTermSuggestionUsed    of unitTerm:DbDomain.Term* relatedUnitSearch:UnitSearchRequest
     | NewUnitTermSuggestions    of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | ToggleBuildingBlockHasUnit
 
@@ -190,5 +190,14 @@ let pipeNameTuple3 msg param =
             let constructParam =
                 param |> fun (x,y,z) -> annotationTableOpt,x,y,z    
             msg (constructParam)
-            |> PipeActiveAnnotationTable
+        )
+
+/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2,x3,x4) other params.
+/// Use this as: (x1,x2,x3) |> pipeNameTuple4 msg
+let pipeNameTuple4 msg param =
+    PipeActiveAnnotationTable
+        (fun annotationTableOpt ->
+            let constructParam =
+                param |> fun (x,y,z,u) -> annotationTableOpt,x,y,z,u 
+            msg (constructParam)
         )

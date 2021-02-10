@@ -16,9 +16,8 @@ let BracketsPattern = "\([^\]]*\)"
 [<LiteralAttribute>]
 let CoreNamePattern = "^[^[(]*"
 
-// currently unused
 [<LiteralAttribute>]
-let UnitAccessionPattern = "#u.+?:\d+"
+let TermAccessionPattern = "#t.+?:\d+"
 
 // currently unused
 [<LiteralAttribute>]
@@ -54,26 +53,34 @@ let parseCoreName (headerStr:string) =
     | _ ->
         None
 
-// currently unused
-let parseUnitAccession (tag:string) =
+let parseTermAccession (tag:string) =
     match tag with
-    | Shared.HelperFunctions.Regex UnitAccessionPattern value ->
+    | Shared.HelperFunctions.Regex TermAccessionPattern value ->
         value.Trim()
         |> Some
     | _ ->
         None
 
-// currently unused
-let parseGroup (tag:string) =
-    match tag with
-    | Shared.HelperFunctions.Regex GroupPattern value ->
-        value.Trim().Replace("#g","") |> Some
-    | _ -> None
+open Shared
 
 let parseColHeader (headerStr:string) =
     let coreName = parseCoreName headerStr
-    let ontology = parseSquaredBrackets headerStr
     let tagArr = parseBrackets headerStr
+    let ontology =
+        let hasOnt = parseSquaredBrackets headerStr
+        let termAccession =
+            match tagArr with
+            | None -> None
+            | Some ta ->
+                let hasAccession = ta |> Array.tryFind (fun x -> x.StartsWith ColumnTags.TermAccessionTag)
+                if hasAccession.IsSome && (parseTermAccession hasAccession.Value).IsSome
+                then hasAccession.Value.Replace(Types.ColumnTags.TermAccessionTag,"") |> Some
+                else None
+        match hasOnt,termAccession with
+        | Some ontName, None    -> OntologyInfo.create ontName "" |> Some
+        | Some ontName, Some ta -> OntologyInfo.create ontName ta |> Some
+        | _,_                   -> None
+
     let isUnit =
         match tagArr with
         | None -> false

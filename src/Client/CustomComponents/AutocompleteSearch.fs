@@ -91,10 +91,10 @@ with
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
         OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str, Unit1) |> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> (sugg.Name, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg.Name, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
     }
 
     static member ofAddBuildingBlockUnit2State (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
@@ -109,10 +109,10 @@ with
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
         OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str,Unit2) |> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> (sugg.Name, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> (sugg, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg.Name, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
     }
 
     static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
@@ -126,12 +126,11 @@ with
         DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
 
         OnInputChangeMsg        = (BuildingBlockNameChange >> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock
-        )
+        OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
     }
 
 
@@ -284,7 +283,9 @@ let autocompleteTermSearchComponentOfParentOntology
                 match inputSize with
                 | Some size -> Button.Size size
                 | _ -> ()
-            ] [str (sprintf "%A" model.TermSearchState.ParentOntology.Value)]
+            ] [str (
+                sprintf "%A" (if model.TermSearchState.ParentOntology.IsSome then model.TermSearchState.ParentOntology.Value.Name else "") 
+            )]
         ]
 
     Control.div [Control.IsExpanded] [

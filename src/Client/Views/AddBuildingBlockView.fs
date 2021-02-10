@@ -100,7 +100,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
             Control.div [] [
                 Dropdown.dropdown [Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection] [
                     Dropdown.trigger [] [
-                        Button.button [Button.OnClick (fun _ -> ToggleSelectionDropdown |> AddBuildingBlock |> dispatch)] [
+                        Button.a [Button.OnClick (fun _ -> ToggleSelectionDropdown |> AddBuildingBlock |> dispatch)] [
                             span [Style [MarginRight "5px"]] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString |> str]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
@@ -118,9 +118,8 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                             List.append x [
                                 Dropdown.Item.div [
                                     Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)]
-                                    Dropdown.Item.Props [ Href "https://nfdi4plants.github.io/AnnotationPrinciples/"; Target "_Blank" ]
                                 ][
-                                    a [][
+                                    a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank" ] [
                                         str "more"
                                     ]
                                 ]
@@ -164,11 +163,6 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                             Fa.i [ Fa.Size Fa.FaLarge; Fa.Solid.Check ][ ]
                         else
                             Fa.i [ Fa.Size Fa.FaLarge ; Fa.Solid.Ban ][ ]
-                        //Fa.stack [Fa.Stack.Size Fa.FaSmall; Fa.Stack.Props [Style [ Color "#666666"]]][
-                        //    Fa.i [Fa.Regular.Square; Fa.Stack2x][]
-                        //    if model.AddBuildingBlockState.BuildingBlockHasUnit then
-                        //        Fa.i [Fa.Solid.Check; Fa.Stack1x][]
-                        //]
                     ]
                 ]
                 Control.p [] [
@@ -219,14 +213,16 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         Button.Props [Disabled true]
                     Button.IsFullWidth
                     Button.OnClick (
-                        let format =
+                        let unitName =
                             match model.AddBuildingBlockState.BuildingBlockHasUnit, model.AddBuildingBlockState.UnitTermSearchText with
                             | _,""              -> None //"0.00"
                             | false, _          -> None//"0.00"
                             | true, str         -> Some str
                                 //sprintf "0.00 \"%s\"" str
-                        let colName = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
-                        fun _ -> (colName,format) |> pipeNameTuple2 AddAnnotationBlock |> ExcelInterop |> dispatch
+                        let colName     = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
+                        let colTerm     = model.AddBuildingBlockState.BuildingBlockSelectedTerm
+                        let unitTerm    = model.AddBuildingBlockState.UnitSelectedTerm
+                        fun _ -> (colName,colTerm,unitName,unitTerm) |> pipeNameTuple4 AddAnnotationBlock |> ExcelInterop |> dispatch
                     )
                 ] [
                     str "Insert this annotation building block"
@@ -276,11 +272,12 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         Button.Props [Disabled true]
                     Button.IsFullWidth
                     Button.OnClick (fun e ->
+                        let unitTermOpt = model.AddBuildingBlockState.Unit2SelectedTerm
                         match model.AddBuildingBlockState.Unit2TermSearchText with
                         | "" ->
                             GenericLog ("Error", "Cannot execute function with empty unit input") |> Dev |> dispatch
                         | str ->
-                            pipeNameTuple AddUnitToAnnotationBlock (Some str) |> ExcelInterop |> dispatch
+                            (Some str, unitTermOpt) |> pipeNameTuple2 AddUnitToAnnotationBlock  |> ExcelInterop |> dispatch
                     )
                 ] [
                     str "Add unit to existing building block"
@@ -305,4 +302,5 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
         Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add unit reference columns to existing building block."]
         // Input forms, etc related to add unit to existing building block.
         addUnitToExistingBlockElements model dispatch
+
     ]

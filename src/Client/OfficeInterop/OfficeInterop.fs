@@ -78,7 +78,7 @@ let exampleExcelFunction () =
             //let! format = createGroupHeaderFormatForRange groupHeader context
             let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
             let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
-            return (sprintf "%A" xmlParsed)
+            return (sprintf "%A" buildingBlocks)
         }
     )
 
@@ -391,7 +391,7 @@ let getTableRepresentation(annotationTable) =
     )
 
 /// This function is used to add a new building block to the active annotationTable.
-let addAnnotationBlock (annotationTable,colName:string,format:string option) =
+let addAnnotationBlock (annotationTable,colName:string,colTermOpt:DbDomain.Term option,format:string option, unitTermOpt:DbDomain.Term option) =
 
     /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
     let isSingleCol =
@@ -410,17 +410,21 @@ let addAnnotationBlock (annotationTable,colName:string,format:string option) =
 
     /// This is used to create the bracket information for reference (hidden) columns. Again this has two modi, one with id tag and one without.
     /// This time no core name is needed as this will always be TSR or TAN.
-    let hiddenColAttributes (parsedColHeader:ColHeader) (id:int) =
+    let hiddenColAttributes (parsedColHeader:ColHeader) (columnTermOption: DbDomain.Term option) (id:int) =
         let coreName =
             match parsedColHeader.Ontology, parsedColHeader.CoreName with
-            | Some o , _ -> o
+            | Some o , _ -> o.Name
             | None, Some cn -> cn
             | _ -> parsedColHeader.Header
         match id with
         | 1 ->
-            (sprintf "[%s] (#h)" coreName)
+            match columnTermOption with
+            | Some t        -> sprintf "[%s] (#h; #t%s)" coreName t.Accession
+            | None          -> sprintf "[%s] (#h)" coreName
         | _ ->
-            (sprintf "[%s] (#%i; #h)" coreName id)
+            match columnTermOption with
+            | Some t        -> sprintf "[%s] (#%i; #h; #t%s)" coreName id t.Accession
+            | None          -> sprintf "[%s] (#%i; #h)" coreName id
 
     Excel.run(fun context ->
         let sheet = context.workbook.worksheets.getActiveWorksheet()
@@ -518,8 +522,8 @@ let addAnnotationBlock (annotationTable,colName:string,format:string option) =
                                     // Parameter [instrument model] | "Term Source REF [instrument model] (#h) | ...
                                     // Factor [instrument model] | "Term Source REF [instrument model] (#h) | ...
                                     // in the example above the mainColumn name is different but "TSR" and "TAN" would be the same.
-                                    || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader int)
-                                    || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader int)
+                                    || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader colTermOpt int)
+                                    || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader colTermOpt int)
                             )
                         if isExisting then
                             loopingCheck (int+1)
@@ -548,7 +552,7 @@ let addAnnotationBlock (annotationTable,colName:string,format:string option) =
                     annotationTable.columns.add(
                         index = newBaseColIndex+1.,
                         values = U4.Case1 col,
-                        name = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader newId)
+                        name = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader colTermOpt newId)
                     )
 
                 // create TAN
@@ -556,7 +560,7 @@ let addAnnotationBlock (annotationTable,colName:string,format:string option) =
                     annotationTable.columns.add(
                         index = newBaseColIndex+2.,
                         values = U4.Case1 col,
-                        name = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader newId)
+                        name = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader colTermOpt newId)
                     )
 
                 // Should the column be Data, Source or Sample then we do not add TSR and TAN
@@ -573,7 +577,7 @@ let addAnnotationBlock (annotationTable,colName:string,format:string option) =
                 /// if format.isSome then we need to also add unit columns in the following scheme:
                 /// Unit [UnitTermName] (#id; #h; #u) | Term Source REF [UnitTermName] (#id; #h; #u) | Term Accession Number [UnitTermName] (#id; #h; #u)
                 let createUnitColsIfNeeded =
-                    OfficeInterop.HelperFunctions.createUnitColumns allColHeaders annotationTable newBaseColIndex rowCount format
+                    OfficeInterop.HelperFunctions.createUnitColumns allColHeaders annotationTable newBaseColIndex rowCount format unitTermOpt
 
                 /// If unit block was added then return some msg information
                 let unitColCreationMsg = if createUnitColsIfNeeded.IsSome then fst createUnitColsIfNeeded.Value else ""
@@ -668,7 +672,14 @@ let getParentTerm (annotationTable) =
                         None
                     else
                         // is selected range is in table then take header value from selected column
-                        tableRange.values.[0].[newColIndex]
+                        let header = tableRange.values.[0].[newColIndex]
+                        let parsedHeader = parseColHeader (string header.Value)
+                        /// as the reference columns also contain a accession tag we want to return the first reference column header
+                        /// instead of the main column header, if the main column header does include an ontology
+                        if parsedHeader.Ontology.IsSome then
+                            tableRange.values.[0].[newColIndex+1]
+                        else
+                            None
                 // return header of selected col
                 value
             )
@@ -777,19 +788,20 @@ let createSearchTermsIFromTable (annotationTable') =
                             // create SearchTermI types that will be passed to the server to get filled with a term option.
                             |> Array.map (fun (searchStr,cellArr) ->
                                 let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
-                                Shared.SearchTermI.create tsrTanColIndices searchStr rowIndices
+                                Shared.SearchTermI.create tsrTanColIndices searchStr "" bBlock.MainColumn.Header.Value.Ontology rowIndices
                             )
                         /// We differentiate between building blocks with and without unit as unit building blocks will not contain terms as values but e.g. numbers.
                         /// In this case we do not want to search the database for the cell values but the parent ontology in the header.
                         /// This will then be used for TSR and TAN.
                         let fillTermConstructsWithUnit (bBlock:BuildingBlock) =
-                            let searchStr = bBlock.MainColumn.Header.Value.Ontology.Value
+                            let searchStr       = bBlock.MainColumn.Header.Value.Ontology.Value.Name
+                            let termAccession   = bBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
                             let rowIndices =
                                 bBlock.MainColumn.Cells
                                 |> Array.map (fun x ->
                                    x.Index
                                 )
-                            [|Shared.SearchTermI.create tsrTanColIndices searchStr rowIndices|]
+                            [|Shared.SearchTermI.create tsrTanColIndices searchStr termAccession None rowIndices|]
                         if bBlock.Unit.IsSome then
                             fillTermConstructsWithUnit bBlock
                         else
@@ -803,10 +815,11 @@ let createSearchTermsIFromTable (annotationTable') =
                     |> Array.map (
                         fun bBlock ->
                             let unit = bBlock.Unit.Value
-                            let searchString = unit.MainColumn.Header.Value.Ontology.Value
+                            let searchString  = unit.MainColumn.Header.Value.Ontology.Value.Name
+                            let termAccession = unit.MainColumn.Header.Value.Ontology.Value.TermAccession 
                             let colIndices = [|unit.MainColumn.Index; unit.TSR.Value.Index; unit.TAN.Value.Index|]
                             let rowIndices = unit.MainColumn.Cells |> Array.map (fun x -> x.Index)
-                            Shared.SearchTermI.create colIndices searchString rowIndices
+                            Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
                     )
 
                 /// Combine search types
@@ -1176,7 +1189,7 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
     )
 
 /// This function is used to add unit reference columns to an existing building block without unit reference columns
-let addUnitToExistingBuildingBlock (annotationTable:string,format:string option) =
+let addUnitToExistingBuildingBlock (annotationTable:string,format:string option,unitTermOpt:DbDomain.Term option) =
     Excel.run(fun context ->
 
         let annotationTableName = annotationTable
@@ -1250,7 +1263,7 @@ let addUnitToExistingBuildingBlock (annotationTable:string,format:string option)
                     |> Array.map string
 
                 let unitColumnResult =
-                    createUnitColumns allColHeaders annotationTable (float findLeftClosestBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format
+                    createUnitColumns allColHeaders annotationTable (float findLeftClosestBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitTermOpt
 
                 let maincolName = findLeftClosestBuildingBlock.MainColumn.Header.Value.Header
 

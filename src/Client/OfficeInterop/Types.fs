@@ -62,9 +62,14 @@ module ColumnTags =
     [<Literal>]
     let UnitTag = "#u"
 
-    /// This can have additional information afterwards so it needs to be parsed as 'StartsWith'
+    /// This has additional information afterwards so it needs to be parsed as 'StartsWith'
+    /// Not used
     [<Literal>]
     let GroupTag = "#g"
+
+    /// This has additional information afterwards so it needs to be parsed as 'StartsWith'
+    [<Literal>]
+    let TermAccessionTag = "#t"
 
 open System
 open Fable.SimpleXml
@@ -342,10 +347,12 @@ type TryFindAnnoTableResult =
                 | _ ->
                     Error "Could not process message. Swate was not able to identify the given annotation tables with a known case."
 
+open Shared
+
 type ColHeader = {
     Header:     string
     CoreName:   string option
-    Ontology:   string option
+    Ontology:   OntologyInfo option
     TagArr:     string [] option
     IsUnitCol:  bool
 }
@@ -398,7 +405,7 @@ module BuildingBlockTypes =
                 ColumnAdress        = this.MainColumn.Index |> Some
                 Importance          = None
                 ValidationFormat    = None
-                Unit                = if this.Unit.IsSome then this.Unit.Value.MainColumn.Header.Value.Ontology else None
+                Unit                = if this.Unit.IsSome then this.Unit.Value.MainColumn.Header.Value.Ontology.Value.Name |> Some else None
             }
 
 

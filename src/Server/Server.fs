@@ -81,7 +81,7 @@ let annotatorApi cString = {
             return searchRes
         }
 
-    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:string) ->
+    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:OntologyInfo) ->
         async {
 
             let searchRes =
@@ -89,7 +89,12 @@ let annotatorApi cString = {
                 | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
-                    let like = OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm)
+                    let like =
+                        if parentTerm.TermAccession = ""
+                        then
+                            OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm.Name)
+                        else
+                            OntologyDB.getTermSuggestionsByParentTermAndAccession cString (typedSoFar,parentTerm.Name,parentTerm.TermAccession)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -134,12 +139,23 @@ let annotatorApi cString = {
     getTermsByNames = fun (queryArr) ->
         async {
             let result =
+                printfn "START" 
                 queryArr |> Array.map (fun searchTerm ->
                     {searchTerm with
                         TermOpt =
-                            // check if search string is empty. This case should delete TAN and TSR in table
+                            // check if search string is empty. This case should delete TAN- and TSR- values in table
                             if searchTerm.SearchString = "" then None
+                            // check if term accession was found. If so search also by this as it is unique
+                            elif searchTerm.TermAccession <> "" then
+                                printfn "hit1: %A" searchTerm.SearchString
+                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchString,searchTerm.TermAccession)
+                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                            elif searchTerm.IsA.IsSome then
+                                printfn "hit2: %A" searchTerm.SearchString
+                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchString,searchTerm.IsA.Value)
+                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
                             else
+                                printfn "hit3: %A" searchTerm.SearchString
                                 let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
                                 if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
                     }

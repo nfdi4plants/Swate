@@ -10,6 +10,7 @@ open System.Text.RegularExpressions
 open OfficeInterop.Regex
 open OfficeInterop.Types
 open BuildingBlockTypes
+open Shared
 
 
 let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
@@ -23,14 +24,19 @@ let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
 /// This will create the column header attributes for a unit block.
 /// as unit always has to be a term and cannot be for example "Source" or "Sample", both of which have a differen format than for exmaple "Parameter [TermName]",
 /// we only need one function to generate id and attributes and bring the unit term in the right format.
-let unitColAttributes (unitTermName:string) (id:int) =
+let unitColAttributes (unitTermName:string) (unitTermOpt:DbDomain.Term option) (id:int) =
     match id with
     | 1 ->
-        sprintf "[%s] (#h; #u)" unitTermName 
+        match unitTermOpt with
+        | Some t    -> sprintf "[%s] (#h; #t%s; #u)" unitTermName t.Accession
+        | None      -> sprintf "[%s] (#h; #u)" unitTermName
     | _ ->
-        sprintf "[%s] (#%i; #h; #u)" unitTermName id
+        match unitTermOpt with
+        | Some t    -> sprintf "[%s] (#%i; #h; #t%s #u)" unitTermName id t.Accession
+        | None      -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
 
-let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) =
+
+let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitTermOpt:DbDomain.Term option) =
     let col = createEmptyMatrixForTables 1 rowCount ""
     if format.IsSome then
         let findNewIdForUnit() =
@@ -40,7 +46,7 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
                     // Should a column with the same name already exist, then count up the id tag.
                     |> Array.exists (fun existingHeader ->
                         // We don't need to check TSR or TAN, because the main column always starts with "Unit"
-                        existingHeader = sprintf "Unit %s" (unitColAttributes format.Value int)
+                        existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitTermOpt int)
                     )
                 if isExisting then
                     loopingCheck (int+1)
@@ -55,7 +61,7 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
             annotationTable.columns.add(
                 index = newBaseColIndex+3.,
                 values = U4.Case1 col,
-                name = sprintf "Unit %s" (unitColAttributes format.Value newUnitId)
+                name = sprintf "Unit %s" (unitColAttributes format.Value unitTermOpt newUnitId)
             )
 
         /// create unit TSR
@@ -63,7 +69,7 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
             annotationTable.columns.add(
                 index = newBaseColIndex+4.,
                 values = U4.Case1 col,
-                name = sprintf "Term Source REF %s" (unitColAttributes format.Value newUnitId)
+                name = sprintf "Term Source REF %s" (unitColAttributes format.Value unitTermOpt newUnitId)
             )
 
         /// create unit TAN
@@ -71,7 +77,7 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
             annotationTable.columns.add(
                 index = newBaseColIndex+5.,
                 values = U4.Case1 col,
-                name = sprintf "Term Accession Number %s" (unitColAttributes format.Value newUnitId)
+                name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitTermOpt newUnitId)
             )
 
         Some (
@@ -229,7 +235,7 @@ module BuildingBlockTypes =
                 // Build in fail safe.
                 errorMsg2 nextCol currentBlock
 
-        // Building blocks are defined by one visuable column and an undefined number of hidden columns.
+        // Building blocks are defined by one visable column and an undefined number of hidden columns.
         // Therefore we iterate through the columns array and use every column without an `#h` tag as the start of a new building block.
         let rec sortColsIntoBuildingBlocks (index:int) (currentBlock:BuildingBlock option) (buildingBlockList:BuildingBlock list) =
             // Exit case if we iterated through all columns
@@ -282,10 +288,46 @@ module BuildingBlockTypes =
                     failwith (sprintf "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' was not recognized as hidden or main column: %A." nextCol.Header)
 
         /// Sort all columns into building blocks.
-        let buildingBlocks =
+        let buildingBlocksPre =
             sortColsIntoBuildingBlocks 0 None []
             |> List.rev
             |> Array.ofList
+
+        // UPDATE IN > 0.2.0
+        /// As we now add the TermAccession as "#txxx" tag in the reference columns we walk over all buildingBlock and update the maincolumn header accordingly.
+        let buildingBlocks =
+            buildingBlocksPre
+            |> Array.map (fun buildingBlock ->
+                match buildingBlock.TAN, buildingBlock.TSR with
+                | Some tan, Some tsr ->
+                    match tan.Header.Value.Ontology, tsr.Header.Value.Ontology with
+                    | Some ont1, Some ont2 ->
+                        let isSame = ont1.TermAccession = ont2.TermAccession
+                        if isSame |> not then
+                            failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern. (3)" buildingBlock.MainColumn.Header.Value.Header)
+                        if ont1.TermAccession <> "" then
+                            let nextMainColumn = {
+                                buildingBlock.MainColumn with
+                                    Header =  {
+                                        buildingBlock.MainColumn.Header.Value with
+                                            Ontology = {
+                                                buildingBlock.MainColumn.Header.Value.Ontology.Value with
+                                                    TermAccession = ont1.TermAccession
+                                            } |> Some
+                                    } |> Some
+                            }
+                            { buildingBlock with MainColumn = nextMainColumn }
+                        else
+                            buildingBlock
+                    | None, None ->
+                        buildingBlock
+                    | _,_ ->
+                        failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern. (2)" buildingBlock.MainColumn.Header.Value.Header)
+                | None, None ->
+                    buildingBlock
+                | _, _ ->
+                    failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern." buildingBlock.MainColumn.Header.Value.Header)
+            )
 
         buildingBlocks
 
