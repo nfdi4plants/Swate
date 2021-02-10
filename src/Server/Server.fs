@@ -16,8 +16,6 @@ open Microsoft.Extensions.Configuration.Json
 open Microsoft.Extensions.Configuration.UserSecrets
 open Microsoft.AspNetCore.Hosting
 
-open ISADotNet
-
 /// Was transferred into dev.json
 //[<Literal>]
 //let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
@@ -26,11 +24,12 @@ let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
+open ISADotNet
+
 let isaDotNetApi = {
     parseJsonToProcess = fun jsonString -> async {
         let parsedJson = ISADotNet.Json.Process.fromString jsonString
-        let t = Process.empty
-        return t
+        return parsedJson
     }
 }
 

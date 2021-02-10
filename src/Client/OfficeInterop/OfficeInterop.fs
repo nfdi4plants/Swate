@@ -11,7 +11,7 @@ open Shared
 
 open OfficeInterop.Regex
 open OfficeInterop.Types
-open XmlValidationTypes
+open Xml
 open OfficeInterop.HelperFunctions
 open OfficeInterop.EventHandlers
 open BuildingBlockTypes
@@ -64,13 +64,21 @@ open Fable.SimpleXml.Generator
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction () =
     Excel.run(fun context ->
-
-        // The first part accesses current CustomXml
+        let annotationTableName = "annotationTable"
+        let selectedRange = context.workbook.getSelectedRange()
         let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+   
+
+        let annoHeaderRange,annoBodyRange = getBuildingBlocksPreSync context annotationTableName
+        let groupHeader = annoHeaderRange.getRowsAbove(1.)
 
         promise {
-            return "test1"
+            // https://docs.microsoft.com/de-de/office/dev/add-ins/excel/excel-add-ins-comments
+            //let! format = createGroupHeaderFormatForRange groupHeader context
+            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+            let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
+            return (sprintf "%A" xmlParsed)
         }
     )
 
@@ -78,13 +86,17 @@ let exampleExcelFunction () =
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction2 () =
     Excel.run(fun context ->
-
-        // The first part accesses current CustomXml
-        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+        let selectedRange = context.workbook.getSelectedRange()
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"])))
 
         promise {
-            return "test2"
+
+            let! baseFunc =
+                context.sync().``then``(fun e ->
+                    sprintf "%A, %A" selectedRange.columnIndex selectedRange.rowIndex
+            )
+
+            return baseFunc
         }
     )
 
@@ -124,10 +136,18 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
         let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"])))
 
         let r = context.runtime.load(U2.Case1 "enableEvents")
+        promise {
 
-        //sync with proxy objects after loading values from excel
-        context.sync()
-            .``then``( fun _ ->
+            ///// This is used to create the range in which we want to display the group header. (The row above the table)
+            //let! groupDisplayRange = context.sync().``then``( fun _ ->
+            //    activeSheet.getRangeByIndexes(tableRange.rowIndex,tableRange.columnIndex,1.,2.)
+            //)
+
+            ///// This will format the row above our table to have accent background, white font and inner vertical white borders
+            //let! _ = createGroupHeaderFormatForRange groupDisplayRange context
+
+            //sync with proxy objects after loading values from excel
+            let! r = context.sync().``then``( fun _ ->
 
                 /// Filter all names of tables on the active worksheet for names starting with "annotationTable".
                 let annoTables =
@@ -154,8 +174,8 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
                 /// Therefore we recreate the tableRange but with a columncount of 2. The 2 Basic columns in any annotation table.
                 /// "Source Name" | "Sample Name"
                 let adaptedRange =
-                    let rowCount = if tableRange.isEntireColumn then 21. else tableRange.rowCount
-                    activeSheet.getRangeByIndexes(tableRange.rowIndex,tableRange.columnIndex,rowCount,2.)
+                    let rowCount = if tableRange.isEntireColumn then 21. else (if tableRange.rowCount <= 1. then 1. else tableRange.rowCount-1.)
+                    activeSheet.getRangeByIndexes(tableRange.rowIndex+1.,tableRange.columnIndex,rowCount,2.)
 
                 /// Create table in current worksheet
                 let annotationTable = activeSheet.tables.add(U2.Case1 adaptedRange,true)
@@ -184,6 +204,9 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
                 TryFindAnnoTableResult.Success newName, sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r" tableRange.address (tableRange.rowCount - 1.)
             )
             //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
+
+            return r
+        }
     )
 
 
@@ -309,7 +332,8 @@ let getTableRepresentation(annotationTable) =
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
         promise {
-            let! xmlParsed, currentSwateValidationXml = getCurrentValidationXml customXmlParts context
+            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+            let currentSwateValidationXml = swateValidationOfXml xmlParsed xml
 
             let! worksheetName, buildingBlocks =
                 context.sync().``then``( fun _ ->
@@ -353,7 +377,7 @@ let getTableRepresentation(annotationTable) =
                             ColumnValidations = updatedNewColumnValidations}
                     else
                         /// Should no current TableValidation xml exist, create a new one
-                        TableValidation.create
+                        ValidationTypes.TableValidation.create
                             ""
                             worksheetName
                             annotationTable
@@ -406,131 +430,162 @@ let addAnnotationBlock (annotationTable,colName:string,format:string option) =
 
         // This is necessary to place new columns next to selected col
         let annoHeaderRange = annotationTable.getHeaderRowRange()
-        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"|]))
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
         let tableRange = annotationTable.getRange()
         let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
         let range = context.workbook.getSelectedRange()
         let _ = range.load(U2.Case1 "columnIndex")
 
         // Ref. 1
-
         let r = context.runtime.load(U2.Case1 "enableEvents")
 
-        context.sync().``then``( fun _ ->
+        promise {
 
-            r.enableEvents <- false
-
-            // Ref. 3
-            /// This is necessary to place new columns next to selected col.
-            /// selected ranged returns indices always from a worksheet perspective but we need the related table index. This is calculated here.
-            let newBaseColIndex =
-                let tableHeaderRangeColIndex = annoHeaderRange.columnIndex
-                let selectColIndex = range.columnIndex
-                let diff = selectColIndex - tableHeaderRangeColIndex |> int
-                let vals = annoHeaderRange.columnCount |> int
-                let maxLength = vals-1
-                if diff < 0 then
-                    maxLength+1
-                elif diff > maxLength then
-                    maxLength+1
-                else
-                    diff+1
-                |> float
-
-            // This is necessary to skip over hidden cols
-            /// Get an array of the headers
-            let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-
-            /// Here is the next col index, which is not hidden, calculated.
-            let newBaseColIndex' = findIndexNextNotHiddenCol headerVals newBaseColIndex
-
-            let allColHeaders =
-                headerVals
-                |> Array.choose id
-                |> Array.map string
-
-            /// This is necessary to check if the would be created col name already exists, to then tick up the id tag.
-            let parsedBaseHeader = parseColHeader colName
-            /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
-            let findNewIdForName() =
-                let rec loopingCheck int =
-                    let isExisting =
-                        allColHeaders
-                        // Should a column with the same name already exist, then count up the id tag.
-                        |> Array.exists (fun existingHeader ->
-                            if isSingleCol then
-                                existingHeader = mainColName colName int
-                            else
-                                existingHeader = mainColName colName int
-                                // i think it is necessary to also check for "TSR" and "TAN" because of the following possibilities
-                                // Parameter [instrument model] | "Term Source REF [instrument model] (#h) | ...
-                                // Factor [instrument model] | "Term Source REF [instrument model] (#h) | ...
-                                // in the example above the mainColumn name is different but "TSR" and "TAN" would be the same.
-                                || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader int)
-                                || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader int)
-                        )
-                    if isExisting then
-                        loopingCheck (int+1)
+            let! newBaseColIndex,headerVals = context.sync().``then``(fun e ->
+                // Ref. 3
+                /// This is necessary to place new columns next to selected col.
+                /// selected ranged returns indices always from a worksheet perspective but we need the related table index. This is calculated here.
+                let newBaseColIndex =
+                    let diff = range.columnIndex - annoHeaderRange.columnIndex |> int
+                    let vals = annoHeaderRange.columnCount |> int
+                    let maxLength = vals-1
+                    if diff < 0 then
+                        maxLength+1
+                    elif diff > maxLength then
+                        maxLength+1
                     else
-                        int
-                loopingCheck 1
+                        diff+1
+                    |> float
 
-            // The new id, which does not exist yet with the column name
-            let newId = findNewIdForName()
+                // This is necessary to skip over hidden cols
+                /// Get an array of the headers
+                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
 
-            let rowCount = tableRange.rowCount |> int
+                /// Here is the next col index, which is not hidden, calculated.
+                let newBaseColIndex' = findIndexNextNotHiddenCol headerVals newBaseColIndex
+                newBaseColIndex', headerVals
+            )
 
-            //create an empty column to insert
-            let col = createEmptyMatrixForTables 1 rowCount ""
+            //let! extendGroupHeader = context.sync().``then``(fun _ ->
+            //    let colCount =
+            //        if isSingleCol then 1.
+            //        elif format.IsSome then 6.
+            //        else 3.
+            //    let getHeaderRange = sheet.getRangeByIndexes(annoHeaderRange.rowIndex-1.,newBaseColIndex+1.,1.,colCount)
+            //    let newRange = getHeaderRange.insert(InsertShiftDirection.Right)
+            //    newRange.merge()
+            //    newRange.load(U2.Case2 (ResizeArray(["values"])))
+            //)
 
-            // create main column
-            let createdCol1() =
-                annotationTable.columns.add(
-                    index = newBaseColIndex',
-                    values = U4.Case1 col,
-                    name = mainColName colName newId
-                )
+            //let! colorNewGroupHeader = createGroupHeaderFormatForRange extendGroupHeader context
 
-            // create TSR
-            let createdCol2() =
-                annotationTable.columns.add(
-                    index = newBaseColIndex'+1.,
-                    values = U4.Case1 col,
-                    name = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader newId)
-                )
+            //let! insertValue = context.sync().``then``(fun e ->
+            //    let nV =
+            //        extendGroupHeader.values
+            //        |> Seq.map (fun innerArr ->
+            //            innerArr 
+            //            |> Seq.map (fun _ ->
+            //                "" |> box |> Some
+            //            ) |> ResizeArray
+            //        ) |> ResizeArray
+            //    extendGroupHeader.values <- nV
+            //)
 
-            // create TAN
-            let createdCol3() =
-                annotationTable.columns.add(
-                    index = newBaseColIndex'+2.,
-                    values = U4.Case1 col,
-                    name = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader newId)
-                )
+            let! res = context.sync().``then``( fun _ ->
 
-            // Should the column be Data, Source or Sample then we do not add TSR and TAN
-            let createCols =
-                if isSingleCol then
-                    [|createdCol1()|]
+                r.enableEvents <- false
+
+
+                let allColHeaders =
+                    headerVals
+                    |> Array.choose id
+                    |> Array.map string
+
+                /// This is necessary to check if the would be created col name already exists, to then tick up the id tag.
+                let parsedBaseHeader = parseColHeader colName
+                /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
+                let findNewIdForName() =
+                    let rec loopingCheck int =
+                        let isExisting =
+                            allColHeaders
+                            // Should a column with the same name already exist, then count up the id tag.
+                            |> Array.exists (fun existingHeader ->
+                                if isSingleCol then
+                                    existingHeader = mainColName colName int
+                                else
+                                    existingHeader = mainColName colName int
+                                    // i think it is necessary to also check for "TSR" and "TAN" because of the following possibilities
+                                    // Parameter [instrument model] | "Term Source REF [instrument model] (#h) | ...
+                                    // Factor [instrument model] | "Term Source REF [instrument model] (#h) | ...
+                                    // in the example above the mainColumn name is different but "TSR" and "TAN" would be the same.
+                                    || existingHeader = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader int)
+                                    || existingHeader = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader int)
+                            )
+                        if isExisting then
+                            loopingCheck (int+1)
+                        else
+                            int
+                    loopingCheck 1
+
+                // The new id, which does not exist yet with the column name
+                let newId = findNewIdForName()
+
+                let rowCount = tableRange.rowCount |> int
+
+                //create an empty column to insert
+                let col = createEmptyMatrixForTables 1 rowCount ""
+
+                // create main column
+                let createdCol1() =
+                    annotationTable.columns.add(
+                        index = newBaseColIndex,
+                        values = U4.Case1 col,
+                        name = mainColName colName newId
+                    )
+
+                // create TSR
+                let createdCol2() =
+                    annotationTable.columns.add(
+                        index = newBaseColIndex+1.,
+                        values = U4.Case1 col,
+                        name = sprintf "Term Source REF %s" (hiddenColAttributes parsedBaseHeader newId)
+                    )
+
+                // create TAN
+                let createdCol3() =
+                    annotationTable.columns.add(
+                        index = newBaseColIndex+2.,
+                        values = U4.Case1 col,
+                        name = sprintf "Term Accession Number %s" (hiddenColAttributes parsedBaseHeader newId)
+                    )
+
+                // Should the column be Data, Source or Sample then we do not add TSR and TAN
+                let createCols =
+                    if isSingleCol then
+                        [|createdCol1()|]
                     
-                else [|
-                    createdCol1()
-                    createdCol2()
-                    createdCol3()
-                |]
+                    else [|
+                        createdCol1()
+                        createdCol2()
+                        createdCol3()
+                    |]
 
-            /// if format.isSome then we need to also add unit columns in the following scheme:
-            /// Unit [UnitTermName] (#id; #h; #u) | Term Source REF [UnitTermName] (#id; #h; #u) | Term Accession Number [UnitTermName] (#id; #h; #u)
-            let createUnitColsIfNeeded =
-                OfficeInterop.HelperFunctions.createUnitColumns allColHeaders annotationTable newBaseColIndex' rowCount format
+                /// if format.isSome then we need to also add unit columns in the following scheme:
+                /// Unit [UnitTermName] (#id; #h; #u) | Term Source REF [UnitTermName] (#id; #h; #u) | Term Accession Number [UnitTermName] (#id; #h; #u)
+                let createUnitColsIfNeeded =
+                    OfficeInterop.HelperFunctions.createUnitColumns allColHeaders annotationTable newBaseColIndex rowCount format
 
-            /// If unit block was added then return some msg information
-            let unitColCreationMsg = if createUnitColsIfNeeded.IsSome then fst createUnitColsIfNeeded.Value else ""
-            let unitColFormat = if createUnitColsIfNeeded.IsSome then snd createUnitColsIfNeeded.Value else "0.00"
+                /// If unit block was added then return some msg information
+                let unitColCreationMsg = if createUnitColsIfNeeded.IsSome then fst createUnitColsIfNeeded.Value else ""
+                let unitColFormat = if createUnitColsIfNeeded.IsSome then snd createUnitColsIfNeeded.Value else "0.00"
 
-            r.enableEvents <- true
-            /// return main col names, unit column format and a message. The first two params are used in a follow up message (executing 'changeTableColumnFormat')
-            mainColName colName newId, unitColFormat, sprintf "%s column was added. %s" colName unitColCreationMsg
-        )
+                r.enableEvents <- true
+                /// return main col names, unit column format and a message. The first two params are used in a follow up message (executing 'changeTableColumnFormat')
+                mainColName colName newId, unitColFormat, sprintf "%s column was added. %s" colName unitColCreationMsg
+            )
+
+            return res
+        }
     )
 
 let changeTableColumnFormat annotationTable (colName:string) (format:string) =
@@ -957,7 +1012,7 @@ let deleteAllCustomXml() =
         }
     )
 
-let getSwateValidationXml() =
+let getSwateCustomXml() =
     Excel.run(fun context ->
 
         // The first part accesses current CustomXml
@@ -990,7 +1045,70 @@ let getSwateValidationXml() =
         }
     )
 
-let writeTableValidationToXml(tableValidation:TableValidation,currentSwateVersion:string) =
+let writeProtocolToXml(protocol:GroupTypes.Protocol,currentSwateVersion:string) =
+    Excel.run(fun context ->
+
+        let newProtocol = {
+            protocol with
+                SwateVersion = if protocol.SwateVersion = "" then currentSwateVersion else protocol.SwateVersion
+        }
+
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        promise {
+            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+
+            let currentProtocolGroup =
+                let previousProtocolGroup = protocolGroupsOfXml xmlParsed xml
+                if previousProtocolGroup.IsNone then GroupTypes.ProtocolGroup.create currentSwateVersion [] else previousProtocolGroup.Value
+
+            let nextProtocolGroup =
+                let newProtocols =
+                    currentProtocolGroup.Protocols
+                    |> List.filter (fun x -> x.TableName <> newProtocol.TableName || x.WorksheetName <> newProtocol.WorksheetName || x.Id <> newProtocol.Id)
+                    |> fun filteredProtocols -> newProtocol::filteredProtocols
+                { currentProtocolGroup with
+                    SwateVersion = currentSwateVersion
+                    Protocols = newProtocols
+                }
+
+            let nextCustomXml =
+                let nextAsXmlFormat = nextProtocolGroup.toXml |> SimpleXml.parseElement
+                let childrenWithoutProtocolGroup = xmlParsed.Children |> List.filter (fun child ->
+                    child.Name <> "ProtocolGroup"
+                )
+                let nextChildren = nextAsXmlFormat::childrenWithoutProtocolGroup
+                { xmlParsed with
+                    Children = nextChildren
+                } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Seq.map (fun x -> x.delete() )
+                    
+                    xmls |> Array.ofSeq
+                )
+
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    customXmlParts.add(nextCustomXml)
+                )
+
+            // This will be displayed in activity log
+            return
+                "Info",
+                sprintf
+                    "Update ProtocolGroup Scheme with '%s - %s - %s' "
+                    newProtocol.WorksheetName
+                    newProtocol.TableName
+                    newProtocol.Id
+        }
+    )
+
+let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,currentSwateVersion:string) =
     Excel.run(fun context ->
 
         // Update DateTime 
@@ -1007,10 +1125,11 @@ let writeTableValidationToXml(tableValidation:TableValidation,currentSwateVersio
     
         promise {
     
-            let! xmlParsed, currentSwateValidationXml' = getCurrentValidationXml customXmlParts context
-    
+            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+
             let currentSwateValidationXml =
-                if currentSwateValidationXml'.IsNone then SwateValidation.init (currentSwateVersion) else currentSwateValidationXml'.Value
+                let previousValidation = swateValidationOfXml xmlParsed xml
+                if previousValidation.IsNone then ValidationTypes.SwateValidation.init (currentSwateVersion) else previousValidation.Value
     
             let nextSwateValidationXml =
                 let newTableValidations =
@@ -1028,8 +1147,7 @@ let writeTableValidationToXml(tableValidation:TableValidation,currentSwateVersio
                     child.Name <> "Validation"
                 )
                 let nextChildren = nextAsXmlFormat::childrenWithoutValidation
-                {
-                    xmlParsed with
+                { xmlParsed with
                         Children = nextChildren
                 } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
                         
@@ -1070,7 +1188,7 @@ let addUnitToExistingBuildingBlock (annotationTable:string,format:string option)
 
         // This is necessary to place new columns next to selected col
         let annoHeaderRange = annotationTable.getHeaderRowRange()
-        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"; "columnIndex"; "columnCount"|]))
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"rowIndex"|]))
 
         let tableRange = annotationTable.getRange()
         let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))

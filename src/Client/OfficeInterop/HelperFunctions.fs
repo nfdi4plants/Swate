@@ -321,7 +321,7 @@ let xmlElementToXmlString (root:XmlElement) =
             text root.Content
     ] |> serializeXml
 
-let getCurrentValidationXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext)=
+let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
     promise {
         let! getXml =
             context.sync().``then``(fun e ->
@@ -356,15 +356,57 @@ let getCurrentValidationXml (customXmlParts:CustomXmlPartCollection) (context:Re
                     failwith "Swate could not parse Workbook Custom Xml Parts. Had neither one root nor many root elements. Please contact the developer."
         if xmlParsed.Name <> "customXml" then failwith (sprintf "Swate found unexpected root xml element: %s" xmlParsed.Name)
 
-        let currentSwateValidationXml =
-            let v = SimpleXml.findElementsByName "Validation" xmlParsed
-            if v.Length > 1 then failwith (sprintf "Swate found multiple 'Validation' xml elements. Please contact the developer.")
-            if v.Length = 0 then
-                None
-            else
-                XmlValidationTypes.SwateValidation.ofXml xml |> Some
+        return xmlParsed, xml
+    }
 
-        return xmlParsed, currentSwateValidationXml
+let swateValidationOfXml (xmlParsed:XmlElement) (xml:string) =
+    let v = SimpleXml.findElementsByName "Validation" xmlParsed
+    if v.Length > 1 then failwith (sprintf "Swate found multiple 'Validation' xml elements. Please contact the developer.")
+    if v.Length = 0 then
+        None
+    else
+        Xml.ValidationTypes.SwateValidation.ofXml xml |> Some
+
+let protocolGroupsOfXml (xmlParsed:XmlElement) (xml:string) =
+    let protocolGroupTag = "ProtocolGroup"
+    let v = SimpleXml.findElementsByName protocolGroupTag xmlParsed
+    if v.Length > 1 then failwith (sprintf "Swate found multiple '%s' xml elements. Please contact the developer." protocolGroupTag)
+    if v.Length = 0 then
+        None
+    else
+        Xml.GroupTypes.ProtocolGroup.ofXml xml |> Some
+
+let createGroupHeaderFormatForRange (range:Excel.Range) (context:RequestContext) =
+    promise {
+
+        let! range = context.sync().``then``(fun e ->
+            range.load(U2.Case2 (ResizeArray(["format"])))
+        )
+
+        let! colorAndGetBorderItems = context.sync().``then``(fun e ->
+    
+            let f = range.format
+    
+            f.fill.color <- "#70AD47"
+            f.font.color <- "white"
+            f.horizontalAlignment <- U2.Case2 "center"
+    
+            let format = f.load(U2.Case2 (ResizeArray(["borders"])))
+            format.borders.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
+        )
+    
+        let! borderItems = context.sync().``then``(fun e ->
+            colorAndGetBorderItems.items |> Array.ofSeq |> Array.map (fun x -> x.load(propertyNames = U2.Case2 (ResizeArray(["sideIndex"; "color"]))) )
+        )
+        let! colorBorder = context.sync().``then``(fun e ->
+            let color = borderItems |> Array.map (fun x ->
+                if x.sideIndex = U2.Case2 "InsideVertical" then
+                    x.color <- "white"
+            )
+            color
+        )
+    
+        ()
     }
 
 let createValueMatrix (colCount:int) (rowCount:int) value =

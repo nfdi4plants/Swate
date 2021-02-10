@@ -60,7 +60,7 @@ let firstRowTabs (model:Model) dispatch =
         createNavigationTab Routing.Route.TermSearch            model dispatch
         createNavigationTab Routing.Route.Validation            model dispatch
         createNavigationTab Routing.Route.FilePicker            model dispatch
-        createNavigationTab Routing.Route.FileUploadJson        model dispatch
+        createNavigationTab Routing.Route.ProtocolInsert        model dispatch
         createNavigationTab Routing.Route.Info                  model dispatch
     ]
 

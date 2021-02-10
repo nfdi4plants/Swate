@@ -339,23 +339,26 @@ type AddBuildingBlockState = {
 /// Validation scheme for Table
 type ValidationState = {
     ActiveTableBuildingBlocks   : OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []
-    TableValidationScheme       : OfficeInterop.Types.XmlValidationTypes.TableValidation
+    TableValidationScheme       : OfficeInterop.Types.Xml.ValidationTypes.TableValidation
     // Client view related
     DisplayedOptionsId      : int option
 } with
     static member init () = {
         ActiveTableBuildingBlocks   = [||]
-        TableValidationScheme       = OfficeInterop.Types.XmlValidationTypes.TableValidation.init()
+        TableValidationScheme       = OfficeInterop.Types.Xml.ValidationTypes.TableValidation.init()
         DisplayedOptionsId          = None
     }
 
-type FileUploadJsonState = {
+
+open ISADotNet
+
+type ProtocolInsertState = {
     UploadData: string
-    ProcessModel: ISADotNet.OntologyAnnotation option
+    ProcessModel: ISADotNet.Process option
 } with
     static member init () = {
         UploadData = ""
-        ProcessModel = None
+        ProcessModel = Some ISADotNet.Process.empty
     }
 
 type Model = {
@@ -389,7 +392,7 @@ type Model = {
     //States regarding File picker functionality
     FilePickerState         : FilePickerState
 
-    FileUploadJsonState     : FileUploadJsonState
+    ProtocolInsertState     : ProtocolInsertState
 
     //Insert annotation columns
     AddBuildingBlockState   : AddBuildingBlockState
@@ -413,5 +416,5 @@ let initializeModel (pageOpt: Route option) = {
     FilePickerState         = FilePickerState       .init ()
     AddBuildingBlockState   = AddBuildingBlockState .init ()
     ValidationState         = ValidationState       .init ()
-    FileUploadJsonState     = FileUploadJsonState   .init ()
+    ProtocolInsertState     = ProtocolInsertState   .init ()
 }

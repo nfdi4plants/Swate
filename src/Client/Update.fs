@@ -255,10 +255,10 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
         currentState, cmd
-    | GetSwateValidationXml ->
+    | GetSwateCustomXml ->
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.getSwateValidationXml
+                OfficeInterop.getSwateCustomXml
                 ()
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
@@ -1177,7 +1177,7 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
                 }
         nextState, Cmd.none
 
-open OfficeInterop.Types.XmlValidationTypes
+open OfficeInterop.Types.Xml.ValidationTypes
 
 let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
     match validationMsg with
@@ -1208,7 +1208,7 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
         }
         nextState, Cmd.none
 
-let handleFileUploadJsonMsg (fujMsg:FileUploadJsonMsg) (currentState: FileUploadJsonState) : FileUploadJsonState * Cmd<Msg> =
+let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolInsertState) : ProtocolInsertState * Cmd<Msg> =
     match fujMsg with
     // Client
     | UpdateUploadData newDataString ->
@@ -1224,13 +1224,11 @@ let handleFileUploadJsonMsg (fujMsg:FileUploadJsonMsg) (currentState: FileUpload
                 parsableString
                 (Ok >> ParseJsonToProcessResult)
                 (Result.Error >> ParseJsonToProcessResult)
-        currentState, Cmd.map FileUploadJson cmd 
+        currentState, Cmd.map ProtocolInsert cmd 
     | ParseJsonToProcessResult (Ok isaProcess) ->
-        printfn "THIS WAS DEPRECATED CHECK IN UPDATE.fs IN ParseJsonToProcessResult"
         let nextState = {
             currentState with
-                // TODO
-                ProcessModel = None
+                ProcessModel = Some isaProcess
         }
         nextState, Cmd.none
     | ParseJsonToProcessResult (Result.Error e) ->
@@ -1436,14 +1434,14 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             }
         nextModel, nextCmd
 
-    | FileUploadJson fileUploadJsonMsg ->
+    | ProtocolInsert fileUploadJsonMsg ->
         let nextFileUploadJsonState, nextCmd =
-            currentModel.FileUploadJsonState
+            currentModel.ProtocolInsertState
             |> handleFileUploadJsonMsg fileUploadJsonMsg
 
         let nextModel = {
             currentModel with
-                FileUploadJsonState = nextFileUploadJsonState
+                ProtocolInsertState = nextFileUploadJsonState
             }
         nextModel, nextCmd
 

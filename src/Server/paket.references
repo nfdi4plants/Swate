@@ -2,5 +2,4 @@ Saturn
 Fable.Remoting.Giraffe
 MySql.Data
 Microsoft.Extensions.Configuration.UserSecrets
-ISADotNet
-System.Text.Encodings.Web
+ISADotNet.Fable

@@ -1,7 +1,7 @@
 namespace Shared
 
 open System
-open ISADotNet
+//open ISADotNet
 
 module URLs =
 
@@ -144,7 +144,7 @@ type ITestAPI = {
 }
 
 type IISADotNetAPIv1 = {
-    parseJsonToProcess      : string                -> Async<ISADotNet.Process>
+    parseJsonToProcess      : string    -> Async<ISADotNet.Process> //Async<ISADotNet.Process>
 }
 
 type IServiceAPIv1 = {

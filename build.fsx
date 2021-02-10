@@ -1,6 +1,26 @@
-#r "paket: groupref build //"
+#r "paket:
+nuget BlackFox.Fake.BuildTask
+nuget Fake.Core.Target
+nuget Fake.Core.Process
+nuget Fake.Core.ReleaseNotes
+nuget Fake.IO.FileSystem
+nuget Fake.DotNet.Cli
+nuget Fake.DotNet.MSBuild
+nuget Fake.DotNet.AssemblyInfoFile
+nuget Fake.DotNet.Paket
+nuget Fake.DotNet.FSFormatting
+nuget Fake.DotNet.Fsi
+nuget Fake.DotNet.NuGet
+nuget Fake.Api.Github
+nuget Fake.DotNet.Testing.Expecto 
+nuget Fake.Extensions.Release
+nuget Fake.Tools.Git //
+"
+
+#if !FAKE
 #load "./.fake/build.fsx/intellisense.fsx"
-#r "netstandard"
+#r "netstandard" // Temp fix for https://github.com/dotnet/fsharp/issues/5216
+#endif
 
 open System
 open System.Text
@@ -10,8 +30,6 @@ open Fake.DotNet
 open Fake.IO
 open Fake.Api
 open Fake.Tools.Git
-open Farmer
-open Farmer.Builders
 
 Target.initEnvironment ()
 
@@ -354,18 +372,19 @@ Target.create "Release" (fun config ->
     let semVer =
         let opt =
             config.Context.Arguments
+            |> List.map (fun x -> x.ToLower())
             |> List.tryFind (fun x -> x.StartsWith "semver:")
         match opt with
-        | Some "semver:major"| Some "semver:Major" ->
+        | Some "semver:major"->
             Trace.trace "Increase major for next release notes."
             Major
-        | Some "semver:minor"| Some "semver:Minor" ->
+        | Some "semver:minor" ->
             Trace.trace "Increase minor for next release notes."
             Minor
-        | Some "semver:Patch"| Some "semver:patch" ->
+        | Some "semver:patch" ->
             Trace.trace "Increase patch for next release notes."
             Patch
-        | Some "semver:wip"| Some "semver:WIP" ->
+        | Some "semver:wip" ->
             Trace.trace "Add new commits to current release."
             WIP
         | Some x ->
@@ -503,8 +522,6 @@ Target.create "Release" (fun config ->
             "RELEASE_NOTES.md"
             newNotes
 
-    writeNewReleaseNotes
-
     Trace.trace "Update RELEASE_NOTES.md done!"
 
     Trace.trace "Update Version.fs"
@@ -634,39 +651,8 @@ Target.create "GithubDraft" (fun config ->
         |> Async.RunSynchronously
 
     Trace.trace "Draft successfully created!"
-    //let responseCreate = 
-    //    FSharp.Data.Http.RequestString
-    //        (   "https://api.github.com/repos/nfdi4plants/Swate/releases", 
-    //            headers = [ 
-    //                "accept", "application/vnd.github.v3+json"; 
-    //                "User-Agent", "Swate";
-    //                "Authorization", sprintf "token 5da68a1d1bdd09413f47b4ecdfd6911d641d7a93"
-    //            ],
-    //            body = FSharp.Data.HttpRequestBody.TextRequest textRequestBody
-    //        )
-    //Trace.trace "Draft successfully created!"
-
-    //let upLink = 
-    //    let pattern = "\"upload_url\":\"[a-z]+://[a-zA-Z./0-9]+"
-    //    System.Text.RegularExpressions.Regex.Match(responseCreate,pattern)
-    //    |> fun x -> x.Value.Replace("\"upload_url\":","").Replace("\"","")
-
-    //let uploadResponse =
-    //    let readInZipAsBinary = 
-    //        let path = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets\swate.zip")
-    //        System.IO.File.ReadAllBytes(path)
-    //    FSharp.Data.Http.RequestString
-    //        (   upLink, 
-    //            query = ["name","swate.zip"; "label","Swate"],
-    //            headers = [ 
-    //                "accept", "application/vnd.github.v3+json"; 
-    //                "User-Agent", "Swate";
-    //                "Authorization", sprintf "token 5da68a1d1bdd09413f47b4ecdfd6911d641d7a93"
-    //                "Content-Type", "application\zip"
-    //            ],
-    //            body = FSharp.Data.HttpRequestBody.BinaryUpload readInZipAsBinary
-    //        )
 )
+
 
 Target.create "Bundle" (fun _ ->
     runDotNet (sprintf "publish -c Release -o \"%s\"" deployDir) serverPath

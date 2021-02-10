@@ -13,7 +13,7 @@ type Route =
 | Validation
 | FilePicker
 | Info
-| FileUploadJson
+| ProtocolInsert
 | ActivityLog
 | Settings
 | NotFound
@@ -25,7 +25,7 @@ type Route =
         | Route.TermSearch          -> "/#TermSearch"
         | Route.Validation          -> "/#Validation"   
         | Route.FilePicker          -> "/#FilePicker"
-        | Route.FileUploadJson      -> "/#FileUploadJson"
+        | Route.ProtocolInsert      -> "/#ProtocolInsert"
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
@@ -37,7 +37,7 @@ type Route =
         | Route.AddBuildingBlock    -> "AddBuildingBlock"
         | Route.TermSearch          -> "TermSearch"
         | Route.Validation          -> "Validation"
-        | Route.FileUploadJson      -> "FileUpload"
+        | Route.ProtocolInsert      -> "ProtocolInsert"
         | Route.Info                -> "Info"
         | Route.FilePicker          -> "FilePicker"
         | Route.ActivityLog         -> "ActivityLog"
@@ -51,7 +51,7 @@ type Route =
         | Route.TermSearch          -> "Manage Terms"
         | Route.Validation          -> "Validation"
         | Route.FilePicker          -> "File Picker"
-        | Route.FileUploadJson      -> "File Upload"
+        | Route.ProtocolInsert      -> "Protocol Insert"
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
@@ -72,14 +72,14 @@ type Route =
             )
 
         match p with
-        | Route.Home                -> createElem [Fa.Solid.Home                           ]   (p.toStringRdbl)
-        | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                     ]   (p.toStringRdbl)
-        | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                 ]   (p.toStringRdbl)
-        | Route.AddBuildingBlock    -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle   ]   (p.toStringRdbl)
-        | Route.FilePicker          -> createElem [Fa.Solid.FileUpload                     ]   (p.toStringRdbl)
-        | Route.FileUploadJson      -> createElem [Fa.Solid.Upload                         ]   (p.toStringRdbl)
-        | Route.ActivityLog         -> createElem [Fa.Solid.History                        ]   (p.toStringRdbl)
-        | Route.Info                -> createElem [Fa.Solid.Question                       ]   (p.toStringRdbl)  
+        | Route.Home                -> createElem [Fa.Solid.Home                            ]   (p.toStringRdbl)
+        | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
+        | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
+        | Route.AddBuildingBlock    -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle    ]   (p.toStringRdbl)
+        | Route.FilePicker          -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
+        | Route.ProtocolInsert      -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
+        | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
+        | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  
         | _                         -> Fa.i [Fa.Solid.QuestionCircle]   []
 
 ///explained here: https://elmish.github.io/browser/routing.html
@@ -99,7 +99,7 @@ module Routing =
             map Route.Validation        (s "Validation")
             map Route.FilePicker        (s "FilePicker")
             map Route.Info              (s "Info")
-            map Route.FileUploadJson    (s "FileUploadJson")
+            map Route.ProtocolInsert    (s "ProtocolInsert")
             map Route.ActivityLog       (s "ActivityLog")
             map Route.Settings          (s "Settings")
             map Route.NotFound          (s "NotFound")

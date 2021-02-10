@@ -15,7 +15,7 @@ open Messages
 
 open CustomComponents
 
-open OfficeInterop.Types.XmlValidationTypes
+open OfficeInterop.Types.Xml.ValidationTypes
 
 let columnListElement ind (columnValidation:ColumnValidation) (model:Model) dispatch =
     let isActive =

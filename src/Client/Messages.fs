@@ -2,9 +2,6 @@ module Messages
 
 open Elmish
 open Thoth.Elmish
-
-open ISADotNet
-
 open Shared
 
 open ExcelColors
@@ -12,7 +9,7 @@ open OfficeInterop
 open OfficeInterop.Types
 open Model
 
-open ISADotNet
+//open ISADotNet
 
 type ExcelInteropMsg =
     | PipeActiveAnnotationTable     of (TryFindAnnoTableResult -> ExcelInteropMsg)
@@ -34,9 +31,9 @@ type ExcelInteropMsg =
     | AutoFitTable                  of activeAnnotationTable:TryFindAnnoTableResult
     //
     | GetTableValidationXml         of activeAnnotationTable:TryFindAnnoTableResult
-    | WriteTableValidationToXml     of newTableValidation:XmlValidationTypes.TableValidation * currentSwateVersion:string
+    | WriteTableValidationToXml     of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
     | DeleteAllCustomXml
-    | GetSwateValidationXml
+    | GetSwateCustomXml
     //
     | FillHiddenColsRequest         of activeAnnotationTable:TryFindAnnoTableResult
     | FillHiddenColumns             of tableName:string*SearchTermI []
@@ -136,15 +133,15 @@ type AddBuildingBlockMsg =
 type ValidationMsg =
     // Client
     | UpdateDisplayedOptionsId of int option
-    | UpdateTableValidationScheme of XmlValidationTypes.TableValidation
+    | UpdateTableValidationScheme of Xml.ValidationTypes.TableValidation
     // OfficeInterop
-    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.XmlValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
+    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
 
-type FileUploadJsonMsg =
+type ProtocolInsertMsg =
     // Client
     | UpdateUploadData of string
     | ParseJsonToProcessRequest of string
-    | ParseJsonToProcessResult of Result<Process,exn>
+    | ParseJsonToProcessResult of Result<ISADotNet.Process,exn>
 
 type TopLevelMsg =
     | CloseSuggestions
@@ -162,7 +159,7 @@ type Msg =
     | FilePicker            of FilePickerMsg
     | AddBuildingBlock      of AddBuildingBlockMsg
     | Validation            of ValidationMsg
-    | FileUploadJson        of FileUploadJsonMsg
+    | ProtocolInsert        of ProtocolInsertMsg
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>

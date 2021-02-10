@@ -1,4 +1,4 @@
-module FileUploadJsonView
+module ProtocolInsertView
 
 open Fulma
 open Fable
@@ -8,7 +8,7 @@ open Fable.FontAwesome
 open Fable.Core.JS
 open Fable.Core.JsInterop
 
-open ISADotNet
+//open ISADotNet
 
 open Model
 open Messages
@@ -23,7 +23,7 @@ let fileUploadViewComponent (model:Model) dispatch =
             Button.IsFullWidth
             Button.Color IsInfo
             Button.OnClick (fun e ->
-                UpdateUploadData "" |> FileUploadJson |> dispatch
+                UpdateUploadData "" |> ProtocolInsert |> dispatch
             )
         ][
             str "Remove Test Data"
@@ -44,7 +44,7 @@ let fileUploadViewComponent (model:Model) dispatch =
                         let reader = Browser.Dom.FileReader.Create()
 
                         reader.onload <- fun evt ->
-                            UpdateUploadData evt.target?result |> FileUploadJson |> dispatch
+                            UpdateUploadData evt.target?result |> ProtocolInsert |> dispatch
                                        
                         reader.onerror <- fun evt ->
                             GenericLog ("Error", evt.Value) |> Dev |> dispatch
@@ -64,21 +64,21 @@ let fileUploadViewComponent (model:Model) dispatch =
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Show uploaded file data."]
         str (
-            let dataStr = model.FileUploadJsonState.UploadData
-            if dataStr = "" then "no upload data found" else sprintf "%A" model.FileUploadJsonState.UploadData
+            let dataStr = model.ProtocolInsertState.UploadData
+            if dataStr = "" then "no upload data found" else sprintf "%A" model.ProtocolInsertState.UploadData
         )
 
         div [][
             Button.button [
                 Button.IsFullWidth
-                Button.OnClick (fun e -> ParseJsonToProcessRequest model.FileUploadJsonState.UploadData |> FileUploadJson |> dispatch)
+                Button.OnClick (fun e -> ParseJsonToProcessRequest model.ProtocolInsertState.UploadData |> ProtocolInsert |> dispatch)
             ][
                 str "Parse json"
             ]
             div [][
                 str (
-                    let dataStr = model.FileUploadJsonState.ProcessModel
-                    if dataStr.IsNone then "no upload data found" else sprintf "%A" model.FileUploadJsonState.ProcessModel.Value
+                    let dataStr = model.ProtocolInsertState.ProcessModel
+                    if dataStr.IsNone then "no upload data found" else sprintf "%A" model.ProtocolInsertState.ProcessModel.Value
                 )
             ]
         ]

@@ -80,9 +80,9 @@ let view (model : Model) (dispatch : Msg -> unit) =
             //Text.p [] [str ""]
         ]
 
-    | Routing.Route.FileUploadJson ->
+    | Routing.Route.ProtocolInsert ->
         BaseView.baseViewComponent model dispatch [
-            FileUploadJsonView.fileUploadViewComponent model dispatch
+            ProtocolInsertView.fileUploadViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]

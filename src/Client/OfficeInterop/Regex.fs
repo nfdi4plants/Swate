@@ -16,8 +16,13 @@ let BracketsPattern = "\([^\]]*\)"
 [<LiteralAttribute>]
 let CoreNamePattern = "^[^[(]*"
 
+// currently unused
 [<LiteralAttribute>]
 let UnitAccessionPattern = "#u.+?:\d+"
+
+// currently unused
+[<LiteralAttribute>]
+let GroupPattern = "#g[a-zA-Z0-9]+"
 
 let parseSquaredBrackets (headerStr:string) =
     match headerStr with
@@ -49,6 +54,7 @@ let parseCoreName (headerStr:string) =
     | _ ->
         None
 
+// currently unused
 let parseUnitAccession (tag:string) =
     match tag with
     | Shared.HelperFunctions.Regex UnitAccessionPattern value ->
@@ -56,6 +62,13 @@ let parseUnitAccession (tag:string) =
         |> Some
     | _ ->
         None
+
+// currently unused
+let parseGroup (tag:string) =
+    match tag with
+    | Shared.HelperFunctions.Regex GroupPattern value ->
+        value.Trim().Replace("#g","") |> Some
+    | _ -> None
 
 let parseColHeader (headerStr:string) =
     let coreName = parseCoreName headerStr
