@@ -76,8 +76,8 @@ type Route =
         | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
         | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
         | Route.AddBuildingBlock    -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle    ]   (p.toStringRdbl)
-        | Route.FilePicker          -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
-        | Route.ProtocolInsert      -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
+        | Route.ProtocolInsert      -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
+        | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
         | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
         | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  
         | _                         -> Fa.i [Fa.Solid.QuestionCircle]   []
