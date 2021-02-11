@@ -17,7 +17,7 @@ let BracketsPattern = "\([^\]]*\)"
 let CoreNamePattern = "^[^[(]*"
 
 [<LiteralAttribute>]
-let TermAccessionPattern = "#t.+?:\d+"
+let TermAccessionPattern = "#t[a-zA-Z0-9]+?:[a-zA-Z0-9]+"
 
 // currently unused
 [<LiteralAttribute>]

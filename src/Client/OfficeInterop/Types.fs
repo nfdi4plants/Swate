@@ -80,11 +80,11 @@ module Xml =
     module GroupTypes =
 
         type SpannedBuildingBlock = {
-            Name            : string
+            ColumnName      : string
             TermAccession   : string
         } with
             static member create name termAccession = {
-                Name            = name
+                ColumnName      = name
                 TermAccession   = termAccession
             }
             static member init = SpannedBuildingBlock.create "" ""
@@ -118,7 +118,7 @@ module Xml =
             static member init = ProtocolGroup.create "" []
 
             member this.toXml =
-                node "ProtocolGroups" [
+                node "ProtocolGroup" [
                     attr.value( "SwateVersion", this.SwateVersion )
                 ] [
                     for protocol in this.Protocols do
@@ -133,8 +133,8 @@ module Xml =
                                 for spannedBuildingBlock in protocol.SpannedBuildingBlocks do
                                     yield
                                         leaf "SpannedBuildingBlock" [
-                                            attr.value( "Name", spannedBuildingBlock.Name )
-                                            attr.value( "TermAccession", spannedBuildingBlock.TermAccession )
+                                            attr.value( "Name",             spannedBuildingBlock.ColumnName     )
+                                            attr.value( "TermAccession",    spannedBuildingBlock.TermAccession  )
                                         ]
                             ]
                 ]  |> serializeXml
@@ -146,8 +146,8 @@ module Xml =
                 let protocolGroup = xml |> SimpleXml.tryFindElementByName protocolGroupTag
                 if protocolGroup.IsNone then failwith (sprintf "Could not find existing <%s> tag." protocolGroupTag)
 
-                let protocols = xml |> SimpleXml.findElementsByName "Protocol"
-                let swateVersion    =  protocolGroup.Value.Attributes.["SwateVersion"]
+                let protocols       = xml |> SimpleXml.findElementsByName "Protocol"
+                let swateVersion    = protocolGroup.Value.Attributes.["SwateVersion"]
                 let nextProtocols   =
                     protocols
                     |> List.map (fun protocol ->

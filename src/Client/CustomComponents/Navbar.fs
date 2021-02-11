@@ -39,7 +39,12 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                 Button.a [
                     Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
                     Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]; Tooltip.dataTooltip ("Autoformat Table")]
-                    Button.OnClick (fun e -> PipeActiveAnnotationTable AutoFitTable |> ExcelInterop |> dispatch )
+                    Button.OnClick (fun e ->
+                        Msg.Batch [
+                            PipeActiveAnnotationTable AutoFitTable |> ExcelInterop
+                            PipeActiveAnnotationTable UpdateProtocolGroupHeader |> ExcelInterop
+                        ]  |> dispatch
+                    )
                     Button.Color Color.IsWhite
                     Button.IsInverted
                 ] [

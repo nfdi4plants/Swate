@@ -17,12 +17,10 @@ type ExcelInteropMsg =
     /// This is used to generate a new annotation table name.
     | PipeCreateAnnotationTableInfo of (string [] -> ExcelInteropMsg)
     | Initialized                   of (string*string)
-    | SyncContext                   of activeAnnotationTable:TryFindAnnoTableResult*string
-    | InSync                        of string
     | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
     | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
-    //| AddAnnotationBlocks           of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list 
-    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * format:string option * unitTermAccession:string option
+    | AddAnnotationBlocks           of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol
+    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * unitTermName:string option * unitTermAccession:string option
     | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
     | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
@@ -30,9 +28,11 @@ type ExcelInteropMsg =
     | AnnotationTableExists         of activeAnnotationTable:TryFindAnnoTableResult
     | GetParentTerm                 of activeAnnotationTable:TryFindAnnoTableResult
     | AutoFitTable                  of activeAnnotationTable:TryFindAnnoTableResult
+    | UpdateProtocolGroupHeader     of activeAnnotationTable:TryFindAnnoTableResult
     //
     | GetTableValidationXml         of activeAnnotationTable:TryFindAnnoTableResult
     | WriteTableValidationToXml     of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
+    | WriteProtocolToXml            of newProtocol:Xml.GroupTypes.Protocol
     | DeleteAllCustomXml
     | GetSwateCustomXml
     //

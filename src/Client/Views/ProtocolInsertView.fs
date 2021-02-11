@@ -97,7 +97,7 @@ let isViableISADotNetProcess (isaProcess:ISADotNet.Process) =
         false, Some <| sprintf "Process contains missing values: %A" (isExistingChecks |> Collections.Array.map fst)
 
 let paramValuePairElement (ppv:ISADotNet.ProcessParameterValue) =
-    Table.table [Table.IsBordered; Table.IsFullWidth][
+    Table.table [Table.IsFullWidth; Table.IsBordered][
         thead [][
             tr [][
                 th [Style [Width "50%"]] [
@@ -148,8 +148,14 @@ let displayProtocolInfoElement isViable (errorMsg:string option) (model:Model) d
     else 
         [
             let paramValuePairs = model.ProtocolInsertState.ProcessModel.Value.ParameterValues.Value
-            for paramValuePair in paramValuePairs do
-                yield paramValuePairElement paramValuePair
+            Field.div [][
+                yield div [Style [MarginBottom "1rem"]][
+                    b [][ str model.ProtocolInsertState.ProcessModel.Value.ExecutesProtocol.Value.Name.Value ]
+                    str (sprintf " - Version %s" model.ProtocolInsertState.ProcessModel.Value.ExecutesProtocol.Value.Version.Value)
+                ]
+                for paramValuePair in paramValuePairs do
+                    yield paramValuePairElement paramValuePair
+            ]
         ]
 
 let fileUploadButton (model:Model) dispatch id =
@@ -186,6 +192,8 @@ let fileUploadButton (model:Model) dispatch id =
         ]
     ]
 
+open OfficeInterop.Types.Xml
+
 let addToTableButton isValid (model:Model) dispatch =
     Field.div [] [
         Control.div [] [
@@ -198,16 +206,24 @@ let addToTableButton isValid (model:Model) dispatch =
                 Button.IsFullWidth
                 Button.Color IsSuccess
                 Button.OnClick (fun e ->
+                    let preProtocol =
+                        let p = model.ProtocolInsertState.ProcessModel.Value
+                        let id = p.ExecutesProtocol.Value.Name.Value
+                        let version = p.ExecutesProtocol.Value.Version.Value
+                        let swateVersion = model.PersistentStorageState.AppVersion
+                        GroupTypes.Protocol.create id version swateVersion "" "" []
                     let minBuildingBlockInfos =
                         OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.ofISADotNetProcess model.ProtocolInsertState.ProcessModel.Value
                         |> List.rev
-                    for minBuildBlockInfo in minBuildingBlockInfos
-                        do 
-                            let msg tableName = AddAnnotationBlock (tableName, minBuildBlockInfo)
-                            PipeActiveAnnotationTable msg |> ExcelInterop |> dispatch
+                    pipeNameTuple2 AddAnnotationBlocks (minBuildingBlockInfos,preProtocol) |> ExcelInterop |> dispatch
+
+                    //for minBuildBlockInfo in minBuildingBlockInfos
+                    //    do 
+                    //        let msg tableName = AddAnnotationBlock (tableName, minBuildBlockInfo)
+                    //        PipeActiveAnnotationTable msg |> ExcelInterop |> dispatch
                 )
             ] [
-                str "Insert these protocol annotation blocks"
+                str "Insert protocol annotation blocks"
             ]
         ]
     ]

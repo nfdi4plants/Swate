@@ -21,6 +21,27 @@ let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
             |] :> IList<U3<bool,string,float>>
     |] :> IList<IList<U3<bool,string,float>>>
 
+let tryFindSpannedBuildingBlocks (currentProtocolGroup:Xml.GroupTypes.Protocol) (buildingBlocks: BuildingBlock []) =
+    let findAllSpannedBlocks =
+        currentProtocolGroup.SpannedBuildingBlocks
+        |> List.choose (fun spannedBlock ->
+            buildingBlocks
+            |> Array.tryFind (fun foundBuildingBlock ->
+                let isSameAccession =
+                    if spannedBlock.TermAccession <> "" && foundBuildingBlock.MainColumn.Header.Value.Ontology.IsSome then
+                        foundBuildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession = spannedBlock.TermAccession
+                    else
+                        false
+                foundBuildingBlock.MainColumn.Header.Value.Header = spannedBlock.ColumnName
+                && isSameAccession
+            )
+        )
+    //let reduce = findAllSpannedBlocks |> List.map (fun x -> x.MainColumn.Header.Value.Header)
+    if findAllSpannedBlocks.Length = currentProtocolGroup.SpannedBuildingBlocks.Length then
+        Some findAllSpannedBlocks
+    else
+        None
+
 /// This will create the column header attributes for a unit block.
 /// as unit always has to be a term and cannot be for example "Source" or "Sample", both of which have a differen format than for exmaple "Parameter [TermName]",
 /// we only need one function to generate id and attributes and bring the unit term in the right format.
@@ -32,7 +53,7 @@ let unitColAttributes (unitTermName:string) (unitAccessionOptt:string option) (i
         | None              -> sprintf "[%s] (#h; #u)" unitTermName
     | _ ->
         match unitAccessionOptt with
-        | Some accession    -> sprintf "[%s] (#%i; #h; #t%s #u)" unitTermName id accession
+        | Some accession    -> sprintf "[%s] (#%i; #h; #t%s; #u)" unitTermName id accession
         | None              -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
 
 
@@ -109,7 +130,7 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
                 let checkIsHidden =
                     prep.TagArr.Value |> Array.contains ColumnTags.HiddenTag
                 if checkIsHidden then 
-                    Some (i + 1 |> float)
+                    Some (i|> float)
                 else
                     None
             else
@@ -122,7 +143,8 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
         if nextIsHidden then
             loopingCheckSkipHiddenCols (newInd + 1.)
         else
-            newInd
+            newInd+1.
+    //failwith (sprintf "START: %A ; FOUND NEW: %A" startIndex (loopingCheckSkipHiddenCols startIndex))
     loopingCheckSkipHiddenCols startIndex
 
 module BuildingBlockTypes =
@@ -270,7 +292,7 @@ module BuildingBlockTypes =
                 then
                     // There are multiple possibilities which column this is: TSR; TAN; Unit; Unit TSR; Unit TAN are the currently existing ones.
                     // We first check if there is NO unit tag in the header tag array
-                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we once (>0.2.1) added accession number behind unit tag
+                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we (>0.2.1) added accession number behind unit tag
                     if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) |> not then
                         let updateCurrentBlock = checkForHiddenColType currentBlock nextCol
                         sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
@@ -409,7 +431,7 @@ let swateValidationOfXml (xmlParsed:XmlElement) (xml:string) =
     else
         Xml.ValidationTypes.SwateValidation.ofXml xml |> Some
 
-let protocolGroupsOfXml (xmlParsed:XmlElement) (xml:string) =
+let protocolGroupOfXml (xmlParsed:XmlElement) (xml:string) =
     let protocolGroupTag = "ProtocolGroup"
     let v = SimpleXml.findElementsByName protocolGroupTag xmlParsed
     if v.Length > 1 then failwith (sprintf "Swate found multiple '%s' xml elements. Please contact the developer." protocolGroupTag)
@@ -418,7 +440,71 @@ let protocolGroupsOfXml (xmlParsed:XmlElement) (xml:string) =
     else
         Xml.GroupTypes.ProtocolGroup.ofXml xml |> Some
 
-let createGroupHeaderFormatForRange (range:Excel.Range) (context:RequestContext) =
+let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
+    Excel.run(fun context ->
+
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        promise {
+            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+
+            let currentProtocolGroup =
+                let previousProtocolGroup = protocolGroupOfXml xmlParsed xml
+                if previousProtocolGroup.IsNone then Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion [] else previousProtocolGroup.Value
+
+            let nextProtocolGroup =
+                let newProtocols =
+                    currentProtocolGroup.Protocols
+                    |> List.filter (fun x -> x.TableName <> protocol.TableName || x.WorksheetName <> protocol.WorksheetName || x.Id <> protocol.Id)
+                    |> fun filteredProtocols ->
+                        if remove then
+                            filteredProtocols
+                        else 
+                            protocol::filteredProtocols
+                { currentProtocolGroup with
+                    SwateVersion = protocol.SwateVersion
+                    Protocols = newProtocols
+                }
+
+            let nextCustomXml =
+                let nextAsXmlFormat = nextProtocolGroup.toXml |> SimpleXml.parseElement
+                let childrenWithoutProtocolGroup = xmlParsed.Children |> List.filter (fun child ->
+                    child.Name <> "ProtocolGroup"
+                )
+                let nextChildren = nextAsXmlFormat::childrenWithoutProtocolGroup
+                { xmlParsed with
+                    Children = nextChildren
+                } |> xmlElementToXmlString
+
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Seq.map (fun x -> x.delete() )
+                    
+                    xmls |> Array.ofSeq
+                )
+
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    customXmlParts.add(nextCustomXml)
+                )
+
+            // This will be displayed in activity log
+            return
+                "Info",
+                sprintf
+                    "%s ProtocolGroup Scheme with '%s - %s - %s' "
+                    (if remove then "Remove Protocol from" else "Update")
+                    protocol.WorksheetName
+                    protocol.TableName
+                    protocol.Id
+        }
+    )
+
+/// range -> 'let groupHeader = annoHeaderRange.getRowsAbove(1.)'
+let formatGroupHeaderForRange (range:Excel.Range) (context:RequestContext) =
     promise {
 
         let! range = context.sync().``then``(fun e ->
@@ -431,6 +517,7 @@ let createGroupHeaderFormatForRange (range:Excel.Range) (context:RequestContext)
     
             f.fill.color <- "#70AD47"
             f.font.color <- "white"
+            f.font.bold <- true
             f.horizontalAlignment <- U2.Case2 "center"
     
             let format = f.load(U2.Case2 (ResizeArray(["borders"])))
@@ -447,8 +534,35 @@ let createGroupHeaderFormatForRange (range:Excel.Range) (context:RequestContext)
             )
             color
         )
-    
         ()
+    }
+
+/// range -> 'let groupHeader = annoHeaderRange.getRowsAbove(1.)'
+let cleanGroupHeaderFormat (range:Excel.Range) (context:RequestContext) =
+    promise {
+        // unmerge group header
+        let! unmerge = context.sync().``then``(fun e ->
+            range.unmerge()
+
+        )
+        // empty group header
+        let! groupHeaderValues = context.sync().``then``(fun e ->
+            range.load(U2.Case1 "values")
+        )
+        // empty group header part 2
+        let! emptyGroupHeaderValues = context.sync().``then``(fun e ->
+            let nV =
+                groupHeaderValues.values
+                |> Seq.map (fun innerArr ->
+                    innerArr 
+                    |> Seq.map (fun _ ->
+                        "" |> box |> Some
+                    ) |> ResizeArray
+                ) |> ResizeArray
+            groupHeaderValues.values <- nV
+        )
+
+        return ()
     }
 
 let createValueMatrix (colCount:int) (rowCount:int) value =

@@ -62,26 +62,21 @@ open Fable.SimpleXml
 open Fable.SimpleXml.Generator
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
-let exampleExcelFunction () =
+let exampleExcelFunction1 () =
     Excel.run(fun context ->
-        let annotationTableName = "annotationTable"
         let selectedRange = context.workbook.getSelectedRange()
-        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
-   
-
-        let annoHeaderRange,annoBodyRange = getBuildingBlocksPreSync context annotationTableName
-        let groupHeader = annoHeaderRange.getRowsAbove(1.)
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"])))
 
         promise {
-            // https://docs.microsoft.com/de-de/office/dev/add-ins/excel/excel-add-ins-comments
-            //let! format = createGroupHeaderFormatForRange groupHeader context
-            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
-            let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
-            return (sprintf "%A" buildingBlocks)
+
+            let! baseFunc =
+                context.sync().``then``(fun e ->
+                    sprintf "%A, %A" selectedRange.columnIndex selectedRange.rowIndex
+            )
+
+            return baseFunc
         }
     )
-
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction2 () =
@@ -205,6 +200,8 @@ let createAnnotationTable ((allTableNames:String []),isDark:bool) =
             )
             //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
 
+            let! sync = context.sync().``then``(fun e -> ())
+
             return r
         }
     )
@@ -282,11 +279,10 @@ let autoFitTable (annotationTable) =
 
             // Ref. 1
             r.enableEvents <- false
-
             // Auto fit on all columns to fit cols and rows to their values.
-            let allCols = allCols.items |> Array.ofSeq
+            let allTableCols = allCols.items |> Array.ofSeq
             let _ =
-                allCols
+                allTableCols
                 |> Array.map (fun col -> col.getRange())
                 |> Array.map (fun x ->
                     // make all columns visible, we will later selectively hide all with '#h' tag
@@ -314,7 +310,7 @@ let autoFitTable (annotationTable) =
             r.enableEvents <- true
 
             // return message
-            "Autoformat Table"
+            "Info","Autoformat Table"
         )
     )
 
@@ -454,11 +450,11 @@ let addAnnotationBlock (annotationTable,buildingBlockInfo:MinimalBuildingBlock) 
                     let vals = annoHeaderRange.columnCount |> int
                     let maxLength = vals-1
                     if diff < 0 then
-                        maxLength+1
+                        maxLength
                     elif diff > maxLength then
-                        maxLength+1
+                        maxLength
                     else
-                        diff+1
+                        diff
                     |> float
 
                 // This is necessary to skip over hidden cols
@@ -469,31 +465,6 @@ let addAnnotationBlock (annotationTable,buildingBlockInfo:MinimalBuildingBlock) 
                 let newBaseColIndex' = findIndexNextNotHiddenCol headerVals newBaseColIndex
                 newBaseColIndex', headerVals
             )
-
-            //let! extendGroupHeader = context.sync().``then``(fun _ ->
-            //    let colCount =
-            //        if isSingleCol then 1.
-            //        elif format.IsSome then 6.
-            //        else 3.
-            //    let getHeaderRange = sheet.getRangeByIndexes(annoHeaderRange.rowIndex-1.,newBaseColIndex+1.,1.,colCount)
-            //    let newRange = getHeaderRange.insert(InsertShiftDirection.Right)
-            //    newRange.merge()
-            //    newRange.load(U2.Case2 (ResizeArray(["values"])))
-            //)
-
-            //let! colorNewGroupHeader = createGroupHeaderFormatForRange extendGroupHeader context
-
-            //let! insertValue = context.sync().``then``(fun e ->
-            //    let nV =
-            //        extendGroupHeader.values
-            //        |> Seq.map (fun innerArr ->
-            //            innerArr 
-            //            |> Seq.map (fun _ ->
-            //                "" |> box |> Some
-            //            ) |> ResizeArray
-            //        ) |> ResizeArray
-            //    extendGroupHeader.values <- nV
-            //)
 
             let! res = context.sync().``then``( fun _ ->
 
@@ -597,7 +568,93 @@ let addAnnotationBlock (annotationTable,buildingBlockInfo:MinimalBuildingBlock) 
             return res
         }
     )
-    
+
+let addAnnotationBlocksAsProtocol (annotationTable,buildingBlockInfoList:MinimalBuildingBlock list, protocol:Xml.GroupTypes.Protocol) =
+   
+    let addBuildingBlock buildingBlockInfo =
+        promise {
+            let! res = addAnnotationBlock(annotationTable,buildingBlockInfo)
+            return [res]
+        }
+    let chainBuildingBlocks buildingBlockInfoList =
+        let promiseList = buildingBlockInfoList |> List.map (fun x -> addBuildingBlock x)
+        let emptyPromise = promise {return []}
+        let rec chain ind (promiseList:JS.Promise<(string*string*string) list> list ) resultPromise =
+            if ind >= promiseList.Length then
+                resultPromise
+            elif ind = 0 then 
+                let currentPromise = promiseList |> List.item ind
+                chain 1 promiseList currentPromise
+            else
+                let currentPromise = promiseList |> List.item ind
+                let nextPromise =
+                    Promise.PromiseBuilder().Merge(currentPromise,resultPromise, (fun x y -> x@y))
+                chain (ind+1) promiseList nextPromise
+
+        chain 0 promiseList emptyPromise
+
+    let infoProm =
+        Excel.run(fun context ->
+            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+            let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
+
+            let annoHeaderRange,annoBodyRange = getBuildingBlocksPreSync context annotationTable
+
+            promise {
+                let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+                
+                let currentProtocolGroup = protocolGroupOfXml xmlParsed xml
+
+                let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
+
+                if currentProtocolGroup.IsSome then
+                    let existsAlready =
+                        currentProtocolGroup.Value.Protocols
+                        |> List.tryFind (fun existingProtocol ->
+                            existingProtocol.TableName      = annotationTable &&
+                            existingProtocol.WorksheetName  = activeSheet.name &&
+                            existingProtocol.Id             = protocol.Id
+                        )
+                    let isComplete =
+                        if existsAlready.IsSome then
+                            (tryFindSpannedBuildingBlocks existsAlready.Value buildingBlocks).IsSome
+                        else
+                            true
+                    if existsAlready.IsSome then
+                        if isComplete then
+                            failwith ( sprintf "Protocol %s exists already in %s - %s." existsAlready.Value.Id existsAlready.Value.TableName existsAlready.Value.WorksheetName )
+
+                let! newProtocol = context.sync().``then``(fun e ->
+                    { protocol with
+                        WorksheetName   = activeSheet.name
+                        TableName       = annotationTable }
+                )
+                let! chainProm = chainBuildingBlocks buildingBlockInfoList
+
+                return (chainProm,newProtocol)
+            }
+        )
+
+    promise {
+        let! blockResults,info = infoProm
+        let createSpannedBlocks =
+            [
+                for ind in 0 .. blockResults.Length-1 do
+                    let colName                     = blockResults |> List.item ind |> (fun (x,_,_) -> x)
+                    let relatedTermAccession        = buildingBlockInfoList |> List.rev |> List.item ind |> (fun x ->
+                        if colName.Contains(x.MainColumnName) |> not then
+                            failwith (sprintf "Had problems relating term accession and term name: %s in %s" x.MainColumnName colName)
+                        if x.MainColumnTermAccession.IsSome then x.MainColumnTermAccession.Value else ""
+                        )
+                    yield
+                        Xml.GroupTypes.SpannedBuildingBlock.create colName relatedTermAccession
+            ]
+        let completeProtocolInfo = {info with SpannedBuildingBlocks = createSpannedBlocks}
+        return (blockResults,completeProtocolInfo)
+    }
+
+
 let changeTableColumnFormat annotationTable (colName:string) (format:string) =
     Excel.run(fun context ->
 
@@ -627,7 +684,7 @@ let changeTableColumnFormat annotationTable (colName:string) (format:string) =
             r.enableEvents <- true
 
             // return msg
-            sprintf "format of %s was changed to %s" colName format
+            "Info",sprintf "Format of %s was changed to %s" colName format
        )
     )
 
@@ -755,7 +812,7 @@ let fillValue (annotationTable,term,termBackground:Shared.DbDomain.Term option) 
             nextColsRange.values <- nextNewVals
             r.enableEvents <- true
             // return print msg
-            sprintf "%A, %A" nextColsRange.values.Count nextNewVals
+            "Info",sprintf "Insert %A %Ax" term nextColsRange.values.Count
         )
     )
 
@@ -995,6 +1052,7 @@ let getTableMetaData (annotationTable) =
             let rowRangeAddr, rowRangeColCount, rowRangeRowCount = rowRange.address,rowRange.columnCount,rowRange.rowCount
             let headerRangeAddr, headerRangeColCount, headerRangeRowCount = headerRange.address,headerRange.columnCount,headerRange.rowCount
 
+            "info",
             sprintf "Table Metadata: [Table] : %ic x %ir ; [TotalRange] : %s : %ic x %ir ; [HeaderRowRange] : %s : %ic x %ir "
                 (colCount            |> int)
                 (rowCount            |> int)
@@ -1006,9 +1064,6 @@ let getTableMetaData (annotationTable) =
                 (headerRangeRowCount |> int)
         )
     )
-
-let syncContext (passthroughMessage : string) =
-    Excel.run (fun context -> context.sync(passthroughMessage))
 
 let deleteAllCustomXml() =
     Excel.run(fun context ->
@@ -1064,68 +1119,161 @@ let getSwateCustomXml() =
         }
     )
 
-let writeProtocolToXml(protocol:GroupTypes.Protocol,currentSwateVersion:string) =
+let writeProtocolToXml(protocol:GroupTypes.Protocol) =
+    updateProtocolFromXml protocol false
+
+let removeProtocolFromXml(protocol:GroupTypes.Protocol) =
+    updateProtocolFromXml protocol true
+
+/// This function ist used to parse the protocol xml and the table to building blocks and assign the correct
+/// table protocol-group-header to each building block.
+let updateProtocolGroupHeader (annotationTableName) =
     Excel.run(fun context ->
 
-        let newProtocol = {
-            protocol with
-                SwateVersion = if protocol.SwateVersion = "" then currentSwateVersion else protocol.SwateVersion
-        }
-
-        // The first part accesses current CustomXml
+        let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
         let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+   
+
+        let annoHeaderRange,annoBodyRange = getBuildingBlocksPreSync context annotationTableName
+        let _ = annoHeaderRange.load(U2.Case1 "rowIndex")
+        let groupHeader = annoHeaderRange.getRowsAbove(1.)
 
         promise {
             let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+            let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
+            let currentProtocolGroup = protocolGroupOfXml xmlParsed xml
 
-            let currentProtocolGroup =
-                let previousProtocolGroup = protocolGroupsOfXml xmlParsed xml
-                if previousProtocolGroup.IsNone then GroupTypes.ProtocolGroup.create currentSwateVersion [] else previousProtocolGroup.Value
+            let! applyGroups = promise {
 
-            let nextProtocolGroup =
-                let newProtocols =
-                    currentProtocolGroup.Protocols
-                    |> List.filter (fun x -> x.TableName <> newProtocol.TableName || x.WorksheetName <> newProtocol.WorksheetName || x.Id <> newProtocol.Id)
-                    |> fun filteredProtocols -> newProtocol::filteredProtocols
-                { currentProtocolGroup with
-                    SwateVersion = currentSwateVersion
-                    Protocols = newProtocols
-                }
+                    let protocolsForCurrentTableSheet =
+                        if currentProtocolGroup.IsSome then
+                            currentProtocolGroup.Value.Protocols
+                            |> List.filter (fun protocol ->
+                                protocol.TableName = annotationTableName
+                                && protocol.WorksheetName = activeSheet.name
+                            )
+                        else
+                            []
 
-            let nextCustomXml =
-                let nextAsXmlFormat = nextProtocolGroup.toXml |> SimpleXml.parseElement
-                let childrenWithoutProtocolGroup = xmlParsed.Children |> List.filter (fun child ->
-                    child.Name <> "ProtocolGroup"
-                )
-                let nextChildren = nextAsXmlFormat::childrenWithoutProtocolGroup
-                { xmlParsed with
-                    Children = nextChildren
-                } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+                    let getGroupHeaderIndicesForProtocol (buildingBlocks:BuildingBlock []) (protocol:Xml.GroupTypes.Protocol) =
+                        let buildingBlockOpts = tryFindSpannedBuildingBlocks protocol buildingBlocks
 
-            let! deleteXml =
-                context.sync().``then``(fun e ->
-                    let items = customXmlParts.items
-                    let xmls = items |> Seq.map (fun x -> x.delete() )
-                    
-                    xmls |> Array.ofSeq
-                )
+                        // caluclate list of indices fro group blocks
+                        if buildingBlockOpts.IsSome then
+                            let getStartAndEnd (mainColIndices:int list) =
+                                let startInd = List.min mainColIndices
+                                let endInd   =
+                                    let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+                                    let max = List.max mainColIndices |> float
+                                    findIndexNextNotHiddenCol headerVals max |> int
+                                startInd,endInd-1
+                            let bbColNumberAndIndices =
+                                buildingBlockOpts.Value
+                                |> List.map (fun bb ->
+                                    let nOfCols =
+                                        if bb.TAN.IsNone || bb.TSR.IsNone then
+                                            1
+                                        elif bb.TAN.IsSome && bb.TSR.IsSome && bb.Unit.IsNone then
+                                            3
+                                        elif bb.TAN.IsSome && bb.TSR.IsSome && bb.Unit.IsSome then
+                                            6
+                                        else failwith (sprintf "Swate encountered an unknown column pattern for building block: %s " bb.MainColumn.Header.Value.Header) 
+                                    bb.MainColumn.Index, nOfCols
+                                )
+                            let rec sortIntoBlocks (iteration:int) (currentGroupIterator:int) (bbColNumberAndIndices:(int*int) list) (collector:(int*int*int) list) =
+                                if iteration >= bbColNumberAndIndices.Length then
+                                    collector
+                                elif iteration = 0 then
+                                    let currentInd, currentN = List.item iteration bbColNumberAndIndices
+                                    sortIntoBlocks 1 currentGroupIterator bbColNumberAndIndices ((currentGroupIterator,currentInd,currentN)::collector)
+                                else
+                                    let currentColIndex, currentNOfCols = List.item iteration bbColNumberAndIndices
+                                    let lastGroup, lastColIndex, lastNOfCols =
+                                        collector
+                                        |> List.sortBy (fun (group,colIndex,nOfCols) -> colIndex)
+                                        |> List.last
+                                    /// - 1 as the lastColIndex is already the mainColumn
+                                    let lastBBEndInd = lastColIndex + lastNOfCols
+                                    if lastBBEndInd = currentColIndex then
+                                        sortIntoBlocks (iteration+1) currentGroupIterator bbColNumberAndIndices ((currentGroupIterator,currentColIndex,currentNOfCols)::collector)
+                                    elif lastBBEndInd > currentColIndex then
+                                        failwith (sprintf "Swate encountered an unknown building block pattern (Error: SIB%i-%i)" lastBBEndInd currentColIndex)
+                                    else 
+                                        let newGroupIterator = currentGroupIterator + 1 
+                                        sortIntoBlocks (iteration+1) newGroupIterator bbColNumberAndIndices ((newGroupIterator,currentColIndex,currentNOfCols)::collector)
+                            let mainColIndiceBlocks =
+                                sortIntoBlocks 0 0 bbColNumberAndIndices []
+                                |> List.groupBy (fun (group,colInd,nOfCols) -> group)
+                                |> List.map (fun x ->
+                                    snd x |> List.map (fun (group,colInd,nOfCols) -> colInd)
+                                )
+                                |> List.map getStartAndEnd
+                            Some mainColIndiceBlocks
+                        else
+                            None
 
-            let! addNext =
-                context.sync().``then``(fun e ->
-                    customXmlParts.add(nextCustomXml)
-                )
+                    let! group =
+                        protocolsForCurrentTableSheet
+                        |> List.map (fun protocol ->
+                            let startEndIndices = getGroupHeaderIndicesForProtocol buildingBlocks protocol
+                            promise {
 
-            // This will be displayed in activity log
-            return
-                "Info",
-                sprintf
-                    "Update ProtocolGroup Scheme with '%s - %s - %s' "
-                    newProtocol.WorksheetName
-                    newProtocol.TableName
-                    newProtocol.Id
+                                let! cleanGroupHeaderFormat = cleanGroupHeaderFormat groupHeader context
+
+                                if startEndIndices.IsSome then
+
+                                    let! r1 =
+                                        startEndIndices.Value
+                                        |> List.map (fun (startInd,endInd )->
+
+                                            promise {
+
+                                                let startInd,endInd = startInd + 1 |> float, endInd |> float
+
+                                                let! mergedGroupHeader =
+                                                    context.sync().``then``(fun e ->
+                                                        /// +2 to also include start and endcolumn, without it would end two too early.
+                                                        let diff = (endInd - startInd) + 2.
+                                                        let getProtocolGroupHeaderRange = activeSheet.getRangeByIndexes(annoHeaderRange.rowIndex-1., startInd, 1., diff)
+                                                        getProtocolGroupHeaderRange.merge()
+                                                        getProtocolGroupHeaderRange.load(U2.Case2 (ResizeArray(["values"])))
+                                                    )
+
+                                                let! insertValue = context.sync().``then``(fun e ->
+                                                    let nV =
+                                                        mergedGroupHeader.values
+                                                        |> Seq.map (fun innerArr ->
+                                                            innerArr 
+                                                            |> Seq.map (fun _ ->
+                                                                protocol.Id |> box |> Some
+                                                            ) |> ResizeArray
+                                                        ) |> ResizeArray
+                                                    mergedGroupHeader.values <- nV
+                                                )
+                                                return sprintf "%A - %A -> %A." startInd endInd protocol.Id
+                                            }
+
+                                        ) |> Promise.Parallel
+
+                                    return String.concat " " r1
+                                    
+                                else
+                                    // REMOVE INCOMPLETE PROTOCOL
+
+                                    let! remove = removeProtocolFromXml protocol
+                                    return sprintf "%A" remove
+
+                            }
+                        ) |> Promise.Parallel
+                    return group
+            }
+            let! format = formatGroupHeaderForRange groupHeader context
+
+            return ()
         }
     )
+
 
 let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,currentSwateVersion:string) =
     Excel.run(fun context ->

@@ -226,7 +226,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         fun _ -> minBuildingBlock |> pipeNameTuple AddAnnotationBlock |> ExcelInterop |> dispatch
                     )
                 ] [
-                    str "Insert this annotation building block"
+                    str "Insert annotation building block"
                 ]
             ]
         ]

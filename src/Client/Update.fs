@@ -82,9 +82,18 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             Cmd.OfPromise.either
                 OfficeInterop.autoFitTable
                 (name)
-                (fun msg -> InSync msg |> ExcelInterop)
+                (GenericLog >> Dev)
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
+        currentState, cmd
+
+    | UpdateProtocolGroupHeader activeTableNameRes ->
+        let cmd name =
+            Cmd.OfPromise.attempt
+                OfficeInterop.updateProtocolGroupHeader
+                (name)
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
     | Initialized (h,p) ->
@@ -109,22 +118,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             ]
 
         nextState, cmd
-        
-    | SyncContext (activeTableNameRes,passthroughMessage) ->
-        currentState,
-        Cmd.batch [
-            Cmd.ofMsg (AutoFitTable activeTableNameRes |> ExcelInterop)
-            Cmd.OfPromise.either
-                OfficeInterop.tryFindActiveAnnotationTable
-                ()
-                (AnnotationTableExists >> ExcelInterop)
-                (GenericError >> Dev)
-            Cmd.OfPromise.either
-                OfficeInterop.syncContext
-                passthroughMessage
-                (fun _ -> ExcelInterop (InSync passthroughMessage))
-                (GenericError >> Dev)
-        ]
 
     | AnnotationTableExists annoTableOpt ->
         let exists =
@@ -138,18 +131,12 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
         nextState,Cmd.none
 
-    | InSync passthroughMessage ->
-        currentState,
-        ("Info",passthroughMessage)
-        |> (GenericLog >> Dev)
-        |> Cmd.ofMsg
-
     | FillSelection (activeTableNameRes,fillValue,fillTerm) ->
         let cmd name =
             Cmd.OfPromise.either
                 OfficeInterop.fillValue  
                 (name,fillValue,fillTerm)
-                ((fun x -> SyncContext (activeTableNameRes,x)) >> ExcelInterop)
+                (GenericLog >> Dev)
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
@@ -160,23 +147,32 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 OfficeInterop.addAnnotationBlock  
                 (tableName,minBuildingBlockInfo)
                 (fun (newColName,format,msg) ->
-                    FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
+                    Msg.Batch [
+                        FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
+                        UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
+                    ]
                 )
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
 
-    //| AddAnnotationBlocks (activeTableNameRes,minBuildingBlockInfos) ->
-    //    let cmd tableName =
-    //        Cmd.OfPromise.either
-    //            OfficeInterop.addAnnotationBlocks 
-    //            (tableName,minBuildingBlockInfos)
-    //            (fun (newColName,format,msg) ->
-    //                FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
-    //            )
-    //            (GenericError >> Dev)
-    //    let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
-    //    currentState, cmd
+    | AddAnnotationBlocks (activeTableNameRes,minBuildingBlockInfos, protocol) ->
+        let cmd tableName =
+            Cmd.OfPromise.either
+                OfficeInterop.addAnnotationBlocksAsProtocol
+                (tableName,minBuildingBlockInfos,protocol)
+                (fun (resList,protocolInfo) ->
+                    Msg.Batch [
+                        for newColName,format,msg in resList do
+                            yield
+                                FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
+                        yield
+                            WriteProtocolToXml protocolInfo |> ExcelInterop
+                    ]
+                )
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
+        currentState, cmd
 
     | AddUnitToAnnotationBlock (activeTableNameRes, format, unitTermOpt) ->
         let cmd name =
@@ -184,7 +180,10 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 OfficeInterop.addUnitToExistingBuildingBlock
                 (name,format,unitTermOpt)
                 (fun (newColName,format,msg) ->
-                    FormatColumn (activeTableNameRes, newColName, format, msg) |> ExcelInterop
+                    Msg.Batch [
+                        FormatColumn (activeTableNameRes, newColName, format, msg) |> ExcelInterop
+                        UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
+                    ]
                 )
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
@@ -192,14 +191,16 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
     | FormatColumn (activeTableNameRes,colName,format,msg) ->
         let cmd name =
-            Cmd.batch [
-                Cmd.ofMsg (InSync msg |> ExcelInterop)
-                Cmd.OfPromise.either
-                    (OfficeInterop.changeTableColumnFormat name colName)
-                    format
-                    ((fun msg -> SyncContext (activeTableNameRes,msg)) >> ExcelInterop)
-                    (GenericError >> Dev)
-            ]
+            Cmd.OfPromise.either
+                (OfficeInterop.changeTableColumnFormat name colName)
+                format
+                (fun x ->
+                    Msg.Batch [
+                        AutoFitTable activeTableNameRes |> ExcelInterop
+                        GenericLog x |> Dev
+                    ]
+                )
+                (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState,cmd
 
@@ -209,9 +210,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 OfficeInterop.createAnnotationTable  
                 (allTableNames,isDark)
                 (fun (res,msg) ->
-                    Msg.Batch [
-                        AnnotationtableCreated (res,msg) |> ExcelInterop
-                    ]
+                    AnnotationtableCreated (res,msg) |> ExcelInterop
                 )
                 (GenericError >> Dev)
         currentState,cmd
@@ -221,8 +220,13 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             currentState with
                 HasAnnotationTable = true
         }
-
-        nextState,Cmd.ofMsg(SyncContext (activeTableNameRes,range)|> ExcelInterop)
+        let msg =
+            Msg.Batch [
+                AutoFitTable activeTableNameRes |> ExcelInterop
+                UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
+                GenericLog ("info", range) |> Dev
+            ]
+        nextState, Cmd.ofMsg msg
 
 
     | GetParentTerm activeTableNameRes ->
@@ -259,12 +263,30 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (GenericError >> Dev)
 
         currentState, cmd
+    | WriteProtocolToXml protocolInfo ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.writeProtocolToXml
+                (protocolInfo)
+                (fun res ->
+                    Msg.Batch [
+                        GenericLog res |> Dev
+                        PipeActiveAnnotationTable UpdateProtocolGroupHeader |> ExcelInterop
+                    ]
+                )
+                (GenericError >> Dev)
+        currentState, cmd
     | DeleteAllCustomXml ->
         let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.deleteAllCustomXml
                 ()
-                (GenericLog >> Dev)
+                (fun res ->
+                    Msg.Batch [
+                        GenericLog res |> Dev
+                        PipeActiveAnnotationTable UpdateProtocolGroupHeader |> ExcelInterop
+                    ]
+                )
                 (GenericError >> Dev)
         currentState, cmd
     | GetSwateCustomXml ->
@@ -333,11 +355,12 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         nextState, cmd
 
+    /// DEV
     | TryExcel  ->
         let nextState = currentState
         let cmd = 
             Cmd.OfPromise.either
-                OfficeInterop.exampleExcelFunction 
+                OfficeInterop.exampleExcelFunction1
                 ()
                 ((fun x -> 
                     ("Debug",x) |> GenericLog) >> Dev
@@ -358,15 +381,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
     //| _ ->
     //    printfn "Hit currently non existing message"
     //    currentState, Cmd.none
-
-    //| ExcelSubscriptionMsg msg ->
-    //    let m,cmd = OfficeInterop.Types.Subscription.update msg currentState.SubscriptionState
-    //    let nextState = {
-    //        currentState with
-    //            SubscriptionState = m
-    //    }
-    //    nextState, Cmd.map (ExcelSubscriptionMsg >> ExcelInterop) cmd
-
         
 let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchState) : TermSearchState * Cmd<Msg> =
     match termSearchMsg with
@@ -578,7 +592,7 @@ let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> 
             Cmd.OfPromise.either
                 OfficeInterop.getTableMetaData
                 (name)
-                ((fun msg -> SyncContext (activeTableNameRes,msg)) >> ExcelInterop)
+                (GenericLog >> Dev)
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd

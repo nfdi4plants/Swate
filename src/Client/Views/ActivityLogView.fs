@@ -25,14 +25,14 @@ let activityLogComponent (model:Model) dispatch =
             str "Back to Term Search"
         ]
         Help.help [][str "This page is used for development/debugging."]
-        Button.button [
-            Button.Color Color.IsInfo
-            Button.IsFullWidth
-            Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
-            Button.Props [Style [MarginBottom "1rem"]]
-        ] [
-            str "Try Excel"
-        ]
+        //Button.button [
+        //    Button.Color Color.IsInfo
+        //    Button.IsFullWidth
+        //    Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
+        //    Button.Props [Style [MarginBottom "1rem"]]
+        //] [
+        //    str "Try Excel"
+        //]
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth
