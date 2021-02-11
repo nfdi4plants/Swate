@@ -17,7 +17,11 @@ let BracketsPattern = "\([^\]]*\)"
 let CoreNamePattern = "^[^[(]*"
 
 [<LiteralAttribute>]
-let UnitAccessionPattern = "#u.+?:\d+"
+let TermAccessionPattern = "#t[a-zA-Z0-9]+?:[a-zA-Z0-9]+"
+
+// currently unused
+[<LiteralAttribute>]
+let GroupPattern = "#g[a-zA-Z0-9]+"
 
 let parseSquaredBrackets (headerStr:string) =
     match headerStr with
@@ -49,33 +53,44 @@ let parseCoreName (headerStr:string) =
     | _ ->
         None
 
-let parseUnitAccession (tag:string) =
+let parseTermAccession (tag:string) =
     match tag with
-    | Shared.HelperFunctions.Regex UnitAccessionPattern value ->
+    | Shared.HelperFunctions.Regex TermAccessionPattern value ->
         value.Trim()
         |> Some
     | _ ->
         None
 
+open Shared
+
 let parseColHeader (headerStr:string) =
     let coreName = parseCoreName headerStr
-    let ontology = parseSquaredBrackets headerStr
     let tagArr = parseBrackets headerStr
-    let isUnit, accessionOpt =
+    let ontology =
+        let hasOnt = parseSquaredBrackets headerStr
+        let termAccession =
+            match tagArr with
+            | None -> None
+            | Some ta ->
+                let hasAccession = ta |> Array.tryFind (fun x -> x.StartsWith ColumnTags.TermAccessionTag)
+                if hasAccession.IsSome && (parseTermAccession hasAccession.Value).IsSome
+                then hasAccession.Value.Replace(Types.ColumnTags.TermAccessionTag,"") |> Some
+                else None
+        match hasOnt,termAccession with
+        | Some ontName, None    -> OntologyInfo.create ontName "" |> Some
+        | Some ontName, Some ta -> OntologyInfo.create ontName ta |> Some
+        | _,_                   -> None
+
+    let isUnit =
         match tagArr with
-        | None ->
-            false, None
+        | None -> false
         | Some ta ->
-            let checkForAccession = ta |> Array.choose parseUnitAccession
-            let isUnit = ta |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart)
-            match checkForAccession.Length with
-            | 1 -> isUnit, checkForAccession.[0].Replace(ColumnTags.UnitTagStart,"") |> Some
-            | _ -> isUnit, None
+            let isUnit = ta |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag)
+            isUnit
     {
         Header              = headerStr
         CoreName            = coreName
         Ontology            = ontology
         TagArr              = tagArr
-        HasUnitAccession    = accessionOpt
         IsUnitCol           = isUnit
     }

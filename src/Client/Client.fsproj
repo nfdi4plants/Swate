@@ -5,10 +5,12 @@
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <Compile Include="NFDIColors.fs" />
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
         <Compile Include="Version.fs" />
+        <Compile Include="ISADotNetHelpers.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="ExcelColors.fs" />
         <Compile Include="OfficeJS.fs" />
@@ -36,8 +38,9 @@
         <Compile Include="Views\AdvancedSearchView.fs" />
         <Compile Include="Views\AddBuildingBlockView.fs" />
         <Compile Include="Views\TermSearchView.fs" />
-        <Compile Include="Views\FilePickerView.fs" />
         <Compile Include="Views\ValidationView.fs" />
+        <Compile Include="Views\FilePickerView.fs" />
+        <Compile Include="Views\ProtocolInsertView.fs" />
         <Compile Include="Views\InfoView.fs" />
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\SettingsView.fs" />

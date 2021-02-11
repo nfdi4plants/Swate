@@ -21,14 +21,23 @@ open Microsoft.AspNetCore.Hosting
 //let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
 
 let serviceApi = {
-    getAppVersion = fun () -> async {return System.AssemblyVersionInformation.AssemblyVersion}
+    getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
+}
+
+open ISADotNet
+
+let isaDotNetApi = {
+    parseJsonToProcess = fun jsonString -> async {
+        let parsedJson = ISADotNet.Json.Process.fromString jsonString
+        return parsedJson
+    }
 }
 
 let annotatorApi cString = {
 
     //Development
     getTestNumber = fun () -> async { return 42 }
-    getTestString = fun strOpt -> async { return sprintf "Test string: %A" strOpt }
+    getTestString = fun strOpt -> async { return None }
 
     //Ontology related requests
     testOntologyInsert = fun (name,version,definition,created,user) ->
@@ -43,7 +52,7 @@ let annotatorApi cString = {
                     definition
                     created
                     user
-            printfn "created ontology entry: \t%A" onto
+            printfn "created pseudo ontology entry: \t%A. No actual db insert has happened." onto
             return onto
         }
 
@@ -61,7 +70,7 @@ let annotatorApi cString = {
                 | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
-                    let like = OntologyDB.getTermSuggestions cString typedSoFar
+                    let like = OntologyDB.getTermSuggestions cString (typedSoFar)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -72,7 +81,7 @@ let annotatorApi cString = {
             return searchRes
         }
 
-    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:string) ->
+    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:OntologyInfo) ->
         async {
 
             let searchRes =
@@ -80,7 +89,12 @@ let annotatorApi cString = {
                 | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
-                    let like = OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm)
+                    let like =
+                        if parentTerm.TermAccession = ""
+                        then
+                            OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm.Name)
+                        else
+                            OntologyDB.getTermSuggestionsByParentTermAndAccession cString (typedSoFar,parentTerm.Name,parentTerm.TermAccession)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -95,18 +109,22 @@ let annotatorApi cString = {
     getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
         async {
             let result =
+                let searchSet = searchName + mustContainName + searchDefinition + mustContainDefinition|> Suggestion.createBigrams
                 OntologyDB.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
+                |> Array.sortByDescending (fun sugg ->
+                    Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                    )
             return result
         }
 
-    getUnitTermSuggestions = fun (max:int,typedSoFar:string) ->
+    getUnitTermSuggestions = fun (max:int,typedSoFar:string, unit:UnitSearchRequest) ->
         async {
             let searchRes =
                 match typedSoFar with
                 | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
-                    let like = OntologyDB.getUnitTermSuggestions cString typedSoFar
+                    let like = OntologyDB.getUnitTermSuggestions cString (typedSoFar)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -115,15 +133,32 @@ let annotatorApi cString = {
                 
                     |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
 
-            return searchRes
+            return (searchRes, unit)
         }
 
     getTermsByNames = fun (queryArr) ->
         async {
             let result =
+                printfn "START" 
                 queryArr |> Array.map (fun searchTerm ->
-                    let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
-                    {searchTerm with TermOpt = if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some }
+                    {searchTerm with
+                        TermOpt =
+                            // check if search string is empty. This case should delete TAN- and TSR- values in table
+                            if searchTerm.SearchString = "" then None
+                            // check if term accession was found. If so search also by this as it is unique
+                            elif searchTerm.TermAccession <> "" then
+                                printfn "hit1: %A" searchTerm.SearchString
+                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchString,searchTerm.TermAccession)
+                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                            elif searchTerm.IsA.IsSome then
+                                printfn "hit2: %A" searchTerm.SearchString
+                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchString,searchTerm.IsA.Value)
+                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                            else
+                                printfn "hit3: %A" searchTerm.SearchString
+                                let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
+                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                    }
                 )
             return result
         }
@@ -134,6 +169,17 @@ let createIServiceAPIv1 =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue serviceApi
     |> Remoting.withDocs "/api/IServiceAPIv1/docs" DocsServiceAPIvs1.serviceApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler(
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+    )
+    |> Remoting.buildHttpHandler
+
+let createISADotNetAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue isaDotNetApi
+    |> Remoting.withDocs "/api/IISADotNetAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
         (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
@@ -182,6 +228,11 @@ let topLevelRouter = router {
     //
     forward @"" (fun next ctx ->
         createIServiceAPIv1 next ctx
+    )
+
+    //
+    forward @"" (fun next ctx ->
+        createISADotNetAPIv1 next ctx
     )
 }
 

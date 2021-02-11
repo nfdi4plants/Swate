@@ -21,30 +21,6 @@ let Excel : Excel.IExports = jsNative
 [<Global>]
 let RangeLoadOptions : Interfaces.RangeLoadOptions = jsNative
 
-
-// Testing Subscription
-// https://elmish.github.io/elmish/subscriptions.html                                           // elmish subscriptions
-// https://docs.microsoft.com/de-de/office/dev/add-ins/develop/dialog-api-in-office-add-ins     // office excel dialog
-//module Subscription =
-//    type Msg =
-//    | TestSubscription of string
-    
-//    type Model =  {
-//        TestString : string
-//    } 
-    
-//    let init () = {
-//        TestString = ""
-//    }
-    
-//    let update msg currentModel =
-//        match msg with
-//        | TestSubscription str ->
-//            let nextModel = {
-//                currentModel with TestString = str
-//            }
-//            nextModel, Cmd.none
-
 module ColumnCoreNames =
 
     module Shown =
@@ -84,174 +60,272 @@ module ColumnTags =
     let HiddenTag = "#h"
 
     [<Literal>]
-    /// As for now, unit tags can contain a accession number if they are existing unit terms.
-    let UnitTagStart = "#u"
+    let UnitTag = "#u"
+
+    /// This has additional information afterwards so it needs to be parsed as 'StartsWith'
+    /// Not used
+    [<Literal>]
+    let GroupTag = "#g"
+
+    /// This has additional information afterwards so it needs to be parsed as 'StartsWith'
+    [<Literal>]
+    let TermAccessionTag = "#t"
 
 open System
 open Fable.SimpleXml
 open Fable.SimpleXml.Generator
 
-//module SwateInteropTypes =
+module Xml =
 
-//    type ColumnRepresentation = {
-//        Header          : string
-//        /// TODO: this is meant for future application and should be implemented together with separate unit columns
-//        Unit            : string option
-//        TagArray        : string []
-//        ParentOntology  : string option
-//    } with
-//        static member init (?header) = {
-//            Header          = if header.IsSome then header.Value else ""
-//            Unit            = None
-//            TagArray        = [||]
-//            ParentOntology  = None
-//        }
+    module GroupTypes =
 
-module XmlValidationTypes =
+        type SpannedBuildingBlock = {
+            ColumnName      : string
+            TermAccession   : string
+        } with
+            static member create name termAccession = {
+                ColumnName      = name
+                TermAccession   = termAccession
+            }
+            static member init = SpannedBuildingBlock.create "" ""
 
-    /// User can define what kind of input a column should have
-    type ContentType =
-        | OntologyTerm of string
-        | Text
-        | Url
-        | Boolean
-        | Number
-        | Int
-        | Decimal
+        type Protocol = {
+            Id                      : string
+            ProtocolVersion         : string
+            SwateVersion            : string
+            TableName               : string
+            WorksheetName           : string
+            SpannedBuildingBlocks   : SpannedBuildingBlock list
+        } with
+            static member create id version swateVersion tableName worksheetName spannedBuildingBlocks = {
+                Id                      = id
+                ProtocolVersion         = version
+                SwateVersion            = swateVersion
+                TableName               = tableName
+                WorksheetName           = worksheetName
+                SpannedBuildingBlocks   = spannedBuildingBlocks
+            }
+            static member init = Protocol.create "" "" "" "" "" []
+
+        type ProtocolGroup = {
+            SwateVersion    : string
+            Protocols       : Protocol list
+        } with
+            static member create swateVersion protocols = {
+                SwateVersion    = swateVersion
+                Protocols       = protocols
+            }
+            static member init = ProtocolGroup.create "" []
+
+            member this.toXml =
+                node "ProtocolGroup" [
+                    attr.value( "SwateVersion", this.SwateVersion )
+                ] [
+                    for protocol in this.Protocols do
+                        yield
+                            node "Protocol" [
+                                attr.value( "Id",               protocol.Id                 )
+                                attr.value( "SwateVersion",     protocol.SwateVersion       )
+                                attr.value( "ProtocolVersion",  protocol.ProtocolVersion    )
+                                attr.value( "TableName",        protocol.TableName          )
+                                attr.value( "WorksheetName",    protocol.WorksheetName      )
+                            ][
+                                for spannedBuildingBlock in protocol.SpannedBuildingBlocks do
+                                    yield
+                                        leaf "SpannedBuildingBlock" [
+                                            attr.value( "Name",             spannedBuildingBlock.ColumnName     )
+                                            attr.value( "TermAccession",    spannedBuildingBlock.TermAccession  )
+                                        ]
+                            ]
+                ]  |> serializeXml
+                 
+            static member ofXml (xmlString:string) =
+                let protocolGroupTag = "ProtocolGroup"
+                let xml = xmlString |> SimpleXml.parseElement
+
+                let protocolGroup = xml |> SimpleXml.tryFindElementByName protocolGroupTag
+                if protocolGroup.IsNone then failwith (sprintf "Could not find existing <%s> tag." protocolGroupTag)
+
+                let protocols       = xml |> SimpleXml.findElementsByName "Protocol"
+                let swateVersion    = protocolGroup.Value.Attributes.["SwateVersion"]
+                let nextProtocols   =
+                    protocols
+                    |> List.map (fun protocol ->
+                        let id              = protocol.Attributes.["Id"]
+                        let swateVersion    = protocol.Attributes.["SwateVersion"]
+                        let protocolVersion = protocol.Attributes.["ProtocolVersion"]
+                        let tableName       = protocol.Attributes.["TableName"]
+                        let worksheetName   = protocol.Attributes.["WorksheetName"]
+                        let nextSpannedBBs   =
+                            protocol.Children
+                            |> List.map (fun spannedBB ->
+                                let name            = spannedBB.Attributes.["Name"]
+                                let termAccession   = spannedBB.Attributes.["TermAccession"]
+                                SpannedBuildingBlock.create name termAccession
+                            )
+                        Protocol.create id protocolVersion swateVersion tableName worksheetName nextSpannedBBs
+                    )
+                ProtocolGroup.create swateVersion nextProtocols
+
+    module ValidationTypes =
+
+        /// User can define what kind of input a column should have
+        type ContentType =
+            | OntologyTerm of string
+            | UnitTerm     of string
+            | Text
+            | Url
+            | Boolean
+            | Number
+            | Int
+            | Decimal
     
-        member this.toReadableString =
-            match this with
-            | OntologyTerm po ->
-                sprintf "Ontology [%s]" po
-            | _ ->
-                string this
+            member this.toReadableString =
+                match this with
+                | OntologyTerm po ->
+                    sprintf "Ontology [%s]" po
+                | UnitTerm ut ->
+                    sprintf "Unit [%s]" ut
+                | _ ->
+                    string this
     
-        static member ofString (str:string) =
-            match str with
-            | ontology when str.StartsWith "OntologyTerm " ->
-                let s = ontology.Replace("OntologyTerm ","").Replace("\"","")
-                OntologyTerm s
-            | "Text"        -> Text
-            | "Url"         -> Url
-            | "Boolean"     -> Boolean
-            | "Number"      -> Number
-            | "Int"         -> Int
-            | "Decimal"     -> Decimal
-            | _ -> 
-                failwith ( sprintf "Tried parsing '%s' to ContenType. No match found." str ) 
+            static member ofString (str:string) =
+                match str with
+                | ontology when str.StartsWith "OntologyTerm " ->
+                    let s = ontology.Replace("OntologyTerm ","").Replace("\"","")
+                    OntologyTerm s
+                | unit when str.StartsWith "UnitTerm " ->
+                    let s = unit.Replace("UnitTerm ", "").Replace("\"","")
+                    UnitTerm s
+                | "Text"        -> Text
+                | "Url"         -> Url
+                | "Boolean"     -> Boolean
+                | "Number"      -> Number
+                | "Int"         -> Int
+                | "Decimal"     -> Decimal
+                | _ -> 
+                    failwith ( sprintf "Tried parsing '%s' to ContenType. No match found." str ) 
 
-    type ColumnValidation = {
-        ColumnHeader        : string
-        ColumnAdress        : int option
-        Importance          : int option
-        ValidationFormat    : ContentType option
-        Unit                : string option
-    } with
-        static member create colHeader colAdress importance validationFormat unit = {
-            ColumnHeader        = colHeader
-            ColumnAdress        = colAdress
-            Importance          = importance
-            ValidationFormat    = validationFormat
-            Unit                = unit
-        }
+        type ColumnValidation = {
+            ColumnHeader        : string
+            ColumnAdress        : int option
+            Importance          : int option
+            ValidationFormat    : ContentType option
+            Unit                : string option
+        } with
+            static member create colHeader colAdress importance validationFormat unit = {
+                ColumnHeader        = colHeader
+                ColumnAdress        = colAdress
+                Importance          = importance
+                ValidationFormat    = validationFormat
+                Unit                = unit
+            }
 
-        static member init (?colHeader, ?colAdress) = {
-            ColumnHeader        = if colHeader.IsSome then colHeader.Value else ""
-            ColumnAdress        = if colAdress.IsSome then colAdress.Value else None
-            Importance          = None
-            ValidationFormat    = None
-            Unit                = None
-        }
+            static member init (?colHeader, ?colAdress) = {
+                ColumnHeader        = if colHeader.IsSome then colHeader.Value else ""
+                ColumnAdress        = if colAdress.IsSome then colAdress.Value else None
+                Importance          = None
+                ValidationFormat    = None
+                Unit                = None
+            }
             
-    type TableValidation = {
-        WorksheetName   : string
-        TableName       : string
-        DateTime        : DateTime
-        // "FirstUser; SecondUser"
-        Userlist        : string list
-        ColumnValidations: ColumnValidation list
-    } with
-        static member create worksheetName tableName dateTime userlist colValidations = {
-            WorksheetName       = worksheetName
-            TableName           = tableName
-            DateTime            = dateTime
-            Userlist            = userlist
-            ColumnValidations   = colValidations
-        }
-        static member init (?worksheetName,?tableName, (?dateTime:DateTime), ?userList) = {
-            WorksheetName       = if worksheetName.IsSome then worksheetName.Value else ""
-            TableName           = if tableName.IsSome then tableName.Value else ""
-            DateTime            = if dateTime.IsSome then dateTime.Value else DateTime.Now
-            Userlist            = if userList.IsSome then userList.Value else []
-            ColumnValidations   = []
-        }
+        type TableValidation = {
+            SwateVersion    : string
+            WorksheetName   : string
+            TableName       : string
+            DateTime        : DateTime
+            // "FirstUser; SecondUser"
+            Userlist        : string list
+            ColumnValidations: ColumnValidation list
+        } with
+            static member create swateVersion worksheetName tableName dateTime userlist colValidations = {
+                SwateVersion        = swateVersion
+                WorksheetName       = worksheetName
+                TableName           = tableName
+                DateTime            = dateTime
+                Userlist            = userlist
+                ColumnValidations   = colValidations
+            }
+            static member init (?swateVersion, ?worksheetName,?tableName, (?dateTime:DateTime), ?userList) = {
+                SwateVersion        = if swateVersion.IsSome then swateVersion.Value else ""
+                WorksheetName       = if worksheetName.IsSome then worksheetName.Value else ""
+                TableName           = if tableName.IsSome then tableName.Value else ""
+                DateTime            = if dateTime.IsSome then dateTime.Value else DateTime.Now
+                Userlist            = if userList.IsSome then userList.Value else []
+                ColumnValidations   = []
+            }
 
-    /// This type is used to work on the CustomXml 'Validation' tag, which is used to store information on how to validate a specifc Swate table as correct.
-    type SwateValidation = {
-        SwateVersion        : string
-        TableValidations    : TableValidation list
-    } with
-        static member init v = {
-            SwateVersion        = v
-            TableValidations    = []
-        }
+        /// This type is used to work on the CustomXml 'Validation' tag, which is used to store information on how to validate a specifc Swate table as correct.
+        type SwateValidation = {
+            /// Used to show the last used Swate version to edit SwateValidation CustomXml
+            SwateVersion        : string
+            TableValidations    : TableValidation list
+        } with
+            static member create swateVersion tableValidations = {
+                SwateVersion        = swateVersion
+                TableValidations    = tableValidations
+            }
+            static member init v = SwateValidation.create v []
     
-        member this.toXml =
-            node "Validation" [
-                attr.value("SwateVersion", this.SwateVersion)
-            ][
-                for table in this.TableValidations do
-                    yield
-                        node "TableValidation" [
-                            attr.value( "WorksheetName", table.WorksheetName )
-                            attr.value( "TableName", table.TableName )
-                            attr.value( "DateTime", table.DateTime.ToString("yyyy-MM-dd HH:mm") )
-                            attr.value( "Userlist", table.Userlist |> String.concat "; " )
-                        ][
-                            for column in table.ColumnValidations do
-                                yield
-                                    leaf "ColumnValidation" [
-                                        attr.value("ColumnHeader"       , column.ColumnHeader)
-                                        attr.value("ColumnAdress"       , if column.ColumnAdress.IsSome then string column.ColumnAdress.Value else "None")
-                                        attr.value("Importance"         , if column.Importance.IsSome then string column.Importance.Value else "None")
-                                        attr.value("ValidationFormat"   , if column.ValidationFormat.IsSome then string column.ValidationFormat.Value else "None")
-                                        attr.value("Unit"               , if column.Unit.IsSome then column.Unit.Value else "None")
-                                    ]
-                        ]
-            ] |> serializeXml
+            member this.toXml =
+                node "Validation" [
+                    attr.value("SwateVersion", this.SwateVersion)
+                ][
+                    for table in this.TableValidations do
+                        yield
+                            node "TableValidation" [
+                                attr.value( "SwateVersion", table.SwateVersion )
+                                attr.value( "WorksheetName", table.WorksheetName )
+                                attr.value( "TableName", table.TableName )
+                                attr.value( "DateTime", table.DateTime.ToString("yyyy-MM-dd HH:mm") )
+                                attr.value( "Userlist", table.Userlist |> String.concat "; " )
+                            ][
+                                for column in table.ColumnValidations do
+                                    yield
+                                        leaf "ColumnValidation" [
+                                            attr.value("ColumnHeader"       , column.ColumnHeader)
+                                            attr.value("ColumnAdress"       , if column.ColumnAdress.IsSome then string column.ColumnAdress.Value else "None")
+                                            attr.value("Importance"         , if column.Importance.IsSome then string column.Importance.Value else "None")
+                                            attr.value("ValidationFormat"   , if column.ValidationFormat.IsSome then string column.ValidationFormat.Value else "None")
+                                            attr.value("Unit"               , if column.Unit.IsSome then column.Unit.Value else "None")
+                                        ]
+                            ]
+                ] |> serializeXml
     
-        static member ofXml (xmlString:string) =
-            let xml = xmlString |> SimpleXml.parseElement
-            let swateValidation =
-                xml |> SimpleXml.tryFindElementByName "Validation"
-            if swateValidation.IsNone then failwith "Could not find existing <Validation> tag."
-            let tableValidations =
-                xml |> SimpleXml.findElementsByName "TableValidation"
-            let validationType = SwateValidation.init swateValidation.Value.Attributes.["SwateVersion"]
-            let tableValidationTypes =
-                tableValidations
-                |> List.map (fun table ->
-                    let worksheetName   = table.Attributes.["WorksheetName"]
-                    let tableName       = table.Attributes.["TableName"]
-                    let dateTime        =
-                        //let day, month, year =
-                        //    let s = table.Attributes.["DateTime"].Split([|"/"|], StringSplitOptions.None)
-                        //    int s.[0], int s.[1], int s.[2]
-                        System.DateTime.Parse(table.Attributes.["DateTime"])
-                    let userlist        = table.Attributes.["Userlist"].Split([|"; "|], StringSplitOptions.RemoveEmptyEntries) |> List.ofSeq
-                    let columnValidationTypes =
-                        table.Children
-                        |> List.map (fun column ->
-                            let columnHeader        = column.Attributes.["ColumnHeader"]
-                            let columnAdress        = column.Attributes.["ColumnAdress"] |> fun x -> if x = "None" then None else Some (int x)
-                            let importance          = column.Attributes.["Importance"] |> fun x -> if x = "None" then None else Some (int x)
-                            let validationFormat    = column.Attributes.["ValidationFormat"] |> fun x -> if x = "None" then None else ContentType.ofString x |> Some
-                            let unit                = column.Attributes.["Unit"] |> fun x -> if x = "None" then None else Some x
-                            ColumnValidation.create columnHeader columnAdress importance validationFormat unit
-                        )
-                    TableValidation.create worksheetName tableName dateTime userlist columnValidationTypes
-                )
-            { validationType with TableValidations = tableValidationTypes }
+            static member ofXml (xmlString:string) =
+                let swateValidationTag = "Validation"
+                let xml = xmlString |> SimpleXml.parseElement
+                let swateValidation =
+                    xml |> SimpleXml.tryFindElementByName swateValidationTag
+                if swateValidation.IsNone then failwith (sprintf "Could not find existing <%s> tag." swateValidationTag)
+                let tableValidations =
+                    xml |> SimpleXml.findElementsByName "TableValidation"
+                let swateVersion = swateValidation.Value.Attributes.["SwateVersion"]
+                let nextTableValidations =
+                    tableValidations
+                    |> List.map (fun table ->
+                        let swateVersion    = table.Attributes.["SwateVersion"]
+                        let worksheetName   = table.Attributes.["WorksheetName"]
+                        let tableName       = table.Attributes.["TableName"]
+                        let dateTime        =
+                            //let day, month, year =
+                            //    let s = table.Attributes.["DateTime"].Split([|"/"|], StringSplitOptions.None)
+                            //    int s.[0], int s.[1], int s.[2]
+                            System.DateTime.Parse(table.Attributes.["DateTime"])
+                        let userlist        = table.Attributes.["Userlist"].Split([|"; "|], StringSplitOptions.RemoveEmptyEntries) |> List.ofSeq
+                        let nextColumnValidations =
+                            table.Children
+                            |> List.map (fun column ->
+                                let columnHeader        = column.Attributes.["ColumnHeader"]
+                                let columnAdress        = column.Attributes.["ColumnAdress"] |> fun x -> if x = "None" then None else Some (int x)
+                                let importance          = column.Attributes.["Importance"] |> fun x -> if x = "None" then None else Some (int x)
+                                let validationFormat    = column.Attributes.["ValidationFormat"] |> fun x -> if x = "None" then None else ContentType.ofString x |> Some
+                                let unit                = column.Attributes.["Unit"] |> fun x -> if x = "None" then None else Some x
+                                ColumnValidation.create columnHeader columnAdress importance validationFormat unit
+                            )
+                        TableValidation.create swateVersion worksheetName tableName dateTime userlist nextColumnValidations
+                    )
+                SwateValidation.create swateVersion nextTableValidations
 
 
 type TryFindAnnoTableResult =
@@ -273,13 +347,14 @@ type TryFindAnnoTableResult =
                 | _ ->
                     Error "Could not process message. Swate was not able to identify the given annotation tables with a known case."
 
+open Shared
+
 type ColHeader = {
-    Header  : string
-    CoreName: string option
-    Ontology: string option
-    TagArr: string [] option
-    HasUnitAccession : string option
-    IsUnitCol: bool
+    Header:     string
+    CoreName:   string option
+    Ontology:   OntologyInfo option
+    TagArr:     string [] option
+    IsUnitCol:  bool
 }
 
 /// This module contains types to handle value search for TSR and TAN columns.
@@ -323,14 +398,50 @@ module BuildingBlockTypes =
             Unit        = unit
         }
 
-        member this.toColumnValidation : (XmlValidationTypes.ColumnValidation) =
+        member this.toColumnValidation : (Xml.ValidationTypes.ColumnValidation) =
 
             {
                 ColumnHeader        = this.MainColumn.Header.Value.Header
                 ColumnAdress        = this.MainColumn.Index |> Some
                 Importance          = None
                 ValidationFormat    = None
-                Unit                = if this.Unit.IsSome then this.Unit.Value.MainColumn.Header.Value.Ontology else None
+                Unit                = if this.Unit.IsSome then this.Unit.Value.MainColumn.Header.Value.Ontology.Value.Name |> Some else None
             }
 
+    open ISADotNetHelpers
+
+    type MinimalBuildingBlock = {
+        MainColumnName          : string
+        MainColumnTermAccession : string option
+        UnitName                : string option
+        UnitTermAccession       : string option
+        Values                  : OntologyInfo option
+    } with
+        static member create mainColName colTermAccession unitName unitTermAccession values = {
+            MainColumnName          = mainColName
+            MainColumnTermAccession = colTermAccession
+            UnitName                = unitName
+            UnitTermAccession       = unitTermAccession
+            Values                  = values
+        }
+
+        // This function assumes that Process.ExecutesProtocol.Parameters.IsSome and Process.ParameterValues.IsSome.
+        // For ExecutesProtocol.Parameters 'parameterName' ('annotationValue','termSource','termAccession') are required.
+        // For Process.ParameterValues 'category' ('annotationValue','termSource','termAccession') and 'value' (IF ONTOLOGY 'annotationValue','termSource','termAccession') are required.
+        // IF Process.ParameterValue has Unit then ('annotationValue','termSource','termAccession') are required.
+        static member ofISADotNetProcess (isaProcess:ISADotNet.Process) = 
+            let paramValuesPairs = isaProcess.ParameterValues.Value
+            paramValuesPairs
+            |> List.map (fun paramValuePair ->
+                let hasUnit             = paramValuePair.Unit.IsSome
+                let hasOntologyValue    = paramValuePair.Value.Value |> ISADotNetHelpers.valueIsOntology
+                let mainColName         =
+                    let n = paramValuePair.Category.Value.ParameterName.Value.Name.Value |> ISADotNetHelpers.annotationValueToString
+                    sprintf "Parameter [%s]" n
+                let colTermAccession    = paramValuePair.Category.Value.ParameterName.Value.TermAccessionNumber.Value |> ISADotNetHelpers.termAccessionReduce
+                let unitName            = if hasUnit then paramValuePair.Unit.Value.Name.Value |> ISADotNetHelpers.annotationValueToString |> Some else None
+                let unitTermAccession   = if hasUnit then paramValuePair.Unit.Value.TermAccessionNumber.Value |> ISADotNetHelpers.termAccessionReduce |> Some else None
+                let values              = if hasOntologyValue.IsSome then hasOntologyValue else OntologyInfo.create (ISADotNetHelpers.valueToString paramValuePair.Value.Value) "" |> Some
+                MinimalBuildingBlock.create mainColName (Some colTermAccession) unitName unitTermAccession values
+            )
 

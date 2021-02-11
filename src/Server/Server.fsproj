@@ -11,6 +11,7 @@
         <Compile Include="OntologyDB.fs" />
         <Compile Include="Docs\DocsFunctions.fs" />
         <Compile Include="Docs\DocsServiceAPIvs1.fs" />
+        <Compile Include="Docs\DocsISADotNetAPIvs1.fs" />
         <Compile Include="Docs\DocsAnnotationAPIvs1.fs" />
         <Compile Include="Server.fs" />
     </ItemGroup>

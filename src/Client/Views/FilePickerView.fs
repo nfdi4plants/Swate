@@ -228,7 +228,7 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             eve.target?style?borderBottom <- "0.5px solid darkgrey")
         OnDragLeave (fun eve ->
             eve.preventDefault()
-            eve.target?style?backgroundColor <- "white"
+            eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
             eve.target?style?borderBottom <- "0px solid darkgrey")
         OnDragEnd (fun eve ->
             // restore wrapper 
@@ -252,7 +252,7 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             eve.preventDefault()
             dropped <- true
             UpdateDNDDropped true |> FilePicker |> dispatch
-            eve.target?style?backgroundColor <- "white"
+            eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
             eve.target?style?borderBottom <- "0px solid darkgrey"
 
             let prevId      = eve.dataTransfer.getData("text")
@@ -350,10 +350,10 @@ let placeOnTopElement model dispatch =
             eve.target?style?borderBottom <- "2px solid darkgrey")
         OnDragLeave (fun eve ->
             eve.preventDefault()
-            eve.target?style?borderBottom <- "2px solid white")
+            eve.target?style?borderBottom <- "2px solid white" ) //(sprintf "2px solid %s" ExcelColors.colorfullMode.BodyBackground) )
         OnDrop (fun eve ->
             eve.preventDefault()
-            eve.target?style?borderBottom <- "2px solid white"
+            eve.target?style?borderBottom <- "2px solid white" //(sprintf "2px solid %s" ExcelColors.colorfullMode.BodyBackground)
             dropped <- true
             UpdateDNDDropped true |> FilePicker |> dispatch
             let prevId      = eve.dataTransfer.getData("text")
@@ -414,69 +414,160 @@ let fileElementContainer (model:Model) dispatch =
                 dragAndDropClone model dispatch (ele)
     ]
 
-let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
-    let inputId = "filePicker_OnFilePickerMainFunc"
-    Content.content [ Content.Props [colorControl model.SiteStyleState.ColorMode ]] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "File Picker"]
-        File.file [] [
-            File.label [] [
-                File.input [
-                    Props [
-                        Id inputId
-                        Multiple true
-                        OnChange (fun ev ->
+let uploadButton (model:Model) dispatch inputId =
+    File.file [
+        File.Color IsInfo
+        File.IsCentered
+        File.Props [Style [Margin "1rem 0"]]
+    ] [
+        File.label [ Props [Style [Width "100%"]] ] [
+            File.input [
+                Props [
+                    Id inputId
+                    Multiple true
+                    OnChange (fun ev ->
 
-                            let files : FileList = ev.target?files
-                            
-                            let fileNames =
-                                [ for i=0 to (files.length - 1) do yield files.item i ]
-                                |> List.map (fun f -> f.name)
+                        let files : FileList = ev.target?files
+                    
+                        let fileNames =
+                            [ for i=0 to (files.length - 1) do yield files.item i ]
+                            |> List.map (fun f -> f.name)
 
-                            fileNames |> LoadNewFiles |> FilePicker |> dispatch
+                        fileNames |> LoadNewFiles |> FilePicker |> dispatch
 
-                            let picker = Browser.Dom.document.getElementById(inputId)
-                            // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
-                            picker?value <- null
-                        )
-                    ]
-                ]
-                File.cta [] [
-                    File.icon [] [
-                        Fa.i [
-                            Fa.Solid.Upload
-                        ] []
-                    ]
-                    File.name [Props [Style [BorderRight "none"]]] [
-                        str "Chose one or multiple files"
-                    ]
+                        let picker = Browser.Dom.document.getElementById(inputId)
+                        // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
+                        picker?value <- null
+                    )
                 ]
             ]
+            File.cta [
+                Props [Style [Width "100%"; JustifyContent "center" ]]
+            ] [
+                File.icon [] [ Fa.i [ Fa.Solid.Upload ] [] ]
+                File.label [ Props [
+                    OnClick (fun e ->
+                        let getUploadElement = Browser.Dom.document.getElementById inputId
+                        getUploadElement.click()
+                    )
+                ] ] [ str "Pick file names" ]
+            ]
         ]
+    ]
 
-        div [
-            Style [Margin "1rem auto"]
-        ][
-            if model.FilePickerState.FileNames = [] then
-                    str "Here you can select files from your computer to insert their names into a Swate column."
-            else
-                fileElementContainer model dispatch
-        ]
 
+let fileNameElements (model:Model) dispatch =
+    div [ ][
+        if model.FilePickerState.FileNames <> [] then
+            fileElementContainer model dispatch
+
+            Button.a [
+                Button.IsFullWidth
+                if model.FilePickerState.FileNames |> List.isEmpty then
+                    yield! [
+                        Button.Disabled true
+                        Button.IsActive false
+                        Button.Color Color.IsDanger
+                    ]
+                else
+                    Button.Color Color.IsSuccess
+                Button.OnClick (fun e ->
+                    (fun tableName -> InsertFileNames (tableName, model.FilePickerState.FileNames |> List.map snd)) |> PipeActiveAnnotationTable |> ExcelInterop |> dispatch 
+                )
+
+            ][
+                str "Insert File Names"
+            ]
+        else
+            div [][
+                str "All names from your selected files will be displayed here."
+            ]
+    ]
+
+let sortButton icon msg =
+    Button.a [
+        Button.IsOutlined
+        Button.Color IsPrimary
+        Button.OnClick msg
+    ][
+        Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
+    ]
+
+let fileSortElements (model:Model) dispatch =
+    div [Style [MarginBottom "1rem"; Display DisplayOptions.Flex]][
         Button.a [
-            Button.IsFullWidth
-            if model.FilePickerState.FileNames |> List.isEmpty then
-                yield! [
-                    Button.Disabled true
-                    Button.IsActive false
-                    Button.Color Color.IsDanger
-                ]
-            else
-                Button.Color Color.IsSuccess
+            Button.IsOutlined
+            Button.Color IsPrimary
             Button.OnClick (fun e ->
-                (fun tableName -> InsertFileNames (tableName, model.FilePickerState.FileNames |> List.map snd)) |> PipeActiveAnnotationTable |> ExcelInterop |> dispatch 
-            )
+                let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
+                let textArea = Browser.Dom.document.createElement "textarea"
+                textArea?value <- txt
+                textArea?style?top <- "0"
+                textArea?style?left <- "0"
+                textArea?style?position <- "fixed"
 
+                Browser.Dom.document.body.appendChild textArea |> ignore
+
+                textArea.focus()
+                /// Can't belive this actually worked
+                textArea?select()
+
+                let t = Browser.Dom.document.execCommand("copy")
+                Browser.Dom.document.body.removeChild(textArea) |> ignore
+                ()
+            )
         ][
-            str "Insert File Names"
+            Fa.i [Fa.Props [Title "Copy to Clipboard"]; Fa.Regular.Clipboard ] [] 
         ]
+
+        Button.list [
+            Button.List.HasAddons
+            Button.List.Props [Style [MarginLeft "auto"]]
+        ][
+            sortButton Fa.Solid.SortAlphaDown (fun e ->
+                let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i,snd x)
+                UpdateFileNames sortedList |> FilePicker |> dispatch
+            )
+            sortButton Fa.Solid.SortAlphaDownAlt (fun e ->
+                let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i,snd x)
+                UpdateFileNames sortedList |> FilePicker |> dispatch
+            )
+        ]
+    ]
+
+let fileContainer (model:Model) dispatch inputId=
+    div [
+        Style [
+            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
+            //BorderRadius "15px 15px 0 0"
+            Padding "0.25rem 1rem"
+            MarginBottom "1rem"
+        ]
+    ][
+        fileSortElements model dispatch
+
+        fileNameElements model dispatch
+    ]
+
+let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
+    let inputId = "filePicker_OnFilePickerMainFunc"
+    Content.content [ ] [
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "File Picker"]
+
+        Help.help [][
+            b [] [ str "Choose one or multiple files, rearrange them and add their names to the Excel sheet."]
+            str " You can use "
+            u [][str "drag'n'drop"]
+            str " to change the file order or remove files selected by accident."
+        ]
+
+        uploadButton model dispatch inputId
+
+        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
+            str "Select files from your computer and insert their names into Excel."
+        ]
+
+        /// COlored container element for all uploaded file names and sort elements
+        fileContainer model dispatch inputId
+        
     ]

@@ -115,13 +115,16 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                         ]
                     ]
                     Dropdown.menu [Props[colorControl model.SiteStyleState.ColorMode];] [
-                        Dropdown.content [] [
+                        Dropdown.content [
+                            Props [Style [MaxHeight "180px"; OverflowY OverflowOptions.Scroll; MarginRight "-100px"; PaddingRight "100px"; Border "1px solid darkgrey"]]
+                        ] [
                             // all ontologies found in database
                             yield createOntologyDropdownItem model dispatch None
                             yield! (
                                 model.PersistentStorageState.SearchableOntologies
                                 |> Array.map snd
                                 |> Array.toList
+                                |> List.sortBy (fun o -> o.Name)
                                 |> List.map (fun ont -> createOntologyDropdownItem model dispatch (Some ont))
                             )
                         ]

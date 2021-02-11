@@ -25,10 +25,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "assets", "assets", "{A21844B3-2816-4F6F-B275-308DA4EC2B3E}"
 	ProjectSection(SolutionItems) = preProject
 		src\Client\public\favicon.png = src\Client\public\favicon.png
-		src\Client\public\assets\icon-16.png = src\Client\public\assets\icon-16.png
-		src\Client\public\assets\icon-32.png = src\Client\public\assets\icon-32.png
-		src\Client\public\assets\icon-80.png = src\Client\public\assets\icon-80.png
-		src\Client\public\assets\logo-filled.png = src\Client\public\assets\logo-filled.png
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{DB2C5A73-BF7F-45D5-AEC8-D36539C5C019}"
@@ -63,7 +59,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{494903F3
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{A7CCC606-3646-4F94-9F59-79C75E413344}"
 	ProjectSection(SolutionItems) = preProject
-		tests\manifest.xml = tests\manifest.xml
 		tests\test.cmd = tests\test.cmd
 		tests\test.sh = tests\test.sh
 	EndProjectSection

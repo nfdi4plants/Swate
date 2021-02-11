@@ -4,13 +4,35 @@
 $FontPathOpenSans: "~open-sans-fonts/open-sans";
 $family-primary: 'Open Sans';
 
+/*
+// Bulma*/
 
-// Bulma
+$excelPrimary: #217346;
+$excelPrimary30: #639d7d;
+
+$mint: #1FC2A7;
+$lightBlue: #4fb3d9;
+$red: #c21f3a;//#e83151;//#E32746;
+$yellow: #FFC000;
+
+// global bulma overrides
+$primary: $excelPrimary;
+$success: $mint;
+$info: $lightBlue;
+$danger: $red;
+$warning: $yellow;
+
+$switch-background-active: $excelPrimary;
+
 @import "~bulma/bulma";
 @import "~bulma-switch";
 @import "~bulma-tooltip";
 @import "~bulma-checkradio";
 @import "~bulma-slider";
+
+[type=checkbox]:checked.switch.is-primary + label::before, [type=checkbox]:checked.switch.is-primary + label::before {
+    background: $mint
+}
 
 html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
@@ -18,9 +40,21 @@ html, body {
     background: #F0F2F4;
 }
 
+a {
+    color: $info
+}
+
+a:hover {
+    color: #3f8fae
+}
+
 .button {
     @extend .button;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.button:disabled, .button[disabled] {
+    opacity: 0.5
 }
 
 .input {
@@ -31,6 +65,23 @@ html, body {
 .clone * {
     pointer-events: none
 }
+
+.delete {
+    @extend .delete
+}
+
+.delete:hover {
+    @extend .delete;
+    background-color: $danger
+}
+
+.validationTableEle {
+}
+
+.validationTableEle:hover {
+    background-color: #E8E8E8 !important
+}
+
 
 
 /////////// Custom simple checkbox, due to issue #54 ///////////////////
@@ -87,7 +138,7 @@ html, body {
 
 /* When the checkbox is checked, add a green background */
 .checkbox-input:checked ~ .checkbox-checkmark {
-    background-color: #3f8159;
+    background-color: $success;
     border: none;
 }
 
@@ -161,6 +212,18 @@ input::-ms-clear {
 
 /// Brands
 
+.nfdiIcon {
+    display: inline-block;
+    width: 59px;
+    height: 59px;
+    margin: 2px 1px;
+    transition: 0.2s opacity;
+}
+
+.nfdiIcon:hover {
+    opacity: 0.7
+}
+
 .myFaBrand  {
     padding: 13px;
     font-size: 30px;
@@ -168,6 +231,7 @@ input::-ms-clear {
     text-align: center;
     text-decoration: none;
     margin: 2px 1px;
+    transition: 0.2s opacity
 }
 
 .myFaBrand:hover {
@@ -210,6 +274,10 @@ input::-ms-clear {
         text-align: center
     }
 
+    .reverseCols {
+        flex-direction: column-reverse;
+        display: flex;
+    }
 }
 
 @media only screen and (max-width: 575px) {

@@ -1,13 +1,13 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>5d6f5462-3401-48ec-9406-d12882e9ad83</Id>
-  <Version>1.0.0.0</Version>
+  <Version>0.3.0</Version>
   <ProviderName>Computational Systems Biology</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="CSBAnnotator"/>
-  <Description DefaultValue="Utility functions to annotate data in a fast and safe way"/>
-  <IconUrl DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-80.png"/>
+  <DisplayName DefaultValue="Swate"/>
+  <Description DefaultValue="Utility functions to annotate data in a fast and safe way."/>
+  <IconUrl DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_32x32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_80x80.png"/>
   <SupportUrl DefaultValue="https://csb.bio.uni-kl.de/"/>
   <AppDomains>
     <AppDomain>bio.uni-kl.de</AppDomain>
@@ -30,8 +30,8 @@
           </GetStarted>
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabData">
-              <Group id="CSBAnnotatorCommands">
-                <Label resid="CSBAnnotatorCommands.Label"/>
+              <Group id="SwateCommands">
+                <Label resid="SwateCommands.Label"/>
                 <Icon>
                   <bt:Image size="16" resid="Icon.16x16"/>
                   <bt:Image size="20" resid="Icon.20x20"/>
@@ -43,7 +43,7 @@
                   <bt:Image size="80" resid="Icon.80x80"/>
                   <bt:Image size="96" resid="Icon.96x96"/>
                 </Icon>
-                <Control xsi:type="Button" id="TermSearch">
+                <!--<Control xsi:type="Button" id="TermSearch">
                   <Label resid="TermSearch.Label"/>
                   <Supertip>
                     <Title resid="TermSearch.Label"/>
@@ -64,7 +64,7 @@
                     <TaskpaneId>ButtonId1</TaskpaneId>
                     <SourceLocation resid="TermSearch.Url"/>
                   </Action>
-                </Control>
+                </Control>-->
                 <Control xsi:type="Button" id="AddBuildingBlock">
                     <Label resid="AddBuildingBlock.Label"/>
                     <Supertip>
@@ -95,31 +95,31 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-16.png"/>
-        <bt:Image id="Icon.20x20" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-20.png"/>
-        <bt:Image id="Icon.24x24" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-24.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-32.png"/>
-        <bt:Image id="Icon.40x40" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-40.png"/>
-        <bt:Image id="Icon.48x48" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-48.png"/>
-        <bt:Image id="Icon.64x64" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-64.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-80.png"/>
-        <bt:Image id="Icon.96x96" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/icon-96.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_16x16.png"/>
+        <bt:Image id="Icon.20x20" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_20x20.png"/>
+        <bt:Image id="Icon.24x24" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_24x24.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_32x32.png"/>
+        <bt:Image id="Icon.40x40" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_40x40.png"/>
+        <bt:Image id="Icon.48x48" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_48x48.png"/>
+        <bt:Image id="Icon.64x64" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_64x64.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_80x80.png"/>
+        <bt:Image id="Icon.96x96" DefaultValue="https://swate.denbi.uni-tuebingen.de/assets/swate_96x96.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
-        <bt:Url id="TermSearch.Url" DefaultValue="https://swate.denbi.uni-tuebingen.de/#TermSearch"/>
+        <!--<bt:Url id="TermSearch.Url" DefaultValue="https://swate.denbi.uni-tuebingen.de/#TermSearch"/>-->
         <bt:Url id="AddBuildingBlock.Url" DefaultValue="https://swate.denbi.uni-tuebingen.de/#AddBuildingBlock"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>
-        <bt:String id="CSBAnnotatorCommands.Label" DefaultValue="CSBAnnotator Commands"/>
-        <bt:String id="TermSearch.Label" DefaultValue="Insert Ontology Term"/>
-        <bt:String id="AddBuildingBlock.Label" DefaultValue="Add Annotation Building Block"/>
+        <bt:String id="SwateCommands.Label" DefaultValue="Swate"/>
+        <!--<bt:String id="TermSearch.Label" DefaultValue="Insert Ontology Term"/>-->
+        <bt:String id="AddBuildingBlock.Label" DefaultValue="Swate"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="CSBAnnotator succesfully. Go to the DATA tab and click the 'Show Annotation Pane' button to get started."/>
-        <bt:String id="TermSearch.Tooltip" DefaultValue="open a taskpane where you can search for ontology terms in multiple ways and fill the results into your sheet."/>
-        <bt:String id="AddBuildingBlock.Tooltip" DefaultValue="open a taskpane where you can select annotation building block and add them to yourt anotation table."/>
+        <bt:String id="GetStarted.Description" DefaultValue="Swate was loaded succesfully. Go to the DATA tab and click the 'Swate' button to get started."/>
+        <!--<bt:String id="TermSearch.Tooltip" DefaultValue="Open a taskpane where you can search for ontology terms in multiple ways and fill the results into your sheet."/>-->
+        <bt:String id="AddBuildingBlock.Tooltip" DefaultValue="Open a task pane to gain full access to the Swate functionality."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

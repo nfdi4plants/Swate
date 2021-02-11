@@ -13,6 +13,7 @@ type Route =
 | Validation
 | FilePicker
 | Info
+| ProtocolInsert
 | ActivityLog
 | Settings
 | NotFound
@@ -24,6 +25,7 @@ type Route =
         | Route.TermSearch          -> "/#TermSearch"
         | Route.Validation          -> "/#Validation"   
         | Route.FilePicker          -> "/#FilePicker"
+        | Route.ProtocolInsert      -> "/#ProtocolInsert"
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
@@ -35,16 +37,31 @@ type Route =
         | Route.AddBuildingBlock    -> "AddBuildingBlock"
         | Route.TermSearch          -> "TermSearch"
         | Route.Validation          -> "Validation"
+        | Route.ProtocolInsert      -> "ProtocolInsert"
         | Route.Info                -> "Info"
         | Route.FilePicker          -> "FilePicker"
         | Route.ActivityLog         -> "ActivityLog"
         | Route.Settings            -> "Settings"
         | Route.NotFound            -> "NotFound"
 
+    member this.toStringRdbl =
+        match this with
+        | Route.Home                -> ""
+        | Route.AddBuildingBlock    -> "Manage Building Blocks"
+        | Route.TermSearch          -> "Manage Terms"
+        | Route.Validation          -> "Validation"
+        | Route.FilePicker          -> "File Picker"
+        | Route.ProtocolInsert      -> "Protocol Insert"
+        | Route.Info                -> "Info"
+        | Route.ActivityLog         -> "Activity Log"
+        | Route.Settings            -> "Settings"
+        | Route.NotFound            -> "NotFound"
+
+
     static member toIcon (p: Route)=
         let createElem icons name =
             Fable.React.Standard.span [
-                Fable.React.Props.Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
+                Fable.React.Props.Class (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
                 Tooltip.dataTooltip (name)
             ] (
                 icons
@@ -55,13 +72,15 @@ type Route =
             )
 
         match p with
-        | Route.Home             -> createElem [Fa.Solid.Home           ] (p |> Route.toString)
-        | Route.TermSearch       -> createElem [Fa.Solid.SearchPlus     ] (p |> Route.toString)
-        | Route.Validation       -> createElem [Fa.Solid.ClipboardCheck ] (p |> Route.toString)
-        | Route.AddBuildingBlock -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle ] (p |> Route.toString)
-        | Route.FilePicker       -> createElem [Fa.Solid.FileUpload     ] (p |> Route.toString)
-        | Route.ActivityLog      -> createElem [Fa.Solid.History        ] (p |> Route.toString)
-        | _  -> Fa.i [Fa.Solid.QuestionCircle]   []
+        | Route.Home                -> createElem [Fa.Solid.Home                            ]   (p.toStringRdbl)
+        | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
+        | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
+        | Route.AddBuildingBlock    -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle    ]   (p.toStringRdbl)
+        | Route.ProtocolInsert      -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
+        | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
+        | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
+        | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  
+        | _                         -> Fa.i [Fa.Solid.QuestionCircle]   []
 
 ///explained here: https://elmish.github.io/browser/routing.html
 //let curry f x y = f (x,y)
@@ -80,6 +99,7 @@ module Routing =
             map Route.Validation        (s "Validation")
             map Route.FilePicker        (s "FilePicker")
             map Route.Info              (s "Info")
+            map Route.ProtocolInsert    (s "ProtocolInsert")
             map Route.ActivityLog       (s "ActivityLog")
             map Route.Settings          (s "Settings")
             map Route.NotFound          (s "NotFound")

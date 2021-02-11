@@ -45,14 +45,14 @@ let activityLogComponent (model:Model) dispatch =
         Container.container [
             Container.Props [Style [
                 Padding "1rem"
-                Border "2.5px solid #f14668"
+                Border (sprintf "2.5px solid %s" NFDIColors.Red.Base)
                 BorderRadius "10px"
             ]]
         ][
             Button.a [
                 Button.Color Color.IsWarning
                 Button.IsFullWidth
-                Button.OnClick (fun e -> GetSwateValidationXml |> ExcelInterop |> dispatch )
+                Button.OnClick (fun e -> GetSwateCustomXml |> ExcelInterop |> dispatch )
                 Button.Props [Style [MarginBottom "1rem"]; Title "Show record type data of Swate validation Xml"]
             ] [
                 span [] [str "Show Swate Validation Xml!"]

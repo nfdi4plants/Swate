@@ -90,11 +90,29 @@ with
         DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (SearchUnitTermTextChange >> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> (sugg.Name,sugg.Accession) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str, Unit1) |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg.Name,sugg.Accession) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+    }
+
+    static member ofAddBuildingBlockUnit2State (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
+        ModalId                 = "Unit2Search_ID"
+        InputId                 = "Unit2SearchInput_ID"
+
+        StateBinding            = state.Unit2TermSearchText
+        Suggestions             = state.Unit2TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        MaxItems                = 5
+        DropDownIsVisible       = state.ShowUnit2TermSuggestions
+        DropDownIsLoading       = state.HasUnit2TermSuggestionsLoading
+
+        AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
+        OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str,Unit2) |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> (sugg, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+
+        HasAdvancedSearch       = true
+        OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
     }
 
     static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
@@ -104,16 +122,15 @@ with
         StateBinding            = state.CurrentBuildingBlock.Name
         Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
         MaxItems                = 5
-        DropDownIsVisible       = state.ShowBuildingBlockNameSuggestions
-        DropDownIsLoading       = state.HasBuildingBlockNameSuggestionsLoading
+        DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
+        DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
 
         OnInputChangeMsg        = (BuildingBlockNameChange >> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
+        OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun sugg -> sugg.Name |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock
-        )
+        OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
     }
 
 
@@ -183,13 +200,17 @@ let createAutocompleteSuggestions
 
 
 let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (isVisible: bool) (isLoading:bool) (suggestions: ReactElement list)  =
-    Container.container[] [
+    Container.container[ ] [
         Dropdown.content [Props [
             Style [
                 if isVisible then Display DisplayOptions.Block else Display DisplayOptions.None
                 //if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
+                ZIndex "20"
+                Width "100%"
+                Position PositionOptions.Absolute
                 BackgroundColor colorMode.ControlBackground
                 BorderColor     colorMode.ControlForeground
+                MarginTop "-0.5rem"
             ]]
         ] [
             Table.table [Table.IsFullWidth] [
@@ -226,6 +247,7 @@ let autocompleteTermSearchComponent
         Input.input [
             Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
+            Input.ValueOrDefault autocompleteParams.StateBinding
             match inputSize with
             | Some size -> Input.Size size
             | _ -> ()
@@ -261,7 +283,9 @@ let autocompleteTermSearchComponentOfParentOntology
                 match inputSize with
                 | Some size -> Button.Size size
                 | _ -> ()
-            ] [str (sprintf "%A" model.TermSearchState.ParentOntology.Value)]
+            ] [str (
+                sprintf "%A" (if model.TermSearchState.ParentOntology.IsSome then model.TermSearchState.ParentOntology.Value.Name else "") 
+            )]
         ]
 
     Control.div [Control.IsExpanded] [
@@ -277,6 +301,7 @@ let autocompleteTermSearchComponentOfParentOntology
                     | Some size -> Input.Size size
                     | _ -> ()
                     Input.Props [
+                        
                         ExcelColors.colorControl colorMode
                         //OnFocus (fun e -> alert "focusout")
                         //OnBlur  (fun e -> alert "focusin")

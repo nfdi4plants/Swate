@@ -27,7 +27,7 @@ open CustomComponents
 //                td [] [
 //                    b [] [str sugg.Name]
 //                ]
-//                td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
+//                td [Style [Color ""]] [if sugg.IsObsolete then str "obsolete"]
 //                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
 //            ])
 //        |> List.ofArray
@@ -43,49 +43,89 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
-    Field.div [] [
+    div [
+        Style [
+            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
+            //BorderRadius "15px 15px 0 0"
+            Padding "0.25rem 1rem"
+            MarginBottom "1rem"
+        ]
+    ] [
+        Field.div [] [
+            AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
+                dispatch
+                model.SiteStyleState.ColorMode
+                model
+                "Start typing to search for terms"
+                (Some Size.IsLarge)
+                (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
 
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
-        br []
+            div [][
+                Switch.switchInline [
+                    Switch.Color IsPrimary
+                    Switch.Id "switch-1"
+                    Switch.Checked model.TermSearchState.SearchByParentOntology
+                    Switch.OnChange (fun e ->
+                        ToggleSearchByParentOntology |> TermSearch |> dispatch
+                        let _ =
+                            let inpId = (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).InputId
+                            let e = Browser.Dom.document.getElementById inpId
+                            e.focus()
+                        ()
+                        // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
+                        //((AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
+                    )
+                ] [ str "Use related term directed search." ]
 
-        AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
-            dispatch
-            model.SiteStyleState.ColorMode
-            model
-            "Start typing to search for terms"
-            (Some Size.IsLarge)
-            (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
+                Help.help [ Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]] ][
+                    a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearch |> dispatch)] [
+                        str "Use advanced search"
+                    ] 
+                ]
+            ]
 
-        Field.div [][
-            Switch.switch [
-                Switch.Color IsSuccess
-                Switch.IsOutlined
-                Switch.Id "switch-1"
-                Switch.Checked model.TermSearchState.SearchByParentOntology
-                Switch.OnChange (fun e ->
-                    ToggleSearchByParentOntology |> TermSearch |> dispatch
-                    // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
-                    ((AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
-                )
-            ] [ str "Use related term directed search." ]
+
+            //Control.div [] [
+            
+                //Input.input [   Input.Placeholder "Start typing to start search"
+                //                Input.Size Size.IsLarge
+                //                Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
+                //                Input.OnChange (fun e ->  e.Value |> SearchTermTextChange |> Simple |> TermSearch |> dispatch)
+                //                Input.Value model.TermSearchState.Simple.TermSearchText
+                //            ]
+                //AutocompleteDropdown.autocompleteDropdownComponent
+                //    model
+                //    dispatch
+                //    model.TermSearchState.Simple.ShowSuggestions
+                //    model.TermSearchState.Simple.HasSuggestionsLoading
+                //    (createTermSuggestions model dispatch)
+            //]
         ]
 
-        //Control.div [] [
-            
-            //Input.input [   Input.Placeholder "Start typing to start search"
-            //                Input.Size Size.IsLarge
-            //                Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
-            //                Input.OnChange (fun e ->  e.Value |> SearchTermTextChange |> Simple |> TermSearch |> dispatch)
-            //                Input.Value model.TermSearchState.Simple.TermSearchText
-            //            ]
-            //AutocompleteDropdown.autocompleteDropdownComponent
-            //    model
-            //    dispatch
-            //    model.TermSearchState.Simple.ShowSuggestions
-            //    model.TermSearchState.Simple.HasSuggestionsLoading
-            //    (createTermSuggestions model dispatch)
-        //]
-        Help.help [] [str "When applicable, search for an ontology term to fill into the selected field(s)"]
+        // Fill selection confirmation
+        Field.div [] [
+            Control.div [] [
+                Button.a [
+                    let hasText = model.TermSearchState.TermSearchText.Length > 0
+                    if hasText then
+                        Button.CustomClass "is-success"
+                        Button.IsActive true
+                    else
+                        Button.CustomClass "is-danger"
+                    Button.Props [
+                        Disabled (not hasText)
+                        //Style [Flex "1"]
+                    ]
+                    Button.IsFullWidth
+                    Button.OnClick (fun _ ->
+                        if hasText then
+                            (model.TermSearchState.TermSearchText,model.TermSearchState.SelectedTerm) |> pipeNameTuple2 FillSelection |> ExcelInterop |> dispatch
+                    )
+                ] [
+                    str "Fill selected cells with this term"
+                ]
+            ]
+        ]
     ]
 
 
@@ -95,27 +135,12 @@ let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [
-        simpleSearchComponent model dispatch
 
-        // Fill selection confirmation
-        Field.div [] [
-            Control.div [] [
-                Button.button   [
-                    let hasText = model.TermSearchState.TermSearchText.Length > 0
-                    if hasText then
-                        Button.CustomClass "is-success"
-                        Button.IsActive true
-                    else
-                        Button.CustomClass "is-danger"
-                        Button.Props [Disabled true]
-                    Button.IsFullWidth
-                    Button.OnClick (fun _ -> (model.TermSearchState.TermSearchText,model.TermSearchState.SelectedTerm) |> pipeNameTuple2 FillSelection |> ExcelInterop |> dispatch)
-                ] [
-                    str "Fill selected cells with this term"
-                    
-                ]
-            ]
-        ]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
+
+        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search for an ontology term to fill into the selected field(s)"]
+
+        simpleSearchComponent model dispatch
 
         //if model.TermSearchState.SelectedTerm.IsNone then
         //    str "No Term Selected"

@@ -64,7 +64,7 @@ type TermSearchState = {
     TermSearchText          : string
     SelectedTerm            : DbDomain.Term option
     TermSuggestions         : DbDomain.Term []
-    ParentOntology          : string option
+    ParentOntology          : OntologyInfo option
     SearchByParentOntology  : bool
     HasSuggestionsLoading   : bool
     ShowSuggestions         : bool
@@ -208,10 +208,10 @@ type PageState = {
             }
 
 type FilePickerState = {
-    FileNames : (int*string) list
+    FileNames       : (int*string) list
     /// Used for drag and drop, to determine if something is currently dragged or not.
     /// Necessary to deactivate pointer events on children during drag.
-    DNDDropped : bool
+    DNDDropped      : bool
 } with
     static member init () = {
         FileNames = []
@@ -294,49 +294,76 @@ type AnnotationBuildingBlock = {
 type AddBuildingBlockState = {
     CurrentBuildingBlock                    : AnnotationBuildingBlock
 
+    BuildingBlockSelectedTerm               : DbDomain.Term option
     BuildingBlockNameSuggestions            : DbDomain.Term []
     ShowBuildingBlockSelection              : bool
     BuildingBlockHasUnit                    : bool
-    ShowBuildingBlockNameSuggestions        : bool
-    HasBuildingBlockNameSuggestionsLoading  : bool
+    ShowBuildingBlockTermSuggestions        : bool
+    HasBuildingBlockTermSuggestionsLoading  : bool
 
+    /// This section is used to add a unit directly to a freshly created building block.
     UnitTermSearchText                      : string
+    UnitSelectedTerm                        : DbDomain.Term option
     UnitTermSuggestions                     : DbDomain.Term []
     HasUnitTermSuggestionsLoading           : bool
     ShowUnitTermSuggestions                 : bool
-    /// This entry determines if the current UnitTermSearchText is a real term or if it is a customly typed unit.
-    /// If UnitTermSearchTextHasTermID.IsSome then the string is the Term.Accession else it is customely typed.
-    /// This is necessary to store the information about the Term.Accession for TAN in the unit columns.
-    UnitTermSearchTextHasTermAccession      : string option
+
+    /// This section is used to add a unit directly to an already existing building block
+    Unit2TermSearchText                     : string
+    Unit2SelectedTerm                       : DbDomain.Term option
+    Unit2TermSuggestions                    : DbDomain.Term []
+    HasUnit2TermSuggestionsLoading          : bool
+    ShowUnit2TermSuggestions                : bool
 
 } with
     static member init () = {
-        CurrentBuildingBlock                    = AnnotationBuildingBlock.init NoneSelected
-
-        BuildingBlockNameSuggestions            = [||]
         ShowBuildingBlockSelection              = false
-        BuildingBlockHasUnit                    = false
-        ShowBuildingBlockNameSuggestions        = false
-        HasBuildingBlockNameSuggestionsLoading  = false
 
+        CurrentBuildingBlock                    = AnnotationBuildingBlock.init AnnotationBuildingBlockType.Parameter
+        BuildingBlockSelectedTerm               = None
+        BuildingBlockNameSuggestions            = [||]
+        ShowBuildingBlockTermSuggestions        = false
+        HasBuildingBlockTermSuggestionsLoading  = false
+        BuildingBlockHasUnit                    = false
+
+        /// This section is used to add a unit directly to a freshly created building block.
         UnitTermSearchText                      = ""
+        UnitSelectedTerm                        = None
         UnitTermSuggestions                     = [||]
-        HasUnitTermSuggestionsLoading           = false
         ShowUnitTermSuggestions                 = false
-        UnitTermSearchTextHasTermAccession      = None
+        HasUnitTermSuggestionsLoading           = false
+
+        /// This section is used to add a unit directly to an already existing building block
+        Unit2TermSearchText                     = ""
+        Unit2SelectedTerm                       = None
+        Unit2TermSuggestions                    = [||]
+        ShowUnit2TermSuggestions                = false
+        HasUnit2TermSuggestionsLoading          = false
     }
 
 /// Validation scheme for Table
 type ValidationState = {
     ActiveTableBuildingBlocks   : OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []
-    TableValidationScheme       : OfficeInterop.Types.XmlValidationTypes.TableValidation
+    TableValidationScheme       : OfficeInterop.Types.Xml.ValidationTypes.TableValidation
     // Client view related
     DisplayedOptionsId      : int option
 } with
     static member init () = {
         ActiveTableBuildingBlocks   = [||]
-        TableValidationScheme       = OfficeInterop.Types.XmlValidationTypes.TableValidation.init()
+        TableValidationScheme       = OfficeInterop.Types.Xml.ValidationTypes.TableValidation.init()
         DisplayedOptionsId          = None
+    }
+
+
+open ISADotNet
+
+type ProtocolInsertState = {
+    UploadData: string
+    ProcessModel: ISADotNet.Process option
+} with
+    static member init () = {
+        UploadData = ""
+        ProcessModel = None
     }
 
 type Model = {
@@ -370,6 +397,8 @@ type Model = {
     //States regarding File picker functionality
     FilePickerState         : FilePickerState
 
+    ProtocolInsertState     : ProtocolInsertState
+
     //Insert annotation columns
     AddBuildingBlockState   : AddBuildingBlockState
 
@@ -392,4 +421,5 @@ let initializeModel (pageOpt: Route option) = {
     FilePickerState         = FilePickerState       .init ()
     AddBuildingBlockState   = AddBuildingBlockState .init ()
     ValidationState         = ValidationState       .init ()
+    ProtocolInsertState     = ProtocolInsertState   .init ()
 }

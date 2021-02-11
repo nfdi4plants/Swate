@@ -10,6 +10,103 @@ open System.Text.RegularExpressions
 open OfficeInterop.Regex
 open OfficeInterop.Types
 open BuildingBlockTypes
+open Shared
+
+
+let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
+    [|
+        for i in 0 .. rowCount-1 do
+            yield   [|
+                for i in 0 .. colCount-1 do yield U3<bool,string,float>.Case2 value
+            |] :> IList<U3<bool,string,float>>
+    |] :> IList<IList<U3<bool,string,float>>>
+
+let tryFindSpannedBuildingBlocks (currentProtocolGroup:Xml.GroupTypes.Protocol) (buildingBlocks: BuildingBlock []) =
+    let findAllSpannedBlocks =
+        currentProtocolGroup.SpannedBuildingBlocks
+        |> List.choose (fun spannedBlock ->
+            buildingBlocks
+            |> Array.tryFind (fun foundBuildingBlock ->
+                let isSameAccession =
+                    if spannedBlock.TermAccession <> "" && foundBuildingBlock.MainColumn.Header.Value.Ontology.IsSome then
+                        foundBuildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession = spannedBlock.TermAccession
+                    else
+                        false
+                foundBuildingBlock.MainColumn.Header.Value.Header = spannedBlock.ColumnName
+                && isSameAccession
+            )
+        )
+    //let reduce = findAllSpannedBlocks |> List.map (fun x -> x.MainColumn.Header.Value.Header)
+    if findAllSpannedBlocks.Length = currentProtocolGroup.SpannedBuildingBlocks.Length then
+        Some findAllSpannedBlocks
+    else
+        None
+
+/// This will create the column header attributes for a unit block.
+/// as unit always has to be a term and cannot be for example "Source" or "Sample", both of which have a differen format than for exmaple "Parameter [TermName]",
+/// we only need one function to generate id and attributes and bring the unit term in the right format.
+let unitColAttributes (unitTermName:string) (unitAccessionOptt:string option) (id:int) =
+    match id with
+    | 1 ->
+        match unitAccessionOptt with
+        | Some accession    -> sprintf "[%s] (#h; #t%s; #u)" unitTermName accession
+        | None              -> sprintf "[%s] (#h; #u)" unitTermName
+    | _ ->
+        match unitAccessionOptt with
+        | Some accession    -> sprintf "[%s] (#%i; #h; #t%s; #u)" unitTermName id accession
+        | None              -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
+
+
+let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
+    let col = createEmptyMatrixForTables 1 rowCount ""
+    if format.IsSome then
+        let findNewIdForUnit() =
+            let rec loopingCheck int =
+                let isExisting =
+                    allColHeaders
+                    // Should a column with the same name already exist, then count up the id tag.
+                    |> Array.exists (fun existingHeader ->
+                        // We don't need to check TSR or TAN, because the main column always starts with "Unit"
+                        existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt int)
+                    )
+                if isExisting then
+                    loopingCheck (int+1)
+                else
+                    int
+            loopingCheck 1
+
+        let newUnitId = findNewIdForUnit()
+
+        /// create unit main column
+        let createdUnitCol1 =
+            annotationTable.columns.add(
+                index = newBaseColIndex+3.,
+                values = U4.Case1 col,
+                name = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
+            )
+
+        /// create unit TSR
+        let createdUnitCol2 =
+            annotationTable.columns.add(
+                index = newBaseColIndex+4.,
+                values = U4.Case1 col,
+                name = sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
+            )
+
+        /// create unit TAN
+        let createdUnitCol3 =
+            annotationTable.columns.add(
+                index = newBaseColIndex+5.,
+                values = U4.Case1 col,
+                name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
+            )
+
+        Some (
+            sprintf " Added specified unit: %s" (format.Value),
+            sprintf "0.00 \"%s\"" (format.Value)
+        )
+    else
+        None
 
 /// Swaps 'Rows with column values' to 'Columns with row values'.
 let viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
@@ -33,7 +130,7 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
                 let checkIsHidden =
                     prep.TagArr.Value |> Array.contains ColumnTags.HiddenTag
                 if checkIsHidden then 
-                    Some (i + 1 |> float)
+                    Some (i|> float)
                 else
                     None
             else
@@ -46,7 +143,8 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
         if nextIsHidden then
             loopingCheckSkipHiddenCols (newInd + 1.)
         else
-            newInd
+            newInd+1.
+    //failwith (sprintf "START: %A ; FOUND NEW: %A" startIndex (loopingCheckSkipHiddenCols startIndex))
     loopingCheckSkipHiddenCols startIndex
 
 module BuildingBlockTypes =
@@ -159,7 +257,7 @@ module BuildingBlockTypes =
                 // Build in fail safe.
                 errorMsg2 nextCol currentBlock
 
-        // Building blocks are defined by one visuable column and an undefined number of hidden columns.
+        // Building blocks are defined by one visable column and an undefined number of hidden columns.
         // Therefore we iterate through the columns array and use every column without an `#h` tag as the start of a new building block.
         let rec sortColsIntoBuildingBlocks (index:int) (currentBlock:BuildingBlock option) (buildingBlockList:BuildingBlock list) =
             // Exit case if we iterated through all columns
@@ -194,11 +292,13 @@ module BuildingBlockTypes =
                 then
                     // There are multiple possibilities which column this is: TSR; TAN; Unit; Unit TSR; Unit TAN are the currently existing ones.
                     // We first check if there is NO unit tag in the header tag array
-                    if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart) |> not then
+                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we (>0.2.1) added accession number behind unit tag
+                    if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) |> not then
                         let updateCurrentBlock = checkForHiddenColType currentBlock nextCol
                         sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
                     /// Next we check for unit columns in the scheme of `Unit [Term] (#h; #u...) | TSR [Term] (#h; #u...) | TAN [Term] (#h; #u...)`
-                    elif nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTagStart) then
+                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we once (>0.2.1) added accession number behind unit tag
+                    elif nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) then
                         /// Please notice that we update the unit building block in the following function and not the core building block.
                         let updatedUnitBlock = checkForHiddenColType currentBlock.Value.Unit nextCol
                         /// Update the core building block with the updated unit building block.
@@ -210,10 +310,46 @@ module BuildingBlockTypes =
                     failwith (sprintf "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' was not recognized as hidden or main column: %A." nextCol.Header)
 
         /// Sort all columns into building blocks.
-        let buildingBlocks =
+        let buildingBlocksPre =
             sortColsIntoBuildingBlocks 0 None []
             |> List.rev
             |> Array.ofList
+
+        // UPDATE IN > 0.2.0
+        /// As we now add the TermAccession as "#txxx" tag in the reference columns we walk over all buildingBlock and update the maincolumn header accordingly.
+        let buildingBlocks =
+            buildingBlocksPre
+            |> Array.map (fun buildingBlock ->
+                match buildingBlock.TAN, buildingBlock.TSR with
+                | Some tan, Some tsr ->
+                    match tan.Header.Value.Ontology, tsr.Header.Value.Ontology with
+                    | Some ont1, Some ont2 ->
+                        let isSame = ont1.TermAccession = ont2.TermAccession
+                        if isSame |> not then
+                            failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern. (3)" buildingBlock.MainColumn.Header.Value.Header)
+                        if ont1.TermAccession <> "" then
+                            let nextMainColumn = {
+                                buildingBlock.MainColumn with
+                                    Header =  {
+                                        buildingBlock.MainColumn.Header.Value with
+                                            Ontology = {
+                                                buildingBlock.MainColumn.Header.Value.Ontology.Value with
+                                                    TermAccession = ont1.TermAccession
+                                            } |> Some
+                                    } |> Some
+                            }
+                            { buildingBlock with MainColumn = nextMainColumn }
+                        else
+                            buildingBlock
+                    | None, None ->
+                        buildingBlock
+                    | _,_ ->
+                        failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern. (2)" buildingBlock.MainColumn.Header.Value.Header)
+                | None, None ->
+                    buildingBlock
+                | _, _ ->
+                    failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern." buildingBlock.MainColumn.Header.Value.Header)
+            )
 
         buildingBlocks
 
@@ -249,7 +385,7 @@ let xmlElementToXmlString (root:XmlElement) =
             text root.Content
     ] |> serializeXml
 
-let getCurrentValidationXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext)=
+let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
     promise {
         let! getXml =
             context.sync().``then``(fun e ->
@@ -284,24 +420,150 @@ let getCurrentValidationXml (customXmlParts:CustomXmlPartCollection) (context:Re
                     failwith "Swate could not parse Workbook Custom Xml Parts. Had neither one root nor many root elements. Please contact the developer."
         if xmlParsed.Name <> "customXml" then failwith (sprintf "Swate found unexpected root xml element: %s" xmlParsed.Name)
 
-        let currentSwateValidationXml =
-            let v = SimpleXml.findElementsByName "Validation" xmlParsed
-            if v.Length > 1 then failwith (sprintf "Swate found multiple 'Validation' xml elements. Please contact the developer.")
-            if v.Length = 0 then
-                None
-            else
-                XmlValidationTypes.SwateValidation.ofXml xml |> Some
-
-        return xmlParsed, currentSwateValidationXml
+        return xmlParsed, xml
     }
 
-let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
-    [|
-        for i in 0 .. rowCount-1 do
-            yield   [|
-                for i in 0 .. colCount-1 do yield U3<bool,string,float>.Case2 value
-            |] :> IList<U3<bool,string,float>>
-    |] :> IList<IList<U3<bool,string,float>>>
+let swateValidationOfXml (xmlParsed:XmlElement) (xml:string) =
+    let v = SimpleXml.findElementsByName "Validation" xmlParsed
+    if v.Length > 1 then failwith (sprintf "Swate found multiple 'Validation' xml elements. Please contact the developer.")
+    if v.Length = 0 then
+        None
+    else
+        Xml.ValidationTypes.SwateValidation.ofXml xml |> Some
+
+let protocolGroupOfXml (xmlParsed:XmlElement) (xml:string) =
+    let protocolGroupTag = "ProtocolGroup"
+    let v = SimpleXml.findElementsByName protocolGroupTag xmlParsed
+    if v.Length > 1 then failwith (sprintf "Swate found multiple '%s' xml elements. Please contact the developer." protocolGroupTag)
+    if v.Length = 0 then
+        None
+    else
+        Xml.GroupTypes.ProtocolGroup.ofXml xml |> Some
+
+let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
+    Excel.run(fun context ->
+
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        promise {
+            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+
+            let currentProtocolGroup =
+                let previousProtocolGroup = protocolGroupOfXml xmlParsed xml
+                if previousProtocolGroup.IsNone then Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion [] else previousProtocolGroup.Value
+
+            let nextProtocolGroup =
+                let newProtocols =
+                    currentProtocolGroup.Protocols
+                    |> List.filter (fun x -> x.TableName <> protocol.TableName || x.WorksheetName <> protocol.WorksheetName || x.Id <> protocol.Id)
+                    |> fun filteredProtocols ->
+                        if remove then
+                            filteredProtocols
+                        else 
+                            protocol::filteredProtocols
+                { currentProtocolGroup with
+                    SwateVersion = protocol.SwateVersion
+                    Protocols = newProtocols
+                }
+
+            let nextCustomXml =
+                let nextAsXmlFormat = nextProtocolGroup.toXml |> SimpleXml.parseElement
+                let childrenWithoutProtocolGroup = xmlParsed.Children |> List.filter (fun child ->
+                    child.Name <> "ProtocolGroup"
+                )
+                let nextChildren = nextAsXmlFormat::childrenWithoutProtocolGroup
+                { xmlParsed with
+                    Children = nextChildren
+                } |> xmlElementToXmlString
+
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Seq.map (fun x -> x.delete() )
+                    
+                    xmls |> Array.ofSeq
+                )
+
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    customXmlParts.add(nextCustomXml)
+                )
+
+            // This will be displayed in activity log
+            return
+                "Info",
+                sprintf
+                    "%s ProtocolGroup Scheme with '%s - %s - %s' "
+                    (if remove then "Remove Protocol from" else "Update")
+                    protocol.WorksheetName
+                    protocol.TableName
+                    protocol.Id
+        }
+    )
+
+/// range -> 'let groupHeader = annoHeaderRange.getRowsAbove(1.)'
+let formatGroupHeaderForRange (range:Excel.Range) (context:RequestContext) =
+    promise {
+
+        let! range = context.sync().``then``(fun e ->
+            range.load(U2.Case2 (ResizeArray(["format"])))
+        )
+
+        let! colorAndGetBorderItems = context.sync().``then``(fun e ->
+    
+            let f = range.format
+    
+            f.fill.color <- "#70AD47"
+            f.font.color <- "white"
+            f.font.bold <- true
+            f.horizontalAlignment <- U2.Case2 "center"
+    
+            let format = f.load(U2.Case2 (ResizeArray(["borders"])))
+            format.borders.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
+        )
+    
+        let! borderItems = context.sync().``then``(fun e ->
+            colorAndGetBorderItems.items |> Array.ofSeq |> Array.map (fun x -> x.load(propertyNames = U2.Case2 (ResizeArray(["sideIndex"; "color"]))) )
+        )
+        let! colorBorder = context.sync().``then``(fun e ->
+            let color = borderItems |> Array.map (fun x ->
+                if x.sideIndex = U2.Case2 "InsideVertical" then
+                    x.color <- "white"
+            )
+            color
+        )
+        ()
+    }
+
+/// range -> 'let groupHeader = annoHeaderRange.getRowsAbove(1.)'
+let cleanGroupHeaderFormat (range:Excel.Range) (context:RequestContext) =
+    promise {
+        // unmerge group header
+        let! unmerge = context.sync().``then``(fun e ->
+            range.unmerge()
+
+        )
+        // empty group header
+        let! groupHeaderValues = context.sync().``then``(fun e ->
+            range.load(U2.Case1 "values")
+        )
+        // empty group header part 2
+        let! emptyGroupHeaderValues = context.sync().``then``(fun e ->
+            let nV =
+                groupHeaderValues.values
+                |> Seq.map (fun innerArr ->
+                    innerArr 
+                    |> Seq.map (fun _ ->
+                        "" |> box |> Some
+                    ) |> ResizeArray
+                ) |> ResizeArray
+            groupHeaderValues.values <- nV
+        )
+
+        return ()
+    }
 
 let createValueMatrix (colCount:int) (rowCount:int) value =
     ResizeArray([

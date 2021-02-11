@@ -14,7 +14,7 @@ open CustomComponents
 
 let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
     let isActive = (model.PageState.CurrentPage = pageLink)
-    Tabs.tab [Tabs.Tab.IsActive isActive;] [
+    Tabs.tab [Tabs.Tab.IsActive isActive] [
         a [ //Href (Routing.Route.toRouteUrl pageLink)
             Style [
                 if isActive then
@@ -34,11 +34,39 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
                 //    str (pageLink |> Routing.Route.toString)
                 //else
                 //    pageLink |> Routing.Route.toIcon
-                span [Class "hideUnder575px"][str (pageLink |> Routing.Route.toString)]
-                span [Class "hideOver575px"][pageLink |> Routing.Route.toIcon]
+                span [Class "hideUnder775px"][str pageLink.toStringRdbl]
+                span [Class "hideOver775px"][pageLink |> Routing.Route.toIcon]
             ]
 
         ]
+    ]
+
+let tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
+    Tabs.tabs[
+        Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
+        Tabs.Props [
+            Style [
+                BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
+                CSSProp.Custom ("overflow","visible")
+            ]
+        ]
+    ] [
+        yield! tabs
+    ]
+
+let firstRowTabs (model:Model) dispatch =
+    tabRow model dispatch [
+        createNavigationTab Routing.Route.AddBuildingBlock      model dispatch
+        createNavigationTab Routing.Route.TermSearch            model dispatch
+        createNavigationTab Routing.Route.Validation            model dispatch
+        createNavigationTab Routing.Route.FilePicker            model dispatch
+        createNavigationTab Routing.Route.ProtocolInsert        model dispatch
+        createNavigationTab Routing.Route.Info                  model dispatch
+    ]
+
+let sndRowTabs (model:Model) dispatch =
+    tabRow model dispatch [
+        
     ]
 
 let footerContentStatic (model:Model) dispatch =
@@ -51,28 +79,25 @@ open Fable.Core.JsInterop
 
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
-    div [   Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;]
+    div [
+        OnClick (fun e ->
+            if model.TermSearchState.ShowSuggestions
+                || model.AddBuildingBlockState.ShowUnitTermSuggestions
+                || model.AddBuildingBlockState.ShowUnit2TermSuggestions
+                || model.AddBuildingBlockState.ShowBuildingBlockTermSuggestions
+            then
+                TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
+        )
+        Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;
+    ]
     ] [
         Navbar.navbarComponent model dispatch
         Container.container [
             Container.IsFluid
         ] [
             br []
-            Tabs.tabs[
-                Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
-                Tabs.Props [
-                    Style [
-                        BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
-                        OverflowX OverflowOptions.Hidden
-                    ]
-                ]
-            ] [
-                createNavigationTab Routing.Route.AddBuildingBlock   model dispatch
-                createNavigationTab Routing.Route.TermSearch         model dispatch
-                createNavigationTab Routing.Route.Validation         model dispatch
-                createNavigationTab Routing.Route.FilePicker         model dispatch
-                createNavigationTab Routing.Route.Info               model dispatch
-            ]
+            firstRowTabs model dispatch
+            //sndRowTabs model dispatch
 
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
@@ -85,23 +110,15 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
 
             br []
 
-            Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
-                Content.content [
-                    Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
-                    Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
-                ] [
-                    yield! footerChildren
-                    //Button.button [
-                    //    Button.OnClick (fun e ->
-                    //        let e = Browser.Dom.document.getElementById("BlockNameSearch")
-                    //        let content = e.innerHTML
-                    //        e.innerHTML <- content
-                    //    )
-                    //][
-                    //    str "Test"
-                    //]
+            if footerChildren.IsEmpty |> not then
+                Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
+                    Content.content [
+                        Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
+                        Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
+                    ] [
+                        yield! footerChildren
+                    ]
                 ]
-            ]
         ]
 
         div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"]][

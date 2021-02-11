@@ -148,6 +148,79 @@ let getTermSuggestionsByParentTerm cString (query:string, parentTerm:string) =
                     (reader.GetBoolean(6))
     |]
 
+let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyInfo) =
+
+    let hasAccession = parentTerm.TermAccession <> ""
+
+    use connection = establishConnection cString
+    connection.Open()
+    use cmd =
+        if hasAccession then
+            new MySqlCommand("getTermByParentTermAndAccession",connection)
+        else
+            new MySqlCommand("getTermByParentTerm",connection)
+
+    cmd.CommandType <- CommandType.StoredProcedure
+
+    let queryParam              = cmd.Parameters.Add("query",MySqlDbType.VarChar)
+    let parentOntologyParam     = cmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+
+    queryParam              .Value <- query
+    parentOntologyParam     .Value <- parentTerm.Name
+
+    if hasAccession then
+        let accessionParam = cmd.Parameters.Add("parentTermAccession", MySqlDbType.VarChar)
+        accessionParam      .Value <- parentTerm.TermAccession
+
+    use reader = cmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+
+let getTermSuggestionsByParentTermAndAccession cString (query:string, parentTerm:string, parentTermAccession:string) =
+    
+    use connection = establishConnection cString
+    connection.Open()
+    use getTermSuggestionsCmd = new MySqlCommand("getTermSuggestionsByParentTermAndAccession",connection)
+    getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
+
+    let queryParam                  = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
+    let parentOntologyParam         = getTermSuggestionsCmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+    let parentTermAccessionParam    = getTermSuggestionsCmd.Parameters.Add("parentTermAccession",MySqlDbType.VarChar)
+
+    queryParam              .Value <- query
+    parentOntologyParam     .Value <- parentTerm
+    parentTermAccessionParam.Value <- parentTermAccession
+
+    use reader = getTermSuggestionsCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+
 let getUnitTermSuggestions cString (query:string) =
     
     use connection = establishConnection cString
@@ -193,6 +266,41 @@ let getTermByName cString (queryStr:string) =
     queryParam.Value    <- queryStr
 
     use reader = getTermByNameCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            DbDomain.createTerm
+                (reader.GetInt64(0))
+                (reader.GetString(1))
+                (reader.GetInt64(2))
+                (reader.GetString(3))
+                (reader.GetString(4))
+                (if (reader.IsDBNull(5)) then
+                    None
+                else
+                    Some (reader.GetString(5)))
+                (reader.GetBoolean(6))
+    |]
+
+let getTermByNameAndAccession cString (queryStr:string,accessionString:string) =
+    
+    use connection = establishConnection cString
+    connection.Open()
+
+    use cmd = connection.CreateCommand()
+    cmd
+        .CommandText <- """
+            SELECT * FROM Term
+            WHERE Term.Name = @name
+            AND Term.Accession = @accession
+        """
+
+    let queryParam      = cmd.Parameters.Add("name",MySqlDbType.VarChar)
+    let accessionParam  = cmd.Parameters.Add("accession",MySqlDbType.VarChar)
+
+    queryParam.Value        <- queryStr
+    accessionParam.Value    <- accessionString
+
+    use reader = cmd.ExecuteReader()
     [|
         while reader.Read() do
             DbDomain.createTerm

@@ -2,7 +2,6 @@ module Messages
 
 open Elmish
 open Thoth.Elmish
-
 open Shared
 
 open ExcelColors
@@ -10,16 +9,18 @@ open OfficeInterop
 open OfficeInterop.Types
 open Model
 
+//open ISADotNet
+
 type ExcelInteropMsg =
     | PipeActiveAnnotationTable     of (TryFindAnnoTableResult -> ExcelInteropMsg)
     /// This is used to pipe (all table names []) to a ExcelInteropMsg.
     /// This is used to generate a new annotation table name.
     | PipeCreateAnnotationTableInfo of (string [] -> ExcelInteropMsg)
     | Initialized                   of (string*string)
-    | SyncContext                   of activeAnnotationTable:TryFindAnnoTableResult*string
-    | InSync                        of string
     | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
-    | AddColumn                     of activeAnnotationTable:TryFindAnnoTableResult * colname:string * format:(string*string option) option
+    | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
+    | AddAnnotationBlocks           of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol
+    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * unitTermName:string option * unitTermAccession:string option
     | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
     | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
@@ -27,14 +28,13 @@ type ExcelInteropMsg =
     | AnnotationTableExists         of activeAnnotationTable:TryFindAnnoTableResult
     | GetParentTerm                 of activeAnnotationTable:TryFindAnnoTableResult
     | AutoFitTable                  of activeAnnotationTable:TryFindAnnoTableResult
+    | UpdateProtocolGroupHeader     of activeAnnotationTable:TryFindAnnoTableResult
     //
     | GetTableValidationXml         of activeAnnotationTable:TryFindAnnoTableResult
-    | WriteTableValidationToXml     of newTableValidation:XmlValidationTypes.TableValidation * currentSwateVersion:string
+    | WriteTableValidationToXml     of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
+    | WriteProtocolToXml            of newProtocol:Xml.GroupTypes.Protocol
     | DeleteAllCustomXml
-    | GetSwateValidationXml
-    //
-    | ToggleEventHandler
-    | UpdateTablesHaveAutoEditHandler
+    | GetSwateCustomXml
     //
     | FillHiddenColsRequest         of activeAnnotationTable:TryFindAnnoTableResult
     | FillHiddenColumns             of tableName:string*SearchTermI []
@@ -77,9 +77,9 @@ type DevMsg =
 type ApiRequestMsg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
-    | GetNewTermSuggestionsByParentTerm         of string*string
+    | GetNewTermSuggestionsByParentTerm         of string*OntologyInfo
     | GetNewBuildingBlockNameSuggestions        of string
-    | GetNewUnitTermSuggestions                 of string
+    | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
     | FetchAllOntologies
     /// This function is used to search for all values found in the table main columns.
@@ -92,7 +92,7 @@ type ApiResponseMsg =
     | TermSuggestionResponse                    of DbDomain.Term []
     | AdvancedTermSearchResultsResponse         of DbDomain.Term []
     | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
-    | UnitTermSuggestionResponse                of DbDomain.Term []
+    | UnitTermSuggestionResponse                of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
     | SearchForInsertTermsResponse              of tableName:string*SearchTermI []  
     //
@@ -115,6 +115,7 @@ type PersistentStorageMsg =
 type FilePickerMsg =
     | LoadNewFiles              of string list
     | UpdateFileNames           of newFileNames:(int*string) list
+    ///
     | UpdateDNDDropped          of isDropped:bool
 
 type AddBuildingBlockMsg =
@@ -122,20 +123,29 @@ type AddBuildingBlockMsg =
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown
 
-    | BuildingBlockNameSuggestionUsed   of string
+    | BuildingBlockNameSuggestionUsed   of DbDomain.Term
     | NewBuildingBlockNameSuggestions   of DbDomain.Term []
 
-    | SearchUnitTermTextChange  of string
-    | UnitTermSuggestionUsed    of unitName:string*unitAccession:string
-    | NewUnitTermSuggestions    of DbDomain.Term []
+    | SearchUnitTermTextChange  of searchString:string * relatedUnitSearch:UnitSearchRequest
+    | UnitTermSuggestionUsed    of unitTerm:DbDomain.Term* relatedUnitSearch:UnitSearchRequest
+    | NewUnitTermSuggestions    of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | ToggleBuildingBlockHasUnit
 
 type ValidationMsg =
     // Client
     | UpdateDisplayedOptionsId of int option
-    | UpdateTableValidationScheme of XmlValidationTypes.TableValidation
+    | UpdateTableValidationScheme of Xml.ValidationTypes.TableValidation
     // OfficeInterop
-    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.XmlValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
+    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
+
+type ProtocolInsertMsg =
+    // Client
+    | UpdateUploadData of string
+    | ParseJsonToProcessRequest of string
+    | ParseJsonToProcessResult of Result<ISADotNet.Process,exn>
+
+type TopLevelMsg =
+    | CloseSuggestions
 
 type Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
@@ -150,6 +160,8 @@ type Msg =
     | FilePicker            of FilePickerMsg
     | AddBuildingBlock      of AddBuildingBlockMsg
     | Validation            of ValidationMsg
+    | ProtocolInsert        of ProtocolInsertMsg
+    | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>
     | DoNothing
@@ -179,5 +191,14 @@ let pipeNameTuple3 msg param =
             let constructParam =
                 param |> fun (x,y,z) -> annotationTableOpt,x,y,z    
             msg (constructParam)
-            |> PipeActiveAnnotationTable
+        )
+
+/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2,x3,x4) other params.
+/// Use this as: (x1,x2,x3) |> pipeNameTuple4 msg
+let pipeNameTuple4 msg param =
+    PipeActiveAnnotationTable
+        (fun annotationTableOpt ->
+            let constructParam =
+                param |> fun (x,y,z,u) -> annotationTableOpt,x,y,z,u 
+            msg (constructParam)
         )

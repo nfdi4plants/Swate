@@ -63,49 +63,56 @@ let view (model : Model) (dispatch : Msg -> unit) =
         BaseView.baseViewComponent model dispatch [
             TermSearchView.termSearchComponent model dispatch
         ] [
-            Text.p [] [str ""]
+            //Text.p [] [str ""]
         ]
 
     | Routing.Route.Validation ->
         BaseView.baseViewComponent model dispatch [
             ValidationView.validationComponent model dispatch
         ] [
-            Text.p [] [str ""]
+            //Text.p [] [str ""]
         ]
 
     | Routing.Route.FilePicker ->
         BaseView.baseViewComponent model dispatch [
             FilePickerView.filePickerComponent model dispatch
         ] [
-            Text.p [] [str ""]
+            //Text.p [] [str ""]
+        ]
+
+    | Routing.Route.ProtocolInsert ->
+        BaseView.baseViewComponent model dispatch [
+            ProtocolInsertView.fileUploadViewComponent model dispatch
+        ] [
+            //Text.p [] [str ""]
         ]
 
     | Routing.Route.ActivityLog ->
         BaseView.baseViewComponent model dispatch [
             ActivityLogView.activityLogComponent model dispatch
         ] [
-            Text.p [] [str ""]
+            //Text.p [] [str ""]
         ]
 
     | Routing.Route.Settings ->
         BaseView.baseViewComponent model dispatch [
             SettingsView.settingsViewComponent model dispatch
         ] [
-            Text.p [] [str ""]
+            //Text.p [] [str ""]
         ]
 
     | Routing.Route.Info ->
         BaseView.baseViewComponent model dispatch [
             InfoView.infoComponent model dispatch
         ][
-            Text.p [] [str ""]
+            //Text.p [] [str ""]
         ]
 
     | Routing.Route.NotFound ->
         BaseView.baseViewComponent model dispatch [
             NotFoundView.notFoundComponent model dispatch
         ] [
-            Text.p [] [str ""]
+            //Text.p [] [str ""]
         ]
 
     | Routing.Route.Home ->
