@@ -59,7 +59,7 @@ let getInContactElement (model:Model) dispatch =
                     str "Swate is part of the dataPLANT organisation."
                 ]
                 Content.content [][
-                    blockquote [][
+                    blockquote [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.ControlBackground]][
                         str "Services and infrastructures to support "
                         a [Href "https://twitter.com/search?q=%23FAIRData&src=hashtag_click"][ str "#FAIRData" ]
                         str " science and good data management practices within the plant basic research community. "

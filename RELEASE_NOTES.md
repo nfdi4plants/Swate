@@ -1,6 +1,9 @@
-### 0.2.1+fdcb58c (Released 2021-2-9)
+### 0.3.0+09467d9 (Released 2021-2-11)
 * Additions:
-    * latest commit #fdcb58c
+    * latest commit #09467d9
+    * [[#4bf33cb](https://github.com/nfdi4plants/Swate/commit/4bf33cb478861250a3f1794140821460115e3173)] Add ontology accession number as tag in ref columns (Issue #100).
+    * [[#262dae3](https://github.com/nfdi4plants/Swate/commit/262dae32acef085d3bfff46c1194f80698278387)] Add option to write process.json to Swate annotation table (Issue #84). :sparkles:
+    * [[#09467d9](https://github.com/nfdi4plants/Swate/commit/09467d97813b708ce8bee58935b0b5830aea15f7)] Visually group building blocks to protocols (Issues 101#, #103, #104) :sparkles:
     * [[#0516353](https://github.com/nfdi4plants/Swate/commit/05163533c6832023301e588ccc59b34af5b18f88)] Add Logos and visually update Swate (Issue #59).
     * [[#5c2e56a](https://github.com/nfdi4plants/Swate/commit/5c2e56a46b57fa627c5b37b7e8307ab633a4e12b)] Add option to add unit cols to existing building block (Issue #94).
     * [[#9987184](https://github.com/nfdi4plants/Swate/commit/99871849bc83cfa4bd4fe7760c2f43dae524d76b)] Add sorensen dice sorting to advanced term search (Issue #95).
@@ -8,8 +11,10 @@
     * [[#4e0d0c9](https://github.com/nfdi4plants/Swate/commit/4e0d0c9e32c5be606542f9ca0f05b74be6626e1d)] Add easy to access navigation option to advanced search (Issue #91).
     * [[#374e326](https://github.com/nfdi4plants/Swate/commit/374e326f2123a2f61825f281bc4886b109d5261d)] Add features from #68 to Update Reference Columns (Issue 87#).
 * Deletions:
-    * [[#9da9c55](https://github.com/nfdi4plants/Swate/commit/9da9c55a23d737aa05ff7c12759446ce5387902f)] Remove event handlers (input assist, #87)
+    * [[#9da9c55](https://github.com/nfdi4plants/Swate/commit/9da9c55a23d737aa05ff7c12759446ce5387902f)] Remove event handlers (input assist, #87).
 * Bugfixes:
+    * [[#8606b12](https://github.com/nfdi4plants/Swate/commit/8606b12fe5497c2fbea2659cafd123c9a22dfe34)] Add Protocol Xml logic and fix ISADotNet dependency.
+    * [[#51928c0](https://github.com/nfdi4plants/Swate/commit/51928c0af9b5d5a39dbc54abbadc3aa81e8580f8)] Fix minor routing icon mismatch.
     * [[#fdcb58c](https://github.com/nfdi4plants/Swate/commit/fdcb58c71ce624879448c4e86e2119b72bc877ae)] Fix minor white/lightgrey mix ups in filepicker view.
     * [[#cc26e81](https://github.com/nfdi4plants/Swate/commit/cc26e81e895d7ec7fc7abef885e5d7afb4c0a7c2)] Fix bug overloading computers when creating an annotation table for whole rows (Issue #63).
     * [[#1e5eb3d](https://github.com/nfdi4plants/Swate/commit/1e5eb3d6c2b0f2f0527d4843c8bc0addabdb0b04)] Fix reset of unit search input when unchecking (Issue #92).

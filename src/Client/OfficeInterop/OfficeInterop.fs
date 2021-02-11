@@ -1268,9 +1268,10 @@ let updateProtocolGroupHeader (annotationTableName) =
                         ) |> Promise.Parallel
                     return group
             }
+
             let! format = formatGroupHeaderForRange groupHeader context
 
-            return ()
+            return ("info", "Update Protocol Header")
         }
     )
 

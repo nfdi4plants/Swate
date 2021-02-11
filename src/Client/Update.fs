@@ -89,9 +89,10 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
     | UpdateProtocolGroupHeader activeTableNameRes ->
         let cmd name =
-            Cmd.OfPromise.attempt
+            Cmd.OfPromise.either
                 OfficeInterop.updateProtocolGroupHeader
                 (name)
+                (GenericLog >> Dev)
                 (GenericError >> Dev)
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
