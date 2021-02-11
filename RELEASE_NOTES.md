@@ -1,6 +1,6 @@
-### 0.3.0+09467d9 (Released 2021-2-11)
+### 0.3.0+0d31c43 (Released 2021-2-11)
 * Additions:
-    * latest commit #09467d9
+    * latest commit #0d31c43
     * [[#4bf33cb](https://github.com/nfdi4plants/Swate/commit/4bf33cb478861250a3f1794140821460115e3173)] Add ontology accession number as tag in ref columns (Issue #100).
     * [[#262dae3](https://github.com/nfdi4plants/Swate/commit/262dae32acef085d3bfff46c1194f80698278387)] Add option to write process.json to Swate annotation table (Issue #84). :sparkles:
     * [[#09467d9](https://github.com/nfdi4plants/Swate/commit/09467d97813b708ce8bee58935b0b5830aea15f7)] Visually group building blocks to protocols (Issues 101#, #103, #104) :sparkles:
@@ -13,6 +13,7 @@
 * Deletions:
     * [[#9da9c55](https://github.com/nfdi4plants/Swate/commit/9da9c55a23d737aa05ff7c12759446ce5387902f)] Remove event handlers (input assist, #87).
 * Bugfixes:
+    * [[#0d31c43](https://github.com/nfdi4plants/Swate/commit/0d31c43ff55961b7eed6d91183c4c91c85356c59)] Fix bug not opening "File Picker" upload window on click.
     * [[#8606b12](https://github.com/nfdi4plants/Swate/commit/8606b12fe5497c2fbea2659cafd123c9a22dfe34)] Add Protocol Xml logic and fix ISADotNet dependency.
     * [[#51928c0](https://github.com/nfdi4plants/Swate/commit/51928c0af9b5d5a39dbc54abbadc3aa81e8580f8)] Fix minor routing icon mismatch.
     * [[#fdcb58c](https://github.com/nfdi4plants/Swate/commit/fdcb58c71ce624879448c4e86e2119b72bc877ae)] Fix minor white/lightgrey mix ups in filepicker view.
