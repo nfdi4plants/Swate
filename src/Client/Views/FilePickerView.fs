@@ -441,9 +441,16 @@ let uploadButton (model:Model) dispatch inputId =
                     )
                 ]
             ]
-            File.cta [ Props [Style [Width "100%"; JustifyContent "center" ]] ] [
+            File.cta [
+                Props [Style [Width "100%"; JustifyContent "center" ]]
+            ] [
                 File.icon [] [ Fa.i [ Fa.Solid.Upload ] [] ]
-                File.label [ ] [ str "Pick file names" ]
+                File.label [ Props [
+                    OnClick (fun e ->
+                        let getUploadElement = Browser.Dom.document.getElementById inputId
+                        getUploadElement.click()
+                    )
+                ] ] [ str "Pick file names" ]
             ]
         ]
     ]
