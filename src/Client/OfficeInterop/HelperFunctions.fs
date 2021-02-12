@@ -56,7 +56,6 @@ let unitColAttributes (unitTermName:string) (unitAccessionOptt:string option) (i
         | Some accession    -> sprintf "[%s] (#%i; #h; #t%s; #u)" unitTermName id accession
         | None              -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
 
-
 let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
     let col = createEmptyMatrixForTables 1 rowCount ""
     if format.IsSome then
