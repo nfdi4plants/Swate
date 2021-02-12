@@ -1213,6 +1213,16 @@ let updateProtocolGroupHeader (annotationTableName) =
                         else
                             None
 
+                    /// 'tableStartIndex' -> let tableRange = annotationTable.getRange().columnIndex
+                    /// 'rangeStartIndex' -> range.columnIndex
+                    let recalculateColIndex tableStartIndex rangeStartIndex =
+                        let tableRangeColIndex = tableStartIndex
+                        let selectColIndex = rangeStartIndex
+                        selectColIndex + tableRangeColIndex
+
+                    let recalculateColIndexToTable rangeStartIndex =
+                        recalculateColIndex annoHeaderRange.columnIndex rangeStartIndex
+
                     let! group =
                         protocolsForCurrentTableSheet
                         |> List.map (fun protocol ->
@@ -1229,12 +1239,11 @@ let updateProtocolGroupHeader (annotationTableName) =
 
                                             promise {
 
-                                                let startInd,endInd = startInd + 1 |> float, endInd |> float
-
+                                                let startInd,endInd = startInd |> float |> recalculateColIndexToTable, endInd |> float |> recalculateColIndexToTable
                                                 let! mergedGroupHeader =
                                                     context.sync().``then``(fun e ->
-                                                        /// +2 to also include start and endcolumn, without it would end two too early.
-                                                        let diff = (endInd - startInd) + 2.
+                                                        /// +1 to also include the endcolumn, without it would end two too early.
+                                                        let diff = (endInd - startInd) + 1.
                                                         let getProtocolGroupHeaderRange = activeSheet.getRangeByIndexes(annoHeaderRange.rowIndex-1., startInd, 1., diff)
                                                         getProtocolGroupHeaderRange.merge()
                                                         getProtocolGroupHeaderRange.load(U2.Case2 (ResizeArray(["values"])))
