@@ -1,3 +1,9 @@
+### 0.3.1+cbc655c (Released 2021-2-12)
+* Additions:
+    * latest commit #cbc655c
+* Bugfixes:
+    * [[#cbc655c](https://github.com/nfdi4plants/Swate/commit/cbc655cd6c9692480ac46c894127831aaea5b713)] Fix protocol headers shifted if not placed in row B (Issue #108) :bug:
+
 ### 0.3.0+0d31c43 (Released 2021-2-11)
 * Additions:
     * latest commit #0d31c43
