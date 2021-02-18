@@ -161,7 +161,7 @@ let displayProtocolInfoElement isViable (errorMsg:string option) (model:Model) d
         ]
 
 let fileUploadButton (model:Model) dispatch id =
-    Label.label [Label.Props [Style [Margin "1rem auto"]]][
+    Label.label [Label.Props [Style [FontWeight "normal";Margin "1rem 0"]]][
         Input.input [
             Input.Props [
                 Id id
@@ -196,41 +196,49 @@ let fileUploadButton (model:Model) dispatch id =
 
 open OfficeInterop.Types.Xml
 
-let addToTableButton isValid (model:Model) dispatch =
-    Field.div [] [
-        Control.div [] [
-            Button.a [
-                if isValid then
-                    Button.IsActive true
-                else
-                    Button.Color Color.IsDanger
-                    Button.Props [Disabled true]
-                Button.IsFullWidth
-                Button.Color IsSuccess
-                Button.OnClick (fun e ->
-                    let preProtocol =
-                        let p = model.ProtocolInsertState.ProcessModel.Value
-                        let id = p.ExecutesProtocol.Value.Name.Value
-                        let version = p.ExecutesProtocol.Value.Version.Value
-                        let swateVersion = model.PersistentStorageState.AppVersion
-                        GroupTypes.Protocol.create id version swateVersion "" "" []
-                    let minBuildingBlockInfos =
-                        OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.ofISADotNetProcess model.ProtocolInsertState.ProcessModel.Value
-                        |> List.rev
-                    pipeNameTuple2 AddAnnotationBlocks (minBuildingBlockInfos,preProtocol) |> ExcelInterop |> dispatch
-
-                    //for minBuildBlockInfo in minBuildingBlockInfos
-                    //    do 
-                    //        let msg tableName = AddAnnotationBlock (tableName, minBuildBlockInfo)
-                    //        PipeActiveAnnotationTable msg |> ExcelInterop |> dispatch
-                )
-            ] [
-                str "Insert protocol annotation blocks"
+let addFromFileToTableButton isValid (model:Model) dispatch =
+    Columns.columns [Columns.IsMobile][
+        Column.column [][
+            Field.div [] [
+                Control.div [] [
+                    Button.a [
+                        if isValid then
+                            Button.IsActive true
+                        else
+                            Button.Color Color.IsDanger
+                            Button.Props [Disabled true]
+                        Button.IsFullWidth
+                        Button.Color IsSuccess
+                        Button.OnClick (fun e ->
+                            let preProtocol =
+                                let p = model.ProtocolInsertState.ProcessModel.Value
+                                let id = p.ExecutesProtocol.Value.Name.Value
+                                let version = p.ExecutesProtocol.Value.Version.Value
+                                let swateVersion = model.PersistentStorageState.AppVersion
+                                GroupTypes.Protocol.create id version swateVersion "" "" []
+                            let minBuildingBlockInfos =
+                                OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.ofISADotNetProcess model.ProtocolInsertState.ProcessModel.Value
+                                |> List.rev
+                            pipeNameTuple3 AddAnnotationBlocks (minBuildingBlockInfos,preProtocol, None) |> ExcelInterop |> dispatch
+                        )
+                    ] [
+                        str "Insert protocol annotation blocks"
+                    ]
+                ]
             ]
         ]
+        if model.ProtocolInsertState.ProcessModel.IsSome then
+            Column.column [Column.Width(Screen.All, Column.IsNarrow)][
+                Button.a [
+                    Button.OnClick (fun e -> RemoveProcessFromModel |> ProtocolInsert |> dispatch)
+                    Button.Color IsDanger
+                ][
+                    Fa.i [Fa.Solid.Times][]
+                ]
+            ]
     ]
 
-let protocolInsertElement (model:Model) dispatch =
+let protocolInsertElement uploadId (model:Model) dispatch =
     let isViable, errorMsg =
         if model.ProtocolInsertState.ProcessModel.IsSome then
             isViableISADotNetProcess model.ProtocolInsertState.ProcessModel.Value
@@ -244,30 +252,6 @@ let protocolInsertElement (model:Model) dispatch =
             MarginBottom "1rem"
         ]
     ] [
-        Field.div [Field.Props [Style [
-            Width "100%"
-        ]]][
-            if model.ProtocolInsertState.ProcessModel.IsSome then
-                yield! displayProtocolInfoElement isViable errorMsg model dispatch
-            else
-                Field.div [][
-                    str "The protocol building blocks will be shown here"
-                ]
-
-            addToTableButton isViable model dispatch
-        ]
-    ]
-
-let fileUploadViewComponent (model:Model) dispatch =
-    let uploadId = "UploadFiles_ElementId"
-    form [
-        OnSubmit (fun e -> e.preventDefault())
-        // https://keycode.info/
-        OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-    ] [
-
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Protocol driven building block insert"]
-
         Help.help [][
             b [] [
                 str "Upload a "
@@ -282,9 +266,136 @@ let fileUploadViewComponent (model:Model) dispatch =
 
         fileUploadButton model dispatch uploadId
 
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Show uploaded file data."]
+        Field.div [Field.Props [Style [
+            Width "100%"
+        ]]][
+            if model.ProtocolInsertState.ProcessModel.IsSome then
+                yield! displayProtocolInfoElement isViable errorMsg model dispatch
+            else
+                Field.div [][
+                    str "The protocol building blocks will be shown here"
+                ]
 
-        protocolInsertElement model dispatch
+            addFromFileToTableButton isViable model dispatch
+        ]
+    ]
+
+let toProtocolSearchElement (model:Model) dispatch =
+    Button.span [
+        Button.OnClick(fun e -> UpdatePageState (Some Routing.Route.ProtocolSearch) |> dispatch)
+        Button.Color IsInfo
+        Button.IsFullWidth
+        Button.Props [Style [Margin "1rem 0"]]
+    ] [str "Browse Database"]
+
+let addFromDBToTableButton (model:Model) dispatch =
+    Columns.columns [Columns.IsMobile][
+        Column.column [][
+            Field.div [] [
+                Control.div [] [
+                    Button.a [
+                        if model.ProtocolInsertState.ProtocolSelected.IsSome && model.ProtocolInsertState.ValidationXml.IsSome && model.ProtocolInsertState.BuildingBlockMinInfoList.IsEmpty |> not
+                        then
+                            Button.IsActive true
+                        else
+                            Button.Color Color.IsDanger
+                            Button.Props [Disabled true]
+                        Button.IsFullWidth
+                        Button.Color IsSuccess
+                        Button.OnClick (fun e ->
+                            let preProtocol =
+                                let p = model.ProtocolInsertState.ProtocolSelected.Value
+                                let id = p.Name
+                                let version = p.Version
+                                let swateVersion = model.PersistentStorageState.AppVersion
+                                GroupTypes.Protocol.create id version swateVersion "" "" []
+                            let minBuildingBlockInfos =
+                                model.ProtocolInsertState.BuildingBlockMinInfoList |> List.rev
+                            /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
+                            let validation =
+                                model.ProtocolInsertState.ValidationXml.Value |> Some 
+                            pipeNameTuple3 AddAnnotationBlocks (minBuildingBlockInfos,preProtocol, validation) |> ExcelInterop |> dispatch
+                        )
+                    ] [
+                        str "Insert protocol annotation blocks"
+                    ]
+                ]
+            ]
+        ]
+        if model.ProtocolInsertState.ProtocolSelected.IsSome then
+            Column.column [Column.Width(Screen.All, Column.IsNarrow)][
+                Button.a [
+                    Button.OnClick (fun e -> RemoveSelectedProtocol |> ProtocolInsert |> dispatch)
+                    Button.Color IsDanger
+                ][
+                    Fa.i [Fa.Solid.Times][]
+                ]
+            ]
+    ]
+
+let showDatabaseProtocolTemplate (model:Model) dispatch =
+    div [ Style [
+            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
+            //BorderRadius "15px 15px 0 0"
+            Padding "0.25rem 1rem"
+            MarginBottom "1rem"
+    ]] [
+        Help.help [][
+            b [] [str "Search the database for protocol templates."]
+            str " The building blocks from these templates can be inserted into a Swate table as protocol."
+        ]
+            
+        toProtocolSearchElement model dispatch
+
+        if model.ProtocolInsertState.ProtocolSelected.IsSome then
+            Table.table [Table.IsFullWidth; Table.IsStriped; Table.IsBordered][
+                thead [][
+                    tr [][
+                        th [][str "Column"]
+                        th [][str "Column TAN"]
+                        th [][str "Unit"]
+                        th [][str "Unit TAN"]
+                    ]
+                ]
+                tbody [][
+                    for minBB in model.ProtocolInsertState.BuildingBlockMinInfoList do
+                        yield
+                            tr [][
+                                td [][str minBB.MainColumnName]
+                                td [][str (if minBB.MainColumnTermAccession.IsSome then minBB.MainColumnTermAccession.Value else "-")]
+                                td [][str (if minBB.UnitName.IsSome then minBB.UnitName.Value else "-")]
+                                td [][str (if minBB.UnitTermAccession.IsSome then minBB.UnitTermAccession.Value else "-")]
+                            ]
+                ]
+            ]
+
+        addFromDBToTableButton model dispatch
+    ]
+
+
+let fileUploadViewComponent (model:Model) dispatch =
+    let uploadId = "UploadFiles_ElementId"
+    form [
+        OnSubmit (fun e -> e.preventDefault())
+        // https://keycode.info/
+        OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
+    ] [
+        
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Protocol driven building block insert"]
+
+
+        /// Box 1
+        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add protocol template from database."]
+
+        showDatabaseProtocolTemplate model dispatch
+
+
+        /// Box 2
+        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks from file."]
+
+        protocolInsertElement uploadId model dispatch
+
+
 
         //div [][
         //    str (

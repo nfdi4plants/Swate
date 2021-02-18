@@ -162,6 +162,13 @@ let annotatorApi cString = {
                 )
             return result
         }
+
+    getAllProtocols = fun () -> async {
+        let protocols = ProtocolDB.getAllProtocols cString
+        return protocols
+    }
+
+    getProtocolBlocksForProtocol = fun prot -> async { return ProtocolDB.getXmlByProtocol cString prot }
 }
 
 let createIServiceAPIv1 =

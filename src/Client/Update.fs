@@ -149,7 +149,8 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (tableName,minBuildingBlockInfo)
                 (fun (newColName,format,msg) ->
                     Msg.Batch [
-                        FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
+                        GenericLog ("Info",msg) |> Dev
+                        FormatColumn (activeTableNameRes,newColName,format) |> ExcelInterop
                         UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
                     ]
                 )
@@ -157,18 +158,23 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
 
-    | AddAnnotationBlocks (activeTableNameRes,minBuildingBlockInfos, protocol) ->
+    | AddAnnotationBlocks (activeTableNameRes, minBuildingBlockInfos, protocol, validationOpt) ->
         let cmd tableName =
             Cmd.OfPromise.either
                 OfficeInterop.addAnnotationBlocksAsProtocol
                 (tableName,minBuildingBlockInfos,protocol)
                 (fun (resList,protocolInfo) ->
+                    let newColNames = resList |> List.map (fun (names,_,_) -> names)
+                    let changeColFormatInfos,msg = resList |> List.map (fun (names,format,msg) -> (names,format), msg ) |> List.unzip
                     Msg.Batch [
-                        for newColName,format,msg in resList do
-                            yield
-                                FormatColumn (activeTableNameRes,newColName,format,msg) |> ExcelInterop
-                        yield
+                        FormatColumns (activeTableNameRes,changeColFormatInfos) |> ExcelInterop
+                        GenericLog ("Info", msg |> String.concat "; ") |> Dev
+                        /// This is currently used for protocol template insert from database
+                        if validationOpt.IsSome then
+                            AddTableValidationtoExisting (validationOpt.Value, newColNames, protocolInfo) |> ExcelInterop
+                        else
                             WriteProtocolToXml protocolInfo |> ExcelInterop
+
                     ]
                 )
                 (GenericError >> Dev)
@@ -180,9 +186,9 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             Cmd.OfPromise.either
                 OfficeInterop.addUnitToExistingBuildingBlock
                 (name,format,unitTermOpt)
-                (fun (newColName,format,msg) ->
+                (fun (newColName,format) ->
                     Msg.Batch [
-                        FormatColumn (activeTableNameRes, newColName, format, msg) |> ExcelInterop
+                        FormatColumn (activeTableNameRes, newColName, format) |> ExcelInterop
                         UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
                     ]
                 )
@@ -190,11 +196,26 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
-    | FormatColumn (activeTableNameRes,colName,format,msg) ->
+    | FormatColumn (activeTableNameRes,colName,format) ->
         let cmd name =
             Cmd.OfPromise.either
                 (OfficeInterop.changeTableColumnFormat name colName)
                 format
+                (fun x ->
+                    Msg.Batch [
+                        AutoFitTable activeTableNameRes |> ExcelInterop
+                        GenericLog x |> Dev
+                    ]
+                )
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
+        currentState,cmd
+
+    | FormatColumns (activeTableNameRes, resList) ->
+        let cmd name =
+            Cmd.OfPromise.either
+                (OfficeInterop.changeTableColumnsFormat name)
+                resList
                 (fun x ->
                     Msg.Batch [
                         AutoFitTable activeTableNameRes |> ExcelInterop
@@ -263,6 +284,27 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 )
                 (GenericError >> Dev)
 
+        currentState, cmd
+
+    | AddTableValidationtoExisting (newTableValidation, newColNames, protocolInfo) ->
+        /// tableValidation is retrived from database and does not contain correct tablename and worksheetname.
+        /// Good thing, we also need those things for protocolInfo so we can access the information from there.
+        let updateTableValidation =
+            {newTableValidation with
+                TableName = protocolInfo.TableName
+                WorksheetName = protocolInfo.WorksheetName}
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.addTableValidationToExisting
+                (updateTableValidation, newColNames)
+                (fun x ->
+                    Msg.Batch [
+                        GenericLog x |> Dev
+                        WriteProtocolToXml protocolInfo |> ExcelInterop
+                        //PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop
+                    ]
+                )
+                (GenericError >> Dev)
         currentState, cmd
     | WriteProtocolToXml protocolInfo ->
         let cmd =
@@ -1241,14 +1283,14 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
         nextState, Cmd.none
 
 let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolInsertState) : ProtocolInsertState * Cmd<Msg> =
+
+    let parseDBProtocol (prot:Shared.Protocol) =
+        let tableName,minBBInfos = prot.TableXml |> OfficeInterop.Regex.MinimalBuildingBlock.ofExcelTableXml
+        let validationType = prot.CustomXml |> SwateValidation.ofXml |> fun x -> x.TableValidations |> List.find (fun x -> x.TableName = tableName)
+        if tableName <> validationType.TableName then failwith "CustomXml and TableXml relate to different tables."
+        prot, validationType, minBBInfos
+
     match fujMsg with
-    // Client
-    | UpdateUploadData newDataString ->
-        let nextState = {
-            currentState with
-                UploadData = newDataString
-        }
-        nextState, Cmd.ofMsg (ParseJsonToProcessRequest newDataString |> ProtocolInsert)
     | ParseJsonToProcessRequest parsableString ->
         let cmd =
             Cmd.OfAsync.either
@@ -1267,13 +1309,97 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
         let cmd =
             GenericError e |> Dev |> Cmd.ofMsg 
         currentState, cmd
-    //| SendJson ->
-    //    let cmd =
-    //        Cmd.OfAsync.perform
-    //            Api.isaDotNetApi.tryTestProcess
-    //            ISADotNet.Process.empty
-    //            (fun x -> GenericLog ("info", "sent process"))
-    //    currentState, Cmd.map Dev cmd 
+    | RemoveProcessFromModel ->
+        let nextState = {
+            currentState with
+                ProcessModel = None
+                UploadData = ""
+        }
+        nextState, Cmd.none
+    | GetAllProtocolsRequest ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.api.getAllProtocols
+                ()
+                (GetAllProtocolsResponse >> ProtocolInsert)
+                (GenericError >> Dev)
+        currentState, cmd
+    | GetAllProtocolsResponse protocols ->
+        let nextState = {
+            currentState with ProtocolsAll = protocols
+        }
+        nextState, Cmd.none
+    | GetProtocolXmlByProtocolRequest prot ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.api.getProtocolBlocksForProtocol
+                prot
+                (ParseProtocolXmlByProtocolRequest >> ProtocolInsert)
+                (GenericError >> Dev)
+        currentState, cmd
+    | ParseProtocolXmlByProtocolRequest prot ->
+        let cmd =
+            Cmd.OfFunc.either
+                parseDBProtocol
+                (prot)
+                (GetProtocolXmlByProtocolResponse >> ProtocolInsert)
+                (GenericError >> Dev)
+        currentState, cmd
+    | GetProtocolXmlByProtocolResponse (prot,validation,minBBInfoList) -> 
+        let nextState = {
+            currentState with
+                ProtocolSelected = Some prot
+                BuildingBlockMinInfoList = minBBInfoList
+                ValidationXml = Some validation
+
+                DisplayedProtDetailsId = None
+        }
+        nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.ProtocolInsert)
+    // Client
+    | UpdateUploadData newDataString ->
+        let nextState = {
+            currentState with
+                UploadData = newDataString
+        }
+        nextState, Cmd.ofMsg (ParseJsonToProcessRequest newDataString |> ProtocolInsert)
+    | UpdateDisplayedProtDetailsId idOpt ->
+        let nextState = {
+            currentState with
+                DisplayedProtDetailsId = idOpt
+        }
+        nextState, Cmd.none
+    | UpdateProtocolNameSearchQuery strVal ->
+        let nextState = {
+            currentState with ProtocolNameSearchQuery = strVal
+        }
+        nextState, Cmd.none
+    | UpdateProtocolTagSearchQuery strVal ->
+        let nextState = {
+            currentState with ProtocolTagSearchQuery = strVal
+        }
+        nextState, Cmd.none
+    | AddProtocolTag tagStr ->
+        let nextState = {
+            currentState with
+                ProtocolSearchTags      = tagStr::currentState.ProtocolSearchTags
+                ProtocolTagSearchQuery  = ""
+        }
+        nextState, Cmd.none
+    | RemoveProtocolTag tagStr ->
+        let nextState = {
+            currentState with
+                ProtocolSearchTags      = currentState.ProtocolSearchTags |> List.filter (fun x -> x <> tagStr)
+        }
+        nextState, Cmd.none
+    | RemoveSelectedProtocol ->
+        let nextState = {
+            currentState with
+                ProtocolSelected = None
+                ValidationXml = None
+                BuildingBlockMinInfoList = []
+        }
+        nextState, Cmd.none
+
 
 
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
@@ -1310,6 +1436,8 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             match pageOpt with
             | Some Routing.Route.Validation ->
                 PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop |> Cmd.ofMsg
+            | Some Routing.Route.ProtocolSearch ->
+                GetAllProtocolsRequest |> ProtocolInsert |> Cmd.ofMsg
             | _ ->
                 Cmd.none
         let nextPageState =

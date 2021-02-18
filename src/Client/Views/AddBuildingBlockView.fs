@@ -189,8 +189,6 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                 ]
                 match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
                 | Parameter | Characteristics | Factor ->
-                    str " "
-
                     Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
                         a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).ModalId |> AdvancedSearch |> dispatch)] [
                             str "Use advanced search unit"

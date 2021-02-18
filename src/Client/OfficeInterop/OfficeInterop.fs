@@ -688,6 +688,51 @@ let changeTableColumnFormat annotationTable (colName:string) (format:string) =
        )
     )
 
+let changeTableColumnsFormat annotationTable (colAndFormatList:(string*string) list) =
+    Excel.run(fun context ->
+
+        let colNames = colAndFormatList |> List.map fst
+        let formats = colAndFormatList |> List.map snd
+        // Ref. 2 
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let annotationTable = sheet.tables.getItem(annotationTable)
+
+        // get ranged of main column that was previously created
+        let colBodyRanges =
+            colNames
+            |> List.map (fun colName ->
+                let colBodyRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
+                let _ = colBodyRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+                colBodyRange
+            )
+
+        // Ref. 1
+        let r = context.runtime.load(U2.Case1 "enableEvents")
+
+        context.sync().``then``( fun _ ->
+
+             r.enableEvents <- false
+
+             let formatCols() =
+                List.map2 (fun (colBodyRange:Excel.Range) format ->
+                    let rowCount = colBodyRange.rowCount |> int
+                    let formats = createValueMatrix 1 rowCount format
+                    colBodyRange.numberFormat <- formats
+                ) colBodyRanges formats
+
+             // create a format column to insert
+
+             // add unit format to previously created main column
+
+             let _ = formatCols()
+
+             r.enableEvents <- true
+
+             // return msg
+             "Info",sprintf "Columns were updated with related format: %A" colAndFormatList
+        )
+    )
+
 // Reform this to onSelectionChanged (Even though we now know how to add eventHandlers we do not know how to pass info from handler to Swate app).
 /// This function will parse the header of a selected column to check for a parent ontology, which will then be used for a isA-directed term search.
 /// Any found parent ontology will also be displayed in a static field before the term search input field.
@@ -1284,7 +1329,6 @@ let updateProtocolGroupHeader (annotationTableName) =
         }
     )
 
-
 let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,currentSwateVersion:string) =
     Excel.run(fun context ->
 
@@ -1339,6 +1383,117 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
             let! addNext =
                 context.sync().``then``(fun e ->
                     customXmlParts.add(nextCustomXml)
+                )
+
+            // This will be displayed in activity log
+            return
+                "Info",
+                sprintf
+                    "Update Validation Scheme with '%s - %s' @%s"
+                    newTableValidation.WorksheetName
+                    newTableValidation.TableName
+                    ( newTableValidation.DateTime.ToString("yyyy-MM-dd HH:mm") )
+        }
+    )
+
+let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidation, colNames: string list) =
+    Excel.run(fun context ->
+
+        let getBaseName (colHeader:string) =
+            let parsedHeader = parseColHeader colHeader
+            let ont = if parsedHeader.Ontology.IsSome then sprintf " [%s]" parsedHeader.Ontology.Value.Name else ""
+            sprintf "%s%s" parsedHeader.CoreName.Value ont
+
+        let newColNameMap =
+            colNames |> List.map (fun x ->
+                getBaseName x, x
+            )
+            |> Map.ofList
+
+        //failwith (sprintf "%A" tableValidation)
+
+        let updateColumnValidationColNames =
+            tableValidation.ColumnValidations
+            |> List.filter (fun x -> x.ColumnHeader <> ColumnCoreNames.Shown.Source && x.ColumnHeader <> ColumnCoreNames.Shown.Sample)
+            |> List.map (fun previousColVal ->
+                let baseName = getBaseName previousColVal.ColumnHeader
+                let newName =
+                    newColNameMap.[baseName]
+                {previousColVal with ColumnHeader = newName}
+            )
+
+        // Update DateTime 
+        let newTableValidation = {
+            tableValidation with
+                DateTime = System.DateTime.Now
+                ColumnValidations = updateColumnValidationColNames
+            }
+
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+    
+        promise {
+    
+            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+
+            let currentSwateValidationXml =
+                let previousValidation = swateValidationOfXml xmlParsed xml
+                if previousValidation.IsNone then ValidationTypes.SwateValidation.init (tableValidation.SwateVersion) else previousValidation.Value
+
+            let updatedTableValidation =
+                let isPreviousTableValidation =
+                    currentSwateValidationXml.TableValidations
+                    |> List.tryFind (fun x -> x.TableName = newTableValidation.TableName && x.WorksheetName = newTableValidation.WorksheetName)
+                if isPreviousTableValidation.IsSome then
+                    let previousTableValidation = isPreviousTableValidation.Value
+                    {previousTableValidation with
+                        ColumnValidations = newTableValidation.ColumnValidations@previousTableValidation.ColumnValidations |> List.sortBy (fun x -> x.ColumnAdress)
+                        SwateVersion = newTableValidation.SwateVersion
+                        DateTime = newTableValidation.DateTime
+                        
+                    }
+                else
+                    newTableValidation
+
+            let nextSwateValidationXml =
+                let newTableValidations =
+                    currentSwateValidationXml.TableValidations
+                    |> List.filter (fun x -> x.TableName <> newTableValidation.TableName || x.WorksheetName <> newTableValidation.WorksheetName)
+                    |> fun filteredValidations -> updatedTableValidation::filteredValidations
+                { currentSwateValidationXml with
+                    SwateVersion = tableValidation.SwateVersion
+                    TableValidations = newTableValidations
+                }
+    
+            let nextCustomXml =
+                let nextAsXmlFormat = nextSwateValidationXml.toXml |> SimpleXml.parseElement
+                let childrenWithoutValidation = xmlParsed.Children |> List.filter (fun child ->
+                    child.Name <> "Validation"
+                )
+                let nextChildren = nextAsXmlFormat::childrenWithoutValidation
+                { xmlParsed with
+                        Children = nextChildren
+                } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+
+            printfn "%A" nextCustomXml
+
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Array.ofSeq |> Array.map (fun x -> x.delete() )
+                    xmls
+                )
+
+            let! reloadedCustomXml =
+                context.sync().``then``(fun e ->
+                    let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+                    workbook.customXmlParts
+                )
+
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    reloadedCustomXml.add(nextCustomXml)
                 )
 
             // This will be displayed in activity log
@@ -1432,9 +1587,9 @@ let addUnitToExistingBuildingBlock (annotationTable:string,format:string option,
                 let maincolName = findLeftClosestBuildingBlock.MainColumn.Header.Value.Header
 
                 /// If unit block was added then return some msg information
-                let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""
+                //let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""
                 let unitColFormat = if unitColumnResult.IsSome then snd unitColumnResult.Value else "0.00"
 
-                maincolName, unitColFormat, unitColCreationMsg
+                maincolName, unitColFormat //, unitColCreationMsg
         )
     )

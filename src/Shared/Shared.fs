@@ -148,6 +148,35 @@ type SearchTermI = {
         TermOpt         = None
     }
 
+type Protocol = {
+    Name            : string
+    Version         : string
+    Created         : DateTime
+    Author          : string
+    Description     : string
+    DocsLink        : string
+    CustomXml       : string
+    TableXml        : string
+    Tags            : string []
+    // WIP
+    Used            : int
+    Rating          : int  
+} with
+    static member create name version created author desc docs tags customXml tableXml used rating = {
+        Name            = name
+        Version         = version
+        Created         = created 
+        Author          = author
+        Description     = desc
+        DocsLink        = docs
+        Tags            = tags
+        CustomXml       = customXml
+        TableXml        = tableXml
+        // WIP          
+        Used            = used
+        Rating          = rating
+    }
+
 /// This type is used to define target for unit term search.
 type UnitSearchRequest =
 | Unit1
@@ -186,6 +215,10 @@ type IAnnotatorAPIv1 = {
     getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<DbDomain.Term [] * UnitSearchRequest>
 
     getTermsByNames                     : SearchTermI []                                                -> Async<SearchTermI []>
+
+    // Protocol apis
+    getAllProtocols                 : unit                                                  -> Async<Protocol []>
+    getProtocolBlocksForProtocol    : Protocol                                              -> Async<Protocol>
 }
 
         

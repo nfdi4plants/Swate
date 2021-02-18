@@ -12,35 +12,38 @@ open Model
 //open ISADotNet
 
 type ExcelInteropMsg =
-    | PipeActiveAnnotationTable     of (TryFindAnnoTableResult -> ExcelInteropMsg)
+    | PipeActiveAnnotationTable             of (TryFindAnnoTableResult -> ExcelInteropMsg)
     /// This is used to pipe (all table names []) to a ExcelInteropMsg.
     /// This is used to generate a new annotation table name.
-    | PipeCreateAnnotationTableInfo of (string [] -> ExcelInteropMsg)
-    | Initialized                   of (string*string)
-    | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
-    | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
-    | AddAnnotationBlocks           of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol
-    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * unitTermName:string option * unitTermAccession:string option
-    | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
+    | PipeCreateAnnotationTableInfo         of (string [] -> ExcelInteropMsg)
+    | Initialized                           of (string*string)
+    | FillSelection                         of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
+    | AddAnnotationBlock                    of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
+    | AddAnnotationBlocks                   of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | AddUnitToAnnotationBlock              of tryFindActiveAnnotationTable:TryFindAnnoTableResult * unitTermName:string option * unitTermAccession:string option
+    | FormatColumn                          of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string
+    | FormatColumns                         of activeAnnotationTable:TryFindAnnoTableResult * (string * string) list
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
-    | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
-    | AnnotationtableCreated        of activeAnnotationTable:TryFindAnnoTableResult * string
-    | AnnotationTableExists         of activeAnnotationTable:TryFindAnnoTableResult
-    | GetParentTerm                 of activeAnnotationTable:TryFindAnnoTableResult
-    | AutoFitTable                  of activeAnnotationTable:TryFindAnnoTableResult
-    | UpdateProtocolGroupHeader     of activeAnnotationTable:TryFindAnnoTableResult
+    | CreateAnnotationTable                 of allTableNames:string [] * isDark:bool
+    | AnnotationtableCreated                of activeAnnotationTable:TryFindAnnoTableResult * string
+    | AnnotationTableExists                 of activeAnnotationTable:TryFindAnnoTableResult
+    | GetParentTerm                         of activeAnnotationTable:TryFindAnnoTableResult
+    | AutoFitTable                          of activeAnnotationTable:TryFindAnnoTableResult
+    | UpdateProtocolGroupHeader             of activeAnnotationTable:TryFindAnnoTableResult
     //
-    | GetTableValidationXml         of activeAnnotationTable:TryFindAnnoTableResult
-    | WriteTableValidationToXml     of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
-    | WriteProtocolToXml            of newProtocol:Xml.GroupTypes.Protocol
+    | GetTableValidationXml                 of activeAnnotationTable:TryFindAnnoTableResult
+    | WriteTableValidationToXml             of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
+    /// needs to set newColNames separately as these validations come from templates for protocol group insert
+    | AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:OfficeInterop.Types.Xml.GroupTypes.Protocol
+    | WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
     | DeleteAllCustomXml
     | GetSwateCustomXml
     //
-    | FillHiddenColsRequest         of activeAnnotationTable:TryFindAnnoTableResult
-    | FillHiddenColumns             of tableName:string*SearchTermI []
-    | UpdateFillHiddenColsState     of FillHiddenColsState
+    | FillHiddenColsRequest                 of activeAnnotationTable:TryFindAnnoTableResult
+    | FillHiddenColumns                     of tableName:string*SearchTermI []
+    | UpdateFillHiddenColsState             of FillHiddenColsState
     //
-    | InsertFileNames               of activeAnnotationTable:TryFindAnnoTableResult*fileNameList:string list
+    | InsertFileNames                       of activeAnnotationTable:TryFindAnnoTableResult*fileNameList:string list
     // Development
     | TryExcel
     | TryExcel2
@@ -139,10 +142,31 @@ type ValidationMsg =
     | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
 
 type ProtocolInsertMsg =
-    // Client
-    | UpdateUploadData of string
+    // ------ Process from file ------
     | ParseJsonToProcessRequest of string
     | ParseJsonToProcessResult of Result<ISADotNet.Process,exn>
+    // Client
+    | RemoveProcessFromModel
+
+    // ------ Protocol from Database ------
+    | GetAllProtocolsRequest
+    | GetAllProtocolsResponse of Protocol []
+    // Access xml from db and parse it
+    /// Get Protocol Xml from db
+    | GetProtocolXmlByProtocolRequest of Protocol
+    /// On return parse Protocol Xml
+    | ParseProtocolXmlByProtocolRequest of Protocol
+    /// Store Result from ParseProtocolXmlByProtocolRequest in model
+    | GetProtocolXmlByProtocolResponse of Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
+    // Client
+    | UpdateUploadData of string
+    | UpdateDisplayedProtDetailsId of int option
+    | UpdateProtocolNameSearchQuery of string
+    | UpdateProtocolTagSearchQuery of string
+    | AddProtocolTag of string
+    | RemoveProtocolTag of string
+    | RemoveSelectedProtocol
+
 
 type TopLevelMsg =
     | CloseSuggestions

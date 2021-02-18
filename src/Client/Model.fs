@@ -357,14 +357,46 @@ type ValidationState = {
 
 open ISADotNet
 
+
+/// This model is used for both protocol insert and protocol search
 type ProtocolInsertState = {
-    UploadData: string
-    ProcessModel: ISADotNet.Process option
+    // Client view
+    DisplayedProtDetailsId  : int option
+
+    // Process.json file upload
+    UploadData              : string
+    ProcessModel            : ISADotNet.Process option
+
+    // Database protocol template
+    ProtocolSelected        : Shared.Protocol option
+    ValidationXml           : OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    BuildingBlockMinInfoList: OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
+    ProtocolsAll            : Shared.Protocol []
+
+    ProtocolNameSearchQuery : string
+    ProtocolTagSearchQuery  : string
+    ProtocolSearchTags      : string list
+
 } with
     static member init () = {
-        UploadData = ""
-        ProcessModel = None
+        // Client view
+        DisplayedProtDetailsId  = None
+
+        // ISADotNet Process.json file upload
+        UploadData              = ""
+        ProcessModel            = None
+
+        // Database protocol templates
+        ProtocolSelected        = None
+        ValidationXml           = None
+        BuildingBlockMinInfoList= []
+        ProtocolsAll            = [||]
+        ProtocolNameSearchQuery = ""
+        ProtocolTagSearchQuery  = ""
+        ProtocolSearchTags      = []
     }
+
+
 
 type Model = {
 

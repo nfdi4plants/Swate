@@ -41,6 +41,7 @@
         <Compile Include="Views\ValidationView.fs" />
         <Compile Include="Views\FilePickerView.fs" />
         <Compile Include="Views\ProtocolInsertView.fs" />
+        <Compile Include="Views\ProtocolSearchView.fs" />
         <Compile Include="Views\InfoView.fs" />
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\SettingsView.fs" />

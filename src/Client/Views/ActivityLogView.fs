@@ -53,9 +53,9 @@ let activityLogComponent (model:Model) dispatch =
                 Button.Color Color.IsWarning
                 Button.IsFullWidth
                 Button.OnClick (fun e -> GetSwateCustomXml |> ExcelInterop |> dispatch )
-                Button.Props [Style [MarginBottom "1rem"]; Title "Show record type data of Swate validation Xml"]
+                Button.Props [Style [MarginBottom "1rem"]; Title "Show record type data of Swate custom Xml"]
             ] [
-                span [] [str "Show Swate Validation Xml!"]
+                span [] [str "Show Custom Xml!"]
             ]
             Button.a [
                 Button.Color Color.IsDanger

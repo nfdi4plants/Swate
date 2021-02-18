@@ -12,6 +12,7 @@ $excelPrimary30: #639d7d;
 
 $mint: #1FC2A7;
 $lightBlue: #4fb3d9;
+$lightBlueLighter20: #72c2e1;
 $red: #c21f3a;//#e83151;//#E32746;
 $yellow: #FFC000;
 
@@ -82,7 +83,24 @@ a:hover {
     background-color: #E8E8E8 !important
 }
 
+.clickableTag {
+    cursor: pointer
+}
 
+.clickableTag:hover {
+    background-color: $lightBlueLighter20 !important;
+}
+
+.clickableTagDelete {
+    cursor: pointer;
+    border: 0.2px solid $info
+}
+
+.clickableTagDelete:hover {
+    background-color: $danger !important;
+    border-color: $danger !important;
+    color: white
+}
 
 /////////// Custom simple checkbox, due to issue #54 ///////////////////
 .checkbox-label {
