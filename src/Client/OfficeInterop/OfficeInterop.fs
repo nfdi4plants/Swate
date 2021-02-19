@@ -267,6 +267,7 @@ let autoFitTable (annotationTable) =
         // Ref. 2
         
         let sheet = context.workbook.worksheets.getActiveWorksheet()
+
         let annotationTable = sheet.tables.getItem(annotationTable)
         let allCols = annotationTable.columns.load(propertyNames = U2.Case1 "items")
     
@@ -654,6 +655,82 @@ let addAnnotationBlocksAsProtocol (annotationTable,buildingBlockInfoList:Minimal
         return (blockResults,completeProtocolInfo)
     }
 
+let removeAnnotationBlock (annotationTable:string) =
+    Excel.run(fun context ->
+
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let table = sheet.tables.getItem(annotationTable)
+
+        // Ref. 2
+
+        let _ = table.load(U2.Case1 "columns")
+        let tableCols = table.columns.load(propertyNames = U2.Case1 "items")
+
+        // This is necessary to place new columns next to selected col
+        let annoHeaderRange = table.getHeaderRowRange()
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"rowIndex"|]))
+
+        let tableRange = table.getRange()
+        let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+
+        let selectedRange = context.workbook.getSelectedRange()
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+
+        // Ref. 2
+        let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
+
+        promise {
+            let! selectedBuildingBlock =
+                context.sync().``then``( fun _ ->
+
+                    if selectedRange.columnCount <> 1. then
+                        failwith "To add a unit please select a single column"
+
+                    let newSelectedColIndex =
+                        // recalculate the selected range index based on table
+                        let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
+                        // if index is smaller 0 it is outside of table range
+                        if diff <= 0. then 0.
+                        // if index is bigger than columnCount-1 then it is outside of tableRange
+                        elif diff >= annoHeaderRange.columnCount-1. then annoHeaderRange.columnCount-1.
+                        else diff
+
+                    /// Sort all columns into building blocks.
+                    let buildingBlocks =
+                        getBuildingBlocks annoHeaderRange annoBodyRange
+
+                    /// find building block with the closest main column index from left
+                    let findLeftClosestBuildingBlock =
+                        buildingBlocks
+                        |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
+                        |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
+
+                    findLeftClosestBuildingBlock
+                )
+
+            let targetedColIndices =
+                let hasTSRAndTan =
+                    if selectedBuildingBlock.hasCompleteTSRTAN then [|selectedBuildingBlock.TAN.Value.Index; selectedBuildingBlock.TSR.Value.Index|] else [||]
+                let hasUnit =
+                    if selectedBuildingBlock.hasCompleteUnitBlock then
+                        [|selectedBuildingBlock.Unit.Value.MainColumn.Index;selectedBuildingBlock.Unit.Value.TSR.Value.Index;selectedBuildingBlock.Unit.Value.TAN.Value.Index|]
+                    else
+                        [||]
+                [|  selectedBuildingBlock.MainColumn.Index
+                    yield! hasTSRAndTan
+                    yield! hasUnit
+                |] |> Array.sort
+
+            let! deleteCols =
+                context.sync().``then``(fun e ->
+                    targetedColIndices |> Array.map (fun targetIndex ->
+                        tableCols.items.[targetIndex].delete()
+                    )
+                )
+
+            return sprintf "Delete Building Block %s (Cols: %A]" selectedBuildingBlock.MainColumn.Header.Value.Header targetedColIndices
+        }
+    )
 
 let changeTableColumnFormat annotationTable (colName:string) (format:string) =
     Excel.run(fun context ->
@@ -1475,8 +1552,6 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
                 { xmlParsed with
                         Children = nextChildren
                 } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
-
-            printfn "%A" nextCustomXml
 
             let! deleteXml =
                 context.sync().``then``(fun e ->

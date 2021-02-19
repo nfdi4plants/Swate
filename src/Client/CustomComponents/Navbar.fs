@@ -20,7 +20,7 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
                     Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-                    Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]; Tooltip.dataTooltip ("Add Annotation Table") ]
+                    Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft "0"; PaddingRight "0"]; Tooltip.dataTooltip ("Add Annotation Table") ]
                     Button.OnClick (fun _ ->
                         (fun (allNames) ->
                             CreateAnnotationTable (allNames,model.SiteStyleState.IsDarkMode))
@@ -38,7 +38,7 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
                     Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]; Tooltip.dataTooltip ("Autoformat Table")]
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft "0"; PaddingRight "0"]; Tooltip.dataTooltip ("Autoformat Table")]
                     Button.OnClick (fun e ->
                         Msg.Batch [
                             PipeActiveAnnotationTable AutoFitTable |> ExcelInterop
@@ -54,7 +54,7 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                 Button.a [
                     Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground]; Tooltip.dataTooltip ("Update Reference Columns")]
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft "0"; PaddingRight "0"]; Tooltip.dataTooltip ("Update Reference Columns")]
                     Button.OnClick (fun _ ->
                         PipeActiveAnnotationTable FillHiddenColsRequest |> ExcelInterop |> dispatch
                     )
@@ -64,6 +64,20 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Fa.span [Fa.Solid.EyeSlash][]
                     span [][str model.ExcelState.FillHiddenColsStateStore.toReadableString]
                     Fa.span [Fa.Solid.Pen][]
+                ]
+            ]
+            Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Button.a [
+                    Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft "0"; PaddingRight "0"]; Tooltip.dataTooltip ("Remove Building Block")]
+                    Button.OnClick (fun _ ->
+                        PipeActiveAnnotationTable RemoveAnnotationBlock |> ExcelInterop |> dispatch
+                    )
+                    Button.Color Color.IsWhite
+                    Button.IsInverted
+                ] [ 
+                    Fa.span [Fa.Solid.MinusCircle][]
+                    Fa.span [Fa.Solid.Columns][]
                 ]
             ]
             Navbar.burger [

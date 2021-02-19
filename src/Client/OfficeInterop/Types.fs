@@ -408,6 +408,26 @@ module BuildingBlockTypes =
                 Unit                = if this.Unit.IsSome then this.Unit.Value.MainColumn.Header.Value.Ontology.Value.Name |> Some else None
             }
 
+        member this.hasCompleteTSRTAN =
+            match this.TAN, this.TSR with
+            | Some tan, Some tsr ->
+                true
+            | None, None ->
+                false
+            | _, _ ->
+                failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN." this.MainColumn.Header.Value.Header)
+
+        member this.hasCompleteUnitBlock =
+            if this.Unit.IsSome then
+                let u = this.Unit.Value
+                match u.TSR, u.TAN with
+                | Some _, Some _ -> true
+                | None, None -> false
+                | _, _ ->
+                    failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN in Unit block." this.MainColumn.Header.Value.Header)
+            else
+                false
+
     open ISADotNetHelpers
 
     type MinimalBuildingBlock = {

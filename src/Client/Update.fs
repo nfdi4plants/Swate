@@ -181,6 +181,23 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
 
+    | RemoveAnnotationBlock (activeTableNameRes) ->
+        let cmd name =
+            Cmd.OfPromise.either
+                OfficeInterop.removeAnnotationBlock
+                (name)
+                (fun msg ->
+                    Msg.Batch [
+                        GenericLog ("Info",msg) |> Dev
+                        AutoFitTable activeTableNameRes |> ExcelInterop
+                        UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
+                    ]
+                )
+                (GenericError >> Dev)
+
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
+        currentState, cmd
+
     | AddUnitToAnnotationBlock (activeTableNameRes, format, unitTermOpt) ->
         let cmd name =
             Cmd.OfPromise.either

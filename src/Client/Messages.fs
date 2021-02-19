@@ -20,6 +20,7 @@ type ExcelInteropMsg =
     | FillSelection                         of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
     | AddAnnotationBlock                    of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
     | AddAnnotationBlocks                   of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | RemoveAnnotationBlock                 of activeAnnotationTable:TryFindAnnoTableResult
     | AddUnitToAnnotationBlock              of tryFindActiveAnnotationTable:TryFindAnnoTableResult * unitTermName:string option * unitTermAccession:string option
     | FormatColumn                          of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string
     | FormatColumns                         of activeAnnotationTable:TryFindAnnoTableResult * (string * string) list
