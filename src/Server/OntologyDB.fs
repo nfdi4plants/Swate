@@ -189,6 +189,45 @@ let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyIn
                     (reader.GetBoolean(6))
     |]
 
+let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
+
+    let hasAccession = parentTerm.TermAccession <> ""
+
+    use connection = establishConnection cString
+    connection.Open()
+    use cmd =
+        if hasAccession then
+            new MySqlCommand("getAllTermsByParentTermAndAccession",connection)
+        else
+            new MySqlCommand("getAllTermsByParentTerm",connection)
+
+    cmd.CommandType <- CommandType.StoredProcedure
+
+    let parentOntologyParam     = cmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+
+    parentOntologyParam     .Value <- parentTerm.Name
+
+    if hasAccession then
+        let accessionParam = cmd.Parameters.Add("parentTermAccession", MySqlDbType.VarChar)
+        accessionParam      .Value <- parentTerm.TermAccession
+
+    use reader = cmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+
 let getTermSuggestionsByParentTermAndAccession cString (query:string, parentTerm:string, parentTermAccession:string) =
     
     use connection = establishConnection cString

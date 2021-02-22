@@ -144,7 +144,7 @@ let createAutocompleteSuggestions
     let suggestions = 
         if autocompleteParams.Suggestions.Length > 0 then
             autocompleteParams.Suggestions
-            |> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
+            //|> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
             |> Array.map (fun sugg ->
                 tr [
                     OnClick (fun _ ->
@@ -207,10 +207,12 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
                 //if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
                 ZIndex "20"
                 Width "100%"
+                MaxHeight "400px"
                 Position PositionOptions.Absolute
                 BackgroundColor colorMode.ControlBackground
                 BorderColor     colorMode.ControlForeground
                 MarginTop "-0.5rem"
+                OverflowY OverflowOptions.Scroll
             ]]
         ] [
             Table.table [Table.IsFullWidth] [
@@ -310,6 +312,14 @@ let autocompleteTermSearchComponentOfParentOntology
                             PipeActiveAnnotationTable GetParentTerm |> ExcelInterop |> dispatch
                             let el = Browser.Dom.document.getElementById autocompleteParams.InputId
                             el.focus()
+                        )
+                        OnDoubleClick (fun e ->
+                            if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.TermSearchText = "" then
+                                let parentOnt = model.TermSearchState.ParentOntology.Value
+                                let (parentOntInfo:OntologyInfo) = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
+                                GetAllTermsByParentTermRequest parentOntInfo |> TermSearch |> dispatch
+                            else
+                                ()
                         )
                     ]           
                     Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
