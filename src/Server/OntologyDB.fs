@@ -90,6 +90,8 @@ SELECT max(ID) FROM Term"""
             isObsolete
     | false -> failwith "Inserting term failed."
 
+open System
+
 let getTermSuggestions cString (query:string) =
     
     use connection = establishConnection cString
@@ -99,7 +101,15 @@ let getTermSuggestions cString (query:string) =
 
     let queryParam      = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
 
-    queryParam      .Value <- query
+    let query' =
+        if query.Contains " " then
+            query.Split([|" "|], StringSplitOptions.RemoveEmptyEntries)
+            |> Array.filter (fun x -> x.Length >= 3 )
+            |> String.concat " "
+        else
+            query
+
+    queryParam      .Value <- query'
 
     use reader = getTermSuggestionsCmd.ExecuteReader()
     [|
