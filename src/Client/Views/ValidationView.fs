@@ -157,37 +157,82 @@ let checkradioList (ind:int) colVal model dispatch =
 
 
 let sliderElements id columnValidation model dispatch =
-    let defaultSliderVal = string (if columnValidation.Importance.IsSome then columnValidation.Importance.Value else 0)
-    let sliderId = sprintf "importanceSlider%i" id
-    let outputSliderId = sprintf "outputForImportanceSlider%i" id
-    [
-        Slider.slider [
-            Slider.Props [Id sliderId; Style [Height "40px"]]
-            Slider.IsFullWidth
-            Slider.IsCircle
-            Slider.Max 100.
-            Slider.Min 0.
-            Slider.Step 1.
-            Slider.CustomClass "has-output"
-            Slider.OnChange (fun e ->
-                // this is used to quickly update the label element to the right of the slider with t he new value
-                let sliderEle = Browser.Dom.document.getElementById(outputSliderId)
-                let _ = sliderEle.textContent <- (if e.Value = "0" then "None" else e.Value)
-                /// Previously this appeared rather laggy, but now it seems to work fine.
+    //let defaultSliderVal = string (if columnValidation.Importance.IsSome then columnValidation.Importance.Value else 0)
+    //let sliderId = sprintf "importanceSlider%i" id
+    //let outputSliderId = sprintf "outputForImportanceSlider%i" id
+    //[
+    //    Slider.slider [
+    //        Slider.Props [Id sliderId; Style [Height "40px"]]
+    //        Slider.IsFullWidth
+    //        Slider.IsCircle
+    //        Slider.Max 10.
+    //        Slider.Min 0.
+    //        Slider.Step 1.
+    //        Slider.CustomClass "has-output"
+    //        Slider.OnChange (fun e ->
+    //            // this is used to quickly update the label element to the right of the slider with the new value
+    //            let sliderEle = Browser.Dom.document.getElementById(outputSliderId)
+    //            let _ = sliderEle.textContent <- (if e.Value = "0" then "None" else e.Value)
+    //            /// Previously this appeared rather laggy, but now it seems to work fine.
+    //            let nextColumnValidation = {
+    //                columnValidation with
+    //                    Importance = if e.Value = "0" then None else int e.Value |> Some
+    //            }
+    //            let nextTableValidation =
+    //                updateTableValidationByColValidation model nextColumnValidation
+    //            UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+    //            //()
+    //        )
+    //        Slider.Color IsPrimary
+    //        Slider.ValueOrDefault defaultSliderVal
+    //    ]
+    //    output [Props.HtmlFor sliderId; Id outputSliderId; Style [TextOverflow "unset"]] [
+    //        str (if defaultSliderVal = "0" then "None" else defaultSliderVal)
+    //    ]
+    //]
+    div [][
+        for i in 1 .. 10 do
+            yield
+                Button.a [
+                    Button.Color IsWarning
+                    Button.Props [Style [Padding "0rem"]]
+                    Button.IsLight
+                    Button.OnClick (fun e ->
+                        let nextColumnValidation = {
+                            columnValidation with
+                                Importance = i |> Some
+                        }
+                        let nextTableValidation =
+                            updateTableValidationByColValidation model nextColumnValidation
+                        UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                        )
+                ][
+                    Fa.span [
+                        Fa.Size Fa.FaLarge
+                        if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
+                            Fa.Solid.Star
+                        else
+                            Fa.Regular.Star
+                        Fa.Props [Style [Color NFDIColors.Yellow.Base]]
+                    ][]
+                ]
+        yield Button.a [
+            Button.Color IsDanger
+            Button.IsLight
+            Button.OnClick (fun e ->
                 let nextColumnValidation = {
                     columnValidation with
-                        Importance = if e.Value = "0" then None else int e.Value |> Some
+                        Importance = None
                 }
                 let nextTableValidation =
                     updateTableValidationByColValidation model nextColumnValidation
                 UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
-                //()
-            )
-            Slider.Color IsPrimary
-            Slider.ValueOrDefault defaultSliderVal
-        ]
-        output [Props.HtmlFor sliderId; Id outputSliderId; Style [TextOverflow "unset"]] [
-            str (if defaultSliderVal = "0" then "None" else defaultSliderVal)
+                )
+        ][
+            Fa.span [
+                Fa.Size Fa.FaLarge
+                Fa.Solid.Backspace
+            ][]
         ]
     ]
 
@@ -255,7 +300,7 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
 
                         Help.help [][str "Define how important it is to fill in the column correctly."]
 
-                        yield! sliderElements ind columnValidation model dispatch
+                        sliderElements ind columnValidation model dispatch
 
                         //submitButton ind columnValidation model dispatch
                     ]
