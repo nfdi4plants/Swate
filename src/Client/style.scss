@@ -102,6 +102,10 @@ a:hover {
     color: white
 }
 
+.toExcelColor {
+    color: $excelPrimary !important
+}
+
 /////////// Custom simple checkbox, due to issue #54 ///////////////////
 .checkbox-label {
     display: inline-block;

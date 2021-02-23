@@ -76,7 +76,21 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Button.Color Color.IsWhite
                     Button.IsInverted
                 ] [ 
-                    Fa.span [Fa.Solid.MinusCircle][]
+                    Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]][]
+                    Fa.span [Fa.Solid.Columns][]
+                ]
+            ]
+            Navbar.Item.a [Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Button.a [
+                    Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft "0"; PaddingRight "0"]; Tooltip.dataTooltip ("Get Building Block Information")]
+                    Button.OnClick (fun _ ->
+                        PipeActiveAnnotationTable GetSelectedBuildingBlockSearchTerms |> ExcelInterop |> dispatch
+                    )
+                    Button.Color Color.IsWhite
+                    Button.IsInverted
+                ] [ 
+                    Fa.span [Fa.Solid.Question; Fa.Props [Style [PaddingRight "0.15rem"]]][]
                     Fa.span [Fa.Solid.Columns][]
                 ]
             ]
@@ -84,13 +98,12 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                 Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible
                 Navbar.Burger.OnClick (fun e -> ToggleBurger |> StyleChange |> dispatch)
                 Navbar.Burger.Modifiers [Modifier.TextColor IsWhite]
-                Navbar.Burger.Props[
+                Navbar.Burger.Props [
                         Role "button"
                         AriaLabel "menu"
                         Props.AriaExpanded false
 
-                ]
-            ] [
+            ]] [
                 span [AriaHidden true] []
                 span [AriaHidden true] []
                 span [AriaHidden true] []

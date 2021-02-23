@@ -308,9 +308,6 @@ module Xml =
                         let worksheetName   = table.Attributes.["WorksheetName"]
                         let tableName       = table.Attributes.["TableName"]
                         let dateTime        =
-                            //let day, month, year =
-                            //    let s = table.Attributes.["DateTime"].Split([|"/"|], StringSplitOptions.None)
-                            //    int s.[0], int s.[1], int s.[2]
                             System.DateTime.Parse(table.Attributes.["DateTime"])
                         let userlist        = table.Attributes.["Userlist"].Split([|"; "|], StringSplitOptions.RemoveEmptyEntries) |> List.ofSeq
                         let nextColumnValidations =

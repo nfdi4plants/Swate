@@ -64,34 +64,93 @@ open Fable.SimpleXml.Generator
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction1 () =
     Excel.run(fun context ->
-        let selectedRange = context.workbook.getSelectedRange()
-        let _ = selectedRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"])))
+        
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"; "worksheets"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"name"; "worksheet"|]))
 
         promise {
+            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+        
+            let tableSheetCombinations =
+                tables.items
+                |> Seq.toArray
+                |> Array.map (fun x -> x.name, x.worksheet.name)
+                |> Map.ofArray
 
-            let! baseFunc =
-                context.sync().``then``(fun e ->
-                    sprintf "%A, %A" selectedRange.columnIndex selectedRange.rowIndex
-            )
+            let currentProtocolGroup = protocolGroupOfXml xmlParsed xml
+            let currentValidationGroup = swateValidationOfXml xmlParsed xml
 
-            return baseFunc
+            /// Filter out all table-worksheet combinations that no longer exist.
+            let newProtocolGroup =
+                if currentProtocolGroup.IsSome then
+                    let protocols = currentProtocolGroup.Value.Protocols
+                    let newProtocols =
+                        protocols |> List.filter (fun protocol ->
+                            let sheetIsExisting = Map.tryFind protocol.WorksheetName tableSheetCombinations
+                            if sheetIsExisting.IsSome then
+                                sheetIsExisting.Value = protocol.TableName
+                            else
+                                false
+                    )
+                    {   currentProtocolGroup.Value with
+                            Protocols = newProtocols
+                    }.toXml |> SimpleXml.parseElement |> Some
+                else
+                    None
+
+            let newValidationGroup =
+                if currentValidationGroup.IsSome then
+                    let tableValidations = currentValidationGroup.Value.TableValidations
+                    let newTableValidations =
+                        tableValidations |> List.filter (fun tableValidation ->
+                            let sheetIsExisting = Map.tryFind tableValidation.WorksheetName tableSheetCombinations
+                            if sheetIsExisting.IsSome then
+                                sheetIsExisting.Value = tableValidation.TableName
+                            else
+                                false
+                    )
+                    {   currentValidationGroup.Value with
+                            TableValidations = newTableValidations
+                    }.toXml |> SimpleXml.parseElement |> Some
+                else
+                    None
+
+            //let nextCustomXml =
+            //    let childrenWithoutValidation = xmlParsed.Children |> List.filter (fun child ->
+            //        child.Name <> "Validation" && child.Name <> "ProtocolGroup "
+            //    )
+            //    let nextChildren = (if newProtocolGroup.IsSome then newProtocolGroup.Value)::(if newProtocolGroup.IsSome then newProtocolGroup.Value)::childrenWithoutValidation
+            //    { xmlParsed with
+            //            Children = nextChildren
+            //    } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+
+            return sprintf "%A" currentValidationGroup
         }
     )
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction2 () =
     Excel.run(fun context ->
+
+        let annotationTable = "annotationTable"
+
         let selectedRange = context.workbook.getSelectedRange()
-        let _ = selectedRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"])))
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+        
+        // Ref. 2
+        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTable
 
         promise {
 
-            let! baseFunc =
-                context.sync().``then``(fun e ->
-                    sprintf "%A, %A" selectedRange.columnIndex selectedRange.rowIndex
-            )
+            let! selectedBuildingBlock =
+                findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
 
-            return baseFunc
+            let searchTerms = sortBuildingBlockToSearchTerm selectedBuildingBlock
+
+            return (sprintf "%A" searchTerms)
         }
     )
 
@@ -681,32 +740,7 @@ let removeAnnotationBlock (annotationTable:string) =
 
         promise {
             let! selectedBuildingBlock =
-                context.sync().``then``( fun _ ->
-
-                    if selectedRange.columnCount <> 1. then
-                        failwith "To add a unit please select a single column"
-
-                    let newSelectedColIndex =
-                        // recalculate the selected range index based on table
-                        let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
-                        // if index is smaller 0 it is outside of table range
-                        if diff <= 0. then 0.
-                        // if index is bigger than columnCount-1 then it is outside of tableRange
-                        elif diff >= annoHeaderRange.columnCount-1. then annoHeaderRange.columnCount-1.
-                        else diff
-
-                    /// Sort all columns into building blocks.
-                    let buildingBlocks =
-                        getBuildingBlocks annoHeaderRange annoBodyRange
-
-                    /// find building block with the closest main column index from left
-                    let findLeftClosestBuildingBlock =
-                        buildingBlocks
-                        |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
-                        |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
-
-                    findLeftClosestBuildingBlock
-                )
+                BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
 
             let targetedColIndices =
                 let hasTSRAndTan =
@@ -729,6 +763,26 @@ let removeAnnotationBlock (annotationTable:string) =
                 )
 
             return sprintf "Delete Building Block %s (Cols: %A]" selectedBuildingBlock.MainColumn.Header.Value.Header targetedColIndices
+        }
+    )
+
+let getAnnotationBlockDetails annotationTable =
+    Excel.run(fun context ->
+
+        let selectedRange = context.workbook.getSelectedRange()
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+        
+        // Ref. 2
+        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTable
+
+        promise {
+
+            let! selectedBuildingBlock =
+                findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
+
+            let searchTerms = sortBuildingBlockToSearchTerm selectedBuildingBlock
+
+            return searchTerms
         }
     )
 
@@ -958,60 +1012,8 @@ let createSearchTermsIFromTable (annotationTable') =
                 let buildingBlocksWithOntology =
                     buildingBlocks |> Array.filter (fun x -> x.TSR.IsSome && x.TAN.IsSome)
 
-                /// We need an array of all distinct cell.values and where they occur in col- and row-index
-                let terms =
-                    buildingBlocksWithOntology
-                    |> Array.collect (fun bBlock ->
-                        // get current col index
-                        let tsrTanColIndices = [|bBlock.TSR.Value.Index; bBlock.TAN.Value.Index|]
-                        let fillTermConstructsNoUnit bBlock =
-                            // group cells by value so we don't get doubles.
-                            bBlock.MainColumn.Cells
-                            |> Array.groupBy (fun cell ->
-                                cell.Value.Value
-                            )
-                            // create SearchTermI types that will be passed to the server to get filled with a term option.
-                            |> Array.map (fun (searchStr,cellArr) ->
-                                let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
-                                Shared.SearchTermI.create tsrTanColIndices searchStr "" bBlock.MainColumn.Header.Value.Ontology rowIndices
-                            )
-                        /// We differentiate between building blocks with and without unit as unit building blocks will not contain terms as values but e.g. numbers.
-                        /// In this case we do not want to search the database for the cell values but the parent ontology in the header.
-                        /// This will then be used for TSR and TAN.
-                        let fillTermConstructsWithUnit (bBlock:BuildingBlock) =
-                            let searchStr       = bBlock.MainColumn.Header.Value.Ontology.Value.Name
-                            let termAccession   = bBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
-                            let rowIndices =
-                                bBlock.MainColumn.Cells
-                                |> Array.map (fun x ->
-                                   x.Index
-                                )
-                            [|Shared.SearchTermI.create tsrTanColIndices searchStr termAccession None rowIndices|]
-                        if bBlock.Unit.IsSome then
-                            fillTermConstructsWithUnit bBlock
-                        else
-                            fillTermConstructsNoUnit bBlock
-                    )
-
-                /// Create search types for the unit building blocks.
-                let units =
-                    buildingBlocksWithOntology
-                    |> Array.filter (fun bBlock -> bBlock.Unit.IsSome)
-                    |> Array.map (
-                        fun bBlock ->
-                            let unit = bBlock.Unit.Value
-                            let searchString  = unit.MainColumn.Header.Value.Ontology.Value.Name
-                            let termAccession = unit.MainColumn.Header.Value.Ontology.Value.TermAccession 
-                            let colIndices = [|unit.MainColumn.Index; unit.TSR.Value.Index; unit.TAN.Value.Index|]
-                            let rowIndices = unit.MainColumn.Cells |> Array.map (fun x -> x.Index)
-                            Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
-                    )
-
                 /// Combine search types
-                let allSearches = [|
-                    yield! terms
-                    yield! units
-                |]
+                let allSearches = sortBuildingBlocksValuesToSearchTerm buildingBlocksWithOntology
 
                 /// Return the name of the table and all search types
                 annotationTable',allSearches

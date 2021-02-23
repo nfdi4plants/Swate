@@ -45,6 +45,8 @@ type ExcelInteropMsg =
     | UpdateFillHiddenColsState             of FillHiddenColsState
     //
     | InsertFileNames                       of activeAnnotationTable:TryFindAnnoTableResult*fileNameList:string list
+    // Show Details to selected BuildingBlock
+    | GetSelectedBuildingBlockSearchTerms   of activeAnnotationTable:TryFindAnnoTableResult
     // Development
     | TryExcel
     | TryExcel2
@@ -52,10 +54,13 @@ type ExcelInteropMsg =
 
 type TermSearchMsg =
     | ToggleSearchByParentOntology
-    | SearchTermTextChange      of string
-    | TermSuggestionUsed        of DbDomain.Term
-    | NewSuggestions            of DbDomain.Term []
-    | StoreParentOntologyFromOfficeInterop of obj option
+    | SearchTermTextChange                  of string
+    | TermSuggestionUsed                    of DbDomain.Term
+    | NewSuggestions                        of DbDomain.Term []
+    | StoreParentOntologyFromOfficeInterop  of obj option
+    // Server
+    | GetAllTermsByParentTermRequest        of OntologyInfo 
+    | GetAllTermsByParentTermResponse       of DbDomain.Term []
 
 type AdvancedSearchMsg =
     // Client
@@ -168,6 +173,10 @@ type ProtocolInsertMsg =
     | RemoveProtocolTag of string
     | RemoveSelectedProtocol
 
+type BuildingBlockDetailsMsg =
+    | GetSelectedBuildingBlockSearchTermsRequest    of Shared.SearchTermI []
+    | GetSelectedBuildingBlockSearchTermsResponse   of Shared.SearchTermI []
+    | ToggleShowDetails
 
 type TopLevelMsg =
     | CloseSuggestions
@@ -186,6 +195,7 @@ type Msg =
     | AddBuildingBlock      of AddBuildingBlockMsg
     | Validation            of ValidationMsg
     | ProtocolInsert        of ProtocolInsertMsg
+    | BuildingBlockDetails  of BuildingBlockDetailsMsg
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>

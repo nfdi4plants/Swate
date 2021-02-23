@@ -415,6 +415,17 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         nextState, cmd
 
+    //
+    | GetSelectedBuildingBlockSearchTerms activeTableNameRes ->
+        let cmd name =
+            Cmd.OfPromise.either
+                OfficeInterop.getAnnotationBlockDetails
+                name
+                (GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
+                (GenericError >> Dev)
+        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
+        currentState, cmd
+
     /// DEV
     | TryExcel  ->
         let nextState = currentState
@@ -518,6 +529,33 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
         let nextState = {
             currentState with
                 ParentOntology = pOnt
+        }
+        nextState, Cmd.none
+
+    // Server
+
+    | GetAllTermsByParentTermRequest ontInfo ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.api.getAllTermsByParentTerm
+                ontInfo
+                (GetAllTermsByParentTermResponse >> TermSearch)
+                (GenericError >> Dev)
+
+        let nextState = {
+            currentState with
+                HasSuggestionsLoading = true
+        }
+
+        nextState, cmd
+
+    | GetAllTermsByParentTermResponse terms ->
+        let nextState = {
+            currentState with
+                TermSuggestions = terms
+                HasSuggestionsLoading = false
+                ShowSuggestions = true
+                
         }
         nextState, Cmd.none
 
@@ -1417,7 +1455,32 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
         }
         nextState, Cmd.none
 
-
+let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
+    match topLevelMsg with
+    // Client
+    | ToggleShowDetails ->
+        let nb = currentState.ShowDetails |> not
+        let nextState = {
+            ShowDetails         = nb
+            BuildingBlockValues = if nb = false then [||] else currentState.BuildingBlockValues
+        }
+        nextState, Cmd.none
+    // Server
+    | GetSelectedBuildingBlockSearchTermsRequest searchTerms ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.api.getTermsByNames
+                searchTerms
+                (GetSelectedBuildingBlockSearchTermsResponse >> BuildingBlockDetails)
+                (GenericError >> Dev)
+        currentState, cmd
+    | GetSelectedBuildingBlockSearchTermsResponse searchTermResults ->
+        let nextState = {
+            currentState with
+                ShowDetails         = true
+                BuildingBlockValues = searchTermResults
+        }
+        nextState, Cmd.none
 
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
@@ -1621,6 +1684,17 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 ProtocolInsertState = nextFileUploadJsonState
             }
         nextModel, nextCmd
+
+    | BuildingBlockDetails buildingBlockDetailsMsg ->
+        let nextState, nextCmd =
+            currentModel.BuildingBlockDetailsState
+            |> handleBuildingBlockMsg buildingBlockDetailsMsg
+
+        let nextModel = {
+            currentModel with
+                BuildingBlockDetailsState = nextState
+            }
+        nextModel, nextCmd 
 
     | TopLevelMsg topLevelMsg ->
         let nextModel, nextCmd =

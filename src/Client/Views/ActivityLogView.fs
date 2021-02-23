@@ -25,22 +25,22 @@ let activityLogComponent (model:Model) dispatch =
             str "Back to Term Search"
         ]
         Help.help [][str "This page is used for development/debugging."]
-        Button.button [
-            Button.Color Color.IsInfo
-            Button.IsFullWidth
-            Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
-            Button.Props [Style [MarginBottom "1rem"]]
-        ] [
-            str "Try Excel"
-        ]
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth
-        //    Button.OnClick (fun e -> TryExcel2 |> ExcelInterop |> dispatch )
+        //    Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
         //    Button.Props [Style [MarginBottom "1rem"]]
         //] [
-        //    str "Try Excel2"
+        //    str "Try Excel"
         //]
+        Button.button [
+            Button.Color Color.IsInfo
+            Button.IsFullWidth
+            Button.OnClick (fun e -> TryExcel2 |> ExcelInterop |> dispatch )
+            Button.Props [Style [MarginBottom "1rem"]]
+        ] [
+            str "Try Excel2"
+        ]
         Label.label [][str "Dangerzone"]
         Container.container [
             Container.Props [Style [

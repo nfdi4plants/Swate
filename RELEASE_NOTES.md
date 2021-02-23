@@ -1,3 +1,9 @@
+### 0.4.0+71801ff (Released 2021-2-19)
+* Additions:
+    * latest commit #71801ff
+    * [[#454ccd7](https://github.com/nfdi4plants/Swate/commit/454ccd7368e61ff5b669b197c5cd3d0ade7b1c6b)] Add database template logic (Issue #10, #107) :sparkles:
+    * [[#71801ff](https://github.com/nfdi4plants/Swate/commit/71801ff2e558834ed5bb413d8b62d2f7eea48419)] Add 'Remove Building Block' button (Issue #102).
+
 ### 0.3.1+cbc655c (Released 2021-2-12)
 * Additions:
     * latest commit #cbc655c

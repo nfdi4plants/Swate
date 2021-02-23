@@ -128,9 +128,9 @@ module.exports = {
         host: '0.0.0.0',
         port: CONFIG.devServerPort,
         https: {
-            key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
-            cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
-            ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
+            key: "C:/Users/Freym/.office-addin-dev-certs/localhost.key",
+            cert: "C:/Users/Freym/.office-addin-dev-certs/localhost.crt",
+            ca: "C:/Users/Freym/.office-addin-dev-certs/ca.crt"
         },
         proxy: CONFIG.devServerProxy,
         hot: true,

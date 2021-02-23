@@ -155,10 +155,17 @@ let annotatorApi cString = {
                             // check if term accession was found. If so search also by this as it is unique
                             elif searchTerm.TermAccession <> "" then
                                 let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchString,searchTerm.TermAccession)
-                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                                if Array.isEmpty searchRes then
+                                    None
+                                else
+                                    searchRes |> Array.head |> Some
                             elif searchTerm.IsA.IsSome then
                                 let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchString,searchTerm.IsA.Value)
-                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                                if Array.isEmpty searchRes then
+                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.SearchString
+                                    if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
+                                else
+                                    searchRes |> Array.head |> Some
                             else
                                 let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
                                 if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some

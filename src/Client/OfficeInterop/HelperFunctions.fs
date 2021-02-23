@@ -352,6 +352,123 @@ module BuildingBlockTypes =
 
         buildingBlocks
 
+    open System
+
+    let findSelectedBuildingBlockPreSync (context:RequestContext) annotationTableName =
+        let selectedRange = context.workbook.getSelectedRange()
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+
+        // Ref. 2
+        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
+        selectedRange, annoHeaderRange, annoBodyRange
+
+    let findSelectedBuildingBlock (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) (context:RequestContext) =
+        context.sync().``then``( fun _ ->
+
+            if selectedRange.columnCount <> 1. then
+                failwith "To add a unit please select a single column"
+
+            let newSelectedColIndex =
+                // recalculate the selected range index based on table
+                let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
+                // if index is smaller 0 it is outside of table range
+                if diff <= 0. then 0.
+                // if index is bigger than columnCount-1 then it is outside of tableRange
+                elif diff >= annoHeaderRange.columnCount-1. then annoHeaderRange.columnCount-1.
+                else diff
+
+            /// Sort all columns into building blocks.
+            let buildingBlocks =
+                getBuildingBlocks annoHeaderRange annoBodyRange
+
+            /// find building block with the closest main column index from left
+            let findLeftClosestBuildingBlock =
+                buildingBlocks
+                |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
+                |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
+
+            findLeftClosestBuildingBlock
+        )
+
+    let private sortMainColValuesToSearchTerms (buildingBlock:BuildingBlock) =
+        // get current col index
+        let tsrTanColIndices = [|buildingBlock.TSR.Value.Index; buildingBlock.TAN.Value.Index|]
+        let fillTermConstructsNoUnit bBlock =
+            // group cells by value so we don't get doubles.
+            bBlock.MainColumn.Cells
+            |> Array.groupBy (fun cell ->
+                cell.Value.Value
+            )
+            // create SearchTermI types that will be passed to the server to get filled with a term option.
+            |> Array.map (fun (searchStr,cellArr) ->
+                let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
+                Shared.SearchTermI.create tsrTanColIndices searchStr "" bBlock.MainColumn.Header.Value.Ontology rowIndices
+            )
+        /// We differentiate between building blocks with and without unit as unit building blocks will not contain terms as values but e.g. numbers.
+        /// In this case we do not want to search the database for the cell values but the parent ontology in the header.
+        /// This will then be used for TSR and TAN.
+        let fillTermConstructsWithUnit (bBlock:BuildingBlock) =
+            let searchStr       = bBlock.MainColumn.Header.Value.Ontology.Value.Name
+            let termAccession   = bBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
+            let rowIndices =
+                bBlock.MainColumn.Cells
+                |> Array.map (fun x ->
+                    x.Index
+                )
+            [|Shared.SearchTermI.create tsrTanColIndices searchStr termAccession None rowIndices|]
+        if buildingBlock.Unit.IsSome then
+            fillTermConstructsWithUnit buildingBlock
+        else
+            fillTermConstructsNoUnit buildingBlock
+
+    let private sortUnitColToSearchTerm (buildingBlock:BuildingBlock) =
+        let unit = buildingBlock.Unit.Value
+        let searchString  = unit.MainColumn.Header.Value.Ontology.Value.Name
+        let termAccession = unit.MainColumn.Header.Value.Ontology.Value.TermAccession 
+        let colIndices = [|unit.MainColumn.Index; unit.TSR.Value.Index; unit.TAN.Value.Index|]
+        let rowIndices = unit.MainColumn.Cells |> Array.map (fun x -> x.Index)
+        Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
+
+    let private sortHeaderToSearchTerm (buildingBlock:BuildingBlock) =
+        let searchString  = buildingBlock.MainColumn.Header.Value.Ontology.Value.Name
+        let termAccession = buildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession 
+        let colIndices = [|buildingBlock.MainColumn.Index; buildingBlock.TSR.Value.Index; buildingBlock.TAN.Value.Index|]
+        let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
+        Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
+
+    let sortBuildingBlockValuesToSearchTerm (buildingBlock:BuildingBlock) =
+
+        /// We need an array of all distinct cell.values and where they occur in col- and row-index
+        let terms() = sortMainColValuesToSearchTerms buildingBlock
+
+        /// Create search types for the unit building blocks.
+        let units() = sortUnitColToSearchTerm buildingBlock
+
+        match buildingBlock.TAN, buildingBlock.TSR with
+        | Some _, Some _ ->
+            /// Combine search types
+            [|
+                yield! terms()
+                if buildingBlock.Unit.IsSome then
+                    yield units()
+            |]
+        | None, None ->
+            let searchString  = ""
+            let termAccession = ""
+            let colIndices = [|buildingBlock.MainColumn.Index|]
+            let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
+            [| Shared.SearchTermI.create colIndices searchString termAccession None rowIndices |]
+        | _ -> failwith (sprintf "Encountered unknown reference column pattern. Building block (%s) can only contain both TSR and TAN or none." buildingBlock.MainColumn.Header.Value.Header)
+
+    let sortBuildingBlockToSearchTerm (buildingBlock:BuildingBlock) =
+        [|yield! sortBuildingBlockValuesToSearchTerm buildingBlock; sortHeaderToSearchTerm buildingBlock|] 
+
+    let sortBuildingBlocksValuesToSearchTerm (buildingBlocks:BuildingBlock []) =
+
+        buildingBlocks |> Array.collect (fun bb ->
+            sortBuildingBlockValuesToSearchTerm bb
+        )
+
 open System
 open Fable.SimpleXml
 open Fable.SimpleXml.Generator

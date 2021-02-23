@@ -106,6 +106,9 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
             if model.DevState.LastFullError.IsSome then
                 CustomComponents.ErrorModal.errorModal model dispatch
 
+            if model.BuildingBlockDetailsState.ShowDetails then
+                CustomComponents.BuildingBlockDetailsModal.buildingBlockDetailModal model dispatch
+
             yield! bodyChildren
 
             br []

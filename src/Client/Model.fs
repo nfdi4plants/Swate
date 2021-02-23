@@ -396,7 +396,14 @@ type ProtocolInsertState = {
         ProtocolSearchTags      = []
     }
 
-
+type BuildingBlockDetailsState = {
+    ShowDetails         : bool
+    BuildingBlockValues : Shared.SearchTermI []
+} with
+    static member init () = {
+        ShowDetails         = false
+        BuildingBlockValues = [||]
+    }
 
 type Model = {
 
@@ -437,21 +444,24 @@ type Model = {
     //Create Validation scheme for Table
     ValidationState         : ValidationState
 
+    BuildingBlockDetailsState   : BuildingBlockDetailsState
+
 }
 
 
 let initializeModel (pageOpt: Route option) = {
-    DebouncerState          = Debouncer             .create()
-    PageState               = PageState             .init pageOpt
-    PersistentStorageState  = PersistentStorageState.init ()
-    DevState                = DevState              .init ()
-    SiteStyleState          = SiteStyleState        .init ()
-    TermSearchState         = TermSearchState       .init ()
-    AdvancedSearchState     = AdvancedSearchState   .init ()
-    ExcelState              = ExcelState            .init ()
-    ApiState                = ApiState              .init ()
-    FilePickerState         = FilePickerState       .init ()
-    AddBuildingBlockState   = AddBuildingBlockState .init ()
-    ValidationState         = ValidationState       .init ()
-    ProtocolInsertState     = ProtocolInsertState   .init ()
+    DebouncerState              = Debouncer                 .create ()
+    PageState                   = PageState                 .init pageOpt
+    PersistentStorageState      = PersistentStorageState    .init ()
+    DevState                    = DevState                  .init ()
+    SiteStyleState              = SiteStyleState            .init ()
+    TermSearchState             = TermSearchState           .init ()
+    AdvancedSearchState         = AdvancedSearchState       .init ()
+    ExcelState                  = ExcelState                .init ()
+    ApiState                    = ApiState                  .init ()
+    FilePickerState             = FilePickerState           .init ()
+    AddBuildingBlockState       = AddBuildingBlockState     .init ()
+    ValidationState             = ValidationState           .init ()
+    ProtocolInsertState         = ProtocolInsertState       .init ()
+    BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
 }
