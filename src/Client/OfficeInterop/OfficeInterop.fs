@@ -65,69 +65,22 @@ open Fable.SimpleXml.Generator
 let exampleExcelFunction1 () =
     Excel.run(fun context ->
         
-        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"; "worksheets"|]))
-        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
-
-        let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
-        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"name"; "worksheet"|]))
-
-        promise {
-            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+        let annotationTable = "annotationTable"
         
-            let tableSheetCombinations =
-                tables.items
-                |> Seq.toArray
-                |> Array.map (fun x -> x.name, x.worksheet.name)
-                |> Map.ofArray
-
-            let currentProtocolGroup = protocolGroupOfXml xmlParsed xml
-            let currentValidationGroup = swateValidationOfXml xmlParsed xml
-
-            /// Filter out all table-worksheet combinations that no longer exist.
-            let newProtocolGroup =
-                if currentProtocolGroup.IsSome then
-                    let protocols = currentProtocolGroup.Value.Protocols
-                    let newProtocols =
-                        protocols |> List.filter (fun protocol ->
-                            let sheetIsExisting = Map.tryFind protocol.WorksheetName tableSheetCombinations
-                            if sheetIsExisting.IsSome then
-                                sheetIsExisting.Value = protocol.TableName
-                            else
-                                false
-                    )
-                    {   currentProtocolGroup.Value with
-                            Protocols = newProtocols
-                    }.toXml |> SimpleXml.parseElement |> Some
-                else
-                    None
-
-            let newValidationGroup =
-                if currentValidationGroup.IsSome then
-                    let tableValidations = currentValidationGroup.Value.TableValidations
-                    let newTableValidations =
-                        tableValidations |> List.filter (fun tableValidation ->
-                            let sheetIsExisting = Map.tryFind tableValidation.WorksheetName tableSheetCombinations
-                            if sheetIsExisting.IsSome then
-                                sheetIsExisting.Value = tableValidation.TableName
-                            else
-                                false
-                    )
-                    {   currentValidationGroup.Value with
-                            TableValidations = newTableValidations
-                    }.toXml |> SimpleXml.parseElement |> Some
-                else
-                    None
-
-            //let nextCustomXml =
-            //    let childrenWithoutValidation = xmlParsed.Children |> List.filter (fun child ->
-            //        child.Name <> "Validation" && child.Name <> "ProtocolGroup "
-            //    )
-            //    let nextChildren = (if newProtocolGroup.IsSome then newProtocolGroup.Value)::(if newProtocolGroup.IsSome then newProtocolGroup.Value)::childrenWithoutValidation
-            //    { xmlParsed with
-            //            Children = nextChildren
-            //    } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
-
-            return sprintf "%A" currentValidationGroup
+        let selectedRange = context.workbook.getSelectedRange()
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+                
+        // Ref. 2
+        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTable
+        
+        promise {
+        
+            let! selectedBuildingBlock =
+                findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
+        
+            let searchTerms = sortBuildingBlockToSearchTerm selectedBuildingBlock
+        
+            return (sprintf "%A" searchTerms)
         }
     )
 
@@ -388,25 +341,15 @@ let getTableRepresentation(annotationTable) =
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
         promise {
-            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
-            let currentSwateValidationXml = swateValidationOfXml xmlParsed xml
+            let! xmlParsed, xml = getCustomXml customXmlParts context
+            let currentTableValidation = getSwateValidationForCurrentTable annotationTable activeWorksheet.name xmlParsed
 
-            let! worksheetName, buildingBlocks =
+            let! buildingBlocks =
                 context.sync().``then``( fun _ ->
                     let buildingBlocks = getBuildingBlocks annoHeaderRange annoBodyRange
 
-                    let worksheetName = activeWorksheet.name
-                    worksheetName, buildingBlocks 
+                    buildingBlocks 
                 )
-
-            let currentTableValidation =
-                if currentSwateValidationXml.IsNone then
-                    None
-                else
-                    let tryFindActiveTableValidation =
-                        currentSwateValidationXml.Value.TableValidations
-                        |> List.tryFind (fun tableVal -> tableVal.TableName = annotationTable && tableVal.WorksheetName = worksheetName)
-                    tryFindActiveTableValidation
 
             /// This function updates the current SwateValidation xml with all found building blocks.
             let updateCurrentTableValidationXml =
@@ -435,7 +378,7 @@ let getTableRepresentation(annotationTable) =
                         /// Should no current TableValidation xml exist, create a new one
                         ValidationTypes.TableValidation.create
                             ""
-                            worksheetName
+                            activeWorksheet.name
                             annotationTable
                             System.DateTime.Now
                             []
@@ -662,7 +605,7 @@ let addAnnotationBlocksAsProtocol (annotationTable,buildingBlockInfoList:Minimal
             let annoHeaderRange,annoBodyRange = getBuildingBlocksPreSync context annotationTable
 
             promise {
-                let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+                let! xmlParsed, xml = getCustomXml customXmlParts context
                 
                 let currentProtocolGroup = protocolGroupOfXml xmlParsed xml
 
@@ -1264,7 +1207,7 @@ let updateProtocolGroupHeader (annotationTableName) =
         let groupHeader = annoHeaderRange.getRowsAbove(1.)
 
         promise {
-            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+            let! xmlParsed, xml = getCustomXml customXmlParts context
             let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
             let currentProtocolGroup = protocolGroupOfXml xmlParsed xml
 
@@ -1425,31 +1368,11 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
     
         promise {
     
-            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+            let! xmlParsed, xml = getCustomXml customXmlParts context
+    
+            let nextCustomXml = updateSwateValidation newTableValidation xmlParsed
 
-            let currentSwateValidationXml =
-                let previousValidation = swateValidationOfXml xmlParsed xml
-                if previousValidation.IsNone then ValidationTypes.SwateValidation.init (currentSwateVersion) else previousValidation.Value
-    
-            let nextSwateValidationXml =
-                let newTableValidations =
-                    currentSwateValidationXml.TableValidations
-                    |> List.filter (fun x -> x.TableName <> newTableValidation.TableName || x.WorksheetName <> newTableValidation.WorksheetName)
-                    |> fun filteredValidations -> newTableValidation::filteredValidations
-                { currentSwateValidationXml with
-                    SwateVersion = currentSwateVersion
-                    TableValidations = newTableValidations
-                }
-    
-            let nextCustomXml =
-                let nextAsXmlFormat = nextSwateValidationXml.toXml |> SimpleXml.parseElement
-                let childrenWithoutValidation = xmlParsed.Children |> List.filter (fun child ->
-                    child.Name <> "Validation"
-                )
-                let nextChildren = nextAsXmlFormat::childrenWithoutValidation
-                { xmlParsed with
-                        Children = nextChildren
-                } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+            let nextCustomXmlString = nextCustomXml |> OfficeInterop.HelperFunctions.xmlElementToXmlString
                         
             let! deleteXml =
                 context.sync().``then``(fun e ->
@@ -1461,7 +1384,7 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
     
             let! addNext =
                 context.sync().``then``(fun e ->
-                    customXmlParts.add(nextCustomXml)
+                    customXmlParts.add(nextCustomXmlString)
                 )
 
             // This will be displayed in activity log
@@ -1514,18 +1437,13 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
     
         promise {
     
-            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+            let! xmlParsed, xml = getCustomXml customXmlParts context
 
-            let currentSwateValidationXml =
-                let previousValidation = swateValidationOfXml xmlParsed xml
-                if previousValidation.IsNone then ValidationTypes.SwateValidation.init (tableValidation.SwateVersion) else previousValidation.Value
+            let currentTableValidationOpt = getSwateValidationForCurrentTable newTableValidation.TableName newTableValidation.WorksheetName xmlParsed
 
             let updatedTableValidation =
-                let isPreviousTableValidation =
-                    currentSwateValidationXml.TableValidations
-                    |> List.tryFind (fun x -> x.TableName = newTableValidation.TableName && x.WorksheetName = newTableValidation.WorksheetName)
-                if isPreviousTableValidation.IsSome then
-                    let previousTableValidation = isPreviousTableValidation.Value
+                if currentTableValidationOpt.IsSome then
+                    let previousTableValidation = currentTableValidationOpt.Value
                     {previousTableValidation with
                         ColumnValidations = newTableValidation.ColumnValidations@previousTableValidation.ColumnValidations |> List.sortBy (fun x -> x.ColumnAdress)
                         SwateVersion = newTableValidation.SwateVersion
@@ -1535,25 +1453,9 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
                 else
                     newTableValidation
 
-            let nextSwateValidationXml =
-                let newTableValidations =
-                    currentSwateValidationXml.TableValidations
-                    |> List.filter (fun x -> x.TableName <> newTableValidation.TableName || x.WorksheetName <> newTableValidation.WorksheetName)
-                    |> fun filteredValidations -> updatedTableValidation::filteredValidations
-                { currentSwateValidationXml with
-                    SwateVersion = tableValidation.SwateVersion
-                    TableValidations = newTableValidations
-                }
-    
-            let nextCustomXml =
-                let nextAsXmlFormat = nextSwateValidationXml.toXml |> SimpleXml.parseElement
-                let childrenWithoutValidation = xmlParsed.Children |> List.filter (fun child ->
-                    child.Name <> "Validation"
-                )
-                let nextChildren = nextAsXmlFormat::childrenWithoutValidation
-                { xmlParsed with
-                        Children = nextChildren
-                } |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+            let nextCustomXml = updateSwateValidation updatedTableValidation xmlParsed
+
+            let nextCustomXmlString = nextCustomXml |> OfficeInterop.HelperFunctions.xmlElementToXmlString
 
             let! deleteXml =
                 context.sync().``then``(fun e ->
@@ -1570,7 +1472,7 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
 
             let! addNext =
                 context.sync().``then``(fun e ->
-                    reloadedCustomXml.add(nextCustomXml)
+                    reloadedCustomXml.add(nextCustomXmlString)
                 )
 
             // This will be displayed in activity log

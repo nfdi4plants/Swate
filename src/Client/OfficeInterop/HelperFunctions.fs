@@ -501,7 +501,7 @@ let xmlElementToXmlString (root:XmlElement) =
             text root.Content
     ] |> serializeXml
 
-let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
+let getCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
     promise {
         let! getXml =
             context.sync().``then``(fun e ->
@@ -523,7 +523,8 @@ let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:Reques
 
         let xmlParsed =
             let isRootElement = xml |> SimpleXml.tryParseElement
-            if xml = "" then "<customXml></customXml>" |> SimpleXml.parseElement
+            if xml = "" then
+                "<customXml></customXml>" |> SimpleXml.parseElement
             elif isRootElement.IsSome then
                 isRootElement.Value
             else
@@ -531,7 +532,7 @@ let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:Reques
                 if isManyRootElements.IsSome then
                     isManyRootElements.Value
                     |> List.tryFind (fun ele -> ele.Name = "customXml")
-                    |> fun customXmlOpt -> if customXmlOpt.IsSome then customXmlOpt.Value else failwith "Swate could not find expected 'customXml' root tag."
+                    |> fun customXmlOpt -> if customXmlOpt.IsSome then customXmlOpt.Value else failwith "Swate could not find expected '<customXml>..</customXml>' root tag."
                 else
                     failwith "Swate could not parse Workbook Custom Xml Parts. Had neither one root nor many root elements. Please contact the developer."
         if xmlParsed.Name <> "customXml" then failwith (sprintf "Swate found unexpected root xml element: %s" xmlParsed.Name)
@@ -539,13 +540,64 @@ let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:Reques
         return xmlParsed, xml
     }
 
-let swateValidationOfXml (xmlParsed:XmlElement) (xml:string) =
-    let v = SimpleXml.findElementsByName "Validation" xmlParsed
-    if v.Length > 1 then failwith (sprintf "Swate found multiple 'Validation' xml elements. Please contact the developer.")
-    if v.Length = 0 then
+let getActiveTableXml (tableName:string) (worksheetName:string) (completeCustomXmlParsed:XmlElement) =
+    let tablexml=
+        completeCustomXmlParsed
+        |> SimpleXml.findElementsByName "SwateTable"
+        |> List.tryFind (fun swateTableXml ->
+            swateTableXml.Attributes.["Table"] = tableName
+            && swateTableXml.Attributes.["Worksheet"] = worksheetName
+        )
+    if tablexml.IsSome then
+        tablexml.Value |> Some
+    else
+        None
+
+let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
+    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
+    if activeTableXml.IsNone then
         None
     else
-        Xml.ValidationTypes.SwateValidation.ofXml xml |> Some
+        let v = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot activeTableXml.Value
+        if v.Length > 1 then failwith (sprintf "Swate found multiple 'TableValidation' xml elements. Please contact the developer.")
+        if v.Length = 0 then
+            None
+        else
+            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
+            Xml.ValidationTypes.TableValidation.ofXml tableXmlAsString |> Some
+
+let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
+
+    let currentTableXml = getActiveTableXml tableValidation.TableName tableValidation.WorksheetName previousCompleteCustomXml
+
+    let nextTableXml =
+        let newValidationXml = tableValidation.toXml |> SimpleXml.parseElement
+        if currentTableXml.IsSome then
+            let filteredChildren =
+                currentTableXml.Value.Children
+                |> List.filter (fun x -> x.Name <> Xml.ValidationTypes.ValidationXmlRoot )
+            {currentTableXml.Value with
+                Children = newValidationXml::filteredChildren
+            }
+        else
+            let initNewSwateTableXml =
+                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" tableValidation.TableName tableValidation.WorksheetName
+            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
+            {swateTableXmlEle with
+                Children = [newValidationXml]
+            }
+    let filterPrevTableFromRootChildren =
+        previousCompleteCustomXml.Children
+        |> List.filter (fun x ->
+            let isExisting =
+                x.Name = "SwateTable"
+                && x.Attributes.["Table"] = tableValidation.TableName
+                && x.Attributes.["Worksheet"] = tableValidation.WorksheetName
+            isExisting |> not
+        )
+    {previousCompleteCustomXml with
+        Children = nextTableXml::filterPrevTableFromRootChildren
+    }
 
 let protocolGroupOfXml (xmlParsed:XmlElement) (xml:string) =
     let protocolGroupTag = "ProtocolGroup"
@@ -564,7 +616,7 @@ let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
         promise {
-            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+            let! xmlParsed, xml = getCustomXml customXmlParts context
 
             let currentProtocolGroup =
                 let previousProtocolGroup = protocolGroupOfXml xmlParsed xml

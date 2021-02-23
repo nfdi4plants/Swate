@@ -169,6 +169,9 @@ module Xml =
 
     module ValidationTypes =
 
+        [<Literal>]
+        let ValidationXmlRoot = "TableValidation"
+
         /// User can define what kind of input a column should have
         type ContentType =
             | OntologyTerm of string
@@ -255,74 +258,51 @@ module Xml =
                 ColumnValidations   = []
             }
 
-        /// This type is used to work on the CustomXml 'Validation' tag, which is used to store information on how to validate a specifc Swate table as correct.
-        type SwateValidation = {
-            /// Used to show the last used Swate version to edit SwateValidation CustomXml
-            SwateVersion        : string
-            TableValidations    : TableValidation list
-        } with
-            static member create swateVersion tableValidations = {
-                SwateVersion        = swateVersion
-                TableValidations    = tableValidations
-            }
-            static member init v = SwateValidation.create v []
-    
             member this.toXml =
-                node "Validation" [
-                    attr.value("SwateVersion", this.SwateVersion)
+                node "TableValidation" [
+                        attr.value( "SwateVersion", this.SwateVersion )
+                        attr.value( "WorksheetName", this.WorksheetName )
+                        attr.value( "TableName", this.TableName )
+                        attr.value( "DateTime", this.DateTime.ToString("yyyy-MM-dd HH:mm") )
+                        attr.value( "Userlist", this.Userlist |> String.concat "; " )
                 ][
-                    for table in this.TableValidations do
+                    for column in this.ColumnValidations do
                         yield
-                            node "TableValidation" [
-                                attr.value( "SwateVersion", table.SwateVersion )
-                                attr.value( "WorksheetName", table.WorksheetName )
-                                attr.value( "TableName", table.TableName )
-                                attr.value( "DateTime", table.DateTime.ToString("yyyy-MM-dd HH:mm") )
-                                attr.value( "Userlist", table.Userlist |> String.concat "; " )
-                            ][
-                                for column in table.ColumnValidations do
-                                    yield
-                                        leaf "ColumnValidation" [
-                                            attr.value("ColumnHeader"       , column.ColumnHeader)
-                                            attr.value("ColumnAdress"       , if column.ColumnAdress.IsSome then string column.ColumnAdress.Value else "None")
-                                            attr.value("Importance"         , if column.Importance.IsSome then string column.Importance.Value else "None")
-                                            attr.value("ValidationFormat"   , if column.ValidationFormat.IsSome then string column.ValidationFormat.Value else "None")
-                                            attr.value("Unit"               , if column.Unit.IsSome then column.Unit.Value else "None")
-                                        ]
+                            leaf "ColumnValidation" [
+                                attr.value("ColumnHeader"       , column.ColumnHeader)
+                                attr.value("ColumnAdress"       , if column.ColumnAdress.IsSome then string column.ColumnAdress.Value else "None")
+                                attr.value("Importance"         , if column.Importance.IsSome then string column.Importance.Value else "None")
+                                attr.value("ValidationFormat"   , if column.ValidationFormat.IsSome then string column.ValidationFormat.Value else "None")
+                                attr.value("Unit"               , if column.Unit.IsSome then column.Unit.Value else "None")
                             ]
                 ] |> serializeXml
-    
+
             static member ofXml (xmlString:string) =
-                let swateValidationTag = "Validation"
                 let xml = xmlString |> SimpleXml.parseElement
-                let swateValidation =
-                    xml |> SimpleXml.tryFindElementByName swateValidationTag
-                if swateValidation.IsNone then failwith (sprintf "Could not find existing <%s> tag." swateValidationTag)
-                let tableValidations =
-                    xml |> SimpleXml.findElementsByName "TableValidation"
-                let swateVersion = swateValidation.Value.Attributes.["SwateVersion"]
-                let nextTableValidations =
-                    tableValidations
-                    |> List.map (fun table ->
-                        let swateVersion    = table.Attributes.["SwateVersion"]
-                        let worksheetName   = table.Attributes.["WorksheetName"]
-                        let tableName       = table.Attributes.["TableName"]
-                        let dateTime        =
-                            System.DateTime.Parse(table.Attributes.["DateTime"])
-                        let userlist        = table.Attributes.["Userlist"].Split([|"; "|], StringSplitOptions.RemoveEmptyEntries) |> List.ofSeq
-                        let nextColumnValidations =
-                            table.Children
-                            |> List.map (fun column ->
-                                let columnHeader        = column.Attributes.["ColumnHeader"]
-                                let columnAdress        = column.Attributes.["ColumnAdress"] |> fun x -> if x = "None" then None else Some (int x)
-                                let importance          = column.Attributes.["Importance"] |> fun x -> if x = "None" then None else Some (int x)
-                                let validationFormat    = column.Attributes.["ValidationFormat"] |> fun x -> if x = "None" then None else ContentType.ofString x |> Some
-                                let unit                = column.Attributes.["Unit"] |> fun x -> if x = "None" then None else Some x
-                                ColumnValidation.create columnHeader columnAdress importance validationFormat unit
-                            )
-                        TableValidation.create swateVersion worksheetName tableName dateTime userlist nextColumnValidations
-                    )
-                SwateValidation.create swateVersion nextTableValidations
+                // failsafe
+                let tableValidationOpt = xml |> SimpleXml.tryFindElementByName ValidationXmlRoot
+                if tableValidationOpt.IsNone then failwith (sprintf "Could not find existing <%s> tag." ValidationXmlRoot)
+                // failsafe end
+                let tableValidation = xml |> SimpleXml.findElementByName ValidationXmlRoot
+                let nextTableValidation =
+                    let swateVersion    = tableValidation.Attributes.["SwateVersion"]
+                    let worksheetName   = tableValidation.Attributes.["WorksheetName"]
+                    let tableName       = tableValidation.Attributes.["TableName"]
+                    let dateTime        =
+                        System.DateTime.Parse(tableValidation.Attributes.["DateTime"])
+                    let userlist        = tableValidation.Attributes.["Userlist"].Split([|"; "|], StringSplitOptions.RemoveEmptyEntries) |> List.ofSeq
+                    let nextColumnValidations =
+                        tableValidation.Children
+                        |> List.map (fun column ->
+                            let columnHeader        = column.Attributes.["ColumnHeader"]
+                            let columnAdress        = column.Attributes.["ColumnAdress"] |> fun x -> if x = "None" then None else Some (int x)
+                            let importance          = column.Attributes.["Importance"] |> fun x -> if x = "None" then None else Some (int x)
+                            let validationFormat    = column.Attributes.["ValidationFormat"] |> fun x -> if x = "None" then None else ContentType.ofString x |> Some
+                            let unit                = column.Attributes.["Unit"] |> fun x -> if x = "None" then None else Some x
+                            ColumnValidation.create columnHeader columnAdress importance validationFormat unit
+                        )
+                    TableValidation.create swateVersion worksheetName tableName dateTime userlist nextColumnValidations
+                nextTableValidation
 
 
 type TryFindAnnoTableResult =

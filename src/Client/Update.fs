@@ -1347,7 +1347,7 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
 
     let parseDBProtocol (prot:Shared.Protocol) =
         let tableName,minBBInfos = prot.TableXml |> OfficeInterop.Regex.MinimalBuildingBlock.ofExcelTableXml
-        let validationType = prot.CustomXml |> SwateValidation.ofXml |> fun x -> x.TableValidations |> List.find (fun x -> x.TableName = tableName)
+        let validationType =  prot.CustomXml |> OfficeInterop.Types.Xml.ValidationTypes.TableValidation.ofXml
         if tableName <> validationType.TableName then failwith "CustomXml and TableXml relate to different tables."
         prot, validationType, minBBInfos
 
