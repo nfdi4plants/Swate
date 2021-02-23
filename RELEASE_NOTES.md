@@ -1,6 +1,11 @@
-### 0.4.0+71801ff (Released 2021-2-19)
+### 0.4.0+19a2f73 (Released 2021-2-23)
 * Additions:
-    * latest commit #71801ff
+    * latest commit #19a2f73
+    * [[#05ec1c4](https://github.com/nfdi4plants/Swate/commit/05ec1c4ec4e7634ba91a7f319f3f99bc31d68ee9)] Made file picker Drag'n'Drop lines thicker (Issue #112).
+    * [[#7760257](https://github.com/nfdi4plants/Swate/commit/7760257839839a03641ba5172d46fe77d97353dc)] Improve addition of validation importance (Issue #113).
+    * [[#44d9277](https://github.com/nfdi4plants/Swate/commit/44d9277901a8cb617bca1b78be679c12b4fc362b)] Add option to show all child terms (Issue #114).
+    * [[#80c6235](https://github.com/nfdi4plants/Swate/commit/80c6235759e13263316e4c8f60b9d0f5eb7bc947)] Improve term search search speed.
+    * [[#19a2f73](https://github.com/nfdi4plants/Swate/commit/19a2f739688a4819cf3275de348d41afa1351fc3)] Add button to display building block information (Issue #96).
     * [[#454ccd7](https://github.com/nfdi4plants/Swate/commit/454ccd7368e61ff5b669b197c5cd3d0ade7b1c6b)] Add database template logic (Issue #10, #107) :sparkles:
     * [[#71801ff](https://github.com/nfdi4plants/Swate/commit/71801ff2e558834ed5bb413d8b62d2f7eea48419)] Add 'Remove Building Block' button (Issue #102).
 
