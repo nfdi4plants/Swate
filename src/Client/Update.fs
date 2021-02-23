@@ -22,7 +22,6 @@ let matchActiveTableResToMsg activeTableNameRes (msg:string -> Cmd<Msg>) =
     | Error eMsg ->
         Msg.Batch [
             UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-            UpdateLastFullError (exn(eMsg) |> Some) |> Dev
             GenericLog ("Error",eMsg) |> Dev
         ] |> Cmd.ofMsg
 
@@ -163,7 +162,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             Cmd.OfPromise.either
                 OfficeInterop.addAnnotationBlocksAsProtocol
                 (tableName,minBuildingBlockInfos,protocol)
-                (fun (resList,protocolInfo) ->
+                (fun (resList,protocolInfo,worksheetName,annotationTableName) ->
                     let newColNames = resList |> List.map (fun (names,_,_) -> names)
                     let changeColFormatInfos,msg = resList |> List.map (fun (names,format,msg) -> (names,format), msg ) |> List.unzip
                     Msg.Batch [
@@ -171,7 +170,10 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                         GenericLog ("Info", msg |> String.concat "; ") |> Dev
                         /// This is currently used for protocol template insert from database
                         if validationOpt.IsSome then
-                            AddTableValidationtoExisting (validationOpt.Value, newColNames, protocolInfo) |> ExcelInterop
+                            /// tableValidation is retrived from database and does not contain correct tablename and worksheetname.
+                            /// This information is passed on from addAnnotationBlocksAsProtocol.
+                            let updatedValidation = {validationOpt.Value with TableName = annotationTableName; WorksheetName = worksheetName}
+                            AddTableValidationtoExisting (updatedValidation, newColNames, protocolInfo) |> ExcelInterop
                         else
                             WriteProtocolToXml protocolInfo |> ExcelInterop
 
@@ -304,16 +306,10 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         currentState, cmd
 
     | AddTableValidationtoExisting (newTableValidation, newColNames, protocolInfo) ->
-        /// tableValidation is retrived from database and does not contain correct tablename and worksheetname.
-        /// Good thing, we also need those things for protocolInfo so we can access the information from there.
-        let updateTableValidation =
-            {newTableValidation with
-                TableName = protocolInfo.TableName
-                WorksheetName = protocolInfo.WorksheetName}
         let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.addTableValidationToExisting
-                (updateTableValidation, newColNames)
+                (newTableValidation, newColNames)
                 (fun x ->
                     Msg.Batch [
                         GenericLog x |> Dev
@@ -323,6 +319,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 )
                 (GenericError >> Dev)
         currentState, cmd
+
     | WriteProtocolToXml protocolInfo ->
         let cmd =
             Cmd.OfPromise.either

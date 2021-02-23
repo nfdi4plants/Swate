@@ -607,7 +607,7 @@ let addAnnotationBlocksAsProtocol (annotationTable,buildingBlockInfoList:Minimal
             promise {
                 let! xmlParsed, xml = getCustomXml customXmlParts context
                 
-                let currentProtocolGroup = protocolGroupOfXml xmlParsed xml
+                let currentProtocolGroup = getSwateProtocolGroupForCurrentTable annotationTable activeSheet.name xmlParsed
 
                 let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
 
@@ -615,8 +615,6 @@ let addAnnotationBlocksAsProtocol (annotationTable,buildingBlockInfoList:Minimal
                     let existsAlready =
                         currentProtocolGroup.Value.Protocols
                         |> List.tryFind (fun existingProtocol ->
-                            existingProtocol.TableName      = annotationTable &&
-                            existingProtocol.WorksheetName  = activeSheet.name &&
                             existingProtocol.Id             = protocol.Id
                         )
                     let isComplete =
@@ -626,21 +624,16 @@ let addAnnotationBlocksAsProtocol (annotationTable,buildingBlockInfoList:Minimal
                             true
                     if existsAlready.IsSome then
                         if isComplete then
-                            failwith ( sprintf "Protocol %s exists already in %s - %s." existsAlready.Value.Id existsAlready.Value.TableName existsAlready.Value.WorksheetName )
+                            failwith ( sprintf "Protocol %s exists already in %s - %s." existsAlready.Value.Id currentProtocolGroup.Value.TableName currentProtocolGroup.Value.WorksheetName )
 
-                let! newProtocol = context.sync().``then``(fun e ->
-                    { protocol with
-                        WorksheetName   = activeSheet.name
-                        TableName       = annotationTable }
-                )
                 let! chainProm = chainBuildingBlocks buildingBlockInfoList
 
-                return (chainProm,newProtocol)
+                return (chainProm,protocol,activeSheet.name,annotationTable)
             }
         )
 
     promise {
-        let! blockResults,info = infoProm
+        let! blockResults,info,worksheetName,annotationTable = infoProm
         let createSpannedBlocks =
             [
                 for ind in 0 .. blockResults.Length-1 do
@@ -654,7 +647,7 @@ let addAnnotationBlocksAsProtocol (annotationTable,buildingBlockInfoList:Minimal
                         Xml.GroupTypes.SpannedBuildingBlock.create colName relatedTermAccession
             ]
         let completeProtocolInfo = {info with SpannedBuildingBlocks = createSpannedBlocks}
-        return (blockResults,completeProtocolInfo)
+        return (blockResults,completeProtocolInfo,worksheetName,annotationTable)
     }
 
 let removeAnnotationBlock (annotationTable:string) =
@@ -1209,140 +1202,136 @@ let updateProtocolGroupHeader (annotationTableName) =
         promise {
             let! xmlParsed, xml = getCustomXml customXmlParts context
             let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
-            let currentProtocolGroup = protocolGroupOfXml xmlParsed xml
+            let currentProtocolGroup = getSwateProtocolGroupForCurrentTable annotationTableName activeSheet.name xmlParsed
 
             let! applyGroups = promise {
 
-                    let protocolsForCurrentTableSheet =
-                        if currentProtocolGroup.IsSome then
-                            currentProtocolGroup.Value.Protocols
-                            |> List.filter (fun protocol ->
-                                protocol.TableName = annotationTableName
-                                && protocol.WorksheetName = activeSheet.name
+                let protocolsForCurrentTableSheet =
+                    if currentProtocolGroup.IsSome then
+                        currentProtocolGroup.Value.Protocols
+                    else
+                        []
+
+                let getGroupHeaderIndicesForProtocol (buildingBlocks:BuildingBlock []) (protocol:Xml.GroupTypes.Protocol) =
+                    let buildingBlockOpts = tryFindSpannedBuildingBlocks protocol buildingBlocks
+
+                    // caluclate list of indices fro group blocks
+                    if buildingBlockOpts.IsSome then
+                        let getStartAndEnd (mainColIndices:int list) =
+                            let startInd = List.min mainColIndices
+                            let endInd   =
+                                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+                                let max = List.max mainColIndices |> float
+                                findIndexNextNotHiddenCol headerVals max |> int
+                            startInd,endInd-1
+                        let bbColNumberAndIndices =
+                            buildingBlockOpts.Value
+                            |> List.map (fun bb ->
+                                let nOfCols =
+                                    if bb.TAN.IsNone || bb.TSR.IsNone then
+                                        1
+                                    elif bb.TAN.IsSome && bb.TSR.IsSome && bb.Unit.IsNone then
+                                        3
+                                    elif bb.TAN.IsSome && bb.TSR.IsSome && bb.Unit.IsSome then
+                                        6
+                                    else failwith (sprintf "Swate encountered an unknown column pattern for building block: %s " bb.MainColumn.Header.Value.Header) 
+                                bb.MainColumn.Index, nOfCols
                             )
-                        else
-                            []
-
-                    let getGroupHeaderIndicesForProtocol (buildingBlocks:BuildingBlock []) (protocol:Xml.GroupTypes.Protocol) =
-                        let buildingBlockOpts = tryFindSpannedBuildingBlocks protocol buildingBlocks
-
-                        // caluclate list of indices fro group blocks
-                        if buildingBlockOpts.IsSome then
-                            let getStartAndEnd (mainColIndices:int list) =
-                                let startInd = List.min mainColIndices
-                                let endInd   =
-                                    let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-                                    let max = List.max mainColIndices |> float
-                                    findIndexNextNotHiddenCol headerVals max |> int
-                                startInd,endInd-1
-                            let bbColNumberAndIndices =
-                                buildingBlockOpts.Value
-                                |> List.map (fun bb ->
-                                    let nOfCols =
-                                        if bb.TAN.IsNone || bb.TSR.IsNone then
-                                            1
-                                        elif bb.TAN.IsSome && bb.TSR.IsSome && bb.Unit.IsNone then
-                                            3
-                                        elif bb.TAN.IsSome && bb.TSR.IsSome && bb.Unit.IsSome then
-                                            6
-                                        else failwith (sprintf "Swate encountered an unknown column pattern for building block: %s " bb.MainColumn.Header.Value.Header) 
-                                    bb.MainColumn.Index, nOfCols
-                                )
-                            let rec sortIntoBlocks (iteration:int) (currentGroupIterator:int) (bbColNumberAndIndices:(int*int) list) (collector:(int*int*int) list) =
-                                if iteration >= bbColNumberAndIndices.Length then
+                        let rec sortIntoBlocks (iteration:int) (currentGroupIterator:int) (bbColNumberAndIndices:(int*int) list) (collector:(int*int*int) list) =
+                            if iteration >= bbColNumberAndIndices.Length then
+                                collector
+                            elif iteration = 0 then
+                                let currentInd, currentN = List.item iteration bbColNumberAndIndices
+                                sortIntoBlocks 1 currentGroupIterator bbColNumberAndIndices ((currentGroupIterator,currentInd,currentN)::collector)
+                            else
+                                let currentColIndex, currentNOfCols = List.item iteration bbColNumberAndIndices
+                                let lastGroup, lastColIndex, lastNOfCols =
                                     collector
-                                elif iteration = 0 then
-                                    let currentInd, currentN = List.item iteration bbColNumberAndIndices
-                                    sortIntoBlocks 1 currentGroupIterator bbColNumberAndIndices ((currentGroupIterator,currentInd,currentN)::collector)
-                                else
-                                    let currentColIndex, currentNOfCols = List.item iteration bbColNumberAndIndices
-                                    let lastGroup, lastColIndex, lastNOfCols =
-                                        collector
-                                        |> List.sortBy (fun (group,colIndex,nOfCols) -> colIndex)
-                                        |> List.last
-                                    /// - 1 as the lastColIndex is already the mainColumn
-                                    let lastBBEndInd = lastColIndex + lastNOfCols
-                                    if lastBBEndInd = currentColIndex then
-                                        sortIntoBlocks (iteration+1) currentGroupIterator bbColNumberAndIndices ((currentGroupIterator,currentColIndex,currentNOfCols)::collector)
-                                    elif lastBBEndInd > currentColIndex then
-                                        failwith (sprintf "Swate encountered an unknown building block pattern (Error: SIB%i-%i)" lastBBEndInd currentColIndex)
-                                    else 
-                                        let newGroupIterator = currentGroupIterator + 1 
-                                        sortIntoBlocks (iteration+1) newGroupIterator bbColNumberAndIndices ((newGroupIterator,currentColIndex,currentNOfCols)::collector)
-                            let mainColIndiceBlocks =
-                                sortIntoBlocks 0 0 bbColNumberAndIndices []
-                                |> List.groupBy (fun (group,colInd,nOfCols) -> group)
-                                |> List.map (fun x ->
-                                    snd x |> List.map (fun (group,colInd,nOfCols) -> colInd)
-                                )
-                                |> List.map getStartAndEnd
-                            Some mainColIndiceBlocks
-                        else
-                            None
+                                    |> List.sortBy (fun (group,colIndex,nOfCols) -> colIndex)
+                                    |> List.last
+                                /// - 1 as the lastColIndex is already the mainColumn
+                                let lastBBEndInd = lastColIndex + lastNOfCols
+                                if lastBBEndInd = currentColIndex then
+                                    sortIntoBlocks (iteration+1) currentGroupIterator bbColNumberAndIndices ((currentGroupIterator,currentColIndex,currentNOfCols)::collector)
+                                elif lastBBEndInd > currentColIndex then
+                                    failwith (sprintf "Swate encountered an unknown building block pattern (Error: SIB%i-%i)" lastBBEndInd currentColIndex)
+                                else 
+                                    let newGroupIterator = currentGroupIterator + 1 
+                                    sortIntoBlocks (iteration+1) newGroupIterator bbColNumberAndIndices ((newGroupIterator,currentColIndex,currentNOfCols)::collector)
+                        let mainColIndiceBlocks =
+                            sortIntoBlocks 0 0 bbColNumberAndIndices []
+                            |> List.groupBy (fun (group,colInd,nOfCols) -> group)
+                            |> List.map (fun x ->
+                                snd x |> List.map (fun (group,colInd,nOfCols) -> colInd)
+                            )
+                            |> List.map getStartAndEnd
+                        Some mainColIndiceBlocks
+                    else
+                        None
 
-                    /// 'tableStartIndex' -> let tableRange = annotationTable.getRange().columnIndex
-                    /// 'rangeStartIndex' -> range.columnIndex
-                    let recalculateColIndex tableStartIndex rangeStartIndex =
-                        let tableRangeColIndex = tableStartIndex
-                        let selectColIndex = rangeStartIndex
-                        selectColIndex + tableRangeColIndex
+                /// 'tableStartIndex' -> let tableRange = annotationTable.getRange().columnIndex
+                /// 'rangeStartIndex' -> range.columnIndex
+                let recalculateColIndex tableStartIndex rangeStartIndex =
+                    let tableRangeColIndex = tableStartIndex
+                    let selectColIndex = rangeStartIndex
+                    selectColIndex + tableRangeColIndex
 
-                    let recalculateColIndexToTable rangeStartIndex =
-                        recalculateColIndex annoHeaderRange.columnIndex rangeStartIndex
+                let recalculateColIndexToTable rangeStartIndex =
+                    recalculateColIndex annoHeaderRange.columnIndex rangeStartIndex
 
-                    let! group =
-                        protocolsForCurrentTableSheet
-                        |> List.map (fun protocol ->
-                            let startEndIndices = getGroupHeaderIndicesForProtocol buildingBlocks protocol
-                            promise {
+                let! group =
+                    protocolsForCurrentTableSheet
+                    |> List.map (fun protocol ->
+                        let startEndIndices = getGroupHeaderIndicesForProtocol buildingBlocks protocol
+                        promise {
 
-                                let! cleanGroupHeaderFormat = cleanGroupHeaderFormat groupHeader context
+                            let! cleanGroupHeaderFormat = cleanGroupHeaderFormat groupHeader context
 
-                                if startEndIndices.IsSome then
+                            if startEndIndices.IsSome then
 
-                                    let! r1 =
-                                        startEndIndices.Value
-                                        |> List.map (fun (startInd,endInd )->
+                                let! r1 =
+                                    startEndIndices.Value
+                                    |> List.map (fun (startInd,endInd )->
 
-                                            promise {
+                                        promise {
 
-                                                let startInd,endInd = startInd |> float |> recalculateColIndexToTable, endInd |> float |> recalculateColIndexToTable
-                                                let! mergedGroupHeader =
-                                                    context.sync().``then``(fun e ->
-                                                        /// +1 to also include the endcolumn, without it would end two too early.
-                                                        let diff = (endInd - startInd) + 1.
-                                                        let getProtocolGroupHeaderRange = activeSheet.getRangeByIndexes(annoHeaderRange.rowIndex-1., startInd, 1., diff)
-                                                        getProtocolGroupHeaderRange.merge()
-                                                        getProtocolGroupHeaderRange.load(U2.Case2 (ResizeArray(["values"])))
-                                                    )
-
-                                                let! insertValue = context.sync().``then``(fun e ->
-                                                    let nV =
-                                                        mergedGroupHeader.values
-                                                        |> Seq.map (fun innerArr ->
-                                                            innerArr 
-                                                            |> Seq.map (fun _ ->
-                                                                protocol.Id |> box |> Some
-                                                            ) |> ResizeArray
-                                                        ) |> ResizeArray
-                                                    mergedGroupHeader.values <- nV
+                                            let startInd,endInd = startInd |> float |> recalculateColIndexToTable, endInd |> float |> recalculateColIndexToTable
+                                            let! mergedGroupHeader =
+                                                context.sync().``then``(fun e ->
+                                                    /// +1 to also include the endcolumn, without it would end two too early.
+                                                    let diff = (endInd - startInd) + 1.
+                                                    let getProtocolGroupHeaderRange = activeSheet.getRangeByIndexes(annoHeaderRange.rowIndex-1., startInd, 1., diff)
+                                                    getProtocolGroupHeaderRange.merge()
+                                                    getProtocolGroupHeaderRange.load(U2.Case2 (ResizeArray(["values"])))
                                                 )
-                                                return sprintf "%A - %A -> %A." startInd endInd protocol.Id
-                                            }
 
-                                        ) |> Promise.Parallel
+                                            let! insertValue = context.sync().``then``(fun e ->
+                                                let nV =
+                                                    mergedGroupHeader.values
+                                                    |> Seq.map (fun innerArr ->
+                                                        innerArr 
+                                                        |> Seq.map (fun _ ->
+                                                            protocol.Id |> box |> Some
+                                                        ) |> ResizeArray
+                                                    ) |> ResizeArray
+                                                mergedGroupHeader.values <- nV
+                                            )
+                                            return sprintf "%A - %A -> %A." startInd endInd protocol.Id
+                                        }
 
-                                    return String.concat " " r1
+                                    ) |> Promise.Parallel
+
+                                return String.concat " " r1
                                     
-                                else
-                                    // REMOVE INCOMPLETE PROTOCOL
+                            else
+                                // REMOVE INCOMPLETE PROTOCOL
 
-                                    let! remove = removeProtocolFromXml protocol
-                                    return sprintf "%A" remove
+                                let! remove = removeProtocolFromXml protocol
+                                return sprintf "%A" remove
 
-                            }
-                        ) |> Promise.Parallel
-                    return group
+                        }
+                    ) |> Promise.Parallel
+                return group
             }
 
             let! format = formatGroupHeaderForRange groupHeader context

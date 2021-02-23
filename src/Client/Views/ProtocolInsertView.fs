@@ -215,7 +215,7 @@ let addFromFileToTableButton isValid (model:Model) dispatch =
                                 let id = p.ExecutesProtocol.Value.Name.Value
                                 let version = p.ExecutesProtocol.Value.Version.Value
                                 let swateVersion = model.PersistentStorageState.AppVersion
-                                GroupTypes.Protocol.create id version swateVersion "" "" []
+                                GroupTypes.Protocol.create id version swateVersion []
                             let minBuildingBlockInfos =
                                 OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.ofISADotNetProcess model.ProtocolInsertState.ProcessModel.Value
                                 |> List.rev
@@ -308,7 +308,7 @@ let addFromDBToTableButton (model:Model) dispatch =
                                 let id = p.Name
                                 let version = p.Version
                                 let swateVersion = model.PersistentStorageState.AppVersion
-                                GroupTypes.Protocol.create id version swateVersion "" "" []
+                                GroupTypes.Protocol.create id version swateVersion []
                             let minBuildingBlockInfos =
                                 model.ProtocolInsertState.BuildingBlockMinInfoList |> List.rev
                             /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.

@@ -79,6 +79,9 @@ module Xml =
 
     module GroupTypes =
 
+        [<Literal>]
+        let ProtocolGroupXmlRoot = "ProtocolGroup"
+
         type SpannedBuildingBlock = {
             ColumnName      : string
             TermAccession   : string
@@ -93,33 +96,35 @@ module Xml =
             Id                      : string
             ProtocolVersion         : string
             SwateVersion            : string
-            TableName               : string
-            WorksheetName           : string
             SpannedBuildingBlocks   : SpannedBuildingBlock list
         } with
-            static member create id version swateVersion tableName worksheetName spannedBuildingBlocks = {
+            static member create id version swateVersion spannedBuildingBlocks = {
                 Id                      = id
                 ProtocolVersion         = version
                 SwateVersion            = swateVersion
-                TableName               = tableName
-                WorksheetName           = worksheetName
                 SpannedBuildingBlocks   = spannedBuildingBlocks
             }
-            static member init = Protocol.create "" "" "" "" "" []
+            static member init = Protocol.create "" "" "" []
 
         type ProtocolGroup = {
             SwateVersion    : string
+            WorksheetName   : string
+            TableName       : string
             Protocols       : Protocol list
         } with
-            static member create swateVersion protocols = {
+            static member create swateVersion tableName worksheetName protocols = {
                 SwateVersion    = swateVersion
+                TableName       = tableName
+                WorksheetName   = worksheetName
                 Protocols       = protocols
             }
-            static member init = ProtocolGroup.create "" []
+            static member init = ProtocolGroup.create "" "" "" []
 
             member this.toXml =
                 node "ProtocolGroup" [
-                    attr.value( "SwateVersion", this.SwateVersion )
+                    attr.value( "SwateVersion"  , this.SwateVersion )
+                    attr.value( "TableName"     , this.TableName    )
+                    attr.value( "WorksheetName" , this.WorksheetName)
                 ] [
                     for protocol in this.Protocols do
                         yield
@@ -127,8 +132,7 @@ module Xml =
                                 attr.value( "Id",               protocol.Id                 )
                                 attr.value( "SwateVersion",     protocol.SwateVersion       )
                                 attr.value( "ProtocolVersion",  protocol.ProtocolVersion    )
-                                attr.value( "TableName",        protocol.TableName          )
-                                attr.value( "WorksheetName",    protocol.WorksheetName      )
+
                             ][
                                 for spannedBuildingBlock in protocol.SpannedBuildingBlocks do
                                     yield
@@ -138,24 +142,24 @@ module Xml =
                                         ]
                             ]
                 ]  |> serializeXml
-                 
+
             static member ofXml (xmlString:string) =
-                let protocolGroupTag = "ProtocolGroup"
                 let xml = xmlString |> SimpleXml.parseElement
 
-                let protocolGroup = xml |> SimpleXml.tryFindElementByName protocolGroupTag
-                if protocolGroup.IsNone then failwith (sprintf "Could not find existing <%s> tag." protocolGroupTag)
-
+                // failsafe
+                let protocolGroup = xml |> SimpleXml.tryFindElementByName ProtocolGroupXmlRoot
+                if protocolGroup.IsNone then failwith (sprintf "Could not find existing <%s> tag." ProtocolGroupXmlRoot)
+                // failsafe end
                 let protocols       = xml |> SimpleXml.findElementsByName "Protocol"
                 let swateVersion    = protocolGroup.Value.Attributes.["SwateVersion"]
+                let tableName       = protocolGroup.Value.Attributes.["TableName"]
+                let worksheetName   = protocolGroup.Value.Attributes.["WorksheetName"]
                 let nextProtocols   =
                     protocols
                     |> List.map (fun protocol ->
                         let id              = protocol.Attributes.["Id"]
                         let swateVersion    = protocol.Attributes.["SwateVersion"]
                         let protocolVersion = protocol.Attributes.["ProtocolVersion"]
-                        let tableName       = protocol.Attributes.["TableName"]
-                        let worksheetName   = protocol.Attributes.["WorksheetName"]
                         let nextSpannedBBs   =
                             protocol.Children
                             |> List.map (fun spannedBB ->
@@ -163,9 +167,9 @@ module Xml =
                                 let termAccession   = spannedBB.Attributes.["TermAccession"]
                                 SpannedBuildingBlock.create name termAccession
                             )
-                        Protocol.create id protocolVersion swateVersion tableName worksheetName nextSpannedBBs
+                        Protocol.create id protocolVersion swateVersion nextSpannedBBs
                     )
-                ProtocolGroup.create swateVersion nextProtocols
+                ProtocolGroup.create swateVersion tableName worksheetName nextProtocols
 
     module ValidationTypes =
 

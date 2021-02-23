@@ -12,6 +12,34 @@ open OfficeInterop.Types
 open BuildingBlockTypes
 open Shared
 
+let getActiveAnnotationTableName (context:RequestContext)=
+    Excel.run(fun context ->
+
+        // Ref. 2
+
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let t = sheet.load(U2.Case2 (ResizeArray[|"tables"|]))
+        let tableItems = t.tables.load(propertyNames=U2.Case1 "items")
+        context.sync()
+            .``then``( fun _ ->
+                /// access names of all tables in the active worksheet.
+                let tables =
+                    tableItems.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+                /// filter all table names for tables starting with "annotationTable"
+                let annoTables =
+                    tables
+                    |> Array.filter (fun x -> x.StartsWith "annotationTable")
+                /// Get the correct error message if we have <> 1 annotation table. Only returns success and the table name if annoTables.Length = 1
+                let res = TryFindAnnoTableResult.exactlyOneAnnotationTable annoTables
+
+                // return result
+                match res with
+                | Success tableName -> tableName
+                | TryFindAnnoTableResult.Error msg -> failwith msg
+        )
+    )
 
 let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
     [|
@@ -559,7 +587,7 @@ let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElem
         None
     else
         let v = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot activeTableXml.Value
-        if v.Length > 1 then failwith (sprintf "Swate found multiple 'TableValidation' xml elements. Please contact the developer.")
+        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.ValidationTypes.ValidationXmlRoot)
         if v.Length = 0 then
             None
         else
@@ -599,52 +627,89 @@ let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) 
         Children = nextTableXml::filterPrevTableFromRootChildren
     }
 
-let protocolGroupOfXml (xmlParsed:XmlElement) (xml:string) =
-    let protocolGroupTag = "ProtocolGroup"
-    let v = SimpleXml.findElementsByName protocolGroupTag xmlParsed
-    if v.Length > 1 then failwith (sprintf "Swate found multiple '%s' xml elements. Please contact the developer." protocolGroupTag)
-    if v.Length = 0 then
+let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
+    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
+    if activeTableXml.IsNone then
         None
     else
-        Xml.GroupTypes.ProtocolGroup.ofXml xml |> Some
+        let v = SimpleXml.findElementsByName Xml.GroupTypes.ProtocolGroupXmlRoot activeTableXml.Value
+        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.GroupTypes.ProtocolGroupXmlRoot)
+        if v.Length = 0 then
+            None
+        else
+            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
+            Xml.GroupTypes.ProtocolGroup.ofXml tableXmlAsString |> Some
 
-let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
+let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
+
+    let currentTableXml = getActiveTableXml protocolGroup.TableName protocolGroup.WorksheetName previousCompleteCustomXml
+
+    let nextTableXml =
+        let newProtocolGroupXml = protocolGroup.toXml |> SimpleXml.parseElement
+        if currentTableXml.IsSome then
+            let filteredChildren =
+                currentTableXml.Value.Children
+                |> List.filter (fun x -> x.Name <> Xml.GroupTypes.ProtocolGroupXmlRoot )
+            {currentTableXml.Value with
+                Children = newProtocolGroupXml::filteredChildren
+            }
+        else
+            let initNewSwateTableXml =
+                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" protocolGroup.TableName protocolGroup.WorksheetName
+            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
+            {swateTableXmlEle with
+                Children = [newProtocolGroupXml]
+            }
+    let filterPrevTableFromRootChildren =
+        previousCompleteCustomXml.Children
+        |> List.filter (fun x ->
+            let isExisting =
+                x.Name = "SwateTable"
+                && x.Attributes.["Table"] = protocolGroup.TableName
+                && x.Attributes.["Worksheet"] = protocolGroup.WorksheetName
+            isExisting |> not
+        )
+    {previousCompleteCustomXml with
+        Children = nextTableXml::filterPrevTableFromRootChildren
+    }
+
+let updateSwateProtocolGroupByProtocol tableName worksheetName (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+
+    let currentSwateProtocolGroup =
+        let isExisting = getSwateProtocolGroupForCurrentTable tableName worksheetName previousCompleteCustomXml
+        if isExisting.IsNone then
+            Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion tableName worksheetName []
+        else
+            isExisting.Value
+
+    let filteredProtocolChildren =
+        currentSwateProtocolGroup.Protocols
+        |> List.filter (fun x -> x.Id <> protocol.Id)
+
+    let nextProtocolGroup =
+        {currentSwateProtocolGroup with
+            Protocols = protocol::filteredProtocolChildren
+        }
+
+    updateSwateProtocolGroup nextProtocolGroup previousCompleteCustomXml
+
+let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
     Excel.run(fun context ->
+
+        let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
 
         // The first part accesses current CustomXml
         let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
         promise {
+            let! annotationTable = getActiveAnnotationTableName context
+
             let! xmlParsed, xml = getCustomXml customXmlParts context
 
-            let currentProtocolGroup =
-                let previousProtocolGroup = protocolGroupOfXml xmlParsed xml
-                if previousProtocolGroup.IsNone then Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion [] else previousProtocolGroup.Value
+            let nextCustomXml = updateSwateProtocolGroupByProtocol annotationTable activeSheet.name protocol xmlParsed
 
-            let nextProtocolGroup =
-                let newProtocols =
-                    currentProtocolGroup.Protocols
-                    |> List.filter (fun x -> x.TableName <> protocol.TableName || x.WorksheetName <> protocol.WorksheetName || x.Id <> protocol.Id)
-                    |> fun filteredProtocols ->
-                        if remove then
-                            filteredProtocols
-                        else 
-                            protocol::filteredProtocols
-                { currentProtocolGroup with
-                    SwateVersion = protocol.SwateVersion
-                    Protocols = newProtocols
-                }
-
-            let nextCustomXml =
-                let nextAsXmlFormat = nextProtocolGroup.toXml |> SimpleXml.parseElement
-                let childrenWithoutProtocolGroup = xmlParsed.Children |> List.filter (fun child ->
-                    child.Name <> "ProtocolGroup"
-                )
-                let nextChildren = nextAsXmlFormat::childrenWithoutProtocolGroup
-                { xmlParsed with
-                    Children = nextChildren
-                } |> xmlElementToXmlString
+            let nextCustomXmlString = nextCustomXml |> xmlElementToXmlString
 
             let! deleteXml =
                 context.sync().``then``(fun e ->
@@ -656,7 +721,7 @@ let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
 
             let! addNext =
                 context.sync().``then``(fun e ->
-                    customXmlParts.add(nextCustomXml)
+                    customXmlParts.add(nextCustomXmlString)
                 )
 
             // This will be displayed in activity log
@@ -665,8 +730,8 @@ let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
                 sprintf
                     "%s ProtocolGroup Scheme with '%s - %s - %s' "
                     (if remove then "Remove Protocol from" else "Update")
-                    protocol.WorksheetName
-                    protocol.TableName
+                    activeSheet.name
+                    annotationTable
                     protocol.Id
         }
     )
