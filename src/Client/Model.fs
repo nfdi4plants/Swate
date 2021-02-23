@@ -396,11 +396,23 @@ type ProtocolInsertState = {
         ProtocolSearchTags      = []
     }
 
+type RequestBuildingBlockInfoStates =
+| Inactive
+| RequestExcelInformation
+| RequestDataBaseInformation
+    member this.toStringMsg =
+        match this with
+        | Inactive                      -> ""
+        | RequestExcelInformation       -> "Check Columns"
+        | RequestDataBaseInformation    -> "Search Database "
+
 type BuildingBlockDetailsState = {
+    CurrentRequestState : RequestBuildingBlockInfoStates
     ShowDetails         : bool
     BuildingBlockValues : Shared.SearchTermI []
 } with
     static member init () = {
+        CurrentRequestState = Inactive
         ShowDetails         = false
         BuildingBlockValues = [||]
     }

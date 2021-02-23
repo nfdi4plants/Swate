@@ -91,6 +91,7 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Button.IsInverted
                 ] [ 
                     Fa.span [Fa.Solid.Question; Fa.Props [Style [PaddingRight "0.15rem"]]][]
+                    span [][str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
                     Fa.span [Fa.Solid.Columns][]
                 ]
             ]

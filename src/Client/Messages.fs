@@ -177,6 +177,7 @@ type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockSearchTermsRequest    of Shared.SearchTermI []
     | GetSelectedBuildingBlockSearchTermsResponse   of Shared.SearchTermI []
     | ToggleShowDetails
+    | UpdateCurrentRequestState                     of RequestBuildingBlockInfoStates
 
 type TopLevelMsg =
     | CloseSuggestions

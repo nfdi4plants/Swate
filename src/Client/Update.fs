@@ -422,9 +422,15 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 OfficeInterop.getAnnotationBlockDetails
                 name
                 (GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
-                (GenericError >> Dev)
+                (fun x ->
+                    Msg.Batch [
+                        GenericError x |> Dev
+                        UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails
+                    ]
+                )
         let cmd = matchActiveTableResToMsg activeTableNameRes cmd
-        currentState, cmd
+        let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
+        currentState, Cmd.batch [cmd;cmd2]
 
     /// DEV
     | TryExcel  ->
@@ -1461,24 +1467,41 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
     | ToggleShowDetails ->
         let nb = currentState.ShowDetails |> not
         let nextState = {
-            ShowDetails         = nb
-            BuildingBlockValues = if nb = false then [||] else currentState.BuildingBlockValues
+            currentState with
+                ShowDetails         = nb
+                BuildingBlockValues = if nb = false then [||] else currentState.BuildingBlockValues
+        }
+        nextState, Cmd.none
+    | UpdateCurrentRequestState nextRequState ->
+        let nextState = {
+            currentState with
+                CurrentRequestState = nextRequState
         }
         nextState, Cmd.none
     // Server
     | GetSelectedBuildingBlockSearchTermsRequest searchTerms ->
+        let nextState = {
+            currentState with
+                CurrentRequestState = RequestBuildingBlockInfoStates.RequestDataBaseInformation
+        }
         let cmd =
             Cmd.OfAsync.either
                 Api.api.getTermsByNames
                 searchTerms
                 (GetSelectedBuildingBlockSearchTermsResponse >> BuildingBlockDetails)
-                (GenericError >> Dev)
-        currentState, cmd
+                (fun x ->
+                    Msg.Batch [
+                        GenericError x |> Dev
+                        UpdateCurrentRequestState Inactive |> BuildingBlockDetails
+                    ]
+                )
+        nextState, cmd
     | GetSelectedBuildingBlockSearchTermsResponse searchTermResults ->
         let nextState = {
             currentState with
                 ShowDetails         = true
                 BuildingBlockValues = searchTermResults
+                CurrentRequestState = Inactive
         }
         nextState, Cmd.none
 
