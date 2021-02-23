@@ -336,7 +336,6 @@ let addFromDBToTableButton (model:Model) dispatch =
 let showDatabaseProtocolTemplate (model:Model) dispatch =
     div [ Style [
             BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-            //BorderRadius "15px 15px 0 0"
             Padding "0.25rem 1rem"
             MarginBottom "1rem"
     ]] [

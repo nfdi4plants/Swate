@@ -305,8 +305,6 @@ let autocompleteTermSearchComponentOfParentOntology
                     Input.Props [
                         
                         ExcelColors.colorControl colorMode
-                        //OnFocus (fun e -> alert "focusout")
-                        //OnBlur  (fun e -> alert "focusin")
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
                             PipeActiveAnnotationTable GetParentTerm |> ExcelInterop |> dispatch
