@@ -110,14 +110,16 @@ type AdvancedSearchState = {
     }
 
 type SiteStyleState = {
+    QuickAcessIconsShown : bool
     BurgerVisible   : bool
     IsDarkMode      : bool
     ColorMode       : ExcelColors.ColorMode
 } with
     static member init () = {
-        BurgerVisible   = false
-        IsDarkMode      = false
-        ColorMode       = ExcelColors.colorfullMode
+        QuickAcessIconsShown    = false
+        BurgerVisible           = false
+        IsDarkMode              = false
+        ColorMode               = ExcelColors.colorfullMode
     }
 
 type DevState = {

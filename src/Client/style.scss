@@ -106,6 +106,44 @@ a:hover {
     color: $excelPrimary !important
 }
 
+/////////// Custom Box with Arrow in the middle of top side /////////////////
+
+// credits go to: https://cssarrowplease.com/
+
+.arrow_box {
+    position: relative;
+    background: #3f8159;
+    border: 4px solid #217346;
+    color: #252423;
+    border-radius: 10px;
+    padding: 1rem
+}
+
+.arrow_box:after, .arrow_box:before {
+    bottom: 100%;
+    left: 50%;
+    border: solid transparent;
+    content: "";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
+}
+
+.arrow_box:after {
+    border-color: rgba(33, 115, 70, 0);
+    border-bottom-color: #3f8159;
+    border-width: 5px;
+    margin-left: -5px;
+}
+
+.arrow_box:before {
+    border-color: rgba(14, 92, 47, 0);
+    border-bottom-color: #217346;
+    border-width: 11px;
+    margin-left: -11px;
+}
+
 /////////// Custom simple checkbox, due to issue #54 ///////////////////
 .checkbox-label {
     display: inline-block;
@@ -208,7 +246,7 @@ input::-ms-clear {
 }
 
 .hideOver575px {
-    display: none
+    display: none !important
 }
 
 .hideOver775px {
@@ -304,11 +342,11 @@ input::-ms-clear {
 
 @media only screen and (max-width: 575px) {
     .hideOver575px {
-        display: unset
+        display: unset !important
     }
 
     .hideUnder575px {
-        display: none
+        display: none !important
     }
 
     .myFlexText {

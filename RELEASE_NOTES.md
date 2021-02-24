@@ -1,6 +1,10 @@
-### 0.4.0+19a2f73 (Released 2021-2-23)
+### 0.4.0+3778ebc (Released 2021-2-23)
 * Additions:
-    * latest commit #19a2f73
+    * latest commit #3778ebc
+    * [[#3778ebc](https://github.com/nfdi4plants/Swate/commit/3778ebc951857295234d2c6d12bacce27bf29fd6)] Add copy to clipboard to term search for vertical term insert (Issue #118).
+    * [[#eff46ae](https://github.com/nfdi4plants/Swate/commit/eff46aec41e4f0eb529d7f37ac789f352c85f5b4)] Restructure CustomXml :hammer::boom:
+    * [[#f8741ab](https://github.com/nfdi4plants/Swate/commit/f8741abf7442558dafb049dad7c96f963eaf8485)] Adjust custom validation xml.
+    * [[#2d816fc](https://github.com/nfdi4plants/Swate/commit/2d816fc2a07ff96250da6d79c2784350e96d885c)] Improve Userfeedback for show building block info.
     * [[#05ec1c4](https://github.com/nfdi4plants/Swate/commit/05ec1c4ec4e7634ba91a7f319f3f99bc31d68ee9)] Made file picker Drag'n'Drop lines thicker (Issue #112).
     * [[#7760257](https://github.com/nfdi4plants/Swate/commit/7760257839839a03641ba5172d46fe77d97353dc)] Improve addition of validation importance (Issue #113).
     * [[#44d9277](https://github.com/nfdi4plants/Swate/commit/44d9277901a8cb617bca1b78be679c12b4fc362b)] Add option to show all child terms (Issue #114).

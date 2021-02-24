@@ -1107,6 +1107,13 @@ let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyle
 
         nextState,Cmd.none
 
+    | ToggleQuickAcessIconsShown ->
+        let nextState = {
+            currentState with
+                QuickAcessIconsShown = not currentState.QuickAcessIconsShown
+        }
+        nextState, Cmd.none
+
     | ToggleColorMode       -> 
         let opposite = not currentState.IsDarkMode
         let nextState = {

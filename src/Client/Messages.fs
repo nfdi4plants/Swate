@@ -115,6 +115,7 @@ type ApiMsg =
 
 type StyleChangeMsg =
     | ToggleBurger
+    | ToggleQuickAcessIconsShown
     | ToggleColorMode
 
 type PersistentStorageMsg =
