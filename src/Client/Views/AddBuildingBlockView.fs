@@ -297,7 +297,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
         // Input forms, etc related to add building block.
         addBuildingBlockElements model dispatch
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add unit reference columns to existing building block."]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add/Update unit reference to existing building block."]
         // Input forms, etc related to add unit to existing building block.
         addUnitToExistingBlockElements model dispatch
 

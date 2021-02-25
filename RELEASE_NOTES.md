@@ -1,6 +1,10 @@
-### 0.4.0+3778ebc (Released 2021-2-23)
+### 0.4.0+5118778 (Released 2021-2-25)
 * Additions:
-    * latest commit #3778ebc
+    * latest commit #5118778
+    * [[#5118778](https://github.com/nfdi4plants/Swate/commit/5118778e38a95a1e71e7a80488fd2a5e9fd63715)] Rename validation to checklist
+    * [[#f61793a](https://github.com/nfdi4plants/Swate/commit/f61793a949250ffa05d34ebbc19c8fa2fba4fb3b)] Refactor PipeActiveTable logic :hammer:
+    * [[#24950d1](https://github.com/nfdi4plants/Swate/commit/24950d160548a04e080b7bd283a699b611a116a6)] Minor visual updates
+    * [[#58b58a4](https://github.com/nfdi4plants/Swate/commit/58b58a42eef1ee08f63059ae2e971e74f8d29b15)] Add drop down for quick access icons
     * [[#3778ebc](https://github.com/nfdi4plants/Swate/commit/3778ebc951857295234d2c6d12bacce27bf29fd6)] Add copy to clipboard to term search for vertical term insert (Issue #118).
     * [[#eff46ae](https://github.com/nfdi4plants/Swate/commit/eff46aec41e4f0eb529d7f37ac789f352c85f5b4)] Restructure CustomXml :hammer::boom:
     * [[#f8741ab](https://github.com/nfdi4plants/Swate/commit/f8741abf7442558dafb049dad7c96f963eaf8485)] Adjust custom validation xml.

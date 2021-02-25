@@ -1571,14 +1571,7 @@ let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string
                                 OfficeInterop.Types.ColumnCoreNames.Shown.Characteristics
                                 OfficeInterop.Types.ColumnCoreNames.Shown.Factor
                         )
-
-                    if findLeftClosestBuildingBlock.Unit.IsSome then
-                        failwith (
-                            sprintf
-                                "Swate cannot add a unit to a building block already containing a unit: %A"
-                                findLeftClosestBuildingBlock.Unit.Value.MainColumn.Header.Value.CoreName
-                        )
-
+                        
                     // This is necessary to skip over hidden cols
                     /// Get an array of the headers
                     let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
@@ -1589,7 +1582,10 @@ let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string
                         |> Array.map string
 
                     let unitColumnResult =
-                        createUnitColumns allColHeaders table (float findLeftClosestBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
+                        if findLeftClosestBuildingBlock.Unit.IsSome then
+                            updateUnitColumns allColHeaders annoHeaderRange (float findLeftClosestBuildingBlock.MainColumn.Index) format unitAccessionOpt
+                        else
+                            createUnitColumns allColHeaders table (float findLeftClosestBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
 
                     let maincolName = findLeftClosestBuildingBlock.MainColumn.Header.Value.Header
 

@@ -72,6 +72,13 @@ let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
             |] :> IList<U3<bool,string,float>>
     |] :> IList<IList<U3<bool,string,float>>>
 
+let createValueMatrix (colCount:int) (rowCount:int) value =
+    ResizeArray([
+        for outer in 0 .. rowCount-1 do
+            let tmp = Array.zeroCreate colCount |> Seq.map (fun _ -> Some (value |> box))
+            ResizeArray(tmp)
+    ])
+
 let tryFindSpannedBuildingBlocks (currentProtocolGroup:Xml.GroupTypes.Protocol) (buildingBlocks: BuildingBlock []) =
     let findAllSpannedBlocks =
         currentProtocolGroup.SpannedBuildingBlocks
@@ -107,25 +114,26 @@ let unitColAttributes (unitTermName:string) (unitAccessionOptt:string option) (i
         | Some accession    -> sprintf "[%s] (#%i; #h; #t%s; #u)" unitTermName id accession
         | None              -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
 
+let findNewIdForUnit (allColHeaders:string []) (format:string option) (unitAccessionOpt:string option) =
+    let rec loopingCheck int =
+        let isExisting =
+            allColHeaders
+            // Should a column with the same name already exist, then count up the id tag.
+            |> Array.exists (fun existingHeader ->
+                // We don't need to check TSR or TAN, because the main column always starts with "Unit"
+                existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt int)
+            )
+        if isExisting then
+            loopingCheck (int+1)
+        else
+            int
+    loopingCheck 1
+
 let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
     let col = createEmptyMatrixForTables 1 rowCount ""
     if format.IsSome then
-        let findNewIdForUnit() =
-            let rec loopingCheck int =
-                let isExisting =
-                    allColHeaders
-                    // Should a column with the same name already exist, then count up the id tag.
-                    |> Array.exists (fun existingHeader ->
-                        // We don't need to check TSR or TAN, because the main column always starts with "Unit"
-                        existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt int)
-                    )
-                if isExisting then
-                    loopingCheck (int+1)
-                else
-                    int
-            loopingCheck 1
 
-        let newUnitId = findNewIdForUnit()
+        let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
 
         /// create unit main column
         let createdUnitCol1 =
@@ -150,6 +158,34 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
                 values = U4.Case1 col,
                 name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
             )
+
+        Some (
+            sprintf " Added specified unit: %s" (format.Value),
+            sprintf "0.00 \"%s\"" (format.Value)
+        )
+    else
+        None
+
+let updateUnitColumns (allColHeaders:string []) (annoHeaderRange:Excel.Range) newBaseColIndex (format:string option) (unitAccessionOpt:string option) =
+    let col v= createValueMatrix 1 1 v
+    if format.IsSome then
+
+        let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
+
+        /// create unit main column
+        let updateUnitCol1 =
+            annoHeaderRange.getColumn(newBaseColIndex+3.)
+            |> fun c1 -> c1.values <- sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+
+        /// create unit TSR
+        let createdUnitCol2 =
+            annoHeaderRange.getColumn(newBaseColIndex+4.)
+            |> fun c2 -> c2.values <- sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+
+        /// create unit TAN
+        let createdUnitCol3 =
+            annoHeaderRange.getColumn(newBaseColIndex+5.)
+            |> fun c3 -> c3.values <- sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
         Some (
             sprintf " Added specified unit: %s" (format.Value),
@@ -820,13 +856,6 @@ let cleanGroupHeaderFormat (range:Excel.Range) (context:RequestContext) =
 
         return ()
     }
-
-let createValueMatrix (colCount:int) (rowCount:int) value =
-    ResizeArray([
-        for outer in 0 .. rowCount-1 do
-            let tmp = Array.zeroCreate colCount |> Seq.map (fun _ -> Some (value |> box))
-            ResizeArray(tmp)
-    ])
 
 /// Not used currently
 let createEmptyAnnotationMatrixForTables (rowCount:int) value (header:string) =

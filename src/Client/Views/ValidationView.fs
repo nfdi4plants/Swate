@@ -191,7 +191,7 @@ let sliderElements id columnValidation model dispatch =
     //    ]
     //]
     div [][
-        for i in 1 .. 10 do
+        for i in 1 .. 5 do
             yield
                 Button.a [
                     Button.Color IsWarning
