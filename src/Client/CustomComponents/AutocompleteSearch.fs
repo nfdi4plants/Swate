@@ -331,7 +331,8 @@ let autocompleteTermSearchComponentOfParentOntology
                                 let (parentOntInfo:OntologyInfo) = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
                                 GetAllTermsByParentTermRequest parentOntInfo |> TermSearch |> dispatch
                             else
-                                ()
+                                let v = Browser.Dom.document.getElementById autocompleteParams.InputId
+                                v?value |> autocompleteParams.OnInputChangeMsg |> dispatch
                         )
                     ]           
                     Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
