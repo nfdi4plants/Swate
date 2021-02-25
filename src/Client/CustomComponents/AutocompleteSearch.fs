@@ -195,7 +195,21 @@ let createAutocompleteSuggestions
             ]
         ]
 
-    suggestions @ [alternative]
+    let alternative2 =
+        tr [
+            colorControl colorMode
+            Class "suggestion"
+        ][
+            td [ColSpan 4] [
+                str ("You can also request a term by opening an ")
+                a [Href Shared.URLs.Nfdi4psoOntologyUrl; Target "_Blank"] [
+                    str "Issue"
+                ]
+                str "."
+            ]
+        ]
+
+    suggestions @ [alternative] @ [alternative2]
 
 
 

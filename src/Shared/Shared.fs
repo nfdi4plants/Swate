@@ -14,6 +14,9 @@ module URLs =
         TermAccessionBaseUrl + replaced
 
     [<LiteralAttribute>]
+    let Nfdi4psoOntologyUrl = @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"
+
+    [<LiteralAttribute>]
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
