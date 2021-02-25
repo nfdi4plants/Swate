@@ -367,10 +367,10 @@ let validationElements (model:Model) dispatch =
             /// Show warning if no validation format was found
             if model.ValidationState.TableValidationScheme.SwateVersion = "" then
                 Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color NFDIColors.Red.Lighter10]]][
-                    str """No validation format for this table found! Hit "Add validation to workbook" to add a validation format for the active annotation table."""
+                    str """No checklist for this table found! Hit "Add checklist to workbook" to add a checklist for the active annotation table."""
                 ]
 
-            // Submit new validation scheme. This will write custom xml into the workbook.
+            // Submit new checklist scheme. This will write custom xml into the workbook.
             Button.a [
                 Button.Color Color.IsSuccess
                 Button.IsFullWidth
@@ -380,10 +380,10 @@ let validationElements (model:Model) dispatch =
                     header?style?opacity <- 0
                     WriteTableValidationToXml (model.ValidationState.TableValidationScheme, model.PersistentStorageState.AppVersion) |> ExcelInterop |> dispatch
                 )
-                Button.Props [Tooltip.dataTooltip "Write validation info to excel worksheet."]
+                Button.Props [Tooltip.dataTooltip "Write checklist info to excel worksheet."]
                 Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
             ] [
-                str "Add validation to workbook"
+                str "Add checklist to workbook"
             ]
         ]
     ]
@@ -394,7 +394,7 @@ let validationComponent model dispatch =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Table Validation"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Checklist Editor"]
 
         Help.help [][
             str "Display a table representation and add information to later validate values in the table according to their respective column."
@@ -405,16 +405,16 @@ let validationComponent model dispatch =
             Button.IsFullWidth
             Button.OnClick (fun e -> GetTableValidationXml |> ExcelInterop |> dispatch )
             Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-            Button.Props [Style [Margin "1rem 0"]; Tooltip.dataTooltip "Get validation info for currently shown annotation table."]
+            Button.Props [Style [Margin "1rem 0"]; Tooltip.dataTooltip "Get checklist info for currently shown annotation table."]
         ] [
             str "Update table representation"
         ]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
-            str """Adjust current Swate table validation. """
+            str """Adjust current Swate table checklist. """
             span [
                 Class (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-                Tooltip.dataTooltip """When hitting "Add validation to workbook" this information will be saved as part of the workbook."""
+                Tooltip.dataTooltip """When hitting "Add checklist to workbook" this information will be saved as part of the workbook."""
                 Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"]
             ][
                 Fa.i [ Fa.Solid.InfoCircle ][]
