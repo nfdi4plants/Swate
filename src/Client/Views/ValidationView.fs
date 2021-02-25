@@ -403,7 +403,7 @@ let validationComponent model dispatch =
         Button.a [
             Button.Color Color.IsInfo
             Button.IsFullWidth
-            Button.OnClick (fun e -> PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop |> dispatch )
+            Button.OnClick (fun e -> GetTableValidationXml |> ExcelInterop |> dispatch )
             Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
             Button.Props [Style [Margin "1rem 0"]; Tooltip.dataTooltip "Get validation info for currently shown annotation table."]
         ] [

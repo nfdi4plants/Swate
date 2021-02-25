@@ -219,7 +219,7 @@ let addFromFileToTableButton isValid (model:Model) dispatch =
                             let minBuildingBlockInfos =
                                 OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.ofISADotNetProcess model.ProtocolInsertState.ProcessModel.Value
                                 |> List.rev
-                            pipeNameTuple3 AddAnnotationBlocks (minBuildingBlockInfos,preProtocol, None) |> ExcelInterop |> dispatch
+                            AddAnnotationBlocks (minBuildingBlockInfos,preProtocol, None) |> ExcelInterop |> dispatch
                         )
                     ] [
                         str "Insert protocol annotation blocks"
@@ -310,7 +310,7 @@ let addFromDBToTableButton (model:Model) dispatch =
                             /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
                             let validation =
                                 model.ProtocolInsertState.ValidationXml.Value |> Some 
-                            pipeNameTuple3 AddAnnotationBlocks (minBuildingBlockInfos,preProtocol, validation) |> ExcelInterop |> dispatch
+                            AddAnnotationBlocks (minBuildingBlockInfos,preProtocol, validation) |> ExcelInterop |> dispatch
                         )
                     ] [
                         str "Insert protocol annotation blocks"

@@ -307,7 +307,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         ExcelColors.colorControl colorMode
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
-                            PipeActiveAnnotationTable GetParentTerm |> ExcelInterop |> dispatch
+                            GetParentTerm |> ExcelInterop |> dispatch
                             let el = Browser.Dom.document.getElementById autocompleteParams.InputId
                             el.focus()
                         )

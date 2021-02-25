@@ -56,44 +56,22 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
     match excelInteropMsg with
 
-    | PipeCreateAnnotationTableInfo createAnnotationTableMsg ->
+    | AutoFitTable ->
         let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getTableInfoForAnnoTableCreation
-                ()
-                (fun (allNames) -> createAnnotationTableMsg allNames |> ExcelInterop)
-                (GenericError >> Dev)
-        currentState, cmd
-
-    /// This message is necessary to find the annotation table name in the active worksheet. The name is then passed on to the message variable.
-    | PipeActiveAnnotationTable nextMsg ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.tryFindActiveAnnotationTable
-                ()
-                (fun activeTableNameRes -> nextMsg activeTableNameRes |> ExcelInterop)
-                (GenericError >> Dev)
-        currentState, cmd
-
-
-    | AutoFitTable activeTableNameRes->
-        let cmd name =
             Cmd.OfPromise.either
                 OfficeInterop.autoFitTable
-                (name)
+                ()
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
 
-    | UpdateProtocolGroupHeader activeTableNameRes ->
-        let cmd name =
+    | UpdateProtocolGroupHeader ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.updateProtocolGroupHeader
-                (name)
+                ()
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
     | Initialized (h,p) ->
@@ -131,42 +109,40 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
 
         nextState,Cmd.none
 
-    | FillSelection (activeTableNameRes,fillValue,fillTerm) ->
-        let cmd name =
+    | FillSelection (fillValue,fillTerm) ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.fillValue  
-                (name,fillValue,fillTerm)
+                (fillValue,fillTerm)
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
-    | AddAnnotationBlock (activeTableNameRes,minBuildingBlockInfo) ->
-        let cmd tableName =
+    | AddAnnotationBlock (minBuildingBlockInfo) ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.addAnnotationBlock  
-                (tableName,minBuildingBlockInfo)
+                (minBuildingBlockInfo)
                 (fun (newColName,format,msg) ->
                     Msg.Batch [
                         GenericLog ("Info",msg) |> Dev
-                        FormatColumn (activeTableNameRes,newColName,format) |> ExcelInterop
-                        UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
+                        FormatColumn (newColName,format) |> ExcelInterop
+                        UpdateProtocolGroupHeader |> ExcelInterop
                     ]
                 )
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
 
-    | AddAnnotationBlocks (activeTableNameRes, minBuildingBlockInfos, protocol, validationOpt) ->
-        let cmd tableName =
+    | AddAnnotationBlocks (minBuildingBlockInfos, protocol, validationOpt) ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.addAnnotationBlocksAsProtocol
-                (tableName,minBuildingBlockInfos,protocol)
+                (minBuildingBlockInfos,protocol)
                 (fun (resList,protocolInfo,worksheetName,annotationTableName) ->
                     let newColNames = resList |> List.map (fun (names,_,_) -> names)
                     let changeColFormatInfos,msg = resList |> List.map (fun (names,format,msg) -> (names,format), msg ) |> List.unzip
                     Msg.Batch [
-                        FormatColumns (activeTableNameRes,changeColFormatInfos) |> ExcelInterop
+                        FormatColumns (changeColFormatInfos) |> ExcelInterop
                         GenericLog ("Info", msg |> String.concat "; ") |> Dev
                         /// This is currently used for protocol template insert from database
                         if validationOpt.IsSome then
@@ -180,115 +156,107 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ]
                 )
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState, cmd
 
-    | RemoveAnnotationBlock (activeTableNameRes) ->
-        let cmd name =
+    | RemoveAnnotationBlock ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.removeAnnotationBlock
-                (name)
+                ()
                 (fun msg ->
                     Msg.Batch [
                         GenericLog ("Info",msg) |> Dev
-                        AutoFitTable activeTableNameRes |> ExcelInterop
-                        UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
+                        AutoFitTable |> ExcelInterop
+                        UpdateProtocolGroupHeader |> ExcelInterop
                     ]
                 )
                 (GenericError >> Dev)
-
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
-    | AddUnitToAnnotationBlock (activeTableNameRes, format, unitTermOpt) ->
-        let cmd name =
+    | AddUnitToAnnotationBlock (format, unitTermOpt) ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.addUnitToExistingBuildingBlock
-                (name,format,unitTermOpt)
+                (format,unitTermOpt)
                 (fun (newColName,format) ->
                     Msg.Batch [
-                        FormatColumn (activeTableNameRes, newColName, format) |> ExcelInterop
-                        UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
+                        FormatColumn (newColName, format) |> ExcelInterop
+                        UpdateProtocolGroupHeader |> ExcelInterop
                     ]
                 )
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
-    | FormatColumn (activeTableNameRes,colName,format) ->
-        let cmd name =
+    | FormatColumn (colName,format) ->
+        let cmd =
             Cmd.OfPromise.either
-                (OfficeInterop.changeTableColumnFormat name colName)
+                (OfficeInterop.changeTableColumnFormat colName)
                 format
                 (fun x ->
                     Msg.Batch [
-                        AutoFitTable activeTableNameRes |> ExcelInterop
+                        AutoFitTable |> ExcelInterop
                         GenericLog x |> Dev
                     ]
                 )
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState,cmd
 
-    | FormatColumns (activeTableNameRes, resList) ->
-        let cmd name =
+    | FormatColumns (resList) ->
+        let cmd =
             Cmd.OfPromise.either
-                (OfficeInterop.changeTableColumnsFormat name)
+                OfficeInterop.changeTableColumnsFormat
                 resList
                 (fun x ->
                     Msg.Batch [
-                        AutoFitTable activeTableNameRes |> ExcelInterop
+                        AutoFitTable |> ExcelInterop
                         GenericLog x |> Dev
                     ]
                 )
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd 
         currentState,cmd
 
-    | CreateAnnotationTable (allTableNames,isDark) ->
+    | CreateAnnotationTable (isDark) ->
         let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.createAnnotationTable  
-                (allTableNames,isDark)
+                (isDark)
                 (fun (res,msg) ->
-                    AnnotationtableCreated (res,msg) |> ExcelInterop
+                    AnnotationtableCreated (msg) |> ExcelInterop
                 )
                 (GenericError >> Dev)
         currentState,cmd
 
-    | AnnotationtableCreated (activeTableNameRes,range) ->
+    | AnnotationtableCreated (range) ->
         let nextState = {
             currentState with
                 HasAnnotationTable = true
         }
         let msg =
             Msg.Batch [
-                AutoFitTable activeTableNameRes |> ExcelInterop
-                UpdateProtocolGroupHeader activeTableNameRes |> ExcelInterop
+                AutoFitTable |> ExcelInterop
+                UpdateProtocolGroupHeader |> ExcelInterop
                 GenericLog ("info", range) |> Dev
             ]
         nextState, Cmd.ofMsg msg
 
 
-    | GetParentTerm activeTableNameRes ->
-        let cmd name =
+    | GetParentTerm ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.getParentTerm
-                (name)
+                ()
                 (StoreParentOntologyFromOfficeInterop >> TermSearch)
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
     //
-    | GetTableValidationXml activeTableNameRes ->
-        let successCmd tableName =
+    | GetTableValidationXml ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.getTableRepresentation
-                (tableName)
+                ()
                 (fun (currentTableValidation, buildingBlocks,msg) ->
                     StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks, msg) |> Validation)
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes successCmd 
         currentState, cmd
     | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
         let cmd =
@@ -298,7 +266,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (fun x ->
                     Msg.Batch [
                         GenericLog x |> Dev
-                        PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop
+                        GetTableValidationXml |> ExcelInterop
                     ]
                 )
                 (GenericError >> Dev)
@@ -328,7 +296,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (fun res ->
                     Msg.Batch [
                         GenericLog res |> Dev
-                        PipeActiveAnnotationTable UpdateProtocolGroupHeader |> ExcelInterop
+                        UpdateProtocolGroupHeader |> ExcelInterop
                     ]
                 )
                 (GenericError >> Dev)
@@ -341,7 +309,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (fun res ->
                     Msg.Batch [
                         GenericLog res |> Dev
-                        PipeActiveAnnotationTable UpdateProtocolGroupHeader |> ExcelInterop
+                        UpdateProtocolGroupHeader |> ExcelInterop
                     ]
                 )
                 (GenericError >> Dev)
@@ -355,18 +323,17 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (GenericError >> Dev)
         currentState, cmd
     //
-    | FillHiddenColsRequest activeTableNameRes ->
-        let cmd name =
+    | FillHiddenColsRequest ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.createSearchTermsIFromTable 
-                (name)
+                ()
                 (SearchForInsertTermsRequest >> Request >> Api)
                 (fun e ->
                     Msg.Batch [
                         UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
                         GenericError e |> Dev
                     ] )
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> ExcelInterop |> Cmd.ofMsg
         let cmds = Cmd.batch [cmd; cmd2]
         currentState, cmds
@@ -399,25 +366,24 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
         }
         nextState, Cmd.none
     //
-    | InsertFileNames (activeTableNameRes,fileNameList) ->
+    | InsertFileNames (fileNameList) ->
         let nextState = currentState
-        let cmd name = 
+        let cmd = 
             Cmd.OfPromise.either
                 OfficeInterop.insertFileNamesFromFilePicker 
-                (name, fileNameList)
+                (fileNameList)
                 ((fun x -> 
                     ("Debug",x) |> GenericLog) >> Dev
                 )
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         nextState, cmd
 
     //
-    | GetSelectedBuildingBlockSearchTerms activeTableNameRes ->
-        let cmd name =
+    | GetSelectedBuildingBlockSearchTerms ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.getAnnotationBlockDetails
-                name
+                ()
                 (GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
                 (fun x ->
                     Msg.Batch [
@@ -425,7 +391,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                         UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails
                     ]
                 )
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
         currentState, Cmd.batch [cmd;cmd2]
 
@@ -688,14 +653,13 @@ let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> 
         }
         nextState, Cmd.none
 
-    | LogTableMetadata activeTableNameRes ->
-        let cmd name =
+    | LogTableMetadata ->
+        let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.getTableMetaData
-                (name)
+                ()
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
-        let cmd = matchActiveTableResToMsg activeTableNameRes cmd
         currentState, cmd
 
 let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Msg> =
@@ -1542,7 +1506,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextCmd =
             match pageOpt with
             | Some Routing.Route.Validation ->
-                PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop |> Cmd.ofMsg
+                GetTableValidationXml |> ExcelInterop |> Cmd.ofMsg
             | Some Routing.Route.ProtocolSearch ->
                 GetAllProtocolsRequest |> ProtocolInsert |> Cmd.ofMsg
             | _ ->

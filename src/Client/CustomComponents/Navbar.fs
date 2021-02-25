@@ -25,11 +25,7 @@ let navbarShortCutIconList model dispatch =
             Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
             Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Add Annotation Table") ]
             Button.OnClick (fun _ ->
-                (fun (allNames) ->
-                    CreateAnnotationTable (allNames,model.SiteStyleState.IsDarkMode))
-                    |> PipeCreateAnnotationTableInfo
-                    |> ExcelInterop
-                    |> dispatch
+                CreateAnnotationTable (model.SiteStyleState.IsDarkMode) |> ExcelInterop |> dispatch
             )
             Button.Color Color.IsWhite
             Button.IsInverted
@@ -43,8 +39,8 @@ let navbarShortCutIconList model dispatch =
             Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Autoformat Table")]
             Button.OnClick (fun e ->
                 Msg.Batch [
-                    PipeActiveAnnotationTable AutoFitTable |> ExcelInterop
-                    PipeActiveAnnotationTable UpdateProtocolGroupHeader |> ExcelInterop
+                    AutoFitTable |> ExcelInterop
+                    UpdateProtocolGroupHeader |> ExcelInterop
                 ]  |> dispatch
             )
             Button.Color Color.IsWhite
@@ -56,7 +52,7 @@ let navbarShortCutIconList model dispatch =
             Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
             Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Update Reference Columns")]
             Button.OnClick (fun _ ->
-                PipeActiveAnnotationTable FillHiddenColsRequest |> ExcelInterop |> dispatch
+                FillHiddenColsRequest |> ExcelInterop |> dispatch
             )
             Button.Color Color.IsWhite
             Button.IsInverted
@@ -69,7 +65,7 @@ let navbarShortCutIconList model dispatch =
             Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
             Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Remove Building Block")]
             Button.OnClick (fun _ ->
-                PipeActiveAnnotationTable RemoveAnnotationBlock |> ExcelInterop |> dispatch
+                RemoveAnnotationBlock |> ExcelInterop |> dispatch
             )
             Button.Color Color.IsWhite
             Button.IsInverted
@@ -82,7 +78,7 @@ let navbarShortCutIconList model dispatch =
             Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
             Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Get Building Block Information")]
             Button.OnClick (fun _ ->
-                PipeActiveAnnotationTable GetSelectedBuildingBlockSearchTerms |> ExcelInterop |> dispatch
+                GetSelectedBuildingBlockSearchTerms |> ExcelInterop |> dispatch
             )
             Button.Color Color.IsWhite
             Button.IsInverted

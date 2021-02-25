@@ -12,27 +12,23 @@ open Model
 //open ISADotNet
 
 type ExcelInteropMsg =
-    | PipeActiveAnnotationTable             of (TryFindAnnoTableResult -> ExcelInteropMsg)
-    /// This is used to pipe (all table names []) to a ExcelInteropMsg.
-    /// This is used to generate a new annotation table name.
-    | PipeCreateAnnotationTableInfo         of (string [] -> ExcelInteropMsg)
     | Initialized                           of (string*string)
-    | FillSelection                         of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
-    | AddAnnotationBlock                    of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
-    | AddAnnotationBlocks                   of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | RemoveAnnotationBlock                 of activeAnnotationTable:TryFindAnnoTableResult
-    | AddUnitToAnnotationBlock              of tryFindActiveAnnotationTable:TryFindAnnoTableResult * unitTermName:string option * unitTermAccession:string option
-    | FormatColumn                          of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string
-    | FormatColumns                         of activeAnnotationTable:TryFindAnnoTableResult * (string * string) list
+    | FillSelection                         of string * (DbDomain.Term option)
+    | AddAnnotationBlock                    of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
+    | AddAnnotationBlocks                   of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | RemoveAnnotationBlock
+    | AddUnitToAnnotationBlock              of unitTermName:string option * unitTermAccession:string option
+    | FormatColumn                          of colname:string * formatString:string
+    | FormatColumns                         of (string * string) list
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
-    | CreateAnnotationTable                 of allTableNames:string [] * isDark:bool
-    | AnnotationtableCreated                of activeAnnotationTable:TryFindAnnoTableResult * string
-    | AnnotationTableExists                 of activeAnnotationTable:TryFindAnnoTableResult
-    | GetParentTerm                         of activeAnnotationTable:TryFindAnnoTableResult
-    | AutoFitTable                          of activeAnnotationTable:TryFindAnnoTableResult
-    | UpdateProtocolGroupHeader             of activeAnnotationTable:TryFindAnnoTableResult
+    | CreateAnnotationTable                 of isDark:bool
+    | AnnotationtableCreated                of string
+    | AnnotationTableExists                 of TryFindAnnoTableResult
+    | GetParentTerm
+    | AutoFitTable
+    | UpdateProtocolGroupHeader
     //
-    | GetTableValidationXml                 of activeAnnotationTable:TryFindAnnoTableResult
+    | GetTableValidationXml
     | WriteTableValidationToXml             of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
     /// needs to set newColNames separately as these validations come from templates for protocol group insert
     | AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:OfficeInterop.Types.Xml.GroupTypes.Protocol
@@ -40,13 +36,13 @@ type ExcelInteropMsg =
     | DeleteAllCustomXml
     | GetSwateCustomXml
     //
-    | FillHiddenColsRequest                 of activeAnnotationTable:TryFindAnnoTableResult
+    | FillHiddenColsRequest
     | FillHiddenColumns                     of tableName:string*SearchTermI []
     | UpdateFillHiddenColsState             of FillHiddenColsState
     //
-    | InsertFileNames                       of activeAnnotationTable:TryFindAnnoTableResult*fileNameList:string list
+    | InsertFileNames                       of fileNameList:string list
     // Show Details to selected BuildingBlock
-    | GetSelectedBuildingBlockSearchTerms   of activeAnnotationTable:TryFindAnnoTableResult
+    | GetSelectedBuildingBlockSearchTerms
     // Development
     | TryExcel
     | TryExcel2
@@ -78,7 +74,7 @@ type AdvancedSearchMsg =
     | NewAdvancedSearchResults          of DbDomain.Term []
 
 type DevMsg =
-    | LogTableMetadata      of activeAnnotationTable:TryFindAnnoTableResult
+    | LogTableMetadata
     | GenericLog            of (string*string)
     | GenericError          of exn
     | UpdateLastFullError   of exn option
@@ -202,40 +198,3 @@ type Msg =
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>
     | DoNothing
-
-/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1) other params.
-let pipeNameTuple msg param =
-    PipeActiveAnnotationTable
-        (fun annotationTableOpt ->
-            msg (annotationTableOpt,param)
-        )
-
-/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2) other params.
-/// Use this as: (x1,x2) |> pipeNameTuple2 msg
-let pipeNameTuple2 msg param =
-    PipeActiveAnnotationTable
-        (fun annotationTableOpt ->
-            let constructParam =
-                param |> fun (x,y) -> annotationTableOpt,x,y    
-            msg (constructParam)
-        )
-
-/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2,x3) other params.
-/// Use this as: (x1,x2,x3) |> pipeNameTuple3 msg
-let pipeNameTuple3 msg param =
-    PipeActiveAnnotationTable
-        (fun annotationTableOpt ->
-            let constructParam =
-                param |> fun (x,y,z) -> annotationTableOpt,x,y,z    
-            msg (constructParam)
-        )
-
-/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2,x3,x4) other params.
-/// Use this as: (x1,x2,x3) |> pipeNameTuple4 msg
-let pipeNameTuple4 msg param =
-    PipeActiveAnnotationTable
-        (fun annotationTableOpt ->
-            let constructParam =
-                param |> fun (x,y,z,u) -> annotationTableOpt,x,y,z,u 
-            msg (constructParam)
-        )

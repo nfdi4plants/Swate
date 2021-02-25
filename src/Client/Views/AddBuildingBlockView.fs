@@ -210,7 +210,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         Button.Color Color.IsDanger
                         Button.Props [Disabled true]
                     Button.IsFullWidth
-                    Button.OnClick (
+                    Button.OnClick (fun e ->
                         let colName     = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
                         let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome then Some model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value.Accession else None
                         let unitName =
@@ -221,7 +221,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                                 //sprintf "0.00 \"%s\"" str
                         let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome then Some model.AddBuildingBlockState.UnitSelectedTerm.Value.Accession else None
                         let minBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.create colName colTerm unitName unitTerm None
-                        fun _ -> minBuildingBlock |> pipeNameTuple AddAnnotationBlock |> ExcelInterop |> dispatch
+                        AddAnnotationBlock minBuildingBlock |> ExcelInterop |> dispatch
                     )
                 ] [
                     str "Insert annotation building block"
@@ -276,7 +276,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         | "" ->
                             GenericLog ("Error", "Cannot execute function with empty unit input") |> Dev |> dispatch
                         | str ->
-                            (Some str, unitTermOpt) |> pipeNameTuple2 AddUnitToAnnotationBlock  |> ExcelInterop |> dispatch
+                            AddUnitToAnnotationBlock (Some str, unitTermOpt) |> ExcelInterop |> dispatch
                     )
                 ] [
                     str "Add unit to existing building block"

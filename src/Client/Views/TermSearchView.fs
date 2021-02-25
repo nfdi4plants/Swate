@@ -108,7 +108,7 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
                             Button.IsFullWidth
                             Button.OnClick (fun _ ->
                                 if hasText then
-                                    (model.TermSearchState.TermSearchText,model.TermSearchState.SelectedTerm) |> pipeNameTuple2 FillSelection |> ExcelInterop |> dispatch
+                                    FillSelection (model.TermSearchState.TermSearchText, model.TermSearchState.SelectedTerm) |> ExcelInterop |> dispatch
                             )
                         ] [
                             str "Fill selected cells with this term"

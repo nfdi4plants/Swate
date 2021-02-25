@@ -12,7 +12,7 @@ open OfficeInterop.Types
 open BuildingBlockTypes
 open Shared
 
-let getActiveAnnotationTableName (context:RequestContext)=
+let getActiveAnnotationTableName() =
     Excel.run(fun context ->
 
         // Ref. 2
@@ -38,6 +38,29 @@ let getActiveAnnotationTableName (context:RequestContext)=
                 match res with
                 | Success tableName -> tableName
                 | TryFindAnnoTableResult.Error msg -> failwith msg
+        )
+    )
+
+/// This function returns the names of all annotationTables in all worksheets.
+/// This function is used to pass a list of all table names to e.g. the 'createAnnotationTable()' function. 
+let getAllTableInfo() =
+    Excel.run(fun context ->
+
+        // Ref. 2
+
+        let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let _ = tables.load(propertyNames = U2.Case1 "name")
+
+        context.sync()
+            .``then``( fun _ ->
+
+                /// Get all names of all tables in the whole workbook.
+                let tableNames =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+
+                tableNames
         )
     )
 
@@ -703,7 +726,7 @@ let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
         promise {
-            let! annotationTable = getActiveAnnotationTableName context
+            let! annotationTable = getActiveAnnotationTableName()
 
             let! xmlParsed, xml = getCustomXml customXmlParts context
 

@@ -483,7 +483,7 @@ let fileNameElements (model:Model) dispatch =
                 else
                     Button.Color Color.IsSuccess
                 Button.OnClick (fun e ->
-                    (fun tableName -> InsertFileNames (tableName, model.FilePickerState.FileNames |> List.map snd)) |> PipeActiveAnnotationTable |> ExcelInterop |> dispatch 
+                    InsertFileNames (model.FilePickerState.FileNames |> List.map snd) |> ExcelInterop |> dispatch 
                 )
 
             ][
