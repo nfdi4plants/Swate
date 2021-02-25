@@ -160,7 +160,7 @@ let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
 
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
 
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search for an ontology term to fill into the selected field(s)"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search for an ontology term to fill into the selected field(s)"]
 
         simpleSearchComponent model dispatch
 

@@ -190,7 +190,7 @@ let fileUploadButton (model:Model) dispatch id =
             ]
         ]
         Button.a [Button.Color Color.IsInfo; Button.IsFullWidth][
-            str "Upload Process.json"
+            str "Upload protocol"
         ]
     ]
 
@@ -258,7 +258,7 @@ let protocolInsertElement uploadId (model:Model) dispatch =
                 a [Href "https://github.com/nfdi4plants/Swate/wiki/Insert-via-Process.json"; Target "_Blank"][ str "process.json" ]
                 str " file."
             ]
-            str " The building blocks in this file can be group inserted into a Swate table."
+            str " The building blocks in this file can be group-inserted into a Swate table."
             str " In the future these files will be accessible either by "
             a [Href "https://github.com/nfdi4plants/Spawn"; Target "_Blank"] [str "Spawn"]
             str " or offered as download!"
@@ -271,10 +271,6 @@ let protocolInsertElement uploadId (model:Model) dispatch =
         ]]][
             if model.ProtocolInsertState.ProcessModel.IsSome then
                 yield! displayProtocolInfoElement isViable errorMsg model dispatch
-            else
-                Field.div [][
-                    str "The protocol building blocks will be shown here"
-                ]
 
             addFromFileToTableButton isViable model dispatch
         ]
@@ -286,7 +282,7 @@ let toProtocolSearchElement (model:Model) dispatch =
         Button.Color IsInfo
         Button.IsFullWidth
         Button.Props [Style [Margin "1rem 0"]]
-    ] [str "Browse Database"]
+    ] [str "Browse protocol template database"]
 
 let addFromDBToTableButton (model:Model) dispatch =
     Columns.columns [Columns.IsMobile][
@@ -384,13 +380,13 @@ let fileUploadViewComponent (model:Model) dispatch =
 
 
         /// Box 1
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add protocol template from database."]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add protocol template from database."]
 
         showDatabaseProtocolTemplate model dispatch
 
 
         /// Box 2
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks from file."]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks from file."]
 
         protocolInsertElement uploadId model dispatch
 

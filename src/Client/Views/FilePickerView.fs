@@ -574,7 +574,7 @@ let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
 
         uploadButton model dispatch inputId
 
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
             str "Select files from your computer and insert their names into Excel."
         ]
 

@@ -293,11 +293,11 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
 
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Select the type of annotation building block (column) to add to the annotation table."]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks (columns) to the annotation table."]
         // Input forms, etc related to add building block.
         addBuildingBlockElements model dispatch
 
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add unit reference columns to existing building block."]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add unit reference columns to existing building block."]
         // Input forms, etc related to add unit to existing building block.
         addUnitToExistingBlockElements model dispatch
 

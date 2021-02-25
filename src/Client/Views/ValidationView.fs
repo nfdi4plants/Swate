@@ -410,7 +410,7 @@ let validationComponent model dispatch =
             str "Update table representation"
         ]
 
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
             str """Adjust current Swate table validation. """
             span [
                 Class (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)

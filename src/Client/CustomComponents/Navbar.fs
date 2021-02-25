@@ -10,6 +10,13 @@ open ExcelColors
 open Model
 open Messages
 
+let placerholderInvis =
+    let padding = "0.5rem"
+    Button.a [
+        Button.Props [Style [Opacity "0"; PointerEvents "None"; Cursor "none"; PaddingLeft padding; PaddingRight padding]]
+    ] [
+        Fa.i [Fa.Solid.SyncAlt][]
+    ]
 
 let navbarShortCutIconList model dispatch =
     let padding = "0.5rem"
@@ -168,7 +175,9 @@ let quickAccessDropdownElement model dispatch =
                             Display DisplayOptions.Flex
                             JustifyContent "space-between"
                         ]] [
-                            yield! subList
+                            subList |> List.tryItem 0 |> fun x -> if x.IsSome then x.Value else placerholderInvis
+                            subList |> List.tryItem 1 |> fun x -> if x.IsSome then x.Value else placerholderInvis
+                            subList |> List.tryItem 2 |> fun x -> if x.IsSome then x.Value else placerholderInvis
                         ]
             ]
         ]
@@ -186,7 +195,7 @@ let quickAccessListElement model dispatch =
 let navbarComponent (model : Model) (dispatch : Msg -> unit) =
     Navbar.navbar [Navbar.Props [Props.Role "navigation"; AriaLabel "main navigation" ; ExcelColors.colorElement model.SiteStyleState.ColorMode]] [
         Navbar.Brand.a [] [
-            Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"]] [
+            Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"; Target "_Blank"]] [
                 img [Props.Src "../assets/Swate_logo_for_excel.svg"]
             ]
 
