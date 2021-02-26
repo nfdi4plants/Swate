@@ -146,7 +146,7 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
                     ][
                         Fa.i [Fa.Regular.Clipboard ] [] 
                     ]
-            ]
+                ]
         ]
     ]
 

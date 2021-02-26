@@ -13,7 +13,7 @@ open Browser.MediaQueryListExtensions
 open CustomComponents
 
 let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
-    let isActive = (model.PageState.CurrentPage = pageLink)
+    let isActive = model.PageState.CurrentPage = pageLink
     Tabs.tab [Tabs.Tab.IsActive isActive] [
         a [ //Href (Routing.Route.toRouteUrl pageLink)
             Style [

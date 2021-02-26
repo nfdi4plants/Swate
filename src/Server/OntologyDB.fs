@@ -105,9 +105,11 @@ let getTermSuggestions cString (query:string) =
         if query.Contains " " then
             query.Split([|" "|], StringSplitOptions.RemoveEmptyEntries)
             |> Array.filter (fun x -> x.Length >= 3 )
+            |> Array.map (fun x -> sprintf "+%s" x)
             |> String.concat " "
         else
             query
+        |> fun x -> x + " *"
 
     queryParam      .Value <- query'
 

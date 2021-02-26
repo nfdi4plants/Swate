@@ -419,9 +419,18 @@ type BuildingBlockDetailsState = {
         BuildingBlockValues = [||]
     }
 
-//type SettingsXmlState = {
-//    FoundTables = 
-//}
+type SettingsXmlState = {
+    RawXml              : string
+    FoundTables         : Shared.AnnotationTable []
+    ProtocolGroupXmls   : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
+    ValidationXmls      : OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+} with
+    static member init () = {
+        RawXml              = ""
+        FoundTables         = [||]
+        ProtocolGroupXmls   = [||]
+        ValidationXmls      = [||]
+    }
 
 type Model = {
 
@@ -462,10 +471,13 @@ type Model = {
     //Create Validation scheme for Table
     ValidationState         : ValidationState
 
+    //Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
 
-}
+    //Used to manage all xml settings
+    SettingsXmlState        : SettingsXmlState
 
+}
 
 let initializeModel (pageOpt: Route option) = {
     DebouncerState              = Debouncer                 .create ()
@@ -482,4 +494,5 @@ let initializeModel (pageOpt: Route option) = {
     ValidationState             = ValidationState           .init ()
     ProtocolInsertState         = ProtocolInsertState       .init ()
     BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
+    SettingsXmlState            = SettingsXmlState          .init ()
 }

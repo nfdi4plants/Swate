@@ -46,6 +46,7 @@
         <Compile Include="Views\InfoView.fs" />
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\SettingsView.fs" />
+        <Compile Include="Views\SettingsXmlView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>

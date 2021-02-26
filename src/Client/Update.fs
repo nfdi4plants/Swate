@@ -319,7 +319,12 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             Cmd.OfPromise.either
                 OfficeInterop.getSwateCustomXml
                 ()
-                (GenericLog >> Dev)
+                (fun xml ->
+                    Msg.Batch [
+                        GenericLog xml |> Dev
+                        UpdateRawCustomXml (snd xml) |> SettingXmlMsg
+                    ]
+                )
                 (GenericError >> Dev)
         currentState, cmd
     //
@@ -1473,6 +1478,16 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
         }
         nextState, Cmd.none
 
+let handleSettingXmlMsg (msg:SettingXmlMsg) (currentState: SettingsXmlState) : SettingsXmlState * Cmd<Msg> =
+    match msg with
+    // Client
+    | UpdateRawCustomXml rawXmlStr ->
+        let nextState = {
+            currentState with
+                RawXml = rawXmlStr
+        }
+        nextState, Cmd.none
+
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
     // Client
@@ -1685,7 +1700,17 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             currentModel with
                 BuildingBlockDetailsState = nextState
             }
-        nextModel, nextCmd 
+        nextModel, nextCmd
+
+    | SettingXmlMsg msg ->
+        let nextState, nextCmd =
+            currentModel.SettingsXmlState
+            |> handleSettingXmlMsg msg
+        let nextModel = {
+            currentModel with
+                SettingsXmlState = nextState
+        }
+        nextModel, nextCmd
 
     | TopLevelMsg topLevelMsg ->
         let nextModel, nextCmd =

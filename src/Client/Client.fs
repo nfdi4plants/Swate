@@ -108,6 +108,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
             //Text.p [] [str ""]
         ]
 
+    | Routing.Route.SettingsXml ->
+        BaseView.baseViewComponent model dispatch [
+            SettingsXmlView.settingsXmlViewComponent model dispatch
+        ] [
+            //Text.p [] [str ""]
+        ]
+
     | Routing.Route.Info ->
         BaseView.baseViewComponent model dispatch [
             InfoView.infoComponent model dispatch

@@ -175,6 +175,9 @@ type BuildingBlockDetailsMsg =
     | ToggleShowDetails
     | UpdateCurrentRequestState                     of RequestBuildingBlockInfoStates
 
+type SettingXmlMsg =
+    | UpdateRawCustomXml of string
+
 type TopLevelMsg =
     | CloseSuggestions
 
@@ -193,6 +196,7 @@ type Msg =
     | Validation            of ValidationMsg
     | ProtocolInsert        of ProtocolInsertMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
+    | SettingXmlMsg         of SettingXmlMsg
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>
