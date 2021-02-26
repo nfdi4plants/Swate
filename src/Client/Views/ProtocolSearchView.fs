@@ -133,7 +133,7 @@ let fileSortElements (model:Model) dispatch =
         ]
     ]
 
-let protocolElement i (sortedTable:Protocol []) (model:Model) dispatch =
+let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
     let isActive =
         match model.ProtocolInsertState.DisplayedProtDetailsId with
         | Some id when id = i ->
@@ -221,7 +221,7 @@ let protocolElement i (sortedTable:Protocol []) (model:Model) dispatch =
 
 let protocolElementContainer (model:Model) dispatch =
     
-    let sortTableBySearchQuery (protocol:Protocol []) =
+    let sortTableBySearchQuery (protocol:ProtocolTemplate []) =
         if model.ProtocolInsertState.ProtocolNameSearchQuery <> ""
         then
             let queryBigram = model.ProtocolInsertState.ProtocolNameSearchQuery |> Shared.Suggestion.createBigrams 
@@ -235,7 +235,7 @@ let protocolElementContainer (model:Model) dispatch =
             bigrams
         else
             protocol
-    let filterTableByTags (protocol:Protocol []) =
+    let filterTableByTags (protocol:ProtocolTemplate []) =
         if model.ProtocolInsertState.ProtocolSearchTags |> List.isEmpty |> not then
             protocol |> Array.filter (fun x ->
                 let protTagSet = x.Tags |> Set.ofArray

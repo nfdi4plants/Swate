@@ -141,8 +141,7 @@ module PredefinedParams =
 
         let searchTermExmp:SearchTermI = {
             ColIndices = [|2; 3|]
-            SearchString = "Bruker Daltonics HCT Series"
-            TermAccession = ""
+            SearchQuery = Shared.OntologyInfo.create "Bruker Daltonics HCT Series" ""
             IsA = Some ontologyInfoExmp
             RowIndices = [|0 .. 10|]
             TermOpt = None

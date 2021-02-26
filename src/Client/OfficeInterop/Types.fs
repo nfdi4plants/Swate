@@ -108,23 +108,21 @@ module Xml =
 
         type ProtocolGroup = {
             SwateVersion    : string
-            WorksheetName   : string
-            TableName       : string
+            AnnotationTable : Shared.AnnotationTable
             Protocols       : Protocol list
         } with
             static member create swateVersion tableName worksheetName protocols = {
                 SwateVersion    = swateVersion
-                TableName       = tableName
-                WorksheetName   = worksheetName
+                AnnotationTable = Shared.AnnotationTable.create tableName worksheetName
                 Protocols       = protocols
             }
             static member init = ProtocolGroup.create "" "" "" []
 
             member this.toXml =
                 node "ProtocolGroup" [
-                    attr.value( "SwateVersion"  , this.SwateVersion )
-                    attr.value( "TableName"     , this.TableName    )
-                    attr.value( "WorksheetName" , this.WorksheetName)
+                    attr.value( "SwateVersion"  , this.SwateVersion                 )
+                    attr.value( "TableName"     , this.AnnotationTable.Name         )
+                    attr.value( "WorksheetName" , this.AnnotationTable.Worksheet    )
                 ] [
                     for protocol in this.Protocols do
                         yield
@@ -238,8 +236,7 @@ module Xml =
             
         type TableValidation = {
             SwateVersion    : string
-            WorksheetName   : string
-            TableName       : string
+            AnnotationTable : Shared.AnnotationTable
             DateTime        : DateTime
             // "FirstUser; SecondUser"
             Userlist        : string list
@@ -247,16 +244,14 @@ module Xml =
         } with
             static member create swateVersion worksheetName tableName dateTime userlist colValidations = {
                 SwateVersion        = swateVersion
-                WorksheetName       = worksheetName
-                TableName           = tableName
+                AnnotationTable     = Shared.AnnotationTable.create tableName worksheetName
                 DateTime            = dateTime
                 Userlist            = userlist
                 ColumnValidations   = colValidations
             }
             static member init (?swateVersion, ?worksheetName,?tableName, (?dateTime:DateTime), ?userList) = {
                 SwateVersion        = if swateVersion.IsSome then swateVersion.Value else ""
-                WorksheetName       = if worksheetName.IsSome then worksheetName.Value else ""
-                TableName           = if tableName.IsSome then tableName.Value else ""
+                AnnotationTable     = Shared.AnnotationTable.create (if tableName.IsSome then tableName.Value else "") (if worksheetName.IsSome then worksheetName.Value else "")
                 DateTime            = if dateTime.IsSome then dateTime.Value else DateTime.Now
                 Userlist            = if userList.IsSome then userList.Value else []
                 ColumnValidations   = []
@@ -265,8 +260,8 @@ module Xml =
             member this.toXml =
                 node "TableValidation" [
                         attr.value( "SwateVersion", this.SwateVersion )
-                        attr.value( "WorksheetName", this.WorksheetName )
-                        attr.value( "TableName", this.TableName )
+                        attr.value( "WorksheetName", this.AnnotationTable.Worksheet)
+                        attr.value( "TableName", this.AnnotationTable.Name)
                         attr.value( "DateTime", this.DateTime.ToString("yyyy-MM-dd HH:mm") )
                         attr.value( "Userlist", this.Userlist |> String.concat "; " )
                 ][

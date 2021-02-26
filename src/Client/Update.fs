@@ -148,7 +148,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                         if validationOpt.IsSome then
                             /// tableValidation is retrived from database and does not contain correct tablename and worksheetname.
                             /// This information is passed on from addAnnotationBlocksAsProtocol.
-                            let updatedValidation = {validationOpt.Value with TableName = annotationTableName; WorksheetName = worksheetName}
+                            let updatedValidation = {validationOpt.Value with AnnotationTable = Shared.AnnotationTable.create annotationTableName worksheetName}
                             AddTableValidationtoExisting (updatedValidation, newColNames, protocolInfo) |> ExcelInterop
                         else
                             WriteProtocolToXml protocolInfo |> ExcelInterop
@@ -1313,10 +1313,10 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
 
 let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolInsertState) : ProtocolInsertState * Cmd<Msg> =
 
-    let parseDBProtocol (prot:Shared.Protocol) =
+    let parseDBProtocol (prot:Shared.ProtocolTemplate) =
         let tableName,minBBInfos = prot.TableXml |> OfficeInterop.Regex.MinimalBuildingBlock.ofExcelTableXml
         let validationType =  prot.CustomXml |> OfficeInterop.Types.Xml.ValidationTypes.TableValidation.ofXml
-        if tableName <> validationType.TableName then failwith "CustomXml and TableXml relate to different tables."
+        if tableName <> validationType.AnnotationTable.Name then failwith "CustomXml and TableXml relate to different tables."
         prot, validationType, minBBInfos
 
     match fujMsg with

@@ -34,7 +34,7 @@ let getAllProtocols cString =
         while reader.Read() do
             let tags = reader.GetString(6).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
             yield
-                Protocol.create
+                ProtocolTemplate.create
                     (reader.GetString(0))       // name
                     (reader.GetString(1))       // version
                     (reader.GetDateTime(2))     // created
@@ -69,7 +69,7 @@ let getProtocolByName cString (queryStr:string) =
         while reader.Read() do
             let tags = reader.GetString(6).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
             yield
-                Protocol.create
+                ProtocolTemplate.create
                     (reader.GetString(0))       // name
                     (reader.GetString(1))       // version
                     (reader.GetDateTime(2))     // created
@@ -83,7 +83,7 @@ let getProtocolByName cString (queryStr:string) =
                     (reader.GetInt32(8))        // rating
     |]
 
-let getXmlByProtocol cString (protocol:Protocol) =
+let getXmlByProtocol cString (protocol:ProtocolTemplate) =
     use connection = establishConnection cString
     connection.Open()
 

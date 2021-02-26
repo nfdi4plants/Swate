@@ -17,6 +17,7 @@ type Route =
 | ProtocolSearch
 | ActivityLog
 | Settings
+| SettingsXml
 | NotFound
 
     static member toRouteUrl (route:Route) =
@@ -31,6 +32,7 @@ type Route =
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
+        | Route.SettingsXml         -> "/#SettingsXml"
         | Route.NotFound            -> "/#NotFound"
 
     static member toString (route:Route) =
@@ -45,6 +47,7 @@ type Route =
         | Route.FilePicker          -> "FilePicker"
         | Route.ActivityLog         -> "ActivityLog"
         | Route.Settings            -> "Settings"
+        | Route.SettingsXml         -> "SettingsXml"
         | Route.NotFound            -> "NotFound"
 
     member this.toStringRdbl =
@@ -59,6 +62,7 @@ type Route =
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
+        | Route.SettingsXml         -> "Xml Settings"
         | Route.NotFound            -> "NotFound"
 
 
@@ -69,10 +73,7 @@ type Route =
                 Tooltip.dataTooltip (name)
             ] (
                 icons
-                |> List.map (
-                    fun icon ->
-                        Fa.span [icon] []
-                )
+                |> List.map ( fun icon -> Fa.span [icon] [] )
             )
 
         match p with
@@ -108,6 +109,7 @@ module Routing =
             map Route.ProtocolSearch    (s "ProtocolSearch")
             map Route.ActivityLog       (s "ActivityLog")
             map Route.Settings          (s "Settings")
+            map Route.SettingsXml       (s "SettingsXml")
             map Route.NotFound          (s "NotFound")
         ]
 

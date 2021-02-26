@@ -330,9 +330,9 @@ let validationElements (model:Model) dispatch =
                     header?style?transition <- "unset"
                 )
             ][
-                b [][ str model.ValidationState.TableValidationScheme.WorksheetName ]
+                b [][ str model.ValidationState.TableValidationScheme.AnnotationTable.Worksheet]
                 str " - "
-                str model.ValidationState.TableValidationScheme.TableName
+                str model.ValidationState.TableValidationScheme.AnnotationTable.Name
                 str " - "
                 str ( model.ValidationState.TableValidationScheme.DateTime.ToString("yyyy-MM-dd HH:mm") )
                 str " - "

@@ -75,16 +75,16 @@ let buildingBlockDetailModal (model:Model) dispatch =
                         th [Class "toExcelColor"][str "RowIndex"]
                     ]
                     tr [][
-                        th [][str mainColHeader.SearchString]
-                        th [][str mainColHeader.TermAccession]
+                        th [][str mainColHeader.SearchQuery.Name]
+                        th [][str mainColHeader.SearchQuery.TermAccession]
                         th [][str (mainColHeader.ColIndices |> Seq.min |> string)]
                         th [][str "Header"]
                     ]
                     if unitHeaderOpt.IsSome then
                         let unitHeader = unitHeaderOpt.Value
                         tr [][
-                            th [][str unitHeader.SearchString]
-                            th [][str unitHeader.TermAccession]
+                            th [][str unitHeader.SearchQuery.Name]
+                            th [][str unitHeader.SearchQuery.TermAccession]
                             th [][str (unitHeader.ColIndices |> Seq.min |> string)]
                             th [][str "Unit"]
                         ]
@@ -93,7 +93,7 @@ let buildingBlockDetailModal (model:Model) dispatch =
                     for t in valueArr do
                         yield
                             tr [] [
-                                td [][str (if t.SearchString = "" then "none" else t.SearchString)]
+                                td [][str (if t.SearchQuery.Name = "" then "none" else t.SearchQuery.Name)]
                                 td [][str (sprintf "%A" (if t.TermOpt.IsSome then t.TermOpt.Value.Accession else "none") )]
                                 td [][str (mainColHeader.ColIndices |> Seq.min |> string)]
                                 td [][str (sprintf "%A" (sprintableRowIndices t.RowIndices) ) ]

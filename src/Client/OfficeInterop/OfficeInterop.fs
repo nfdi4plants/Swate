@@ -618,7 +618,7 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                             true
                     if existsAlready.IsSome then
                         if isComplete then
-                            failwith ( sprintf "Protocol %s exists already in %s - %s." existsAlready.Value.Id currentProtocolGroup.Value.TableName currentProtocolGroup.Value.WorksheetName )
+                            failwith ( sprintf "Protocol %s exists already in %s - %s." existsAlready.Value.Id currentProtocolGroup.Value.AnnotationTable.Name currentProtocolGroup.Value.AnnotationTable.Worksheet)
 
                 let! chainProm = chainBuildingBlocks buildingBlockInfoList
 
@@ -1030,13 +1030,13 @@ let UpdateTableBySearchTermsI (annotationTable,terms:SearchTermI []) =
                                         let accession = Shared.URLs.TermAccessionBaseUrl + a.Replace(":","_")
                                         splitA.[0], accession
                                     t.Name,ont,accession
-                                elif term.SearchString = "" then
+                                elif term.SearchQuery.Name = "" then
                                     let t = ""
                                     let ont = ""
                                     let accession = ""
                                     t, ont, accession
                                 elif term.TermOpt = None then
-                                    let t = term.SearchString
+                                    let t = term.SearchQuery.Name
                                     let ont = "user-specific"
                                     let accession = "user-specific"
                                     t, ont, accession
@@ -1419,8 +1419,8 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
                 "Info",
                 sprintf
                     "Update Validation Scheme with '%s - %s' @%s"
-                    newTableValidation.WorksheetName
-                    newTableValidation.TableName
+                    newTableValidation.AnnotationTable.Worksheet
+                    newTableValidation.AnnotationTable.Name
                     ( newTableValidation.DateTime.ToString("yyyy-MM-dd HH:mm") )
         }
     )
@@ -1466,7 +1466,7 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
     
             let! xmlParsed, xml = getCustomXml customXmlParts context
 
-            let currentTableValidationOpt = getSwateValidationForCurrentTable newTableValidation.TableName newTableValidation.WorksheetName xmlParsed
+            let currentTableValidationOpt = getSwateValidationForCurrentTable newTableValidation.AnnotationTable.Name newTableValidation.AnnotationTable.Worksheet xmlParsed
 
             let updatedTableValidation =
                 if currentTableValidationOpt.IsSome then
@@ -1507,8 +1507,8 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
                 "Info",
                 sprintf
                     "Update Validation Scheme with '%s - %s' @%s"
-                    newTableValidation.WorksheetName
-                    newTableValidation.TableName
+                    newTableValidation.AnnotationTable.Worksheet
+                    newTableValidation.AnnotationTable.Name
                     ( newTableValidation.DateTime.ToString("yyyy-MM-dd HH:mm") )
         }
     )

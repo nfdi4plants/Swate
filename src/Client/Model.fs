@@ -370,10 +370,10 @@ type ProtocolInsertState = {
     ProcessModel            : ISADotNet.Process option
 
     // Database protocol template
-    ProtocolSelected        : Shared.Protocol option
+    ProtocolSelected        : Shared.ProtocolTemplate option
     ValidationXml           : OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     BuildingBlockMinInfoList: OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
-    ProtocolsAll            : Shared.Protocol []
+    ProtocolsAll            : Shared.ProtocolTemplate []
 
     ProtocolNameSearchQuery : string
     ProtocolTagSearchQuery  : string
@@ -418,6 +418,10 @@ type BuildingBlockDetailsState = {
         ShowDetails         = false
         BuildingBlockValues = [||]
     }
+
+//type SettingsXmlState = {
+//    FoundTables = 
+//}
 
 type Model = {
 

@@ -655,7 +655,7 @@ let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElem
 
 let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
 
-    let currentTableXml = getActiveTableXml tableValidation.TableName tableValidation.WorksheetName previousCompleteCustomXml
+    let currentTableXml = getActiveTableXml tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet previousCompleteCustomXml
 
     let nextTableXml =
         let newValidationXml = tableValidation.toXml |> SimpleXml.parseElement
@@ -668,7 +668,7 @@ let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) 
             }
         else
             let initNewSwateTableXml =
-                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" tableValidation.TableName tableValidation.WorksheetName
+                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet
             let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
             {swateTableXmlEle with
                 Children = [newValidationXml]
@@ -678,8 +678,8 @@ let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) 
         |> List.filter (fun x ->
             let isExisting =
                 x.Name = "SwateTable"
-                && x.Attributes.["Table"] = tableValidation.TableName
-                && x.Attributes.["Worksheet"] = tableValidation.WorksheetName
+                && x.Attributes.["Table"] = tableValidation.AnnotationTable.Name
+                && x.Attributes.["Worksheet"] = tableValidation.AnnotationTable.Worksheet
             isExisting |> not
         )
     {previousCompleteCustomXml with
@@ -701,7 +701,7 @@ let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlE
 
 let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
 
-    let currentTableXml = getActiveTableXml protocolGroup.TableName protocolGroup.WorksheetName previousCompleteCustomXml
+    let currentTableXml = getActiveTableXml protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet previousCompleteCustomXml
 
     let nextTableXml =
         let newProtocolGroupXml = protocolGroup.toXml |> SimpleXml.parseElement
@@ -714,7 +714,7 @@ let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previ
             }
         else
             let initNewSwateTableXml =
-                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" protocolGroup.TableName protocolGroup.WorksheetName
+                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet
             let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
             {swateTableXmlEle with
                 Children = [newProtocolGroupXml]
@@ -724,8 +724,8 @@ let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previ
         |> List.filter (fun x ->
             let isExisting =
                 x.Name = "SwateTable"
-                && x.Attributes.["Table"] = protocolGroup.TableName
-                && x.Attributes.["Worksheet"] = protocolGroup.WorksheetName
+                && x.Attributes.["Table"] = protocolGroup.AnnotationTable.Name
+                && x.Attributes.["Worksheet"] = protocolGroup.AnnotationTable.Worksheet
             isExisting |> not
         )
     {previousCompleteCustomXml with

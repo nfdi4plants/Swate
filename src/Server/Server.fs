@@ -151,23 +151,23 @@ let annotatorApi cString = {
                     {searchTerm with
                         TermOpt =
                             // check if search string is empty. This case should delete TAN- and TSR- values in table
-                            if searchTerm.SearchString = "" then None
+                            if searchTerm.SearchQuery.Name = "" then None
                             // check if term accession was found. If so search also by this as it is unique
-                            elif searchTerm.TermAccession <> "" then
-                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchString,searchTerm.TermAccession)
+                            elif searchTerm.SearchQuery.TermAccession <> "" then
+                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchQuery.Name,searchTerm.SearchQuery.TermAccession)
                                 if Array.isEmpty searchRes then
                                     None
                                 else
                                     searchRes |> Array.head |> Some
                             elif searchTerm.IsA.IsSome then
-                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchString,searchTerm.IsA.Value)
+                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchQuery.Name,searchTerm.IsA.Value)
                                 if Array.isEmpty searchRes then
-                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.SearchString
+                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.SearchQuery.Name
                                     if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
                                 else
                                     searchRes |> Array.head |> Some
                             else
-                                let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
+                                let searchRes = OntologyDB.getTermByName cString searchTerm.SearchQuery.Name
                                 if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
                     }
                 )

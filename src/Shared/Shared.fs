@@ -123,7 +123,9 @@ module DbDomain =
     }
 
 type OntologyInfo = {
+    /// This is the Ontology Name
     Name            : string
+    /// This is the Ontology Term Accession 'XX:aaaaaa'
     TermAccession   : string
 } with
     static member create name termAccession = {
@@ -131,27 +133,38 @@ type OntologyInfo = {
         TermAccession   = termAccession
     }
 
+type AnnotationTable = {
+    Name            : string
+    Worksheet       : string
+} with
+    static member create name worksheet = {
+        Name        = name
+        Worksheet   = worksheet
+    }
+
 /// Used in OfficeInterop to effectively find possible Term names and search for them in db
 type SearchTermI = {
     ColIndices      : int []
-    /// This is the Ontology Name
-    SearchString    : string
-    /// This is the Ontology Term Accession 'XX:aaaaaa'
-    TermAccession   : string
+    SearchQuery     : OntologyInfo
+    ///// This is the Ontology Name
+    //SearchString    : string
+    ///// This is the Ontology Term Accession 'XX:aaaaaa'
+    //TermAccession   : string
     IsA             : OntologyInfo option
     RowIndices      : int []
     TermOpt         : DbDomain.Term option
 } with
     static member create colIndices searchString termAccession ontologyInfoOpt rowIndices = {
         ColIndices      = colIndices
-        SearchString    = searchString
-        TermAccession   = termAccession
+        SearchQuery     = OntologyInfo.create searchString termAccession
+        //SearchString    = searchString
+        //TermAccession   = termAccession
         IsA             = ontologyInfoOpt
         RowIndices      = rowIndices
         TermOpt         = None
     }
 
-type Protocol = {
+type ProtocolTemplate = {
     Name            : string
     Version         : string
     Created         : DateTime
@@ -222,8 +235,8 @@ type IAnnotatorAPIv1 = {
     getTermsByNames                     : SearchTermI []                                                -> Async<SearchTermI []>
 
     // Protocol apis
-    getAllProtocols                 : unit                                                  -> Async<Protocol []>
-    getProtocolBlocksForProtocol    : Protocol                                              -> Async<Protocol>
+    getAllProtocols                 : unit                                                  -> Async<ProtocolTemplate []>
+    getProtocolBlocksForProtocol    : ProtocolTemplate                                      -> Async<ProtocolTemplate>
 }
 
         
