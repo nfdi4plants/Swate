@@ -88,22 +88,32 @@ let exampleExcelFunction1 () =
 let exampleExcelFunction2 () =
     Excel.run(fun context ->
 
-        let annotationTable = "annotationTable"
-
-        let selectedRange = context.workbook.getSelectedRange()
-        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
-        
-        // Ref. 2
-        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTable
-
         promise {
 
-            let! selectedBuildingBlock =
-                findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
+            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
-            let searchTerms = sortBuildingBlockToSearchTerm selectedBuildingBlock
+            let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+            let _ = tables.load(propertyNames = U2.Case2 (ResizeArray [|"name";"worksheet"|]))
 
-            return (sprintf "%A" searchTerms)
+            let! allTables = context.sync().``then``( fun _ ->
+
+                /// Get all names of all tables in the whole workbook.
+                let tableNames =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> Shared.AnnotationTable.create x.name x.worksheet.name)
+
+                tableNames
+            )
+
+            let! xmlParsed = getCustomXml customXmlParts context
+
+            let protocolGroups = getAllSwateProtocolGroups xmlParsed
+
+            let tableValidations = getAllSwateTableValidation xmlParsed
+            
+            return (sprintf "%A, %A, %A" protocolGroups.Length tableValidations.Length allTables)
         }
     )
 
@@ -328,7 +338,7 @@ let getTableRepresentation() =
             let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
             let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
-            let! xmlParsed, xml = getCustomXml customXmlParts context
+            let! xmlParsed = getCustomXml customXmlParts context
             let currentTableValidation = getSwateValidationForCurrentTable annotationTable activeWorksheet.name xmlParsed
 
             let! buildingBlocks =
@@ -599,7 +609,7 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
 
                 let annoHeaderRange,annoBodyRange = getBuildingBlocksPreSync context annotationTable
 
-                let! xmlParsed, xml = getCustomXml customXmlParts context
+                let! xmlParsed = getCustomXml customXmlParts context
                 
                 let currentProtocolGroup = getSwateProtocolGroupForCurrentTable annotationTable activeSheet.name xmlParsed
 
@@ -622,12 +632,14 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
 
                 let! chainProm = chainBuildingBlocks buildingBlockInfoList
 
-                return (chainProm,protocol,activeSheet.name,annotationTable)
+                let updateProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name} 
+
+                return (chainProm,updateProtocol)
             }
         )
 
     promise {
-        let! blockResults,info,worksheetName,annotationTable = infoProm
+        let! blockResults,info = infoProm
         let createSpannedBlocks =
             [
                 for ind in 0 .. blockResults.Length-1 do
@@ -641,7 +653,7 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                         Xml.GroupTypes.SpannedBuildingBlock.create colName relatedTermAccession
             ]
         let completeProtocolInfo = {info with SpannedBuildingBlocks = createSpannedBlocks}
-        return (blockResults,completeProtocolInfo,worksheetName,annotationTable)
+        return (blockResults,completeProtocolInfo)
     }
 
 let removeAnnotationBlock () =
@@ -1227,6 +1239,8 @@ let removeProtocolFromXml(protocol:GroupTypes.Protocol) =
 let updateProtocolGroupHeader () =
     Excel.run(fun context ->
 
+        printfn "START!"
+
         promise {
             let! annotationTable = getActiveAnnotationTableName()
             let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
@@ -1238,7 +1252,7 @@ let updateProtocolGroupHeader () =
             let _ = annoHeaderRange.load(U2.Case1 "rowIndex")
             let groupHeader = annoHeaderRange.getRowsAbove(1.)
 
-            let! xmlParsed, xml = getCustomXml customXmlParts context
+            let! xmlParsed = getCustomXml customXmlParts context
             let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
             let currentProtocolGroup = getSwateProtocolGroupForCurrentTable annotationTable activeSheet.name xmlParsed
 
@@ -1395,7 +1409,7 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
     
         promise {
     
-            let! xmlParsed, xml = getCustomXml customXmlParts context
+            let! xmlParsed = getCustomXml customXmlParts context
     
             let nextCustomXml = updateSwateValidation newTableValidation xmlParsed
 
@@ -1464,7 +1478,7 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
     
         promise {
     
-            let! xmlParsed, xml = getCustomXml customXmlParts context
+            let! xmlParsed = getCustomXml customXmlParts context
 
             let currentTableValidationOpt = getSwateValidationForCurrentTable newTableValidation.AnnotationTable.Name newTableValidation.AnnotationTable.Worksheet xmlParsed
 
@@ -1596,5 +1610,153 @@ let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string
                     maincolName, unitColFormat //, unitColCreationMsg
             )
             return res
+        }
+    )
+
+let getAllValidationXmlParsed() =
+    Excel.run(fun context ->
+
+        promise {
+
+            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+            let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+            let _ = tables.load(propertyNames = U2.Case2 (ResizeArray [|"name";"worksheet"|]))
+
+            let! allTables = context.sync().``then``( fun _ ->
+
+                /// Get all names of all tables in the whole workbook.
+                let tableNames =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> Shared.AnnotationTable.create x.name x.worksheet.name)
+
+                tableNames
+            )
+
+            let! xmlParsed = getCustomXml customXmlParts context
+
+            let tableValidations = getAllSwateTableValidation xmlParsed
+            
+            return (tableValidations, allTables)
+        }
+    )
+
+let getAllProtocolGroupXmlParsed() =
+    Excel.run(fun context ->
+
+        promise {
+
+            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+            let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+            let _ = tables.load(propertyNames = U2.Case2 (ResizeArray [|"name";"worksheet"|]))
+
+            let! allTables = context.sync().``then``( fun _ ->
+
+                /// Get all names of all tables in the whole workbook.
+                let tableNames =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> Shared.AnnotationTable.create x.name x.worksheet.name)
+
+                tableNames
+            )
+
+            let! xmlParsed = getCustomXml customXmlParts context
+
+            let protocolGroups = getAllSwateProtocolGroups xmlParsed
+            
+            return (protocolGroups, allTables)
+        }
+    )
+
+let removeXmlType(xmlType:XmlTypes) =
+    Excel.run(fun context ->
+
+        promise {
+
+            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+            let! xmlParsed = getCustomXml customXmlParts context
+
+            let nextCustomXml =
+                match xmlType with
+                | ValidationType tableValidation ->
+                    removeSwateValidation tableValidation xmlParsed
+                | GroupType protGroup ->
+                    removeSwateProtocolGroup protGroup xmlParsed
+                | ProtocolType protocol ->
+                    removeSwateProtocol protocol xmlParsed
+
+            let nextCustomXmlString = nextCustomXml |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Array.ofSeq |> Array.map (fun x -> x.delete() )
+                    xmls
+                )
+
+            let! reloadedCustomXml =
+                context.sync().``then``(fun e ->
+                    let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+                    workbook.customXmlParts
+                )
+
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    reloadedCustomXml.add(nextCustomXmlString)
+                )
+
+            return (sprintf "Removed %s" xmlType.toStringRdb)
+        }
+    )
+
+let updateAnnotationTableByXmlType(prevXmlType:XmlTypes, nextXmlType:XmlTypes) =
+
+    Excel.run(fun context ->
+
+        promise {
+
+            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+            let! xmlParsed = getCustomXml customXmlParts context
+
+            let nextCustomXml =
+                match prevXmlType,nextXmlType with
+                | XmlTypes.ValidationType prevV, XmlTypes.ValidationType nextV ->
+                    replaceValidationByValidation prevV nextV xmlParsed
+                | XmlTypes.GroupType prevV, XmlTypes.GroupType nextV ->
+                    replaceProtGroupByProtGroup prevV nextV xmlParsed
+                | XmlTypes.ProtocolType prevV, XmlTypes.ProtocolType nextV ->
+                    failwith "Not coded yet"
+                | anyElse1, anyElse2 -> failwith "Swate encountered different XmlTypes while trying to reassign custom xml to new annotation table - worksheet combination."
+
+            let nextCustomXmlString = nextCustomXml |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Array.ofSeq |> Array.map (fun x -> x.delete() )
+                    xmls
+                )
+
+            let! reloadedCustomXml =
+                context.sync().``then``(fun e ->
+                    let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+                    workbook.customXmlParts
+                )
+
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    reloadedCustomXml.add(nextCustomXmlString)
+                )
+
+            return (sprintf "Updated %s BY %s" prevXmlType.toStringRdb nextXmlType.toStringRdb)
         }
     )

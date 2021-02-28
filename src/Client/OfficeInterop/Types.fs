@@ -96,12 +96,14 @@ module Xml =
             Id                      : string
             ProtocolVersion         : string
             SwateVersion            : string
+            AnnotationTable         : Shared.AnnotationTable
             SpannedBuildingBlocks   : SpannedBuildingBlock list
         } with
-            static member create id version swateVersion spannedBuildingBlocks = {
+            static member create id version swateVersion spannedBuildingBlocks tableName worksheetName = {
                 Id                      = id
                 ProtocolVersion         = version
                 SwateVersion            = swateVersion
+                AnnotationTable         = Shared.AnnotationTable.create tableName worksheetName
                 SpannedBuildingBlocks   = spannedBuildingBlocks
             }
             static member init = Protocol.create "" "" "" []
@@ -127,9 +129,11 @@ module Xml =
                     for protocol in this.Protocols do
                         yield
                             node "Protocol" [
-                                attr.value( "Id",               protocol.Id                 )
-                                attr.value( "SwateVersion",     protocol.SwateVersion       )
-                                attr.value( "ProtocolVersion",  protocol.ProtocolVersion    )
+                                attr.value( "Id",               protocol.Id                         )
+                                attr.value( "SwateVersion",     protocol.SwateVersion               )
+                                attr.value( "ProtocolVersion",  protocol.ProtocolVersion            )
+                                attr.value( "TableName",        protocol.AnnotationTable.Name       )
+                                attr.value( "WorksheetName",    protocol.AnnotationTable.Worksheet  )
 
                             ][
                                 for spannedBuildingBlock in protocol.SpannedBuildingBlocks do
@@ -158,6 +162,8 @@ module Xml =
                         let id              = protocol.Attributes.["Id"]
                         let swateVersion    = protocol.Attributes.["SwateVersion"]
                         let protocolVersion = protocol.Attributes.["ProtocolVersion"]
+                        let tableName       = protocol.Attributes.["TableName"]
+                        let worksheetName   = protocol.Attributes.["WorksheetName"]
                         let nextSpannedBBs   =
                             protocol.Children
                             |> List.map (fun spannedBB ->
@@ -165,7 +171,7 @@ module Xml =
                                 let termAccession   = spannedBB.Attributes.["TermAccession"]
                                 SpannedBuildingBlock.create name termAccession
                             )
-                        Protocol.create id protocolVersion swateVersion nextSpannedBBs
+                        Protocol.create id protocolVersion swateVersion nextSpannedBBs tableName worksheetName
                     )
                 ProtocolGroup.create swateVersion tableName worksheetName nextProtocols
 
@@ -242,6 +248,7 @@ module Xml =
             Userlist        : string list
             ColumnValidations: ColumnValidation list
         } with
+
             static member create swateVersion worksheetName tableName dateTime userlist colValidations = {
                 SwateVersion        = swateVersion
                 AnnotationTable     = Shared.AnnotationTable.create tableName worksheetName
@@ -249,6 +256,7 @@ module Xml =
                 Userlist            = userlist
                 ColumnValidations   = colValidations
             }
+
             static member init (?swateVersion, ?worksheetName,?tableName, (?dateTime:DateTime), ?userList) = {
                 SwateVersion        = if swateVersion.IsSome then swateVersion.Value else ""
                 AnnotationTable     = Shared.AnnotationTable.create (if tableName.IsSome then tableName.Value else "") (if worksheetName.IsSome then worksheetName.Value else "")
@@ -302,6 +310,18 @@ module Xml =
                         )
                     TableValidation.create swateVersion worksheetName tableName dateTime userlist nextColumnValidations
                 nextTableValidation
+
+    type XmlTypes =
+    | ProtocolType      of GroupTypes.Protocol
+    | GroupType         of GroupTypes.ProtocolGroup
+    | ValidationType    of ValidationTypes.TableValidation
+        with
+            member this.toStringRdb =
+                match this with
+                | ProtocolType v    -> sprintf "Protocol %A (%s, %s)" v.Id v.AnnotationTable.Name v.AnnotationTable.Worksheet
+                | GroupType v       -> sprintf "Protocol group (%s, %s)" v.AnnotationTable.Name v.AnnotationTable.Worksheet
+                | ValidationType v  -> sprintf "Table checklist (%s, %s)" v.AnnotationTable.Name v.AnnotationTable.Worksheet
+
 
 
 type TryFindAnnoTableResult =

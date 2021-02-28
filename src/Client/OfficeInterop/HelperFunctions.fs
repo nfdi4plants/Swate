@@ -624,7 +624,7 @@ let getCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContex
                     failwith "Swate could not parse Workbook Custom Xml Parts. Had neither one root nor many root elements. Please contact the developer."
         if xmlParsed.Name <> "customXml" then failwith (sprintf "Swate found unexpected root xml element: %s" xmlParsed.Name)
 
-        return xmlParsed, xml
+        return xmlParsed
     }
 
 let getActiveTableXml (tableName:string) (worksheetName:string) (completeCustomXmlParsed:XmlElement) =
@@ -640,6 +640,15 @@ let getActiveTableXml (tableName:string) (worksheetName:string) (completeCustomX
     else
         None
 
+
+let getAllSwateTableValidation (xmlParsed:XmlElement) =
+    let protocolGroups = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot xmlParsed
+
+    protocolGroups
+    |> List.map (
+        xmlElementToXmlString >> Xml.ValidationTypes.TableValidation.ofXml
+    )
+
 let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
     let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
     if activeTableXml.IsNone then
@@ -653,7 +662,8 @@ let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElem
             let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
             Xml.ValidationTypes.TableValidation.ofXml tableXmlAsString |> Some
 
-let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
+/// Use the 'remove' parameter to remove any Swate table validation xml for the worksheet annotation table name combination in 'tableValidation'
+let private updateRemoveSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) (remove:bool) =
 
     let currentTableXml = getActiveTableXml tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet previousCompleteCustomXml
 
@@ -664,7 +674,11 @@ let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) 
                 currentTableXml.Value.Children
                 |> List.filter (fun x -> x.Name <> Xml.ValidationTypes.ValidationXmlRoot )
             {currentTableXml.Value with
-                Children = newValidationXml::filteredChildren
+                Children =
+                    if remove then
+                        filteredChildren
+                    else
+                        newValidationXml::filteredChildren
             }
         else
             let initNewSwateTableXml =
@@ -686,6 +700,25 @@ let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) 
         Children = nextTableXml::filterPrevTableFromRootChildren
     }
 
+let removeSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateValidation tableValidation previousCompleteCustomXml true
+
+let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateValidation tableValidation previousCompleteCustomXml false
+
+let replaceValidationByValidation tableVal1 tableVal2 previousCompleteCustomXml =
+    let removeTableVal1 = removeSwateValidation tableVal1 previousCompleteCustomXml
+    let addTableVal2 = updateSwateValidation tableVal2 removeTableVal1
+    addTableVal2
+
+let getAllSwateProtocolGroups (xmlParsed:XmlElement) =
+    let protocolGroups = SimpleXml.findElementsByName Xml.GroupTypes.ProtocolGroupXmlRoot xmlParsed
+
+    protocolGroups
+    |> List.map (
+        xmlElementToXmlString >> Xml.GroupTypes.ProtocolGroup.ofXml
+    )
+
 let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
     let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
     if activeTableXml.IsNone then
@@ -699,7 +732,8 @@ let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlE
             let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
             Xml.GroupTypes.ProtocolGroup.ofXml tableXmlAsString |> Some
 
-let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
+/// Use the 'remove' parameter to remove any Swate protocol group xml for the worksheet annotation table name combination in 'protocolGroup'
+let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) (remove:bool) =
 
     let currentTableXml = getActiveTableXml protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet previousCompleteCustomXml
 
@@ -710,7 +744,11 @@ let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previ
                 currentTableXml.Value.Children
                 |> List.filter (fun x -> x.Name <> Xml.GroupTypes.ProtocolGroupXmlRoot )
             {currentTableXml.Value with
-                Children = newProtocolGroupXml::filteredChildren
+                Children =
+                    if remove then
+                        filteredChildren
+                    else
+                        newProtocolGroupXml::filteredChildren
             }
         else
             let initNewSwateTableXml =
@@ -732,12 +770,24 @@ let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previ
         Children = nextTableXml::filterPrevTableFromRootChildren
     }
 
-let updateSwateProtocolGroupByProtocol tableName worksheetName (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+let removeSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml true
+
+let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml false
+
+let replaceProtGroupByProtGroup protGroup1 protGroup2 (previousCompleteCustomXml:XmlElement) =
+    let removeProtGroup1 = removeSwateProtocolGroup protGroup1 previousCompleteCustomXml
+    let addProtGroup2 = updateSwateProtocolGroup protGroup2 removeProtGroup1
+    addProtGroup2
+
+/// Use the 'remove' parameter to remove any Swate protocol xml for the worksheet annotation table name combination in 'protocolGroup'
+let updateRemoveSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) (remove:bool)=
 
     let currentSwateProtocolGroup =
-        let isExisting = getSwateProtocolGroupForCurrentTable tableName worksheetName previousCompleteCustomXml
+        let isExisting = getSwateProtocolGroupForCurrentTable protocol.AnnotationTable.Name protocol.AnnotationTable.Worksheet previousCompleteCustomXml
         if isExisting.IsNone then
-            Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion tableName worksheetName []
+            Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion protocol.AnnotationTable.Name protocol.AnnotationTable.Worksheet []
         else
             isExisting.Value
 
@@ -747,10 +797,20 @@ let updateSwateProtocolGroupByProtocol tableName worksheetName (protocol:Xml.Gro
 
     let nextProtocolGroup =
         {currentSwateProtocolGroup with
-            Protocols = protocol::filteredProtocolChildren
+            Protocols =
+                if remove then
+                    filteredProtocolChildren
+                else
+                    protocol::filteredProtocolChildren
         }
 
     updateSwateProtocolGroup nextProtocolGroup previousCompleteCustomXml
+
+let removeSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateProtocol protocol previousCompleteCustomXml true
+
+let updateSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateProtocol protocol previousCompleteCustomXml false
 
 let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
     Excel.run(fun context ->
@@ -764,9 +824,13 @@ let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
         promise {
             let! annotationTable = getActiveAnnotationTableName()
 
-            let! xmlParsed, xml = getCustomXml customXmlParts context
+            let! xmlParsed = getCustomXml customXmlParts context
 
-            let nextCustomXml = updateSwateProtocolGroupByProtocol annotationTable activeSheet.name protocol xmlParsed
+            // Not sure if this is necessary. Previously table and worksheet name were accessed at this point.
+            // Then AnnotationTable was added to protocol. So now we refresh these values at this point.
+            let securityUpdateForProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
+
+            let nextCustomXml = updateSwateProtocol securityUpdateForProtocol xmlParsed
 
             let nextCustomXmlString = nextCustomXml |> xmlElementToXmlString
 

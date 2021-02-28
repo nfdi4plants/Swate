@@ -420,16 +420,36 @@ type BuildingBlockDetailsState = {
     }
 
 type SettingsXmlState = {
-    RawXml              : string
-    FoundTables         : Shared.AnnotationTable []
-    ProtocolGroupXmls   : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
-    ValidationXmls      : OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+    // // Client // //
+    // Validation xml
+    ActiveSwateValidation                   : OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    NextAnnotationTableForActiveValidation  : AnnotationTable option
+    // Protocol group xml
+    ActiveProtocolGroup                     : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    NextAnnotationTableForActiveProtGroup   : AnnotationTable option
+    // Protocol
+    ActiveProtocol                          : OfficeInterop.Types.Xml.GroupTypes.Protocol option
+    NextAnnotationTableForActiveProtocol    : AnnotationTable option
+    //
+    RawXml                                  : string
+    FoundTables                             : Shared.AnnotationTable []
+    ProtocolGroupXmls                       : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
+    ValidationXmls                          : OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
 } with
     static member init () = {
-        RawXml              = ""
-        FoundTables         = [||]
-        ProtocolGroupXmls   = [||]
-        ValidationXmls      = [||]
+        // Client
+        ActiveSwateValidation                   = None
+        NextAnnotationTableForActiveValidation  = None
+        ActiveProtocolGroup                     = None
+        NextAnnotationTableForActiveProtGroup   = None
+        ActiveProtocol                          = None
+        /// Unused
+        NextAnnotationTableForActiveProtocol    = None
+        //
+        RawXml                                  = ""
+        FoundTables                             = [||]
+        ProtocolGroupXmls                       = [||]
+        ValidationXmls                          = [||]
     }
 
 type Model = {

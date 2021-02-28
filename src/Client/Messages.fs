@@ -176,7 +176,27 @@ type BuildingBlockDetailsMsg =
     | UpdateCurrentRequestState                     of RequestBuildingBlockInfoStates
 
 type SettingXmlMsg =
+    // // Client // //
+    // Validation Xml
+    | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | UpdateNextAnnotationTableForActiveValidation  of AnnotationTable option
+    | UpdateValidationXmls                          of OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+    // Protocol Group Xml
+    | UpdateProtocolGroupXmls                       of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
+    | UpdateActiveProtocolGroup                     of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    | UpdateNextAnnotationTableForActiveProtGroup   of AnnotationTable option
+    // Protocol Xml
+    | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
+    | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
+    //
     | UpdateRawCustomXml of string
+    // Excel Interop
+    | GetAllValidationXmlParsedRequest
+    | GetAllValidationXmlParsedResponse of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
+    | GetAllProtocolGroupXmlParsedRequest
+    | GetAllProtocolGroupXmlParsedResponse of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
+    | ReassignCustomXmlRequest      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
+    | RemoveCustomXmlRequest        of xml: OfficeInterop.Types.Xml.XmlTypes
 
 type TopLevelMsg =
     | CloseSuggestions
