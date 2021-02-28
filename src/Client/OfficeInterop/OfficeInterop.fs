@@ -1239,8 +1239,6 @@ let removeProtocolFromXml(protocol:GroupTypes.Protocol) =
 let updateProtocolGroupHeader () =
     Excel.run(fun context ->
 
-        printfn "START!"
-
         promise {
             let! annotationTable = getActiveAnnotationTableName()
             let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
@@ -1255,8 +1253,6 @@ let updateProtocolGroupHeader () =
             let! xmlParsed = getCustomXml customXmlParts context
             let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
             let currentProtocolGroup = getSwateProtocolGroupForCurrentTable annotationTable activeSheet.name xmlParsed
-
-            printfn "Next expect None: %A" (currentProtocolGroup.IsNone)
 
             let! applyGroups = promise {
 
@@ -1319,6 +1315,7 @@ let updateProtocolGroupHeader () =
                                 snd x |> List.map (fun (group,colInd,nOfCols) -> colInd)
                             )
                             |> List.map getStartAndEnd
+                            |> List.sortByDescending fst
                         Some mainColIndiceBlocks
                     else
                         None
@@ -1341,42 +1338,57 @@ let updateProtocolGroupHeader () =
                         let startEndIndices = getGroupHeaderIndicesForProtocol buildingBlocks protocol
                         promise {
 
-
                             if startEndIndices.IsSome then
 
-                                let! r1 =
+                                let! startDiffList =
                                     startEndIndices.Value
-                                    |> List.map (fun (startInd,endInd )->
-
+                                    |> List.sortByDescending fst
+                                    |> List.map (fun (startInd,endInd ) ->
                                         promise {
 
                                             let startInd,endInd = startInd |> float |> recalculateColIndexToTable, endInd |> float |> recalculateColIndexToTable
-                                            let! mergedGroupHeader =
+                                            let! diff =
                                                 context.sync().``then``(fun e ->
-                                                    /// +1 to also include the endcolumn, without it would end two too early.
+                                                    /// +1 to also include the endcolumn, without it would end too early.
                                                     let diff = (endInd - startInd) + 1.
                                                     let getProtocolGroupHeaderRange = activeSheet.getRangeByIndexes(annoHeaderRange.rowIndex-1., startInd, 1., diff)
                                                     getProtocolGroupHeaderRange.merge()
-                                                    getProtocolGroupHeaderRange.load(U2.Case2 (ResizeArray(["values"])))
+                                                    diff
                                                 )
-
-                                            let! insertValue = context.sync().``then``(fun e ->
-                                                let nV =
-                                                    mergedGroupHeader.values
-                                                    |> Seq.map (fun innerArr ->
-                                                        innerArr 
-                                                        |> Seq.map (fun _ ->
-                                                            protocol.Id |> box |> Some
-                                                        ) |> ResizeArray
-                                                    ) |> ResizeArray
-                                                mergedGroupHeader.values <- nV
-                                            )
-                                            return sprintf "%A - %A -> %A." startInd endInd protocol.Id
+                                            return (startInd, diff)
                                         }
 
-                                    ) |> Promise.Parallel
+                                    ) |> Promise.all
 
-                                return String.concat " " r1
+                                let! insertValue = promise {
+
+                                    let! mergedHeaders =
+                                        context.sync().``then``(fun e -> [|
+                                            for start,diff in startDiffList do
+                                                let range = activeSheet.getRangeByIndexes(annoHeaderRange.rowIndex-1., start, 1., diff)
+                                                let _ = range.load (U2.Case1 "values")
+                                                yield
+                                                    int diff, range
+                                                    
+                                        |])
+                                    
+                                    let! insertValue =
+                                        context.sync().``then``(fun e ->
+                                            mergedHeaders
+                                            |> Array.map (fun (n,mergedHeader) ->
+                                                    let v = protocol.Id |> box |> Some
+                                                    let nV =
+                                                        [|
+                                                            Array.init n (fun _ -> v) |> ResizeArray
+                                                        |] |> ResizeArray
+                                                    mergedHeader.values <- nV
+                                                )
+                                        )
+
+                                    return sprintf "%A" protocol.Id
+                                }
+
+                                return ""
                                     
                             else
                                 // REMOVE INCOMPLETE PROTOCOL
