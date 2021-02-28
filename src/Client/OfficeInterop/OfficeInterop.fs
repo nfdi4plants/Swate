@@ -1256,6 +1256,8 @@ let updateProtocolGroupHeader () =
             let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
             let currentProtocolGroup = getSwateProtocolGroupForCurrentTable annotationTable activeSheet.name xmlParsed
 
+            printfn "Next expect None: %A" (currentProtocolGroup.IsNone)
+
             let! applyGroups = promise {
 
                 let protocolsForCurrentTableSheet =
@@ -1331,13 +1333,14 @@ let updateProtocolGroupHeader () =
                 let recalculateColIndexToTable rangeStartIndex =
                     recalculateColIndex annoHeaderRange.columnIndex rangeStartIndex
 
+                let! cleanGroupHeaderFormat = cleanGroupHeaderFormat groupHeader context
+
                 let! group =
                     protocolsForCurrentTableSheet
                     |> List.map (fun protocol ->
                         let startEndIndices = getGroupHeaderIndicesForProtocol buildingBlocks protocol
                         promise {
 
-                            let! cleanGroupHeaderFormat = cleanGroupHeaderFormat groupHeader context
 
                             if startEndIndices.IsSome then
 
