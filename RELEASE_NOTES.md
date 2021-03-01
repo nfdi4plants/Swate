@@ -1,6 +1,6 @@
-### 0.4.0+ba4f238 (Released 2021-3-1)
+### 0.4.0+6753299 (Released 2021-3-1)
 * Additions:
-    * latest commit #ba4f238
+    * latest commit #6753299
     * [[#24950d1](https://github.com/nfdi4plants/Swate/commit/24950d160548a04e080b7bd283a699b611a116a6)] Minor visual updates
     * [[#183a80c](https://github.com/nfdi4plants/Swate/commit/183a80c31f823ad56706459dacc631fd2da0becb)] Update dropdown navbar quick access.
     * [[#4b818db](https://github.com/nfdi4plants/Swate/commit/4b818db47d9662964be0515075945a3fa4b3261c)] Add Advanced custom xml settings (Issue #111).
