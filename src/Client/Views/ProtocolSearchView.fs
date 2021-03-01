@@ -285,7 +285,8 @@ let protocolElementContainer (model:Model) dispatch =
     ]
 
 let protocolSearchViewComponent (model:Model) dispatch =
-    let isEmpty = model.ProtocolInsertState.ProtocolsAll |> isNull || model.ProtocolInsertState.ProtocolsAll |> Array.isEmpty 
+    let isEmpty = model.ProtocolInsertState.ProtocolsAll |> isNull || model.ProtocolInsertState.ProtocolsAll |> Array.isEmpty
+    let isLoading = model.ProtocolInsertState.Loading
     form [
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
@@ -293,8 +294,11 @@ let protocolSearchViewComponent (model:Model) dispatch =
     ] [
         breadcrumbEle dispatch
 
-        if isEmpty then
+        if isEmpty && not isLoading then
             Help.help [Help.Color IsDanger][str "No Protocols were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
+
+        if isLoading then
+            CustomComponents.Loading.loadingModal
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search the database for a protocol template you want to use."]
 

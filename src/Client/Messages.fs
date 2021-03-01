@@ -168,6 +168,7 @@ type ProtocolInsertMsg =
     | AddProtocolTag of string
     | RemoveProtocolTag of string
     | RemoveSelectedProtocol
+    | UpdateLoading of bool
 
 type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockSearchTermsRequest    of Shared.SearchTermI []

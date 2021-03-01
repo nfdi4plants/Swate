@@ -378,6 +378,7 @@ type ProtocolInsertState = {
     ProtocolNameSearchQuery : string
     ProtocolTagSearchQuery  : string
     ProtocolSearchTags      : string list
+    Loading                 : bool
 
 } with
     static member init () = {
@@ -396,6 +397,8 @@ type ProtocolInsertState = {
         ProtocolNameSearchQuery = ""
         ProtocolTagSearchQuery  = ""
         ProtocolSearchTags      = []
+
+        Loading                 = false
     }
 
 type RequestBuildingBlockInfoStates =

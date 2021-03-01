@@ -12,3 +12,13 @@ let loadingComponent =
         Fa.Pulse
         Fa.Size Fa.Fa4x
     ] []
+
+let loadingModal =
+    Modal.modal [ Modal.IsActive true ] [
+        Modal.background [] []
+        Modal.content [Props [Style [Width "auto"]]][
+            Box.box' [ ] [
+                loadingComponent
+            ]
+        ]
+    ]

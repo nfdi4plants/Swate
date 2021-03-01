@@ -1352,16 +1352,19 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
         }
         nextState, Cmd.none
     | GetAllProtocolsRequest ->
+        let nextState = {currentState with Loading = true}
         let cmd =
             Cmd.OfAsync.either
                 Api.api.getAllProtocols
                 ()
                 (GetAllProtocolsResponse >> ProtocolInsert)
                 (GenericError >> Dev)
-        currentState, cmd
+        nextState, cmd
     | GetAllProtocolsResponse protocols ->
         let nextState = {
-            currentState with ProtocolsAll = protocols
+            currentState with
+                ProtocolsAll = protocols
+                Loading = false
         }
         nextState, Cmd.none
     | GetProtocolXmlByProtocolRequest prot ->
@@ -1378,7 +1381,12 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
                 parseDBProtocol
                 (prot)
                 (GetProtocolXmlByProtocolResponse >> ProtocolInsert)
-                (GenericError >> Dev)
+                (fun e ->
+                    Msg.Batch [
+                        GenericError e |> Dev
+                        UpdateLoading false |> ProtocolInsert 
+                    ]
+                )
         currentState, cmd
     | GetProtocolXmlByProtocolResponse (prot,validation,minBBInfoList) -> 
         let nextState = {
@@ -1391,6 +1399,11 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
         }
         nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.ProtocolInsert)
     // Client
+    | UpdateLoading nextLoadingState ->
+        let nextState = {
+            currentState with Loading = nextLoadingState
+        }
+        nextState, Cmd.none
     | UpdateUploadData newDataString ->
         let nextState = {
             currentState with
@@ -1494,9 +1507,7 @@ let handleSettingXmlMsg (msg:SettingXmlMsg) (currentState: SettingsXmlState) : S
                 GetAllProtocolGroupXmlParsedRequest |> SettingXmlMsg
                 UpdateProtocolGroupHeader |> ExcelInterop
             ]
-        //| _ -> failwith "this is not coded yet"
-            
-
+        
     match msg with
     // // Client // //
     // Validation Xml
