@@ -1,21 +1,25 @@
-### 0.4.0+5118778 (Released 2021-2-25)
+### 0.4.0+183a80c (Released 2021-3-1)
 * Additions:
-    * latest commit #5118778
-    * [[#5118778](https://github.com/nfdi4plants/Swate/commit/5118778e38a95a1e71e7a80488fd2a5e9fd63715)] Rename validation to checklist
-    * [[#f61793a](https://github.com/nfdi4plants/Swate/commit/f61793a949250ffa05d34ebbc19c8fa2fba4fb3b)] Refactor PipeActiveTable logic :hammer:
+    * latest commit #183a80c
     * [[#24950d1](https://github.com/nfdi4plants/Swate/commit/24950d160548a04e080b7bd283a699b611a116a6)] Minor visual updates
+    * [[#183a80c](https://github.com/nfdi4plants/Swate/commit/183a80c31f823ad56706459dacc631fd2da0becb)] Update dropdown navbar quick access.
+    * [[#4b818db](https://github.com/nfdi4plants/Swate/commit/4b818db47d9662964be0515075945a3fa4b3261c)] Add Advanced custom xml settings (Issue #111).
+    * [[#d7cce09](https://github.com/nfdi4plants/Swate/commit/d7cce0939cfdd1212e8ea1e4f12863d77280d50e)] Add link to nfdi4pso issues (Issue #99).
+    * [[#848acf7](https://github.com/nfdi4plants/Swate/commit/848acf7092daf70a9f8ae6f129b58751cfe14191)] Add "Update unit" functionality (Issue #110).
+    * [[#5118778](https://github.com/nfdi4plants/Swate/commit/5118778e38a95a1e71e7a80488fd2a5e9fd63715)] Rename validation to checklist
     * [[#58b58a4](https://github.com/nfdi4plants/Swate/commit/58b58a42eef1ee08f63059ae2e971e74f8d29b15)] Add drop down for quick access icons
     * [[#3778ebc](https://github.com/nfdi4plants/Swate/commit/3778ebc951857295234d2c6d12bacce27bf29fd6)] Add copy to clipboard to term search for vertical term insert (Issue #118).
     * [[#eff46ae](https://github.com/nfdi4plants/Swate/commit/eff46aec41e4f0eb529d7f37ac789f352c85f5b4)] Restructure CustomXml :hammer::boom:
-    * [[#f8741ab](https://github.com/nfdi4plants/Swate/commit/f8741abf7442558dafb049dad7c96f963eaf8485)] Adjust custom validation xml.
-    * [[#2d816fc](https://github.com/nfdi4plants/Swate/commit/2d816fc2a07ff96250da6d79c2784350e96d885c)] Improve Userfeedback for show building block info.
-    * [[#05ec1c4](https://github.com/nfdi4plants/Swate/commit/05ec1c4ec4e7634ba91a7f319f3f99bc31d68ee9)] Made file picker Drag'n'Drop lines thicker (Issue #112).
-    * [[#7760257](https://github.com/nfdi4plants/Swate/commit/7760257839839a03641ba5172d46fe77d97353dc)] Improve addition of validation importance (Issue #113).
     * [[#44d9277](https://github.com/nfdi4plants/Swate/commit/44d9277901a8cb617bca1b78be679c12b4fc362b)] Add option to show all child terms (Issue #114).
-    * [[#80c6235](https://github.com/nfdi4plants/Swate/commit/80c6235759e13263316e4c8f60b9d0f5eb7bc947)] Improve term search search speed.
-    * [[#19a2f73](https://github.com/nfdi4plants/Swate/commit/19a2f739688a4819cf3275de348d41afa1351fc3)] Add button to display building block information (Issue #96).
+    * [[#746ecf4](https://github.com/nfdi4plants/Swate/commit/746ecf4c3036f3c68b92d4d74c37118e491f83c1)] Redo autocomplete search on double click.
     * [[#454ccd7](https://github.com/nfdi4plants/Swate/commit/454ccd7368e61ff5b669b197c5cd3d0ade7b1c6b)] Add database template logic (Issue #10, #107) :sparkles:
+    * [[#19a2f73](https://github.com/nfdi4plants/Swate/commit/19a2f739688a4819cf3275de348d41afa1351fc3)] Add button to display building block information (Issue #96).
     * [[#71801ff](https://github.com/nfdi4plants/Swate/commit/71801ff2e558834ed5bb413d8b62d2f7eea48419)] Add 'Remove Building Block' button (Issue #102).
+    * [[#80c6235](https://github.com/nfdi4plants/Swate/commit/80c6235759e13263316e4c8f60b9d0f5eb7bc947)] Improve term search search speed.
+    * [[#7760257](https://github.com/nfdi4plants/Swate/commit/7760257839839a03641ba5172d46fe77d97353dc)] Improve addition of validation importance (Issue #113).
+* Bugfixes:
+    * [[#41e298d](https://github.com/nfdi4plants/Swate/commit/41e298d4369d320331b50c7d08494567daac7004)] Fix updating protocol group header bug if split too often (Issue #120).
+    * [[#01d5cf5](https://github.com/nfdi4plants/Swate/commit/01d5cf5db6152ca16d8fa765c80fd9034d8c9f8e)] Fix protocol group headers not correctly removed bug (Issue #119).
 
 ### 0.3.1+cbc655c (Released 2021-2-12)
 * Additions:

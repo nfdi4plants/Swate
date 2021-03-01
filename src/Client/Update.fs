@@ -1684,8 +1684,8 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 PageState = nextPageState
         }
         nextModel, nextCmd
-    /// does not work due to office.js ->
-    /// https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
+    // does not work due to office.js ->
+    // https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
     //| Navigate route ->
     //    currentModel, Navigation.newUrl (Routing.Route.toRouteUrl route)
     | Bounce (delay, bounceId, msgToBounce) ->
@@ -1699,7 +1699,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 DebouncerState = debouncerModel
         }
 
-        nextModel,Cmd.batch [Cmd.map DebouncerSelfMsg debouncerCmd]
+        nextModel,Cmd.map DebouncerSelfMsg debouncerCmd
 
     | DebouncerSelfMsg debouncerMsg ->
         let nextDebouncerState, debouncerCmd =

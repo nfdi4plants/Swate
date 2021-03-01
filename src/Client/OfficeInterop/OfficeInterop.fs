@@ -1568,31 +1568,12 @@ let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string
             // Ref. 2
             let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
 
+            let! selectedBuildingBlock =
+                BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
+
             let! res = context.sync().``then``( fun _ ->
 
-                    if selectedRange.columnCount <> 1. then
-                        failwith "To add a unit please select a single column"
-
-                    let newSelectedColIndex =
-                        // recalculate the selected range index based on table
-                        let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
-                        // if index is smaller 0 it is outside of table range
-                        if diff <= 0. then 0.
-                        // if index is bigger than columnCount-1 then it is outside of tableRange
-                        elif diff >= annoHeaderRange.columnCount-1. then annoHeaderRange.columnCount-1.
-                        else diff
-
-                    /// Sort all columns into building blocks.
-                    let buildingBlocks =
-                        getBuildingBlocks annoHeaderRange annoBodyRange
-
-                    /// find building block with the closest main column index from left
-                    let findLeftClosestBuildingBlock =
-                        buildingBlocks
-                        |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
-                        |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
-
-                    if findLeftClosestBuildingBlock.TAN.IsNone || findLeftClosestBuildingBlock.TSR.IsNone then
+                    if selectedBuildingBlock.TAN.IsNone || selectedBuildingBlock.TSR.IsNone then
                         failwith (
                             sprintf
                                 "Swate can only add a unit to columns of the type: %s, %s, %s."
@@ -1611,12 +1592,12 @@ let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string
                         |> Array.map string
 
                     let unitColumnResult =
-                        if findLeftClosestBuildingBlock.Unit.IsSome then
-                            updateUnitColumns allColHeaders annoHeaderRange (float findLeftClosestBuildingBlock.MainColumn.Index) format unitAccessionOpt
+                        if selectedBuildingBlock.Unit.IsSome then
+                            updateUnitColumns allColHeaders annoHeaderRange (float selectedBuildingBlock.MainColumn.Index) format unitAccessionOpt
                         else
-                            createUnitColumns allColHeaders table (float findLeftClosestBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
+                            createUnitColumns allColHeaders table (float selectedBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
 
-                    let maincolName = findLeftClosestBuildingBlock.MainColumn.Header.Value.Header
+                    let maincolName = selectedBuildingBlock.MainColumn.Header.Value.Header
 
                     /// If unit block was added then return some msg information
                     //let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""

@@ -185,8 +185,6 @@ let quickAccessDropdownElement model dispatch =
             div [
                 Class "arrow_box"
                 Style [
-                    //Width "150px"
-                    //Left "-69px"
                     Display (if model.SiteStyleState.QuickAcessIconsShown then DisplayOptions.Block else DisplayOptions.None)
                     Position PositionOptions.Absolute
                     ZIndex "20"

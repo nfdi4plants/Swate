@@ -453,15 +453,17 @@ module BuildingBlockTypes =
         context.sync().``then``( fun _ ->
 
             if selectedRange.columnCount <> 1. then
-                failwith "To add a unit please select a single column"
+                failwith "To use this function please select a single column"
+
+            let errorMsg = "To use this function please select a single column of a Swate table."
 
             let newSelectedColIndex =
                 // recalculate the selected range index based on table
                 let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
                 // if index is smaller 0 it is outside of table range
-                if diff <= 0. then 0.
+                if diff < 0. then failwith errorMsg
                 // if index is bigger than columnCount-1 then it is outside of tableRange
-                elif diff >= annoHeaderRange.columnCount-1. then annoHeaderRange.columnCount-1.
+                elif diff > annoHeaderRange.columnCount-1. then failwith errorMsg
                 else diff
 
             /// Sort all columns into building blocks.
@@ -517,9 +519,22 @@ module BuildingBlockTypes =
         Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
 
     let private sortHeaderToSearchTerm (buildingBlock:BuildingBlock) =
-        let searchString  = buildingBlock.MainColumn.Header.Value.Ontology.Value.Name
-        let termAccession = buildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession 
-        let colIndices = [|buildingBlock.MainColumn.Index; buildingBlock.TSR.Value.Index; buildingBlock.TAN.Value.Index|]
+        let isOntologyTerm = buildingBlock.MainColumn.Header.Value.Ontology.IsSome
+        let searchString  =
+            if isOntologyTerm then
+                buildingBlock.MainColumn.Header.Value.Ontology.Value.Name
+            else
+                buildingBlock.MainColumn.Header.Value.Header
+        let termAccession =
+            if isOntologyTerm then
+                buildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
+            else
+                ""
+        let colIndices = [|
+            buildingBlock.MainColumn.Index;
+            if buildingBlock.TSR.IsSome then buildingBlock.TSR.Value.Index;
+            if buildingBlock.TAN.IsSome then buildingBlock.TAN.Value.Index
+        |]
         let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
         Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
 
@@ -548,7 +563,9 @@ module BuildingBlockTypes =
         | _ -> failwith (sprintf "Encountered unknown reference column pattern. Building block (%s) can only contain both TSR and TAN or none." buildingBlock.MainColumn.Header.Value.Header)
 
     let sortBuildingBlockToSearchTerm (buildingBlock:BuildingBlock) =
-        [|yield! sortBuildingBlockValuesToSearchTerm buildingBlock; sortHeaderToSearchTerm buildingBlock|] 
+        let bbValuesToSearchTerm = sortBuildingBlockValuesToSearchTerm buildingBlock
+        let bbHeaderToSearchTerm = sortHeaderToSearchTerm buildingBlock
+        [|yield! bbValuesToSearchTerm; bbHeaderToSearchTerm|] 
 
     let sortBuildingBlocksValuesToSearchTerm (buildingBlocks:BuildingBlock []) =
 
