@@ -1,6 +1,6 @@
-### 0.4.0+183a80c (Released 2021-3-1)
+### 0.4.0+ba4f238 (Released 2021-3-1)
 * Additions:
-    * latest commit #183a80c
+    * latest commit #ba4f238
     * [[#24950d1](https://github.com/nfdi4plants/Swate/commit/24950d160548a04e080b7bd283a699b611a116a6)] Minor visual updates
     * [[#183a80c](https://github.com/nfdi4plants/Swate/commit/183a80c31f823ad56706459dacc631fd2da0becb)] Update dropdown navbar quick access.
     * [[#4b818db](https://github.com/nfdi4plants/Swate/commit/4b818db47d9662964be0515075945a3fa4b3261c)] Add Advanced custom xml settings (Issue #111).
@@ -18,6 +18,7 @@
     * [[#80c6235](https://github.com/nfdi4plants/Swate/commit/80c6235759e13263316e4c8f60b9d0f5eb7bc947)] Improve term search search speed.
     * [[#7760257](https://github.com/nfdi4plants/Swate/commit/7760257839839a03641ba5172d46fe77d97353dc)] Improve addition of validation importance (Issue #113).
 * Bugfixes:
+    * [[#ba4f238](https://github.com/nfdi4plants/Swate/commit/ba4f2389644d5f5adcb0460ab498eeccea96a84c)] Fix bug not finding the correct selected building block (Issue #121).
     * [[#41e298d](https://github.com/nfdi4plants/Swate/commit/41e298d4369d320331b50c7d08494567daac7004)] Fix updating protocol group header bug if split too often (Issue #120).
     * [[#01d5cf5](https://github.com/nfdi4plants/Swate/commit/01d5cf5db6152ca16d8fa765c80fd9034d8c9f8e)] Fix protocol group headers not correctly removed bug (Issue #119).
 
