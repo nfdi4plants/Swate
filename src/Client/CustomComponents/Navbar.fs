@@ -18,76 +18,107 @@ let placerholderInvis =
         Fa.i [Fa.Solid.SyncAlt][]
     ]
 
+type ShortCutIcon = {
+    Description : string
+    FaList      : ReactElement list
+    Msg         : Msg
+    Category    : string
+} with
+    static member create description faList msg category = {
+        Description = description
+        FaList      = faList
+        Msg         = msg
+        Category    = category
+    }
+
+let shortCutIconList model =
+    [
+        ShortCutIcon.create
+            "Add Annotation Table"
+            [
+                Fa.span [Fa.Solid.Plus][]
+                Fa.span [Fa.Solid.Table][]
+            ]
+            (CreateAnnotationTable (model.SiteStyleState.IsDarkMode) |> ExcelInterop)
+            "Table"
+        ShortCutIcon.create
+            "Autoformat Table"
+            [
+                Fa.i [Fa.Solid.SyncAlt][]
+            ]
+            (Msg.Batch [
+                AutoFitTable |> ExcelInterop
+                UpdateProtocolGroupHeader |> ExcelInterop
+            ])
+            "Formatting"
+        ShortCutIcon.create
+            "Update Reference Columns"
+            [
+                Fa.span [Fa.Solid.EyeSlash][]
+                span [][str model.ExcelState.FillHiddenColsStateStore.toReadableString]
+                Fa.span [Fa.Solid.Pen][]
+            ]
+            (FillHiddenColsRequest |> ExcelInterop)
+            "Formatting"
+        ShortCutIcon.create
+            "Remove Building Block"
+            [ 
+                Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]][]
+                Fa.span [Fa.Solid.Columns][]
+            ]
+            (RemoveAnnotationBlock |> ExcelInterop)
+            "BuildingBlock"
+        ShortCutIcon.create
+            "Get Building Block Information"
+            [ 
+                Fa.span [Fa.Solid.Question; Fa.Props [Style [PaddingRight "0.15rem"]]][]
+                span [][str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
+                Fa.span [Fa.Solid.Columns][]
+            ]
+            (GetSelectedBuildingBlockSearchTerms |> ExcelInterop)
+            "BuildingBlock"
+    ]
+    
 let navbarShortCutIconList model dispatch =
     let padding = "0.5rem"
     [
-        Button.a [
-            Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-            Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Add Annotation Table") ]
-            Button.OnClick (fun _ ->
-                CreateAnnotationTable (model.SiteStyleState.IsDarkMode) |> ExcelInterop |> dispatch
-            )
-            Button.Color Color.IsWhite
-            Button.IsInverted
-        ] [
-            Fa.span [Fa.Solid.Plus][]
-            Fa.span [Fa.Solid.Table][]
-        ]
+        for icon in shortCutIconList model do
+            yield 
+                Button.a [
+                    Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
+                    Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip (icon.Description) ]
+                    Button.OnClick (fun _ ->
+                        icon.Msg |> dispatch
+                    )
+                    Button.Color Color.IsWhite
+                    Button.IsInverted
+                ] icon.FaList
+    ]
 
-        Button.a [
-            Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-            Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Autoformat Table")]
-            Button.OnClick (fun e ->
-                Msg.Batch [
-                    AutoFitTable |> ExcelInterop
-                    UpdateProtocolGroupHeader |> ExcelInterop
-                ]  |> dispatch
-            )
-            Button.Color Color.IsWhite
-            Button.IsInverted
-        ] [
-            Fa.i [Fa.Solid.SyncAlt][]
-        ]
-        Button.a [
-            Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-            Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Update Reference Columns")]
-            Button.OnClick (fun _ ->
-                FillHiddenColsRequest |> ExcelInterop |> dispatch
-            )
-            Button.Color Color.IsWhite
-            Button.IsInverted
-        ] [
-            Fa.span [Fa.Solid.EyeSlash][]
-            span [][str model.ExcelState.FillHiddenColsStateStore.toReadableString]
-            Fa.span [Fa.Solid.Pen][]
-        ]
-        Button.a [
-            Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-            Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Remove Building Block")]
-            Button.OnClick (fun _ ->
-                RemoveAnnotationBlock |> ExcelInterop |> dispatch
-            )
-            Button.Color Color.IsWhite
-            Button.IsInverted
-        ] [ 
-            Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]][]
-            Fa.span [Fa.Solid.Columns][]
-        ]
-
-        Button.a [
-            Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-            Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip ("Get Building Block Information")]
-            Button.OnClick (fun _ ->
-                GetSelectedBuildingBlockSearchTerms |> ExcelInterop |> dispatch
-            )
-            Button.Color Color.IsWhite
-            Button.IsInverted
-        ] [ 
-            Fa.span [Fa.Solid.Question; Fa.Props [Style [PaddingRight "0.15rem"]]][]
-            span [][str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
-            Fa.span [Fa.Solid.Columns][]
+let dropdownShortCutIconList model dispatch =
+    Table.table [
+        Table.Props [Style [ BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; Color "white"; Cursor "default" ]]
+    ][
+        tbody [][
+            for icon in shortCutIconList model do
+                yield
+                    tr [][
+                        td [][Help.help [][ str icon.Description]]
+                        td [][
+                            let padding = "0.5rem"
+                            Button.a [
+                                Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]]
+                                Button.OnClick (fun _ ->
+                                    icon.Msg |> dispatch
+                                )
+                                Button.Color Color.IsWhite
+                                Button.IsInverted
+                            ] icon.FaList
+                        ]
+                    ]
         ]
     ]
+    
 
 let quickAccessDropdownElement model dispatch =
     let prepIconLists =
@@ -117,9 +148,6 @@ let quickAccessDropdownElement model dispatch =
             ][
                 div [Style [
                     Position PositionOptions.Relative
-                    //Display DisplayOptions.Flex
-                    //JustifyContent "center"
-                    //AlignItems AlignItemsOptions.Center
                 ]] [
                     Fa.i [
                         Fa.Props [Style [
@@ -157,24 +185,25 @@ let quickAccessDropdownElement model dispatch =
             div [
                 Class "arrow_box"
                 Style [
-                    Width "150px"
-                    Left "-69px"
+                    //Width "150px"
+                    //Left "-69px"
                     Display (if model.SiteStyleState.QuickAcessIconsShown then DisplayOptions.Block else DisplayOptions.None)
                     Position PositionOptions.Absolute
                     ZIndex "20"
                 ]
             ][
-                for subList in prepIconLists do
-                    yield
-                        div [Style [
-                            Color model.SiteStyleState.ColorMode.Text
-                            Display DisplayOptions.Flex
-                            JustifyContent "space-between"
-                        ]] [
-                            subList |> List.tryItem 0 |> fun x -> if x.IsSome then x.Value else placerholderInvis
-                            subList |> List.tryItem 1 |> fun x -> if x.IsSome then x.Value else placerholderInvis
-                            subList |> List.tryItem 2 |> fun x -> if x.IsSome then x.Value else placerholderInvis
-                        ]
+                dropdownShortCutIconList model dispatch
+                //for subList in prepIconLists do
+                //    yield
+                //        div [Style [
+                //            Color model.SiteStyleState.ColorMode.Text
+                //            Display DisplayOptions.Flex
+                //            JustifyContent "space-between"
+                //        ]] [
+                //            subList |> List.tryItem 0 |> fun x -> if x.IsSome then x.Value else placerholderInvis
+                //            subList |> List.tryItem 1 |> fun x -> if x.IsSome then x.Value else placerholderInvis
+                //            subList |> List.tryItem 2 |> fun x -> if x.IsSome then x.Value else placerholderInvis
+                //        ]
             ]
         ]
     ]
