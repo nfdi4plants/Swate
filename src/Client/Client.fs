@@ -87,6 +87,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
             //Text.p [] [str ""]
         ]
 
+    | Routing.Route.ProtocolSearch ->
+        BaseView.baseViewComponent model dispatch [
+            ProtocolSearchView.protocolSearchViewComponent model dispatch
+        ] [
+            //Text.p [] [str ""]
+        ]
+
     | Routing.Route.ActivityLog ->
         BaseView.baseViewComponent model dispatch [
             ActivityLogView.activityLogComponent model dispatch
@@ -97,6 +104,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
     | Routing.Route.Settings ->
         BaseView.baseViewComponent model dispatch [
             SettingsView.settingsViewComponent model dispatch
+        ] [
+            //Text.p [] [str ""]
+        ]
+
+    | Routing.Route.SettingsXml ->
+        BaseView.baseViewComponent model dispatch [
+            SettingsXmlView.settingsXmlViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]

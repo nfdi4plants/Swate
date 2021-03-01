@@ -110,14 +110,16 @@ type AdvancedSearchState = {
     }
 
 type SiteStyleState = {
+    QuickAcessIconsShown : bool
     BurgerVisible   : bool
     IsDarkMode      : bool
     ColorMode       : ExcelColors.ColorMode
 } with
     static member init () = {
-        BurgerVisible   = false
-        IsDarkMode      = false
-        ColorMode       = ExcelColors.colorfullMode
+        QuickAcessIconsShown    = false
+        BurgerVisible           = false
+        IsDarkMode              = false
+        ColorMode               = ExcelColors.colorfullMode
     }
 
 type DevState = {
@@ -357,13 +359,100 @@ type ValidationState = {
 
 open ISADotNet
 
+
+/// This model is used for both protocol insert and protocol search
 type ProtocolInsertState = {
-    UploadData: string
-    ProcessModel: ISADotNet.Process option
+    // Client view
+    DisplayedProtDetailsId  : int option
+
+    // Process.json file upload
+    UploadData              : string
+    ProcessModel            : ISADotNet.Process option
+
+    // Database protocol template
+    ProtocolSelected        : Shared.ProtocolTemplate option
+    ValidationXml           : OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    BuildingBlockMinInfoList: OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
+    ProtocolsAll            : Shared.ProtocolTemplate []
+
+    ProtocolNameSearchQuery : string
+    ProtocolTagSearchQuery  : string
+    ProtocolSearchTags      : string list
+    Loading                 : bool
+
 } with
     static member init () = {
-        UploadData = ""
-        ProcessModel = None
+        // Client view
+        DisplayedProtDetailsId  = None
+
+        // ISADotNet Process.json file upload
+        UploadData              = ""
+        ProcessModel            = None
+
+        // Database protocol templates
+        ProtocolSelected        = None
+        ValidationXml           = None
+        BuildingBlockMinInfoList= []
+        ProtocolsAll            = [||]
+        ProtocolNameSearchQuery = ""
+        ProtocolTagSearchQuery  = ""
+        ProtocolSearchTags      = []
+
+        Loading                 = false
+    }
+
+type RequestBuildingBlockInfoStates =
+| Inactive
+| RequestExcelInformation
+| RequestDataBaseInformation
+    member this.toStringMsg =
+        match this with
+        | Inactive                      -> ""
+        | RequestExcelInformation       -> "Check Columns"
+        | RequestDataBaseInformation    -> "Search Database "
+
+type BuildingBlockDetailsState = {
+    CurrentRequestState : RequestBuildingBlockInfoStates
+    ShowDetails         : bool
+    BuildingBlockValues : Shared.SearchTermI []
+} with
+    static member init () = {
+        CurrentRequestState = Inactive
+        ShowDetails         = false
+        BuildingBlockValues = [||]
+    }
+
+type SettingsXmlState = {
+    // // Client // //
+    // Validation xml
+    ActiveSwateValidation                   : OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    NextAnnotationTableForActiveValidation  : AnnotationTable option
+    // Protocol group xml
+    ActiveProtocolGroup                     : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    NextAnnotationTableForActiveProtGroup   : AnnotationTable option
+    // Protocol
+    ActiveProtocol                          : OfficeInterop.Types.Xml.GroupTypes.Protocol option
+    NextAnnotationTableForActiveProtocol    : AnnotationTable option
+    //
+    RawXml                                  : string
+    FoundTables                             : Shared.AnnotationTable []
+    ProtocolGroupXmls                       : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
+    ValidationXmls                          : OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+} with
+    static member init () = {
+        // Client
+        ActiveSwateValidation                   = None
+        NextAnnotationTableForActiveValidation  = None
+        ActiveProtocolGroup                     = None
+        NextAnnotationTableForActiveProtGroup   = None
+        ActiveProtocol                          = None
+        /// Unused
+        NextAnnotationTableForActiveProtocol    = None
+        //
+        RawXml                                  = ""
+        FoundTables                             = [||]
+        ProtocolGroupXmls                       = [||]
+        ValidationXmls                          = [||]
     }
 
 type Model = {
@@ -405,21 +494,28 @@ type Model = {
     //Create Validation scheme for Table
     ValidationState         : ValidationState
 
+    //Used to show selected building block information
+    BuildingBlockDetailsState   : BuildingBlockDetailsState
+
+    //Used to manage all xml settings
+    SettingsXmlState        : SettingsXmlState
+
 }
 
-
 let initializeModel (pageOpt: Route option) = {
-    DebouncerState          = Debouncer             .create()
-    PageState               = PageState             .init pageOpt
-    PersistentStorageState  = PersistentStorageState.init ()
-    DevState                = DevState              .init ()
-    SiteStyleState          = SiteStyleState        .init ()
-    TermSearchState         = TermSearchState       .init ()
-    AdvancedSearchState     = AdvancedSearchState   .init ()
-    ExcelState              = ExcelState            .init ()
-    ApiState                = ApiState              .init ()
-    FilePickerState         = FilePickerState       .init ()
-    AddBuildingBlockState   = AddBuildingBlockState .init ()
-    ValidationState         = ValidationState       .init ()
-    ProtocolInsertState     = ProtocolInsertState   .init ()
+    DebouncerState              = Debouncer                 .create ()
+    PageState                   = PageState                 .init pageOpt
+    PersistentStorageState      = PersistentStorageState    .init ()
+    DevState                    = DevState                  .init ()
+    SiteStyleState              = SiteStyleState            .init ()
+    TermSearchState             = TermSearchState           .init ()
+    AdvancedSearchState         = AdvancedSearchState       .init ()
+    ExcelState                  = ExcelState                .init ()
+    ApiState                    = ApiState                  .init ()
+    FilePickerState             = FilePickerState           .init ()
+    AddBuildingBlockState       = AddBuildingBlockState     .init ()
+    ValidationState             = ValidationState           .init ()
+    ProtocolInsertState         = ProtocolInsertState       .init ()
+    BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
+    SettingsXmlState            = SettingsXmlState          .init ()
 }

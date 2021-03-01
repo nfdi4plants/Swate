@@ -14,8 +14,10 @@ type Route =
 | FilePicker
 | Info
 | ProtocolInsert
+| ProtocolSearch
 | ActivityLog
 | Settings
+| SettingsXml
 | NotFound
 
     static member toRouteUrl (route:Route) =
@@ -26,9 +28,11 @@ type Route =
         | Route.Validation          -> "/#Validation"   
         | Route.FilePicker          -> "/#FilePicker"
         | Route.ProtocolInsert      -> "/#ProtocolInsert"
+        | Route.ProtocolSearch      -> "/#ProtocolSearch"
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
+        | Route.SettingsXml         -> "/#SettingsXml"
         | Route.NotFound            -> "/#NotFound"
 
     static member toString (route:Route) =
@@ -38,10 +42,12 @@ type Route =
         | Route.TermSearch          -> "TermSearch"
         | Route.Validation          -> "Validation"
         | Route.ProtocolInsert      -> "ProtocolInsert"
+        | Route.ProtocolSearch      -> "ProtocolSearch"
         | Route.Info                -> "Info"
         | Route.FilePicker          -> "FilePicker"
         | Route.ActivityLog         -> "ActivityLog"
         | Route.Settings            -> "Settings"
+        | Route.SettingsXml         -> "SettingsXml"
         | Route.NotFound            -> "NotFound"
 
     member this.toStringRdbl =
@@ -52,9 +58,11 @@ type Route =
         | Route.Validation          -> "Validation"
         | Route.FilePicker          -> "File Picker"
         | Route.ProtocolInsert      -> "Protocol Insert"
+        | Route.ProtocolSearch      -> "Protocol Search"
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
+        | Route.SettingsXml         -> "Xml Settings"
         | Route.NotFound            -> "NotFound"
 
 
@@ -65,18 +73,16 @@ type Route =
                 Tooltip.dataTooltip (name)
             ] (
                 icons
-                |> List.map (
-                    fun icon ->
-                        Fa.span [icon] []
-                )
+                |> List.map ( fun icon -> Fa.span [icon] [] )
             )
 
         match p with
         | Route.Home                -> createElem [Fa.Solid.Home                            ]   (p.toStringRdbl)
         | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
         | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
-        | Route.AddBuildingBlock    -> createElem [Fa.Solid.Columns; Fa.Solid.PlusCircle    ]   (p.toStringRdbl)
+        | Route.AddBuildingBlock    -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
         | Route.ProtocolInsert      -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
+        | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
         | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
         | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
         | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  
@@ -100,8 +106,10 @@ module Routing =
             map Route.FilePicker        (s "FilePicker")
             map Route.Info              (s "Info")
             map Route.ProtocolInsert    (s "ProtocolInsert")
+            map Route.ProtocolSearch    (s "ProtocolSearch")
             map Route.ActivityLog       (s "ActivityLog")
             map Route.Settings          (s "Settings")
+            map Route.SettingsXml       (s "SettingsXml")
             map Route.NotFound          (s "NotFound")
         ]
 

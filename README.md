@@ -8,23 +8,25 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
 
 <!-- TOC -->
 
-- [Features](#features)
-- [Install/Use](#installuse)
+- [Swate](#swate)
+  - [Features](#features)
+  - [Install/Use](#installuse)
     - [Excel desktop](#excel-desktop)
-        - [Using the release archive](#using-the-release-archive)
-        - [Using a shared folder](#using-a-shared-folder)
+      - [Using the release archive](#using-the-release-archive)
+      - [Using a shared folder](#using-a-shared-folder)
     - [Excel online](#excel-online)
-- [Discuss/Get help](#discussget-help)
+  - [Discuss/Get help](#discussget-help)
     - [Documentation](#documentation)
-        - [API docs](#api-docs)
-        - [Feature documentation](#feature-documentation)
-        - [Guides](#guides)
+      - [API docs](#api-docs)
+      - [Feature documentation](#feature-documentation)
+      - [Guides](#guides)
     - [Report problems and request features](#report-problems-and-request-features)
     - [(Beta) Discuss in the GitHub Discussion forum](#beta-discuss-in-the-github-discussion-forum)
-- [Develop](#develop)
+  - [Develop](#develop)
     - [Contribute](#contribute)
     - [Prerequisites](#prerequisites)
-    - [use install.cmd](#use-installcmd)
+    - [Use install.cmd](#use-installcmd)
+    - [Set up Sql Dump](#set-up-sql-dump)
     - [Project Decription](#project-decription)
 
 <!-- /TOC -->
@@ -143,13 +145,23 @@ Before you contribute to the project remember to return all placeholders to your
 
         `CheckNetIsolation LoopbackExempt -a -n="microsoft.win32webviewhost_cw5n1h2txyewy"`
 
-### use install.cmd
+### Use install.cmd
 
 The install.cmd executes several console commands for one of which it needs adminstratorial rights (dotnet fake build -t setup) to install the certificate mentioned above.
 Open powershell as adminstrator and navigate to the Swate-folder ```cd your\folder\path\Swate``` then use ```.\install.cmd``` to initialize the setup.
 While running a installation dialogue for the certificate will open and can be handled as described above.
 
 By installing this repo via the install.cmd file the MySql password will default to 'example'.
+
+### Set up Sql Dump
+
+By now the SwatwDB.sql dump in this repo is outdated. You can request a current version by opening an issue. In addition, the dump has become so large that it can no longer be loaded on mysql db creation and needs further input:
+
+After following the instructions above:
+1. Go to `localhost:8085` and create a new database called `SwateDB`
+2. Open powershell in the folder with the sql dump. 
+3. Use `cmd /c "docker exec -i db_db_1 mysql -uroot -pexample SwateDB<SwateDB.sql"`
+4. Observe in Adminer how the tables are created and slowly filled.
 
 ### Project Decription
 

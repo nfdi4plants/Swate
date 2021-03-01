@@ -106,6 +106,14 @@ let annotatorApi cString = {
             return searchRes
         }
 
+    getAllTermsByParentTerm = fun (parentTerm:OntologyInfo) ->
+        async {
+            let searchRes =
+                OntologyDB.getAllTermsByParentTermOntologyInfo
+
+            return searchRes cString parentTerm
+        }
+
     getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
         async {
             let result =
@@ -139,29 +147,44 @@ let annotatorApi cString = {
     getTermsByNames = fun (queryArr) ->
         async {
             let result =
-                printfn "START" 
                 queryArr |> Array.map (fun searchTerm ->
                     {searchTerm with
                         TermOpt =
                             // check if search string is empty. This case should delete TAN- and TSR- values in table
-                            if searchTerm.SearchString = "" then None
+                            if searchTerm.SearchQuery.Name = "" then None
                             // check if term accession was found. If so search also by this as it is unique
-                            elif searchTerm.TermAccession <> "" then
-                                printfn "hit1: %A" searchTerm.SearchString
-                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchString,searchTerm.TermAccession)
-                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                            elif searchTerm.SearchQuery.TermAccession <> "" then
+                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchQuery.Name,searchTerm.SearchQuery.TermAccession)
+                                if Array.isEmpty searchRes then
+                                    None
+                                else
+                                    searchRes |> Array.head |> Some
                             elif searchTerm.IsA.IsSome then
-                                printfn "hit2: %A" searchTerm.SearchString
-                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchString,searchTerm.IsA.Value)
-                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchQuery.Name,searchTerm.IsA.Value)
+                                if Array.isEmpty searchRes then
+                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.SearchQuery.Name
+                                    if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
+                                else
+                                    searchRes |> Array.head |> Some
                             else
-                                printfn "hit3: %A" searchTerm.SearchString
-                                let searchRes = OntologyDB.getTermByName cString searchTerm.SearchString
+                                let searchRes = OntologyDB.getTermByName cString searchTerm.SearchQuery.Name
                                 if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
                     }
                 )
             return result
         }
+
+    getAllProtocols = fun () -> async {
+        let protocols = ProtocolDB.getAllProtocols cString
+        return protocols
+    }
+
+    getProtocolBlocksForProtocol = fun prot -> async { return ProtocolDB.getXmlByProtocol cString prot }
+
+    increaseTimesUsed = fun templateName -> async {
+        ProtocolDB.increaseTimesUsed cString templateName
+        return ()
+    }
 }
 
 let createIServiceAPIv1 =

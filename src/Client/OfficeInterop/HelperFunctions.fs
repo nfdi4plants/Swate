@@ -12,6 +12,57 @@ open OfficeInterop.Types
 open BuildingBlockTypes
 open Shared
 
+let getActiveAnnotationTableName() =
+    Excel.run(fun context ->
+
+        // Ref. 2
+
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let t = sheet.load(U2.Case2 (ResizeArray[|"tables"|]))
+        let tableItems = t.tables.load(propertyNames=U2.Case1 "items")
+        context.sync()
+            .``then``( fun _ ->
+                /// access names of all tables in the active worksheet.
+                let tables =
+                    tableItems.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+                /// filter all table names for tables starting with "annotationTable"
+                let annoTables =
+                    tables
+                    |> Array.filter (fun x -> x.StartsWith "annotationTable")
+                /// Get the correct error message if we have <> 1 annotation table. Only returns success and the table name if annoTables.Length = 1
+                let res = TryFindAnnoTableResult.exactlyOneAnnotationTable annoTables
+
+                // return result
+                match res with
+                | Success tableName -> tableName
+                | TryFindAnnoTableResult.Error msg -> failwith msg
+        )
+    )
+
+/// This function returns the names of all annotationTables in all worksheets.
+/// This function is used to pass a list of all table names to e.g. the 'createAnnotationTable()' function. 
+let getAllTableInfo() =
+    Excel.run(fun context ->
+
+        // Ref. 2
+
+        let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let _ = tables.load(propertyNames = U2.Case1 "name")
+
+        context.sync()
+            .``then``( fun _ ->
+
+                /// Get all names of all tables in the whole workbook.
+                let tableNames =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.map (fun x -> x.name)
+
+                tableNames
+        )
+    )
 
 let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
     [|
@@ -20,6 +71,13 @@ let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
                 for i in 0 .. colCount-1 do yield U3<bool,string,float>.Case2 value
             |] :> IList<U3<bool,string,float>>
     |] :> IList<IList<U3<bool,string,float>>>
+
+let createValueMatrix (colCount:int) (rowCount:int) value =
+    ResizeArray([
+        for outer in 0 .. rowCount-1 do
+            let tmp = Array.zeroCreate colCount |> Seq.map (fun _ -> Some (value |> box))
+            ResizeArray(tmp)
+    ])
 
 let tryFindSpannedBuildingBlocks (currentProtocolGroup:Xml.GroupTypes.Protocol) (buildingBlocks: BuildingBlock []) =
     let findAllSpannedBlocks =
@@ -56,25 +114,26 @@ let unitColAttributes (unitTermName:string) (unitAccessionOptt:string option) (i
         | Some accession    -> sprintf "[%s] (#%i; #h; #t%s; #u)" unitTermName id accession
         | None              -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
 
+let findNewIdForUnit (allColHeaders:string []) (format:string option) (unitAccessionOpt:string option) =
+    let rec loopingCheck int =
+        let isExisting =
+            allColHeaders
+            // Should a column with the same name already exist, then count up the id tag.
+            |> Array.exists (fun existingHeader ->
+                // We don't need to check TSR or TAN, because the main column always starts with "Unit"
+                existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt int)
+            )
+        if isExisting then
+            loopingCheck (int+1)
+        else
+            int
+    loopingCheck 1
+
 let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
     let col = createEmptyMatrixForTables 1 rowCount ""
     if format.IsSome then
-        let findNewIdForUnit() =
-            let rec loopingCheck int =
-                let isExisting =
-                    allColHeaders
-                    // Should a column with the same name already exist, then count up the id tag.
-                    |> Array.exists (fun existingHeader ->
-                        // We don't need to check TSR or TAN, because the main column always starts with "Unit"
-                        existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt int)
-                    )
-                if isExisting then
-                    loopingCheck (int+1)
-                else
-                    int
-            loopingCheck 1
 
-        let newUnitId = findNewIdForUnit()
+        let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
 
         /// create unit main column
         let createdUnitCol1 =
@@ -99,6 +158,34 @@ let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseC
                 values = U4.Case1 col,
                 name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
             )
+
+        Some (
+            sprintf " Added specified unit: %s" (format.Value),
+            sprintf "0.00 \"%s\"" (format.Value)
+        )
+    else
+        None
+
+let updateUnitColumns (allColHeaders:string []) (annoHeaderRange:Excel.Range) newBaseColIndex (format:string option) (unitAccessionOpt:string option) =
+    let col v= createValueMatrix 1 1 v
+    if format.IsSome then
+
+        let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
+
+        /// create unit main column
+        let updateUnitCol1 =
+            annoHeaderRange.getColumn(newBaseColIndex+3.)
+            |> fun c1 -> c1.values <- sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+
+        /// create unit TSR
+        let createdUnitCol2 =
+            annoHeaderRange.getColumn(newBaseColIndex+4.)
+            |> fun c2 -> c2.values <- sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+
+        /// create unit TAN
+        let createdUnitCol3 =
+            annoHeaderRange.getColumn(newBaseColIndex+5.)
+            |> fun c3 -> c3.values <- sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
         Some (
             sprintf " Added specified unit: %s" (format.Value),
@@ -352,6 +439,140 @@ module BuildingBlockTypes =
 
         buildingBlocks
 
+    open System
+
+    let findSelectedBuildingBlockPreSync (context:RequestContext) annotationTableName =
+        let selectedRange = context.workbook.getSelectedRange()
+        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+
+        // Ref. 2
+        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
+        selectedRange, annoHeaderRange, annoBodyRange
+
+    let findSelectedBuildingBlock (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) (context:RequestContext) =
+        context.sync().``then``( fun _ ->
+
+            if selectedRange.columnCount <> 1. then
+                failwith "To use this function please select a single column"
+
+            let errorMsg = "To use this function please select a single column of a Swate table."
+
+            let newSelectedColIndex =
+                // recalculate the selected range index based on table
+                let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
+                // if index is smaller 0 it is outside of table range
+                if diff < 0. then failwith errorMsg
+                // if index is bigger than columnCount-1 then it is outside of tableRange
+                elif diff > annoHeaderRange.columnCount-1. then failwith errorMsg
+                else diff
+
+            /// Sort all columns into building blocks.
+            let buildingBlocks =
+                getBuildingBlocks annoHeaderRange annoBodyRange
+
+            /// find building block with the closest main column index from left
+            let findLeftClosestBuildingBlock =
+                buildingBlocks
+                |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
+                |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
+
+            findLeftClosestBuildingBlock
+        )
+
+    let private sortMainColValuesToSearchTerms (buildingBlock:BuildingBlock) =
+        // get current col index
+        let tsrTanColIndices = [|buildingBlock.TSR.Value.Index; buildingBlock.TAN.Value.Index|]
+        let fillTermConstructsNoUnit bBlock =
+            // group cells by value so we don't get doubles.
+            bBlock.MainColumn.Cells
+            |> Array.groupBy (fun cell ->
+                cell.Value.Value
+            )
+            // create SearchTermI types that will be passed to the server to get filled with a term option.
+            |> Array.map (fun (searchStr,cellArr) ->
+                let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
+                Shared.SearchTermI.create tsrTanColIndices searchStr "" bBlock.MainColumn.Header.Value.Ontology rowIndices
+            )
+        /// We differentiate between building blocks with and without unit as unit building blocks will not contain terms as values but e.g. numbers.
+        /// In this case we do not want to search the database for the cell values but the parent ontology in the header.
+        /// This will then be used for TSR and TAN.
+        let fillTermConstructsWithUnit (bBlock:BuildingBlock) =
+            let searchStr       = bBlock.MainColumn.Header.Value.Ontology.Value.Name
+            let termAccession   = bBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
+            let rowIndices =
+                bBlock.MainColumn.Cells
+                |> Array.map (fun x ->
+                    x.Index
+                )
+            [|Shared.SearchTermI.create tsrTanColIndices searchStr termAccession None rowIndices|]
+        if buildingBlock.Unit.IsSome then
+            fillTermConstructsWithUnit buildingBlock
+        else
+            fillTermConstructsNoUnit buildingBlock
+
+    let private sortUnitColToSearchTerm (buildingBlock:BuildingBlock) =
+        let unit = buildingBlock.Unit.Value
+        let searchString  = unit.MainColumn.Header.Value.Ontology.Value.Name
+        let termAccession = unit.MainColumn.Header.Value.Ontology.Value.TermAccession 
+        let colIndices = [|unit.MainColumn.Index; unit.TSR.Value.Index; unit.TAN.Value.Index|]
+        let rowIndices = unit.MainColumn.Cells |> Array.map (fun x -> x.Index)
+        Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
+
+    let private sortHeaderToSearchTerm (buildingBlock:BuildingBlock) =
+        let isOntologyTerm = buildingBlock.MainColumn.Header.Value.Ontology.IsSome
+        let searchString  =
+            if isOntologyTerm then
+                buildingBlock.MainColumn.Header.Value.Ontology.Value.Name
+            else
+                buildingBlock.MainColumn.Header.Value.Header
+        let termAccession =
+            if isOntologyTerm then
+                buildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
+            else
+                ""
+        let colIndices = [|
+            buildingBlock.MainColumn.Index;
+            if buildingBlock.TSR.IsSome then buildingBlock.TSR.Value.Index;
+            if buildingBlock.TAN.IsSome then buildingBlock.TAN.Value.Index
+        |]
+        let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
+        Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
+
+    let sortBuildingBlockValuesToSearchTerm (buildingBlock:BuildingBlock) =
+
+        /// We need an array of all distinct cell.values and where they occur in col- and row-index
+        let terms() = sortMainColValuesToSearchTerms buildingBlock
+
+        /// Create search types for the unit building blocks.
+        let units() = sortUnitColToSearchTerm buildingBlock
+
+        match buildingBlock.TAN, buildingBlock.TSR with
+        | Some _, Some _ ->
+            /// Combine search types
+            [|
+                yield! terms()
+                if buildingBlock.Unit.IsSome then
+                    yield units()
+            |]
+        | None, None ->
+            let searchString  = ""
+            let termAccession = ""
+            let colIndices = [|buildingBlock.MainColumn.Index|]
+            let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
+            [| Shared.SearchTermI.create colIndices searchString termAccession None rowIndices |]
+        | _ -> failwith (sprintf "Encountered unknown reference column pattern. Building block (%s) can only contain both TSR and TAN or none." buildingBlock.MainColumn.Header.Value.Header)
+
+    let sortBuildingBlockToSearchTerm (buildingBlock:BuildingBlock) =
+        let bbValuesToSearchTerm = sortBuildingBlockValuesToSearchTerm buildingBlock
+        let bbHeaderToSearchTerm = sortHeaderToSearchTerm buildingBlock
+        [|yield! bbValuesToSearchTerm; bbHeaderToSearchTerm|] 
+
+    let sortBuildingBlocksValuesToSearchTerm (buildingBlocks:BuildingBlock []) =
+
+        buildingBlocks |> Array.collect (fun bb ->
+            sortBuildingBlockValuesToSearchTerm bb
+        )
+
 open System
 open Fable.SimpleXml
 open Fable.SimpleXml.Generator
@@ -384,7 +605,7 @@ let xmlElementToXmlString (root:XmlElement) =
             text root.Content
     ] |> serializeXml
 
-let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
+let getCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
     promise {
         let! getXml =
             context.sync().``then``(fun e ->
@@ -406,7 +627,8 @@ let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:Reques
 
         let xmlParsed =
             let isRootElement = xml |> SimpleXml.tryParseElement
-            if xml = "" then "<customXml></customXml>" |> SimpleXml.parseElement
+            if xml = "" then
+                "<customXml></customXml>" |> SimpleXml.parseElement
             elif isRootElement.IsSome then
                 isRootElement.Value
             else
@@ -414,68 +636,220 @@ let getCurrentCustomXml (customXmlParts:CustomXmlPartCollection) (context:Reques
                 if isManyRootElements.IsSome then
                     isManyRootElements.Value
                     |> List.tryFind (fun ele -> ele.Name = "customXml")
-                    |> fun customXmlOpt -> if customXmlOpt.IsSome then customXmlOpt.Value else failwith "Swate could not find expected 'customXml' root tag."
+                    |> fun customXmlOpt -> if customXmlOpt.IsSome then customXmlOpt.Value else failwith "Swate could not find expected '<customXml>..</customXml>' root tag."
                 else
                     failwith "Swate could not parse Workbook Custom Xml Parts. Had neither one root nor many root elements. Please contact the developer."
         if xmlParsed.Name <> "customXml" then failwith (sprintf "Swate found unexpected root xml element: %s" xmlParsed.Name)
 
-        return xmlParsed, xml
+        return xmlParsed
     }
 
-let swateValidationOfXml (xmlParsed:XmlElement) (xml:string) =
-    let v = SimpleXml.findElementsByName "Validation" xmlParsed
-    if v.Length > 1 then failwith (sprintf "Swate found multiple 'Validation' xml elements. Please contact the developer.")
-    if v.Length = 0 then
+let getActiveTableXml (tableName:string) (worksheetName:string) (completeCustomXmlParsed:XmlElement) =
+    let tablexml=
+        completeCustomXmlParsed
+        |> SimpleXml.findElementsByName "SwateTable"
+        |> List.tryFind (fun swateTableXml ->
+            swateTableXml.Attributes.["Table"] = tableName
+            && swateTableXml.Attributes.["Worksheet"] = worksheetName
+        )
+    if tablexml.IsSome then
+        tablexml.Value |> Some
+    else
+        None
+
+
+let getAllSwateTableValidation (xmlParsed:XmlElement) =
+    let protocolGroups = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot xmlParsed
+
+    protocolGroups
+    |> List.map (
+        xmlElementToXmlString >> Xml.ValidationTypes.TableValidation.ofXml
+    )
+
+let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
+    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
+    if activeTableXml.IsNone then
         None
     else
-        Xml.ValidationTypes.SwateValidation.ofXml xml |> Some
+        let v = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot activeTableXml.Value
+        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.ValidationTypes.ValidationXmlRoot)
+        if v.Length = 0 then
+            None
+        else
+            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
+            Xml.ValidationTypes.TableValidation.ofXml tableXmlAsString |> Some
 
-let protocolGroupOfXml (xmlParsed:XmlElement) (xml:string) =
-    let protocolGroupTag = "ProtocolGroup"
-    let v = SimpleXml.findElementsByName protocolGroupTag xmlParsed
-    if v.Length > 1 then failwith (sprintf "Swate found multiple '%s' xml elements. Please contact the developer." protocolGroupTag)
-    if v.Length = 0 then
+/// Use the 'remove' parameter to remove any Swate table validation xml for the worksheet annotation table name combination in 'tableValidation'
+let private updateRemoveSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) (remove:bool) =
+
+    let currentTableXml = getActiveTableXml tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet previousCompleteCustomXml
+
+    let nextTableXml =
+        let newValidationXml = tableValidation.toXml |> SimpleXml.parseElement
+        if currentTableXml.IsSome then
+            let filteredChildren =
+                currentTableXml.Value.Children
+                |> List.filter (fun x -> x.Name <> Xml.ValidationTypes.ValidationXmlRoot )
+            {currentTableXml.Value with
+                Children =
+                    if remove then
+                        filteredChildren
+                    else
+                        newValidationXml::filteredChildren
+            }
+        else
+            let initNewSwateTableXml =
+                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet
+            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
+            {swateTableXmlEle with
+                Children = [newValidationXml]
+            }
+    let filterPrevTableFromRootChildren =
+        previousCompleteCustomXml.Children
+        |> List.filter (fun x ->
+            let isExisting =
+                x.Name = "SwateTable"
+                && x.Attributes.["Table"] = tableValidation.AnnotationTable.Name
+                && x.Attributes.["Worksheet"] = tableValidation.AnnotationTable.Worksheet
+            isExisting |> not
+        )
+    {previousCompleteCustomXml with
+        Children = nextTableXml::filterPrevTableFromRootChildren
+    }
+
+let removeSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateValidation tableValidation previousCompleteCustomXml true
+
+let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateValidation tableValidation previousCompleteCustomXml false
+
+let replaceValidationByValidation tableVal1 tableVal2 previousCompleteCustomXml =
+    let removeTableVal1 = removeSwateValidation tableVal1 previousCompleteCustomXml
+    let addTableVal2 = updateSwateValidation tableVal2 removeTableVal1
+    addTableVal2
+
+let getAllSwateProtocolGroups (xmlParsed:XmlElement) =
+    let protocolGroups = SimpleXml.findElementsByName Xml.GroupTypes.ProtocolGroupXmlRoot xmlParsed
+
+    protocolGroups
+    |> List.map (
+        xmlElementToXmlString >> Xml.GroupTypes.ProtocolGroup.ofXml
+    )
+
+let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
+    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
+    if activeTableXml.IsNone then
         None
     else
-        Xml.GroupTypes.ProtocolGroup.ofXml xml |> Some
+        let v = SimpleXml.findElementsByName Xml.GroupTypes.ProtocolGroupXmlRoot activeTableXml.Value
+        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.GroupTypes.ProtocolGroupXmlRoot)
+        if v.Length = 0 then
+            None
+        else
+            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
+            Xml.GroupTypes.ProtocolGroup.ofXml tableXmlAsString |> Some
 
-let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
+/// Use the 'remove' parameter to remove any Swate protocol group xml for the worksheet annotation table name combination in 'protocolGroup'
+let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) (remove:bool) =
+
+    let currentTableXml = getActiveTableXml protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet previousCompleteCustomXml
+
+    let nextTableXml =
+        let newProtocolGroupXml = protocolGroup.toXml |> SimpleXml.parseElement
+        if currentTableXml.IsSome then
+            let filteredChildren =
+                currentTableXml.Value.Children
+                |> List.filter (fun x -> x.Name <> Xml.GroupTypes.ProtocolGroupXmlRoot )
+            {currentTableXml.Value with
+                Children =
+                    if remove then
+                        filteredChildren
+                    else
+                        newProtocolGroupXml::filteredChildren
+            }
+        else
+            let initNewSwateTableXml =
+                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet
+            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
+            {swateTableXmlEle with
+                Children = [newProtocolGroupXml]
+            }
+    let filterPrevTableFromRootChildren =
+        previousCompleteCustomXml.Children
+        |> List.filter (fun x ->
+            let isExisting =
+                x.Name = "SwateTable"
+                && x.Attributes.["Table"] = protocolGroup.AnnotationTable.Name
+                && x.Attributes.["Worksheet"] = protocolGroup.AnnotationTable.Worksheet
+            isExisting |> not
+        )
+    {previousCompleteCustomXml with
+        Children = nextTableXml::filterPrevTableFromRootChildren
+    }
+
+let removeSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml true
+
+let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml false
+
+let replaceProtGroupByProtGroup protGroup1 protGroup2 (previousCompleteCustomXml:XmlElement) =
+    let removeProtGroup1 = removeSwateProtocolGroup protGroup1 previousCompleteCustomXml
+    let addProtGroup2 = updateSwateProtocolGroup protGroup2 removeProtGroup1
+    addProtGroup2
+
+/// Use the 'remove' parameter to remove any Swate protocol xml for the worksheet annotation table name combination in 'protocolGroup'
+let updateRemoveSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) (remove:bool)=
+
+    let currentSwateProtocolGroup =
+        let isExisting = getSwateProtocolGroupForCurrentTable protocol.AnnotationTable.Name protocol.AnnotationTable.Worksheet previousCompleteCustomXml
+        if isExisting.IsNone then
+            Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion protocol.AnnotationTable.Name protocol.AnnotationTable.Worksheet []
+        else
+            isExisting.Value
+
+    let filteredProtocolChildren =
+        currentSwateProtocolGroup.Protocols
+        |> List.filter (fun x -> x.Id <> protocol.Id)
+
+    let nextProtocolGroup =
+        {currentSwateProtocolGroup with
+            Protocols =
+                if remove then
+                    filteredProtocolChildren
+                else
+                    protocol::filteredProtocolChildren
+        }
+
+    updateSwateProtocolGroup nextProtocolGroup previousCompleteCustomXml
+
+let removeSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateProtocol protocol previousCompleteCustomXml true
+
+let updateSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+    updateRemoveSwateProtocol protocol previousCompleteCustomXml false
+
+let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
     Excel.run(fun context ->
+
+        let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
 
         // The first part accesses current CustomXml
         let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
         let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
         promise {
-            let! xmlParsed, xml = getCurrentCustomXml customXmlParts context
+            let! annotationTable = getActiveAnnotationTableName()
 
-            let currentProtocolGroup =
-                let previousProtocolGroup = protocolGroupOfXml xmlParsed xml
-                if previousProtocolGroup.IsNone then Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion [] else previousProtocolGroup.Value
+            let! xmlParsed = getCustomXml customXmlParts context
 
-            let nextProtocolGroup =
-                let newProtocols =
-                    currentProtocolGroup.Protocols
-                    |> List.filter (fun x -> x.TableName <> protocol.TableName || x.WorksheetName <> protocol.WorksheetName || x.Id <> protocol.Id)
-                    |> fun filteredProtocols ->
-                        if remove then
-                            filteredProtocols
-                        else 
-                            protocol::filteredProtocols
-                { currentProtocolGroup with
-                    SwateVersion = protocol.SwateVersion
-                    Protocols = newProtocols
-                }
+            // Not sure if this is necessary. Previously table and worksheet name were accessed at this point.
+            // Then AnnotationTable was added to protocol. So now we refresh these values at this point.
+            let securityUpdateForProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
-            let nextCustomXml =
-                let nextAsXmlFormat = nextProtocolGroup.toXml |> SimpleXml.parseElement
-                let childrenWithoutProtocolGroup = xmlParsed.Children |> List.filter (fun child ->
-                    child.Name <> "ProtocolGroup"
-                )
-                let nextChildren = nextAsXmlFormat::childrenWithoutProtocolGroup
-                { xmlParsed with
-                    Children = nextChildren
-                } |> xmlElementToXmlString
+            let nextCustomXml = updateSwateProtocol securityUpdateForProtocol xmlParsed
+
+            let nextCustomXmlString = nextCustomXml |> xmlElementToXmlString
 
             let! deleteXml =
                 context.sync().``then``(fun e ->
@@ -487,7 +861,7 @@ let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
 
             let! addNext =
                 context.sync().``then``(fun e ->
-                    customXmlParts.add(nextCustomXml)
+                    customXmlParts.add(nextCustomXmlString)
                 )
 
             // This will be displayed in activity log
@@ -496,8 +870,8 @@ let updateProtocolFromXml(protocol:Xml.GroupTypes.Protocol) (remove:bool) =
                 sprintf
                     "%s ProtocolGroup Scheme with '%s - %s - %s' "
                     (if remove then "Remove Protocol from" else "Update")
-                    protocol.WorksheetName
-                    protocol.TableName
+                    activeSheet.name
+                    annotationTable
                     protocol.Id
         }
     )
@@ -563,13 +937,6 @@ let cleanGroupHeaderFormat (range:Excel.Range) (context:RequestContext) =
 
         return ()
     }
-
-let createValueMatrix (colCount:int) (rowCount:int) value =
-    ResizeArray([
-        for outer in 0 .. rowCount-1 do
-            let tmp = Array.zeroCreate colCount |> Seq.map (fun _ -> Some (value |> box))
-            ResizeArray(tmp)
-    ])
 
 /// Not used currently
 let createEmptyAnnotationMatrixForTables (rowCount:int) value (header:string) =

@@ -28,11 +28,32 @@ let toggleDarkModeElement (model:Model) dispatch =
         ]
     ]
 
+let customXmlSettings (model:Model) dispatch =
+    Level.level [Level.Level.IsMobile][
+        Level.left [][
+            str "Custom Xml"
+        ]
+        Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
+            Button.a [
+                Button.Color IsInfo
+                Button.IsOutlined
+                Button.OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch ) 
+            ][
+                str "Advanced Settings"
+            ]
+        ]
+    ]
+
 let settingsViewComponent (model:Model) dispatch =
     div [
-        Style [MaxWidth "500px"]
+        //Style [MaxWidth "500px"]
     ][
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Swate Settings"]
+
         Label.label [][str "Customize Swate"]
         toggleDarkModeElement model dispatch
+
+
+        Label.label [][str "Advanced Settings"]
+        customXmlSettings model dispatch
     ]

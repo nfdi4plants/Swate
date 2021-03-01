@@ -30,6 +30,7 @@
         <Compile Include="CustomComponents\Navbar.fs" />
         <Compile Include="CustomComponents\Loading.fs" />
         <Compile Include="CustomComponents\ErrorModal.fs" />
+        <Compile Include="CustomComponents\BuildingBlockDetailsModal.fs" />
         <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
@@ -41,9 +42,11 @@
         <Compile Include="Views\ValidationView.fs" />
         <Compile Include="Views\FilePickerView.fs" />
         <Compile Include="Views\ProtocolInsertView.fs" />
+        <Compile Include="Views\ProtocolSearchView.fs" />
         <Compile Include="Views\InfoView.fs" />
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\SettingsView.fs" />
+        <Compile Include="Views\SettingsXmlView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>

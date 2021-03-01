@@ -14,17 +14,8 @@ open Browser.Types
 
 //TO-DO: Save log as tab seperated file
 
-let activityLogComponent (model:Model) dispatch =
-    div [][
-        Button.button [
-            Button.Color Color.IsLink
-            Button.IsFullWidth
-            Button.OnClick (fun e -> UpdatePageState (Some Routing.Route.TermSearch) |> dispatch)
-            Button.Props [Style [MarginBottom "1rem"]]
-        ] [
-            str "Back to Term Search"
-        ]
-        Help.help [][str "This page is used for development/debugging."]
+let debugBox model dispatch =
+    Box.box' [][
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth
@@ -33,14 +24,14 @@ let activityLogComponent (model:Model) dispatch =
         //] [
         //    str "Try Excel"
         //]
-        //Button.button [
-        //    Button.Color Color.IsInfo
-        //    Button.IsFullWidth
-        //    Button.OnClick (fun e -> TryExcel2 |> ExcelInterop |> dispatch )
-        //    Button.Props [Style [MarginBottom "1rem"]]
-        //] [
-        //    str "Try Excel2"
-        //]
+        Button.button [
+            Button.Color Color.IsInfo
+            Button.IsFullWidth
+            Button.OnClick (fun e -> TryExcel2 |> ExcelInterop |> dispatch )
+            Button.Props [Style [MarginBottom "1rem"]]
+        ] [
+            str "Try Excel2"
+        ]
         Label.label [][str "Dangerzone"]
         Container.container [
             Container.Props [Style [
@@ -53,9 +44,9 @@ let activityLogComponent (model:Model) dispatch =
                 Button.Color Color.IsWarning
                 Button.IsFullWidth
                 Button.OnClick (fun e -> GetSwateCustomXml |> ExcelInterop |> dispatch )
-                Button.Props [Style [MarginBottom "1rem"]; Title "Show record type data of Swate validation Xml"]
+                Button.Props [Style [MarginBottom "1rem"]; Title "Show record type data of Swate custom Xml"]
             ] [
-                span [] [str "Show Swate Validation Xml!"]
+                span [] [str "Show Custom Xml!"]
             ]
             Button.a [
                 Button.Color Color.IsDanger
@@ -72,14 +63,33 @@ let activityLogComponent (model:Model) dispatch =
                 ]
             ]
         ]
-        Table.table [
-            Table.IsFullWidth
-            Table.Props [ExcelColors.colorBackground model.SiteStyleState.ColorMode]
-        ] [
-            tbody [] (
-                model.DevState.Log
-                |> List.map LogItem.toTableRow
-            )
+    ]
+
+let activityLogComponent (model:Model) dispatch =
+    div [][
+
+        Label.label [Label.Size IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Activity Log"]
+
+        //debugBox model dispatch
+
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display all recorded activities of this session."]
+        div [
+            Style [
+                BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
+                //BorderRadius "15px 15px 0 0"
+                Padding "0.25rem 1rem"
+                MarginBottom "1rem"
+            ]
+        ][
+            Table.table [
+                Table.IsFullWidth
+                Table.Props [ExcelColors.colorBackground model.SiteStyleState.ColorMode]
+            ] [
+                tbody [] (
+                    model.DevState.Log
+                    |> List.map LogItem.toTableRow
+                )
+            ]
         ]
     ]
 

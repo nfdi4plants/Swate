@@ -90,6 +90,8 @@ SELECT max(ID) FROM Term"""
             isObsolete
     | false -> failwith "Inserting term failed."
 
+open System
+
 let getTermSuggestions cString (query:string) =
     
     use connection = establishConnection cString
@@ -99,7 +101,17 @@ let getTermSuggestions cString (query:string) =
 
     let queryParam      = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
 
-    queryParam      .Value <- query
+    let query' =
+        if query.Contains " " then
+            query.Split([|" "|], StringSplitOptions.RemoveEmptyEntries)
+            |> Array.filter (fun x -> x.Length >= 3 )
+            |> Array.map (fun x -> sprintf "+%s" x)
+            |> String.concat " "
+        else
+            query
+        |> fun x -> x + " *"
+
+    queryParam      .Value <- query'
 
     use reader = getTermSuggestionsCmd.ExecuteReader()
     [|
@@ -166,6 +178,45 @@ let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyIn
     let parentOntologyParam     = cmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
 
     queryParam              .Value <- query
+    parentOntologyParam     .Value <- parentTerm.Name
+
+    if hasAccession then
+        let accessionParam = cmd.Parameters.Add("parentTermAccession", MySqlDbType.VarChar)
+        accessionParam      .Value <- parentTerm.TermAccession
+
+    use reader = cmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+
+let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
+
+    let hasAccession = parentTerm.TermAccession <> ""
+
+    use connection = establishConnection cString
+    connection.Open()
+    use cmd =
+        if hasAccession then
+            new MySqlCommand("getAllTermsByParentTermAndAccession",connection)
+        else
+            new MySqlCommand("getAllTermsByParentTerm",connection)
+
+    cmd.CommandType <- CommandType.StoredProcedure
+
+    let parentOntologyParam     = cmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+
     parentOntologyParam     .Value <- parentTerm.Name
 
     if hasAccession then

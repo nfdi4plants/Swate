@@ -144,7 +144,7 @@ let createAutocompleteSuggestions
     let suggestions = 
         if autocompleteParams.Suggestions.Length > 0 then
             autocompleteParams.Suggestions
-            |> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
+            //|> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
             |> Array.map (fun sugg ->
                 tr [
                     OnClick (fun _ ->
@@ -195,7 +195,21 @@ let createAutocompleteSuggestions
             ]
         ]
 
-    suggestions @ [alternative]
+    let alternative2 =
+        tr [
+            colorControl colorMode
+            Class "suggestion"
+        ][
+            td [ColSpan 4] [
+                str ("You can also request a term by opening an ")
+                a [Href Shared.URLs.Nfdi4psoOntologyUrl; Target "_Blank"] [
+                    str "Issue"
+                ]
+                str "."
+            ]
+        ]
+
+    suggestions @ [alternative] @ [alternative2]
 
 
 
@@ -207,10 +221,12 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
                 //if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
                 ZIndex "20"
                 Width "100%"
+                MaxHeight "400px"
                 Position PositionOptions.Absolute
                 BackgroundColor colorMode.ControlBackground
                 BorderColor     colorMode.ControlForeground
                 MarginTop "-0.5rem"
+                OverflowY OverflowOptions.Scroll
             ]]
         ] [
             Table.table [Table.IsFullWidth] [
@@ -303,13 +319,20 @@ let autocompleteTermSearchComponentOfParentOntology
                     Input.Props [
                         
                         ExcelColors.colorControl colorMode
-                        //OnFocus (fun e -> alert "focusout")
-                        //OnBlur  (fun e -> alert "focusin")
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
-                            PipeActiveAnnotationTable GetParentTerm |> ExcelInterop |> dispatch
+                            GetParentTerm |> ExcelInterop |> dispatch
                             let el = Browser.Dom.document.getElementById autocompleteParams.InputId
                             el.focus()
+                        )
+                        OnDoubleClick (fun e ->
+                            if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.TermSearchText = "" then
+                                let parentOnt = model.TermSearchState.ParentOntology.Value
+                                let (parentOntInfo:OntologyInfo) = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
+                                GetAllTermsByParentTermRequest parentOntInfo |> TermSearch |> dispatch
+                            else
+                                let v = Browser.Dom.document.getElementById autocompleteParams.InputId
+                                v?value |> autocompleteParams.OnInputChangeMsg |> dispatch
                         )
                     ]           
                     Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)

@@ -79,6 +79,9 @@ module Xml =
 
     module GroupTypes =
 
+        [<Literal>]
+        let ProtocolGroupXmlRoot = "ProtocolGroup"
+
         type SpannedBuildingBlock = {
             ColumnName      : string
             TermAccession   : string
@@ -93,42 +96,45 @@ module Xml =
             Id                      : string
             ProtocolVersion         : string
             SwateVersion            : string
-            TableName               : string
-            WorksheetName           : string
+            AnnotationTable         : Shared.AnnotationTable
             SpannedBuildingBlocks   : SpannedBuildingBlock list
         } with
-            static member create id version swateVersion tableName worksheetName spannedBuildingBlocks = {
+            static member create id version swateVersion spannedBuildingBlocks tableName worksheetName = {
                 Id                      = id
                 ProtocolVersion         = version
                 SwateVersion            = swateVersion
-                TableName               = tableName
-                WorksheetName           = worksheetName
+                AnnotationTable         = Shared.AnnotationTable.create tableName worksheetName
                 SpannedBuildingBlocks   = spannedBuildingBlocks
             }
-            static member init = Protocol.create "" "" "" "" "" []
+            static member init = Protocol.create "" "" "" []
 
         type ProtocolGroup = {
             SwateVersion    : string
+            AnnotationTable : Shared.AnnotationTable
             Protocols       : Protocol list
         } with
-            static member create swateVersion protocols = {
+            static member create swateVersion tableName worksheetName protocols = {
                 SwateVersion    = swateVersion
+                AnnotationTable = Shared.AnnotationTable.create tableName worksheetName
                 Protocols       = protocols
             }
-            static member init = ProtocolGroup.create "" []
+            static member init = ProtocolGroup.create "" "" "" []
 
             member this.toXml =
                 node "ProtocolGroup" [
-                    attr.value( "SwateVersion", this.SwateVersion )
+                    attr.value( "SwateVersion"  , this.SwateVersion                 )
+                    attr.value( "TableName"     , this.AnnotationTable.Name         )
+                    attr.value( "WorksheetName" , this.AnnotationTable.Worksheet    )
                 ] [
                     for protocol in this.Protocols do
                         yield
                             node "Protocol" [
-                                attr.value( "Id",               protocol.Id                 )
-                                attr.value( "SwateVersion",     protocol.SwateVersion       )
-                                attr.value( "ProtocolVersion",  protocol.ProtocolVersion    )
-                                attr.value( "TableName",        protocol.TableName          )
-                                attr.value( "WorksheetName",    protocol.WorksheetName      )
+                                attr.value( "Id",               protocol.Id                         )
+                                attr.value( "SwateVersion",     protocol.SwateVersion               )
+                                attr.value( "ProtocolVersion",  protocol.ProtocolVersion            )
+                                attr.value( "TableName",        protocol.AnnotationTable.Name       )
+                                attr.value( "WorksheetName",    protocol.AnnotationTable.Worksheet  )
+
                             ][
                                 for spannedBuildingBlock in protocol.SpannedBuildingBlocks do
                                     yield
@@ -138,16 +144,18 @@ module Xml =
                                         ]
                             ]
                 ]  |> serializeXml
-                 
+
             static member ofXml (xmlString:string) =
-                let protocolGroupTag = "ProtocolGroup"
                 let xml = xmlString |> SimpleXml.parseElement
 
-                let protocolGroup = xml |> SimpleXml.tryFindElementByName protocolGroupTag
-                if protocolGroup.IsNone then failwith (sprintf "Could not find existing <%s> tag." protocolGroupTag)
-
+                // failsafe
+                let protocolGroup = xml |> SimpleXml.tryFindElementByName ProtocolGroupXmlRoot
+                if protocolGroup.IsNone then failwith (sprintf "Could not find existing <%s> tag." ProtocolGroupXmlRoot)
+                // failsafe end
                 let protocols       = xml |> SimpleXml.findElementsByName "Protocol"
                 let swateVersion    = protocolGroup.Value.Attributes.["SwateVersion"]
+                let tableName       = protocolGroup.Value.Attributes.["TableName"]
+                let worksheetName   = protocolGroup.Value.Attributes.["WorksheetName"]
                 let nextProtocols   =
                     protocols
                     |> List.map (fun protocol ->
@@ -163,11 +171,14 @@ module Xml =
                                 let termAccession   = spannedBB.Attributes.["TermAccession"]
                                 SpannedBuildingBlock.create name termAccession
                             )
-                        Protocol.create id protocolVersion swateVersion tableName worksheetName nextSpannedBBs
+                        Protocol.create id protocolVersion swateVersion nextSpannedBBs tableName worksheetName
                     )
-                ProtocolGroup.create swateVersion nextProtocols
+                ProtocolGroup.create swateVersion tableName worksheetName nextProtocols
 
     module ValidationTypes =
+
+        [<Literal>]
+        let ValidationXmlRoot = "TableValidation"
 
         /// User can define what kind of input a column should have
         type ContentType =
@@ -231,101 +242,86 @@ module Xml =
             
         type TableValidation = {
             SwateVersion    : string
-            WorksheetName   : string
-            TableName       : string
+            AnnotationTable : Shared.AnnotationTable
             DateTime        : DateTime
             // "FirstUser; SecondUser"
             Userlist        : string list
             ColumnValidations: ColumnValidation list
         } with
+
             static member create swateVersion worksheetName tableName dateTime userlist colValidations = {
                 SwateVersion        = swateVersion
-                WorksheetName       = worksheetName
-                TableName           = tableName
+                AnnotationTable     = Shared.AnnotationTable.create tableName worksheetName
                 DateTime            = dateTime
                 Userlist            = userlist
                 ColumnValidations   = colValidations
             }
+
             static member init (?swateVersion, ?worksheetName,?tableName, (?dateTime:DateTime), ?userList) = {
                 SwateVersion        = if swateVersion.IsSome then swateVersion.Value else ""
-                WorksheetName       = if worksheetName.IsSome then worksheetName.Value else ""
-                TableName           = if tableName.IsSome then tableName.Value else ""
+                AnnotationTable     = Shared.AnnotationTable.create (if tableName.IsSome then tableName.Value else "") (if worksheetName.IsSome then worksheetName.Value else "")
                 DateTime            = if dateTime.IsSome then dateTime.Value else DateTime.Now
                 Userlist            = if userList.IsSome then userList.Value else []
                 ColumnValidations   = []
             }
 
-        /// This type is used to work on the CustomXml 'Validation' tag, which is used to store information on how to validate a specifc Swate table as correct.
-        type SwateValidation = {
-            /// Used to show the last used Swate version to edit SwateValidation CustomXml
-            SwateVersion        : string
-            TableValidations    : TableValidation list
-        } with
-            static member create swateVersion tableValidations = {
-                SwateVersion        = swateVersion
-                TableValidations    = tableValidations
-            }
-            static member init v = SwateValidation.create v []
-    
             member this.toXml =
-                node "Validation" [
-                    attr.value("SwateVersion", this.SwateVersion)
+                node "TableValidation" [
+                        attr.value( "SwateVersion", this.SwateVersion )
+                        attr.value( "WorksheetName", this.AnnotationTable.Worksheet)
+                        attr.value( "TableName", this.AnnotationTable.Name)
+                        attr.value( "DateTime", this.DateTime.ToString("yyyy-MM-dd HH:mm") )
+                        attr.value( "Userlist", this.Userlist |> String.concat "; " )
                 ][
-                    for table in this.TableValidations do
+                    for column in this.ColumnValidations do
                         yield
-                            node "TableValidation" [
-                                attr.value( "SwateVersion", table.SwateVersion )
-                                attr.value( "WorksheetName", table.WorksheetName )
-                                attr.value( "TableName", table.TableName )
-                                attr.value( "DateTime", table.DateTime.ToString("yyyy-MM-dd HH:mm") )
-                                attr.value( "Userlist", table.Userlist |> String.concat "; " )
-                            ][
-                                for column in table.ColumnValidations do
-                                    yield
-                                        leaf "ColumnValidation" [
-                                            attr.value("ColumnHeader"       , column.ColumnHeader)
-                                            attr.value("ColumnAdress"       , if column.ColumnAdress.IsSome then string column.ColumnAdress.Value else "None")
-                                            attr.value("Importance"         , if column.Importance.IsSome then string column.Importance.Value else "None")
-                                            attr.value("ValidationFormat"   , if column.ValidationFormat.IsSome then string column.ValidationFormat.Value else "None")
-                                            attr.value("Unit"               , if column.Unit.IsSome then column.Unit.Value else "None")
-                                        ]
+                            leaf "ColumnValidation" [
+                                attr.value("ColumnHeader"       , column.ColumnHeader)
+                                attr.value("ColumnAdress"       , if column.ColumnAdress.IsSome then string column.ColumnAdress.Value else "None")
+                                attr.value("Importance"         , if column.Importance.IsSome then string column.Importance.Value else "None")
+                                attr.value("ValidationFormat"   , if column.ValidationFormat.IsSome then string column.ValidationFormat.Value else "None")
+                                attr.value("Unit"               , if column.Unit.IsSome then column.Unit.Value else "None")
                             ]
                 ] |> serializeXml
-    
+
             static member ofXml (xmlString:string) =
-                let swateValidationTag = "Validation"
                 let xml = xmlString |> SimpleXml.parseElement
-                let swateValidation =
-                    xml |> SimpleXml.tryFindElementByName swateValidationTag
-                if swateValidation.IsNone then failwith (sprintf "Could not find existing <%s> tag." swateValidationTag)
-                let tableValidations =
-                    xml |> SimpleXml.findElementsByName "TableValidation"
-                let swateVersion = swateValidation.Value.Attributes.["SwateVersion"]
-                let nextTableValidations =
-                    tableValidations
-                    |> List.map (fun table ->
-                        let swateVersion    = table.Attributes.["SwateVersion"]
-                        let worksheetName   = table.Attributes.["WorksheetName"]
-                        let tableName       = table.Attributes.["TableName"]
-                        let dateTime        =
-                            //let day, month, year =
-                            //    let s = table.Attributes.["DateTime"].Split([|"/"|], StringSplitOptions.None)
-                            //    int s.[0], int s.[1], int s.[2]
-                            System.DateTime.Parse(table.Attributes.["DateTime"])
-                        let userlist        = table.Attributes.["Userlist"].Split([|"; "|], StringSplitOptions.RemoveEmptyEntries) |> List.ofSeq
-                        let nextColumnValidations =
-                            table.Children
-                            |> List.map (fun column ->
-                                let columnHeader        = column.Attributes.["ColumnHeader"]
-                                let columnAdress        = column.Attributes.["ColumnAdress"] |> fun x -> if x = "None" then None else Some (int x)
-                                let importance          = column.Attributes.["Importance"] |> fun x -> if x = "None" then None else Some (int x)
-                                let validationFormat    = column.Attributes.["ValidationFormat"] |> fun x -> if x = "None" then None else ContentType.ofString x |> Some
-                                let unit                = column.Attributes.["Unit"] |> fun x -> if x = "None" then None else Some x
-                                ColumnValidation.create columnHeader columnAdress importance validationFormat unit
-                            )
-                        TableValidation.create swateVersion worksheetName tableName dateTime userlist nextColumnValidations
-                    )
-                SwateValidation.create swateVersion nextTableValidations
+                // failsafe
+                let tableValidationOpt = xml |> SimpleXml.tryFindElementByName ValidationXmlRoot
+                if tableValidationOpt.IsNone then failwith (sprintf "Could not find existing <%s> tag." ValidationXmlRoot)
+                // failsafe end
+                let tableValidation = xml |> SimpleXml.findElementByName ValidationXmlRoot
+                let nextTableValidation =
+                    let swateVersion    = tableValidation.Attributes.["SwateVersion"]
+                    let worksheetName   = tableValidation.Attributes.["WorksheetName"]
+                    let tableName       = tableValidation.Attributes.["TableName"]
+                    let dateTime        =
+                        System.DateTime.Parse(tableValidation.Attributes.["DateTime"])
+                    let userlist        = tableValidation.Attributes.["Userlist"].Split([|"; "|], StringSplitOptions.RemoveEmptyEntries) |> List.ofSeq
+                    let nextColumnValidations =
+                        tableValidation.Children
+                        |> List.map (fun column ->
+                            let columnHeader        = column.Attributes.["ColumnHeader"]
+                            let columnAdress        = column.Attributes.["ColumnAdress"] |> fun x -> if x = "None" then None else Some (int x)
+                            let importance          = column.Attributes.["Importance"] |> fun x -> if x = "None" then None else Some (int x)
+                            let validationFormat    = column.Attributes.["ValidationFormat"] |> fun x -> if x = "None" then None else ContentType.ofString x |> Some
+                            let unit                = column.Attributes.["Unit"] |> fun x -> if x = "None" then None else Some x
+                            ColumnValidation.create columnHeader columnAdress importance validationFormat unit
+                        )
+                    TableValidation.create swateVersion worksheetName tableName dateTime userlist nextColumnValidations
+                nextTableValidation
+
+    type XmlTypes =
+    | ProtocolType      of GroupTypes.Protocol
+    | GroupType         of GroupTypes.ProtocolGroup
+    | ValidationType    of ValidationTypes.TableValidation
+        with
+            member this.toStringRdb =
+                match this with
+                | ProtocolType v    -> sprintf "Protocol %A (%s, %s)" v.Id v.AnnotationTable.Name v.AnnotationTable.Worksheet
+                | GroupType v       -> sprintf "Protocol group (%s, %s)" v.AnnotationTable.Name v.AnnotationTable.Worksheet
+                | ValidationType v  -> sprintf "Table checklist (%s, %s)" v.AnnotationTable.Name v.AnnotationTable.Worksheet
+
 
 
 type TryFindAnnoTableResult =
@@ -408,6 +404,26 @@ module BuildingBlockTypes =
                 Unit                = if this.Unit.IsSome then this.Unit.Value.MainColumn.Header.Value.Ontology.Value.Name |> Some else None
             }
 
+        member this.hasCompleteTSRTAN =
+            match this.TAN, this.TSR with
+            | Some tan, Some tsr ->
+                true
+            | None, None ->
+                false
+            | _, _ ->
+                failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN." this.MainColumn.Header.Value.Header)
+
+        member this.hasCompleteUnitBlock =
+            if this.Unit.IsSome then
+                let u = this.Unit.Value
+                match u.TSR, u.TAN with
+                | Some _, Some _ -> true
+                | None, None -> false
+                | _, _ ->
+                    failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN in Unit block." this.MainColumn.Header.Value.Header)
+            else
+                false
+
     open ISADotNetHelpers
 
     type MinimalBuildingBlock = {
@@ -444,4 +460,7 @@ module BuildingBlockTypes =
                 let values              = if hasOntologyValue.IsSome then hasOntologyValue else OntologyInfo.create (ISADotNetHelpers.valueToString paramValuePair.Value.Value) "" |> Some
                 MinimalBuildingBlock.create mainColName (Some colTermAccession) unitName unitTermAccession values
             )
+
+
+            
 

@@ -157,37 +157,82 @@ let checkradioList (ind:int) colVal model dispatch =
 
 
 let sliderElements id columnValidation model dispatch =
-    let defaultSliderVal = string (if columnValidation.Importance.IsSome then columnValidation.Importance.Value else 0)
-    let sliderId = sprintf "importanceSlider%i" id
-    let outputSliderId = sprintf "outputForImportanceSlider%i" id
-    [
-        Slider.slider [
-            Slider.Props [Id sliderId; Style [Height "40px"]]
-            Slider.IsFullWidth
-            Slider.IsCircle
-            Slider.Max 100.
-            Slider.Min 0.
-            Slider.Step 1.
-            Slider.CustomClass "has-output"
-            Slider.OnChange (fun e ->
-                // this is used to quickly update the label element to the right of the slider with t he new value
-                let sliderEle = Browser.Dom.document.getElementById(outputSliderId)
-                let _ = sliderEle.textContent <- (if e.Value = "0" then "None" else e.Value)
-                /// Previously this appeared rather laggy, but now it seems to work fine.
+    //let defaultSliderVal = string (if columnValidation.Importance.IsSome then columnValidation.Importance.Value else 0)
+    //let sliderId = sprintf "importanceSlider%i" id
+    //let outputSliderId = sprintf "outputForImportanceSlider%i" id
+    //[
+    //    Slider.slider [
+    //        Slider.Props [Id sliderId; Style [Height "40px"]]
+    //        Slider.IsFullWidth
+    //        Slider.IsCircle
+    //        Slider.Max 10.
+    //        Slider.Min 0.
+    //        Slider.Step 1.
+    //        Slider.CustomClass "has-output"
+    //        Slider.OnChange (fun e ->
+    //            // this is used to quickly update the label element to the right of the slider with the new value
+    //            let sliderEle = Browser.Dom.document.getElementById(outputSliderId)
+    //            let _ = sliderEle.textContent <- (if e.Value = "0" then "None" else e.Value)
+    //            /// Previously this appeared rather laggy, but now it seems to work fine.
+    //            let nextColumnValidation = {
+    //                columnValidation with
+    //                    Importance = if e.Value = "0" then None else int e.Value |> Some
+    //            }
+    //            let nextTableValidation =
+    //                updateTableValidationByColValidation model nextColumnValidation
+    //            UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+    //            //()
+    //        )
+    //        Slider.Color IsPrimary
+    //        Slider.ValueOrDefault defaultSliderVal
+    //    ]
+    //    output [Props.HtmlFor sliderId; Id outputSliderId; Style [TextOverflow "unset"]] [
+    //        str (if defaultSliderVal = "0" then "None" else defaultSliderVal)
+    //    ]
+    //]
+    div [][
+        for i in 1 .. 5 do
+            yield
+                Button.a [
+                    Button.Color IsWarning
+                    Button.Props [Style [Padding "0rem"]]
+                    Button.IsLight
+                    Button.OnClick (fun e ->
+                        let nextColumnValidation = {
+                            columnValidation with
+                                Importance = i |> Some
+                        }
+                        let nextTableValidation =
+                            updateTableValidationByColValidation model nextColumnValidation
+                        UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                        )
+                ][
+                    Fa.span [
+                        Fa.Size Fa.FaLarge
+                        if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
+                            Fa.Solid.Star
+                        else
+                            Fa.Regular.Star
+                        Fa.Props [Style [Color NFDIColors.Yellow.Base]]
+                    ][]
+                ]
+        yield Button.a [
+            Button.Color IsDanger
+            Button.IsLight
+            Button.OnClick (fun e ->
                 let nextColumnValidation = {
                     columnValidation with
-                        Importance = if e.Value = "0" then None else int e.Value |> Some
+                        Importance = None
                 }
                 let nextTableValidation =
                     updateTableValidationByColValidation model nextColumnValidation
                 UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
-                //()
-            )
-            Slider.Color IsPrimary
-            Slider.ValueOrDefault defaultSliderVal
-        ]
-        output [Props.HtmlFor sliderId; Id outputSliderId; Style [TextOverflow "unset"]] [
-            str (if defaultSliderVal = "0" then "None" else defaultSliderVal)
+                )
+        ][
+            Fa.span [
+                Fa.Size Fa.FaLarge
+                Fa.Solid.Backspace
+            ][]
         ]
     ]
 
@@ -255,7 +300,7 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
 
                         Help.help [][str "Define how important it is to fill in the column correctly."]
 
-                        yield! sliderElements ind columnValidation model dispatch
+                        sliderElements ind columnValidation model dispatch
 
                         //submitButton ind columnValidation model dispatch
                     ]
@@ -285,9 +330,9 @@ let validationElements (model:Model) dispatch =
                     header?style?transition <- "unset"
                 )
             ][
-                b [][ str model.ValidationState.TableValidationScheme.WorksheetName ]
+                b [][ str model.ValidationState.TableValidationScheme.AnnotationTable.Worksheet]
                 str " - "
-                str model.ValidationState.TableValidationScheme.TableName
+                str model.ValidationState.TableValidationScheme.AnnotationTable.Name
                 str " - "
                 str ( model.ValidationState.TableValidationScheme.DateTime.ToString("yyyy-MM-dd HH:mm") )
                 str " - "
@@ -322,10 +367,10 @@ let validationElements (model:Model) dispatch =
             /// Show warning if no validation format was found
             if model.ValidationState.TableValidationScheme.SwateVersion = "" then
                 Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color NFDIColors.Red.Lighter10]]][
-                    str """No validation format for this table found! Hit "Add validation to workbook" to add a validation format for the active annotation table."""
+                    str """No checklist for this table found! Hit "Add checklist to workbook" to add a checklist for the active annotation table."""
                 ]
 
-            // Submit new validation scheme. This will write custom xml into the workbook.
+            // Submit new checklist scheme. This will write custom xml into the workbook.
             Button.a [
                 Button.Color Color.IsSuccess
                 Button.IsFullWidth
@@ -335,10 +380,10 @@ let validationElements (model:Model) dispatch =
                     header?style?opacity <- 0
                     WriteTableValidationToXml (model.ValidationState.TableValidationScheme, model.PersistentStorageState.AppVersion) |> ExcelInterop |> dispatch
                 )
-                Button.Props [Tooltip.dataTooltip "Write validation info to excel worksheet."]
+                Button.Props [Tooltip.dataTooltip "Write checklist info to excel worksheet."]
                 Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
             ] [
-                str "Add validation to workbook"
+                str "Add checklist to workbook"
             ]
         ]
     ]
@@ -349,7 +394,7 @@ let validationComponent model dispatch =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Table Validation"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Checklist Editor"]
 
         Help.help [][
             str "Display a table representation and add information to later validate values in the table according to their respective column."
@@ -358,18 +403,18 @@ let validationComponent model dispatch =
         Button.a [
             Button.Color Color.IsInfo
             Button.IsFullWidth
-            Button.OnClick (fun e -> PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop |> dispatch )
+            Button.OnClick (fun e -> GetTableValidationXml |> ExcelInterop |> dispatch )
             Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-            Button.Props [Style [Margin "1rem 0"]; Tooltip.dataTooltip "Get validation info for currently shown annotation table."]
+            Button.Props [Style [Margin "1rem 0"]; Tooltip.dataTooltip "Get checklist info for currently shown annotation table."]
         ] [
             str "Update table representation"
         ]
 
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
-            str """Adjust current Swate table validation. """
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
+            str """Adjust current Swate table checklist. """
             span [
                 Class (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-                Tooltip.dataTooltip """When hitting "Add validation to workbook" this information will be saved as part of the workbook."""
+                Tooltip.dataTooltip """When hitting "Add checklist to workbook" this information will be saved as part of the workbook."""
                 Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"]
             ][
                 Fa.i [ Fa.Solid.InfoCircle ][]

@@ -12,35 +12,37 @@ open Model
 //open ISADotNet
 
 type ExcelInteropMsg =
-    | PipeActiveAnnotationTable     of (TryFindAnnoTableResult -> ExcelInteropMsg)
-    /// This is used to pipe (all table names []) to a ExcelInteropMsg.
-    /// This is used to generate a new annotation table name.
-    | PipeCreateAnnotationTableInfo of (string [] -> ExcelInteropMsg)
-    | Initialized                   of (string*string)
-    | FillSelection                 of activeAnnotationTable:TryFindAnnoTableResult * string * (DbDomain.Term option)
-    | AddAnnotationBlock            of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
-    | AddAnnotationBlocks           of activeAnnotationTable:TryFindAnnoTableResult * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol
-    | AddUnitToAnnotationBlock      of tryFindActiveAnnotationTable:TryFindAnnoTableResult * unitTermName:string option * unitTermAccession:string option
-    | FormatColumn                  of activeAnnotationTable:TryFindAnnoTableResult * colname:string * formatString:string * prevmsg:string
+    | Initialized                           of (string*string)
+    | FillSelection                         of string * (DbDomain.Term option)
+    | AddAnnotationBlock                    of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
+    | AddAnnotationBlocks                   of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | RemoveAnnotationBlock
+    | AddUnitToAnnotationBlock              of unitTermName:string option * unitTermAccession:string option
+    | FormatColumn                          of colname:string * formatString:string
+    | FormatColumns                         of (string * string) list
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
-    | CreateAnnotationTable         of allTableNames:string [] * isDark:bool
-    | AnnotationtableCreated        of activeAnnotationTable:TryFindAnnoTableResult * string
-    | AnnotationTableExists         of activeAnnotationTable:TryFindAnnoTableResult
-    | GetParentTerm                 of activeAnnotationTable:TryFindAnnoTableResult
-    | AutoFitTable                  of activeAnnotationTable:TryFindAnnoTableResult
-    | UpdateProtocolGroupHeader     of activeAnnotationTable:TryFindAnnoTableResult
+    | CreateAnnotationTable                 of isDark:bool
+    | AnnotationtableCreated                of string
+    | AnnotationTableExists                 of TryFindAnnoTableResult
+    | GetParentTerm
+    | AutoFitTable
+    | UpdateProtocolGroupHeader
     //
-    | GetTableValidationXml         of activeAnnotationTable:TryFindAnnoTableResult
-    | WriteTableValidationToXml     of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
-    | WriteProtocolToXml            of newProtocol:Xml.GroupTypes.Protocol
+    | GetTableValidationXml
+    | WriteTableValidationToXml             of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
+    /// needs to set newColNames separately as these validations come from templates for protocol group insert
+    | AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:OfficeInterop.Types.Xml.GroupTypes.Protocol
+    | WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
     | DeleteAllCustomXml
     | GetSwateCustomXml
     //
-    | FillHiddenColsRequest         of activeAnnotationTable:TryFindAnnoTableResult
-    | FillHiddenColumns             of tableName:string*SearchTermI []
-    | UpdateFillHiddenColsState     of FillHiddenColsState
+    | FillHiddenColsRequest
+    | FillHiddenColumns                     of tableName:string*SearchTermI []
+    | UpdateFillHiddenColsState             of FillHiddenColsState
     //
-    | InsertFileNames               of activeAnnotationTable:TryFindAnnoTableResult*fileNameList:string list
+    | InsertFileNames                       of fileNameList:string list
+    // Show Details to selected BuildingBlock
+    | GetSelectedBuildingBlockSearchTerms
     // Development
     | TryExcel
     | TryExcel2
@@ -48,10 +50,13 @@ type ExcelInteropMsg =
 
 type TermSearchMsg =
     | ToggleSearchByParentOntology
-    | SearchTermTextChange      of string
-    | TermSuggestionUsed        of DbDomain.Term
-    | NewSuggestions            of DbDomain.Term []
-    | StoreParentOntologyFromOfficeInterop of obj option
+    | SearchTermTextChange                  of string
+    | TermSuggestionUsed                    of DbDomain.Term
+    | NewSuggestions                        of DbDomain.Term []
+    | StoreParentOntologyFromOfficeInterop  of obj option
+    // Server
+    | GetAllTermsByParentTermRequest        of OntologyInfo 
+    | GetAllTermsByParentTermResponse       of DbDomain.Term []
 
 type AdvancedSearchMsg =
     // Client
@@ -69,7 +74,7 @@ type AdvancedSearchMsg =
     | NewAdvancedSearchResults          of DbDomain.Term []
 
 type DevMsg =
-    | LogTableMetadata      of activeAnnotationTable:TryFindAnnoTableResult
+    | LogTableMetadata
     | GenericLog            of (string*string)
     | GenericError          of exn
     | UpdateLastFullError   of exn option
@@ -106,6 +111,7 @@ type ApiMsg =
 
 type StyleChangeMsg =
     | ToggleBurger
+    | ToggleQuickAcessIconsShown
     | ToggleColorMode
 
 type PersistentStorageMsg =
@@ -139,10 +145,60 @@ type ValidationMsg =
     | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
 
 type ProtocolInsertMsg =
+    // ------ Process from file ------
+    | ParseJsonToProcessRequest         of string
+    | ParseJsonToProcessResult          of Result<ISADotNet.Process,exn>
     // Client
-    | UpdateUploadData of string
-    | ParseJsonToProcessRequest of string
-    | ParseJsonToProcessResult of Result<ISADotNet.Process,exn>
+    | RemoveProcessFromModel
+    // ------ Protocol from Database ------
+    | GetAllProtocolsRequest
+    | GetAllProtocolsResponse           of ProtocolTemplate []
+    // Access xml from db and parse it
+    /// Get Protocol Xml from db
+    | GetProtocolXmlByProtocolRequest   of ProtocolTemplate
+    /// On return parse Protocol Xml
+    | ParseProtocolXmlByProtocolRequest of ProtocolTemplate
+    /// Store Result from ParseProtocolXmlByProtocolRequest in model
+    | GetProtocolXmlByProtocolResponse  of ProtocolTemplate * OfficeInterop.Types.Xml.ValidationTypes.TableValidation * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
+    | ProtocolIncreaseTimesUsed         of protocolName:string
+    // Client
+    | UpdateUploadData                  of string
+    | UpdateDisplayedProtDetailsId      of int option
+    | UpdateProtocolNameSearchQuery     of string
+    | UpdateProtocolTagSearchQuery      of string
+    | AddProtocolTag                    of string
+    | RemoveProtocolTag                 of string
+    | RemoveSelectedProtocol
+    | UpdateLoading                     of bool
+
+type BuildingBlockDetailsMsg =
+    | GetSelectedBuildingBlockSearchTermsRequest    of Shared.SearchTermI []
+    | GetSelectedBuildingBlockSearchTermsResponse   of Shared.SearchTermI []
+    | ToggleShowDetails
+    | UpdateCurrentRequestState                     of RequestBuildingBlockInfoStates
+
+type SettingXmlMsg =
+    // // Client // //
+    // Validation Xml
+    | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | UpdateNextAnnotationTableForActiveValidation  of AnnotationTable option
+    | UpdateValidationXmls                          of OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+    // Protocol Group Xml
+    | UpdateProtocolGroupXmls                       of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
+    | UpdateActiveProtocolGroup                     of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    | UpdateNextAnnotationTableForActiveProtGroup   of AnnotationTable option
+    // Protocol Xml
+    | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
+    | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
+    //
+    | UpdateRawCustomXml of string
+    // Excel Interop
+    | GetAllValidationXmlParsedRequest
+    | GetAllValidationXmlParsedResponse of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
+    | GetAllProtocolGroupXmlParsedRequest
+    | GetAllProtocolGroupXmlParsedResponse of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
+    | ReassignCustomXmlRequest      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
+    | RemoveCustomXmlRequest        of xml: OfficeInterop.Types.Xml.XmlTypes
 
 type TopLevelMsg =
     | CloseSuggestions
@@ -161,44 +217,9 @@ type Msg =
     | AddBuildingBlock      of AddBuildingBlockMsg
     | Validation            of ValidationMsg
     | ProtocolInsert        of ProtocolInsertMsg
+    | BuildingBlockDetails  of BuildingBlockDetailsMsg
+    | SettingXmlMsg         of SettingXmlMsg
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>
     | DoNothing
-
-/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1) other params.
-let pipeNameTuple msg param =
-    PipeActiveAnnotationTable
-        (fun annotationTableOpt ->
-            msg (annotationTableOpt,param)
-        )
-
-/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2) other params.
-/// Use this as: (x1,x2) |> pipeNameTuple2 msg
-let pipeNameTuple2 msg param =
-    PipeActiveAnnotationTable
-        (fun annotationTableOpt ->
-            let constructParam =
-                param |> fun (x,y) -> annotationTableOpt,x,y    
-            msg (constructParam)
-        )
-
-/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2,x3) other params.
-/// Use this as: (x1,x2,x3) |> pipeNameTuple3 msg
-let pipeNameTuple3 msg param =
-    PipeActiveAnnotationTable
-        (fun annotationTableOpt ->
-            let constructParam =
-                param |> fun (x,y,z) -> annotationTableOpt,x,y,z    
-            msg (constructParam)
-        )
-
-/// This function is used to easily pipe a message into `PipeActiveAnnotationTable`. This is designed for a message with (x1,x2,x3,x4) other params.
-/// Use this as: (x1,x2,x3) |> pipeNameTuple4 msg
-let pipeNameTuple4 msg param =
-    PipeActiveAnnotationTable
-        (fun annotationTableOpt ->
-            let constructParam =
-                param |> fun (x,y,z,u) -> annotationTableOpt,x,y,z,u 
-            msg (constructParam)
-        )

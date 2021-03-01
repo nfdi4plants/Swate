@@ -185,6 +185,9 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             Cursor "pointer";
             Padding "1rem 1.5rem";
             Position PositionOptions.Relative
+            TextOverflow "Ellipsis"
+            OverflowX OverflowOptions.Hidden
+            WhiteSpace WhiteSpaceOptions.Nowrap
         ]
         Draggable true
         OnDragStart (fun eve ->
@@ -224,12 +227,18 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
         OnDragEnter (fun eve ->
             eve.stopPropagation()
             eve.preventDefault()
-            eve.target?style?backgroundColor <- "lightgrey"
-            eve.target?style?borderBottom <- "0.5px solid darkgrey")
+            //eve.target?style?backgroundColor <- "lightgrey"
+            //eve.target?style?borderBottom <- "5px solid darkgrey"
+            parent()?style?backgroundColor <- "lightgrey"
+            parent()?style?borderBottom <- "5px solid darkgrey"
+        )
         OnDragLeave (fun eve ->
             eve.preventDefault()
-            eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
-            eve.target?style?borderBottom <- "0px solid darkgrey")
+            //eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
+            //eve.target?style?borderBottom <- "0px solid darkgrey"
+            parent()?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
+            parent()?style?borderBottom <- "0px solid darkgrey"
+        )
         OnDragEnd (fun eve ->
             // restore wrapper 
             parent()?style?height <- fileTileHeight
@@ -252,8 +261,10 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             eve.preventDefault()
             dropped <- true
             UpdateDNDDropped true |> FilePicker |> dispatch
-            eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
-            eve.target?style?borderBottom <- "0px solid darkgrey"
+            //eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
+            //eve.target?style?borderBottom <- "0px solid darkgrey"
+            parent()?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
+            parent()?style?borderBottom <- "0px solid darkgrey"
 
             let prevId      = eve.dataTransfer.getData("text")
             let prevEle     = Browser.Dom.document.getElementById(createEleId prevId)
@@ -333,7 +344,7 @@ let fileElement (model:Model) dispatch (id:string) =
         Id wrapperId
         Style [
             Height fileTileHeight
-            Transition "0.5s ease"
+            Transition "0.5s height ease"
             Order 0
         ]
         OnDragOver(fun e -> e.preventDefault())
@@ -472,7 +483,7 @@ let fileNameElements (model:Model) dispatch =
                 else
                     Button.Color Color.IsSuccess
                 Button.OnClick (fun e ->
-                    (fun tableName -> InsertFileNames (tableName, model.FilePickerState.FileNames |> List.map snd)) |> PipeActiveAnnotationTable |> ExcelInterop |> dispatch 
+                    InsertFileNames (model.FilePickerState.FileNames |> List.map snd) |> ExcelInterop |> dispatch 
                 )
 
             ][
@@ -563,7 +574,7 @@ let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
 
         uploadButton model dispatch inputId
 
-        Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
             str "Select files from your computer and insert their names into Excel."
         ]
 

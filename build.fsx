@@ -444,7 +444,7 @@ Target.create "Release" (fun config ->
 
     Trace.trace "Update RELEASE_NOTES.md"
 
-    let writeNewReleaseNotes =
+    let writeNewReleaseNotes() =
 
         let commitNoteArr = cutCommitsAtPreviousReleaseCommit |> Array.ofList |> Array.map (fun x -> x.Split([|";"|],StringSplitOptions.None))
         // REMOVE this line as soon as parsing of semver metadata is fixed.
@@ -521,6 +521,8 @@ Target.create "Release" (fun config ->
             false
             "RELEASE_NOTES.md"
             newNotes
+
+    writeNewReleaseNotes()
 
     Trace.trace "Update RELEASE_NOTES.md done!"
 
