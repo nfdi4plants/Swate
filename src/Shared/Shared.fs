@@ -237,6 +237,7 @@ type IAnnotatorAPIv1 = {
     // Protocol apis
     getAllProtocols                 : unit                                                  -> Async<ProtocolTemplate []>
     getProtocolBlocksForProtocol    : ProtocolTemplate                                      -> Async<ProtocolTemplate>
+    increaseTimesUsed               : string                                                -> Async<unit>
 }
 
         

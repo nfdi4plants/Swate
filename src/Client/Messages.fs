@@ -146,29 +146,30 @@ type ValidationMsg =
 
 type ProtocolInsertMsg =
     // ------ Process from file ------
-    | ParseJsonToProcessRequest of string
-    | ParseJsonToProcessResult of Result<ISADotNet.Process,exn>
+    | ParseJsonToProcessRequest         of string
+    | ParseJsonToProcessResult          of Result<ISADotNet.Process,exn>
     // Client
     | RemoveProcessFromModel
     // ------ Protocol from Database ------
     | GetAllProtocolsRequest
-    | GetAllProtocolsResponse of ProtocolTemplate []
+    | GetAllProtocolsResponse           of ProtocolTemplate []
     // Access xml from db and parse it
     /// Get Protocol Xml from db
-    | GetProtocolXmlByProtocolRequest of ProtocolTemplate
+    | GetProtocolXmlByProtocolRequest   of ProtocolTemplate
     /// On return parse Protocol Xml
     | ParseProtocolXmlByProtocolRequest of ProtocolTemplate
     /// Store Result from ParseProtocolXmlByProtocolRequest in model
-    | GetProtocolXmlByProtocolResponse of ProtocolTemplate * OfficeInterop.Types.Xml.ValidationTypes.TableValidation * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
+    | GetProtocolXmlByProtocolResponse  of ProtocolTemplate * OfficeInterop.Types.Xml.ValidationTypes.TableValidation * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
+    | ProtocolIncreaseTimesUsed         of protocolName:string
     // Client
-    | UpdateUploadData of string
-    | UpdateDisplayedProtDetailsId of int option
-    | UpdateProtocolNameSearchQuery of string
-    | UpdateProtocolTagSearchQuery of string
-    | AddProtocolTag of string
-    | RemoveProtocolTag of string
+    | UpdateUploadData                  of string
+    | UpdateDisplayedProtDetailsId      of int option
+    | UpdateProtocolNameSearchQuery     of string
+    | UpdateProtocolTagSearchQuery      of string
+    | AddProtocolTag                    of string
+    | RemoveProtocolTag                 of string
     | RemoveSelectedProtocol
-    | UpdateLoading of bool
+    | UpdateLoading                     of bool
 
 type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockSearchTermsRequest    of Shared.SearchTermI []

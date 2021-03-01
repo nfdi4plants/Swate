@@ -1398,6 +1398,14 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
                 DisplayedProtDetailsId = None
         }
         nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.ProtocolInsert)
+    | ProtocolIncreaseTimesUsed protocolTemplateName ->
+        let cmd =
+            Cmd.OfAsync.attempt
+                Api.api.increaseTimesUsed
+                protocolTemplateName
+                (GenericError >> Dev)
+        currentState, cmd
+                
     // Client
     | UpdateLoading nextLoadingState ->
         let nextState = {

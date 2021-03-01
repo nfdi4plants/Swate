@@ -309,7 +309,8 @@ let addFromDBToTableButton (model:Model) dispatch =
                                 model.ProtocolInsertState.BuildingBlockMinInfoList |> List.rev
                             /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
                             let validation =
-                                model.ProtocolInsertState.ValidationXml.Value |> Some 
+                                model.ProtocolInsertState.ValidationXml.Value |> Some
+                            ProtocolIncreaseTimesUsed preProtocol.Id |> ProtocolInsert |> dispatch
                             AddAnnotationBlocks (minBuildingBlockInfos,preProtocol, validation) |> ExcelInterop |> dispatch
                         )
                     ] [

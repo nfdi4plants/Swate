@@ -180,6 +180,11 @@ let annotatorApi cString = {
     }
 
     getProtocolBlocksForProtocol = fun prot -> async { return ProtocolDB.getXmlByProtocol cString prot }
+
+    increaseTimesUsed = fun templateName -> async {
+        ProtocolDB.increaseTimesUsed cString templateName
+        return ()
+    }
 }
 
 let createIServiceAPIv1 =

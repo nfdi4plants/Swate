@@ -121,75 +121,25 @@ let getXmlByProtocol cString (protocol:ProtocolTemplate) =
         TableXml = if tableXml.IsSome then tableXml.Value |> snd else ""
     }
 
-//let selectProtocolBlocksByProtocol cString (protocol:Protocol) =
-//    use connection = establishConnection cString
-//    connection.Open()
+let increaseTimesUsed cString (templateName) =
+    use connection = establishConnection cString
+    connection.Open()
 
-//    use cmd = connection.CreateCommand()
-//    cmd
-//        .CommandText <- """
-//            SELECT * FROM ProtocolBlock
-//            WHERE FK_Name = @name
-//            AND FK_Version = @version
-//        """
+    use cmd = connection.CreateCommand()
+    cmd
+        .CommandText <- """
+            UPDATE Protocol
+            SET Used = Used + 1
+            WHERE Name = @name
+        """
 
-//    let nameParam = cmd.Parameters.Add("name",MySqlDbType.VarChar)
-//    let versionParam = cmd.Parameters.Add("version",MySqlDbType.VarChar)
-    
-//    nameParam.Value     <- protocol.Name
-//    versionParam.Value  <- protocol.Version
-    
-//    use reader = cmd.ExecuteReader()
-//    let protBlocks = [|
-//        while reader.Read() do
-//            let header = reader.GetString(3)
-//            let unitOpt = if reader.IsDBNull(4) then None else Some <| reader.GetString(4)
-//            let valueOpt =
-//                if reader.IsDBNull(5) then
-//                    if reader.IsDBNull(6) then
-//                        None
-//                    else
-//                        Some <| reader.GetString(6)
-//                else
-//                    Some <| reader.GetString(5)
-//            yield
-//                {|
-//                    Id      = (reader.GetInt32(0))
-//                    Header  = header
-//                    Unit    = unitOpt
-//                    Value   = valueOpt
+    let nameParam = cmd.Parameters.Add("name",MySqlDbType.VarChar)
 
-//                    AccesionValues = [|
-//                        Some header
-//                        unitOpt
-//                        valueOpt
-//                    |]
-//                |}
-//    |]
+    nameParam.Value <- templateName
 
-//    reader.Dispose()
+    let nOfRowsAffected = cmd.ExecuteNonQuery()
 
-//    let terms =
-//        protBlocks
-//        |> Array.collect (fun x -> Array.choose id x.AccesionValues)
-//        |> Array.collect (fun x -> getTermByAccession cString x)
+    if nOfRowsAffected <> 1 then
+        failwith (sprintf "Executed command returned error: ER-ITU:%i" nOfRowsAffected)
 
-//    let protocolBlocks =
-//        protBlocks
-//        |> Array.map (fun preBlock ->
-//            let header = terms |> Array.find (fun x -> x.Accession = preBlock.Header)
-//            let unit = if preBlock.Unit.IsSome then terms |> Array.tryFind (fun x -> x.Accession = preBlock.Unit.Value) else None
-//            let valueTerm =
-//                if preBlock.Value.IsSome then
-//                    terms |> Array.tryFind (fun x -> x.Accession = preBlock.Value.Value)
-//                else
-//                    None
-//            ProtocolBlock.create
-//                preBlock.Id
-//                header
-//                unit
-//                (if valueTerm.IsNone then preBlock.Value else None)
-//                valueTerm
-//        )
-//    { protocol with ProtocolBlocks = protocolBlocks }
 
