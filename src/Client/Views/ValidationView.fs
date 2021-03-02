@@ -147,7 +147,6 @@ let checkradioList (ind:int) colVal model dispatch =
         
         checkradioElement ind   (Some ContentType.Number)   colVal model dispatch
         checkradioElement ind   (Some ContentType.Int)      colVal model dispatch
-        checkradioElement ind   (Some ContentType.Decimal)  colVal model dispatch
         checkradioElement ind   (Some ContentType.Text)     colVal model dispatch
         checkradioElement ind   (Some ContentType.Url)      colVal model dispatch
 

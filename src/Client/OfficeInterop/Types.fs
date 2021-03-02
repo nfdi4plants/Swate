@@ -189,7 +189,6 @@ module Xml =
             | Boolean
             | Number
             | Int
-            | Decimal
     
             member this.toReadableString =
                 match this with
@@ -213,7 +212,6 @@ module Xml =
                 | "Boolean"     -> Boolean
                 | "Number"      -> Number
                 | "Int"         -> Int
-                | "Decimal"     -> Decimal
                 | _ -> 
                     failwith ( sprintf "Tried parsing '%s' to ContenType. No match found." str ) 
 
