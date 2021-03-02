@@ -55,7 +55,7 @@ type Route =
         | Route.Home                -> ""
         | Route.AddBuildingBlock    -> "Manage Building Blocks"
         | Route.TermSearch          -> "Manage Terms"
-        | Route.Validation          -> "Validation"
+        | Route.Validation          -> "Checklist Editor"
         | Route.FilePicker          -> "File Picker"
         | Route.ProtocolInsert      -> "Protocol Insert"
         | Route.ProtocolSearch      -> "Protocol Search"
