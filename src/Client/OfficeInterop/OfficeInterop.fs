@@ -1228,6 +1228,32 @@ let getSwateCustomXml() =
         }
     )
 
+let updateSwateCustomXml(newXmlString:String) =
+    Excel.run(fun context ->
+
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+        promise {
+
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Seq.map (fun x -> x.delete() )
+            
+                    xmls |> Array.ofSeq
+                )
+
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    customXmlParts.add(newXmlString)
+                )
+
+            return "Info", "Custom xml update successful" 
+        }
+    )
+
 let writeProtocolToXml(protocol:GroupTypes.Protocol) =
     updateProtocolFromXml protocol false
 

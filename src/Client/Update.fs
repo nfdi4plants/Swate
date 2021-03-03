@@ -328,6 +328,14 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 )
                 (GenericError >> Dev)
         currentState, cmd
+    | UpdateSwateCustomXml newCustomXml ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.updateSwateCustomXml
+                newCustomXml
+                (GenericLog >> Dev)
+                (GenericError >> Dev)
+        currentState, cmd
     //
     | FillHiddenColsRequest ->
         let cmd =
@@ -1582,7 +1590,14 @@ let handleSettingXmlMsg (msg:SettingXmlMsg) (currentState: SettingsXmlState) : S
     | UpdateRawCustomXml rawXmlStr ->
         let nextState = {
             currentState with
-                RawXml = rawXmlStr
+                RawXml      = rawXmlStr
+                NextRawXml  = ""
+        }
+        nextState, Cmd.none
+    | UpdateNextRawCustomXml nextRawCustomXml ->
+        let nextState = {
+            currentState with
+                NextRawXml = nextRawCustomXml
         }
         nextState, Cmd.none
     // OfficeInterop

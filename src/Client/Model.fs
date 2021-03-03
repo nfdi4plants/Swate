@@ -435,6 +435,7 @@ type SettingsXmlState = {
     NextAnnotationTableForActiveProtocol    : AnnotationTable option
     //
     RawXml                                  : string
+    NextRawXml                              : string
     FoundTables                             : Shared.AnnotationTable []
     ProtocolGroupXmls                       : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
     ValidationXmls                          : OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
@@ -450,6 +451,7 @@ type SettingsXmlState = {
         NextAnnotationTableForActiveProtocol    = None
         //
         RawXml                                  = ""
+        NextRawXml                              = ""
         FoundTables                             = [||]
         ProtocolGroupXmls                       = [||]
         ValidationXmls                          = [||]

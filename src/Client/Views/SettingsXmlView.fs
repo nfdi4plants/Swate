@@ -71,22 +71,26 @@ let showRawCustomXmlButton model dispatch =
     ]
 
 let textAreaEle (model:Model) dispatch = 
-    Media.media [][
-        Media.content [][
-            Field.div [][
-                Control.div [][
-                    Textarea.textarea [
-                        Textarea.Props [Style []]
-                        Textarea.IsReadOnly true
-                        Textarea.Value model.SettingsXmlState.RawXml
-                    ][ ]
-                ]
+    Columns.columns [Columns.IsMobile][
+        Column.column [][
+            Control.div [][
+                Textarea.textarea [
+                    Textarea.OnChange (fun e ->
+                        UpdateNextRawCustomXml e.Value |> SettingXmlMsg |> dispatch
+                    )
+                    Textarea.DefaultValue model.SettingsXmlState.RawXml
+                ][ ]
             ]
         ]
-        Media.right [][
+        Column.column [
+            Column.Width (Screen.All,Column.IsNarrow)
+        ][
             Field.div [][
                 Button.a [
-                    Button.Props [Title "Copy to Clipboard"]
+                    Button.Props [
+                        Style [Width "40.5px"]
+                        Title "Copy to Clipboard"
+                    ]
                     Button.Color IsInfo
                     Button.OnClick (fun e ->
                         let txt = model.SettingsXmlState.RawXml
@@ -108,6 +112,28 @@ let textAreaEle (model:Model) dispatch =
                     )
                 ][
                     Fa.i [Fa.Regular.Clipboard ] [] 
+                ]
+            ]
+            Field.div [][
+                Button.a [
+                    Button.IsStatic (model.SettingsXmlState.NextRawXml = "")
+                    Button.Props [
+                        Style [Width "40.5px"]
+                        Title "Apply Changes"
+                    ]
+                    Button.Color IsWarning
+                    Button.OnClick (fun e ->
+                        let rmvWhiteSpace =
+                            let xmlEle = model.SettingsXmlState.NextRawXml |> Fable.SimpleXml.SimpleXml.parseElementNonStrict
+                            xmlEle
+                            |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+                        printfn "%A" rmvWhiteSpace
+                        ExcelInteropMsg.UpdateSwateCustomXml rmvWhiteSpace |> ExcelInterop |> dispatch
+                    )
+                ][
+                    Fa.i [
+                        Fa.Solid.Pen
+                    ] [] 
                 ]
             ]
         ]

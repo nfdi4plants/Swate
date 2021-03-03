@@ -35,6 +35,7 @@ type ExcelInteropMsg =
     | WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
     | DeleteAllCustomXml
     | GetSwateCustomXml
+    | UpdateSwateCustomXml                  of string
     //
     | FillHiddenColsRequest
     | FillHiddenColumns                     of tableName:string*SearchTermI []
@@ -191,14 +192,15 @@ type SettingXmlMsg =
     | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
     | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
     //
-    | UpdateRawCustomXml of string
+    | UpdateRawCustomXml                            of string
+    | UpdateNextRawCustomXml                        of string
     // Excel Interop
     | GetAllValidationXmlParsedRequest
-    | GetAllValidationXmlParsedResponse of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
+    | GetAllValidationXmlParsedResponse             of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
     | GetAllProtocolGroupXmlParsedRequest
-    | GetAllProtocolGroupXmlParsedResponse of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
-    | ReassignCustomXmlRequest      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
-    | RemoveCustomXmlRequest        of xml: OfficeInterop.Types.Xml.XmlTypes
+    | GetAllProtocolGroupXmlParsedResponse          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
+    | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
+    | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypes
 
 type TopLevelMsg =
     | CloseSuggestions
