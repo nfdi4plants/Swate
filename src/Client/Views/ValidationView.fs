@@ -150,8 +150,12 @@ let checkradioList (ind:int) colVal model dispatch =
         checkradioElement ind   (Some ContentType.Text)     colVal model dispatch
         checkradioElement ind   (Some ContentType.Url)      colVal model dispatch
 
+        checkradioElement ind (Some <| ContentType.Checksum Checksum.MD5) colVal model dispatch
+        checkradioElement ind (Some <| ContentType.Checksum Checksum.Sha256) colVal model dispatch
+
         checkradioElement ind   ontologyContent             colVal model dispatch
         checkradioElement ind   unitContent                 colVal model dispatch
+
     ]
 
 

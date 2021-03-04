@@ -180,10 +180,21 @@ module Xml =
         [<Literal>]
         let ValidationXmlRoot = "TableValidation"
 
+        type Checksum =
+            | MD5
+            | Sha256
+
+            static member ofString str =
+                match str with
+                | "MD5"     -> MD5
+                | "Sha256"  -> Sha256
+                | anyElse   -> failwith (sprintf "Cannot convert '%s' into known Checksum type" anyElse)
+
         /// User can define what kind of input a column should have
         type ContentType =
-            | OntologyTerm of string
-            | UnitTerm     of string
+            | OntologyTerm  of string
+            | UnitTerm      of string
+            | Checksum      of Checksum
             | Text
             | Url
             | Boolean
@@ -196,6 +207,8 @@ module Xml =
                     sprintf "Ontology [%s]" po
                 | UnitTerm ut ->
                     sprintf "Unit [%s]" ut
+                | Checksum checksum ->
+                    sprintf "Checksum %A" checksum
                 | _ ->
                     string this
     
@@ -207,6 +220,9 @@ module Xml =
                 | unit when str.StartsWith "UnitTerm " ->
                     let s = unit.Replace("UnitTerm ", "").Replace("\"","")
                     UnitTerm s
+                | checksum when str.StartsWith "Checksum " ->
+                    let s = checksum.Replace("Checksum ","").Replace("\"","") |> Checksum.ofString
+                    Checksum s
                 | "Text"        -> Text
                 | "Url"         -> Url
                 | "Boolean"     -> Boolean
