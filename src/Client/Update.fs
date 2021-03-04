@@ -407,6 +407,15 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 )
         let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
         currentState, Cmd.batch [cmd;cmd2]
+    //
+    | CreatePointerJson ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.createPointerJson
+                ()
+                (fun x -> Some x |> UpdatePointerJson |> SettingDataStewardMsg)
+                (GenericError >> Dev)
+        currentState, cmd
 
     /// DEV
     | TryExcel  ->
@@ -1665,6 +1674,16 @@ let handleSettingXmlMsg (msg:SettingXmlMsg) (currentState: SettingsXmlState) : S
                 (GenericError >> Dev)
         currentState, cmd
 
+let handleSettingDataStewardMsg (topLevelMsg:SettingDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
+    match topLevelMsg with
+    // Client
+    | UpdatePointerJson nextPointerJson ->
+        let nextState = {
+            currentState with
+                PointerJson = nextPointerJson
+        }
+        nextState, Cmd.none
+
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
     // Client
@@ -1886,6 +1905,16 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel = {
             currentModel with
                 SettingsXmlState = nextState
+        }
+        nextModel, nextCmd
+
+    | SettingDataStewardMsg msg ->
+        let nextState, nextCmd =
+            currentModel.SettingsDataStewardState
+            |> handleSettingDataStewardMsg msg
+        let nextModel = {
+            currentModel with
+                SettingsDataStewardState = nextState
         }
         nextModel, nextCmd
 

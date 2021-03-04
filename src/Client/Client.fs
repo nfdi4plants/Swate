@@ -114,6 +114,12 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ] [
             //Text.p [] [str ""]
         ]
+    | Routing.Route.SettingsDataStewards ->
+        BaseView.baseViewComponent model dispatch [
+            SettingsDataStewardView.settingsDataStewardViewComponent model dispatch
+        ] [
+            //Text.p [] [str ""]
+        ]
 
     | Routing.Route.Info ->
         BaseView.baseViewComponent model dispatch [

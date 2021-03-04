@@ -1782,3 +1782,40 @@ let updateAnnotationTableByXmlType(prevXmlType:XmlTypes, nextXmlType:XmlTypes) =
             return (sprintf "Updated %s BY %s" prevXmlType.toStringRdb nextXmlType.toStringRdb)
         }
     )
+
+let createPointerJson() =
+    Excel.run(fun context ->
+
+    let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
+        
+    promise {
+        let! annotationTable = getActiveAnnotationTableName()
+        let workbook = context.workbook.load(U2.Case1 "name")
+
+        let! json = context.sync().``then``(fun e -> 
+            [
+                "name"          , Fable.SimpleJson.JString  ""
+                "version"       , Fable.SimpleJson.JString  ""     
+                "author"        , Fable.SimpleJson.JString  ""
+                "description"   , Fable.SimpleJson.JString  ""
+                "docslink"      , Fable.SimpleJson.JString  ""
+                "tags"          , Fable.SimpleJson.JArray   []        
+                "Workbook"      , Fable.SimpleJson.JString  workbook.name
+                "Worksheet"     , Fable.SimpleJson.JString  activeSheet.name
+                "Table"         , Fable.SimpleJson.JString  annotationTable
+            ]
+            |> List.map (fun x ->
+                [x]
+                |> Map.ofList
+                |> Fable.SimpleJson.JObject
+                |> Fable.SimpleJson.SimpleJson.toString
+                |> fun x -> "  " + x.Replace("{","").Replace("}","")
+            )
+            |> String.concat (sprintf ",%s" System.Environment.NewLine)
+            |> fun jsonbody ->
+                sprintf "{%s%s%s}" System.Environment.NewLine jsonbody System.Environment.NewLine
+        )
+
+        return json
+        }
+    )

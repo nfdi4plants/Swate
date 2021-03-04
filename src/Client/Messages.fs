@@ -44,6 +44,8 @@ type ExcelInteropMsg =
     | InsertFileNames                       of fileNameList:string list
     // Show Details to selected BuildingBlock
     | GetSelectedBuildingBlockSearchTerms
+    //
+    | CreatePointerJson
     // Development
     | TryExcel
     | TryExcel2
@@ -202,6 +204,10 @@ type SettingXmlMsg =
     | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
     | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypes
 
+type SettingDataStewardMsg =
+    // Client
+    | UpdatePointerJson of string option
+
 type TopLevelMsg =
     | CloseSuggestions
 
@@ -221,6 +227,7 @@ type Msg =
     | ProtocolInsert        of ProtocolInsertMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
     | SettingXmlMsg         of SettingXmlMsg
+    | SettingDataStewardMsg of SettingDataStewardMsg
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>

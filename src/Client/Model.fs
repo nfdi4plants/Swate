@@ -457,51 +457,60 @@ type SettingsXmlState = {
         ValidationXmls                          = [||]
     }
 
+type SettingsDataStewardState = {
+    PointerJson : string option
+} with
+    static member init () = {
+        PointerJson = None
+    }
+
 type Model = {
 
-    //PageState
+    ///PageState
     PageState               : PageState
 
-    //Data that needs to be persistent once loaded
+    ///Data that needs to be persistent once loaded
     PersistentStorageState  : PersistentStorageState
  
-    //Debouncing
+    ///Debouncing
     DebouncerState          : Debouncer.State
 
-    //Error handling, Logging, etc.
+    ///Error handling, Logging, etc.
     DevState                : DevState
 
-    //Site Meta Options (Styling etc)
+    ///Site Meta Options (Styling etc)
     SiteStyleState          : SiteStyleState
 
-    //States regarding term search
+    ///States regarding term search
     TermSearchState         : TermSearchState
 
     AdvancedSearchState     : AdvancedSearchState
 
-    //Use this in the future to model excel stuff like table data
+    ///Use this in the future to model excel stuff like table data
     ExcelState              : ExcelState
 
-    //Use this to log Api calls and maybe handle them better
+    ///Use this to log Api calls and maybe handle them better
     ApiState                : ApiState
 
-    //States regarding File picker functionality
+    ///States regarding File picker functionality
     FilePickerState         : FilePickerState
 
     ProtocolInsertState     : ProtocolInsertState
 
-    //Insert annotation columns
+    ///Insert annotation columns
     AddBuildingBlockState   : AddBuildingBlockState
 
-    //Create Validation scheme for Table
+    ///Create Validation scheme for Table
     ValidationState         : ValidationState
 
-    //Used to show selected building block information
+    ///Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
 
-    //Used to manage all xml settings
-    SettingsXmlState        : SettingsXmlState
+    ///Used to manage all custom xml settings
+    SettingsXmlState            : SettingsXmlState
 
+    ///Used to manage functions specifically for data stewards
+    SettingsDataStewardState    : SettingsDataStewardState
 }
 
 let initializeModel (pageOpt: Route option) = {
@@ -520,4 +529,5 @@ let initializeModel (pageOpt: Route option) = {
     ProtocolInsertState         = ProtocolInsertState       .init ()
     BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
     SettingsXmlState            = SettingsXmlState          .init ()
+    SettingsDataStewardState    = SettingsDataStewardState  .init ()
 }

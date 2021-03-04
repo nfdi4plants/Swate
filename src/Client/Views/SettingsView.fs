@@ -44,6 +44,22 @@ let customXmlSettings (model:Model) dispatch =
         ]
     ]
 
+let dataStewardsSettings (model:Model) dispatch =
+    Level.level [Level.Level.IsMobile][
+        Level.left [][
+            str "Data Stewards"
+        ]
+        Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
+            Button.a [
+                Button.Color IsInfo
+                Button.IsOutlined
+                Button.OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsDataStewards) |> dispatch ) 
+            ][
+                str "Advanced Settings"
+            ]
+        ]
+    ]
+
 let settingsViewComponent (model:Model) dispatch =
     div [
         //Style [MaxWidth "500px"]
@@ -56,4 +72,5 @@ let settingsViewComponent (model:Model) dispatch =
 
         Label.label [][str "Advanced Settings"]
         customXmlSettings model dispatch
+        dataStewardsSettings model dispatch
     ]
