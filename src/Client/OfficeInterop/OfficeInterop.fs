@@ -377,7 +377,7 @@ let getTableRepresentation() =
                             ""
                             activeWorksheet.name
                             annotationTable
-                            System.DateTime.Now
+                            (System.DateTime.Now.ToUniversalTime())
                             []
                             newColumnValidations
                 updateTableValidation
@@ -1441,7 +1441,7 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
             tableValidation with
                 // This line is used to give freshly created TableValidations the current Swate Version
                 SwateVersion = if tableValidation.SwateVersion = "" then currentSwateVersion else tableValidation.SwateVersion
-                DateTime = System.DateTime.Now
+                DateTime = System.DateTime.Now.ToUniversalTime()
             }
 
         // The first part accesses current CustomXml
@@ -1509,7 +1509,7 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
         // Update DateTime 
         let newTableValidation = {
             tableValidation with
-                DateTime = System.DateTime.Now
+                DateTime = System.DateTime.Now.ToUniversalTime()
                 ColumnValidations = updateColumnValidationColNames
             }
 

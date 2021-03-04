@@ -274,7 +274,7 @@ module Xml =
             static member init (?swateVersion, ?worksheetName,?tableName, (?dateTime:DateTime), ?userList) = {
                 SwateVersion        = if swateVersion.IsSome then swateVersion.Value else ""
                 AnnotationTable     = Shared.AnnotationTable.create (if tableName.IsSome then tableName.Value else "") (if worksheetName.IsSome then worksheetName.Value else "")
-                DateTime            = if dateTime.IsSome then dateTime.Value else DateTime.Now
+                DateTime            = if dateTime.IsSome then dateTime.Value else DateTime.Now.ToUniversalTime()
                 Userlist            = if userList.IsSome then userList.Value else []
                 ColumnValidations   = []
             }
