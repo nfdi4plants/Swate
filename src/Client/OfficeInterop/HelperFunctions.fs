@@ -847,7 +847,11 @@ let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
             // Then AnnotationTable was added to protocol. So now we refresh these values at this point.
             let securityUpdateForProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
-            let nextCustomXml = updateSwateProtocol securityUpdateForProtocol xmlParsed
+            let nextCustomXml =
+                if remove then
+                    removeSwateProtocol securityUpdateForProtocol xmlParsed
+                else
+                    updateSwateProtocol securityUpdateForProtocol xmlParsed
 
             let nextCustomXmlString = nextCustomXml |> xmlElementToXmlString
 
