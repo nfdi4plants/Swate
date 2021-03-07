@@ -76,7 +76,7 @@ let textAreaEle (model:Model) dispatch =
             Control.div [][
                 Textarea.textarea [
                     Textarea.OnChange (fun e ->
-                        UpdateNextRawCustomXml e.Value |> SettingXmlMsg |> dispatch
+                        UpdateNextRawCustomXml e.Value |> SettingsXmlMsg |> dispatch
                     )
                     Textarea.DefaultValue model.SettingsXmlState.RawXml
                 ][ ]
@@ -154,7 +154,7 @@ let showRawCustomXmlEle (model:Model) dispatch =
             if model.SettingsXmlState.RawXml <> "" then
                 Column.column [Column.Width (Screen.All,Column.IsNarrow)][
                     Button.a [
-                        Button.OnClick (fun e -> UpdateRawCustomXml "" |> SettingXmlMsg |> dispatch)
+                        Button.OnClick (fun e -> UpdateRawCustomXml "" |> SettingsXmlMsg |> dispatch)
                         Button.Color IsDanger
                         Button.Props [Title "Remove custom xml from the text area"]
                     ][
@@ -181,7 +181,7 @@ let getValidationXmlButton (model:Model) dispatch =
         Button.Color IsInfo
         Button.IsFullWidth
         Button.OnClick (fun e ->
-            GetAllValidationXmlParsedRequest |> SettingXmlMsg |> dispatch
+            GetAllValidationXmlParsedRequest |> SettingsXmlMsg |> dispatch
         )
     ][
         str "Load checklist xml"
@@ -191,7 +191,7 @@ let removeValidationXmlButton (model:Model) dispatch =
     Button.span [
         Button.Color IsDanger
         Button.OnClick (fun e ->
-            UpdateValidationXmls [||] |> SettingXmlMsg |> dispatch
+            UpdateValidationXmls [||] |> SettingsXmlMsg |> dispatch
         )
     ][
         Fa.i [Fa.Solid.Times][]
@@ -221,7 +221,7 @@ let applyChangesToTableValidationButton (model:Model) dispatch (tableValidation:
                             (if newat.Name = "" then prevat.Name else newat.Name)
                             (if newat.Worksheet = "" then prevat.Worksheet else newat.Worksheet)
             }
-            ReassignCustomXmlRequest (prevXml,newXml) |> SettingXmlMsg |> dispatch
+            ReassignCustomXmlRequest (prevXml,newXml) |> SettingsXmlMsg |> dispatch
         )
     ][
         text [if isNextValidForWorkbook then Style [Color "white"]] [str "Apply Changes"]
@@ -231,7 +231,7 @@ let removeTableValidationButton (model:Model) dispatch (tableValidation:Validati
     Button.a [
         Button.OnClick (fun e ->
             let xmlType = XmlTypes.ValidationType tableValidation
-            RemoveCustomXmlRequest xmlType |> SettingXmlMsg |> dispatch
+            RemoveCustomXmlRequest xmlType |> SettingsXmlMsg |> dispatch
         )
         Button.Color IsDanger
     ][
@@ -270,7 +270,7 @@ let displaySingleTableValidationEle (model:Model) dispatch (tableValidation:Vali
                 Class "validationTableEle"
                 OnClick (fun e ->
                     let next = if isActive then None else Some tableValidation
-                    UpdateActiveSwateValidation next |> SettingXmlMsg |> dispatch
+                    UpdateActiveSwateValidation next |> SettingsXmlMsg |> dispatch
                 )
             ][
                 th [
@@ -290,7 +290,7 @@ let displaySingleTableValidationEle (model:Model) dispatch (tableValidation:Vali
                                         { model.SettingsXmlState.NextAnnotationTableForActiveValidation.Value with Name = e.Value }
                                     else AnnotationTable.create e.Value ""
                                     |> Some
-                                UpdateNextAnnotationTableForActiveValidation nextAnnoT |> SettingXmlMsg |> dispatch
+                                UpdateNextAnnotationTableForActiveValidation nextAnnoT |> SettingsXmlMsg |> dispatch
                             )
                         ]
                     else
@@ -312,7 +312,7 @@ let displaySingleTableValidationEle (model:Model) dispatch (tableValidation:Vali
                                         { model.SettingsXmlState.NextAnnotationTableForActiveValidation.Value with Worksheet = e.Value }
                                     else AnnotationTable.create "" e.Value
                                     |> Some
-                                UpdateNextAnnotationTableForActiveValidation nextAnnoT |> SettingXmlMsg |> dispatch
+                                UpdateNextAnnotationTableForActiveValidation nextAnnoT |> SettingsXmlMsg |> dispatch
                             )
                         ]
                     else
@@ -403,7 +403,7 @@ let getProtocolGroupXmlButton (model:Model) dispatch =
         Button.Color IsInfo
         Button.IsFullWidth
         Button.OnClick (fun e ->
-            GetAllProtocolGroupXmlParsedRequest |> SettingXmlMsg |> dispatch
+            GetAllProtocolGroupXmlParsedRequest |> SettingsXmlMsg |> dispatch
         )
     ][
         str "Load protocol group xml"
@@ -413,7 +413,7 @@ let removeProtocolGroupXmlButton (model:Model) dispatch =
     Button.span [
         Button.Color IsDanger
         Button.OnClick (fun e ->
-            UpdateProtocolGroupXmls [||] |> SettingXmlMsg |> dispatch
+            UpdateProtocolGroupXmls [||] |> SettingsXmlMsg |> dispatch
         )
     ][
         Fa.i [Fa.Solid.Times][]
@@ -434,7 +434,7 @@ let applyChangesToProtocolGroupButton (model:Model) dispatch (protGroup:GroupTyp
                     AnnotationTable = AnnotationTable.create newName newWorksheet
                     Protocols = protGroup.Protocols |> List.map (fun x -> {x with AnnotationTable = AnnotationTable.create newName newWorksheet})
             }
-            ReassignCustomXmlRequest (prevXml,newXml) |> SettingXmlMsg |> dispatch
+            ReassignCustomXmlRequest (prevXml,newXml) |> SettingsXmlMsg |> dispatch
         )
     ][
         text [if isNextValidForWorkbook then Style [Color "white"]] [str "Apply Changes"]
@@ -444,7 +444,7 @@ let removeProtocolGroupButton (model:Model) dispatch (protGroup:GroupTypes.Proto
     Button.a [
         Button.OnClick (fun e ->
             let xmlType = XmlTypes.GroupType protGroup
-            RemoveCustomXmlRequest xmlType |> SettingXmlMsg |> dispatch
+            RemoveCustomXmlRequest xmlType |> SettingsXmlMsg |> dispatch
         )
         Button.Color IsDanger
     ][
@@ -475,7 +475,7 @@ let protocolChildList (protocol:GroupTypes.Protocol) isActive model dispatch =
                                     Button.Color IsDanger
                                     Button.OnClick (fun e ->
                                         let xml = XmlTypes.ProtocolType protocol
-                                        RemoveCustomXmlRequest xml |> SettingXmlMsg |> dispatch
+                                        RemoveCustomXmlRequest xml |> SettingsXmlMsg |> dispatch
                                     )
                                 ][
                                     str "Remove"
@@ -520,7 +520,7 @@ let displaySingleProtocolGroupEle model dispatch (protocolGroup:GroupTypes.Proto
                 Class "validationTableEle"
                 OnClick (fun e ->
                     let next = if isActive then None else Some protocolGroup
-                    UpdateActiveProtocolGroup next |> SettingXmlMsg |> dispatch
+                    UpdateActiveProtocolGroup next |> SettingsXmlMsg |> dispatch
                 )
             ][
                 th [
@@ -540,7 +540,7 @@ let displaySingleProtocolGroupEle model dispatch (protocolGroup:GroupTypes.Proto
                                         { model.SettingsXmlState.NextAnnotationTableForActiveProtGroup.Value with Name = e.Value }
                                     else AnnotationTable.create e.Value ""
                                     |> Some
-                                UpdateNextAnnotationTableForActiveProtGroup nextAnnoT |> SettingXmlMsg |> dispatch
+                                UpdateNextAnnotationTableForActiveProtGroup nextAnnoT |> SettingsXmlMsg |> dispatch
                             )
                         ]
                     else
@@ -562,7 +562,7 @@ let displaySingleProtocolGroupEle model dispatch (protocolGroup:GroupTypes.Proto
                                         { model.SettingsXmlState.NextAnnotationTableForActiveProtGroup.Value with Worksheet = e.Value }
                                     else AnnotationTable.create "" e.Value
                                     |> Some
-                                UpdateNextAnnotationTableForActiveProtGroup nextAnnoT |> SettingXmlMsg |> dispatch
+                                UpdateNextAnnotationTableForActiveProtGroup nextAnnoT |> SettingsXmlMsg |> dispatch
                             )
                         ]
                     else
@@ -593,7 +593,7 @@ let displaySingleProtocolGroupEle model dispatch (protocolGroup:GroupTypes.Proto
                                 Button.Color IsInfo
                                 Button.OnClick (fun e ->
                                     let nextProtocol = if isActiveProt then None else Some protocol
-                                    UpdateActiveProtocol nextProtocol |> SettingXmlMsg |> dispatch
+                                    UpdateActiveProtocol nextProtocol |> SettingsXmlMsg |> dispatch
                                 )
                                 Button.IsOutlined
                                 Button.Props [Style [BorderRadius "0"]]

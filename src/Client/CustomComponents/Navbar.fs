@@ -118,30 +118,32 @@ let dropdownShortCutIconList model dispatch =
                     ]
         ]
     ]
-    
 
 let quickAccessDropdownElement model dispatch =
-    let prepIconLists =
-        let split length (xs: seq<'T>) =
-            let rec loop xs =
-                [
-                    yield Seq.truncate length xs |> Seq.toList
-                    match Seq.length xs <= length with
-                    | false -> yield! loop (Seq.skip length xs)
-                    | true -> ()
-                ]
-            loop xs
-        let iconList = navbarShortCutIconList model dispatch
-        split 3 iconList
+    //let prepIconLists =
+    //    let split length (xs: seq<'T>) =
+    //        let rec loop xs =
+    //            [
+    //                yield Seq.truncate length xs |> Seq.toList
+    //                match Seq.length xs <= length with
+    //                | false -> yield! loop (Seq.skip length xs)
+    //                | true -> ()
+    //            ]
+    //        loop xs
+    //    let iconList = navbarShortCutIconList model dispatch
+    //    split 3 iconList
     Navbar.Item.div [
-        Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]
+        Navbar.Item.Props [
+            OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)
+            Style [ Color model.SiteStyleState.ColorMode.Text]
+        ]
         Navbar.Item.CustomClass "hideOver575px"
     ] [
         div [Style [
             Position PositionOptions.Relative
         ]] [
             Button.a [
-                Button.OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)
+                //Button.OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)
                 Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft "0"; PaddingRight "0"]]
                 Button.Color Color.IsWhite
                 Button.IsInverted
@@ -218,8 +220,8 @@ let quickAccessListElement model dispatch =
 let navbarComponent (model : Model) (dispatch : Msg -> unit) =
     Navbar.navbar [Navbar.Props [Props.Role "navigation"; AriaLabel "main navigation" ; ExcelColors.colorElement model.SiteStyleState.ColorMode]] [
         Navbar.Brand.a [] [
-            Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"; Target "_Blank"]] [
-                img [Props.Src "../assets/Swate_logo_for_excel.svg"]
+            Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"; Target "_Blank"; Style [Width "100px"]]] [
+                img [Props.Src @"assets\Swate_logo_for_excel.svg"]
             ]
 
             quickAccessListElement model dispatch

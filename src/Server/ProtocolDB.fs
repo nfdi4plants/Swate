@@ -65,23 +65,20 @@ let getProtocolByName cString (queryStr:string) =
     queryParam.Value    <- queryStr
 
     use reader = cmd.ExecuteReader()
-    [|
-        while reader.Read() do
-            let tags = reader.GetString(6).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
-            yield
-                ProtocolTemplate.create
-                    (reader.GetString(0))       // name
-                    (reader.GetString(1))       // version
-                    (reader.GetDateTime(2))     // created
-                    (reader.GetString(3))       // author
-                    (reader.GetString(4))       // description
-                    (reader.GetString(5))       // docs link
-                    tags
-                    ""                          // customXml
-                    ""                          // tableXml
-                    (reader.GetInt32(7))        // used
-                    (reader.GetInt32(8))        // rating
-    |]
+    reader.Read() |> ignore
+    let tags = reader.GetString(6).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
+    ProtocolTemplate.create
+        (reader.GetString(0))       // name
+        (reader.GetString(1))       // version
+        (reader.GetDateTime(2))     // created
+        (reader.GetString(3))       // author
+        (reader.GetString(4))       // description
+        (reader.GetString(5))       // docs link
+        tags
+        ""                          // customXml
+        ""                          // tableXml
+        (reader.GetInt32(7))        // used
+        (reader.GetInt32(8))        // rating
 
 let getXmlByProtocol cString (protocol:ProtocolTemplate) =
     use connection = establishConnection cString

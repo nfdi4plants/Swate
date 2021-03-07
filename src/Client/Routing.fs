@@ -19,6 +19,7 @@ type Route =
 | Settings
 | SettingsXml
 | SettingsDataStewards
+| SettingsProtocol
 | NotFound
 
     static member toRouteUrl (route:Route) =
@@ -35,6 +36,7 @@ type Route =
         | Route.Settings            -> "/#Settings"
         | Route.SettingsXml         -> "/#Settings/Xml"
         | Route.SettingsDataStewards-> "/#Settings/DataStewards"
+        | Route.SettingsProtocol    -> "/#Settings/Protocol"
         | Route.NotFound            -> "/#NotFound"
 
     member this.toStringRdbl =
@@ -51,6 +53,7 @@ type Route =
         | Route.Settings            -> "Settings"
         | Route.SettingsXml         -> "Xml Settings"
         | Route.SettingsDataStewards-> "Settings for Data Stewards"
+        | Route.SettingsProtocol    -> "Protocol Settings"
         | Route.NotFound            -> "NotFound"
 
     static member toIcon (p: Route)=
@@ -97,6 +100,7 @@ module Routing =
             map Route.ActivityLog           (s "ActivityLog")
             map Route.Settings              (s "Settings")
             map Route.SettingsXml           (s "Settings" </> s "Xml")
+            map Route.SettingsProtocol      (s "Settings" </> s "Protocol")
             map Route.SettingsDataStewards  (s "Settings" </> s "DataStewards")
             map Route.NotFound              (s "NotFound")
         ]

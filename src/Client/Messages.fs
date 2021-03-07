@@ -46,6 +46,7 @@ type ExcelInteropMsg =
     | GetSelectedBuildingBlockSearchTerms
     //
     | CreatePointerJson
+    //
     // Development
     | TryExcel
     | TryExcel2
@@ -180,7 +181,7 @@ type BuildingBlockDetailsMsg =
     | ToggleShowDetails
     | UpdateCurrentRequestState                     of RequestBuildingBlockInfoStates
 
-type SettingXmlMsg =
+type SettingsXmlMsg =
     // // Client // //
     // Validation Xml
     | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
@@ -204,9 +205,17 @@ type SettingXmlMsg =
     | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
     | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypes
 
-type SettingDataStewardMsg =
+type SettingsDataStewardMsg =
     // Client
     | UpdatePointerJson of string option
+
+type SettingsProtocolMsg =
+    | UpdateProtocolsFromExcel          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    | UpdateProtocolsFromDB             of Shared.ProtocolTemplate []
+    // ExcelInterop
+    | GetActiveProtocolGroupXmlParsed
+    | GetProtocolsFromDBRequest         of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    | UpdateProtocolByNewVersion        of OfficeInterop.Types.Xml.GroupTypes.Protocol * Shared.ProtocolTemplate
 
 type TopLevelMsg =
     | CloseSuggestions
@@ -226,8 +235,9 @@ type Msg =
     | Validation            of ValidationMsg
     | ProtocolInsert        of ProtocolInsertMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
-    | SettingXmlMsg         of SettingXmlMsg
-    | SettingDataStewardMsg of SettingDataStewardMsg
+    | SettingsXmlMsg        of SettingsXmlMsg
+    | SettingDataStewardMsg of SettingsDataStewardMsg
+    | SettingsProtocolMsg   of SettingsProtocolMsg
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>

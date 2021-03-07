@@ -52,7 +52,7 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
         }
         nextModel,Cmd.none
 
-let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:ExcelState) : ExcelState * Cmd<Msg> =
+let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model) : Model * Cmd<Msg> =
 
     match excelInteropMsg with
 
@@ -63,7 +63,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 ()
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     | UpdateProtocolGroupHeader ->
         let cmd =
@@ -72,16 +72,16 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 ()
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     | Initialized (h,p) ->
         let welcomeMsg = sprintf "Ready to go in %s running on %s" h p
 
-        let nextState = {
-            currentState with
+        let nextModel = {
+            currentModel.ExcelState with
                 Host        = h
                 Platform    = p
-        }
+        } 
 
         let cmd =
             Cmd.batch [
@@ -95,7 +95,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
             ]
 
-        nextState, cmd
+        currentModel.updateByExcelState nextModel, cmd
 
     | AnnotationTableExists annoTableOpt ->
         let exists =
@@ -103,11 +103,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
             | Success name -> true
             | _ -> false
         let nextState = {
-            currentState with
+            currentModel.ExcelState with
                 HasAnnotationTable = exists
         }
 
-        nextState,Cmd.none
+        currentModel.updateByExcelState nextState,Cmd.none
 
     | FillSelection (fillValue,fillTerm) ->
         let cmd =
@@ -116,7 +116,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (fillValue,fillTerm)
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     | AddAnnotationBlock (minBuildingBlockInfo) ->
         let cmd =
@@ -131,7 +131,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ]
                 )
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     | AddAnnotationBlocks (minBuildingBlockInfos, protocol, validationOpt) ->
         let cmd =
@@ -153,16 +153,15 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                             AddTableValidationtoExisting (updatedValidation, newColNames, protocolInfo) |> ExcelInterop
                         else
                             WriteProtocolToXml protocolInfo |> ExcelInterop
-
                     ]
                 )
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     | RemoveAnnotationBlock ->
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.removeAnnotationBlock
+                OfficeInterop.removeSelectedAnnotationBlock
                 ()
                 (fun msg ->
                     Msg.Batch [
@@ -172,7 +171,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ]
                 )
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     | AddUnitToAnnotationBlock (format, unitTermOpt) ->
         let cmd =
@@ -186,7 +185,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ]
                 )
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     | FormatColumn (colName,format) ->
         let cmd =
@@ -200,7 +199,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ]
                 )
                 (GenericError >> Dev)
-        currentState,cmd
+        currentModel,cmd
 
     | FormatColumns (resList) ->
         let cmd =
@@ -214,7 +213,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ]
                 )
                 (GenericError >> Dev)
-        currentState,cmd
+        currentModel,cmd
 
     | CreateAnnotationTable (isDark) ->
         let cmd =
@@ -225,11 +224,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     AnnotationtableCreated (msg) |> ExcelInterop
                 )
                 (GenericError >> Dev)
-        currentState,cmd
+        currentModel,cmd
 
     | AnnotationtableCreated (range) ->
         let nextState = {
-            currentState with
+            currentModel.ExcelState with
                 HasAnnotationTable = true
         }
         let msg =
@@ -238,7 +237,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 UpdateProtocolGroupHeader |> ExcelInterop
                 GenericLog ("info", range) |> Dev
             ]
-        nextState, Cmd.ofMsg msg
+        currentModel.updateByExcelState nextState, Cmd.ofMsg msg
 
 
     | GetParentTerm ->
@@ -248,7 +247,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 ()
                 (StoreParentOntologyFromOfficeInterop >> TermSearch)
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
     //
     | GetTableValidationXml ->
         let cmd =
@@ -258,7 +257,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (fun (currentTableValidation, buildingBlocks,msg) ->
                     StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks, msg) |> Validation)
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
     | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
         let cmd =
             Cmd.OfPromise.either
@@ -272,7 +271,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 )
                 (GenericError >> Dev)
 
-        currentState, cmd
+        currentModel, cmd
 
     | AddTableValidationtoExisting (newTableValidation, newColNames, protocolInfo) ->
         let cmd =
@@ -283,11 +282,10 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     Msg.Batch [
                         GenericLog x |> Dev
                         WriteProtocolToXml protocolInfo |> ExcelInterop
-                        //PipeActiveAnnotationTable GetTableValidationXml |> ExcelInterop
                     ]
                 )
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     | WriteProtocolToXml protocolInfo ->
         let cmd =
@@ -298,10 +296,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     Msg.Batch [
                         GenericLog res |> Dev
                         UpdateProtocolGroupHeader |> ExcelInterop
+                        if currentModel.PageState.CurrentPage = Route.SettingsProtocol then GetActiveProtocolGroupXmlParsed |> SettingsProtocolMsg 
                     ]
                 )
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
     | DeleteAllCustomXml ->
         let cmd =
             Cmd.OfPromise.either
@@ -314,7 +313,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ]
                 )
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
     | GetSwateCustomXml ->
         let cmd =
             Cmd.OfPromise.either
@@ -323,11 +322,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 (fun xml ->
                     Msg.Batch [
                         GenericLog xml |> Dev
-                        UpdateRawCustomXml (snd xml) |> SettingXmlMsg
+                        UpdateRawCustomXml (snd xml) |> SettingsXmlMsg
                     ]
                 )
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
     | UpdateSwateCustomXml newCustomXml ->
         let cmd =
             Cmd.OfPromise.either
@@ -335,7 +334,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 newCustomXml
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
     //
     | FillHiddenColsRequest ->
         let cmd =
@@ -350,7 +349,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ] )
         let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> ExcelInterop |> Cmd.ofMsg
         let cmds = Cmd.batch [cmd; cmd2]
-        currentState, cmds
+        currentModel, cmds
 
     | FillHiddenColumns (tableName,insertTerms) ->
         let cmd =
@@ -370,18 +369,17 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ] )
         let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelWriteFoundTerms |> ExcelInterop |> Cmd.ofMsg
         let cmds = Cmd.batch [cmd; cmd2]
-        currentState, cmds
+        currentModel, cmds
 
 
     | UpdateFillHiddenColsState newState ->
         let nextState = {
-            currentState with
+            currentModel.ExcelState with
                 FillHiddenColsStateStore = newState
         }
-        nextState, Cmd.none
+        currentModel.updateByExcelState nextState, Cmd.none
     //
     | InsertFileNames (fileNameList) ->
-        let nextState = currentState
         let cmd = 
             Cmd.OfPromise.either
                 OfficeInterop.insertFileNamesFromFilePicker 
@@ -390,7 +388,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ("Debug",x) |> GenericLog) >> Dev
                 )
                 (GenericError >> Dev)
-        nextState, cmd
+        currentModel, cmd
 
     //
     | GetSelectedBuildingBlockSearchTerms ->
@@ -406,7 +404,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ]
                 )
         let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
-        currentState, Cmd.batch [cmd;cmd2]
+        currentModel, Cmd.batch [cmd;cmd2]
     //
     | CreatePointerJson ->
         let cmd =
@@ -415,11 +413,10 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                 ()
                 (fun x -> Some x |> UpdatePointerJson |> SettingDataStewardMsg)
                 (GenericError >> Dev)
-        currentState, cmd
+        currentModel, cmd
 
     /// DEV
     | TryExcel  ->
-        let nextState = currentState
         let cmd = 
             Cmd.OfPromise.either
                 OfficeInterop.exampleExcelFunction1
@@ -428,9 +425,8 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ("Debug",x) |> GenericLog) >> Dev
                 )
                 (GenericError >> Dev)
-        nextState, cmd
+        currentModel, cmd
     | TryExcel2 ->
-        let nextState = currentState
         let cmd = 
             Cmd.OfPromise.either
                 OfficeInterop.exampleExcelFunction2 
@@ -439,7 +435,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentState:Excel
                     ("Debug",x) |> GenericLog) >> Dev
                 )
                 (GenericError >> Dev)
-        nextState, cmd
+        currentModel, cmd
     //| _ ->
     //    printfn "Hit currently non existing message"
     //    currentState, Cmd.none
@@ -930,23 +926,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
     match resMsg with
     | TermSuggestionResponse suggestions ->
-        //let finishedCall = {
-        //    currentState.currentCall with
-        //        Status = Successfull
-        //}
 
-        //let nextState = {
-        //    currentState with
-        //        currentCall = noCall
-        //        callHistory = finishedCall::currentState.callHistory
-        //}
-
-        //let cmds = Cmd.batch [
-        //    ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-        //    suggestions |> NewSuggestions |> TermSearch |> Cmd.ofMsg
-        //]
-
-        //nextState, cmds
         handleTermSuggestionResponse
             (NewSuggestions >> TermSearch)
             suggestions
@@ -1372,7 +1352,7 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
         let nextState = {currentState with Loading = true}
         let cmd =
             Cmd.OfAsync.either
-                Api.api.getAllProtocols
+                Api.api.getAllProtocolsWithoutXml
                 ()
                 (GetAllProtocolsResponse >> ProtocolInsert)
                 (GenericError >> Dev)
@@ -1387,7 +1367,7 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
     | GetProtocolXmlByProtocolRequest prot ->
         let cmd =
             Cmd.OfAsync.either
-                Api.api.getProtocolBlocksForProtocol
+                Api.api.getProtocolXmlForProtocol
                 prot
                 (ParseProtocolXmlByProtocolRequest >> ProtocolInsert)
                 (GenericError >> Dev)
@@ -1517,19 +1497,19 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
         }
         nextState, Cmd.none
 
-let handleSettingXmlMsg (msg:SettingXmlMsg) (currentState: SettingsXmlState) : SettingsXmlState * Cmd<Msg> =
+let handleSettingsXmlMsg (msg:SettingsXmlMsg) (currentState: SettingsXmlState) : SettingsXmlState * Cmd<Msg> =
 
     let matchXmlTypeToUpdateMsg msg (xmlType:OfficeInterop.Types.Xml.XmlTypes) =
         match xmlType with
         | OfficeInterop.Types.Xml.XmlTypes.ValidationType v ->
             Msg.Batch [
                 GenericLog ("Info", msg) |> Dev
-                GetAllValidationXmlParsedRequest |> SettingXmlMsg
+                GetAllValidationXmlParsedRequest |> SettingsXmlMsg
             ]
         | OfficeInterop.Types.Xml.XmlTypes.GroupType _ | OfficeInterop.Types.Xml.XmlTypes.ProtocolType _ ->
             Msg.Batch [
                 GenericLog ("Info", msg) |> Dev
-                GetAllProtocolGroupXmlParsedRequest |> SettingXmlMsg
+                GetAllProtocolGroupXmlParsedRequest |> SettingsXmlMsg
                 UpdateProtocolGroupHeader |> ExcelInterop
             ]
         
@@ -1620,7 +1600,7 @@ let handleSettingXmlMsg (msg:SettingXmlMsg) (currentState: SettingsXmlState) : S
             Cmd.OfPromise.either
                 OfficeInterop.getAllValidationXmlParsed
                 ()
-                (GetAllValidationXmlParsedResponse >> SettingXmlMsg)
+                (GetAllValidationXmlParsedResponse >> SettingsXmlMsg)
                 (GenericError >> Dev)
         nextState, cmd
     | GetAllValidationXmlParsedResponse (tableValidations, annoTables) ->
@@ -1644,7 +1624,7 @@ let handleSettingXmlMsg (msg:SettingXmlMsg) (currentState: SettingsXmlState) : S
             Cmd.OfPromise.either
                 OfficeInterop.getAllProtocolGroupXmlParsed
                 ()
-                (GetAllProtocolGroupXmlParsedResponse >> SettingXmlMsg)
+                (GetAllProtocolGroupXmlParsedResponse >> SettingsXmlMsg)
                 (GenericError >> Dev)
         nextState, cmd
     | GetAllProtocolGroupXmlParsedResponse (protocolGroupXmls, annoTables) ->
@@ -1674,7 +1654,7 @@ let handleSettingXmlMsg (msg:SettingXmlMsg) (currentState: SettingsXmlState) : S
                 (GenericError >> Dev)
         currentState, cmd
 
-let handleSettingDataStewardMsg (topLevelMsg:SettingDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
+let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
     match topLevelMsg with
     // Client
     | UpdatePointerJson nextPointerJson ->
@@ -1683,6 +1663,60 @@ let handleSettingDataStewardMsg (topLevelMsg:SettingDataStewardMsg) (currentStat
                 PointerJson = nextPointerJson
         }
         nextState, Cmd.none
+
+let handleSettingsProtocolMsg (topLevelMsg:SettingsProtocolMsg) (currentState: SettingsProtocolState) : SettingsProtocolState * Cmd<Msg> =
+    match topLevelMsg with
+    // Client
+    | UpdateProtocolsFromDB nextProtFromDB ->
+        let nextState = {
+            currentState with
+                ProtocolsFromDB = nextProtFromDB
+        }
+        nextState, Cmd.none
+    | UpdateProtocolsFromExcel nextProtFromExcel ->
+        let nextState = {
+            currentState with
+                ProtocolsFromExcel = nextProtFromExcel
+        }
+        nextState, Cmd.none
+    // Excel
+    | GetActiveProtocolGroupXmlParsed ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getActiveProtocolGroupXmlParsed
+                ()
+                (fun x ->
+                    Msg.Batch [
+                        UpdateProtocolsFromExcel x |> SettingsProtocolMsg
+                        GetProtocolsFromDBRequest x |> SettingsProtocolMsg
+                    ]
+                )
+                (GenericError >> Dev)
+        currentState, cmd
+    | UpdateProtocolByNewVersion (prot, protTemplate) ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.updateProtocolByNewVersion
+                (prot,protTemplate)
+                (AddAnnotationBlocks >> ExcelInterop)
+                (GenericError >> Dev)
+        currentState, cmd
+    // Server
+    | GetProtocolsFromDBRequest activeProtGroupOpt ->
+        let cmd =
+            match activeProtGroupOpt with
+            | Some protGroup ->
+                let protNames = protGroup.Protocols |> List.map (fun x -> x.Id) |> Array.ofList
+                Cmd.OfAsync.either
+                    Api.api.getProtocolsByName
+                    protNames
+                    (UpdateProtocolsFromDB >> SettingsProtocolMsg)
+                    (GenericError >> Dev)
+            | None ->
+                GenericLog ("Info", "No protocols found for active table") |> Dev |> Cmd.ofMsg
+        currentState, cmd
+            
+
 
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
@@ -1765,14 +1799,9 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         nextModel, debouncerCmd
 
     | ExcelInterop excelMsg ->
-        let nextExcelState,nextCmd =
-            currentModel.ExcelState
+        let nextModel,nextCmd =
+            currentModel
             |> handleExcelInteropMsg excelMsg
-
-        let nextModel = {
-            currentModel with
-                ExcelState = nextExcelState
-        }
         nextModel,nextCmd
 
     | TermSearch termSearchMsg ->
@@ -1898,10 +1927,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             }
         nextModel, nextCmd
 
-    | SettingXmlMsg msg ->
+    | SettingsXmlMsg msg ->
         let nextState, nextCmd =
             currentModel.SettingsXmlState
-            |> handleSettingXmlMsg msg
+            |> handleSettingsXmlMsg msg
         let nextModel = {
             currentModel with
                 SettingsXmlState = nextState
@@ -1911,10 +1940,20 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | SettingDataStewardMsg msg ->
         let nextState, nextCmd =
             currentModel.SettingsDataStewardState
-            |> handleSettingDataStewardMsg msg
+            |> handleSettingsDataStewardMsg msg
         let nextModel = {
             currentModel with
                 SettingsDataStewardState = nextState
+        }
+        nextModel, nextCmd
+
+    | SettingsProtocolMsg msg ->
+        let nextState, nextCmd =
+            currentModel.SettingsProtocolState
+            |> handleSettingsProtocolMsg msg
+        let nextModel = {
+            currentModel with
+                SettingsProtocolState = nextState
         }
         nextModel, nextCmd
 

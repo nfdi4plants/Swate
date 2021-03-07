@@ -174,12 +174,18 @@ let annotatorApi cString = {
             return result
         }
 
-    getAllProtocols = fun () -> async {
+    getAllProtocolsWithoutXml = fun () -> async {
         let protocols = ProtocolDB.getAllProtocols cString
         return protocols
     }
 
-    getProtocolBlocksForProtocol = fun prot -> async { return ProtocolDB.getXmlByProtocol cString prot }
+    getProtocolXmlForProtocol = fun prot -> async { return ProtocolDB.getXmlByProtocol cString prot }
+
+    getProtocolsByName = fun (names) -> async {
+        let protsWithoutXml = names |> Array.map (fun x -> ProtocolDB.getProtocolByName cString x)
+        let protsWithXml = protsWithoutXml |> Array.map (ProtocolDB.getXmlByProtocol cString)
+        return protsWithXml
+    }
 
     increaseTimesUsed = fun templateName -> async {
         ProtocolDB.increaseTimesUsed cString templateName

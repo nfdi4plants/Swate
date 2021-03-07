@@ -235,9 +235,10 @@ type IAnnotatorAPIv1 = {
     getTermsByNames                     : SearchTermI []                                                -> Async<SearchTermI []>
 
     // Protocol apis
-    getAllProtocols                 : unit                                                  -> Async<ProtocolTemplate []>
-    getProtocolBlocksForProtocol    : ProtocolTemplate                                      -> Async<ProtocolTemplate>
-    increaseTimesUsed               : string                                                -> Async<unit>
+    getAllProtocolsWithoutXml       : unit                      -> Async<ProtocolTemplate []>
+    getProtocolsByName              : string []                 -> Async<ProtocolTemplate []>
+    getProtocolXmlForProtocol       : ProtocolTemplate          -> Async<ProtocolTemplate>
+    increaseTimesUsed               : string                    -> Async<unit>
 }
 
         

@@ -120,6 +120,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ] [
             //Text.p [] [str ""]
         ]
+    | Routing.Route.SettingsProtocol ->
+        BaseView.baseViewComponent model dispatch [
+            SettingsProtocolView.settingsProtocolViewComponent model dispatch
+        ] [
+            //Text.p [] [str ""]
+        ]
+
 
     | Routing.Route.Info ->
         BaseView.baseViewComponent model dispatch [

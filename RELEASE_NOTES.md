@@ -1,3 +1,15 @@
+### 0.4.1+66fb577 (Released 2021-3-5)
+* Additions:
+    * latest commit #66fb577
+    * [[#4534b82](https://github.com/nfdi4plants/Swate/commit/4534b8284d424138967b4100dd3e061456123897)] Correct routing name.
+    * [[#088335f](https://github.com/nfdi4plants/Swate/commit/088335f811d41026269e2489337986331534c4a6)] Add option to update raw custom xml (Issue  #123).
+    * [[#a3286eb](https://github.com/nfdi4plants/Swate/commit/a3286ebcefe217bbc4354c9e19fe79004d7afb6d)] Add checksum content type (Issue #127).
+    * [[#97407d4](https://github.com/nfdi4plants/Swate/commit/97407d45c5139ded3234824f46c530e68e0556a1)] Changed DateTime to use UTC (Issue #126).
+    * [[#137cc54](https://github.com/nfdi4plants/Swate/commit/137cc542db62fecb52fad77177bb6de1a72c1965)] Add more info for existing building blocks (Issue #124).
+    * [[#66fb577](https://github.com/nfdi4plants/Swate/commit/66fb5771c55632c4cc0bf229996d8fa4cd304a69)] Add option to create pointer json template (Issue #129).
+* Deletions:
+    * [[#84d71ee](https://github.com/nfdi4plants/Swate/commit/84d71eef62c1d55bb2130143926d47e8b462fdeb)] Remove 'decimal' validation type.
+
 ### 0.4.0+a0e04f3 (Released 2021-3-1)
 * Additions:
     * latest commit #a0e04f3

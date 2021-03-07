@@ -615,11 +615,20 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                         if isComplete then
                             failwith ( sprintf "Protocol %s exists already in %s - %s." existsAlready.Value.Id currentProtocolGroup.Value.AnnotationTable.Name currentProtocolGroup.Value.AnnotationTable.Worksheet)
 
-                let! chainProm = chainBuildingBlocks buildingBlockInfoList
+                /// filter out building blocks that are only passed to keep the colNames
+                let onlyNonExistingBuildingBlocks = buildingBlockInfoList |> List.filter (fun x -> x.IsAlreadyExisting <> true)
+                let alreadyExistingBlocks =
+                    buildingBlockInfoList
+                    |> List.filter (fun x -> x.IsAlreadyExisting = true)
+                    |> List.map (fun x ->
+                        x.MainColumnName, "0.00", ""
+                    )
+
+                let! chainProm = chainBuildingBlocks onlyNonExistingBuildingBlocks
 
                 let updateProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
-                return (chainProm,updateProtocol)
+                return (chainProm@alreadyExistingBlocks,updateProtocol)
             }
         )
 
@@ -629,15 +638,24 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
             [
                 for ind in 0 .. blockResults.Length-1 do
                     let colName                     = blockResults |> List.item ind |> (fun (x,_,_) -> x)
-                    let relatedTermAccession        = buildingBlockInfoList |> List.rev |> List.item ind |> (fun x ->
-                        if colName.Contains(x.MainColumnName) |> not then
-                            failwith (sprintf "Had problems relating term accession and term name: %s in %s" x.MainColumnName colName)
-                        if x.MainColumnTermAccession.IsSome then x.MainColumnTermAccession.Value else ""
-                        )
+                    let relatedTermAccession        =
+                        buildingBlockInfoList
+                        |> List.tryFind ( fun x -> colName.Contains(x.MainColumnName) )
+                        |> fun x ->
+                            if x.IsNone then
+                                failwith (
+                                    sprintf
+                                        "Could not find created building block information %s in given list: %A"
+                                        colName
+                                        (buildingBlockInfoList|> List.map (fun y -> y.MainColumnName))
+                                )
+                            else
+                                if x.IsSome && x.Value.MainColumnTermAccession.IsSome then x.Value.MainColumnTermAccession.Value else ""
                     yield
                         Xml.GroupTypes.SpannedBuildingBlock.create colName relatedTermAccession
             ]
         let completeProtocolInfo = {info with SpannedBuildingBlocks = createSpannedBlocks}
+        printfn "%A" completeProtocolInfo
         return (blockResults,completeProtocolInfo)
     }
 
@@ -1266,6 +1284,7 @@ let updateSwateCustomXml(newXmlString:String) =
     )
 
 let writeProtocolToXml(protocol:GroupTypes.Protocol) =
+    printfn "%A" protocol
     updateProtocolFromXml protocol false
 
 let removeProtocolFromXml(protocol:GroupTypes.Protocol) =
@@ -1493,7 +1512,7 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
 
 let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidation, colNames: string list) =
     Excel.run(fun context ->
-
+        printfn "START ADDING TABLEVALIDATION"
         let getBaseName (colHeader:string) =
             let parsedHeader = parseColHeader colHeader
             let ont = if parsedHeader.Ontology.IsSome then sprintf " [%s]" parsedHeader.Ontology.Value.Name else ""
@@ -1504,7 +1523,8 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
                 getBaseName x, x
             )
             |> Map.ofList
-
+        printfn "%A" newColNameMap
+        printfn "%A" tableValidation
         //failwith (sprintf "%A" tableValidation)
 
         let updateColumnValidationColNames =
@@ -1769,7 +1789,7 @@ let updateProtocolByNewVersion (prot:OfficeInterop.Types.Xml.GroupTypes.Protocol
                 minBuildingBlocksInfoDB
                 |> List.filter (fun minimalBB ->
                     filterBuildingBlocksForProtocol
-                    |> Array.exists (fun bb -> minimalBB = MinimalBuildingBlock.ofBuildingBlockWithoutValues bb)
+                    |> Array.exists (fun bb -> minimalBB = MinimalBuildingBlock.ofBuildingBlockWithoutValues false bb)
                     |> not
                 )
 
@@ -1777,9 +1797,22 @@ let updateProtocolByNewVersion (prot:OfficeInterop.Types.Xml.GroupTypes.Protocol
                 filterBuildingBlocksForProtocol
                 |> Array.filter (fun x ->
                     minBuildingBlocksInfoDB
-                    |> List.exists (fun minimalBB -> minimalBB = MinimalBuildingBlock.ofBuildingBlockWithoutValues x)
+                    |> List.exists (fun minimalBB -> minimalBB = MinimalBuildingBlock.ofBuildingBlockWithoutValues false x)
                     |> not
                 )
+
+            let alreadyExistingBuildingBlocks =
+                filterBuildingBlocksForProtocol
+                |> Array.filter (fun bb ->
+                    buildingBlocksToRemove
+                    |> Array.contains bb
+                    |> not
+                )
+                |> Array.map (fun bb ->
+                     MinimalBuildingBlock.ofBuildingBlockWithoutValues true bb
+                     |> fun minBB -> {minBB with MainColumnName = bb.MainColumn.Header.Value.Header}
+                )
+                |> List.ofArray
 
             let! remove =
                 removeAnnotationBlocks annotationTable buildingBlocksToRemove
@@ -1822,7 +1855,11 @@ let updateProtocolByNewVersion (prot:OfficeInterop.Types.Xml.GroupTypes.Protocol
                 let swateVersion = prot.SwateVersion
                 GroupTypes.Protocol.create id version swateVersion [] annotationTable activeWorksheet.name
 
-            return minimalBuildingBlocksToAdd, protocol, validationType
+            /// Need to connect both again. 'alreadyExistingBuildingBlocks' is marked as already existing and is only passed to remain info about 
+            let minimalBuildingBlockInfo =
+                minimalBuildingBlocksToAdd@alreadyExistingBuildingBlocks
+
+            return minimalBuildingBlockInfo, protocol, validationType
         }
     )
 

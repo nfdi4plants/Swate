@@ -47,6 +47,7 @@
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\SettingsView.fs" />
         <Compile Include="Views\SettingsXmlView.fs" />
+        <Compile Include="Views\SettingsProtocolView.fs" />
         <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />

@@ -441,18 +441,24 @@ module BuildingBlockTypes =
     open ISADotNetHelpers
 
     type MinimalBuildingBlock = {
+        /// If 'IsAlreadyExisting' = false then this is just a core name + ont (e.g. Parameter [instrument model], so no id).
+        /// If 'IsAlreadyExisting' = true this is the real value from the table.
         MainColumnName          : string
         MainColumnTermAccession : string option
         UnitName                : string option
         UnitTermAccession       : string option
         Values                  : OntologyInfo option
+        /// When this type is given to 'AddBuildingBlocks' this parameter differentiates between term that were already found in the table and term that
+        /// need to be added. This is important to correctly update existing protocols by their newest version from the DB
+        IsAlreadyExisting       : bool
     } with
-        static member create mainColName colTermAccession unitName unitTermAccession values = {
+        static member create mainColName colTermAccession unitName unitTermAccession values isExisting = {
             MainColumnName          = mainColName
             MainColumnTermAccession = colTermAccession
             UnitName                = unitName
             UnitTermAccession       = unitTermAccession
             Values                  = values
+            IsAlreadyExisting       = isExisting
         }
 
         // This function assumes that Process.ExecutesProtocol.Parameters.IsSome and Process.ParameterValues.IsSome.
@@ -472,8 +478,28 @@ module BuildingBlockTypes =
                 let unitName            = if hasUnit then paramValuePair.Unit.Value.Name.Value |> ISADotNetHelpers.annotationValueToString |> Some else None
                 let unitTermAccession   = if hasUnit then paramValuePair.Unit.Value.TermAccessionNumber.Value |> ISADotNetHelpers.termAccessionReduce |> Some else None
                 let values              = if hasOntologyValue.IsSome then hasOntologyValue else OntologyInfo.create (ISADotNetHelpers.valueToString paramValuePair.Value.Value) "" |> Some
-                MinimalBuildingBlock.create mainColName (Some colTermAccession) unitName unitTermAccession values
+                MinimalBuildingBlock.create mainColName (Some colTermAccession) unitName unitTermAccession values false
             )
+
+        static member ofBuildingBlockWithoutValues isExisting (buildingBlock:BuildingBlock) =
+            let bbHeader    = buildingBlock.MainColumn.Header.Value
+            let mainColName =
+                let ont = if bbHeader.Ontology.IsSome then sprintf " [%s]" bbHeader.Ontology.Value.Name else ""
+                sprintf "%s%s" bbHeader.CoreName.Value ont
+            let mainColAccession =
+                if bbHeader.Ontology.IsSome then bbHeader.Ontology.Value.TermAccession |> Some else None
+            let unitName, unitTermAccession =
+                if buildingBlock.hasCompleteUnitBlock then
+                    let unitHeader = buildingBlock.Unit.Value.MainColumn.Header.Value
+                    let unitColName =
+                        if unitHeader.Ontology.IsSome then unitHeader.Ontology.Value.Name |> Some else None
+                    let unitColAccession =
+                        if unitHeader.Ontology.IsSome then unitHeader.Ontology.Value.TermAccession |> Some else None
+                    unitColName,unitColAccession
+                else
+                    None, None
+            MinimalBuildingBlock.create mainColName mainColAccession unitName unitTermAccession None isExisting
+
 
 
             

@@ -464,6 +464,15 @@ type SettingsDataStewardState = {
         PointerJson = None
     }
 
+type SettingsProtocolState = {
+    ProtocolsFromExcel  : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    ProtocolsFromDB     : Shared.ProtocolTemplate []
+} with
+    static member init () = {
+        ProtocolsFromExcel  = None
+        ProtocolsFromDB     = [||]
+    }
+
 type Model = {
 
     ///PageState
@@ -511,7 +520,12 @@ type Model = {
 
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
-}
+
+    ///Used to manage protocols
+    SettingsProtocolState       : SettingsProtocolState
+} with
+    member this.updateByExcelState (s:ExcelState) =
+        { this with ExcelState = s}
 
 let initializeModel (pageOpt: Route option) = {
     DebouncerState              = Debouncer                 .create ()
@@ -530,4 +544,5 @@ let initializeModel (pageOpt: Route option) = {
     BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
     SettingsXmlState            = SettingsXmlState          .init ()
     SettingsDataStewardState    = SettingsDataStewardState  .init ()
+    SettingsProtocolState       = SettingsProtocolState     .init ()
 }
