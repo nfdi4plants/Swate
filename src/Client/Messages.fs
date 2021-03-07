@@ -220,7 +220,63 @@ type SettingsProtocolMsg =
 type TopLevelMsg =
     | CloseSuggestions
 
-type Msg =
+type Model = {
+
+    ///PageState
+    PageState               : PageState
+
+    ///Data that needs to be persistent once loaded
+    PersistentStorageState  : PersistentStorageState
+ 
+    ///Debouncing
+    DebouncerState          : Debouncer.State
+
+    ///Error handling, Logging, etc.
+    DevState                : DevState
+
+    ///Site Meta Options (Styling etc)
+    SiteStyleState          : SiteStyleState
+
+    ///States regarding term search
+    TermSearchState         : TermSearchState
+
+    AdvancedSearchState     : AdvancedSearchState
+
+    ///Use this in the future to model excel stuff like table data
+    ExcelState              : ExcelState
+
+    ///Use this to log Api calls and maybe handle them better
+    ApiState                : ApiState
+
+    ///States regarding File picker functionality
+    FilePickerState         : FilePickerState
+
+    ProtocolInsertState     : ProtocolInsertState
+
+    ///Insert annotation columns
+    AddBuildingBlockState   : AddBuildingBlockState
+
+    ///Create Validation scheme for Table
+    ValidationState         : ValidationState
+
+    ///Used to show selected building block information
+    BuildingBlockDetailsState   : BuildingBlockDetailsState
+
+    ///Used to manage all custom xml settings
+    SettingsXmlState            : SettingsXmlState
+
+    ///Used to manage functions specifically for data stewards
+    SettingsDataStewardState    : SettingsDataStewardState
+
+    ///Used to manage protocols
+    SettingsProtocolState       : SettingsProtocolState
+
+    WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
+} with
+    member this.updateByExcelState (s:ExcelState) =
+        { this with ExcelState = s}
+
+and Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
     | Api                   of ApiMsg
     | Dev                   of DevMsg
@@ -241,4 +297,29 @@ type Msg =
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>
+    /// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
+    | UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
     | DoNothing
+
+open Routing
+
+let initializeModel (pageOpt: Route option) = {
+    DebouncerState              = Debouncer                 .create ()
+    PageState                   = PageState                 .init pageOpt
+    PersistentStorageState      = PersistentStorageState    .init ()
+    DevState                    = DevState                  .init ()
+    SiteStyleState              = SiteStyleState            .init ()
+    TermSearchState             = TermSearchState           .init ()
+    AdvancedSearchState         = AdvancedSearchState       .init ()
+    ExcelState                  = ExcelState                .init ()
+    ApiState                    = ApiState                  .init ()
+    FilePickerState             = FilePickerState           .init ()
+    AddBuildingBlockState       = AddBuildingBlockState     .init ()
+    ValidationState             = ValidationState           .init ()
+    ProtocolInsertState         = ProtocolInsertState       .init ()
+    BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
+    SettingsXmlState            = SettingsXmlState          .init ()
+    SettingsDataStewardState    = SettingsDataStewardState  .init ()
+    SettingsProtocolState       = SettingsProtocolState     .init ()
+    WarningModal                = None
+}

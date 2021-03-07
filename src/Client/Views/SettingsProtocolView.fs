@@ -69,7 +69,10 @@ let applyNewestVersionButton (protocol:Protocol) (dbProtocolTemplate:Shared.Prot
         Button.Color IsWarning
         Button.IsFullWidth
         Button.OnClick (fun e ->
-            UpdateProtocolByNewVersion (protocol, dbProtocolTemplate) |> SettingsProtocolMsg |> dispatch
+            let msg = UpdateProtocolByNewVersion (protocol, dbProtocolTemplate) |> SettingsProtocolMsg
+            let messageBody = "This function has major impact on your table. Please save your progress before clicking 'Continue'."
+            let nM = {|ModalMessage = messageBody;NextMsg = msg|} |> Some
+            UpdateWarningModal nM |> dispatch
         )
     ][
         str "update"
@@ -91,18 +94,21 @@ let displayVersionControlEle (model:Model) dispatch =
                 let dbProts = model.SettingsProtocolState.ProtocolsFromDB
                 let relatedDBProt = dbProts |> Array.tryFind (fun x -> x.Name = prot.Id)
                 let color =
-                    let dbVersion = splitVersion relatedDBProt.Value.Version
-                    let usedVersion = splitVersion prot.ProtocolVersion
-                    if dbVersion.Major > usedVersion.Major then
-                        Some NFDIColors.Red.Base
-                    elif dbVersion.Minor > usedVersion.Minor then
-                        Some "orange"
-                    elif dbVersion.Patch > usedVersion.Patch then
-                        Some NFDIColors.Yellow.Lighter20
-                    elif dbVersion = usedVersion then
-                        Some NFDIColors.Mint.Base
-                    else
+                    if relatedDBProt.IsNone then
                         None
+                    else
+                        let dbVersion = splitVersion relatedDBProt.Value.Version
+                        let usedVersion = splitVersion prot.ProtocolVersion
+                        if dbVersion.Major > usedVersion.Major then
+                            Some NFDIColors.Red.Base
+                        elif dbVersion.Minor > usedVersion.Minor then
+                            Some "orange"
+                        elif dbVersion.Patch > usedVersion.Patch then
+                            Some NFDIColors.Yellow.Lighter20
+                        elif dbVersion = usedVersion then
+                            Some NFDIColors.Mint.Base
+                        else
+                            None
                 let docTag() = Tag.tag [] [ a [ OnClick (fun e -> e.stopPropagation()); Href relatedDBProt.Value.DocsLink; Target "_Blank" ] [str "docs"] ]
                 yield
                     tr [][
@@ -112,7 +118,8 @@ let displayVersionControlEle (model:Model) dispatch =
                                 Title "Could not find protocol in DB."
                             elif color.IsNone then
                                 Title "Versions could not be compared. Make sure they have the format '1.0.0'"
-                            else Style [Color color.Value; FontWeight "bold"]
+                            else
+                                Style [Color color.Value; FontWeight "bold"]
                         ][
                             str prot.ProtocolVersion
                         ]

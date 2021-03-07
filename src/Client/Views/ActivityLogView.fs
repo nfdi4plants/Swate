@@ -32,6 +32,17 @@ let debugBox model dispatch =
         ] [
             str "Try Excel2"
         ]
+        Button.a [
+            Button.IsFullWidth
+            Button.OnClick (fun e ->
+                let msg = UpdateWarningModal None
+                let message = "This is a warning modal. Be careful if you know what you are doing."
+                let nM = {|ModalMessage = message; NextMsg = msg|} |> Some
+                UpdateWarningModal nM |> dispatch
+            )
+        ][
+            str "Test"
+        ]
         Label.label [][str "Dangerzone"]
         Container.container [
             Container.Props [Style [

@@ -332,7 +332,12 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
             Cmd.OfPromise.either
                 OfficeInterop.updateSwateCustomXml
                 newCustomXml
-                (GenericLog >> Dev)
+                (fun x ->
+                    Msg.Batch [
+                        x |> (GenericLog >> Dev)
+                        GetSwateCustomXml |> ExcelInterop
+                    ]
+                )
                 (GenericError >> Dev)
         currentModel, cmd
     //
@@ -1716,8 +1721,6 @@ let handleSettingsProtocolMsg (topLevelMsg:SettingsProtocolMsg) (currentState: S
                 GenericLog ("Info", "No protocols found for active table") |> Dev |> Cmd.ofMsg
         currentState, cmd
             
-
-
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
     // Client
@@ -1747,6 +1750,12 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                     msgSeq |> Seq.map Cmd.ofMsg
             ]
         currentModel, cmd
+    | UpdateWarningModal (nextModalOpt) ->
+        let nextModel = {
+            currentModel with
+                WarningModal = nextModalOpt
+        }
+        nextModel, Cmd.none
     | UpdatePageState (pageOpt:Route option) ->
         let nextCmd =
             match pageOpt with
