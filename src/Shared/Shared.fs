@@ -20,7 +20,7 @@ module URLs =
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
-    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate#swate"
+    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate/wiki"
 
     [<LiteralAttribute>]
     let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
