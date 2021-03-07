@@ -64,23 +64,10 @@ open Fable.SimpleXml.Generator
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction1 () =
     Excel.run(fun context ->
-        
-        let annotationTable = "annotationTable"
-        
-        let selectedRange = context.workbook.getSelectedRange()
-        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
-                
-        // Ref. 2
-        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTable
-        
+              
         promise {
         
-            let! selectedBuildingBlock =
-                findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
-        
-            let searchTerms = sortBuildingBlockToSearchTerm selectedBuildingBlock
-        
-            return (sprintf "%A" searchTerms)
+            return (sprintf "0" )
         }
     )
 
@@ -513,8 +500,6 @@ let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
                 //create an empty column to insert
                 let col value = createEmptyMatrixForTables 1 rowCount value
 
-                printfn "%A" buildingBlockInfo.Values
-
                 // create main column
                 let createdCol1() =
                     let mainColVal = if buildingBlockInfo.Values.IsSome then buildingBlockInfo.Values.Value.Name else ""
@@ -581,7 +566,9 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
         }
     let chainBuildingBlocks buildingBlockInfoList =
         let promiseList = buildingBlockInfoList |> List.map (fun x -> addBuildingBlock x)
+
         let emptyPromise = promise {return []}
+
         let rec chain ind (promiseList:JS.Promise<(string*string*string) list> list ) resultPromise =
             if ind >= promiseList.Length then
                 resultPromise
@@ -618,9 +605,7 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                 if currentProtocolGroup.IsSome then
                     let existsAlready =
                         currentProtocolGroup.Value.Protocols
-                        |> List.tryFind (fun existingProtocol ->
-                            existingProtocol.Id             = protocol.Id
-                        )
+                        |> List.tryFind ( fun existingProtocol -> existingProtocol.Id = protocol.Id )
                     let isComplete =
                         if existsAlready.IsSome then
                             (tryFindSpannedBuildingBlocks existsAlready.Value buildingBlocks).IsSome
@@ -632,7 +617,7 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
 
                 let! chainProm = chainBuildingBlocks buildingBlockInfoList
 
-                let updateProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name} 
+                let updateProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
                 return (chainProm,updateProtocol)
             }
@@ -656,7 +641,51 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
         return (blockResults,completeProtocolInfo)
     }
 
-let removeAnnotationBlock () =
+/// This function removes a given building block from a given annotation table.
+/// It returns the affected column indices.
+let removeAnnotationBlock (tableName:string) (annotationBlock:BuildingBlock) =
+    Excel.run(fun context ->
+        promise {
+
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let table = sheet.tables.getItem(tableName)
+        
+            // Ref. 2
+        
+            let _ = table.load(U2.Case1 "columns")
+            let tableCols = table.columns.load(propertyNames = U2.Case1 "items")
+
+            let targetedColIndices =
+                let hasTSRAndTan =
+                    if annotationBlock.hasCompleteTSRTAN then [|annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index|] else [||]
+                let hasUnit =
+                    if annotationBlock.hasCompleteUnitBlock then
+                        [|annotationBlock.Unit.Value.MainColumn.Index;annotationBlock.Unit.Value.TSR.Value.Index;annotationBlock.Unit.Value.TAN.Value.Index|]
+                    else
+                        [||]
+                [|  annotationBlock.MainColumn.Index
+                    yield! hasTSRAndTan
+                    yield! hasUnit
+                |] |> Array.sort
+
+            let! deleteCols =
+                context.sync().``then``(fun e ->
+                    targetedColIndices |> Array.map (fun targetIndex ->
+                        tableCols.items.[targetIndex].delete()
+                    )
+                )
+
+            return targetedColIndices
+        }
+    )
+
+let removeAnnotationBlocks (tableName:string) (annotationBlocks:BuildingBlock [])  =
+    annotationBlocks
+    |> Array.sortByDescending (fun x -> x.MainColumn.Index)
+    |> Array.map (removeAnnotationBlock tableName)
+    |> Promise.all
+
+let removeSelectedAnnotationBlock () =
     Excel.run(fun context ->
 
         promise {
@@ -687,27 +716,9 @@ let removeAnnotationBlock () =
             let! selectedBuildingBlock =
                 BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
 
-            let targetedColIndices =
-                let hasTSRAndTan =
-                    if selectedBuildingBlock.hasCompleteTSRTAN then [|selectedBuildingBlock.TAN.Value.Index; selectedBuildingBlock.TSR.Value.Index|] else [||]
-                let hasUnit =
-                    if selectedBuildingBlock.hasCompleteUnitBlock then
-                        [|selectedBuildingBlock.Unit.Value.MainColumn.Index;selectedBuildingBlock.Unit.Value.TSR.Value.Index;selectedBuildingBlock.Unit.Value.TAN.Value.Index|]
-                    else
-                        [||]
-                [|  selectedBuildingBlock.MainColumn.Index
-                    yield! hasTSRAndTan
-                    yield! hasUnit
-                |] |> Array.sort
+            let! deleteCols = removeAnnotationBlock annotationTable selectedBuildingBlock
 
-            let! deleteCols =
-                context.sync().``then``(fun e ->
-                    targetedColIndices |> Array.map (fun targetIndex ->
-                        tableCols.items.[targetIndex].delete()
-                    )
-                )
-
-            return sprintf "Delete Building Block %s (Cols: %A]" selectedBuildingBlock.MainColumn.Header.Value.Header targetedColIndices
+            return sprintf "Delete Building Block %s (Cols: %A]" selectedBuildingBlock.MainColumn.Header.Value.Header deleteCols
         }
     )
 
@@ -1290,7 +1301,6 @@ let updateProtocolGroupHeader () =
 
                 let getGroupHeaderIndicesForProtocol (buildingBlocks:BuildingBlock []) (protocol:Xml.GroupTypes.Protocol) =
                     let buildingBlockOpts = tryFindSpannedBuildingBlocks protocol buildingBlocks
-
                     // caluclate list of indices fro group blocks
                     if buildingBlockOpts.IsSome then
                         let getStartAndEnd (mainColIndices:int list) =
@@ -1304,15 +1314,16 @@ let updateProtocolGroupHeader () =
                             buildingBlockOpts.Value
                             |> List.map (fun bb ->
                                 let nOfCols =
-                                    if bb.TAN.IsNone || bb.TSR.IsNone then
+                                    if bb.hasCompleteTSRTAN |> not then
                                         1
-                                    elif bb.TAN.IsSome && bb.TSR.IsSome && bb.Unit.IsNone then
+                                    elif bb.hasCompleteTSRTAN && bb.hasCompleteUnitBlock |> not then
                                         3
-                                    elif bb.TAN.IsSome && bb.TSR.IsSome && bb.Unit.IsSome then
+                                    elif bb.hasCompleteTSRTAN && bb.hasCompleteUnitBlock then
                                         6
                                     else failwith (sprintf "Swate encountered an unknown column pattern for building block: %s " bb.MainColumn.Header.Value.Header) 
                                 bb.MainColumn.Index, nOfCols
                             )
+                            |> List.sortBy fst
                         let rec sortIntoBlocks (iteration:int) (currentGroupIterator:int) (bbColNumberAndIndices:(int*int) list) (collector:(int*int*int) list) =
                             if iteration >= bbColNumberAndIndices.Length then
                                 collector
@@ -1418,7 +1429,7 @@ let updateProtocolGroupHeader () =
                                     
                             else
                                 // REMOVE INCOMPLETE PROTOCOL
-
+                                printfn "REMOVE!"
                                 let! remove = removeProtocolFromXml protocol
                                 return sprintf "%A" remove
 
@@ -1665,6 +1676,26 @@ let getAllValidationXmlParsed() =
         }
     )
 
+let getActiveProtocolGroupXmlParsed() =
+    Excel.run(fun context ->
+    
+        promise {
+
+            let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
+            let! annotationTable = getActiveAnnotationTableName()
+
+            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+
+            let! xmlParsed = getCustomXml customXmlParts context
+
+            let protocolGroup = getSwateProtocolGroupForCurrentTable annotationTable activeSheet.name xmlParsed
+
+            return protocolGroup
+
+        }
+    )
+
 let getAllProtocolGroupXmlParsed() =
     Excel.run(fun context ->
 
@@ -1694,6 +1725,107 @@ let getAllProtocolGroupXmlParsed() =
             return (protocolGroups, allTables)
         }
     )
+
+
+/// This function aims to update a protocol with a newer version from the db. To do this with minimum user friction we want the following:
+/// Keep all already existing building blocks that still exist in the new version. By doing this we keep already filled in values.
+/// Remove all building blocks that are not part of the new version.
+/// Add all new building blocks.
+// Of couse this is best be done by using already existing functions. Therefore we try the following. Return information necessary to use:
+// Msg 'AddAnnotationBlocks' -> this will add all new blocks that are mentioned in 'minimalBuildingBlocks', add validationXml to existing and also add protocol xml.
+// 'Remove building block' functionality by passing the correct indices
+let updateProtocolByNewVersion (prot:OfficeInterop.Types.Xml.GroupTypes.Protocol, dbTemplate:Shared.ProtocolTemplate) =
+    Excel.run(fun context ->
+    
+        promise {
+    
+            let! annotationTable = getActiveAnnotationTableName()
+    
+            // Ref. 2
+            let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "name")
+            let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
+    
+            //let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            //let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+    
+            //let! xmlParsed = getCustomXml customXmlParts context
+            //let currentProtocolGroup = getSwateValidationForCurrentTable annotationTable activeWorksheet.name xmlParsed
+    
+            let! allBuildingBlocks =
+                context.sync().``then``( fun _ ->
+                    let buildingBlocks = getBuildingBlocks annoHeaderRange annoBodyRange
+    
+                    buildingBlocks 
+                )
+
+            let filterBuildingBlocksForProtocol =
+                allBuildingBlocks |> Array.filter (fun bb ->
+                    prot.SpannedBuildingBlocks |> List.exists (fun spannedBB -> spannedBB.ColumnName = bb.MainColumn.Header.Value.Header)
+                )
+
+            let minBuildingBlocksInfoDB = dbTemplate.TableXml |> MinimalBuildingBlock.ofExcelTableXml |> snd
+
+            let minimalBuildingBlocksToAdd =
+                minBuildingBlocksInfoDB
+                |> List.filter (fun minimalBB ->
+                    filterBuildingBlocksForProtocol
+                    |> Array.exists (fun bb -> minimalBB = MinimalBuildingBlock.ofBuildingBlockWithoutValues bb)
+                    |> not
+                )
+
+            let buildingBlocksToRemove =
+                filterBuildingBlocksForProtocol
+                |> Array.filter (fun x ->
+                    minBuildingBlocksInfoDB
+                    |> List.exists (fun minimalBB -> minimalBB = MinimalBuildingBlock.ofBuildingBlockWithoutValues x)
+                    |> not
+                )
+
+            let! remove =
+                removeAnnotationBlocks annotationTable buildingBlocksToRemove
+
+            let! reloadBuildingBlocks =
+                let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
+
+                let allBuildingBlocks =
+                    context.sync().``then``( fun _ ->
+                        let buildingBlocks = getBuildingBlocks annoHeaderRange annoBodyRange
+    
+                        buildingBlocks 
+                    )
+
+                allBuildingBlocks
+
+            let filterReloadedBuildingBlocksForProtocol =
+                reloadBuildingBlocks |> Array.filter (fun bb ->
+                    prot.SpannedBuildingBlocks |> List.exists (fun spannedBB -> spannedBB.ColumnName = bb.MainColumn.Header.Value.Header)
+                )
+
+            let table = activeWorksheet.tables.getItem(annotationTable)
+
+            //Auto select place to add new building blocks.
+            let! selectCorrectIndex = context.sync().``then``(fun e ->
+                let lastInd = filterReloadedBuildingBlocksForProtocol |> Array.map (fun bb -> bb.MainColumn.Index) |> Array.max |> float
+
+                table.getDataBodyRange().getColumn(lastInd).select()
+            )
+
+            let validationType =
+                dbTemplate.CustomXml
+                |> ValidationTypes.TableValidation.ofXml
+                |> Some
+
+            let protocol =
+                let id = dbTemplate.Name
+                let version = dbTemplate.Version
+                /// This could be outdated and needs to be updated during Msg-handling
+                let swateVersion = prot.SwateVersion
+                GroupTypes.Protocol.create id version swateVersion [] annotationTable activeWorksheet.name
+
+            return minimalBuildingBlocksToAdd, protocol, validationType
+        }
+    )
+
 
 let removeXmlType(xmlType:XmlTypes) =
     Excel.run(fun context ->
