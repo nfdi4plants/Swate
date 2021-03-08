@@ -82,11 +82,11 @@ let settingsViewComponent (model:Model) dispatch =
     ][
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Swate Settings"]
 
-        Label.label [][str "Customize Swate"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Customize Swate"]
         toggleDarkModeElement model dispatch
 
 
-        Label.label [][str "Advanced Settings"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Advanced Settings"]
         customXmlSettings model dispatch
         dataStewardsSettings model dispatch
         protocolSettings model dispatch

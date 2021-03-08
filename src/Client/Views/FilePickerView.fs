@@ -202,14 +202,14 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             eve.preventDefault()
             //eve.target?style?backgroundColor <- "lightgrey"
             //eve.target?style?borderBottom <- "5px solid darkgrey"
-            parent()?style?backgroundColor <- "lightgrey"
+            parent()?style?backgroundColor <- model.SiteStyleState.ColorMode.ControlForeground
             parent()?style?borderBottom <- "5px solid darkgrey"
         )
         OnDragLeave (fun eve ->
             eve.preventDefault()
             //eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
             //eve.target?style?borderBottom <- "0px solid darkgrey"
-            parent()?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
+            parent()?style?backgroundColor <- model.SiteStyleState.ColorMode.BodyBackground
             parent()?style?borderBottom <- "0px solid darkgrey"
         )
         OnDragEnd (fun eve ->
@@ -236,7 +236,7 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             eve.preventDefault()
             dropped <- true
             UpdateDNDDropped true |> FilePicker |> dispatch
-            parent()?style?backgroundColor  <- ExcelColors.colorfullMode.BodyBackground
+            parent()?style?backgroundColor  <- model.SiteStyleState.ColorMode.BodyBackground
             parent()?style?borderBottom     <- "0px solid darkgrey"
 
             let prevId      = eve.dataTransfer.getData("text")

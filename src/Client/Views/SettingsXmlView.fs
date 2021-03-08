@@ -282,7 +282,7 @@ let displaySingleTableValidationEle (model:Model) dispatch (tableValidation:Vali
         thead [][
             tr [
                 Style [Cursor "pointer"]
-                Class "validationTableEle"
+                Class "hoverTableEle"
                 OnClick (fun e ->
                     let next = if isActive then None else Some tableValidation
                     UpdateActiveSwateValidation next |> SettingsXmlMsg |> dispatch
@@ -546,7 +546,7 @@ let displaySingleProtocolGroupEle model dispatch (protocolGroup:GroupTypes.Proto
         thead [][
             tr [
                 Style [Cursor "pointer"]
-                Class "validationTableEle"
+                Class "hoverTableEle"
                 OnClick (fun e ->
                     let next = if isActive then None else Some protocolGroup
                     UpdateActiveProtocolGroup next |> SettingsXmlMsg |> dispatch

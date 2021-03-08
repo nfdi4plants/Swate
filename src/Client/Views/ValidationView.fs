@@ -31,12 +31,12 @@ let columnListElement ind (columnValidation:ColumnValidation) (model:Model) disp
         if isActive then
             Class "nonSelectText"
         else
-            Class "nonSelectText validationTableEle"
+            Class "nonSelectText hoverTableEle"
         Style [
             Cursor "pointer"
             UserSelect UserSelectOptions.None
             if isActive then
-                BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
+                BackgroundColor NFDIColors.Mint.Darker10
             if isActive then
                 Color "white"
             else
@@ -260,8 +260,9 @@ let sliderElements id columnValidation model dispatch =
                     Control.div [][
                         Button.a [
                             Button.Color IsWarning
-                            Button.IsLight
-                            Button.Props [Style [Padding "0rem"]]
+                            //Button.IsLight
+                            Button.IsOutlined
+                            Button.Props [Style [Padding "0rem"; BorderColor model.SiteStyleState.ColorMode.BodyForeground]]
                             Button.OnClick (fun e ->
                                 let nextColumnValidation = {
                                     columnValidation with
@@ -278,14 +279,15 @@ let sliderElements id columnValidation model dispatch =
                                     Fa.Solid.Star
                                 else
                                     Fa.Regular.Star
-                                Fa.Props [Style [Color NFDIColors.Yellow.Base]]
+                                //Fa.Props [Style [Color NFDIColors.Yellow.Base]]
                             ][]
                         ]
                     ]
             yield
                 Button.a [
                     Button.Color IsDanger
-                    Button.IsLight
+                    Button.Props [Style [BorderColor model.SiteStyleState.ColorMode.BodyForeground]]
+                    Button.IsOutlined
                     Button.OnClick (fun e ->
                         let nextColumnValidation = {
                             columnValidation with
@@ -343,7 +345,7 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
             ColSpan 4
             Style [
                 Padding "0";
-                if isVisible then BorderBottom (sprintf "2px solid %s" model.SiteStyleState.ColorMode.Accent)
+                if isVisible then BorderBottom (sprintf "2px solid %s" NFDIColors.Mint.Base)
             ]
         ][
             Box.box' [

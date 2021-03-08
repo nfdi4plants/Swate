@@ -14,7 +14,7 @@ open Model
 open Messages
 
 
-let breadcrumbEle dispatch =
+let breadcrumbEle (model:Model) dispatch =
     Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
         Breadcrumb.item [][
             a [
@@ -23,8 +23,11 @@ let breadcrumbEle dispatch =
                 str (Routing.Route.ProtocolInsert.toStringRdbl)
             ]
         ]
-        Breadcrumb.item [ Breadcrumb.Item.IsActive true ][
+        Breadcrumb.item [
+            Breadcrumb.Item.IsActive true
+        ][
             a [
+                Style [Color model.SiteStyleState.ColorMode.Text]
                 OnClick (fun e -> UpdatePageState (Some Routing.Route.ProtocolInsert) |> dispatch)
             ][
                 str Routing.Route.ProtocolSearch.toStringRdbl
@@ -62,9 +65,9 @@ let fileSortElements (model:Model) dispatch =
         else
             [||]
     div [ Style [MarginBottom "0.75rem"] ][
-        Columns.columns [Columns.IsMobile; Columns.Props [Style [MarginBottom "0"]]] [
+        Columns.columns [Columns.IsMobile; Columns.Props [Style [MarginBottom "0";]]] [
             Column.column [ ] [
-                Label.label [Label.Size IsSmall] [str "Search by protocol name"]
+                Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]] [str "Search by protocol name"]
                 Control.div [
                     Control.HasIconRight
                 ] [
@@ -80,7 +83,7 @@ let fileSortElements (model:Model) dispatch =
             ]
 
             Column.column [ ] [
-                Label.label [Label.Size IsSmall] [str "Search for tags"]
+                Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]] [str "Search for tags"]
                 Control.div [
                     Control.HasIconRight
                 ] [
@@ -95,9 +98,10 @@ let fileSortElements (model:Model) dispatch =
                             [ ] ]
                     /// Pseudo dropdown
                     Box.box' [Props [Style [
+                        yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode
                         Position PositionOptions.Absolute
                         Width "100%"
-                        Border "0.5px solid darkgrey"
+                        //Border "0.5px solid"
                         if hitTagList |> Array.isEmpty then Display DisplayOptions.None
                     ]]] [
                         Tag.list [][
@@ -120,7 +124,7 @@ let fileSortElements (model:Model) dispatch =
                 yield
                     Control.div [ ] [
                         Tag.list [Tag.List.HasAddons][
-                            Tag.tag [Tag.Color IsInfo; Tag.Props [Style [Border (sprintf "0.2px solid %s" NFDIColors.LightBlue.Base) ]]] [str selectedTag]
+                            Tag.tag [Tag.Color IsInfo; Tag.Props [Style [Border "0px"]]] [str selectedTag]
                             Tag.delete [
                                 Tag.CustomClass "clickableTagDelete"
                                 //Tag.Color IsWarning;
@@ -146,7 +150,7 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
             if isActive then
                 Class "nonSelectText"
             else
-                Class "nonSelectText validationTableEle"
+                Class "nonSelectText hoverTableEle"
             Style [
                 Cursor "pointer"
                 UserSelect UserSelectOptions.None
@@ -179,13 +183,13 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
                 Style [
                     Padding "0"
                     if isActive then
-                        BorderBottom (sprintf "2px solid %s" ExcelColors.colorfullMode.Accent)
+                        BorderBottom (sprintf "2px solid %s" model.SiteStyleState.ColorMode.Accent)
                     if not isActive then
                         Display DisplayOptions.None
                 ]
                 ColSpan 5
             ] [
-                Box.box' [][
+                Box.box' [Props [Style [BorderRadius "0px"; yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode]]][
                     Columns.columns [][
                         Column.column [][
                             Text.div [][
@@ -260,20 +264,17 @@ let protocolElementContainer (model:Model) dispatch =
     ] [
         fileSortElements model dispatch
         Table.table [
-            //Table.IsBordered
             Table.IsFullWidth
             Table.IsStriped
+            Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text]]
         ] [
             thead [][
                 tr [][
-                    
-                ]
-                tr [][
-                    th [][ str "Protocol Name"      ]
-                    th [][ str "Documentation"      ]
-                    th [][ str "Protocol Version"   ]
-                    th [][ str "Uses"               ]
-                    th [][]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Protocol Name"      ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Documentation"      ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Protocol Version"   ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Uses"               ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][]
                 ]
             ]
             tbody [][
@@ -292,7 +293,7 @@ let protocolSearchViewComponent (model:Model) dispatch =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        breadcrumbEle dispatch
+        breadcrumbEle model dispatch
 
         if isEmpty && not isLoading then
             Help.help [Help.Color IsDanger][str "No Protocols were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
