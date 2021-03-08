@@ -32,7 +32,10 @@ let warningModal (model:Model) dispatch =
                 Button.a [
                     Button.Color IsWarning
                     Button.Props [Style [Float FloatOptions.Right]]
-                    Button.OnClick msg
+                    Button.OnClick (fun e ->
+                        UpdateWarningModal None |> dispatch
+                        model.WarningModal.Value.NextMsg |> dispatch
+                    )
                 ][
                     str "Continue"
                 ]

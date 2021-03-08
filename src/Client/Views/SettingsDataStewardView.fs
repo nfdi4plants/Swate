@@ -108,10 +108,10 @@ let createPointerJsonEle (model:Model) dispatch =
             createPointerJsonButton model dispatch
         ]
 
-        Field.div [][
-            if model.SettingsDataStewardState.PointerJson.IsSome then
+        if model.SettingsDataStewardState.PointerJson.IsSome then
+            Field.div [][
                 textFieldEle model dispatch
-        ]
+            ]
     ]
 
 let settingsDataStewardViewComponent (model:Model) dispatch =

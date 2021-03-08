@@ -127,8 +127,10 @@ let textAreaEle (model:Model) dispatch =
                             let xmlEle = model.SettingsXmlState.NextRawXml |> Fable.SimpleXml.SimpleXml.parseElementNonStrict
                             xmlEle
                             |> OfficeInterop.HelperFunctions.xmlElementToXmlString
-                        printfn "%A" rmvWhiteSpace
-                        ExcelInteropMsg.UpdateSwateCustomXml rmvWhiteSpace |> ExcelInterop |> dispatch
+                        let msg = ExcelInteropMsg.UpdateSwateCustomXml rmvWhiteSpace |> ExcelInterop
+                        let modalBody = "Changes in this field could potentially invalidate your checklist and protocol xml. Please safe a copy before clicking 'Continue'."
+                        let nM = {|ModalMessage = modalBody; NextMsg = msg|} |> Some
+                        UpdateWarningModal nM |> dispatch
                     )
                 ][
                     Fa.i [
@@ -147,25 +149,34 @@ let showRawCustomXmlEle (model:Model) dispatch =
             MarginBottom "1rem"
         ]
     ][
-        Columns.columns [Columns.IsMobile][
-            Column.column [][
-                showRawCustomXmlButton model dispatch
+        Field.div [][
+            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]][
+                str "Here you can display all custom xml of your Swate table. This can help debug your Swate table and/or fix any problems occuring."
             ]
-            if model.SettingsXmlState.RawXml <> "" then
-                Column.column [Column.Width (Screen.All,Column.IsNarrow)][
-                    Button.a [
-                        Button.OnClick (fun e -> UpdateRawCustomXml "" |> SettingsXmlMsg |> dispatch)
-                        Button.Color IsDanger
-                        Button.Props [Title "Remove custom xml from the text area"]
-                    ][
-                        Fa.i [Fa.Solid.Times][]
-                    ]
-                ]
         ]
 
+        Field.div [][
+            Columns.columns [Columns.IsMobile][
+                Column.column [][
+                    showRawCustomXmlButton model dispatch
+                ]
+                if model.SettingsXmlState.RawXml <> "" then
+                    Column.column [Column.Width (Screen.All,Column.IsNarrow)][
+                        Button.a [
+                            Button.OnClick (fun e -> UpdateRawCustomXml "" |> SettingsXmlMsg |> dispatch)
+                            Button.Color IsDanger
+                            Button.Props [Title "Remove custom xml from the text area"]
+                        ][
+                            Fa.i [Fa.Solid.Times][]
+                        ]
+                    ]
+            ]
+        ]
 
         if model.SettingsXmlState.RawXml <> "" then
-            textAreaEle model dispatch
+            Field.div [][
+                textAreaEle model dispatch
+            ]
     ]
 
 
@@ -231,7 +242,10 @@ let removeTableValidationButton (model:Model) dispatch (tableValidation:Validati
     Button.a [
         Button.OnClick (fun e ->
             let xmlType = XmlTypes.ValidationType tableValidation
-            RemoveCustomXmlRequest xmlType |> SettingsXmlMsg |> dispatch
+            let msg = RemoveCustomXmlRequest xmlType |> SettingsXmlMsg
+            let modalBody = "This function will remove the related checklist xml without chance of recovery. Please safe a copy before clicking 'Continue'."
+            let nM = {|ModalMessage = modalBody; NextMsg = msg|} |> Some
+            UpdateWarningModal nM |> dispatch
         )
         Button.Color IsDanger
     ][
@@ -373,6 +387,14 @@ let showValidationXmlEle (model:Model) dispatch =
         ]
     ][
         Field.div [][
+            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]][
+                str "This block will display all checklist xml for this workbook. You can then remove single elements or assign
+                them to a new table-sheet combination. Should Swate find any information not related to an existing table-sheet
+                combination these will be marked in red."
+            ]
+        ]
+
+        Field.div [][
             Columns.columns [Columns.IsMobile][
                 Column.column [][
                     getValidationXmlButton model dispatch
@@ -444,7 +466,10 @@ let removeProtocolGroupButton (model:Model) dispatch (protGroup:GroupTypes.Proto
     Button.a [
         Button.OnClick (fun e ->
             let xmlType = XmlTypes.GroupType protGroup
-            RemoveCustomXmlRequest xmlType |> SettingsXmlMsg |> dispatch
+            let msg = RemoveCustomXmlRequest xmlType |> SettingsXmlMsg
+            let modalBody = "This function will remove the related protocol xml without chance of recovery. Please safe a copy before clicking 'Continue'."
+            let nM = {|ModalMessage = modalBody; NextMsg = msg|} |> Some
+            UpdateWarningModal nM |> dispatch
         )
         Button.Color IsDanger
     ][
@@ -475,7 +500,10 @@ let protocolChildList (protocol:GroupTypes.Protocol) isActive model dispatch =
                                     Button.Color IsDanger
                                     Button.OnClick (fun e ->
                                         let xml = XmlTypes.ProtocolType protocol
-                                        RemoveCustomXmlRequest xml |> SettingsXmlMsg |> dispatch
+                                        let msg = RemoveCustomXmlRequest xml |> SettingsXmlMsg
+                                        let modalBody = "This function will remove the related protocol xml without chance of recovery. Please safe a copy before clicking 'Continue'."
+                                        let nM = {|ModalMessage = modalBody; NextMsg = msg|} |> Some
+                                        UpdateWarningModal nM |> dispatch
                                     )
                                 ][
                                     str "Remove"
@@ -596,10 +624,11 @@ let displaySingleProtocolGroupEle model dispatch (protocolGroup:GroupTypes.Proto
                                     UpdateActiveProtocol nextProtocol |> SettingsXmlMsg |> dispatch
                                 )
                                 Button.IsOutlined
+                                Button.IsFullWidth
                                 Button.Props [Style [BorderRadius "0"]]
                             ][
                                 Fa.i [
-                                    Fa.Props [Style [Transition "transform 0.25s"]]
+                                    Fa.Props [Style [Transition "transform 0.4s"]]
                                     if isActiveProt then Fa.Rotate180
                                     Fa.Solid.AngleDown
                                 ][]
@@ -640,6 +669,14 @@ let showProtocolGroupXmlEle (model:Model) dispatch =
         ]
     ][
         Field.div [][
+            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]][
+                str "This block will display all protocol xml for this workbook. You can then remove single elements or assign
+                them to a new table-sheet combination. Should Swate find any information not related to an existing table-sheet
+                combination these will be marked in red."
+            ]
+        ]
+
+        Field.div [][
             Columns.columns [Columns.IsMobile][
                 Column.column [][
                     getProtocolGroupXmlButton model dispatch
@@ -666,6 +703,8 @@ let settingsXmlViewComponent (model:Model) dispatch =
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
         breadcrumbEle dispatch
+
+        Help.help [][str "The functions on this page allow more or less direct manipulation of the Xml used to save additional information about your Swate table. Please use them with care."]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display raw custom xml."]
         showRawCustomXmlEle model dispatch
