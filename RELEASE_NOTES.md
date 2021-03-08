@@ -1,6 +1,6 @@
-### 0.4.1+0d9c945 (Released 2021-3-8)
+### 0.4.1+d75743c (Released 2021-3-8)
 * Additions:
-    * latest commit #0d9c945
+    * latest commit #d75743c
     * [[#0d9c945](https://github.com/nfdi4plants/Swate/commit/0d9c94558052d7f13e9707da6202e3a3f34440b9)] Add links to template repository.
     * [[#6b5a56f](https://github.com/nfdi4plants/Swate/commit/6b5a56f5786eb356703438ecffcb768a6444abcb)] Improve darkmode (Issue #25).
     * [[#37503a5](https://github.com/nfdi4plants/Swate/commit/37503a50786536ba88a72d591e2cf51fdfd113dc)] Enable term search without present annotation table (Issue #132).
@@ -15,6 +15,7 @@
 * Deletions:
     * [[#84d71ee](https://github.com/nfdi4plants/Swate/commit/84d71eef62c1d55bb2130143926d47e8b462fdeb)] Remove 'decimal' validation type.
 * Bugfixes:
+    * [[#d75743c](https://github.com/nfdi4plants/Swate/commit/d75743cc4597ab9ba557ea9522e6beea091db209)] Add minor fixes
     * [[#bd13cbf](https://github.com/nfdi4plants/Swate/commit/bd13cbf39f013277381b04bb9f30577d2a929f42)] Fix drag n drop problems in filepicker.
     * [[#33695f4](https://github.com/nfdi4plants/Swate/commit/33695f429ac6aa76e8638b9d5b375921b3d856bd)] Fix protocol grouping bug.
     * [[#f4d08e8](https://github.com/nfdi4plants/Swate/commit/f4d08e8f1f41c712ff787ce231e4c085795eef2a)] Fix protocol xml not correctly removed bug.
