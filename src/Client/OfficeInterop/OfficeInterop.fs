@@ -607,7 +607,7 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                         currentProtocolGroup.Value.Protocols
                         |> List.tryFind ( fun existingProtocol ->
                             if buildingBlockInfoList |> List.exists (fun x -> x.IsAlreadyExisting = true) then
-                                existingProtocol.Id = protocol.Id
+                                existingProtocol.Id = protocol.Id && existingProtocol.ProtocolVersion = protocol.ProtocolVersion
                             else
                                 false
                         )

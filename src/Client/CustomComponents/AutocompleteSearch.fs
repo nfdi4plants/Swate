@@ -261,6 +261,7 @@ let autocompleteTermSearchComponent
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
+            Input.Props [Style [BorderColor ExcelColors.Colorfull.gray40]]
             Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
             Input.ValueOrDefault autocompleteParams.StateBinding
