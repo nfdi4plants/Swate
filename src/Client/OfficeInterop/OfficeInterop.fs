@@ -869,59 +869,62 @@ let getParentTerm () =
     Excel.run (fun context ->
 
         promise {
-            let! annotationTable = getActiveAnnotationTableName()
-            // Ref. 2
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTable)
-            let tableRange = annotationTable.getRange()
-            let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"; "values"|]))
-            let range = context.workbook.getSelectedRange()
-            let _ = range.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"|]))
+            try
+                let! annotationTable = getActiveAnnotationTableName()
+                // Ref. 2
+                let sheet = context.workbook.worksheets.getActiveWorksheet()
+                let annotationTable = sheet.tables.getItem(annotationTable)
+                let tableRange = annotationTable.getRange()
+                let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"; "values"|]))
+                let range = context.workbook.getSelectedRange()
+                let _ = range.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"|]))
 
-            let! res = context.sync().``then``( fun _ ->
+                let! res = context.sync().``then``( fun _ ->
 
-                // Ref. 3
-                /// recalculate the selected col index from a worksheet perspective to the table perspective.
-                let newColIndex =
-                    let tableRangeColIndex = tableRange.columnIndex
-                    let selectColIndex = range.columnIndex
-                    selectColIndex - tableRangeColIndex |> int
+                    // Ref. 3
+                    /// recalculate the selected col index from a worksheet perspective to the table perspective.
+                    let newColIndex =
+                        let tableRangeColIndex = tableRange.columnIndex
+                        let selectColIndex = range.columnIndex
+                        selectColIndex - tableRangeColIndex |> int
 
-                let newRowIndex =
-                    let tableRangeRowIndex = tableRange.rowIndex
-                    let selectedRowIndex = range.rowIndex
-                    selectedRowIndex - tableRangeRowIndex |> int
+                    let newRowIndex =
+                        let tableRangeRowIndex = tableRange.rowIndex
+                        let selectedRowIndex = range.rowIndex
+                        selectedRowIndex - tableRangeRowIndex |> int
 
-                /// Get all values from the table range
-                let colHeaderVals = tableRange.values.[0]
-                let rowVals = tableRange.values
-                /// Get the index of the last column in the table
-                let lastColInd = colHeaderVals.Count-1
-                /// Get the index of the last row in the table
-                let lastRowInd = rowVals.Count-1
-                let value =
-                    // check if selected range is inside table 
-                    if
-                        newColIndex < 0
-                        || newColIndex > lastColInd
-                        || newRowIndex < 0
-                        || newRowIndex > lastRowInd
-                    then
-                        None
-                    else
-                        // is selected range is in table then take header value from selected column
-                        let header = tableRange.values.[0].[newColIndex]
-                        let parsedHeader = parseColHeader (string header.Value)
-                        /// as the reference columns also contain a accession tag we want to return the first reference column header
-                        /// instead of the main column header, if the main column header does include an ontology
-                        if parsedHeader.Ontology.IsSome then
-                            tableRange.values.[0].[newColIndex+1]
-                        else
+                    /// Get all values from the table range
+                    let colHeaderVals = tableRange.values.[0]
+                    let rowVals = tableRange.values
+                    /// Get the index of the last column in the table
+                    let lastColInd = colHeaderVals.Count-1
+                    /// Get the index of the last row in the table
+                    let lastRowInd = rowVals.Count-1
+                    let value =
+                        // check if selected range is inside table 
+                        if
+                            newColIndex < 0
+                            || newColIndex > lastColInd
+                            || newRowIndex < 0
+                            || newRowIndex > lastRowInd
+                        then
                             None
-                // return header of selected col
-                value
-            )
-            return res
+                        else
+                            // is selected range is in table then take header value from selected column
+                            let header = tableRange.values.[0].[newColIndex]
+                            let parsedHeader = parseColHeader (string header.Value)
+                            /// as the reference columns also contain a accession tag we want to return the first reference column header
+                            /// instead of the main column header, if the main column header does include an ontology
+                            if parsedHeader.Ontology.IsSome then
+                                tableRange.values.[0].[newColIndex+1]
+                            else
+                                None
+                    // return header of selected col
+                    value
+                )
+                return res
+            with
+                | exn -> return None
         }
     )
 

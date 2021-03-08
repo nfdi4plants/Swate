@@ -37,7 +37,10 @@ let columnListElement ind (columnValidation:ColumnValidation) (model:Model) disp
             UserSelect UserSelectOptions.None
             if isActive then
                 BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
+            if isActive then
                 Color "white"
+            else
+                Color model.SiteStyleState.ColorMode.Text
         ]
         OnClick (fun e ->
             e.preventDefault()
@@ -251,16 +254,42 @@ let sliderElements id columnValidation model dispatch =
     //    ]
     //]
     div [][
-        for i in 1 .. 5 do
+        Field.div [Field.HasAddons][
+            for i in 1 .. 5 do
+                yield
+                    Control.div [][
+                        Button.a [
+                            Button.Color IsWarning
+                            Button.IsLight
+                            Button.Props [Style [Padding "0rem"]]
+                            Button.OnClick (fun e ->
+                                let nextColumnValidation = {
+                                    columnValidation with
+                                        Importance = i |> Some
+                                }
+                                let nextTableValidation =
+                                    updateTableValidationByColValidation model nextColumnValidation
+                                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                                )
+                        ][
+                            Fa.span [
+                                Fa.Size Fa.FaLarge
+                                if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
+                                    Fa.Solid.Star
+                                else
+                                    Fa.Regular.Star
+                                Fa.Props [Style [Color NFDIColors.Yellow.Base]]
+                            ][]
+                        ]
+                    ]
             yield
                 Button.a [
-                    Button.Color IsWarning
-                    Button.Props [Style [Padding "0rem"]]
+                    Button.Color IsDanger
                     Button.IsLight
                     Button.OnClick (fun e ->
                         let nextColumnValidation = {
                             columnValidation with
-                                Importance = i |> Some
+                                Importance = None
                         }
                         let nextTableValidation =
                             updateTableValidationByColValidation model nextColumnValidation
@@ -269,30 +298,9 @@ let sliderElements id columnValidation model dispatch =
                 ][
                     Fa.span [
                         Fa.Size Fa.FaLarge
-                        if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
-                            Fa.Solid.Star
-                        else
-                            Fa.Regular.Star
-                        Fa.Props [Style [Color NFDIColors.Yellow.Base]]
+                        Fa.Solid.Backspace
                     ][]
                 ]
-        yield Button.a [
-            Button.Color IsDanger
-            Button.IsLight
-            Button.OnClick (fun e ->
-                let nextColumnValidation = {
-                    columnValidation with
-                        Importance = None
-                }
-                let nextTableValidation =
-                    updateTableValidationByColValidation model nextColumnValidation
-                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
-                )
-        ][
-            Fa.span [
-                Fa.Size Fa.FaLarge
-                Fa.Solid.Backspace
-            ][]
         ]
     ]
 
@@ -335,7 +343,7 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
             ColSpan 4
             Style [
                 Padding "0";
-                if isVisible then BorderBottom (sprintf "2px solid %s" ExcelColors.colorfullMode.Accent)
+                if isVisible then BorderBottom (sprintf "2px solid %s" model.SiteStyleState.ColorMode.Accent)
             ]
         ][
             Box.box' [
@@ -343,6 +351,9 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
                     Style [
                         Display (if isVisible then DisplayOptions.Block else DisplayOptions.None)
                         Width "100%"
+                        BorderRadius "0px"
+                        BackgroundColor model.SiteStyleState.ColorMode.BodyForeground
+                        Color model.SiteStyleState.ColorMode.Text
                     ]
                 ]
             ][
@@ -361,8 +372,6 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
                         Help.help [][str "Define how important it is to fill in the column correctly."]
 
                         sliderElements ind columnValidation model dispatch
-
-                        //submitButton ind columnValidation model dispatch
                     ]
                 ]
             ]
@@ -405,13 +414,16 @@ let validationElements (model:Model) dispatch =
                     )
                 )
             ]
-            Table.table [ Table.IsHoverable; Table.IsFullWidth ] [
+            Table.table [
+                Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
+                Table.IsHoverable; Table.IsFullWidth
+            ] [
                 thead [ ] [
                     tr [ ] [
-                        th [ ] [ str "Column Header" ]
-                        th [ ] [ str "Importance" ]
-                        th [ ] [ str "Content Type" ]
-                        th [][]
+                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Column Header" ]
+                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Importance" ]
+                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Content Type" ]
+                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ ]
                     ]
                 ]
                 tbody [ ] [
