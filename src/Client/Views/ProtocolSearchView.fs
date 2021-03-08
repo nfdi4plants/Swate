@@ -262,6 +262,16 @@ let protocolElementContainer (model:Model) dispatch =
             MarginBottom "1rem"
         ]
     ] [
+        Field.div [][
+            Help.help [][
+                b [][str "Search for protocol templates."]
+                str " For more information you can look "
+                a [ Href @"https://github.com/nfdi4plants/SWATE_templates/wiki"; Target "_Blank" ][str "here"]
+                str ". If you find any problems with a protocol or have other suggestions you can contact us "
+                a [ Href @"https://github.com/nfdi4plants/SWATE_templates/issues/new/choose"; Target "_Blank" ] [str "here"]
+                str "."
+            ]
+        ]
         fileSortElements model dispatch
         Table.table [
             Table.IsFullWidth
