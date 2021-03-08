@@ -1,6 +1,7 @@
-### 0.4.1+6b5a56f (Released 2021-3-8)
+### 0.4.1+0d9c945 (Released 2021-3-8)
 * Additions:
-    * latest commit #6b5a56f
+    * latest commit #0d9c945
+    * [[#0d9c945](https://github.com/nfdi4plants/Swate/commit/0d9c94558052d7f13e9707da6202e3a3f34440b9)] Add links to template repository.
     * [[#6b5a56f](https://github.com/nfdi4plants/Swate/commit/6b5a56f5786eb356703438ecffcb768a6444abcb)] Improve darkmode (Issue #25).
     * [[#37503a5](https://github.com/nfdi4plants/Swate/commit/37503a50786536ba88a72d591e2cf51fdfd113dc)] Enable term search without present annotation table (Issue #132).
     * [[#05a69b3](https://github.com/nfdi4plants/Swate/commit/05a69b323db6325d1309b7fbd5cf5b7f4279308e)] Increase responsiveness for copy to clipboard.
