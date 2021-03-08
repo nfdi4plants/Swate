@@ -267,9 +267,6 @@ let autocompleteTermSearchComponent
             match inputSize with
             | Some size -> Input.Size size
             | _ -> ()
-            Input.Props [
-                ExcelColors.colorControl colorMode
-            ]           
             Input.OnChange (
                 fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
             )
@@ -317,8 +314,6 @@ let autocompleteTermSearchComponentOfParentOntology
                     | Some size -> Input.Size size
                     | _ -> ()
                     Input.Props [
-                        
-                        ExcelColors.colorControl colorMode
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
                             GetParentTerm |> ExcelInterop |> dispatch

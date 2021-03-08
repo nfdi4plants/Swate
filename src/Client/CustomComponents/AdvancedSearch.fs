@@ -35,7 +35,6 @@ let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: DbD
             TabIndex 0
             OnClick (fun _ -> ontOpt |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
             OnKeyDown (fun k -> if k.key = "Enter" then ontOpt |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
-            colorControl model.SiteStyleState.ColorMode
         ]
     ][
         Text.span [
@@ -62,8 +61,8 @@ let createAdvancedTermSearchResultRows (model:Model) (dispatch: Msg -> unit) (su
         |> Array.map (fun sugg ->
             tr [
                 OnClick (fun _ -> sugg |> suggestionUsedHandler |> dispatch)
-                colorControl model.SiteStyleState.ColorMode
                 Class "suggestion"
+                colorControl model.SiteStyleState.ColorMode
             ] [
                 td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
                     Fa.i [Fa.Solid.InfoCircle] []
@@ -140,7 +139,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                     Input.input [
                         Input.Placeholder "... search key words"
                         Input.Size IsSmall
-                        Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
+                        //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                         Input.OnChange (fun e ->
                             {model.AdvancedSearchState.AdvancedSearchOptions
                                 with SearchTermName = e.Value
@@ -161,7 +160,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                     Input.input [
                         Input.Placeholder "... must exist in name"
                         Input.Size IsSmall
-                        Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
+                        //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                         Input.OnChange (fun e ->
                             {model.AdvancedSearchState.AdvancedSearchOptions
                                 with MustContainName = e.Value
@@ -182,7 +181,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                     Input.input [
                         Input.Placeholder "... search key words"
                         Input.Size IsSmall
-                        Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
+                        //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                         Input.OnChange (fun e ->
                             {model.AdvancedSearchState.AdvancedSearchOptions
                                 with SearchTermDefinition = e.Value
@@ -204,7 +203,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                         Input.input [
                             Input.Placeholder "... must exist in definition"
                             Input.Size IsSmall
-                            Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
+                            //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                             Input.OnChange (fun e ->
                                 {model.AdvancedSearchState.AdvancedSearchOptions
                                     with MustContainDefinition = e.Value
@@ -227,7 +226,7 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
         ][
             Button.buttonComponent model.SiteStyleState.ColorMode true "Change search options" (fun _ -> UpdateAdvancedTermSearchSubpage AdvancedTermSearchSubpages.InputFormSubpage |> AdvancedSearch |> dispatch)
         ]
-        Label.label [] [str "Results:"]
+        Label.label [Label.Props [colorControl model.SiteStyleState.ColorMode]] [str "Results:"]
         if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.ResultsSubpage then
             if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
                 div [
@@ -251,17 +250,13 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
 
 let advancedSearchSelectedResultDisplay (model:Model) (result:DbDomain.Term) =
     Container.container [] [
-        Heading.h4 [] [str "Selected Result:"]
+        Heading.h4 [Heading.Props [colorControl model.SiteStyleState.ColorMode]] [str "Selected Result:"]
         Table.table [Table.IsFullWidth] [
-            thead [] []
-            tbody [] [
+            tbody [colorControl model.SiteStyleState.ColorMode] [
                 tr [
-                colorControl model.SiteStyleState.ColorMode
+                //colorControl model.SiteStyleState.ColorMode
                 Class "suggestion"
                 ] [
-                    td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip result.Definition] [
-                        Fa.i [Fa.Solid.InfoCircle] []
-                    ]
                     td [] [
                         b [] [str result.Name]
                     ]
@@ -281,12 +276,12 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
             && model.AdvancedSearchState.ModalId = modalId
         )
         Modal.Props [
-            colorControl model.SiteStyleState.ColorMode
+            //colorControl model.SiteStyleState.ColorMode
             Id modalId
         ]
     ] [
         Modal.background [] []
-        Modal.Card.card [Props [colorControl model.SiteStyleState.ColorMode]] [
+        Modal.Card.card [] [
             Modal.Card.head [Props [colorControl model.SiteStyleState.ColorMode]] [
                 Modal.close [Modal.Close.Size IsLarge; Modal.Close.OnClick (fun _ -> ToggleModal modalId |> AdvancedSearch |> dispatch)] []
                 Heading.h4 [Heading.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
@@ -306,7 +301,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                 //    |None   -> advancedSearchResultTable model dispatch 
                 //    |Some r -> advancedSearchSelectedResultDisplay model r
             ]
-            Modal.Card.foot [] [
+            Modal.Card.foot [Props [colorControl model.SiteStyleState.ColorMode]] [
                 form [
                     OnSubmit    (fun e -> e.preventDefault())
                     OnKeyDown   (fun k -> if k.key = "Enter" then k.preventDefault())
