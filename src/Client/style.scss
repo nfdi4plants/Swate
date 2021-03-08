@@ -81,16 +81,21 @@ a:hover {
     @extend .delete
 }
 
+a.navbar-item:hover {
+    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)) !important;
+}
+
 .delete:hover {
     @extend .delete;
     background-color: $danger
 }
 
-.validationTableEle {
+.hoverTableEle {
 }
 
-.validationTableEle:hover {
-    background-color: #E8E8E8 !important
+.hoverTableEle:hover {
+    /*background-color: #E8E8E8 !important*/
+    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4));
 }
 
 .clickableTag {

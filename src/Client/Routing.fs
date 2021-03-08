@@ -18,6 +18,8 @@ type Route =
 | ActivityLog
 | Settings
 | SettingsXml
+| SettingsDataStewards
+| SettingsProtocol
 | NotFound
 
     static member toRouteUrl (route:Route) =
@@ -32,30 +34,17 @@ type Route =
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
-        | Route.SettingsXml         -> "/#SettingsXml"
+        | Route.SettingsXml         -> "/#Settings/Xml"
+        | Route.SettingsDataStewards-> "/#Settings/DataStewards"
+        | Route.SettingsProtocol    -> "/#Settings/Protocol"
         | Route.NotFound            -> "/#NotFound"
-
-    static member toString (route:Route) =
-        match route with
-        | Route.Home                -> ""
-        | Route.AddBuildingBlock    -> "AddBuildingBlock"
-        | Route.TermSearch          -> "TermSearch"
-        | Route.Validation          -> "Validation"
-        | Route.ProtocolInsert      -> "ProtocolInsert"
-        | Route.ProtocolSearch      -> "ProtocolSearch"
-        | Route.Info                -> "Info"
-        | Route.FilePicker          -> "FilePicker"
-        | Route.ActivityLog         -> "ActivityLog"
-        | Route.Settings            -> "Settings"
-        | Route.SettingsXml         -> "SettingsXml"
-        | Route.NotFound            -> "NotFound"
 
     member this.toStringRdbl =
         match this with
         | Route.Home                -> ""
         | Route.AddBuildingBlock    -> "Manage Building Blocks"
         | Route.TermSearch          -> "Manage Terms"
-        | Route.Validation          -> "Validation"
+        | Route.Validation          -> "Checklist Editor"
         | Route.FilePicker          -> "File Picker"
         | Route.ProtocolInsert      -> "Protocol Insert"
         | Route.ProtocolSearch      -> "Protocol Search"
@@ -63,8 +52,9 @@ type Route =
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
         | Route.SettingsXml         -> "Xml Settings"
+        | Route.SettingsDataStewards-> "Settings for Data Stewards"
+        | Route.SettingsProtocol    -> "Protocol Settings"
         | Route.NotFound            -> "NotFound"
-
 
     static member toIcon (p: Route)=
         let createElem icons name =
@@ -99,18 +89,20 @@ module Routing =
     /// The URL is turned into a Result.
     let route : Parser<Route -> Route,_> =
         oneOf [
-            map Route.Home              (s "")
-            map Route.TermSearch        (s "TermSearch")
-            map Route.AddBuildingBlock  (s "AddBuildingBlock")
-            map Route.Validation        (s "Validation")
-            map Route.FilePicker        (s "FilePicker")
-            map Route.Info              (s "Info")
-            map Route.ProtocolInsert    (s "ProtocolInsert")
-            map Route.ProtocolSearch    (s "ProtocolSearch")
-            map Route.ActivityLog       (s "ActivityLog")
-            map Route.Settings          (s "Settings")
-            map Route.SettingsXml       (s "SettingsXml")
-            map Route.NotFound          (s "NotFound")
+            map Route.Home                  (s "")
+            map Route.TermSearch            (s "TermSearch")
+            map Route.AddBuildingBlock      (s "AddBuildingBlock")
+            map Route.Validation            (s "Validation")
+            map Route.FilePicker            (s "FilePicker")
+            map Route.Info                  (s "Info")
+            map Route.ProtocolInsert        (s "ProtocolInsert")
+            map Route.ProtocolSearch        (s "ProtocolSearch")
+            map Route.ActivityLog           (s "ActivityLog")
+            map Route.Settings              (s "Settings")
+            map Route.SettingsXml           (s "Settings" </> s "Xml")
+            map Route.SettingsProtocol      (s "Settings" </> s "Protocol")
+            map Route.SettingsDataStewards  (s "Settings" </> s "DataStewards")
+            map Route.NotFound              (s "NotFound")
         ]
 
     //this would be the way to got if we would use push based routing, but i decided to use hash based routing. Ill leave this here for now as a note.

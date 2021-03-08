@@ -752,8 +752,11 @@ let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlE
 /// Use the 'remove' parameter to remove any Swate protocol group xml for the worksheet annotation table name combination in 'protocolGroup'
 let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) (remove:bool) =
 
+    printfn "START UPDATE PROTOCOL GROUP"
     let currentTableXml = getActiveTableXml protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet previousCompleteCustomXml
 
+
+    printfn "create next group"
     let nextTableXml =
         let newProtocolGroupXml = protocolGroup.toXml |> SimpleXml.parseElement
         if currentTableXml.IsSome then
@@ -774,6 +777,8 @@ let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) 
             {swateTableXmlEle with
                 Children = [newProtocolGroupXml]
             }
+
+    printfn "filter out previous group"
     let filterPrevTableFromRootChildren =
         previousCompleteCustomXml.Children
         |> List.filter (fun x ->
@@ -783,6 +788,7 @@ let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) 
                 && x.Attributes.["Worksheet"] = protocolGroup.AnnotationTable.Worksheet
             isExisting |> not
         )
+    printfn "create new Group"
     {previousCompleteCustomXml with
         Children = nextTableXml::filterPrevTableFromRootChildren
     }
@@ -808,9 +814,14 @@ let updateRemoveSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousComple
         else
             isExisting.Value
 
+    printfn "START UPDATE"
+    printfn "CurrentProtocolGroup: %A" currentSwateProtocolGroup
+
     let filteredProtocolChildren =
         currentSwateProtocolGroup.Protocols
         |> List.filter (fun x -> x.Id <> protocol.Id)
+
+    printfn "filter out children"
 
     let nextProtocolGroup =
         {currentSwateProtocolGroup with
@@ -847,7 +858,11 @@ let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
             // Then AnnotationTable was added to protocol. So now we refresh these values at this point.
             let securityUpdateForProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
-            let nextCustomXml = updateSwateProtocol securityUpdateForProtocol xmlParsed
+            let nextCustomXml =
+                if remove then
+                    removeSwateProtocol securityUpdateForProtocol xmlParsed
+                else
+                    updateSwateProtocol securityUpdateForProtocol xmlParsed
 
             let nextCustomXmlString = nextCustomXml |> xmlElementToXmlString
 

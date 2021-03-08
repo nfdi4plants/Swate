@@ -35,6 +35,7 @@ type ExcelInteropMsg =
     | WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
     | DeleteAllCustomXml
     | GetSwateCustomXml
+    | UpdateSwateCustomXml                  of string
     //
     | FillHiddenColsRequest
     | FillHiddenColumns                     of tableName:string*SearchTermI []
@@ -43,6 +44,9 @@ type ExcelInteropMsg =
     | InsertFileNames                       of fileNameList:string list
     // Show Details to selected BuildingBlock
     | GetSelectedBuildingBlockSearchTerms
+    //
+    | CreatePointerJson
+    //
     // Development
     | TryExcel
     | TryExcel2
@@ -177,7 +181,7 @@ type BuildingBlockDetailsMsg =
     | ToggleShowDetails
     | UpdateCurrentRequestState                     of RequestBuildingBlockInfoStates
 
-type SettingXmlMsg =
+type SettingsXmlMsg =
     // // Client // //
     // Validation Xml
     | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
@@ -191,19 +195,88 @@ type SettingXmlMsg =
     | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
     | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
     //
-    | UpdateRawCustomXml of string
+    | UpdateRawCustomXml                            of string
+    | UpdateNextRawCustomXml                        of string
     // Excel Interop
     | GetAllValidationXmlParsedRequest
-    | GetAllValidationXmlParsedResponse of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
+    | GetAllValidationXmlParsedResponse             of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
     | GetAllProtocolGroupXmlParsedRequest
-    | GetAllProtocolGroupXmlParsedResponse of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
-    | ReassignCustomXmlRequest      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
-    | RemoveCustomXmlRequest        of xml: OfficeInterop.Types.Xml.XmlTypes
+    | GetAllProtocolGroupXmlParsedResponse          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
+    | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
+    | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypes
+
+type SettingsDataStewardMsg =
+    // Client
+    | UpdatePointerJson of string option
+
+type SettingsProtocolMsg =
+    | UpdateProtocolsFromExcel          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    | UpdateProtocolsFromDB             of Shared.ProtocolTemplate []
+    // ExcelInterop
+    | GetActiveProtocolGroupXmlParsed
+    | GetProtocolsFromDBRequest         of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    | UpdateProtocolByNewVersion        of OfficeInterop.Types.Xml.GroupTypes.Protocol * Shared.ProtocolTemplate
 
 type TopLevelMsg =
     | CloseSuggestions
 
-type Msg =
+type Model = {
+
+    ///PageState
+    PageState               : PageState
+
+    ///Data that needs to be persistent once loaded
+    PersistentStorageState  : PersistentStorageState
+ 
+    ///Debouncing
+    DebouncerState          : Debouncer.State
+
+    ///Error handling, Logging, etc.
+    DevState                : DevState
+
+    ///Site Meta Options (Styling etc)
+    SiteStyleState          : SiteStyleState
+
+    ///States regarding term search
+    TermSearchState         : TermSearchState
+
+    AdvancedSearchState     : AdvancedSearchState
+
+    ///Use this in the future to model excel stuff like table data
+    ExcelState              : ExcelState
+
+    ///Use this to log Api calls and maybe handle them better
+    ApiState                : ApiState
+
+    ///States regarding File picker functionality
+    FilePickerState         : FilePickerState
+
+    ProtocolInsertState     : ProtocolInsertState
+
+    ///Insert annotation columns
+    AddBuildingBlockState   : AddBuildingBlockState
+
+    ///Create Validation scheme for Table
+    ValidationState         : ValidationState
+
+    ///Used to show selected building block information
+    BuildingBlockDetailsState   : BuildingBlockDetailsState
+
+    ///Used to manage all custom xml settings
+    SettingsXmlState            : SettingsXmlState
+
+    ///Used to manage functions specifically for data stewards
+    SettingsDataStewardState    : SettingsDataStewardState
+
+    ///Used to manage protocols
+    SettingsProtocolState       : SettingsProtocolState
+
+    WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
+} with
+    member this.updateByExcelState (s:ExcelState) =
+        { this with ExcelState = s}
+
+and Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
     | Api                   of ApiMsg
     | Dev                   of DevMsg
@@ -218,8 +291,35 @@ type Msg =
     | Validation            of ValidationMsg
     | ProtocolInsert        of ProtocolInsertMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
-    | SettingXmlMsg         of SettingXmlMsg
+    | SettingsXmlMsg        of SettingsXmlMsg
+    | SettingDataStewardMsg of SettingsDataStewardMsg
+    | SettingsProtocolMsg   of SettingsProtocolMsg
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>
+    /// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
+    | UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
     | DoNothing
+
+open Routing
+
+let initializeModel (pageOpt: Route option) = {
+    DebouncerState              = Debouncer                 .create ()
+    PageState                   = PageState                 .init pageOpt
+    PersistentStorageState      = PersistentStorageState    .init ()
+    DevState                    = DevState                  .init ()
+    SiteStyleState              = SiteStyleState            .init ()
+    TermSearchState             = TermSearchState           .init ()
+    AdvancedSearchState         = AdvancedSearchState       .init ()
+    ExcelState                  = ExcelState                .init ()
+    ApiState                    = ApiState                  .init ()
+    FilePickerState             = FilePickerState           .init ()
+    AddBuildingBlockState       = AddBuildingBlockState     .init ()
+    ValidationState             = ValidationState           .init ()
+    ProtocolInsertState         = ProtocolInsertState       .init ()
+    BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
+    SettingsXmlState            = SettingsXmlState          .init ()
+    SettingsDataStewardState    = SettingsDataStewardState  .init ()
+    SettingsProtocolState       = SettingsProtocolState     .init ()
+    WarningModal                = None
+}

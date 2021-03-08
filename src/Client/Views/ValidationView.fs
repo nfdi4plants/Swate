@@ -31,13 +31,16 @@ let columnListElement ind (columnValidation:ColumnValidation) (model:Model) disp
         if isActive then
             Class "nonSelectText"
         else
-            Class "nonSelectText validationTableEle"
+            Class "nonSelectText hoverTableEle"
         Style [
             Cursor "pointer"
             UserSelect UserSelectOptions.None
             if isActive then
-                BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
+                BackgroundColor NFDIColors.Mint.Darker10
+            if isActive then
                 Color "white"
+            else
+                Color model.SiteStyleState.ColorMode.Text
         ]
         OnClick (fun e ->
             e.preventDefault()
@@ -79,25 +82,6 @@ let updateTableValidationByColValidation (model:Model) (updatedColValidation:Col
 
 let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValidation:ColumnValidation) (model:Model) dispatch =
     let contentType = if contentTypeOpt.IsSome then contentTypeOpt.Value.toReadableString else "None"
-    /// See issue #54
-    //Checkradio.radio [
-    //    //Checkradio.InputProps [Style [Border "1px solid red"]]
-    //    Checkradio.Id (sprintf "checkradio%i%s" id contentType)
-    //    Checkradio.Disabled (contentType = "Ontology [None]")
-    //    Checkradio.Name (sprintf "ContentType%i" id)
-    //    Checkradio.OnChange (fun e ->
-    //        let newFormat = {
-    //            format with
-    //                ContentType = contentTypeOpt
-    //        }
-    //        UpdateValidationFormat (format,newFormat) |> Validation |> dispatch
-    //    )
-    //    Checkradio.Checked (contentTypeOpt = format.ContentType)
-    //    Checkradio.LabelProps [Class "nonSelectText"]
-    //    Checkradio.Color IsSuccess
-    //][
-    //    str contentType
-    //]
     let isDisabled = (contentType = "Ontology [None]" || contentType = "Unit [None]")
     div [Style [Position PositionOptions.Relative]] [
         input [
@@ -128,6 +112,81 @@ let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValida
         ][]
     ]
 
+let checkradioCheckssumElement (id:int) (contentTypeOpt:ContentType option) (columnValidation:ColumnValidation) (model:Model) dispatch =
+    let contentType = if contentTypeOpt.IsSome then contentTypeOpt.Value.toReadableString else "None"
+    let isDisabled = contentType = "Checksum [None]"
+    div [Style [Position PositionOptions.Relative]] [
+        input [
+            Type "checkbox";
+            Class "checkbox-input"
+            Id (sprintf "checkradio%i%s" id contentType)
+            Name (sprintf "ContentType%i" id)
+            Disabled isDisabled
+            OnChange (fun e ->
+                let nextColumnValidation = {
+                    columnValidation with
+                        ValidationFormat = contentTypeOpt
+                }
+                let nextTableValidation =
+                    updateTableValidationByColValidation model nextColumnValidation
+                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+            )
+            Checked (
+                contentTypeOpt.IsSome && columnValidation.ValidationFormat.IsSome
+                && match contentTypeOpt.Value with
+                    | Checksum (_,_)    -> true
+                    | _                 -> false
+                && match columnValidation.ValidationFormat.Value with
+                    | Checksum (_,_)    -> true
+                    | _                 -> false
+                
+            )
+
+        ]
+        label [
+            Class "checkbox-label"
+            HtmlFor (sprintf "checkradio%i%s" id contentType)
+        ][str contentType]
+        label [
+            Class "checkbox-checkmark";
+            HtmlFor (sprintf "checkradio%i%s" id contentType)
+        ][]
+        Select.select [
+            Select.Props [
+                Style [MarginLeft "0.75rem"]
+            ]
+            Select.Size IsSmall
+            Select.Color (if isDisabled then IsGreyLight else IsSuccess)
+        ][
+            select [
+                Disabled isDisabled
+                OnChange (fun e ->
+                    let newContentType =
+                        match contentTypeOpt.Value with
+                        | Checksum (checksumType,_) ->
+                            let newVal = if e.Value = "None" then "" else e.Value
+                            Checksum (checksumType,newVal) |> Some
+                        | _ -> None
+                    if newContentType.IsSome then
+                        let nextColumnValidation = {
+                            columnValidation with
+                                ValidationFormat = newContentType
+                        }
+                        let nextTableValidation =
+                            updateTableValidationByColValidation model nextColumnValidation
+                        UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                    else
+                        ()
+                )
+            ][
+                yield option [][str "None"]
+                for col in model.ValidationState.TableValidationScheme.ColumnValidations do
+                    yield
+                        option [ ][ str col.ColumnHeader ]
+            ]
+        ]
+    ]
+
 let findOntology (columnValidation:ColumnValidation) (buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []) =
     buildingBlocks
     |> Array.find (fun x -> x.MainColumn.Header.Value.Header = columnValidation.ColumnHeader)
@@ -138,7 +197,10 @@ let checkradioList (ind:int) colVal model dispatch =
 
     let unitContent =
         if colVal.Unit.IsSome then ContentType.UnitTerm colVal.Unit.Value |> Some else ContentType.UnitTerm "None" |> Some
-        
+
+    let checksumContent =
+        if colVal.Unit.IsSome then ContentType.Checksum (colVal.Unit.Value,"") |> Some else ContentType.Checksum ("None","") |> Some
+
     let ontologyContent =
         if hasOntology.IsSome then ContentType.OntologyTerm hasOntology.Value.Name |> Some else ContentType.OntologyTerm "None" |> Some
 
@@ -147,12 +209,13 @@ let checkradioList (ind:int) colVal model dispatch =
         
         checkradioElement ind   (Some ContentType.Number)   colVal model dispatch
         checkradioElement ind   (Some ContentType.Int)      colVal model dispatch
-        checkradioElement ind   (Some ContentType.Decimal)  colVal model dispatch
         checkradioElement ind   (Some ContentType.Text)     colVal model dispatch
         checkradioElement ind   (Some ContentType.Url)      colVal model dispatch
 
         checkradioElement ind   ontologyContent             colVal model dispatch
         checkradioElement ind   unitContent                 colVal model dispatch
+
+        checkradioCheckssumElement  ind checksumContent     colVal model dispatch
     ]
 
 
@@ -191,16 +254,44 @@ let sliderElements id columnValidation model dispatch =
     //    ]
     //]
     div [][
-        for i in 1 .. 5 do
+        Field.div [Field.HasAddons][
+            for i in 1 .. 5 do
+                yield
+                    Control.div [][
+                        Button.a [
+                            Button.Color IsWarning
+                            //Button.IsLight
+                            Button.IsOutlined
+                            Button.Props [Style [Padding "0rem"; BorderColor model.SiteStyleState.ColorMode.BodyForeground]]
+                            Button.OnClick (fun e ->
+                                let nextColumnValidation = {
+                                    columnValidation with
+                                        Importance = i |> Some
+                                }
+                                let nextTableValidation =
+                                    updateTableValidationByColValidation model nextColumnValidation
+                                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                                )
+                        ][
+                            Fa.span [
+                                Fa.Size Fa.FaLarge
+                                if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
+                                    Fa.Solid.Star
+                                else
+                                    Fa.Regular.Star
+                                //Fa.Props [Style [Color NFDIColors.Yellow.Base]]
+                            ][]
+                        ]
+                    ]
             yield
                 Button.a [
-                    Button.Color IsWarning
-                    Button.Props [Style [Padding "0rem"]]
-                    Button.IsLight
+                    Button.Color IsDanger
+                    Button.Props [Style [BorderColor model.SiteStyleState.ColorMode.BodyForeground]]
+                    Button.IsOutlined
                     Button.OnClick (fun e ->
                         let nextColumnValidation = {
                             columnValidation with
-                                Importance = i |> Some
+                                Importance = None
                         }
                         let nextTableValidation =
                             updateTableValidationByColValidation model nextColumnValidation
@@ -209,30 +300,9 @@ let sliderElements id columnValidation model dispatch =
                 ][
                     Fa.span [
                         Fa.Size Fa.FaLarge
-                        if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
-                            Fa.Solid.Star
-                        else
-                            Fa.Regular.Star
-                        Fa.Props [Style [Color NFDIColors.Yellow.Base]]
+                        Fa.Solid.Backspace
                     ][]
                 ]
-        yield Button.a [
-            Button.Color IsDanger
-            Button.IsLight
-            Button.OnClick (fun e ->
-                let nextColumnValidation = {
-                    columnValidation with
-                        Importance = None
-                }
-                let nextTableValidation =
-                    updateTableValidationByColValidation model nextColumnValidation
-                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
-                )
-        ][
-            Fa.span [
-                Fa.Size Fa.FaLarge
-                Fa.Solid.Backspace
-            ][]
         ]
     ]
 
@@ -275,7 +345,7 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
             ColSpan 4
             Style [
                 Padding "0";
-                if isVisible then BorderBottom (sprintf "2px solid %s" ExcelColors.colorfullMode.Accent)
+                if isVisible then BorderBottom (sprintf "2px solid %s" NFDIColors.Mint.Base)
             ]
         ][
             Box.box' [
@@ -283,6 +353,9 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
                     Style [
                         Display (if isVisible then DisplayOptions.Block else DisplayOptions.None)
                         Width "100%"
+                        BorderRadius "0px"
+                        BackgroundColor model.SiteStyleState.ColorMode.BodyForeground
+                        Color model.SiteStyleState.ColorMode.Text
                     ]
                 ]
             ][
@@ -301,8 +374,6 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
                         Help.help [][str "Define how important it is to fill in the column correctly."]
 
                         sliderElements ind columnValidation model dispatch
-
-                        //submitButton ind columnValidation model dispatch
                     ]
                 ]
             ]
@@ -345,13 +416,16 @@ let validationElements (model:Model) dispatch =
                     )
                 )
             ]
-            Table.table [ Table.IsHoverable; Table.IsFullWidth ] [
+            Table.table [
+                Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
+                Table.IsHoverable; Table.IsFullWidth
+            ] [
                 thead [ ] [
                     tr [ ] [
-                        th [ ] [ str "Column Header" ]
-                        th [ ] [ str "Importance" ]
-                        th [ ] [ str "Content Type" ]
-                        th [][]
+                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Column Header" ]
+                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Importance" ]
+                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Content Type" ]
+                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ ]
                     ]
                 ]
                 tbody [ ] [

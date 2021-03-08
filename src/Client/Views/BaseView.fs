@@ -76,6 +76,7 @@ let footerContentStatic (model:Model) dispatch =
     ]
 
 open Fable.Core.JsInterop
+open Fable.FontAwesome
 
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
@@ -105,6 +106,9 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
             // Error Modal element, not shown when no lastFullEror
             if model.DevState.LastFullError.IsSome then
                 CustomComponents.ErrorModal.errorModal model dispatch
+
+            if model.WarningModal.IsSome then
+                CustomComponents.WarningModal.warningModal model dispatch
 
             if model.BuildingBlockDetailsState.ShowDetails then
                 CustomComponents.BuildingBlockDetailsModal.buildingBlockDetailModal model dispatch

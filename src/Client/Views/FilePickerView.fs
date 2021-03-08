@@ -16,31 +16,6 @@ open Update
 open Shared
 open Browser.Types
 
-//let createFileList (model:Model) (dispatch: Msg -> unit) =
-//    if model.FilePickerState.FileNames.Length > 0 then
-//        model.FilePickerState.FileNames
-//        |> List.map (fun fileName ->
-//            tr [
-//                colorControl model.SiteStyleState.ColorMode
-//            ] [
-//                td [
-//                ] [
-//                    Delete.delete [
-//                        Delete.OnClick (fun _ -> fileName |> RemoveFileFromFileList |> FilePicker |> dispatch)
-//                    ][]
-//                ]
-//                td [] [
-//                    b [] [str fileName]
-//                ]
-
-//            ])
-//    else
-//        [
-//            tr [] [
-//                td [] [str "No Files selected."]
-//            ]
-//        ]
-
 [<Literal>]
 let fileTileHeight = "50px"
 
@@ -127,8 +102,6 @@ let dragAndDropClone (model:Model) dispatch id =
                 then
                     let clone = clone()
                     if mustUpdateModel then
-                        //printfn "trigger model reorder"
-                        printfn "prev list: %A" model.FilePickerState.FileNames
                         // Update model list
                         let newList =
                             [
@@ -150,14 +123,14 @@ let dragAndDropClone (model:Model) dispatch id =
                         clone?style?opacity <- 0
                         //clone?style?visibility <- "hidden"
                         clone?style?transition <- "all 0s ease 0s"
-                        child()?style?display <- "block"
+                        child()?style?opacity <- "1"
                     else
                         clone?style?opacity <- 0
                         //clone?style?visibility <- "hidden"
                         clone?style?transition <- "all 0s ease 0s"
-                        child()?style?display <- "block"
-
+                        child()?style?opacity <- "1"
         )
+        OnDragOver(fun e -> e.preventDefault())
     ][
         Delete.delete [
             Delete.Props [ Style [
@@ -168,7 +141,7 @@ let dragAndDropClone (model:Model) dispatch id =
         str (sprintf "%s" fileName)
     ]
 
-let findIndByFileName (model:Model) id=
+let findIndByFileName (model:Model) id =
     model.FilePickerState.FileNames |> List.find (fun (ind,name) -> name = id) |> fst
 
 let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
@@ -193,13 +166,13 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
         OnDragStart (fun eve ->
             dropped <- false
             UpdateDNDDropped false |> FilePicker |> dispatch
-
+            printfn "START"
             eve.stopPropagation()
             let offset = child().getBoundingClientRect()
             let windowScrollY = Browser.Dom.window.scrollY
             parent()?style?height <- "0px"
-            // Display none child
-            child()?style?display <- "none"
+            // display stopped working, so we use opacity now.
+            child()?style?opacity <- "0"
             let clone = clone()
             let x = offset.left
             let y = offset.top + windowScrollY - offset.height
@@ -229,19 +202,20 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             eve.preventDefault()
             //eve.target?style?backgroundColor <- "lightgrey"
             //eve.target?style?borderBottom <- "5px solid darkgrey"
-            parent()?style?backgroundColor <- "lightgrey"
+            parent()?style?backgroundColor <- model.SiteStyleState.ColorMode.ControlForeground
             parent()?style?borderBottom <- "5px solid darkgrey"
         )
         OnDragLeave (fun eve ->
             eve.preventDefault()
             //eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
             //eve.target?style?borderBottom <- "0px solid darkgrey"
-            parent()?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
+            parent()?style?backgroundColor <- model.SiteStyleState.ColorMode.BodyBackground
             parent()?style?borderBottom <- "0px solid darkgrey"
         )
         OnDragEnd (fun eve ->
             // restore wrapper 
             parent()?style?height <- fileTileHeight
+            printfn "END"
             let slideClone =
                 if coordinates.IsNone then failwith "Unknown Drag and Drop pattern 0.2"
                 if dropped then
@@ -257,25 +231,21 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             ()
         )
         OnDrop (fun eve ->
+            printfn "DROPPED"
             //eve.stopPropagation()
             eve.preventDefault()
             dropped <- true
             UpdateDNDDropped true |> FilePicker |> dispatch
-            //eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
-            //eve.target?style?borderBottom <- "0px solid darkgrey"
-            parent()?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
-            parent()?style?borderBottom <- "0px solid darkgrey"
+            parent()?style?backgroundColor  <- model.SiteStyleState.ColorMode.BodyBackground
+            parent()?style?borderBottom     <- "0px solid darkgrey"
 
             let prevId      = eve.dataTransfer.getData("text")
             let prevEle     = Browser.Dom.document.getElementById(createEleId prevId)
             let prevWrapper = Browser.Dom.document.getElementById(createWrapperId prevId)
             let prevClone   = Browser.Dom.document.getElementById(createCloneId prevId)
-            //printfn "prev id: %i" prevId
-            //let dragEleOrder    = prevWrapper?style?order
             let dragEleOrder = findIndByFileName model prevId
             let dragDown     = dragEleOrder < findIndByFileName model id //parent()?style?order
             let dragUp       = dragEleOrder > findIndByFileName model id //parent()?style?order
-            //printfn "up: %b, down: %b" dragUp dragDown
 
             let droppenOnEleOrder     =
                 if dragDown then
@@ -408,8 +378,7 @@ let placeOnTopElement model dispatch =
             Order "-1"
             BorderBottom "2px solid white"
         ]
-    ][
-    ]
+    ][]
     
 let fileElementContainer (model:Model) dispatch =
     div [
@@ -497,8 +466,7 @@ let fileNameElements (model:Model) dispatch =
 
 let sortButton icon msg =
     Button.a [
-        Button.IsOutlined
-        Button.Color IsPrimary
+        Button.Color IsInfo
         Button.OnClick msg
     ][
         Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
@@ -507,9 +475,10 @@ let sortButton icon msg =
 let fileSortElements (model:Model) dispatch =
     div [Style [MarginBottom "1rem"; Display DisplayOptions.Flex]][
         Button.a [
-            Button.IsOutlined
-            Button.Color IsPrimary
+            Button.Props [Title "Copy to Clipboard"]
+            Button.Color IsInfo
             Button.OnClick (fun e ->
+                CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
                 let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
                 let textArea = Browser.Dom.document.createElement "textarea"
                 textArea?value <- txt
@@ -528,7 +497,7 @@ let fileSortElements (model:Model) dispatch =
                 ()
             )
         ][
-            Fa.i [Fa.Props [Title "Copy to Clipboard"]; Fa.Regular.Clipboard ] [] 
+            CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" Fa.Regular.Clipboard Fa.Solid.Check
         ]
 
         Button.list [
@@ -580,5 +549,4 @@ let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
 
         /// COlored container element for all uploaded file names and sort elements
         fileContainer model dispatch inputId
-        
     ]

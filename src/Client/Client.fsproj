@@ -23,6 +23,7 @@
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
         <Compile Include="Update.fs" />
+        <Compile Include="CustomComponents\ResponsiveFA.fs" />
         <Compile Include="CustomComponents\DwnButton.fs" />
         <Compile Include="CustomComponents\Footer.fs" />
         <Compile Include="CustomComponents\Button.fs" />
@@ -30,6 +31,7 @@
         <Compile Include="CustomComponents\Navbar.fs" />
         <Compile Include="CustomComponents\Loading.fs" />
         <Compile Include="CustomComponents\ErrorModal.fs" />
+        <Compile Include="CustomComponents\WarningModal.fs" />
         <Compile Include="CustomComponents\BuildingBlockDetailsModal.fs" />
         <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
@@ -47,6 +49,8 @@
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\SettingsView.fs" />
         <Compile Include="Views\SettingsXmlView.fs" />
+        <Compile Include="Views\SettingsProtocolView.fs" />
+        <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>

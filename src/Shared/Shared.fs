@@ -20,7 +20,7 @@ module URLs =
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
-    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate#swate"
+    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate/wiki"
 
     [<LiteralAttribute>]
     let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
@@ -235,9 +235,10 @@ type IAnnotatorAPIv1 = {
     getTermsByNames                     : SearchTermI []                                                -> Async<SearchTermI []>
 
     // Protocol apis
-    getAllProtocols                 : unit                                                  -> Async<ProtocolTemplate []>
-    getProtocolBlocksForProtocol    : ProtocolTemplate                                      -> Async<ProtocolTemplate>
-    increaseTimesUsed               : string                                                -> Async<unit>
+    getAllProtocolsWithoutXml       : unit                      -> Async<ProtocolTemplate []>
+    getProtocolsByName              : string []                 -> Async<ProtocolTemplate []>
+    getProtocolXmlForProtocol       : ProtocolTemplate          -> Async<ProtocolTemplate>
+    increaseTimesUsed               : string                    -> Async<unit>
 }
 
         

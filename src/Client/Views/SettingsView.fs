@@ -44,16 +44,50 @@ let customXmlSettings (model:Model) dispatch =
         ]
     ]
 
+let dataStewardsSettings (model:Model) dispatch =
+    Level.level [Level.Level.IsMobile][
+        Level.left [][
+            str "Data Stewards"
+        ]
+        Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
+            Button.a [
+                Button.Color IsInfo
+                Button.IsOutlined
+                Button.OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsDataStewards) |> dispatch ) 
+            ][
+                str "Advanced Settings"
+            ]
+        ]
+    ]
+
+let protocolSettings (model:Model) dispatch =
+    Level.level [Level.Level.IsMobile][
+        Level.left [][
+            str Routing.Route.SettingsProtocol.toStringRdbl
+        ]
+        Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
+            Button.a [
+                Button.Color IsInfo
+                Button.IsOutlined
+                Button.OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsProtocol) |> dispatch ) 
+            ][
+                str "Advanced Settings"
+            ]
+        ]
+    ]
+
 let settingsViewComponent (model:Model) dispatch =
     div [
         //Style [MaxWidth "500px"]
     ][
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Swate Settings"]
 
-        Label.label [][str "Customize Swate"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Customize Swate"]
         toggleDarkModeElement model dispatch
 
 
-        Label.label [][str "Advanced Settings"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Advanced Settings"]
         customXmlSettings model dispatch
+        dataStewardsSettings model dispatch
+        protocolSettings model dispatch
     ]

@@ -74,7 +74,7 @@ let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block:
     ]
 
 let addBuildingBlockFooterComponent (model:Model) (dispatch:Msg -> unit) =
-    Content.content [] [
+    Content.content [ ] [
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ 
             str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString))
         ]
@@ -98,15 +98,17 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
             Field.HasAddons
         ] [
             Control.div [] [
-                Dropdown.dropdown [Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection] [
+                Dropdown.dropdown [
+                    Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection
+                ] [
                     Dropdown.trigger [] [
                         Button.a [Button.OnClick (fun _ -> ToggleSelectionDropdown |> AddBuildingBlock |> dispatch)] [
                             span [Style [MarginRight "5px"]] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString |> str]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
-                    Dropdown.menu [Props[colorControl model.SiteStyleState.ColorMode]] [
-                        Dropdown.content [] ([
+                    Dropdown.menu [ ] [
+                        Dropdown.content [Props [colorControl model.SiteStyleState.ColorMode]] ([
                             Parameter       
                             Factor          
                             Characteristics 
@@ -220,7 +222,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                             | true, str         -> Some str
                                 //sprintf "0.00 \"%s\"" str
                         let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome then Some model.AddBuildingBlockState.UnitSelectedTerm.Value.Accession else None
-                        let minBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.create colName colTerm unitName unitTerm None
+                        let minBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.create colName colTerm unitName unitTerm None false
                         AddAnnotationBlock minBuildingBlock |> ExcelInterop |> dispatch
                     )
                 ] [
@@ -290,6 +292,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Msg -> unit) =
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
+
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
 

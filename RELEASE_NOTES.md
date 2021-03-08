@@ -1,3 +1,25 @@
+### 0.4.1+d75743c (Released 2021-3-8)
+* Additions:
+    * latest commit #d75743c
+    * [[#0d9c945](https://github.com/nfdi4plants/Swate/commit/0d9c94558052d7f13e9707da6202e3a3f34440b9)] Add links to template repository.
+    * [[#6b5a56f](https://github.com/nfdi4plants/Swate/commit/6b5a56f5786eb356703438ecffcb768a6444abcb)] Improve darkmode (Issue #25).
+    * [[#37503a5](https://github.com/nfdi4plants/Swate/commit/37503a50786536ba88a72d591e2cf51fdfd113dc)] Enable term search without present annotation table (Issue #132).
+    * [[#05a69b3](https://github.com/nfdi4plants/Swate/commit/05a69b323db6325d1309b7fbd5cf5b7f4279308e)] Increase responsiveness for copy to clipboard.
+    * [[#44a75d1](https://github.com/nfdi4plants/Swate/commit/44a75d12c1583e138ed2cc328146922d14752d4f)] Add warnings to advanced setting functions.
+    * [[#7d4060b](https://github.com/nfdi4plants/Swate/commit/7d4060b15def48f17b64dd42d0e1da207a3285cd)] Add function to update used protocols. :sparkles:
+    * [[#088335f](https://github.com/nfdi4plants/Swate/commit/088335f811d41026269e2489337986331534c4a6)] Add option to update raw custom xml (Issue  #123).
+    * [[#a3286eb](https://github.com/nfdi4plants/Swate/commit/a3286ebcefe217bbc4354c9e19fe79004d7afb6d)] Add checksum content type (Issue #127, Issue #131).
+    * [[#97407d4](https://github.com/nfdi4plants/Swate/commit/97407d45c5139ded3234824f46c530e68e0556a1)] Changed DateTime to use UTC (Issue #126).
+    * [[#137cc54](https://github.com/nfdi4plants/Swate/commit/137cc542db62fecb52fad77177bb6de1a72c1965)] Add more info for existing building blocks (Issue #124).
+    * [[#66fb577](https://github.com/nfdi4plants/Swate/commit/66fb5771c55632c4cc0bf229996d8fa4cd304a69)] Add option to create pointer json template (Issue #129).
+* Deletions:
+    * [[#84d71ee](https://github.com/nfdi4plants/Swate/commit/84d71eef62c1d55bb2130143926d47e8b462fdeb)] Remove 'decimal' validation type.
+* Bugfixes:
+    * [[#d75743c](https://github.com/nfdi4plants/Swate/commit/d75743cc4597ab9ba557ea9522e6beea091db209)] Add minor fixes
+    * [[#bd13cbf](https://github.com/nfdi4plants/Swate/commit/bd13cbf39f013277381b04bb9f30577d2a929f42)] Fix drag n drop problems in filepicker.
+    * [[#33695f4](https://github.com/nfdi4plants/Swate/commit/33695f429ac6aa76e8638b9d5b375921b3d856bd)] Fix protocol grouping bug.
+    * [[#f4d08e8](https://github.com/nfdi4plants/Swate/commit/f4d08e8f1f41c712ff787ce231e4c085795eef2a)] Fix protocol xml not correctly removed bug.
+
 ### 0.4.0+a0e04f3 (Released 2021-3-1)
 * Additions:
     * latest commit #a0e04f3

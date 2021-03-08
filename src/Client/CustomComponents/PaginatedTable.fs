@@ -18,10 +18,15 @@ type paginationParameters = {
 }
 
 let createPaginationLinkFromIndex (dispatch:Msg->unit) (pageIndex:int) (currentPageinationIndex: int)=
-
+    let isActve = pageIndex = currentPageinationIndex
     Pagination.Link.a [
-        Pagination.Link.Current (pageIndex = currentPageinationIndex)
-        Pagination.Link.Props [OnClick (fun _ -> pageIndex |> ChangePageinationIndex |> AdvancedSearch |> dispatch)]
+        Pagination.Link.Current isActve
+        Pagination.Link.Props [
+            Style [
+                if isActve then Color "white"; BackgroundColor NFDIColors.Mint.Base; BorderColor NFDIColors.Mint.Base;
+            ]
+            OnClick (fun _ -> pageIndex |> ChangePageinationIndex |> AdvancedSearch |> dispatch)
+        ]
     ] [
         span [] [str (string (pageIndex+1))]
     ]

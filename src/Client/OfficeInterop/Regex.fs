@@ -136,7 +136,7 @@ module MinimalBuildingBlock =
                     let newCurrentMinBBCol =
                         let ont = if currentCol.Ontology.IsSome then sprintf " [%s]" currentCol.Ontology.Value.Name else ""
                         let name = sprintf "%s%s" currentCol.CoreName.Value ont
-                        MinimalBuildingBlock.create name None None None None |> Some
+                        MinimalBuildingBlock.create name None None None None false |> Some
                     let newMinBBColList =
                         if currentMinBBCol.IsSome then currentMinBBCol.Value::minBBColList else minBBColList
                     parseToMinBB (iterator+1) newCurrentMinBBCol newMinBBColList

@@ -435,6 +435,7 @@ type SettingsXmlState = {
     NextAnnotationTableForActiveProtocol    : AnnotationTable option
     //
     RawXml                                  : string
+    NextRawXml                              : string
     FoundTables                             : Shared.AnnotationTable []
     ProtocolGroupXmls                       : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
     ValidationXmls                          : OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
@@ -450,72 +451,26 @@ type SettingsXmlState = {
         NextAnnotationTableForActiveProtocol    = None
         //
         RawXml                                  = ""
+        NextRawXml                              = ""
         FoundTables                             = [||]
         ProtocolGroupXmls                       = [||]
         ValidationXmls                          = [||]
     }
 
-type Model = {
+type SettingsDataStewardState = {
+    PointerJson : string option
+} with
+    static member init () = {
+        PointerJson = None
+    }
 
-    //PageState
-    PageState               : PageState
+type SettingsProtocolState = {
+    ProtocolsFromExcel  : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    ProtocolsFromDB     : Shared.ProtocolTemplate []
+} with
+    static member init () = {
+        ProtocolsFromExcel  = None
+        ProtocolsFromDB     = [||]
+    }
 
-    //Data that needs to be persistent once loaded
-    PersistentStorageState  : PersistentStorageState
- 
-    //Debouncing
-    DebouncerState          : Debouncer.State
-
-    //Error handling, Logging, etc.
-    DevState                : DevState
-
-    //Site Meta Options (Styling etc)
-    SiteStyleState          : SiteStyleState
-
-    //States regarding term search
-    TermSearchState         : TermSearchState
-
-    AdvancedSearchState     : AdvancedSearchState
-
-    //Use this in the future to model excel stuff like table data
-    ExcelState              : ExcelState
-
-    //Use this to log Api calls and maybe handle them better
-    ApiState                : ApiState
-
-    //States regarding File picker functionality
-    FilePickerState         : FilePickerState
-
-    ProtocolInsertState     : ProtocolInsertState
-
-    //Insert annotation columns
-    AddBuildingBlockState   : AddBuildingBlockState
-
-    //Create Validation scheme for Table
-    ValidationState         : ValidationState
-
-    //Used to show selected building block information
-    BuildingBlockDetailsState   : BuildingBlockDetailsState
-
-    //Used to manage all xml settings
-    SettingsXmlState        : SettingsXmlState
-
-}
-
-let initializeModel (pageOpt: Route option) = {
-    DebouncerState              = Debouncer                 .create ()
-    PageState                   = PageState                 .init pageOpt
-    PersistentStorageState      = PersistentStorageState    .init ()
-    DevState                    = DevState                  .init ()
-    SiteStyleState              = SiteStyleState            .init ()
-    TermSearchState             = TermSearchState           .init ()
-    AdvancedSearchState         = AdvancedSearchState       .init ()
-    ExcelState                  = ExcelState                .init ()
-    ApiState                    = ApiState                  .init ()
-    FilePickerState             = FilePickerState           .init ()
-    AddBuildingBlockState       = AddBuildingBlockState     .init ()
-    ValidationState             = ValidationState           .init ()
-    ProtocolInsertState         = ProtocolInsertState       .init ()
-    BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
-    SettingsXmlState            = SettingsXmlState          .init ()
-}
+/// The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

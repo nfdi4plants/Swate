@@ -261,15 +261,13 @@ let autocompleteTermSearchComponent
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
+            Input.Props [Style [BorderColor ExcelColors.Colorfull.gray40]]
             Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
             Input.ValueOrDefault autocompleteParams.StateBinding
             match inputSize with
             | Some size -> Input.Size size
             | _ -> ()
-            Input.Props [
-                ExcelColors.colorControl colorMode
-            ]           
             Input.OnChange (
                 fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
             )
@@ -317,8 +315,6 @@ let autocompleteTermSearchComponentOfParentOntology
                     | Some size -> Input.Size size
                     | _ -> ()
                     Input.Props [
-                        
-                        ExcelColors.colorControl colorMode
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
                             GetParentTerm |> ExcelInterop |> dispatch

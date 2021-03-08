@@ -8,6 +8,7 @@ open Browser.Blob
 open Fulma
 
 open Model
+open Messages
 open Fable.React
 open Fable.Core
 
