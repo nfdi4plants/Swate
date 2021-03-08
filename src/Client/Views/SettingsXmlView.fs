@@ -93,6 +93,7 @@ let textAreaEle (model:Model) dispatch =
                     ]
                     Button.Color IsInfo
                     Button.OnClick (fun e ->
+                        CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_customxmlSettings_rawXml"
                         let txt = model.SettingsXmlState.RawXml
                         let textArea = Browser.Dom.document.createElement "textarea"
                         textArea?value <- txt
@@ -111,7 +112,7 @@ let textAreaEle (model:Model) dispatch =
                         ()
                     )
                 ][
-                    Fa.i [Fa.Regular.Clipboard ] [] 
+                    CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_customxmlSettings_rawXml" Fa.Regular.Clipboard Fa.Solid.Check
                 ]
             ]
             Field.div [][

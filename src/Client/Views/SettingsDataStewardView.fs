@@ -72,6 +72,7 @@ let textFieldEle (model:Model) dispatch =
                     ]
                     Button.Color IsInfo
                     Button.OnClick (fun e ->
+                        CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_settingsDataSteward"
                         let txt = model.SettingsDataStewardState.PointerJson.Value
                         let textArea = Browser.Dom.document.createElement "textarea"
                         textArea?value <- txt
@@ -90,7 +91,7 @@ let textFieldEle (model:Model) dispatch =
                         ()
                     )
                 ][
-                    Fa.i [Fa.Regular.Clipboard ] [] 
+                    CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_settingsDataSteward" Fa.Regular.Clipboard Fa.Solid.Check
                 ]
             ]
         ]

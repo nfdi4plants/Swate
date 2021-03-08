@@ -23,6 +23,7 @@
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
         <Compile Include="Update.fs" />
+        <Compile Include="CustomComponents\ResponsiveFA.fs" />
         <Compile Include="CustomComponents\DwnButton.fs" />
         <Compile Include="CustomComponents\Footer.fs" />
         <Compile Include="CustomComponents\Button.fs" />

@@ -125,6 +125,9 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
                         Button.Props [Title "Copy to Clipboard"]
                         Button.Color IsInfo
                         Button.OnClick (fun e ->
+                            /// trigger icon response
+                            CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_termsearch"
+                            //
                             let t = model.TermSearchState.SelectedTerm.Value
                             let txt = [t.Name; t.Accession |> Shared.URLs.termAccessionUrlOfAccessionStr; t.Accession.Split(@":").[0] ] |> String.concat System.Environment.NewLine
                             let textArea = Browser.Dom.document.createElement "textarea"
@@ -144,7 +147,7 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
                             ()
                         )
                     ][
-                        Fa.i [Fa.Regular.Clipboard ] [] 
+                        CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_termsearch" Fa.Regular.Clipboard Fa.Solid.Check
                     ]
                 ]
         ]

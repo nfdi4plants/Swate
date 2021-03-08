@@ -120,18 +120,6 @@ let dropdownShortCutIconList model dispatch =
     ]
 
 let quickAccessDropdownElement model dispatch =
-    //let prepIconLists =
-    //    let split length (xs: seq<'T>) =
-    //        let rec loop xs =
-    //            [
-    //                yield Seq.truncate length xs |> Seq.toList
-    //                match Seq.length xs <= length with
-    //                | false -> yield! loop (Seq.skip length xs)
-    //                | true -> ()
-    //            ]
-    //        loop xs
-    //    let iconList = navbarShortCutIconList model dispatch
-    //    split 3 iconList
     Navbar.Item.div [
         Navbar.Item.Props [
             OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)
@@ -143,7 +131,6 @@ let quickAccessDropdownElement model dispatch =
             Position PositionOptions.Relative
         ]] [
             Button.a [
-                //Button.OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)
                 Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft "0"; PaddingRight "0"]]
                 Button.Color Color.IsWhite
                 Button.IsInverted

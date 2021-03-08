@@ -76,6 +76,7 @@ let footerContentStatic (model:Model) dispatch =
     ]
 
 open Fable.Core.JsInterop
+open Fable.FontAwesome
 
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =

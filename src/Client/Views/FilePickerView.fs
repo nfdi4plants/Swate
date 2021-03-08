@@ -466,8 +466,7 @@ let fileNameElements (model:Model) dispatch =
 
 let sortButton icon msg =
     Button.a [
-        Button.IsOutlined
-        Button.Color IsPrimary
+        Button.Color IsInfo
         Button.OnClick msg
     ][
         Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
@@ -476,9 +475,10 @@ let sortButton icon msg =
 let fileSortElements (model:Model) dispatch =
     div [Style [MarginBottom "1rem"; Display DisplayOptions.Flex]][
         Button.a [
-            Button.IsOutlined
-            Button.Color IsPrimary
+            Button.Props [Title "Copy to Clipboard"]
+            Button.Color IsInfo
             Button.OnClick (fun e ->
+                CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
                 let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
                 let textArea = Browser.Dom.document.createElement "textarea"
                 textArea?value <- txt
@@ -497,7 +497,7 @@ let fileSortElements (model:Model) dispatch =
                 ()
             )
         ][
-            Fa.i [Fa.Props [Title "Copy to Clipboard"]; Fa.Regular.Clipboard ] [] 
+            CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" Fa.Regular.Clipboard Fa.Solid.Check
         ]
 
         Button.list [
