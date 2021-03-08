@@ -98,14 +98,18 @@ let isViableISADotNetProcess (isaProcess:ISADotNet.Process) =
     else
         false, Some <| sprintf "Process contains missing values: %A" (isExistingChecks |> Collections.Array.map fst)
 
-let paramValuePairElement (ppv:ISADotNet.ProcessParameterValue) =
-    Table.table [Table.IsFullWidth; Table.IsBordered][
+let paramValuePairElement (model:Model) (ppv:ISADotNet.ProcessParameterValue) =
+    Table.table [
+        Table.IsFullWidth;
+        Table.IsBordered
+        Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text]]
+    ][
         thead [][
             tr [][
-                th [Style [Width "50%"]] [
+                th [Style [Width "50%"; Color model.SiteStyleState.ColorMode.Text]] [
                     str (annotationValueToString ppv.Category.Value.ParameterName.Value.Name.Value)
                 ]
-                th [][
+                th [Style [Color model.SiteStyleState.ColorMode.Text]][
                     str (termAccessionReduce ppv.Category.Value.ParameterName.Value.TermAccessionNumber.Value)
                 ]
             ]
@@ -156,7 +160,7 @@ let displayProtocolInfoElement isViable (errorMsg:string option) (model:Model) d
                     str (sprintf " - Version %s" model.ProtocolInsertState.ProcessModel.Value.ExecutesProtocol.Value.Version.Value)
                 ]
                 for paramValuePair in paramValuePairs do
-                    yield paramValuePairElement paramValuePair
+                    yield paramValuePairElement model paramValuePair
             ]
         ]
 
@@ -247,7 +251,6 @@ let protocolInsertElement uploadId (model:Model) dispatch =
     div [
         Style [
             BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-            //BorderRadius "15px 15px 0 0"
             Padding "0.25rem 1rem"
             MarginBottom "1rem"
         ]
@@ -343,13 +346,17 @@ let showDatabaseProtocolTemplate (model:Model) dispatch =
         toProtocolSearchElement model dispatch
 
         if model.ProtocolInsertState.ProtocolSelected.IsSome then
-            Table.table [Table.IsFullWidth; Table.IsStriped; Table.IsBordered][
+            Table.table [
+                Table.IsFullWidth;
+                Table.IsBordered
+                Table.Props [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
+            ][
                 thead [][
                     tr [][
-                        th [][str "Column"]
-                        th [][str "Column TAN"]
-                        th [][str "Unit"]
-                        th [][str "Unit TAN"]
+                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column"]
+                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column TAN"]
+                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit"]
+                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit TAN"]
                     ]
                 ]
                 tbody [][
