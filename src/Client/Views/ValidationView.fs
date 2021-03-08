@@ -79,25 +79,6 @@ let updateTableValidationByColValidation (model:Model) (updatedColValidation:Col
 
 let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValidation:ColumnValidation) (model:Model) dispatch =
     let contentType = if contentTypeOpt.IsSome then contentTypeOpt.Value.toReadableString else "None"
-    /// See issue #54
-    //Checkradio.radio [
-    //    //Checkradio.InputProps [Style [Border "1px solid red"]]
-    //    Checkradio.Id (sprintf "checkradio%i%s" id contentType)
-    //    Checkradio.Disabled (contentType = "Ontology [None]")
-    //    Checkradio.Name (sprintf "ContentType%i" id)
-    //    Checkradio.OnChange (fun e ->
-    //        let newFormat = {
-    //            format with
-    //                ContentType = contentTypeOpt
-    //        }
-    //        UpdateValidationFormat (format,newFormat) |> Validation |> dispatch
-    //    )
-    //    Checkradio.Checked (contentTypeOpt = format.ContentType)
-    //    Checkradio.LabelProps [Class "nonSelectText"]
-    //    Checkradio.Color IsSuccess
-    //][
-    //    str contentType
-    //]
     let isDisabled = (contentType = "Ontology [None]" || contentType = "Unit [None]")
     div [Style [Position PositionOptions.Relative]] [
         input [
@@ -128,6 +109,81 @@ let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValida
         ][]
     ]
 
+let checkradioCheckssumElement (id:int) (contentTypeOpt:ContentType option) (columnValidation:ColumnValidation) (model:Model) dispatch =
+    let contentType = if contentTypeOpt.IsSome then contentTypeOpt.Value.toReadableString else "None"
+    let isDisabled = contentType = "Checksum [None]"
+    div [Style [Position PositionOptions.Relative]] [
+        input [
+            Type "checkbox";
+            Class "checkbox-input"
+            Id (sprintf "checkradio%i%s" id contentType)
+            Name (sprintf "ContentType%i" id)
+            Disabled isDisabled
+            OnChange (fun e ->
+                let nextColumnValidation = {
+                    columnValidation with
+                        ValidationFormat = contentTypeOpt
+                }
+                let nextTableValidation =
+                    updateTableValidationByColValidation model nextColumnValidation
+                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+            )
+            Checked (
+                contentTypeOpt.IsSome && columnValidation.ValidationFormat.IsSome
+                && match contentTypeOpt.Value with
+                    | Checksum (_,_)    -> true
+                    | _                 -> false
+                && match columnValidation.ValidationFormat.Value with
+                    | Checksum (_,_)    -> true
+                    | _                 -> false
+                
+            )
+
+        ]
+        label [
+            Class "checkbox-label"
+            HtmlFor (sprintf "checkradio%i%s" id contentType)
+        ][str contentType]
+        label [
+            Class "checkbox-checkmark";
+            HtmlFor (sprintf "checkradio%i%s" id contentType)
+        ][]
+        Select.select [
+            Select.Props [
+                Style [MarginLeft "0.75rem"]
+            ]
+            Select.Size IsSmall
+            Select.Color (if isDisabled then IsGreyLight else IsSuccess)
+        ][
+            select [
+                Disabled isDisabled
+                OnChange (fun e ->
+                    let newContentType =
+                        match contentTypeOpt.Value with
+                        | Checksum (checksumType,_) ->
+                            let newVal = if e.Value = "None" then "" else e.Value
+                            Checksum (checksumType,newVal) |> Some
+                        | _ -> None
+                    if newContentType.IsSome then
+                        let nextColumnValidation = {
+                            columnValidation with
+                                ValidationFormat = newContentType
+                        }
+                        let nextTableValidation =
+                            updateTableValidationByColValidation model nextColumnValidation
+                        UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                    else
+                        ()
+                )
+            ][
+                yield option [][str "None"]
+                for col in model.ValidationState.TableValidationScheme.ColumnValidations do
+                    yield
+                        option [ ][ str col.ColumnHeader ]
+            ]
+        ]
+    ]
+
 let findOntology (columnValidation:ColumnValidation) (buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []) =
     buildingBlocks
     |> Array.find (fun x -> x.MainColumn.Header.Value.Header = columnValidation.ColumnHeader)
@@ -138,7 +194,10 @@ let checkradioList (ind:int) colVal model dispatch =
 
     let unitContent =
         if colVal.Unit.IsSome then ContentType.UnitTerm colVal.Unit.Value |> Some else ContentType.UnitTerm "None" |> Some
-        
+
+    let checksumContent =
+        if colVal.Unit.IsSome then ContentType.Checksum (colVal.Unit.Value,"") |> Some else ContentType.Checksum ("None","") |> Some
+
     let ontologyContent =
         if hasOntology.IsSome then ContentType.OntologyTerm hasOntology.Value.Name |> Some else ContentType.OntologyTerm "None" |> Some
 
@@ -150,12 +209,10 @@ let checkradioList (ind:int) colVal model dispatch =
         checkradioElement ind   (Some ContentType.Text)     colVal model dispatch
         checkradioElement ind   (Some ContentType.Url)      colVal model dispatch
 
-        checkradioElement ind (Some <| ContentType.Checksum Checksum.MD5) colVal model dispatch
-        checkradioElement ind (Some <| ContentType.Checksum Checksum.Sha256) colVal model dispatch
-
         checkradioElement ind   ontologyContent             colVal model dispatch
         checkradioElement ind   unitContent                 colVal model dispatch
 
+        checkradioCheckssumElement  ind checksumContent     colVal model dispatch
     ]
 
 

@@ -180,21 +180,23 @@ module Xml =
         [<Literal>]
         let ValidationXmlRoot = "TableValidation"
 
-        type Checksum =
-            | MD5
-            | Sha256
+        //type Checksum =
+        //    | MD5
+        //    | Sha256
+        //    | NoChecksum
 
-            static member ofString str =
-                match str with
-                | "MD5"     -> MD5
-                | "Sha256"  -> Sha256
-                | anyElse   -> failwith (sprintf "Cannot convert '%s' into known Checksum type" anyElse)
+        //    static member tryOfString str =
+        //        match str with
+        //        | "MD5"     -> Some MD5
+        //        | "Sha256"  -> Some Sha256
+        //        | "None"    -> Some NoChecksum
+        //        | anyElse   -> None 
 
         /// User can define what kind of input a column should have
         type ContentType =
             | OntologyTerm  of string
             | UnitTerm      of string
-            | Checksum      of Checksum
+            | Checksum      of string * string
             | Text
             | Url
             | Boolean
@@ -207,8 +209,8 @@ module Xml =
                     sprintf "Ontology [%s]" po
                 | UnitTerm ut ->
                     sprintf "Unit [%s]" ut
-                | Checksum checksum ->
-                    sprintf "Checksum %A" checksum
+                | Checksum (checksum,col) ->
+                    sprintf "Checksum [%A%s]" checksum (if col <> "" then "," + col else "")
                 | _ ->
                     string this
     
@@ -221,8 +223,12 @@ module Xml =
                     let s = unit.Replace("UnitTerm ", "").Replace("\"","")
                     UnitTerm s
                 | checksum when str.StartsWith "Checksum " ->
-                    let s = checksum.Replace("Checksum ","").Replace("\"","") |> Checksum.ofString
-                    Checksum s
+                    let split = checksum.Replace("Checksum ","").Replace("\"","")
+                    let s = split.[1..split.Length-2]
+                    let hasColumn =
+                        let split = s.Split([|","|], 1, StringSplitOptions.RemoveEmptyEntries)
+                        if split.Length = 2 then Some split.[1] else None
+                    Checksum (s,if hasColumn.IsNone then "" else hasColumn.Value)
                 | "Text"        -> Text
                 | "Url"         -> Url
                 | "Boolean"     -> Boolean
