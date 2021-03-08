@@ -605,7 +605,12 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                 if currentProtocolGroup.IsSome then
                     let existsAlready =
                         currentProtocolGroup.Value.Protocols
-                        |> List.tryFind ( fun existingProtocol -> existingProtocol.Id = protocol.Id )
+                        |> List.tryFind ( fun existingProtocol ->
+                            if buildingBlockInfoList |> List.exists (fun x -> x.IsAlreadyExisting = true) then
+                                existingProtocol.Id = protocol.Id
+                            else
+                                false
+                        )
                     let isComplete =
                         if existsAlready.IsSome then
                             (tryFindSpannedBuildingBlocks existsAlready.Value buildingBlocks).IsSome
