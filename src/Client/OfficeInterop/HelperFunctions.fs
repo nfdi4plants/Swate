@@ -129,70 +129,102 @@ let findNewIdForUnit (allColHeaders:string []) (format:string option) (unitAcces
             int
     loopingCheck 1
 
-let createUnitColumns (allColHeaders:string []) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
+let createUnitColumns (annotationTableName:string) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
     let col = createEmptyMatrixForTables 1 rowCount ""
     if format.IsSome then
+        Excel.run(fun context ->
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let annotationTable = sheet.tables.getItem(annotationTableName)
+            let annoHeaderRange = annotationTable.getHeaderRowRange()
+            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
 
-        let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
+            context.sync().``then``(fun e ->
+                printfn "1"
+                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
 
-        /// create unit main column
-        let createdUnitCol1 =
-            annotationTable.columns.add(
-                index = newBaseColIndex+3.,
-                values = U4.Case1 col,
-                name = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
+                let allColHeaders =
+                    headerVals
+                    |> Array.choose id
+                    |> Array.map string
+
+                printfn "2"
+                let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
+
+                /// create unit main column
+                let createdUnitCol1 =
+                    annotationTable.columns.add(
+                        index = newBaseColIndex+3.,
+                        values = U4.Case1 col,
+                        name = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
+                    )
+
+                /// create unit TSR
+                let createdUnitCol2 =
+                    annotationTable.columns.add(
+                        index = newBaseColIndex+4.,
+                        values = U4.Case1 col,
+                        name = sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
+                    )
+
+                /// create unit TAN
+                let createdUnitCol3 =
+                    annotationTable.columns.add(
+                        index = newBaseColIndex+5.,
+                        values = U4.Case1 col,
+                        name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
+                    )
+                printfn "3"
+                Some (
+                    sprintf " Added specified unit: %s" (format.Value),
+                    sprintf "0.00 \"%s\"" (format.Value)
+                )
             )
-
-        /// create unit TSR
-        let createdUnitCol2 =
-            annotationTable.columns.add(
-                index = newBaseColIndex+4.,
-                values = U4.Case1 col,
-                name = sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
-            )
-
-        /// create unit TAN
-        let createdUnitCol3 =
-            annotationTable.columns.add(
-                index = newBaseColIndex+5.,
-                values = U4.Case1 col,
-                name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
-            )
-
-        Some (
-            sprintf " Added specified unit: %s" (format.Value),
-            sprintf "0.00 \"%s\"" (format.Value)
         )
-    else
-        None
 
-let updateUnitColumns (allColHeaders:string []) (annoHeaderRange:Excel.Range) newBaseColIndex (format:string option) (unitAccessionOpt:string option) =
+    else
+        promise {return None}
+
+let updateUnitColumns (annotationTableName:string) newBaseColIndex (format:string option) (unitAccessionOpt:string option) =
     let col v= createValueMatrix 1 1 v
     if format.IsSome then
+        Excel.run(fun context ->
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let annotationTable = sheet.tables.getItem(annotationTableName)
+            let annoHeaderRange = annotationTable.getHeaderRowRange()
+            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
 
-        let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
+            context.sync().``then``(fun e ->
+                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+            
+                let allColHeaders =
+                    headerVals
+                    |> Array.choose id
+                    |> Array.map string
+                let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
 
-        /// create unit main column
-        let updateUnitCol1 =
-            annoHeaderRange.getColumn(newBaseColIndex+3.)
-            |> fun c1 -> c1.values <- sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+                /// create unit main column
+                let updateUnitCol1 =
+                    annoHeaderRange.getColumn(newBaseColIndex+3.)
+                    |> fun c1 -> c1.values <- sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-        /// create unit TSR
-        let createdUnitCol2 =
-            annoHeaderRange.getColumn(newBaseColIndex+4.)
-            |> fun c2 -> c2.values <- sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+                /// create unit TSR
+                let createdUnitCol2 =
+                    annoHeaderRange.getColumn(newBaseColIndex+4.)
+                    |> fun c2 -> c2.values <- sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-        /// create unit TAN
-        let createdUnitCol3 =
-            annoHeaderRange.getColumn(newBaseColIndex+5.)
-            |> fun c3 -> c3.values <- sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+                /// create unit TAN
+                let createdUnitCol3 =
+                    annoHeaderRange.getColumn(newBaseColIndex+5.)
+                    |> fun c3 -> c3.values <- sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-        Some (
-            sprintf " Added specified unit: %s" (format.Value),
-            sprintf "0.00 \"%s\"" (format.Value)
+                Some (
+                    sprintf " Added specified unit: %s" (format.Value),
+                    sprintf "0.00 \"%s\"" (format.Value)
+                )
+            )
         )
     else
-        None
+        promise {return None}
 
 /// Swaps 'Rows with column values' to 'Columns with row values'.
 let viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =

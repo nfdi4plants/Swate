@@ -376,6 +376,7 @@ let getTableRepresentation() =
 /// This function is used to add a new building block to the active annotationTable.
 let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
 
+    printfn "Start with building block %A" buildingBlockInfo.MainColumnName
     /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
     let isSingleCol =
         match buildingBlockInfo.MainColumnName with
@@ -413,10 +414,10 @@ let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
 
         promise {
 
-            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTableName = getActiveAnnotationTableName()
 
             let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTable)
+            let annotationTable = sheet.tables.getItem(annotationTableName)
 
             // Ref. 2
 
@@ -428,8 +429,6 @@ let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
             let range = context.workbook.getSelectedRange()
             let _ = range.load(U2.Case1 "columnIndex")
 
-            // Ref. 1
-            let r = context.runtime.load(U2.Case1 "enableEvents")
 
             let! newBaseColIndex,headerVals = context.sync().``then``(fun e ->
                 // Ref. 3
@@ -456,10 +455,9 @@ let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
                 newBaseColIndex', headerVals
             )
 
-            let! res = context.sync().``then``( fun _ ->
+            let rowCount = tableRange.rowCount |> int
 
-                r.enableEvents <- false
-
+            let! mainColName = context.sync().``then``( fun _ ->
 
                 let allColHeaders =
                     headerVals
@@ -494,8 +492,6 @@ let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
 
                 // The new id, which does not exist yet with the column name
                 let newId = findNewIdForName()
-
-                let rowCount = tableRange.rowCount |> int
 
                 //create an empty column to insert
                 let col value = createEmptyMatrixForTables 1 rowCount value
@@ -539,49 +535,48 @@ let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
                         createdCol3()
                     |]
 
+                /// return main col names, unit column format and a message. The first two params are used in a follow up message (executing 'changeTableColumnFormat')
+                mainColName buildingBlockInfo.MainColumnName newId
+            )
+            printfn "Start with unit for building block %A" buildingBlockInfo.MainColumnName
+            let! createUnitColsIfNeeded =
                 /// if format.isSome then we need to also add unit columns in the following scheme:
                 /// Unit [UnitTermName] (#id; #h; #u) | Term Source REF [UnitTermName] (#id; #h; #u) | Term Accession Number [UnitTermName] (#id; #h; #u)
                 let createUnitColsIfNeeded =
-                    OfficeInterop.HelperFunctions.createUnitColumns allColHeaders annotationTable newBaseColIndex rowCount buildingBlockInfo.UnitName buildingBlockInfo.UnitTermAccession
+                    OfficeInterop.HelperFunctions.createUnitColumns annotationTableName newBaseColIndex rowCount buildingBlockInfo.UnitName buildingBlockInfo.UnitTermAccession
 
-                /// If unit block was added then return some msg information
-                let unitColCreationMsg = if createUnitColsIfNeeded.IsSome then fst createUnitColsIfNeeded.Value else ""
-                let unitColFormat = if createUnitColsIfNeeded.IsSome then snd createUnitColsIfNeeded.Value else "0.00"
+                createUnitColsIfNeeded
 
-                r.enableEvents <- true
-                /// return main col names, unit column format and a message. The first two params are used in a follow up message (executing 'changeTableColumnFormat')
-                mainColName buildingBlockInfo.MainColumnName newId, unitColFormat, sprintf "%s column was added. %s" buildingBlockInfo.MainColumnName unitColCreationMsg
-            )
+            /// If unit block was added then return some msg information
+            let unitColCreationMsg = if createUnitColsIfNeeded.IsSome then fst createUnitColsIfNeeded.Value else ""
+            let unitColFormat = if createUnitColsIfNeeded.IsSome then snd createUnitColsIfNeeded.Value else "0.00"
 
-            return res
+            printfn "Done with building block %A" buildingBlockInfo.MainColumnName
+            return mainColName, unitColFormat, sprintf "%s column was added. %s" mainColName unitColCreationMsg
+
         }
     )
 
+open Fable
+
 let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock list, protocol:Xml.GroupTypes.Protocol) =
-   
-    let addBuildingBlock buildingBlockInfo =
-        promise {
-            let! res = addAnnotationBlock(buildingBlockInfo)
-            return [res]
+  
+    let chainBuildingBlocks (buildingBlockInfoList:MinimalBuildingBlock list) =
+        let state bb = promise {
+            let! baseAsync = bb |> addAnnotationBlock
+            return [baseAsync]
         }
-    let chainBuildingBlocks buildingBlockInfoList =
-        let promiseList = buildingBlockInfoList |> List.map (fun x -> addBuildingBlock x)
-
-        let emptyPromise = promise {return []}
-
-        let rec chain ind (promiseList:JS.Promise<(string*string*string) list> list ) resultPromise =
-            if ind >= promiseList.Length then
-                resultPromise
-            elif ind = 0 then 
-                let currentPromise = promiseList |> List.item ind
-                chain 1 promiseList currentPromise
-            else
-                let currentPromise = promiseList |> List.item ind
-                let nextPromise =
-                    Promise.PromiseBuilder().Merge(currentPromise,resultPromise, (fun x y -> x@y))
-                chain (ind+1) promiseList nextPromise
-
-        chain 0 promiseList emptyPromise
+        buildingBlockInfoList.Tail
+        |> List.fold (fun (previousPromise:JS.Promise<(string*string*string) list>) nextID ->
+            promise {
+                let! prev,nextPromise =
+                    previousPromise.``then``(fun e ->
+                        e,state nextID
+                    )
+                let! next = nextPromise
+                return next@prev
+            }            
+        ) (state buildingBlockInfoList.Head)
 
     let infoProm =
 
@@ -629,7 +624,11 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                         x.MainColumnName, "0.00", ""
                     )
 
+                printfn "start creating all building blocks"
+
                 let! chainProm = chainBuildingBlocks onlyNonExistingBuildingBlocks
+
+                printfn "done creating all building blocks"
 
                 let updateProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
@@ -1520,7 +1519,6 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
 
 let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidation, colNames: string list) =
     Excel.run(fun context ->
-        printfn "START ADDING TABLEVALIDATION"
         let getBaseName (colHeader:string) =
             let parsedHeader = parseColHeader colHeader
             let ont = if parsedHeader.Ontology.IsSome then sprintf " [%s]" parsedHeader.Ontology.Value.Name else ""
@@ -1531,8 +1529,6 @@ let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidatio
                 getBaseName x, x
             )
             |> Map.ofList
-        printfn "%A" newColNameMap
-        printfn "%A" tableValidation
         //failwith (sprintf "%A" tableValidation)
 
         let updateColumnValidationColNames =
@@ -1636,41 +1632,28 @@ let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string
             let! selectedBuildingBlock =
                 BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
 
-            let! res = context.sync().``then``( fun _ ->
+            if selectedBuildingBlock.TAN.IsNone || selectedBuildingBlock.TSR.IsNone then
+                failwith (
+                    sprintf
+                        "Swate can only add a unit to columns of the type: %s, %s, %s."
+                        OfficeInterop.Types.ColumnCoreNames.Shown.Parameter
+                        OfficeInterop.Types.ColumnCoreNames.Shown.Characteristics
+                        OfficeInterop.Types.ColumnCoreNames.Shown.Factor
+                )
 
-                    if selectedBuildingBlock.TAN.IsNone || selectedBuildingBlock.TSR.IsNone then
-                        failwith (
-                            sprintf
-                                "Swate can only add a unit to columns of the type: %s, %s, %s."
-                                OfficeInterop.Types.ColumnCoreNames.Shown.Parameter
-                                OfficeInterop.Types.ColumnCoreNames.Shown.Characteristics
-                                OfficeInterop.Types.ColumnCoreNames.Shown.Factor
-                        )
-                        
-                    // This is necessary to skip over hidden cols
-                    /// Get an array of the headers
-                    let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+            let! unitColumnResult = 
+                if selectedBuildingBlock.Unit.IsSome then
+                    updateUnitColumns annotationTable (float selectedBuildingBlock.MainColumn.Index) format unitAccessionOpt
+                else
+                    createUnitColumns annotationTable (float selectedBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
 
-                    let allColHeaders =
-                        headerVals
-                        |> Array.choose id
-                        |> Array.map string
+            let maincolName = selectedBuildingBlock.MainColumn.Header.Value.Header
 
-                    let unitColumnResult =
-                        if selectedBuildingBlock.Unit.IsSome then
-                            updateUnitColumns allColHeaders annoHeaderRange (float selectedBuildingBlock.MainColumn.Index) format unitAccessionOpt
-                        else
-                            createUnitColumns allColHeaders table (float selectedBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
+            /// If unit block was added then return some msg information
+            //let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""
+            let unitColFormat = if unitColumnResult.IsSome then snd unitColumnResult.Value else "0.00"
 
-                    let maincolName = selectedBuildingBlock.MainColumn.Header.Value.Header
-
-                    /// If unit block was added then return some msg information
-                    //let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""
-                    let unitColFormat = if unitColumnResult.IsSome then snd unitColumnResult.Value else "0.00"
-
-                    maincolName, unitColFormat //, unitColCreationMsg
-            )
-            return res
+            return maincolName, unitColFormat
         }
     )
 
