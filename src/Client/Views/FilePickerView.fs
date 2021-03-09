@@ -117,7 +117,6 @@ let dragAndDropClone (model:Model) dispatch id =
                                     )
                             ] |> fun updatedOrderList ->
                                     let sortedList = List.sortBy fst updatedOrderList
-                                    printfn "next list: %A" sortedList
                                     UpdateFileNames ( sortedList ) |> FilePicker |> dispatch
                         mustUpdateModel <- false
                         clone?style?opacity <- 0
@@ -166,7 +165,6 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
         OnDragStart (fun eve ->
             dropped <- false
             UpdateDNDDropped false |> FilePicker |> dispatch
-            printfn "START"
             eve.stopPropagation()
             let offset = child().getBoundingClientRect()
             let windowScrollY = Browser.Dom.window.scrollY
@@ -215,7 +213,6 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
         OnDragEnd (fun eve ->
             // restore wrapper 
             parent()?style?height <- fileTileHeight
-            printfn "END"
             let slideClone =
                 if coordinates.IsNone then failwith "Unknown Drag and Drop pattern 0.2"
                 if dropped then
@@ -231,7 +228,6 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
             ()
         )
         OnDrop (fun eve ->
-            printfn "DROPPED"
             //eve.stopPropagation()
             eve.preventDefault()
             dropped <- true

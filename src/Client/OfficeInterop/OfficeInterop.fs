@@ -376,7 +376,6 @@ let getTableRepresentation() =
 /// This function is used to add a new building block to the active annotationTable.
 let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
 
-    printfn "Start with building block %A" buildingBlockInfo.MainColumnName
     /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
     let isSingleCol =
         match buildingBlockInfo.MainColumnName with
@@ -538,26 +537,19 @@ let addAnnotationBlock (buildingBlockInfo:MinimalBuildingBlock) =
                 /// return main col names, unit column format and a message. The first two params are used in a follow up message (executing 'changeTableColumnFormat')
                 mainColName buildingBlockInfo.MainColumnName newId
             )
-            printfn "Start with unit for building block %A" buildingBlockInfo.MainColumnName
-            let! createUnitColsIfNeeded =
-                /// if format.isSome then we need to also add unit columns in the following scheme:
-                /// Unit [UnitTermName] (#id; #h; #u) | Term Source REF [UnitTermName] (#id; #h; #u) | Term Accession Number [UnitTermName] (#id; #h; #u)
-                let createUnitColsIfNeeded =
-                    OfficeInterop.HelperFunctions.createUnitColumns annotationTableName newBaseColIndex rowCount buildingBlockInfo.UnitName buildingBlockInfo.UnitTermAccession
 
-                createUnitColsIfNeeded
+            /// if format.isSome then we need to also add unit columns in the following scheme:
+            /// Unit [UnitTermName] (#id; #h; #u) | Term Source REF [UnitTermName] (#id; #h; #u) | Term Accession Number [UnitTermName] (#id; #h; #u)
+            let! createUnitColsIfNeeded =
+                OfficeInterop.HelperFunctions.createUnitColumns context annotationTable newBaseColIndex rowCount buildingBlockInfo.UnitName buildingBlockInfo.UnitTermAccession
 
             /// If unit block was added then return some msg information
             let unitColCreationMsg = if createUnitColsIfNeeded.IsSome then fst createUnitColsIfNeeded.Value else ""
             let unitColFormat = if createUnitColsIfNeeded.IsSome then snd createUnitColsIfNeeded.Value else "0.00"
 
-            printfn "Done with building block %A" buildingBlockInfo.MainColumnName
             return mainColName, unitColFormat, sprintf "%s column was added. %s" mainColName unitColCreationMsg
-
         }
     )
-
-open Fable
 
 let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock list, protocol:Xml.GroupTypes.Protocol) =
   
@@ -566,17 +558,21 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
             let! baseAsync = bb |> addAnnotationBlock
             return [baseAsync]
         }
-        buildingBlockInfoList.Tail
-        |> List.fold (fun (previousPromise:JS.Promise<(string*string*string) list>) nextID ->
-            promise {
-                let! prev,nextPromise =
-                    previousPromise.``then``(fun e ->
-                        e,state nextID
-                    )
-                let! next = nextPromise
-                return next@prev
-            }            
-        ) (state buildingBlockInfoList.Head)
+        /// include isEmpty check to avoid errors during protocol update without any building blocks to add
+        if buildingBlockInfoList.IsEmpty then
+            promise {return []}
+        else
+            buildingBlockInfoList.Tail
+            |> List.fold (fun (previousPromise:JS.Promise<(string*string*string) list>) nextID ->
+                promise {
+                    let! prev,nextPromise =
+                        previousPromise.``then``(fun e ->
+                            e,state nextID
+                        )
+                    let! next = nextPromise
+                    return next@prev
+                }            
+            ) (state buildingBlockInfoList.Head)
 
     let infoProm =
 
@@ -624,11 +620,7 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                         x.MainColumnName, "0.00", ""
                     )
 
-                printfn "start creating all building blocks"
-
                 let! chainProm = chainBuildingBlocks onlyNonExistingBuildingBlocks
-
-                printfn "done creating all building blocks"
 
                 let updateProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
@@ -659,7 +651,6 @@ let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock li
                         Xml.GroupTypes.SpannedBuildingBlock.create colName relatedTermAccession
             ]
         let completeProtocolInfo = {info with SpannedBuildingBlocks = createSpannedBlocks}
-        printfn "%A" completeProtocolInfo
         return (blockResults,completeProtocolInfo)
     }
 
@@ -1291,7 +1282,6 @@ let updateSwateCustomXml(newXmlString:String) =
     )
 
 let writeProtocolToXml(protocol:GroupTypes.Protocol) =
-    printfn "%A" protocol
     updateProtocolFromXml protocol false
 
 let removeProtocolFromXml(protocol:GroupTypes.Protocol) =
@@ -1455,7 +1445,6 @@ let updateProtocolGroupHeader () =
                                     
                             else
                                 // REMOVE INCOMPLETE PROTOCOL
-                                printfn "REMOVE!"
                                 let! remove = removeProtocolFromXml protocol
                                 return sprintf "%A" remove
 
@@ -1632,7 +1621,7 @@ let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string
             let! selectedBuildingBlock =
                 BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
 
-            if selectedBuildingBlock.TAN.IsNone || selectedBuildingBlock.TSR.IsNone then
+            if selectedBuildingBlock.hasCompleteTSRTAN |> not then
                 failwith (
                     sprintf
                         "Swate can only add a unit to columns of the type: %s, %s, %s."
@@ -1643,9 +1632,9 @@ let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string
 
             let! unitColumnResult = 
                 if selectedBuildingBlock.Unit.IsSome then
-                    updateUnitColumns annotationTable (float selectedBuildingBlock.MainColumn.Index) format unitAccessionOpt
+                    updateUnitColumns context table (float selectedBuildingBlock.MainColumn.Index) format unitAccessionOpt
                 else
-                    createUnitColumns annotationTable (float selectedBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
+                    createUnitColumns context table (float selectedBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
 
             let maincolName = selectedBuildingBlock.MainColumn.Header.Value.Header
 
@@ -1756,22 +1745,18 @@ let updateProtocolByNewVersion (prot:OfficeInterop.Types.Xml.GroupTypes.Protocol
             let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "name")
             let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
     
-            //let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-            //let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
-    
-            //let! xmlParsed = getCustomXml customXmlParts context
-            //let currentProtocolGroup = getSwateValidationForCurrentTable annotationTable activeWorksheet.name xmlParsed
-    
             let! allBuildingBlocks =
                 context.sync().``then``( fun _ ->
-                    let buildingBlocks = getBuildingBlocks annoHeaderRange annoBodyRange
-    
-                    buildingBlocks 
+                    getBuildingBlocks annoHeaderRange annoBodyRange 
                 )
 
+            /// Filter all annotation blocks for those that are part of existing protocol
             let filterBuildingBlocksForProtocol =
                 allBuildingBlocks |> Array.filter (fun bb ->
-                    prot.SpannedBuildingBlocks |> List.exists (fun spannedBB -> spannedBB.ColumnName = bb.MainColumn.Header.Value.Header)
+                    prot.SpannedBuildingBlocks
+                    |> List.exists (fun spannedBB ->
+                        spannedBB.ColumnName = bb.MainColumn.Header.Value.Header
+                    )
                 )
 
             let minBuildingBlocksInfoDB = dbTemplate.TableXml |> MinimalBuildingBlock.ofExcelTableXml |> snd

@@ -1,3 +1,9 @@
+### 0.4.3+9b7d7fe (Released 2021-3-9)
+* Additions:
+    * latest commit #9b7d7fe
+* Bugfixes:
+    * [[#9b7d7fe](https://github.com/nfdi4plants/Swate/commit/9b7d7fe5ca562fee346227430c1fc1aebffa3b10)] Remove bugs with protocol update :bug:
+
 ### 0.4.2+ae04aa5 (Released 2021-3-9)
 * Additions:
     * latest commit #ae04aa5

@@ -10,14 +10,6 @@ open ExcelColors
 open Model
 open Messages
 
-let placerholderInvis =
-    let padding = "0.5rem"
-    Button.a [
-        Button.Props [Style [Opacity "0"; PointerEvents "None"; Cursor "none"; PaddingLeft padding; PaddingRight padding]]
-    ] [
-        Fa.i [Fa.Solid.SyncAlt][]
-    ]
-
 type ShortCutIcon = {
     Description : string
     FaList      : ReactElement list
