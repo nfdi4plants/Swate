@@ -1,3 +1,10 @@
+### 0.4.3+9b7d7fe (Released 2021-3-9)
+* Additions:
+    * latest commit #9b7d7fe
+    * [[#116c0c3](https://github.com/nfdi4plants/Swate/commit/116c0c3e79ca8f3e094d27c1d4df5d018cc80a16)] Merge pull request #135 from nfdi4plants/kevinf-patch-0.4.2
+* Bugfixes:
+    * [[#9b7d7fe](https://github.com/nfdi4plants/Swate/commit/9b7d7fe5ca562fee346227430c1fc1aebffa3b10)] Remove bugs with protocol update :bug:
+
 ### 0.4.2+ae04aa5 (Released 2021-3-9)
 * Additions:
     * latest commit #ae04aa5
