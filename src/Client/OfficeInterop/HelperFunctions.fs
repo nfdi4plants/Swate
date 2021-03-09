@@ -129,27 +129,23 @@ let findNewIdForUnit (allColHeaders:string []) (format:string option) (unitAcces
             int
     loopingCheck 1
 
-let createUnitColumns (annotationTableName:string) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
+let createUnitColumns (context:Excel.RequestContext) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
     let col = createEmptyMatrixForTables 1 rowCount ""
     if format.IsSome then
-        Excel.run(fun context ->
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
-
-            context.sync().``then``(fun e ->
-                printfn "1"
+        promise {
+            let! annoHeaderRange = context.sync().``then``(fun e ->
+                let annoHeaderRange = annotationTable.getHeaderRowRange()
+                let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
+                annoHeaderRange
+            )
+            let! res = context.sync().``then``(fun e ->
                 let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-
                 let allColHeaders =
                     headerVals
                     |> Array.choose id
                     |> Array.map string
 
-                printfn "2"
                 let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
-
                 /// create unit main column
                 let createdUnitCol1 =
                     annotationTable.columns.add(
@@ -173,54 +169,52 @@ let createUnitColumns (annotationTableName:string) newBaseColIndex rowCount (for
                         values = U4.Case1 col,
                         name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
                     )
-                printfn "3"
+
                 Some (
                     sprintf " Added specified unit: %s" (format.Value),
                     sprintf "0.00 \"%s\"" (format.Value)
                 )
             )
-        )
+
+            return res
+        }
 
     else
         promise {return None}
 
-let updateUnitColumns (annotationTableName:string) newBaseColIndex (format:string option) (unitAccessionOpt:string option) =
+let updateUnitColumns (context:RequestContext) (annotationTable:Table) newBaseColIndex (format:string option) (unitAccessionOpt:string option) =
     let col v= createValueMatrix 1 1 v
     if format.IsSome then
-        Excel.run(fun context ->
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
 
-            context.sync().``then``(fun e ->
-                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+        context.sync().``then``(fun e ->
+            let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
             
-                let allColHeaders =
-                    headerVals
-                    |> Array.choose id
-                    |> Array.map string
-                let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
+            let allColHeaders =
+                headerVals
+                |> Array.choose id
+                |> Array.map string
+            let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
 
-                /// create unit main column
-                let updateUnitCol1 =
-                    annoHeaderRange.getColumn(newBaseColIndex+3.)
-                    |> fun c1 -> c1.values <- sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+            /// create unit main column
+            let updateUnitCol1 =
+                annoHeaderRange.getColumn(newBaseColIndex+3.)
+                |> fun c1 -> c1.values <- sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-                /// create unit TSR
-                let createdUnitCol2 =
-                    annoHeaderRange.getColumn(newBaseColIndex+4.)
-                    |> fun c2 -> c2.values <- sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+            /// create unit TSR
+            let createdUnitCol2 =
+                annoHeaderRange.getColumn(newBaseColIndex+4.)
+                |> fun c2 -> c2.values <- sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-                /// create unit TAN
-                let createdUnitCol3 =
-                    annoHeaderRange.getColumn(newBaseColIndex+5.)
-                    |> fun c3 -> c3.values <- sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+            /// create unit TAN
+            let createdUnitCol3 =
+                annoHeaderRange.getColumn(newBaseColIndex+5.)
+                |> fun c3 -> c3.values <- sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-                Some (
-                    sprintf " Added specified unit: %s" (format.Value),
-                    sprintf "0.00 \"%s\"" (format.Value)
-                )
+            Some (
+                sprintf " Added specified unit: %s" (format.Value),
+                sprintf "0.00 \"%s\"" (format.Value)
             )
         )
     else
@@ -784,11 +778,8 @@ let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlE
 /// Use the 'remove' parameter to remove any Swate protocol group xml for the worksheet annotation table name combination in 'protocolGroup'
 let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) (remove:bool) =
 
-    printfn "START UPDATE PROTOCOL GROUP"
     let currentTableXml = getActiveTableXml protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet previousCompleteCustomXml
 
-
-    printfn "create next group"
     let nextTableXml =
         let newProtocolGroupXml = protocolGroup.toXml |> SimpleXml.parseElement
         if currentTableXml.IsSome then
@@ -810,7 +801,6 @@ let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) 
                 Children = [newProtocolGroupXml]
             }
 
-    printfn "filter out previous group"
     let filterPrevTableFromRootChildren =
         previousCompleteCustomXml.Children
         |> List.filter (fun x ->
@@ -820,7 +810,7 @@ let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) 
                 && x.Attributes.["Worksheet"] = protocolGroup.AnnotationTable.Worksheet
             isExisting |> not
         )
-    printfn "create new Group"
+
     {previousCompleteCustomXml with
         Children = nextTableXml::filterPrevTableFromRootChildren
     }
@@ -846,14 +836,9 @@ let updateRemoveSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousComple
         else
             isExisting.Value
 
-    printfn "START UPDATE"
-    printfn "CurrentProtocolGroup: %A" currentSwateProtocolGroup
-
     let filteredProtocolChildren =
         currentSwateProtocolGroup.Protocols
         |> List.filter (fun x -> x.Id <> protocol.Id)
-
-    printfn "filter out children"
 
     let nextProtocolGroup =
         {currentSwateProtocolGroup with
