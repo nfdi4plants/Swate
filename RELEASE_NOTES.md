@@ -1,3 +1,9 @@
+### 0.4.2+ae04aa5 (Released 2021-3-9)
+* Additions:
+    * latest commit #ae04aa5
+* Bugfixes:
+    * [[#ae04aa5](https://github.com/nfdi4plants/Swate/commit/ae04aa51261e614d0c422f03d646e1a76d664501)] Stabilize protocol insert against bugs :bug:
+
 ### 0.4.1+d75743c (Released 2021-3-8)
 * Additions:
     * latest commit #d75743c
