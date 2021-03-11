@@ -13,6 +13,11 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
     Notification.notification [
         Notification.Color IsWarning
         Notification.Props [
+            Style [
+                BackgroundColor (if model.SiteStyleState.IsDarkMode = false then NFDIColors.Yellow.Base else model.SiteStyleState.ColorMode.ControlBackground)
+                Color model.SiteStyleState.ColorMode.Text
+                //yield! colorControlInArray model.SiteStyleState.ColorMode
+            ]
         ]
     ] [
         Notification.delete [ Props [
@@ -21,12 +26,14 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
             )
         ]] [ ]
         Heading.h5 [] [str "Warning: No Annotation table found in worksheet"]
-        Text.p [] [
+        Field.div [] [
             str "Your worksheet seems to contain no annotation table. You can create one by pressing the button below"
         ]
-        Button.buttonComponent
-            model.SiteStyleState.ColorMode
-            true
-            "create annotation table"
-            (fun _ -> CreateAnnotationTable (model.SiteStyleState.IsDarkMode) |> ExcelInterop |> dispatch )
+        Field.div [][
+            Button.buttonComponent
+                model.SiteStyleState.ColorMode
+                model.SiteStyleState.IsDarkMode
+                "create annotation table"
+                (fun _ -> CreateAnnotationTable model.SiteStyleState.IsDarkMode |> ExcelInterop |> dispatch )
+        ]
     ]

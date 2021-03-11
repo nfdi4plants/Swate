@@ -13,9 +13,9 @@ open Shared
 open Model
 open Messages
 
-let dangerZone model dispatch =
+let dangerZone (model:Model) dispatch =
     div [][
-        Label.label [][str "Dangerzone"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]][str "Dangerzone"]
         Container.container [
             Container.Props [Style [
                 Padding "1rem"
@@ -40,7 +40,7 @@ let dangerZone model dispatch =
         ]
     ]
 
-let breadcrumbEle dispatch =
+let breadcrumbEle model dispatch =
     Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
         Breadcrumb.item [][
             a [
@@ -51,6 +51,7 @@ let breadcrumbEle dispatch =
         ]
         Breadcrumb.item [ Breadcrumb.Item.IsActive true ][
             a [
+                Style [Color model.SiteStyleState.ColorMode.Text]
                 OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch)
             ][
                 str Routing.Route.SettingsXml.toStringRdbl
@@ -703,7 +704,7 @@ let settingsXmlViewComponent (model:Model) dispatch =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        breadcrumbEle dispatch
+        breadcrumbEle model dispatch
 
         Help.help [][str "The functions on this page allow more or less direct manipulation of the Xml used to save additional information about your Swate table. Please use them with care."]
 

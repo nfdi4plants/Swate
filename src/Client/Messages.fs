@@ -303,23 +303,40 @@ and Msg =
 
 open Routing
 
-let initializeModel (pageOpt: Route option) = {
-    DebouncerState              = Debouncer                 .create ()
-    PageState                   = PageState                 .init pageOpt
-    PersistentStorageState      = PersistentStorageState    .init ()
-    DevState                    = DevState                  .init ()
-    SiteStyleState              = SiteStyleState            .init ()
-    TermSearchState             = TermSearchState           .init ()
-    AdvancedSearchState         = AdvancedSearchState       .init ()
-    ExcelState                  = ExcelState                .init ()
-    ApiState                    = ApiState                  .init ()
-    FilePickerState             = FilePickerState           .init ()
-    AddBuildingBlockState       = AddBuildingBlockState     .init ()
-    ValidationState             = ValidationState           .init ()
-    ProtocolInsertState         = ProtocolInsertState       .init ()
-    BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
-    SettingsXmlState            = SettingsXmlState          .init ()
-    SettingsDataStewardState    = SettingsDataStewardState  .init ()
-    SettingsProtocolState       = SettingsProtocolState     .init ()
-    WarningModal                = None
-}
+let initializeModel (pageOpt: Route option) =
+    let isDarkMode =
+        let cookies = Browser.Dom.document.cookie
+        let cookiesSplit = cookies.Split([|";"|], System.StringSplitOptions.RemoveEmptyEntries)
+        cookiesSplit
+        |> Array.tryFind (fun x -> x.StartsWith (Cookies.IsDarkMode.toCookieString + "="))
+        |> fun cookieOpt ->
+            if cookieOpt.IsSome then
+                cookieOpt.Value.Replace(Cookies.IsDarkMode.toCookieString + "=","")
+                |> fun cookie ->
+                    printfn "%A" cookie
+                    match cookie with
+                    | "false"| "False"  -> false
+                    | "true" | "True"   -> true
+                    | anyElse -> false
+            else
+                false
+    {
+        DebouncerState              = Debouncer                 .create ()
+        PageState                   = PageState                 .init pageOpt
+        PersistentStorageState      = PersistentStorageState    .init ()
+        DevState                    = DevState                  .init ()
+        SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
+        TermSearchState             = TermSearchState           .init ()
+        AdvancedSearchState         = AdvancedSearchState       .init ()
+        ExcelState                  = ExcelState                .init ()
+        ApiState                    = ApiState                  .init ()
+        FilePickerState             = FilePickerState           .init ()
+        AddBuildingBlockState       = AddBuildingBlockState     .init ()
+        ValidationState             = ValidationState           .init ()
+        ProtocolInsertState         = ProtocolInsertState       .init ()
+        BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
+        SettingsXmlState            = SettingsXmlState          .init ()
+        SettingsDataStewardState    = SettingsDataStewardState  .init ()
+        SettingsProtocolState       = SettingsProtocolState     .init ()
+        WarningModal                = None
+    }

@@ -21,9 +21,17 @@ let toggleDarkModeElement (model:Model) dispatch =
         Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
             Switch.switch [
                 Switch.Id "DarkModeSwitch"
+                Switch.Checked model.SiteStyleState.IsDarkMode
                 Switch.IsOutlined
-                Switch.Color IsSuccess
-                Switch.OnChange (fun _ -> ToggleColorMode |> StyleChange |> dispatch)
+                Switch.Color IsPrimary
+                Switch.OnChange (fun _ ->
+                    Browser.Dom.document.cookie <-
+                        let isDarkMode b =
+                            let expire = System.DateTime.Now.AddYears 100
+                            sprintf "%s=%b; expires=%A; path=/" Cookies.IsDarkMode.toCookieString b expire
+                        not model.SiteStyleState.IsDarkMode |> isDarkMode
+                    ToggleColorMode |> StyleChange |> dispatch
+                )
             ] []
         ]
     ]

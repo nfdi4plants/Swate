@@ -13,7 +13,7 @@ open Shared
 open Model
 open Messages
 
-let breadcrumbEle dispatch =
+let breadcrumbEle model dispatch =
     Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
         Breadcrumb.item [][
             a [
@@ -24,6 +24,7 @@ let breadcrumbEle dispatch =
         ]
         Breadcrumb.item [ Breadcrumb.Item.IsActive true ][
             a [
+                Style [Color model.SiteStyleState.ColorMode.Text]
                 OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch)
             ][
                 str Routing.Route.SettingsProtocol.toStringRdbl
@@ -137,6 +138,10 @@ let checkProtocolEle (model:Model) dispatch =
         MarginBottom "1rem"
     ]] [
         Field.div [][
+            str "Here you can check protocols, used in the Swate table of your open Excel worksheet, for updates."
+        ]
+
+        Field.div [][
             getActiveProtocolButton model dispatch
         ]
 
@@ -152,7 +157,7 @@ let settingsProtocolViewComponent (model:Model) dispatch =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        breadcrumbEle dispatch
+        breadcrumbEle model dispatch
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Check protocols for newest versions."]
         checkProtocolEle model dispatch
