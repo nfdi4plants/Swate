@@ -1,3 +1,8 @@
+### 0.4.4+4ae3198 (Released 2021-3-11)
+* Additions:
+    * latest commit #4ae3198
+    * [[#4ae3198](https://github.com/nfdi4plants/Swate/commit/4ae31986bc4b1a24ccead037afbde4ced9ed7a44)] Update DB protocol.
+
 ### 0.4.3+9b7d7fe (Released 2021-3-9)
 * Additions:
     * latest commit #9b7d7fe
