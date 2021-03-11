@@ -1941,7 +1941,7 @@ let createPointerJson() =
             [
                 "name"          , Fable.SimpleJson.JString  ""
                 "version"       , Fable.SimpleJson.JString  ""     
-                "author"        , Fable.SimpleJson.JString  ""
+                "author"        , Fable.SimpleJson.JArray   []
                 "description"   , Fable.SimpleJson.JString  ""
                 "docslink"      , Fable.SimpleJson.JString  ""
                 "tags"          , Fable.SimpleJson.JArray   []        
