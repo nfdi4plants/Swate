@@ -89,14 +89,11 @@ let getXmlByProtocol cString (protocol:ProtocolTemplate) =
         .CommandText <- """
             SELECT * FROM ProtocolXml
             WHERE FK_Name = @name
-            AND FK_Version = @version
         """
 
     let nameParam = cmd.Parameters.Add("name",MySqlDbType.VarChar)
-    let versionParam = cmd.Parameters.Add("version",MySqlDbType.VarChar)
 
-    nameParam.Value     <- protocol.Name
-    versionParam.Value  <- protocol.Version
+    nameParam.Value <- protocol.Name
 
     use reader = cmd.ExecuteReader()
     let res = [|
