@@ -1,3 +1,11 @@
+### 0.4.5+b360273 (Released 2021-3-12)
+* Additions:
+    * latest commit #b360273
+    * [[#d630a76](https://github.com/nfdi4plants/Swate/commit/d630a76445f1845bb93de9ae89bf1e983f81c51f)] Save darkmode as cookie and improve darkmode (Issue #134).
+* Bugfixes:
+    * [[#b360273](https://github.com/nfdi4plants/Swate/commit/b36027369f60a612e2660ec3b8bfefb09cbe5664)] Fix bug, removing protocol groups if one column is not an ontology.
+    * [[#402a220](https://github.com/nfdi4plants/Swate/commit/402a220824ee69ebd1cb5e6f4ecd2ba4cf1627f7)] Fix pointer .json generator (Issue #139).
+
 ### 0.4.4+4ae3198 (Released 2021-3-11)
 * Additions:
     * latest commit #4ae3198
