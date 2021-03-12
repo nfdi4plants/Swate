@@ -14,7 +14,7 @@ open Model
 open Messages
 
 
-let breadcrumbEle dispatch =
+let breadcrumbEle model dispatch =
     Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
         Breadcrumb.item [][
             a [
@@ -25,6 +25,7 @@ let breadcrumbEle dispatch =
         ]
         Breadcrumb.item [ Breadcrumb.Item.IsActive true ][
             a [
+                Style [Color model.SiteStyleState.ColorMode.Text]
                 OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsDataStewards) |> dispatch)
             ][
                 str Routing.Route.SettingsXml.toStringRdbl
@@ -106,6 +107,15 @@ let createPointerJsonEle (model:Model) dispatch =
         ]
     ][
         Field.div [][
+            b [] [str "Here you can create a prefilled template for a template pointer .json."]
+            str " This is used to smooth the creation of new templates "
+            a [Href @"https://github.com/nfdi4plants/SWATE_templates"; Target "_Blank"][str "here"]
+            str ". If you want to create/request a new template please open an issue "
+            a [Href @"https://github.com/nfdi4plants/SWATE_templates/issues/new?assignees=&labels=&template=feature_request.md&title=%5BFEATURE%5D"; Target "_Blank"][str "here"]
+            str "."
+        ]
+
+        Field.div [][
             createPointerJsonButton model dispatch
         ]
 
@@ -121,7 +131,7 @@ let settingsDataStewardViewComponent (model:Model) dispatch =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        breadcrumbEle dispatch
+        breadcrumbEle model dispatch
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display raw custom xml."]
         createPointerJsonEle model dispatch

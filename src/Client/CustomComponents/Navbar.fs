@@ -89,7 +89,7 @@ let navbarShortCutIconList model dispatch =
 
 let dropdownShortCutIconList model dispatch =
     Table.table [
-        Table.Props [Style [ BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; Color "white"; Cursor "default" ]]
+        Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; Color "white"; Cursor "default" ]]
     ][
         tbody [][
             for icon in shortCutIconList model do
@@ -99,7 +99,11 @@ let dropdownShortCutIconList model dispatch =
                         td [][
                             let padding = "0.5rem"
                             Button.a [
-                                Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]]
+                                Button.Props [ Style [
+                                    if model.SiteStyleState.IsDarkMode |> not then
+                                        BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
+                                    PaddingLeft padding; PaddingRight padding
+                                ]]
                                 Button.OnClick (fun _ ->
                                     icon.Msg |> dispatch
                                 )
@@ -121,9 +125,18 @@ let quickAccessDropdownElement model dispatch =
     ] [
         div [Style [
             Position PositionOptions.Relative
+            BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
+            if model.SiteStyleState.IsDarkMode then
+                BorderColor model.SiteStyleState.ColorMode.ControlForeground
+            else
+                BorderColor model.SiteStyleState.ColorMode.Fade
         ]] [
             Button.a [
-                Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft "0"; PaddingRight "0"]]
+                Button.Props [Style [
+                    if model.SiteStyleState.IsDarkMode |> not then
+                        BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
+                    PaddingLeft "0"; PaddingRight "0"]
+                ]
                 Button.Color Color.IsWhite
                 Button.IsInverted
             ][

@@ -7,6 +7,18 @@ open Shared
 open Thoth.Elmish
 open Routing
 
+type Cookies =
+| IsDarkMode
+
+    member this.toCookieString =
+        match this with
+        | IsDarkMode    -> "isDarkmode"
+
+    static member ofString str =
+        match str with
+        | "isDarkmode"  -> IsDarkMode
+        | anyElse       -> failwith (sprintf "Cookie-Parser encountered unknown cookie name: %s" anyElse)
+
 type LogItem =
     | Debug of (System.DateTime*string)
     | Info  of (System.DateTime*string)
@@ -115,11 +127,11 @@ type SiteStyleState = {
     IsDarkMode      : bool
     ColorMode       : ExcelColors.ColorMode
 } with
-    static member init () = {
+    static member init (?darkMode) = {
         QuickAcessIconsShown    = false
         BurgerVisible           = false
-        IsDarkMode              = false
-        ColorMode               = ExcelColors.colorfullMode
+        IsDarkMode              = if darkMode.IsSome then darkMode.Value else false
+        ColorMode               = if darkMode.IsSome && darkMode.Value = true then ExcelColors.darkMode else ExcelColors.colorfullMode
     }
 
 type DevState = {

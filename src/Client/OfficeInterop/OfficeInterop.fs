@@ -1317,7 +1317,7 @@ let updateProtocolGroupHeader () =
 
                 let getGroupHeaderIndicesForProtocol (buildingBlocks:BuildingBlock []) (protocol:Xml.GroupTypes.Protocol) =
                     let buildingBlockOpts = tryFindSpannedBuildingBlocks protocol buildingBlocks
-                    // caluclate list of indices fro group blocks
+                    // caluclate list of indices for group blocks
                     if buildingBlockOpts.IsSome then
                         let getStartAndEnd (mainColIndices:int list) =
                             let startInd = List.min mainColIndices
@@ -1855,9 +1855,9 @@ let removeXmlType(xmlType:XmlTypes) =
                 | ValidationType tableValidation ->
                     removeSwateValidation tableValidation xmlParsed
                 | GroupType protGroup ->
-                    removeSwateProtocolGroup protGroup xmlParsed
+                    updateRemoveSwateProtocolGroup protGroup xmlParsed true
                 | ProtocolType protocol ->
-                    removeSwateProtocol protocol xmlParsed
+                    updateRemoveSwateProtocol protocol xmlParsed true
 
             let nextCustomXmlString = nextCustomXml |> OfficeInterop.HelperFunctions.xmlElementToXmlString
 
@@ -1941,7 +1941,7 @@ let createPointerJson() =
             [
                 "name"          , Fable.SimpleJson.JString  ""
                 "version"       , Fable.SimpleJson.JString  ""     
-                "author"        , Fable.SimpleJson.JString  ""
+                "author"        , Fable.SimpleJson.JArray   []
                 "description"   , Fable.SimpleJson.JString  ""
                 "docslink"      , Fable.SimpleJson.JString  ""
                 "tags"          , Fable.SimpleJson.JArray   []        

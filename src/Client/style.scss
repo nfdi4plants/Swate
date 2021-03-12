@@ -127,9 +127,9 @@ a.navbar-item:hover {
 
 .arrow_box {
     position: relative;
-    background: #3f8159;
-    border: 4px solid #217346;
-    color: #252423;
+    background: inherit;
+    border: 4px solid;
+    border-color: inherit;
     border-radius: 10px;
     padding: 1rem;
     transform: translateX(calc(8px - 50%));
@@ -148,14 +148,14 @@ a.navbar-item:hover {
 
 .arrow_box:after {
     border-color: rgba(33, 115, 70, 0);
-    border-bottom-color: #3f8159;
+    border-bottom-color: inherit;
     border-width: 5px;
     margin-left: -5px;
 }
 
 .arrow_box:before {
     border-color: rgba(14, 92, 47, 0);
-    border-bottom-color: #217346;
+    border-bottom-color: inherit;
     border-width: 11px;
     margin-left: -11px;
 }
