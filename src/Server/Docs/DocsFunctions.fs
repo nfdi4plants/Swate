@@ -129,6 +129,7 @@ module PredefinedParams =
     module Examples =
 
         let ontologyInfoExmp:OntologyInfo = OntologyInfo.create "Instrument Model" "MS:1000031"
+        let ontologyInfoExmp2:OntologyInfo = OntologyInfo.create "Q TRAP" "MS:1000187"
         
         let unitOntologyExmp:DbDomain.Ontology = {
             ID = 1L

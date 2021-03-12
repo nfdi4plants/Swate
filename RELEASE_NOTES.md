@@ -1,3 +1,8 @@
+### 0.4.6+9cad63e (Released 2021-3-12)
+* Additions:
+    * latest commit #9cad63e
+    * [[#9cad63e](https://github.com/nfdi4plants/Swate/commit/9cad63e1cd456b377fe42ce1d5488412eacf19db)] Merge pull request #141 from nfdi4plants/kevinf-patch-0.4.5
+
 ### 0.4.5+b360273 (Released 2021-3-12)
 * Additions:
     * latest commit #b360273

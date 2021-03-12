@@ -278,11 +278,11 @@ type Model = {
 
 and Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
+    | DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
     | Api                   of ApiMsg
     | Dev                   of DevMsg
     | TermSearch            of TermSearchMsg
     | AdvancedSearch        of AdvancedSearchMsg
-    | DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
     | ExcelInterop          of ExcelInteropMsg
     | StyleChange           of StyleChangeMsg
     | PersistentStorage     of PersistentStorageMsg

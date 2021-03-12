@@ -108,7 +108,7 @@ let annotatorApiDocsv1 =
 
         ////////
         annotatorDocsv1.route <@ fun api -> api.getTermSuggestionsByParentTerm @>
-        |> annotatorDocsv1.alias "Get Terms By Parent Ontology (<code>getTermSuggestionsByParentTerm</code>)"
+        |> annotatorDocsv1.alias "Get Terms By Parent Ontology Term (<code>getTermSuggestionsByParentTerm</code>)"
         |> annotatorDocsv1.description (
             createDocumentationDescription
                 "This is a <code>getTermSuggestions</code> variant, used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the parent ontology (written at the top of the column)."
@@ -116,12 +116,59 @@ let annotatorApiDocsv1 =
                 (Some [|
                     Parameter.create "n" ParamInteger "This parameter sets the number of returned results."
                     Parameter.create "queryString" ParamString "This parameter is used to search the Term.Name column for hits."
-                    Parameter.create "parentOntology" ParamString "This parameter is used to search <b>only</b> is_a relationships by the parentOntology (Term.Name)."
+                    Parameter.create "parentOntology" DocsFunctions.PredefinedParams.OntologyInfoType "This parameter is used to search <b>only</b> is_a relationships by the parentOntology (Term.Name, Term.Accession)."
                 |])
                 "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
                 (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
         )
         |> annotatorDocsv1.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q",PredefinedParams.Examples.ontologyInfoExmp) @>
+
+        ////////
+        annotatorDocsv1.route <@ fun api -> api.getAllTermsByParentTerm @>
+        |> annotatorDocsv1.alias "Get All Terms By Parent Ontology Term (<code>getAllTermsByParentTerm</code>)"
+        |> annotatorDocsv1.description (
+            createDocumentationDescription
+                "This is a <code>getTermSuggestions</code> variant, used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the parent ontology (written at the top of the column)."
+                "If a column with a parent ontology is selected, the app will add this to the 'TermSearch' field in a static button. This can be toggled but a small slider below. If this alternative term search is active then <code>getAllTermsByParentTerm</code> and the input field is still empty, a double click will trigger this search."
+                (Some [|
+                    Parameter.create "parentOntology" DocsFunctions.PredefinedParams.OntologyInfoType "This parameter is used to search <b>only</b> is_a relationships by the parentOntology (Term.Name, Term.Accession)."
+                |])
+                "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
+                (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
+        )
+        |> annotatorDocsv1.example <@ fun api -> api.getAllTermsByParentTerm PredefinedParams.Examples.ontologyInfoExmp @>
+
+        ////////
+        annotatorDocsv1.route <@ fun api -> api.getTermSuggestionsByChildTerm @>
+        |> annotatorDocsv1.alias "Get Terms By Child Ontology Term (<code>getTermSuggestionsByChildTerm</code>)"
+        |> annotatorDocsv1.description (
+            createDocumentationDescription
+                "This function does something similiar to <code>getTermSuggestionsByParentTerm</code>. But instead of searching children in a is_a directed search, it searches all parents in a is_a directed search."
+                "It is used purely as API endpoint for Spawn, but might be implemented for Swate in the future."
+                (Some [|
+                    Parameter.create "n" ParamInteger "This parameter sets the number of returned results."
+                    Parameter.create "queryString" ParamString "This parameter is used to search the Term.Name column for hits."
+                    Parameter.create "parentOntology" DocsFunctions.PredefinedParams.OntologyInfoType "This parameter is used to search <b>only</b> is_a relationships by the parentOntology (Term.Name, Term.Accession)."
+                |])
+                "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
+                (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
+        )
+        |> annotatorDocsv1.example <@ fun api -> api.getTermSuggestionsByChildTerm (5,"inst",PredefinedParams.Examples.ontologyInfoExmp2) @>
+
+        ////////
+        annotatorDocsv1.route <@ fun api -> api.getAllTermsByChildTerm @>
+        |> annotatorDocsv1.alias "Get All Terms By Child Ontology Term (<code>getAllTermsByChildTerm</code>)"
+        |> annotatorDocsv1.description (
+            createDocumentationDescription
+                "This is a <code>getTermSuggestions</code> variant, used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the child ontology term."
+                "It is used purely as API endpoint for Spawn, but might be implemented for Swate in the future."
+                (Some [|
+                    Parameter.create "parentOntology" DocsFunctions.PredefinedParams.OntologyInfoType "This parameter is used to search <b>only</b> is_a relationships by the parentOntology (Term.Name, Term.Accession)."
+                |])
+                "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
+                (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
+        )
+        |> annotatorDocsv1.example <@ fun api -> api.getAllTermsByParentTerm (PredefinedParams.Examples.ontologyInfoExmp2) @>
 
         ////////
         annotatorDocsv1.route <@ fun api -> api.getTermsForAdvancedSearch @>
