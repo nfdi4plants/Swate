@@ -1,7 +1,7 @@
-### 0.4.6+9cad63e (Released 2021-3-12)
+### 0.4.6+89aa7bc (Released 2021-3-12)
 * Additions:
-    * latest commit #9cad63e
-    * [[#9cad63e](https://github.com/nfdi4plants/Swate/commit/9cad63e1cd456b377fe42ce1d5488412eacf19db)] Merge pull request #141 from nfdi4plants/kevinf-patch-0.4.5
+    * latest commit #89aa7bc
+    * [[#89aa7bc](https://github.com/nfdi4plants/Swate/commit/89aa7bc8a2e31b8598e0e0b916733f211035fa4c)] Add Spawn API endpoints.
 
 ### 0.4.5+b360273 (Released 2021-3-12)
 * Additions:
