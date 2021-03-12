@@ -313,7 +313,6 @@ let initializeModel (pageOpt: Route option) =
             if cookieOpt.IsSome then
                 cookieOpt.Value.Replace(Cookies.IsDarkMode.toCookieString + "=","")
                 |> fun cookie ->
-                    printfn "%A" cookie
                     match cookie with
                     | "false"| "False"  -> false
                     | "true" | "True"   -> true

@@ -86,10 +86,12 @@ let tryFindSpannedBuildingBlocks (currentProtocolGroup:Xml.GroupTypes.Protocol) 
             buildingBlocks
             |> Array.tryFind (fun foundBuildingBlock ->
                 let isSameAccession =
-                    if spannedBlock.TermAccession <> "" && foundBuildingBlock.MainColumn.Header.Value.Ontology.IsSome then
-                        foundBuildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession = spannedBlock.TermAccession
+                    if spannedBlock.TermAccession <> "" || foundBuildingBlock.MainColumn.Header.Value.Ontology.IsSome then
+                        // As in the above only one option is that ontology is some we need a default in the next step.
+                        // We default to an empty termaccession, as 'spannedBlock' MUST be <> "" to trigger the default
+                        (Option.defaultValue (OntologyInfo.create "" "") foundBuildingBlock.MainColumn.Header.Value.Ontology).TermAccession = spannedBlock.TermAccession
                     else
-                        false
+                        true
                 foundBuildingBlock.MainColumn.Header.Value.Header = spannedBlock.ColumnName
                 && isSameAccession
             )
@@ -791,7 +793,7 @@ let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) 
                     if remove then
                         filteredChildren
                     else
-                        newProtocolGroupXml::filteredChildren
+                        if filteredChildren.IsEmpty then [newProtocolGroupXml] else newProtocolGroupXml::filteredChildren
             }
         else
             let initNewSwateTableXml =
@@ -815,15 +817,15 @@ let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) 
         Children = nextTableXml::filterPrevTableFromRootChildren
     }
 
-let removeSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
-    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml true
+//let removeSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
+//    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml true
 
-let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
-    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml false
+//let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
+//    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml false
 
 let replaceProtGroupByProtGroup protGroup1 protGroup2 (previousCompleteCustomXml:XmlElement) =
-    let removeProtGroup1 = removeSwateProtocolGroup protGroup1 previousCompleteCustomXml
-    let addProtGroup2 = updateSwateProtocolGroup protGroup2 removeProtGroup1
+    let removeProtGroup1 = updateRemoveSwateProtocolGroup protGroup1 previousCompleteCustomXml true
+    let addProtGroup2 = updateRemoveSwateProtocolGroup protGroup2 removeProtGroup1 false
     addProtGroup2
 
 /// Use the 'remove' parameter to remove any Swate protocol xml for the worksheet annotation table name combination in 'protocolGroup'
@@ -846,16 +848,16 @@ let updateRemoveSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousComple
                 if remove then
                     filteredProtocolChildren
                 else
-                    protocol::filteredProtocolChildren
+                    if filteredProtocolChildren.IsEmpty then [protocol] else protocol::filteredProtocolChildren
         }
 
-    updateSwateProtocolGroup nextProtocolGroup previousCompleteCustomXml
+    updateRemoveSwateProtocolGroup nextProtocolGroup previousCompleteCustomXml false
 
-let removeSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
-    updateRemoveSwateProtocol protocol previousCompleteCustomXml true
+//let removeSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+//    updateRemoveSwateProtocol protocol previousCompleteCustomXml true
 
-let updateSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
-    updateRemoveSwateProtocol protocol previousCompleteCustomXml false
+//let updateSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+//    updateRemoveSwateProtocol protocol previousCompleteCustomXml false
 
 let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
     Excel.run(fun context ->
@@ -876,10 +878,7 @@ let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
             let securityUpdateForProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
             let nextCustomXml =
-                if remove then
-                    removeSwateProtocol securityUpdateForProtocol xmlParsed
-                else
-                    updateSwateProtocol securityUpdateForProtocol xmlParsed
+                updateRemoveSwateProtocol securityUpdateForProtocol xmlParsed remove
 
             let nextCustomXmlString = nextCustomXml |> xmlElementToXmlString
 
