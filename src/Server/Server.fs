@@ -109,9 +109,42 @@ let annotatorApi cString = {
     getAllTermsByParentTerm = fun (parentTerm:OntologyInfo) ->
         async {
             let searchRes =
-                OntologyDB.getAllTermsByParentTermOntologyInfo
+                OntologyDB.getAllTermsByParentTermOntologyInfo cString parentTerm
 
-            return searchRes cString parentTerm
+            return searchRes  
+        }
+
+    getTermSuggestionsByChildTerm = fun (max:int,typedSoFar:string,childTerm:OntologyInfo) ->
+        async {
+
+            let searchRes =
+                match typedSoFar with
+                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                    OntologyDB.getTermByAccession cString foundAccession
+                | _ ->
+                    let like =
+                        if childTerm.TermAccession = ""
+                        then
+                            OntologyDB.getTermSuggestionsByChildTerm cString (typedSoFar,childTerm.Name)
+                        else
+                            OntologyDB.getTermSuggestionsByChildTermAndAccession cString (typedSoFar,childTerm.Name,childTerm.TermAccession)
+                    let searchSet = typedSoFar |> Suggestion.createBigrams
+                    like
+                    |> Array.sortByDescending (fun sugg ->
+                            Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                    )
+                    
+                    |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+
+            return searchRes
+        }
+
+    getAllTermsByChildTerm = fun (childTerm:OntologyInfo) ->
+        async {
+            let searchRes =
+                OntologyDB.getAllTermsByChildTermOntologyInfo cString childTerm
+
+            return searchRes  
         }
 
     getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->

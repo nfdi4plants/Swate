@@ -160,6 +160,36 @@ let getTermSuggestionsByParentTerm cString (query:string, parentTerm:string) =
                     (reader.GetBoolean(6))
     |]
 
+let getTermSuggestionsByChildTerm cString (query:string, childTerm:string) =
+    
+    use connection = establishConnection cString
+    connection.Open()
+    use getTermSuggestionsCmd = new MySqlCommand("getTermSuggestionsByChildTerm",connection)
+    getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
+
+    let queryParam              = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
+    let childOntologyParam     = getTermSuggestionsCmd.Parameters.Add("childOntology",MySqlDbType.VarChar)
+
+    queryParam              .Value <- query
+    childOntologyParam      .Value <- childTerm
+
+    use reader = getTermSuggestionsCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+
 let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyInfo) =
 
     let hasAccession = parentTerm.TermAccession <> ""
@@ -240,6 +270,45 @@ let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
                     (reader.GetBoolean(6))
     |]
 
+let getAllTermsByChildTermOntologyInfo cString (childTerm:OntologyInfo) =
+
+    let hasAccession = childTerm.TermAccession <> ""
+
+    use connection = establishConnection cString
+    connection.Open()
+    use cmd =
+        if hasAccession then
+            new MySqlCommand("getAllTermsByChildTermAndAccession",connection)
+        else
+            new MySqlCommand("getAllTermsByChildTerm",connection)
+
+    cmd.CommandType <- CommandType.StoredProcedure
+
+    let parentOntologyParam     = cmd.Parameters.Add("childOntology",MySqlDbType.VarChar)
+
+    parentOntologyParam     .Value <- childTerm.Name
+
+    if hasAccession then
+        let accessionParam = cmd.Parameters.Add("childTermAccession", MySqlDbType.VarChar)
+        accessionParam      .Value <- childTerm.TermAccession
+
+    use reader = cmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+
 let getTermSuggestionsByParentTermAndAccession cString (query:string, parentTerm:string, parentTermAccession:string) =
     
     use connection = establishConnection cString
@@ -254,6 +323,38 @@ let getTermSuggestionsByParentTermAndAccession cString (query:string, parentTerm
     queryParam              .Value <- query
     parentOntologyParam     .Value <- parentTerm
     parentTermAccessionParam.Value <- parentTermAccession
+
+    use reader = getTermSuggestionsCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            yield
+                DbDomain.createTerm
+                    (reader.GetInt64(0))
+                    (reader.GetString(1))
+                    (reader.GetInt64(2))
+                    (reader.GetString(3))
+                    (reader.GetString(4))
+                    (if (reader.IsDBNull(5)) then
+                        None
+                    else
+                        Some (reader.GetString(5)))
+                    (reader.GetBoolean(6))
+    |]
+
+let getTermSuggestionsByChildTermAndAccession cString (query:string, childTerm:string, childTermAccession:string) =
+    
+    use connection = establishConnection cString
+    connection.Open()
+    use getTermSuggestionsCmd = new MySqlCommand("getTermSuggestionsByChildTermAndAccession",connection)
+    getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
+
+    let queryParam                  = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
+    let childOntologyParam         = getTermSuggestionsCmd.Parameters.Add("childOntology",MySqlDbType.VarChar)
+    let childTermAccessionParam    = getTermSuggestionsCmd.Parameters.Add("childTermAccession",MySqlDbType.VarChar)
+
+    queryParam              .Value <- query
+    childOntologyParam     .Value <- childTerm
+    childTermAccessionParam.Value <- childTermAccession
 
     use reader = getTermSuggestionsCmd.ExecuteReader()
     [|
