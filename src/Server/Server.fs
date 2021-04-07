@@ -46,7 +46,6 @@ let annotatorApi cString = {
             //let createdEntry = OntologyDB.insertOntology cString name version definition created user
             let onto =
                 DbDomain.createOntology 
-                    0L
                     name
                     version
                     definition

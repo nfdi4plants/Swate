@@ -79,7 +79,6 @@ module Suggestion =
 module DbDomain =
     
     type Ontology = {
-        ID              : int64
         Name            : string
         CurrentVersion  : string
         Definition      : string
@@ -87,8 +86,7 @@ module DbDomain =
         UserID          : string
     }
 
-    let createOntology id name currentVersion definition dateCreated userID = {
-        ID              = id            
+    let createOntology name currentVersion definition dateCreated userID = {     
         Name            = name          
         CurrentVersion  = currentVersion
         Definition      = definition    
@@ -97,8 +95,7 @@ module DbDomain =
     }
 
     type Term = {
-        ID              : int64
-        OntologyId      : int64
+        OntologyName    : string
         Accession       : string
         Name            : string
         Definition      : string
@@ -106,9 +103,8 @@ module DbDomain =
         IsObsolete      : bool
     }
 
-    let createTerm id accession ontologyID name definition xrefvaluetype isObsolete = {
-        ID            = id           
-        OntologyId    = ontologyID   
+    let createTerm accession ontologyName name definition xrefvaluetype isObsolete = {          
+        OntologyName  = ontologyName
         Accession     = accession    
         Name          = name         
         Definition    = definition   
