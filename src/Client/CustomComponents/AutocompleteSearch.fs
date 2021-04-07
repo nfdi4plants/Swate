@@ -268,6 +268,12 @@ let autocompleteTermSearchComponent
             match inputSize with
             | Some size -> Input.Size size
             | _ -> ()
+            Input.Props [
+                OnDoubleClick (fun e ->
+                    let v = Browser.Dom.document.getElementById autocompleteParams.InputId
+                    v?value |> autocompleteParams.OnInputChangeMsg |> dispatch
+                )
+            ]      
             Input.OnChange (
                 fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
             )
