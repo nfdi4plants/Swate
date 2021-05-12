@@ -37,9 +37,7 @@ SELECT max(ID) FROM Ontology"""
     use reader = insertOntologyCmd.ExecuteReader()
     match reader.Read() with
     | true -> 
-        let identity = reader.GetInt64(0)
         DbDomain.createOntology 
-            identity
             name
             currentVersion
             definition
@@ -48,7 +46,7 @@ SELECT max(ID) FROM Ontology"""
     | false -> failwith "Inserting ontology failed."
 
 
-let insertTerm cString (accession:string) (ontologyID:int64) (name:string) (definition:string) (xrefvaluetype: string option) (isObsolete:bool) =
+let insertTerm cString (accession:string) (ontologyName:string) (name:string) (definition:string) (xrefvaluetype: string option) (isObsolete:bool) =
     
     use connection = establishConnection cString
     connection.Open()
@@ -56,19 +54,19 @@ let insertTerm cString (accession:string) (ontologyID:int64) (name:string) (defi
 
     insertTermCmd
         .CommandText <-"""
-INSERT INTO Term (Accession,OntologyID,Name,Definition,XRefValueType,IsObsolete)
+INSERT INTO Term (Accession,FK_OntologyName,Name,Definition,XRefValueType,IsObsolete)
 VALUES (@acc,@ontId,@name,@def,@xrv,@iO);
 SELECT max(ID) FROM Term"""
 
     let accessionParam      = insertTermCmd.Parameters.Add("acc",MySqlDbType.VarChar)
-    let ontologyIDParam     = insertTermCmd.Parameters.Add("ontId",MySqlDbType.Int64)
+    let ontologyNameParam     = insertTermCmd.Parameters.Add("ontId",MySqlDbType.VarChar)
     let nameParam           = insertTermCmd.Parameters.Add("name",MySqlDbType.VarChar)
     let definitionParam     = insertTermCmd.Parameters.Add("def",MySqlDbType.VarChar)
     let xRefValueTypeParam  = insertTermCmd.Parameters.Add("xrv",MySqlDbType.VarChar)
     let isObsoleteParam     = insertTermCmd.Parameters.Add("iO",MySqlDbType.Bit)
 
     accessionParam      .Value <- accession
-    ontologyIDParam     .Value <- ontologyID
+    ontologyNameParam   .Value <- ontologyName
     nameParam           .Value <- name
     definitionParam     .Value <- definition
     isObsoleteParam     .Value <- isObsolete
@@ -79,11 +77,9 @@ SELECT max(ID) FROM Term"""
     use reader = insertTermCmd.ExecuteReader()
     match reader.Read() with
     | true -> 
-        let identity = reader.GetInt64(0)
         DbDomain.createTerm 
-            identity
             accession
-            ontologyID
+            ontologyName
             name
             definition
             xrefvaluetype
@@ -118,16 +114,15 @@ let getTermSuggestions cString (query:string) =
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getTermSuggestionsByParentTerm cString (query:string, parentTerm:string) =
@@ -148,16 +143,15 @@ let getTermSuggestionsByParentTerm cString (query:string, parentTerm:string) =
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getTermSuggestionsByChildTerm cString (query:string, childTerm:string) =
@@ -178,16 +172,15 @@ let getTermSuggestionsByChildTerm cString (query:string, childTerm:string) =
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyInfo) =
@@ -219,16 +212,15 @@ let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyIn
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
@@ -258,16 +250,15 @@ let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getAllTermsByChildTermOntologyInfo cString (childTerm:OntologyInfo) =
@@ -297,16 +288,15 @@ let getAllTermsByChildTermOntologyInfo cString (childTerm:OntologyInfo) =
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getTermSuggestionsByParentTermAndAccession cString (query:string, parentTerm:string, parentTermAccession:string) =
@@ -329,16 +319,15 @@ let getTermSuggestionsByParentTermAndAccession cString (query:string, parentTerm
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getTermSuggestionsByChildTermAndAccession cString (query:string, childTerm:string, childTermAccession:string) =
@@ -361,16 +350,15 @@ let getTermSuggestionsByChildTermAndAccession cString (query:string, childTerm:s
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getUnitTermSuggestions cString (query:string) =
@@ -390,16 +378,15 @@ let getUnitTermSuggestions cString (query:string) =
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getTermByName cString (queryStr:string) =
@@ -421,16 +408,15 @@ let getTermByName cString (queryStr:string) =
     [|
         while reader.Read() do
             DbDomain.createTerm
-                (reader.GetInt64(0))
-                (reader.GetString(1))
-                (reader.GetInt64(2))
-                (reader.GetString(3))
-                (reader.GetString(4))
-                (if (reader.IsDBNull(5)) then
-                    None
-                else
-                    Some (reader.GetString(5)))
-                (reader.GetBoolean(6))
+               (reader.GetString(0))
+               (reader.GetString(1))
+               (reader.GetString(2))
+               (reader.GetString(3))
+               (if (reader.IsDBNull(4)) then
+                   None
+               else
+                   Some (reader.GetString(4)))
+               (reader.GetBoolean(5))
     |]
 
 let getTermByNameAndAccession cString (queryStr:string,accessionString:string) =
@@ -456,16 +442,15 @@ let getTermByNameAndAccession cString (queryStr:string,accessionString:string) =
     [|
         while reader.Read() do
             DbDomain.createTerm
-                (reader.GetInt64(0))
-                (reader.GetString(1))
-                (reader.GetInt64(2))
-                (reader.GetString(3))
-                (reader.GetString(4))
-                (if (reader.IsDBNull(5)) then
-                    None
-                else
-                    Some (reader.GetString(5)))
-                (reader.GetBoolean(6))
+               (reader.GetString(0))
+               (reader.GetString(1))
+               (reader.GetString(2))
+               (reader.GetString(3))
+               (if (reader.IsDBNull(4)) then
+                   None
+               else
+                   Some (reader.GetString(4)))
+               (reader.GetBoolean(5))
     |]
 
 let getTermByAccession cString (queryStr:string) =
@@ -488,16 +473,15 @@ let getTermByAccession cString (queryStr:string) =
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
     |]
 
 let getAllOntologies cString () =
@@ -512,12 +496,11 @@ let getAllOntologies cString () =
         while reader.Read() do
             yield
                 DbDomain.createOntology
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
                     (reader.GetString(2))
-                    (reader.GetString(3))
-                    (reader.GetDateTime(4)) // TODO:
-                    (reader.GetString(5))
+                    (reader.GetDateTime(3)) // TODO:
+                    (reader.GetString(4))
     |]
 
 let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (searchName : string) (mustContainName:string) (searchDef:string) (mustContainDef:string) (keepObsolete:bool) =
@@ -527,16 +510,16 @@ let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (searc
     use advancedTermSearchCmd = new MySqlCommand("advancedTermSearch",connection)
     advancedTermSearchCmd.CommandType <- CommandType.StoredProcedure
 
-    let ontIdParam                  = advancedTermSearchCmd.Parameters.Add("ontologyID",MySqlDbType.Int64)
+    let ontNameParam                = advancedTermSearchCmd.Parameters.Add("ontologyName",MySqlDbType.VarChar)
     let searchNameParam             = advancedTermSearchCmd.Parameters.Add("searchTermName",MySqlDbType.VarChar)
     let mustContainNameParam        = advancedTermSearchCmd.Parameters.Add("mustContainName",MySqlDbType.VarChar)
     let searchDefParam              = advancedTermSearchCmd.Parameters.Add("searchTermDefinition",MySqlDbType.VarChar)
     let mustContainDefParam         = advancedTermSearchCmd.Parameters.Add("mustContainDefinition",MySqlDbType.VarChar)
 
     if ont.IsSome then
-        ontIdParam              .Value <- ont.Value.ID
+        ontNameParam            .Value <- ont.Value.Name
     else
-        ontIdParam              .Value <- DBNull.Value
+        ontNameParam            .Value <- DBNull.Value
  
     searchNameParam             .Value <- searchName
     mustContainNameParam        .Value <- mustContainName
@@ -548,17 +531,16 @@ let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (searc
         while reader.Read() do
             yield
                 DbDomain.createTerm
-                    (reader.GetInt64(0))
+                    (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetInt64(2))
+                    (reader.GetString(2))
                     (reader.GetString(3))
-                    (reader.GetString(4))
-                    (if (reader.IsDBNull(5)) then
+                    (if (reader.IsDBNull(4)) then
                         None
                     else
-                        Some (reader.GetString(5)))
-                    (reader.GetBoolean(6))
-    |]
+                        Some (reader.GetString(4)))
+                    (reader.GetBoolean(5))
+        |]
     |> fun res ->
         if keepObsolete then
             res

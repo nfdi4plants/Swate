@@ -132,7 +132,6 @@ module PredefinedParams =
         let ontologyInfoExmp2:OntologyInfo = OntologyInfo.create "Q TRAP" "MS:1000187"
         
         let unitOntologyExmp:DbDomain.Ontology = {
-            ID = 1L
             Name = "uo"
             CurrentVersion = "releases/2020-03-10"
             Definition = "Unit Ontology"
