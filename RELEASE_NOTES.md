@@ -1,3 +1,9 @@
+### 0.4.7+23edde8 (Released 2021-5-12)
+* Additions:
+    * latest commit #23edde8
+    * [[#23edde8](https://github.com/nfdi4plants/Swate/commit/23edde88061148ee37a038a44324f338d3d4ee88)] Add redo search on double click to building block input elements.
+    * [[#b10131b](https://github.com/nfdi4plants/Swate/commit/b10131b5a9957824f8957227ff8b192434adc62e)] Update database, add part_of Term relationships
+
 ### 0.4.6+89aa7bc (Released 2021-3-12)
 * Additions:
     * latest commit #89aa7bc
