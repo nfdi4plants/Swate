@@ -13,7 +13,7 @@
         "babel-loader": "^8.0.5",
         "copy-webpack-plugin": "^6.2.0",
         "core-js": "^3.3.2",
-        "css-loader": "^4.3.0",
+        "css-loader": "^5.2.6",
         "fable-compiler": "^2.13.0",
         "fable-loader": "^2.1.8",
         "file-loader": "^4.2.0",
@@ -21,8 +21,8 @@
         "mini-css-extract-plugin": "^0.10.1",
         "react": "^16.10.2",
         "react-dom": "^16.10.2",
-        "remotedev": "^0.2.9",
-        "resolve-url-loader": "^3.1.2",
+        "remotedev": "^0.2.7",
+        "resolve-url-loader": "^4.0.0",
         "sass": "^1.27.0",
         "sass-loader": "^9.0.3",
         "selfsigned": "^1.10.8",
@@ -30,7 +30,7 @@
         "terser": "^4.8.0",
         "webpack": "^4.44.2",
         "webpack-cli": "^3.3.12",
-        "webpack-dev-server": "^3.8.2"
+        "webpack-dev-server": "^3.7.2"
     },
     "dependencies": {
         "bulma": "^0.9.0",

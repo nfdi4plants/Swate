@@ -111,7 +111,7 @@ GitHub recently added forum-like features to repositories, which makes it possib
 ## Develop
 
 ### Contribute
-
+Starting at [Prerequisites](#prerequisites) we will explain the set up, but please read the following first.
 Before you contribute to the project remember to return all placeholders to your project:
 
 -   webpack.config.js    
@@ -170,13 +170,14 @@ By installing this repo via the install.cmd file the MySql password will default
 
 ### Set up Sql Dump
 
-By now the SwatwDB.sql dump in this repo is outdated. You can request a current version by opening an issue. In addition, the dump has become so large that it can no longer be loaded on mysql db creation and needs further input:
+The database became too large for GitHub to upload the dump directly. Therefore we now provide the basic Database structure as .sql dump file in this repo, including the data for ontologiesand all template related tables. Only Terms and TermRelationships are missing. These tables can be populated via the private repository SwateDB (v2 branch). If you can't access this repository, please post an issue and you will get a complete dump.
+
+The following instructions can help to import that dump into the database:
 
 After following the instructions above:
-1. Go to `localhost:8085` and create a new database called `SwateDB`
-2. Open powershell in the folder with the sql dump. 
-3. Use `cmd /c "docker exec -i db_db_1 mysql -uroot -pexample SwateDB<SwateDB.sql"`
-4. Observe in Adminer how the tables are created and slowly filled.
+1. Open powershell in the folder with the sql dump. 
+2. Use `cmd /c "docker exec -i db_db_1 mysql -uroot -pexample SwateDB<SwateDB.sql"`
+3. Observe in Adminer how the tables are created and slowly filled.
 
 ### Project Decription
 
