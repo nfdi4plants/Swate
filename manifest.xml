@@ -4,7 +4,7 @@
   <Version>0.4.7</Version>
   <ProviderName>Computational Systems Biology</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Swate"/>
+  <DisplayName DefaultValue="Swate_local"/>
   <Description DefaultValue="Utility functions to annotate data in a fast and safe way."/>
   <IconUrl DefaultValue="https://localhost:3000/assets/swate_32x32.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/swate_80x80.png"/>
@@ -112,9 +112,9 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>
-        <bt:String id="SwateCommands.Label" DefaultValue="Swate"/>
+        <bt:String id="SwateCommands.Label" DefaultValue="Swate_local"/>
         <!--<bt:String id="TermSearch.Label" DefaultValue="Insert Ontology Term"/>-->
-        <bt:String id="AddBuildingBlock.Label" DefaultValue="Swate"/>
+        <bt:String id="AddBuildingBlock.Label" DefaultValue="Swate_local"/> <!--(maybe) old title-->
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Swate was loaded succesfully. Go to the DATA tab and click the 'Swate' button to get started."/>
