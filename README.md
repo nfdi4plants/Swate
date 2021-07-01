@@ -12,7 +12,7 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
   - [Features](#features)
   - [Install/Use](#installuse)
     - [Excel desktop](#excel-desktop)
-      - [Using the release archive](#using-the-release-archive)
+      - [Using the Swate Installer](#using-the-swate-installer)
       - [Using a shared folder](#using-a-shared-folder)
     - [Excel online](#excel-online)
   - [Discuss/Get help](#discussget-help)
@@ -51,11 +51,21 @@ You can also search existing issues for solutions for your questions and/or disc
 
 ### Excel desktop
 
-#### Using the release archive
 
-- Install [node.js LTS](https://nodejs.org/en/) (needed for office addin related tooling)
-- Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
-- Execute the test.cmd (windows, as administrator) or test.sh (macOS, you will need to make it executable via chmod a+x) script.
+#### Using the Swate installer
+Use the new [Swate installer](https://github.com/omaus/Swate_Install#swate-installer).
+
+<details>
+    <summary>Alternative | Using the release archive</summary>
+    
+    #### Using the release archive
+    
+    - Install [node.js LTS](https://nodejs.org/en/) (needed for office addin related tooling)
+    - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
+    - Execute the test.cmd (windows, as administrator) or test.sh (macOS, you will need to make it executable via chmod 
+    a+x) script.
+  
+</details>
 
 #### Using a shared folder 
 
