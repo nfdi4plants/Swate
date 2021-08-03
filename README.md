@@ -35,7 +35,7 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
 
 The base features of Swate are:
 
-- **Gradual workflow annotation table building** via the [basic annotation building blocks](https://nfdi4plants.github.io/AnnotationPrinciples/)
+- **Gradual workflow annotation table building** via the [basic annotation building blocks](https://nfdi4plants.de/annotation-principles)
 - No-fuss **ontology term search**:
     - search for ontology terms quickly via autocomplete
     - use is-a **relational term search** (e.g. search all terms that are also a 'plant organ') to constrain your annotation column to a subset of ontologies
