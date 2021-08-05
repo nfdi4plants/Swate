@@ -471,21 +471,21 @@ module BuildingBlockTypes =
         // For ExecutesProtocol.Parameters 'parameterName' ('annotationValue','termSource','termAccession') are required.
         // For Process.ParameterValues 'category' ('annotationValue','termSource','termAccession') and 'value' (IF ONTOLOGY 'annotationValue','termSource','termAccession') are required.
         // IF Process.ParameterValue has Unit then ('annotationValue','termSource','termAccession') are required.
-        static member ofISADotNetProcess (isaProcess:ISADotNet.Process) = 
-            let paramValuesPairs = isaProcess.ParameterValues.Value
-            paramValuesPairs
-            |> List.map (fun paramValuePair ->
-                let hasUnit             = paramValuePair.Unit.IsSome
-                let hasOntologyValue    = paramValuePair.Value.Value |> ISADotNetHelpers.valueIsOntology
-                let mainColName         =
-                    let n = paramValuePair.Category.Value.ParameterName.Value.Name.Value |> ISADotNetHelpers.annotationValueToString
-                    sprintf "Parameter [%s]" n
-                let colTermAccession    = paramValuePair.Category.Value.ParameterName.Value.TermAccessionNumber.Value |> ISADotNetHelpers.termAccessionReduce
-                let unitName            = if hasUnit then paramValuePair.Unit.Value.Name.Value |> ISADotNetHelpers.annotationValueToString |> Some else None
-                let unitTermAccession   = if hasUnit then paramValuePair.Unit.Value.TermAccessionNumber.Value |> ISADotNetHelpers.termAccessionReduce |> Some else None
-                let values              = if hasOntologyValue.IsSome then hasOntologyValue else OntologyInfo.create (ISADotNetHelpers.valueToString paramValuePair.Value.Value) "" |> Some
-                MinimalBuildingBlock.create mainColName (Some colTermAccession) unitName unitTermAccession values false
-            )
+        //static member ofISADotNetProcess (isaProcess:ISADotNet.Process) = 
+        //    let paramValuesPairs = isaProcess.ParameterValues.Value
+        //    paramValuesPairs
+        //    |> List.map (fun paramValuePair ->
+        //        let hasUnit             = paramValuePair.Unit.IsSome
+        //        let hasOntologyValue    = paramValuePair.Value.Value |> ISADotNetHelpers.valueIsOntology
+        //        let mainColName         =
+        //            let n = paramValuePair.Category.Value.ParameterName.Value.Name.Value |> ISADotNetHelpers.annotationValueToString
+        //            sprintf "Parameter [%s]" n
+        //        let colTermAccession    = paramValuePair.Category.Value.ParameterName.Value.TermAccessionNumber.Value |> ISADotNetHelpers.termAccessionReduce
+        //        let unitName            = if hasUnit then paramValuePair.Unit.Value.Name.Value |> ISADotNetHelpers.annotationValueToString |> Some else None
+        //        let unitTermAccession   = if hasUnit then paramValuePair.Unit.Value.TermAccessionNumber.Value |> ISADotNetHelpers.termAccessionReduce |> Some else None
+        //        let values              = if hasOntologyValue.IsSome then hasOntologyValue else OntologyInfo.create (ISADotNetHelpers.valueToString paramValuePair.Value.Value) "" |> Some
+        //        MinimalBuildingBlock.create mainColName (Some colTermAccession) unitName unitTermAccession values false
+        //    )
 
         static member ofBuildingBlockWithoutValues isExisting (buildingBlock:BuildingBlock) =
             let bbHeader    = buildingBlock.MainColumn.Header.Value

@@ -306,8 +306,8 @@ let createNewSemVer (semVerReleaseType:SemVerRelease) (newestCommitHash:string) 
 let rec sortCommitsByKeyWords (all:string list) (additions:string list) (deletions:string list) (bugs:string list) =
     let bugKeyWords = [|"bug"; "problem"; "fix"|] |> Array.map String.toLower
     let deleteKeyWords = [|"delete"; "remove"|] |> Array.map String.toLower
-    let isHeadBugKeyWord (head:string) = Array.exists (fun x -> head.ToLower().Contains x) bugKeyWords
-    let isHeadDeleteKeyWord (head:string) = Array.exists (fun x -> head.ToLower().Contains x) deleteKeyWords
+    let isHeadBugKeyWord (head:string) = Array.exists (fun (x:string) -> (String.toLower head).Contains x) bugKeyWords
+    let isHeadDeleteKeyWord (head:string) = Array.exists (fun (x:string) -> (String.toLower head).Contains x) deleteKeyWords
     match all with
     | head::rest when isHeadBugKeyWord head
             -> sortCommitsByKeyWords rest additions deletions (head::bugs)
@@ -458,8 +458,8 @@ Target.create "Release" (fun config ->
         let formattedCommitNoteList =
             commitNoteArr
             |> Array.filter (fun x ->
-                match x.[2].ToLower().Contains with
-                | x when x "update release_notes.md" || x "update release notes" ->
+                match (String.toLower x.[2]) with
+                | x when x.Contains "update release_notes.md" || x.Contains "update release notes" ->
                     false
                 | _ -> true
             )

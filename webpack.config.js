@@ -4,8 +4,6 @@
 // In most cases, you'll only need to edit the CONFIG object (after dependencies)
 // See below if you need better fine-tuning of Webpack options
 
-// Dependencies. Also required: core-js, fable-loader, fable-compiler, @babel/core,
-// @babel/preset-env, babel-loader, sass, sass-loader, css-loader, style-loader, file-loader, resolve-url-loader
 var path = require('path');
 var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
@@ -16,7 +14,7 @@ var CONFIG = {
     // The tags to include the generated JS and CSS will be automatically injected in the HTML template
     // See https://github.com/jantimon/html-webpack-plugin
     indexHtmlTemplate: './src/Client/index.html',
-    fsharpEntry: './src/Client/Client.fsproj',
+    fsharpEntry: './src/Client/Client.fs.js',
     cssEntry: './src/Client/style.scss',
     outputDir: './deploy/public',
     assetsDir: './src/Client/public',
@@ -24,8 +22,8 @@ var CONFIG = {
     // When using webpack-dev-server, you may need to redirect some calls
     // to a external API server. See https://webpack.js.org/configuration/dev-server/#devserver-proxy
     devServerProxy: {
-        // redirect requests that start with /api/ to the server on port 8085
-        '/api': {
+        // redirect requests that start with /api/ to the server on port 3000
+        '/api/**': {
             target: 'http://localhost:5000',
             secure: false,
             changeOrigin: true,
@@ -38,26 +36,14 @@ var CONFIG = {
             ignorePath: false
         },
         // redirect websocket requests that start with /socket/ to the server on the port 8085
-        '/socket': {
+        '/socket/**': {
             target: 'http://localhost:5000',
             ws: true,
             secure: false,
             changeOrigin: true,
             ignorePath: false
            }
-       },
-    babel: {
-        presets: [
-            ['@babel/preset-env', {
-                modules: false,
-                // This adds polyfills when needed. Requires core-js dependency.
-                // See https://babeljs.io/docs/en/babel-preset-env#usebuiltins
-                // Note that you still need to add custom polyfills if necessary (e.g. whatwg-fetch)
-                useBuiltIns: 'usage',
-                corejs: 3
-            }]
-        ],
-    }
+       }
 }
 
 // If we're running the webpack-dev-server, assume we're in development mode
@@ -83,8 +69,8 @@ module.exports = {
     entry: isProduction ? {
         app: [resolve(CONFIG.fsharpEntry), resolve(CONFIG.cssEntry)]
     } : {
-            app: resolve(CONFIG.fsharpEntry),
-            style: resolve(CONFIG.cssEntry)
+        app: resolve(CONFIG.fsharpEntry),
+        style: resolve(CONFIG.cssEntry)
     },
     // Add a hash to the output file name in production
     // to prevent browser caching if code changes
@@ -109,7 +95,7 @@ module.exports = {
     plugins: isProduction ?
         commonPlugins.concat([
             new MiniCssExtractPlugin({ filename: 'style.[name].[hash].css' }),
-            new CopyWebpackPlugin({ patterns: [{ from: resolve(CONFIG.assetsDir) }]}),
+            new CopyWebpackPlugin({ patterns: [{ from: resolve(CONFIG.assetsDir) }] }),
         ])
         : commonPlugins.concat([
             new webpack.HotModuleReplacementPlugin(),
@@ -128,37 +114,18 @@ module.exports = {
         host: '0.0.0.0',
         port: CONFIG.devServerPort,
         https: {
-            key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
-            cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
-            ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
+            key: "C:/Users/Freym/.office-addin-dev-certs/localhost.key",
+            cert: "C:/Users/Freym/.office-addin-dev-certs/localhost.crt",
+            ca: "C:/Users/Freym/.office-addin-dev-certs/ca.crt"
         },
         proxy: CONFIG.devServerProxy,
         hot: true,
         inline: true
     },
-    // - fable-loader: transforms F# into JS
-    // - babel-loader: transforms JS to old syntax (compatible with old browsers)
     // - sass-loaders: transforms SASS/SCSS into JS
     // - file-loader: Moves files referenced in the code (fonts, images) into output folder
     module: {
         rules: [
-            {
-                test: /\.fs(x|proj)?$/,
-                use: {
-                    loader: 'fable-loader',
-                    options: {
-                        babel: CONFIG.babel
-                    }
-                }
-            },
-            {
-                test: /\.js$/,
-                exclude: /node_modules/,
-                use: {
-                    loader: 'babel-loader',
-                    options: CONFIG.babel
-                },
-            },
             {
                 test: /\.(sass|scss|css)$/,
                 use: [
@@ -179,7 +146,6 @@ module.exports = {
         ]
     }
 };
-
 function resolve(filePath) {
     return path.isAbsolute(filePath) ? filePath : path.join(__dirname, filePath);
 }

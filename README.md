@@ -150,7 +150,7 @@ Before you contribute to the project remember to return all placeholders to your
 
         This will use office-addin-dev-certs to create the necessary certificates, and open the installation dialogue for you:
 
-        ![File](docsrc/files/img/file.png)
+        ![File](.img/install_certificate_window.png)
 
         installing this ca certificate under your trusted root certification authorities will enable you to use https via localhost.
 
@@ -199,7 +199,7 @@ the Excel window (update: you can now use [EdgeDevToolsPreview](https://www.micr
  - open Excel online in your favorite browser
  - create a blank new workbook (or use any workbook, but be warned that you can't undo stuff done via Office.js) 
  - Go to Insert > Office-Add-Ins and upload the manifest.xml file contained in this repo
-    ![Add In Upload](docsrc/files/img/AddInUpload.png)
+    ![Add In Upload](.img/AddInUpload.png)
  - You will now have the full debug experience in your browser dev tools.
 
 Alternatively, you can debug all functionality that does not use Excel Interop in your normal browser (the app runs on port 3000 via https)

@@ -150,8 +150,8 @@ type ValidationMsg =
 
 type ProtocolInsertMsg =
     // ------ Process from file ------
-    | ParseJsonToProcessRequest         of string
-    | ParseJsonToProcessResult          of Result<ISADotNet.Process,exn>
+    //| ParseJsonToProcessRequest         of string
+    //| ParseJsonToProcessResult          of Result<ISADotNet.Process,exn>
     // Client
     | RemoveProcessFromModel
     // ------ Protocol from Database ------

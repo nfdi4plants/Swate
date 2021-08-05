@@ -374,7 +374,7 @@ type ValidationState = {
     }
 
 
-open ISADotNet
+//open ISADotNet
 
 
 /// This model is used for both protocol insert and protocol search
@@ -384,7 +384,7 @@ type ProtocolInsertState = {
 
     // Process.json file upload
     UploadData              : string
-    ProcessModel            : ISADotNet.Process option
+    //ProcessModel            : ISADotNet.Process option
 
     // Database protocol template
     ProtocolSelected        : Shared.ProtocolTemplate option
@@ -404,7 +404,7 @@ type ProtocolInsertState = {
 
         // ISADotNet Process.json file upload
         UploadData              = ""
-        ProcessModel            = None
+        //ProcessModel            = None
 
         // Database protocol templates
         ProtocolSelected        = None

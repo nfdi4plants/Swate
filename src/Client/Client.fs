@@ -159,7 +159,7 @@ Program.mkProgram init Update.update view
 |> Program.withConsoleTrace
 #endif
 |> Program.toNavigable (parseHash Routing.Routing.route) Update.urlUpdate
-|> Program.withReactBatched "elmish-app"
+|> Program.withReactSynchronous "elmish-app"
 #if DEBUG
 |> Program.withDebugger
 #endif

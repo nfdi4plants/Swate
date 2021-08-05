@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <TargetFramework>net5.0</TargetFramework>
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
@@ -9,7 +9,6 @@
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
-        <Compile Include="Version.fs" />
         <Compile Include="ISADotNetHelpers.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="ExcelColors.fs" />
@@ -53,9 +52,6 @@
         <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />
-    </ItemGroup>
-    <ItemGroup>
-      <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="3.1.0" />
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\Shared\Shared.fsproj" />

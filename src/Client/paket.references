@@ -1,5 +1,6 @@
 Fable.Core
 Fable.Elmish
+Fable.React
 Fable.Elmish.React
 Fable.Elmish.Debugger
 Fable.Elmish.HMR
@@ -15,4 +16,3 @@ Fable.Browser.MediaQueryList
 Fable.SimpleJson
 Fable.SimpleXml
 FSharp.Data
-ISADotNet.Fable

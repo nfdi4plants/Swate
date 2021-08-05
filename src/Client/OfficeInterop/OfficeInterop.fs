@@ -140,6 +140,7 @@ let createAnnotationTable (isDark:bool) =
         let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"])))
 
         let r = context.runtime.load(U2.Case1 "enableEvents")
+
         promise {
 
             let! allTableNames = getAllTableInfo()

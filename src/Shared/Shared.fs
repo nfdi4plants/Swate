@@ -199,9 +199,9 @@ type ITestAPI = {
     getTestNumber           : unit      -> Async<int>
 }
 
-type IISADotNetAPIv1 = {
-    parseJsonToProcess      : string    -> Async<ISADotNet.Process> //Async<ISADotNet.Process>
-}
+//type IISADotNetAPIv1 = {
+//    parseJsonToProcess      : string    -> Async<ISADotNet.Process> //Async<ISADotNet.Process>
+//}
 
 type IServiceAPIv1 = {
     getAppVersion           : unit      -> Async<string>

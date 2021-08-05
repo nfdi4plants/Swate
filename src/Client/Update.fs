@@ -1328,31 +1328,31 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
         prot, validationType, minBBInfos
 
     match fujMsg with
-    | ParseJsonToProcessRequest parsableString ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.isaDotNetApi.parseJsonToProcess
-                parsableString
-                (Ok >> ParseJsonToProcessResult)
-                (Result.Error >> ParseJsonToProcessResult)
-        currentState, Cmd.map ProtocolInsert cmd 
-    | ParseJsonToProcessResult (Ok isaProcess) ->
-        let nextState = {
-            currentState with
-                ProcessModel = Some isaProcess
-        }
-        nextState, Cmd.none
-    | ParseJsonToProcessResult (Result.Error e) ->
-        let cmd =
-            GenericError e |> Dev |> Cmd.ofMsg 
-        currentState, cmd
-    | RemoveProcessFromModel ->
-        let nextState = {
-            currentState with
-                ProcessModel = None
-                UploadData = ""
-        }
-        nextState, Cmd.none
+    //| ParseJsonToProcessRequest parsableString ->
+    //    let cmd =
+    //        Cmd.OfAsync.either
+    //            Api.isaDotNetApi.parseJsonToProcess
+    //            parsableString
+    //            (Ok >> ParseJsonToProcessResult)
+    //            (Result.Error >> ParseJsonToProcessResult)
+    //    currentState, Cmd.map ProtocolInsert cmd 
+    //| ParseJsonToProcessResult (Ok isaProcess) ->
+    //    let nextState = {
+    //        currentState with
+    //            ProcessModel = Some isaProcess
+    //    }
+    //    nextState, Cmd.none
+    //| ParseJsonToProcessResult (Result.Error e) ->
+    //    let cmd =
+    //        GenericError e |> Dev |> Cmd.ofMsg 
+    //    currentState, cmd
+    //| RemoveProcessFromModel ->
+    //    let nextState = {
+    //        currentState with
+    //            ProcessModel = None
+    //            UploadData = ""
+    //    }
+    //    nextState, Cmd.none
     | GetAllProtocolsRequest ->
         let nextState = {currentState with Loading = true}
         let cmd =
@@ -1414,12 +1414,12 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
             currentState with Loading = nextLoadingState
         }
         nextState, Cmd.none
-    | UpdateUploadData newDataString ->
-        let nextState = {
-            currentState with
-                UploadData = newDataString
-        }
-        nextState, Cmd.ofMsg (ParseJsonToProcessRequest newDataString |> ProtocolInsert)
+    //| UpdateUploadData newDataString ->
+    //    let nextState = {
+    //        currentState with
+    //            UploadData = newDataString
+    //    }
+    //    nextState, Cmd.ofMsg (ParseJsonToProcessRequest newDataString |> ProtocolInsert)
     | UpdateDisplayedProtDetailsId idOpt ->
         let nextState = {
             currentState with

@@ -3,7 +3,7 @@ open System.Threading.Tasks
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
-open FSharp.Control.Tasks.V2
+//open FSharp.Control.Tasks.V2
 open Giraffe
 open Saturn
 open Shared
@@ -24,14 +24,14 @@ let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
-open ISADotNet
+//open ISADotNet
 
-let isaDotNetApi = {
-    parseJsonToProcess = fun jsonString -> async {
-        let parsedJson = ISADotNet.Json.Process.fromString jsonString
-        return parsedJson
-    }
-}
+//let isaDotNetApi = {
+//    parseJsonToProcess = fun jsonString -> async {
+//        let parsedJson = ISADotNet.Json.Process.fromString jsonString
+//        return parsedJson
+//    }
+//}
 
 let annotatorApi cString = {
 
@@ -236,16 +236,16 @@ let createIServiceAPIv1 =
     )
     |> Remoting.buildHttpHandler
 
-let createISADotNetAPIv1 =
-    Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue isaDotNetApi
-    |> Remoting.withDocs "/api/IISADotNetAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetApiDocsv1
-    |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
-    )
-    |> Remoting.buildHttpHandler
+//let createISADotNetAPIv1 =
+//    Remoting.createApi()
+//    |> Remoting.withRouteBuilder Route.builder
+//    |> Remoting.fromValue isaDotNetApi
+//    |> Remoting.withDocs "/api/IISADotNetAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetApiDocsv1
+//    |> Remoting.withDiagnosticsLogger(printfn "%A")
+//    |> Remoting.withErrorHandler(
+//        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+//    )
+//    |> Remoting.buildHttpHandler
 
 let createIAnnotatorApiv1 cString =
     Remoting.createApi()
@@ -292,9 +292,9 @@ let topLevelRouter = router {
     )
 
     //
-    forward @"" (fun next ctx ->
-        createISADotNetAPIv1 next ctx
-    )
+    //forward @"" (fun next ctx ->
+    //    createISADotNetAPIv1 next ctx
+    //)
 }
 
 let app = application {
