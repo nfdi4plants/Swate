@@ -162,6 +162,10 @@ Target.create "RunTests" (fun _ ->
     |> runParallel
 )
 
+Target.create "run-db" (fun _ ->
+    run dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
+)
+
 Target.create "Format" (fun _ ->
     run dotnet "fantomas . -r" "src"
 )
@@ -203,10 +207,11 @@ let dependencies = [
         ==> "SetLoopbackExempt"
         ==> "Setup"
 
-    "testfake"
+    "run-db"
 
     "release"
 
+    "testfake"
     "Ignore"
 ]
 
