@@ -82,6 +82,25 @@ let npm =
             |> failwith
 
     createProcess npmPath
+let npx =
+    let npxPath =
+        match ProcessUtils.tryFindFileOnPath "npx" with
+        | Some path -> path
+        | None ->
+            "npx was not found in path. Please install it and make sure it's available from your path."
+            |> failwith
+    createProcess npxPath
+let node =
+    let nodePath =
+        match ProcessUtils.tryFindFileOnPath "node" with
+        | Some path -> path
+        | None ->
+            "node was not found in path. Please install it and make sure it's available from your path."
+            |> failwith
+    createProcess nodePath
+
+    
+let dockerCompose = createProcess "docker-compose"
 
 let run proc arg dir =
     proc arg dir
@@ -94,10 +113,13 @@ let runParallel processes =
     |> ignore
 
 let runOrDefault args =
+    Trace.trace (sprintf "%A" args)
     try
         match args with
         | [| target |] -> Target.runOrDefault target
-        | _ -> Target.runOrDefault "Run"
+        | arr when args.Length > 1 ->
+            Target.run 0 (Array.head arr) ( Array.tail arr |> List.ofArray )
+        | _ -> Target.runOrDefault "Ignore" 
         0
     with e ->
         printfn "%A" e
