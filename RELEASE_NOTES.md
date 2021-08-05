@@ -1,11 +1,12 @@
-### 0.5.0+6ba34f2 (Released 2021-8-5)
+### 0.5.0+131b395 (Released 2021-8-5)
 * Additions:
-    * latest commit #6ba34f2
+    * latest commit #131b395
     * [[#4796598](https://github.com/nfdi4plants/Swate/commit/47965986e914f30b3b438bc44ede81308dc16d39)] Update SQL db dump for development.
     * [[#4c11f3e](https://github.com/nfdi4plants/Swate/commit/4c11f3ea09d28b566cd9cbfaaad9fc9eb05beba7)] Update db dump and readme according to prev. changes.
     * [[#344cb04](https://github.com/nfdi4plants/Swate/commit/344cb048730c2c41121a50d233f8dca7080d5fd8)] Set MariaDB to version 10.4, as 10.6 is not supported by .NET Core 3.1
     * [[#703b4aa](https://github.com/nfdi4plants/Swate/commit/703b4aa9c1fb3c95a1b1ab8b971c9917ca3e6c88)] Add .img folder und move designs.
     * [[#6ba34f2](https://github.com/nfdi4plants/Swate/commit/6ba34f2268267e4c7686f547dce707e8b4b93700)] Update to SAFE stack v3.
+    * [[#131b395](https://github.com/nfdi4plants/Swate/commit/131b395386164933802f135cc78dbcd20441ed27)] Add officedebug and release note functions to build.fsproj.
 * Deletions:
     * [[#40318c1](https://github.com/nfdi4plants/Swate/commit/40318c1dc826d160258f4aa303b6274e4812b4f4)] Remove unused docs code.
     * [[#41ecd8d](https://github.com/nfdi4plants/Swate/commit/41ecd8da5e04424a8efb80f9fec66b7d4bdffdc0)] Remove unused code and setup files.
