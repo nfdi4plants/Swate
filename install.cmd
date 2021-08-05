@@ -4,4 +4,4 @@ dotnet paket restore
 
 dotnet run - setup
 
-dotnet fake - officedebug
+dotnet run - officedebug
