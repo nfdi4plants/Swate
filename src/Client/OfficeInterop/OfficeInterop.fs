@@ -1,11 +1,9 @@
 module OfficeInterop
 
 open Fable.Core
-open Fable.Core.JsInterop
-open OfficeJS
-open Excel
-open System.Collections.Generic
-open System.Text.RegularExpressions
+open OfficeJS.Fable
+open OfficeJS.Fable.Excel
+open OfficeJS.Fable.GlobalBindings
 
 open Shared
 
@@ -13,7 +11,6 @@ open OfficeInterop.Regex
 open OfficeInterop.Types
 open Xml
 open OfficeInterop.HelperFunctions
-open OfficeInterop.EventHandlers
 open BuildingBlockTypes
 
 /// Reoccuring Comment Defitinitions
@@ -56,10 +53,7 @@ let consoleLog (message: string): unit = jsNative
         //let x = ranges.load(U2.Case1 "address")
 
 open System
-open Fable.Core
 
-open Fable.SimpleXml
-open Fable.SimpleXml.Generator
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction1 () =

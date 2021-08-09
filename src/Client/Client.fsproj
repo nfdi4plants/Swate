@@ -12,7 +12,6 @@
         <Compile Include="ISADotNetHelpers.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="ExcelColors.fs" />
-        <Compile Include="OfficeJS.fs" />
         <Compile Include="OfficeInterop\Types.fs" />
         <Compile Include="OfficeInterop\Regex.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />

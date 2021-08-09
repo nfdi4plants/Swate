@@ -2,8 +2,9 @@ module OfficeInterop.HelperFunctions
 
 open Fable.Core
 open Fable.Core.JsInterop
-open OfficeJS
-open Excel
+open OfficeJS.Fable
+open OfficeJS.Fable.Excel
+open OfficeJS.Fable.GlobalBindings
 open System.Collections.Generic
 open System.Text.RegularExpressions
 
@@ -278,7 +279,7 @@ module BuildingBlockTypes =
     /// This function is part 2 to get a 'BuildingBlock []' representation of a Swate table.
     /// It's parameters are the output of 'getBuildingBlocksPreSync' and it will return a full 'BuildingBlock []'.
     /// It MUST be used either in or after 'context.sync().``then``(fun e -> ..)' after 'getBuildingBlocksPreSync'.
-    let getBuildingBlocks (annoHeaderRange:OfficeJS.Excel.Range) (annoBodyRange:OfficeJS.Excel.Range) =
+    let getBuildingBlocks (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) =
 
         /// Get the table by 'Columns [| Rows [|Values|] |]'
         let columnBodies =

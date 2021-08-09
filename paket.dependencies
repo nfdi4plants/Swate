@@ -3,6 +3,7 @@ framework: net5.0
 storage: none
 
 nuget Fable.Remoting.Giraffe
+nuget OfficeJS.Fable
 nuget Saturn
 nuget Expecto
 nuget FSharp.Data

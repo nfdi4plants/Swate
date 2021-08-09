@@ -4,8 +4,9 @@ open System
 
 open Fable.Core
 open Fable.Core.JsInterop
-open OfficeJS
-open Excel
+open OfficeJS.Fable
+open OfficeJS.Fable.Excel
+open OfficeJS.Fable.GlobalBindings
 open System.Collections.Generic
 open System.Text.RegularExpressions
 

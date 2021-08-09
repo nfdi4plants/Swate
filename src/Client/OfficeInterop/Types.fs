@@ -8,18 +8,18 @@ open Fable.Core.JsInterop
 open Elmish
 open Browser
 
-open OfficeJS
+open OfficeJS.Fable
 open Excel
 
-[<Global>]
-let Office : Office.IExports = jsNative
+//[<Global>]
+//let Office : Office.IExports = jsNative
 
-[<Global>]
-//[<CompiledName("Office.Excel")>]
-let Excel : Excel.IExports = jsNative
+//[<Global>]
+////[<CompiledName("Office.Excel")>]
+//let Excel : Excel.IExports = jsNative
 
-[<Global>]
-let RangeLoadOptions : Interfaces.RangeLoadOptions = jsNative
+//[<Global>]
+//let RangeLoadOptions : Interfaces.RangeLoadOptions = jsNative
 
 module ColumnCoreNames =
 
