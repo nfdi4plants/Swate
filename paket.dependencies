@@ -2,8 +2,8 @@ source https://api.nuget.org/v3/index.json
 framework: net5.0
 storage: none
 
+nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
-nuget OfficeJS.Fable
 nuget Saturn
 nuget Expecto
 nuget FSharp.Data

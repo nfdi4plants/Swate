@@ -17,6 +17,7 @@ open Model
 open Messages
 open Update
 open Shared
+open OfficeJS.Fable.GlobalBindings
 
 module Server =
 
@@ -30,7 +31,7 @@ module Server =
       |> Remoting.buildProxy<IAnnotatorAPIv1>
 
 let initializeAddIn () =
-    OfficeInterop.Types.Office.onReady()
+    Office.onReady()
 
 
 // defines the initial state and initial command (= side-effect) of the application

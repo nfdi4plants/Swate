@@ -16,4 +16,4 @@ Fable.Browser.MediaQueryList
 Fable.SimpleJson
 Fable.SimpleXml
 FSharp.Data
-OfficeJS.Fable
+ExcelJS.Fable
