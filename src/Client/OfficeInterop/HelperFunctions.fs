@@ -2,9 +2,9 @@ module OfficeInterop.HelperFunctions
 
 open Fable.Core
 open Fable.Core.JsInterop
-open OfficeJS.Fable
-open OfficeJS.Fable.Excel
-open OfficeJS.Fable.GlobalBindings
+open ExcelJS.Fable
+open Excel
+open GlobalBindings
 open System.Collections.Generic
 open System.Text.RegularExpressions
 

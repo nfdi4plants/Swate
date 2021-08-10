@@ -15,7 +15,6 @@
         <Compile Include="OfficeInterop\Types.fs" />
         <Compile Include="OfficeInterop\Regex.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
-        <Compile Include="OfficeInterop\EventHandlers.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="Api.fs" />
         <Compile Include="Model.fs" />

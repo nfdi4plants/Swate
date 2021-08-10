@@ -1,9 +1,9 @@
 module OfficeInterop
 
 open Fable.Core
-open OfficeJS.Fable
-open OfficeJS.Fable.Excel
-open OfficeJS.Fable.GlobalBindings
+open ExcelJS.Fable
+open Excel
+open GlobalBindings
 
 open Shared
 

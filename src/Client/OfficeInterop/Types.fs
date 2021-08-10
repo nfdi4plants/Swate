@@ -8,7 +8,7 @@ open Fable.Core.JsInterop
 open Elmish
 open Browser
 
-open OfficeJS.Fable
+open ExcelJS.Fable
 open Excel
 
 //[<Global>]

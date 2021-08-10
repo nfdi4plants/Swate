@@ -3,7 +3,7 @@ RESTRICTION: == net5.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     BouncyCastle.NetCore (1.8.8)
-    ExcelJS.Fable (0.1)
+    ExcelJS.Fable (0.3)
       Fable.Core (>= 3.2.8)
       Fable.React (>= 7.4.1)
       FSharp.Core (>= 5.0)
