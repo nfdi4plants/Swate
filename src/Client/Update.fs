@@ -66,13 +66,14 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
 
     | UpdateProtocolGroupHeader ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.updateProtocolGroupHeader
-                ()
-                (GenericLog >> Dev)
-                (GenericError >> Dev)
-        currentModel, cmd
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.updateProtocolGroupHeader
+        //        ()
+        //        (GenericLog >> Dev)
+        //        (GenericError >> Dev)
+        failwith """Function "UpdateProtocolGroupHeader" is currently not supported."""
+        currentModel, Cmd.none
 
     | Initialized (h,p) ->
         let welcomeMsg = sprintf "Ready to go in %s running on %s" h p
@@ -119,73 +120,77 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
 
     | AddAnnotationBlock (minBuildingBlockInfo) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.addAnnotationBlock  
-                (minBuildingBlockInfo)
-                (fun (newColName,format,msg) ->
-                    Msg.Batch [
-                        GenericLog ("Info",msg) |> Dev
-                        FormatColumn (newColName,format) |> ExcelInterop
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
+        failwith """Function "AddAnnotationBlock" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.addAnnotationBlock  
+        //        (minBuildingBlockInfo)
+        //        (fun (newColName,format,msg) ->
+        //            Msg.Batch [
+        //                GenericLog ("Info",msg) |> Dev
+        //                FormatColumn (newColName,format) |> ExcelInterop
+        //                UpdateProtocolGroupHeader |> ExcelInterop
+        //            ]
+        //        )
+        //        (GenericError >> Dev)
+        currentModel, Cmd.none
 
     | AddAnnotationBlocks (minBuildingBlockInfos, protocol, validationOpt) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.addAnnotationBlocksAsProtocol
-                (minBuildingBlockInfos,protocol)
-                (fun (resList,protocolInfo) ->
-                    let newColNames = resList |> List.map (fun (names,_,_) -> names)
-                    let changeColFormatInfos,msg = resList |> List.map (fun (names,format,msg) -> (names,format), msg ) |> List.unzip
-                    Msg.Batch [
-                        FormatColumns (changeColFormatInfos) |> ExcelInterop
-                        GenericLog ("Info", msg |> String.concat "; ") |> Dev
-                        /// This is currently used for protocol template insert from database
-                        if validationOpt.IsSome then
-                            /// tableValidation is retrived from database and does not contain correct tablename and worksheetname.
-                            /// But it is updated during 'addAnnotationBlocksAsProtocol' with the active annotationtable
-                            /// The next step can be redesigned, as the protocol is also passed to 'AddTableValidationtoExisting'
-                            let updatedValidation = {validationOpt.Value with AnnotationTable = Shared.AnnotationTable.create protocolInfo.AnnotationTable.Name protocolInfo.AnnotationTable.Worksheet}
-                            AddTableValidationtoExisting (updatedValidation, newColNames, protocolInfo) |> ExcelInterop
-                        else
-                            WriteProtocolToXml protocolInfo |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
+        failwith """Function "AddAnnotationBlocks" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.addAnnotationBlocksAsProtocol
+        //        (minBuildingBlockInfos,protocol)
+        //        (fun (resList,protocolInfo) ->
+        //            let newColNames = resList |> List.map (fun (names,_,_) -> names)
+        //            let changeColFormatInfos,msg = resList |> List.map (fun (names,format,msg) -> (names,format), msg ) |> List.unzip
+        //            Msg.Batch [
+        //                FormatColumns (changeColFormatInfos) |> ExcelInterop
+        //                GenericLog ("Info", msg |> String.concat "; ") |> Dev
+        //                /// This is currently used for protocol template insert from database
+        //                if validationOpt.IsSome then
+        //                    /// tableValidation is retrived from database and does not contain correct tablename and worksheetname.
+        //                    /// But it is updated during 'addAnnotationBlocksAsProtocol' with the active annotationtable
+        //                    /// The next step can be redesigned, as the protocol is also passed to 'AddTableValidationtoExisting'
+        //                    let updatedValidation = {validationOpt.Value with AnnotationTable = Shared.AnnotationTable.create protocolInfo.AnnotationTable.Name protocolInfo.AnnotationTable.Worksheet}
+        //                    AddTableValidationtoExisting (updatedValidation, newColNames, protocolInfo) |> ExcelInterop
+        //                else
+        //                    WriteProtocolToXml protocolInfo |> ExcelInterop
+        //            ]
+        //        )
+        //        (GenericError >> Dev)
+        currentModel, Cmd.none
 
     | RemoveAnnotationBlock ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.removeSelectedAnnotationBlock
-                ()
-                (fun msg ->
-                    Msg.Batch [
-                        GenericLog ("Info",msg) |> Dev
-                        AutoFitTable |> ExcelInterop
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
+        failwith """Function "RemoveAnnotationBlock" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.removeSelectedAnnotationBlock
+        //        ()
+        //        (fun msg ->
+        //            Msg.Batch [
+        //                GenericLog ("Info",msg) |> Dev
+        //                AutoFitTable |> ExcelInterop
+        //                UpdateProtocolGroupHeader |> ExcelInterop
+        //            ]
+        //        )
+        //        (GenericError >> Dev)
+        currentModel, Cmd.none
 
     | AddUnitToAnnotationBlock (format, unitTermOpt) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.addUnitToExistingBuildingBlock
-                (format,unitTermOpt)
-                (fun (newColName,format) ->
-                    Msg.Batch [
-                        FormatColumn (newColName, format) |> ExcelInterop
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
+        failwith """Function "AddUnitToAnnotationBlock" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.addUnitToExistingBuildingBlock
+        //        (format,unitTermOpt)
+        //        (fun (newColName,format) ->
+        //            Msg.Batch [
+        //                FormatColumn (newColName, format) |> ExcelInterop
+        //                UpdateProtocolGroupHeader |> ExcelInterop
+        //            ]
+        //        )
+        //        (GenericError >> Dev)
+        currentModel, Cmd.none
 
     | FormatColumn (colName,format) ->
         let cmd =
@@ -250,14 +255,15 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
     //
     | GetTableValidationXml ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getTableRepresentation
-                ()
-                (fun (currentTableValidation, buildingBlocks,msg) ->
-                    StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks, msg) |> Validation)
-                (GenericError >> Dev)
-        currentModel, cmd
+        failwith """Function "GetTableValidationXml" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.getTableRepresentation
+        //        ()
+        //        (fun (currentTableValidation, buildingBlocks,msg) ->
+        //            StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks, msg) |> Validation)
+        //        (GenericError >> Dev)
+        currentModel, Cmd.none
     | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
         let cmd =
             Cmd.OfPromise.either
@@ -342,19 +348,20 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
     //
     | FillHiddenColsRequest ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.createSearchTermsIFromTable 
-                ()
-                (SearchForInsertTermsRequest >> Request >> Api)
-                (fun e ->
-                    Msg.Batch [
-                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-                        GenericError e |> Dev
-                    ] )
-        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> ExcelInterop |> Cmd.ofMsg
-        let cmds = Cmd.batch [cmd; cmd2]
-        currentModel, cmds
+        failwith """Function "FillHiddenColsRequest" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.createSearchTermsIFromTable 
+        //        ()
+        //        (SearchForInsertTermsRequest >> Request >> Api)
+        //        (fun e ->
+        //            Msg.Batch [
+        //                UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+        //                GenericError e |> Dev
+        //            ] )
+        //let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> ExcelInterop |> Cmd.ofMsg
+        //let cmds = Cmd.batch [cmd; cmd2]
+        currentModel, Cmd.none
 
     | FillHiddenColumns (tableName,insertTerms) ->
         let cmd =
@@ -397,19 +404,20 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
 
     //
     | GetSelectedBuildingBlockSearchTerms ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getAnnotationBlockDetails
-                ()
-                (GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
-                (fun x ->
-                    Msg.Batch [
-                        GenericError x |> Dev
-                        UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails
-                    ]
-                )
-        let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
-        currentModel, Cmd.batch [cmd;cmd2]
+        failwith """Function "GetSelectedBuildingBlockSearchTerms" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.getAnnotationBlockDetails
+        //        ()
+        //        (GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
+        //        (fun x ->
+        //            Msg.Batch [
+        //                GenericError x |> Dev
+        //                UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails
+        //            ]
+        //        )
+        //let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
+        currentModel, Cmd.none//Cmd.batch [cmd;cmd2]
     //
     | CreatePointerJson ->
         let cmd =
@@ -1321,11 +1329,11 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
 
 let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolInsertState) : ProtocolInsertState * Cmd<Msg> =
 
-    let parseDBProtocol (prot:Shared.ProtocolTemplate) =
-        let tableName,minBBInfos = prot.TableXml |> OfficeInterop.Regex.MinimalBuildingBlock.ofExcelTableXml
-        let validationType =  prot.CustomXml |> TableValidation.ofXml
-        if tableName <> validationType.AnnotationTable.Name then failwith "CustomXml and TableXml relate to different tables."
-        prot, validationType, minBBInfos
+    //let parseDBProtocol (prot:Shared.ProtocolTemplate) =
+    //    let tableName,minBBInfos = prot.TableXml |> OfficeInterop.Regex.MinimalBuildingBlock.ofExcelTableXml
+    //    let validationType =  prot.CustomXml |> TableValidation.ofXml
+    //    if tableName <> validationType.AnnotationTable.Name then failwith "CustomXml and TableXml relate to different tables."
+    //    prot, validationType, minBBInfos
 
     match fujMsg with
     //| ParseJsonToProcessRequest parsableString ->
@@ -1378,18 +1386,19 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
                 (GenericError >> Dev)
         currentState, cmd
     | ParseProtocolXmlByProtocolRequest prot ->
-        let cmd =
-            Cmd.OfFunc.either
-                parseDBProtocol
-                (prot)
-                (GetProtocolXmlByProtocolResponse >> ProtocolInsert)
-                (fun e ->
-                    Msg.Batch [
-                        GenericError e |> Dev
-                        UpdateLoading false |> ProtocolInsert 
-                    ]
-                )
-        currentState, cmd
+        failwith """Function "ParseProtocolXmlByProtocolRequest" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfFunc.either
+        //        parseDBProtocol
+        //        (prot)
+        //        (GetProtocolXmlByProtocolResponse >> ProtocolInsert)
+        //        (fun e ->
+        //            Msg.Batch [
+        //                GenericError e |> Dev
+        //                UpdateLoading false |> ProtocolInsert 
+        //            ]
+        //        )
+        currentState, Cmd.none
     | GetProtocolXmlByProtocolResponse (prot,validation,minBBInfoList) -> 
         let nextState = {
             currentState with
@@ -1699,13 +1708,14 @@ let handleSettingsProtocolMsg (topLevelMsg:SettingsProtocolMsg) (currentState: S
                 (GenericError >> Dev)
         currentState, cmd
     | UpdateProtocolByNewVersion (prot, protTemplate) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.updateProtocolByNewVersion
-                (prot,protTemplate)
-                (AddAnnotationBlocks >> ExcelInterop)
-                (GenericError >> Dev)
-        currentState, cmd
+        failwith """Function "UpdateProtocolByNewVersion" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.updateProtocolByNewVersion
+        //        (prot,protTemplate)
+        //        (AddAnnotationBlocks >> ExcelInterop)
+        //        (GenericError >> Dev)
+        currentState, Cmd.none
     // Server
     | GetProtocolsFromDBRequest activeProtGroupOpt ->
         let cmd =

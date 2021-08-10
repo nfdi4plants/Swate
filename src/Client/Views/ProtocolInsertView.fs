@@ -345,31 +345,37 @@ let showDatabaseProtocolTemplate (model:Model) dispatch =
             
         toProtocolSearchElement model dispatch
 
-        if model.ProtocolInsertState.ProtocolSelected.IsSome then
-            Table.table [
-                Table.IsFullWidth;
-                Table.IsBordered
-                Table.Props [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
-            ][
-                thead [][
-                    tr [][
-                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column"]
-                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column TAN"]
-                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit"]
-                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit TAN"]
-                    ]
-                ]
-                tbody [][
-                    for minBB in model.ProtocolInsertState.BuildingBlockMinInfoList do
-                        yield
-                            tr [][
-                                td [][str minBB.MainColumnName]
-                                td [][str (if minBB.MainColumnTermAccession.IsSome then minBB.MainColumnTermAccession.Value else "-")]
-                                td [][str (if minBB.UnitName.IsSome then minBB.UnitName.Value else "-")]
-                                td [][str (if minBB.UnitTermAccession.IsSome then minBB.UnitTermAccession.Value else "-")]
-                            ]
-                ]
-            ]
+        Notification.notification [
+            Notification.Color IsDanger
+        ][
+            str """Currently "model.ProtocolInsertState.ProtocolSelected" is not supported. Please check ProtocolInsertView.fs."""
+        ]
+
+        //if model.ProtocolInsertState.ProtocolSelected.IsSome then
+        //    Table.table [
+        //        Table.IsFullWidth;
+        //        Table.IsBordered
+        //        Table.Props [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
+        //    ][
+        //        thead [][
+        //            tr [][
+        //                th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column"]
+        //                th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column TAN"]
+        //                th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit"]
+        //                th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit TAN"]
+        //            ]
+        //        ]
+        //        tbody [][
+        //            for minBB in model.ProtocolInsertState.BuildingBlockMinInfoList do
+        //                yield
+        //                    tr [][
+        //                        td [][str minBB.MainColumnName]
+        //                        td [][str (if minBB.MainColumnTermAccession.IsSome then minBB.MainColumnTermAccession.Value else "-")]
+        //                        td [][str (if minBB.UnitName.IsSome then minBB.UnitName.Value else "-")]
+        //                        td [][str (if minBB.UnitTermAccession.IsSome then minBB.UnitTermAccession.Value else "-")]
+        //                    ]
+        //        ]
+        //    ]
 
         addFromDBToTableButton model dispatch
     ]

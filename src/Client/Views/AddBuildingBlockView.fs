@@ -222,7 +222,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                             | true, str         -> Some str
                                 //sprintf "0.00 \"%s\"" str
                         let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome then Some model.AddBuildingBlockState.UnitSelectedTerm.Value.Accession else None
-                        let minBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.create colName colTerm unitName unitTerm None false
+                        let minBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.create colName colTerm unitName None false
                         AddAnnotationBlock minBuildingBlock |> ExcelInterop |> dispatch
                     )
                 ] [

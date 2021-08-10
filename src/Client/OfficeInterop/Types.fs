@@ -370,8 +370,9 @@ type ColHeader = {
     CoreName:   string option
     Ontology:   OntologyInfo option
     TagArr:     string [] option
-    IsUnitCol:  bool
-}
+} with
+    member this.IsUnitCol =
+        this.TagArr.IsSome && this.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag)
 
 /// This module contains types to handle value search for TSR and TAN columns.
 /// The types help to summarize and collect needed information about the column partitions (~ building block, e.g. 1 col for `Source Name`,
@@ -401,11 +402,11 @@ module BuildingBlockTypes =
 
     type BuildingBlock = {
         MainColumn  : Column
+        Unit        : Column option
         /// Term Source REF
         TSR         : Column option
         /// Term Accession Number
         TAN         : Column option
-        Unit        : BuildingBlock option
     } with
         static member create mainCol tsr tan unit = {
             MainColumn  = mainCol
@@ -421,7 +422,7 @@ module BuildingBlockTypes =
                 ColumnAdress        = this.MainColumn.Index |> Some
                 Importance          = None
                 ValidationFormat    = None
-                Unit                = if this.Unit.IsSome then this.Unit.Value.MainColumn.Header.Value.Ontology.Value.Name |> Some else None
+                Unit                = if this.Unit.IsSome then this.Unit.Value.Header.Value.Ontology.Value.Name |> Some else None
             }
 
         member this.hasCompleteTSRTAN =
@@ -433,36 +434,25 @@ module BuildingBlockTypes =
             | _, _ ->
                 failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN." this.MainColumn.Header.Value.Header)
 
-        member this.hasCompleteUnitBlock =
-            if this.Unit.IsSome then
-                let u = this.Unit.Value
-                match u.TSR, u.TAN with
-                | Some _, Some _ -> true
-                | None, None -> false
-                | _, _ ->
-                    failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN in Unit block." this.MainColumn.Header.Value.Header)
-            else
-                false
+        member this.hasUnit = this.Unit.IsSome
 
     open ISADotNetHelpers
 
     type MinimalBuildingBlock = {
         /// If 'IsAlreadyExisting' = false then this is just a core name + ont (e.g. Parameter [instrument model], so no id).
         /// If 'IsAlreadyExisting' = true this is the real value from the table.
-        MainColumnName          : string
-        MainColumnTermAccession : string option
-        UnitName                : string option
-        UnitTermAccession       : string option
-        Values                  : OntologyInfo option
+        ColumnName          : string
+        UnitName            : string option
+        ColumnTermAccession : string option
+        Values              : OntologyInfo option
         /// When this type is given to 'AddBuildingBlocks' this parameter differentiates between term that were already found in the table and term that
         /// need to be added. This is important to correctly update existing protocols by their newest version from the DB
         IsAlreadyExisting       : bool
     } with
-        static member create mainColName colTermAccession unitName unitTermAccession values isExisting = {
-            MainColumnName          = mainColName
-            MainColumnTermAccession = colTermAccession
+        static member create mainColName colTermAccession unitName values isExisting = {
+            ColumnName          = mainColName
+            ColumnTermAccession = colTermAccession
             UnitName                = unitName
-            UnitTermAccession       = unitTermAccession
             Values                  = values
             IsAlreadyExisting       = isExisting
         }
@@ -488,23 +478,21 @@ module BuildingBlockTypes =
         //    )
 
         static member ofBuildingBlockWithoutValues isExisting (buildingBlock:BuildingBlock) =
-            let bbHeader    = buildingBlock.MainColumn.Header.Value
-            let mainColName =
+            let bbHeader = buildingBlock.MainColumn.Header.Value
+            let colName =
                 let ont = if bbHeader.Ontology.IsSome then sprintf " [%s]" bbHeader.Ontology.Value.Name else ""
                 sprintf "%s%s" bbHeader.CoreName.Value ont
-            let mainColAccession =
+            let colAccession =
                 if bbHeader.Ontology.IsSome then bbHeader.Ontology.Value.TermAccession |> Some else None
-            let unitName, unitTermAccession =
-                if buildingBlock.hasCompleteUnitBlock then
-                    let unitHeader = buildingBlock.Unit.Value.MainColumn.Header.Value
+            let unitName =
+                if buildingBlock.hasUnit then
+                    let unitHeader = buildingBlock.Unit.Value.Header.Value
                     let unitColName =
                         if unitHeader.Ontology.IsSome then unitHeader.Ontology.Value.Name |> Some else None
-                    let unitColAccession =
-                        if unitHeader.Ontology.IsSome then unitHeader.Ontology.Value.TermAccession |> Some else None
-                    unitColName,unitColAccession
+                    unitColName
                 else
-                    None, None
-            MinimalBuildingBlock.create mainColName mainColAccession unitName unitTermAccession None isExisting
+                    None
+            MinimalBuildingBlock.create colName colAccession unitName None isExisting
 
 
 

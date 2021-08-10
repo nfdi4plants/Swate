@@ -13,6 +13,7 @@ open OfficeInterop.Types
 open BuildingBlockTypes
 open Shared
 
+// ExcelApi 1.1
 let getActiveAnnotationTableName() =
     Excel.run(fun context ->
 
@@ -42,6 +43,7 @@ let getActiveAnnotationTableName() =
         )
     )
 
+// ExcelApi 1.1
 /// This function returns the names of all annotationTables in all worksheets.
 /// This function is used to pass a list of all table names to e.g. the 'createAnnotationTable()' function. 
 let getAllTableInfo() =
@@ -132,6 +134,7 @@ let findNewIdForUnit (allColHeaders:string []) (format:string option) (unitAcces
             int
     loopingCheck 1
 
+// ExcelApi 1.1 OR 1.4 (columns.add)
 let createUnitColumns (context:Excel.RequestContext) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
     let col = createEmptyMatrixForTables 1 rowCount ""
     if format.IsSome then
@@ -262,345 +265,349 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
     //failwith (sprintf "START: %A ; FOUND NEW: %A" startIndex (loopingCheckSkipHiddenCols startIndex))
     loopingCheckSkipHiddenCols startIndex
 
-module BuildingBlockTypes =
-    
-    /// This function is part 1 to get a 'BuildingBlock []' representation of a Swate table.
-    /// It should be used as follows: 'let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable'
-    /// This function will load all necessery excel properties.
-    let getBuildingBlocksPreSync (context:RequestContext) annotationTable =
-        let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem(annotationTable)
-        let annoHeaderRange = annotationTable.getHeaderRowRange()
-        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-        let annoBodyRange = annotationTable.getDataBodyRange()
-        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
-        annoHeaderRange, annoBodyRange
+//module BuildingBlockTypes =
 
-    /// This function is part 2 to get a 'BuildingBlock []' representation of a Swate table.
-    /// It's parameters are the output of 'getBuildingBlocksPreSync' and it will return a full 'BuildingBlock []'.
-    /// It MUST be used either in or after 'context.sync().``then``(fun e -> ..)' after 'getBuildingBlocksPreSync'.
-    let getBuildingBlocks (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) =
+//    // ExcelApi 1.1
+//    /// This function is part 1 to get a 'BuildingBlock []' representation of a Swate table.
+//    /// It should be used as follows: 'let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable'
+//    /// This function will load all necessery excel properties.
+//    let getBuildingBlocksPreSync (context:RequestContext) annotationTable =
+//        let sheet = context.workbook.worksheets.getActiveWorksheet()
+//        let annotationTable = sheet.tables.getItem(annotationTable)
+//        let annoHeaderRange = annotationTable.getHeaderRowRange()
+//        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+//        let annoBodyRange = annotationTable.getDataBodyRange()
+//        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+//        annoHeaderRange, annoBodyRange
 
-        /// Get the table by 'Columns [| Rows [|Values|] |]'
-        let columnBodies =
-            annoBodyRange.values
-            |> viewRowsByColumns
+//    // ExcelApi 1.1
+//    /// This function is part 2 to get a 'BuildingBlock []' representation of a Swate table.
+//    /// It's parameters are the output of 'getBuildingBlocksPreSync' and it will return a full 'BuildingBlock []'.
+//    /// It MUST be used either in or after 'context.sync().``then``(fun e -> ..)' after 'getBuildingBlocksPreSync'.
+//    let getBuildingBlocks (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) =
 
-        /// Write columns into 'BuildingBlockTypes.Column'
-        let columns =
-            [|
-                // iterate over n of columns
-                for ind = 0 to (int annoHeaderRange.columnCount - 1) do
-                    yield (
-                        // Get column header and parse it
-                        let header =
-                            annoHeaderRange.values.[0].[ind]
-                            |> fun x -> if x.IsSome then parseColHeader (string annoHeaderRange.values.[0].[ind].Value) |> Some else None
-                        // Get column values and write them to 'BuildingBlockTypes.Cell'
-                        let cells =
-                            columnBodies.[ind]
-                            |> Array.mapi (fun i cellVal ->
-                                let cellValue = if cellVal.IsSome then Some (string cellVal.Value) else None
-                                Cell.create i cellValue
-                            )
-                        // Create column
-                        Column.create ind header cells
-                    )
-            |]
+//        /// Get the table by 'Columns [| Rows [|Values|] |]'
+//        let columnBodies =
+//            annoBodyRange.values
+//            |> viewRowsByColumns
 
-        /// Failsafe (1): it should never happen, that the nextColumn is a hidden column without an existing building block.
-        let errorMsg1 (nextCol:Column) (buildingBlock:BuildingBlock option) =
-            failwith (
-                sprintf 
-                    "Swate encountered an error while processing the active annotation table.
-                    Swate found a hidden column (%s) without a prior main column (not hidden)."
-                    nextCol.Header.Value.Header
-            )
+//        /// Write columns into 'BuildingBlockTypes.Column'
+//        let columns =
+//            [|
+//                // iterate over n of columns
+//                for ind = 0 to (int annoHeaderRange.columnCount - 1) do
+//                    yield (
+//                        // Get column header and parse it
+//                        let header =
+//                            annoHeaderRange.values.[0].[ind]
+//                            |> fun x -> if x.IsSome then parseColHeader (string annoHeaderRange.values.[0].[ind].Value) |> Some else None
+//                        // Get column values and write them to 'BuildingBlockTypes.Cell'
+//                        let cells =
+//                            columnBodies.[ind]
+//                            |> Array.mapi (fun i cellVal ->
+//                                let cellValue = if cellVal.IsSome then Some (string cellVal.Value) else None
+//                                Cell.create i cellValue
+//                            )
+//                        // Create column
+//                        Column.create ind header cells
+//                    )
+//            |]
 
-        /// Hidden columns do only come with certain core names. The acceptable names can be found in OfficeInterop.Types.ColumnCoreNames.
-        let errorMsg2 (nextCol:Column) (buildingBlock:BuildingBlock option) =
-            failwith (
-                sprintf
-                    "Swate encountered an error while processing the active annotation table.
-                    Swate found a hidden column (%s) with an unknown core name: %A"
-                    nextCol.Header.Value.Header
-                    nextCol.Header.Value.CoreName
-            )
+//        /// Failsafe (1): it should never happen, that the nextColumn is a hidden column without an existing building block.
+//        let errorMsg1 (nextCol:Column) (buildingBlock:BuildingBlock option) =
+//            failwith (
+//                sprintf 
+//                    "Swate encountered an error while processing the active annotation table.
+//                    Swate found a hidden column (%s) without a prior main column (not hidden)."
+//                    nextCol.Header.Value.Header
+//            )
 
-        /// If a columns core name already exists for the current building block, then the block is faulty and needs userinput to be corrected.
-        let errorMsg3 (nextCol:Column) (buildingBlock:BuildingBlock option) assignedCol =
-            failwith (
-                sprintf
-                    "Swate encountered an error while processing the active annotation table.
-                    Swate found a hidden column (%s) with a core name (%A) that is already assigned to the previous building block.
-                    Building block main column: %s, already assigned column: %s"
-                    nextCol.Header.Value.Header
-                    nextCol.Header.Value.CoreName
-                    buildingBlock.Value.MainColumn.Header.Value.Header
-                    assignedCol
-            )
+//        /// Hidden columns do only come with certain core names. The acceptable names can be found in OfficeInterop.Types.ColumnCoreNames.
+//        let errorMsg2 (nextCol:Column) (buildingBlock:BuildingBlock option) =
+//            failwith (
+//                sprintf
+//                    "Swate encountered an error while processing the active annotation table.
+//                    Swate found a hidden column (%s) with an unknown core name: %A"
+//                    nextCol.Header.Value.Header
+//                    nextCol.Header.Value.CoreName
+//            )
 
-        /// Update current building block with new reference column. A ref col can be TSR, TAN and unit cols.
-        let checkForHiddenColType (currentBlock:BuildingBlock option) (nextCol:Column) =
-            // Then we need to check if the nextCol is either a TSR, TAN or a unit column
-            match nextCol.Header.Value.CoreName.Value with
-            | ColumnCoreNames.Hidden.TermAccessionNumber ->
-                // Build in fail safes.
-                if currentBlock.IsNone then errorMsg1 nextCol currentBlock
-                if currentBlock.Value.TAN.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.TAN.Value.Header.Value.Header
-                // Update building block
-                let updateCurrentBlock =
-                    { currentBlock.Value with
-                        TAN =  Some nextCol } |> Some
-                updateCurrentBlock
-            | ColumnCoreNames.Hidden.TermSourceREF ->
-                // Build in fail safe.
-                if currentBlock.IsNone then errorMsg1 nextCol currentBlock
-                if currentBlock.Value.TSR.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.TSR.Value.Header.Value.Header
-                // Update building block
-                let updateCurrentBlock =
-                    { currentBlock.Value with
-                        TSR =  Some nextCol } |> Some
-                updateCurrentBlock
-            | ColumnCoreNames.Hidden.Unit ->
-                // Build in fail safe.
-                if currentBlock.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.MainColumn.Header.Value.Header
-                // Create unit building block
-                let newBlock = BuildingBlock.create nextCol None None None |> Some
-                newBlock 
-            | _ ->
-                // Build in fail safe.
-                errorMsg2 nextCol currentBlock
+//        /// If a columns core name already exists for the current building block, then the block is faulty and needs userinput to be corrected.
+//        let errorMsg3 (nextCol:Column) (buildingBlock:BuildingBlock option) assignedCol =
+//            failwith (
+//                sprintf
+//                    "Swate encountered an error while processing the active annotation table.
+//                    Swate found a hidden column (%s) with a core name (%A) that is already assigned to the previous building block.
+//                    Building block main column: %s, already assigned column: %s"
+//                    nextCol.Header.Value.Header
+//                    nextCol.Header.Value.CoreName
+//                    buildingBlock.Value.MainColumn.Header.Value.Header
+//                    assignedCol
+//            )
 
-        // Building blocks are defined by one visable column and an undefined number of hidden columns.
-        // Therefore we iterate through the columns array and use every column without an `#h` tag as the start of a new building block.
-        let rec sortColsIntoBuildingBlocks (index:int) (currentBlock:BuildingBlock option) (buildingBlockList:BuildingBlock list) =
-            // Exit case if we iterated through all columns
-            if index > (int annoHeaderRange.columnCount - 1) then
-                // Should we have a 'currentBuildingBlock' add it to the 'buildingBlockList' before returning it.
-                if currentBlock.IsSome then
-                    currentBlock.Value::buildingBlockList
-                else
-                    buildingBlockList
-            else
-                let nextCol = columns.[index]
-                // If the nextCol does not have an header it is empty and therefore skipped.
-                if
-                    nextCol.Header.IsNone
-                then
-                    sortColsIntoBuildingBlocks (index+1) currentBlock buildingBlockList
-                // If the nextCol.Header has no tag array or its tag array does NOT contain a hidden tag then it starts a new building block
-                elif
-                    (nextCol.Header.Value.TagArr.IsSome && nextCol.Header.Value.TagArr.Value |> Array.contains ColumnTags.HiddenTag |> not)
-                    || (nextCol.Header.IsSome && nextCol.Header.Value.TagArr.IsNone)
-                then
-                    let newBuildingBlock = BuildingBlock.create nextCol None None None |> Some
-                    // If there is a 'currentBlock' we add it to the list of building blocks ('buildingBlockList').
-                    if currentBlock.IsSome then
-                        sortColsIntoBuildingBlocks (index+1) newBuildingBlock (currentBlock.Value::buildingBlockList)
-                    // If there is no currentBuildingBlock, e.g. at the start of this function we replace the None with the first building block.
-                    else
-                        sortColsIntoBuildingBlocks (index+1) newBuildingBlock buildingBlockList
-                // if the nextCol.Header has a tag array and it does contain a hidden tag then it is added to the currentBlock
-                elif
-                    nextCol.Header.Value.TagArr.IsSome && nextCol.Header.Value.TagArr.Value |> Array.contains ColumnTags.HiddenTag
-                then
-                    // There are multiple possibilities which column this is: TSR; TAN; Unit; Unit TSR; Unit TAN are the currently existing ones.
-                    // We first check if there is NO unit tag in the header tag array
-                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we (>0.2.1) added accession number behind unit tag
-                    if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) |> not then
-                        let updateCurrentBlock = checkForHiddenColType currentBlock nextCol
-                        sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
-                    /// Next we check for unit columns in the scheme of `Unit [Term] (#h; #u...) | TSR [Term] (#h; #u...) | TAN [Term] (#h; #u...)`
-                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we once (>0.2.1) added accession number behind unit tag
-                    elif nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) then
-                        /// Please notice that we update the unit building block in the following function and not the core building block.
-                        let updatedUnitBlock = checkForHiddenColType currentBlock.Value.Unit nextCol
-                        /// Update the core building block with the updated unit building block.
-                        let updateCurrentBlock = {currentBlock.Value with Unit = updatedUnitBlock} |> Some
-                        sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
-                    else
-                        failwith "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' can only contain a '#u' tag or not."
-                else
-                    failwith (sprintf "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' was not recognized as hidden or main column: %A." nextCol.Header)
+//        /// Update current building block with new reference column. A ref col can be TSR, TAN and unit cols.
+//        let checkForHiddenColType (currentBlock:BuildingBlock option) (nextCol:Column) =
+//            // Then we need to check if the nextCol is either a TSR, TAN or a unit column
+//            match nextCol.Header.Value.CoreName.Value with
+//            | ColumnCoreNames.Hidden.TermAccessionNumber ->
+//                // Build in fail safes.
+//                if currentBlock.IsNone then errorMsg1 nextCol currentBlock
+//                if currentBlock.Value.TAN.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.TAN.Value.Header.Value.Header
+//                // Update building block
+//                let updateCurrentBlock =
+//                    { currentBlock.Value with
+//                        TAN =  Some nextCol } |> Some
+//                updateCurrentBlock
+//            | ColumnCoreNames.Hidden.TermSourceREF ->
+//                // Build in fail safe.
+//                if currentBlock.IsNone then errorMsg1 nextCol currentBlock
+//                if currentBlock.Value.TSR.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.TSR.Value.Header.Value.Header
+//                // Update building block
+//                let updateCurrentBlock =
+//                    { currentBlock.Value with
+//                        TSR =  Some nextCol } |> Some
+//                updateCurrentBlock
+//            | ColumnCoreNames.Hidden.Unit ->
+//                // Build in fail safe.
+//                if currentBlock.IsSome then errorMsg3 nextCol currentBlock currentBlock.Value.MainColumn.Header.Value.Header
+//                // Create unit building block
+//                let newBlock = BuildingBlock.create nextCol None None None |> Some
+//                newBlock 
+//            | _ ->
+//                // Build in fail safe.
+//                errorMsg2 nextCol currentBlock
 
-        /// Sort all columns into building blocks.
-        let buildingBlocksPre =
-            sortColsIntoBuildingBlocks 0 None []
-            |> List.rev
-            |> Array.ofList
+//        // Building blocks are defined by one visable column and an undefined number of hidden columns.
+//        // Therefore we iterate through the columns array and use every column without an `#h` tag as the start of a new building block.
+//        let rec sortColsIntoBuildingBlocks (index:int) (currentBlock:BuildingBlock option) (buildingBlockList:BuildingBlock list) =
+//            // Exit case if we iterated through all columns
+//            if index > (int annoHeaderRange.columnCount - 1) then
+//                // Should we have a 'currentBuildingBlock' add it to the 'buildingBlockList' before returning it.
+//                if currentBlock.IsSome then
+//                    currentBlock.Value::buildingBlockList
+//                else
+//                    buildingBlockList
+//            else
+//                let nextCol = columns.[index]
+//                // If the nextCol does not have an header it is empty and therefore skipped.
+//                if
+//                    nextCol.Header.IsNone
+//                then
+//                    sortColsIntoBuildingBlocks (index+1) currentBlock buildingBlockList
+//                // If the nextCol.Header has no tag array or its tag array does NOT contain a hidden tag then it starts a new building block
+//                elif
+//                    (nextCol.Header.Value.TagArr.IsSome && nextCol.Header.Value.TagArr.Value |> Array.contains ColumnTags.HiddenTag |> not)
+//                    || (nextCol.Header.IsSome && nextCol.Header.Value.TagArr.IsNone)
+//                then
+//                    let newBuildingBlock = BuildingBlock.create nextCol None None None |> Some
+//                    // If there is a 'currentBlock' we add it to the list of building blocks ('buildingBlockList').
+//                    if currentBlock.IsSome then
+//                        sortColsIntoBuildingBlocks (index+1) newBuildingBlock (currentBlock.Value::buildingBlockList)
+//                    // If there is no currentBuildingBlock, e.g. at the start of this function we replace the None with the first building block.
+//                    else
+//                        sortColsIntoBuildingBlocks (index+1) newBuildingBlock buildingBlockList
+//                // if the nextCol.Header has a tag array and it does contain a hidden tag then it is added to the currentBlock
+//                elif
+//                    nextCol.Header.Value.TagArr.IsSome && nextCol.Header.Value.TagArr.Value |> Array.contains ColumnTags.HiddenTag
+//                then
+//                    // There are multiple possibilities which column this is: TSR; TAN; Unit; Unit TSR; Unit TAN are the currently existing ones.
+//                    // We first check if there is NO unit tag in the header tag array
+//                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we (>0.2.1) added accession number behind unit tag
+//                    if nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) |> not then
+//                        let updateCurrentBlock = checkForHiddenColType currentBlock nextCol
+//                        sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
+//                    /// Next we check for unit columns in the scheme of `Unit [Term] (#h; #u...) | TSR [Term] (#h; #u...) | TAN [Term] (#h; #u...)`
+//                    /// DEPRECATED! For now we keep "x.StartsWith ColumnTags.UnitTag" instead of contains, as we once (>0.2.1) added accession number behind unit tag
+//                    elif nextCol.Header.Value.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag) then
+//                        /// Please notice that we update the unit building block in the following function and not the core building block.
+//                        let updatedUnitBlock = checkForHiddenColType currentBlock.Value.Unit nextCol
+//                        /// Update the core building block with the updated unit building block.
+//                        let updateCurrentBlock = {currentBlock.Value with Unit = updatedUnitBlock} |> Some
+//                        sortColsIntoBuildingBlocks (index+1) updateCurrentBlock buildingBlockList
+//                    else
+//                        failwith "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' can only contain a '#u' tag or not."
+//                else
+//                    failwith (sprintf "The tag array of the next column to process in 'sortColsIntoBuildingBlocks' was not recognized as hidden or main column: %A." nextCol.Header)
 
-        // UPDATE IN > 0.2.0
-        /// As we now add the TermAccession as "#txxx" tag in the reference columns we walk over all buildingBlock and update the maincolumn header accordingly.
-        let buildingBlocks =
-            buildingBlocksPre
-            |> Array.map (fun buildingBlock ->
-                match buildingBlock.TAN, buildingBlock.TSR with
-                | Some tan, Some tsr ->
-                    match tan.Header.Value.Ontology, tsr.Header.Value.Ontology with
-                    | Some ont1, Some ont2 ->
-                        let isSame = ont1.TermAccession = ont2.TermAccession
-                        if isSame |> not then
-                            failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern. (3)" buildingBlock.MainColumn.Header.Value.Header)
-                        if ont1.TermAccession <> "" then
-                            let nextMainColumn = {
-                                buildingBlock.MainColumn with
-                                    Header =  {
-                                        buildingBlock.MainColumn.Header.Value with
-                                            Ontology = {
-                                                buildingBlock.MainColumn.Header.Value.Ontology.Value with
-                                                    TermAccession = ont1.TermAccession
-                                            } |> Some
-                                    } |> Some
-                            }
-                            { buildingBlock with MainColumn = nextMainColumn }
-                        else
-                            buildingBlock
-                    | None, None ->
-                        buildingBlock
-                    | _,_ ->
-                        failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern. (2)" buildingBlock.MainColumn.Header.Value.Header)
-                | None, None ->
-                    buildingBlock
-                | _, _ ->
-                    failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern." buildingBlock.MainColumn.Header.Value.Header)
-            )
+//        /// Sort all columns into building blocks.
+//        let buildingBlocksPre =
+//            sortColsIntoBuildingBlocks 0 None []
+//            |> List.rev
+//            |> Array.ofList
 
-        buildingBlocks
+//        // UPDATE IN > 0.2.0
+//        /// As we now add the TermAccession as "#txxx" tag in the reference columns we walk over all buildingBlock and update the maincolumn header accordingly.
+//        let buildingBlocks =
+//            buildingBlocksPre
+//            |> Array.map (fun buildingBlock ->
+//                match buildingBlock.TAN, buildingBlock.TSR with
+//                | Some tan, Some tsr ->
+//                    match tan.Header.Value.Ontology, tsr.Header.Value.Ontology with
+//                    | Some ont1, Some ont2 ->
+//                        let isSame = ont1.TermAccession = ont2.TermAccession
+//                        if isSame |> not then
+//                            failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern. (3)" buildingBlock.MainColumn.Header.Value.Header)
+//                        if ont1.TermAccession <> "" then
+//                            let nextMainColumn = {
+//                                buildingBlock.MainColumn with
+//                                    Header =  {
+//                                        buildingBlock.MainColumn.Header.Value with
+//                                            Ontology = {
+//                                                buildingBlock.MainColumn.Header.Value.Ontology.Value with
+//                                                    TermAccession = ont1.TermAccession
+//                                            } |> Some
+//                                    } |> Some
+//                            }
+//                            { buildingBlock with MainColumn = nextMainColumn }
+//                        else
+//                            buildingBlock
+//                    | None, None ->
+//                        buildingBlock
+//                    | _,_ ->
+//                        failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern. (2)" buildingBlock.MainColumn.Header.Value.Header)
+//                | None, None ->
+//                    buildingBlock
+//                | _, _ ->
+//                    failwith (sprintf "During BuildingBlock update with TermAccession found BuildingBlock (%s) with unknow TAN TSR pattern." buildingBlock.MainColumn.Header.Value.Header)
+//            )
 
-    open System
+//        buildingBlocks
 
-    let findSelectedBuildingBlockPreSync (context:RequestContext) annotationTableName =
-        let selectedRange = context.workbook.getSelectedRange()
-        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+//    open System
 
-        // Ref. 2
-        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
-        selectedRange, annoHeaderRange, annoBodyRange
+//    // ExcelApi 1.1
+//    let findSelectedBuildingBlockPreSync (context:RequestContext) annotationTableName =
+//        let selectedRange = context.workbook.getSelectedRange()
+//        let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
 
-    let findSelectedBuildingBlock (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) (context:RequestContext) =
-        context.sync().``then``( fun _ ->
+//        // Ref. 2
+//        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
+//        selectedRange, annoHeaderRange, annoBodyRange
 
-            if selectedRange.columnCount <> 1. then
-                failwith "To use this function please select a single column"
+//    // ExcelApi 1.1
+//    let findSelectedBuildingBlock (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) (context:RequestContext) =
+//        context.sync().``then``( fun _ ->
 
-            let errorMsg = "To use this function please select a single column of a Swate table."
+//            if selectedRange.columnCount <> 1. then
+//                failwith "To use this function please select a single column"
 
-            let newSelectedColIndex =
-                // recalculate the selected range index based on table
-                let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
-                // if index is smaller 0 it is outside of table range
-                if diff < 0. then failwith errorMsg
-                // if index is bigger than columnCount-1 then it is outside of tableRange
-                elif diff > annoHeaderRange.columnCount-1. then failwith errorMsg
-                else diff
+//            let errorMsg = "To use this function please select a single column of a Swate table."
 
-            /// Sort all columns into building blocks.
-            let buildingBlocks =
-                getBuildingBlocks annoHeaderRange annoBodyRange
+//            let newSelectedColIndex =
+//                // recalculate the selected range index based on table
+//                let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
+//                // if index is smaller 0 it is outside of table range
+//                if diff < 0. then failwith errorMsg
+//                // if index is bigger than columnCount-1 then it is outside of tableRange
+//                elif diff > annoHeaderRange.columnCount-1. then failwith errorMsg
+//                else diff
 
-            /// find building block with the closest main column index from left
-            let findLeftClosestBuildingBlock =
-                buildingBlocks
-                |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
-                |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
+//            /// Sort all columns into building blocks.
+//            let buildingBlocks =
+//                getBuildingBlocks annoHeaderRange annoBodyRange
 
-            findLeftClosestBuildingBlock
-        )
+//            /// find building block with the closest main column index from left
+//            let findLeftClosestBuildingBlock =
+//                buildingBlocks
+//                |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
+//                |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
 
-    let private sortMainColValuesToSearchTerms (buildingBlock:BuildingBlock) =
-        // get current col index
-        let tsrTanColIndices = [|buildingBlock.TSR.Value.Index; buildingBlock.TAN.Value.Index|]
-        let fillTermConstructsNoUnit bBlock =
-            // group cells by value so we don't get doubles.
-            bBlock.MainColumn.Cells
-            |> Array.groupBy (fun cell ->
-                cell.Value.Value
-            )
-            // create SearchTermI types that will be passed to the server to get filled with a term option.
-            |> Array.map (fun (searchStr,cellArr) ->
-                let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
-                Shared.SearchTermI.create tsrTanColIndices searchStr "" bBlock.MainColumn.Header.Value.Ontology rowIndices
-            )
-        /// We differentiate between building blocks with and without unit as unit building blocks will not contain terms as values but e.g. numbers.
-        /// In this case we do not want to search the database for the cell values but the parent ontology in the header.
-        /// This will then be used for TSR and TAN.
-        let fillTermConstructsWithUnit (bBlock:BuildingBlock) =
-            let searchStr       = bBlock.MainColumn.Header.Value.Ontology.Value.Name
-            let termAccession   = bBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
-            let rowIndices =
-                bBlock.MainColumn.Cells
-                |> Array.map (fun x ->
-                    x.Index
-                )
-            [|Shared.SearchTermI.create tsrTanColIndices searchStr termAccession None rowIndices|]
-        if buildingBlock.Unit.IsSome then
-            fillTermConstructsWithUnit buildingBlock
-        else
-            fillTermConstructsNoUnit buildingBlock
+//            findLeftClosestBuildingBlock
+//        )
 
-    let private sortUnitColToSearchTerm (buildingBlock:BuildingBlock) =
-        let unit = buildingBlock.Unit.Value
-        let searchString  = unit.MainColumn.Header.Value.Ontology.Value.Name
-        let termAccession = unit.MainColumn.Header.Value.Ontology.Value.TermAccession 
-        let colIndices = [|unit.MainColumn.Index; unit.TSR.Value.Index; unit.TAN.Value.Index|]
-        let rowIndices = unit.MainColumn.Cells |> Array.map (fun x -> x.Index)
-        Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
+//    let private sortMainColValuesToSearchTerms (buildingBlock:BuildingBlock) =
+//        // get current col index
+//        let tsrTanColIndices = [|buildingBlock.TSR.Value.Index; buildingBlock.TAN.Value.Index|]
+//        let fillTermConstructsNoUnit bBlock =
+//            // group cells by value so we don't get doubles.
+//            bBlock.MainColumn.Cells
+//            |> Array.groupBy (fun cell ->
+//                cell.Value.Value
+//            )
+//            // create SearchTermI types that will be passed to the server to get filled with a term option.
+//            |> Array.map (fun (searchStr,cellArr) ->
+//                let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
+//                Shared.SearchTermI.create tsrTanColIndices searchStr "" bBlock.MainColumn.Header.Value.Ontology rowIndices
+//            )
+//        /// We differentiate between building blocks with and without unit as unit building blocks will not contain terms as values but e.g. numbers.
+//        /// In this case we do not want to search the database for the cell values but the parent ontology in the header.
+//        /// This will then be used for TSR and TAN.
+//        let fillTermConstructsWithUnit (bBlock:BuildingBlock) =
+//            let searchStr       = bBlock.MainColumn.Header.Value.Ontology.Value.Name
+//            let termAccession   = bBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
+//            let rowIndices =
+//                bBlock.MainColumn.Cells
+//                |> Array.map (fun x ->
+//                    x.Index
+//                )
+//            [|Shared.SearchTermI.create tsrTanColIndices searchStr termAccession None rowIndices|]
+//        if buildingBlock.Unit.IsSome then
+//            fillTermConstructsWithUnit buildingBlock
+//        else
+//            fillTermConstructsNoUnit buildingBlock
 
-    let private sortHeaderToSearchTerm (buildingBlock:BuildingBlock) =
-        let isOntologyTerm = buildingBlock.MainColumn.Header.Value.Ontology.IsSome
-        let searchString  =
-            if isOntologyTerm then
-                buildingBlock.MainColumn.Header.Value.Ontology.Value.Name
-            else
-                buildingBlock.MainColumn.Header.Value.Header
-        let termAccession =
-            if isOntologyTerm then
-                buildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
-            else
-                ""
-        let colIndices = [|
-            buildingBlock.MainColumn.Index;
-            if buildingBlock.TSR.IsSome then buildingBlock.TSR.Value.Index;
-            if buildingBlock.TAN.IsSome then buildingBlock.TAN.Value.Index
-        |]
-        let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
-        Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
+//    let private sortUnitColToSearchTerm (buildingBlock:BuildingBlock) =
+//        let unit = buildingBlock.Unit.Value
+//        let searchString  = unit.MainColumn.Header.Value.Ontology.Value.Name
+//        let termAccession = unit.MainColumn.Header.Value.Ontology.Value.TermAccession 
+//        let colIndices = [|unit.MainColumn.Index; unit.TSR.Value.Index; unit.TAN.Value.Index|]
+//        let rowIndices = unit.MainColumn.Cells |> Array.map (fun x -> x.Index)
+//        Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
 
-    let sortBuildingBlockValuesToSearchTerm (buildingBlock:BuildingBlock) =
+//    let private sortHeaderToSearchTerm (buildingBlock:BuildingBlock) =
+//        let isOntologyTerm = buildingBlock.MainColumn.Header.Value.Ontology.IsSome
+//        let searchString  =
+//            if isOntologyTerm then
+//                buildingBlock.MainColumn.Header.Value.Ontology.Value.Name
+//            else
+//                buildingBlock.MainColumn.Header.Value.Header
+//        let termAccession =
+//            if isOntologyTerm then
+//                buildingBlock.MainColumn.Header.Value.Ontology.Value.TermAccession
+//            else
+//                ""
+//        let colIndices = [|
+//            buildingBlock.MainColumn.Index;
+//            if buildingBlock.TSR.IsSome then buildingBlock.TSR.Value.Index;
+//            if buildingBlock.TAN.IsSome then buildingBlock.TAN.Value.Index
+//        |]
+//        let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
+//        Shared.SearchTermI.create colIndices searchString termAccession None rowIndices
 
-        /// We need an array of all distinct cell.values and where they occur in col- and row-index
-        let terms() = sortMainColValuesToSearchTerms buildingBlock
+//    let sortBuildingBlockValuesToSearchTerm (buildingBlock:BuildingBlock) =
 
-        /// Create search types for the unit building blocks.
-        let units() = sortUnitColToSearchTerm buildingBlock
+//        /// We need an array of all distinct cell.values and where they occur in col- and row-index
+//        let terms() = sortMainColValuesToSearchTerms buildingBlock
 
-        match buildingBlock.TAN, buildingBlock.TSR with
-        | Some _, Some _ ->
-            /// Combine search types
-            [|
-                yield! terms()
-                if buildingBlock.Unit.IsSome then
-                    yield units()
-            |]
-        | None, None ->
-            let searchString  = ""
-            let termAccession = ""
-            let colIndices = [|buildingBlock.MainColumn.Index|]
-            let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
-            [| Shared.SearchTermI.create colIndices searchString termAccession None rowIndices |]
-        | _ -> failwith (sprintf "Encountered unknown reference column pattern. Building block (%s) can only contain both TSR and TAN or none." buildingBlock.MainColumn.Header.Value.Header)
+//        /// Create search types for the unit building blocks.
+//        let units() = sortUnitColToSearchTerm buildingBlock
 
-    let sortBuildingBlockToSearchTerm (buildingBlock:BuildingBlock) =
-        let bbValuesToSearchTerm = sortBuildingBlockValuesToSearchTerm buildingBlock
-        let bbHeaderToSearchTerm = sortHeaderToSearchTerm buildingBlock
-        [|yield! bbValuesToSearchTerm; bbHeaderToSearchTerm|] 
+//        match buildingBlock.TAN, buildingBlock.TSR with
+//        | Some _, Some _ ->
+//            /// Combine search types
+//            [|
+//                yield! terms()
+//                if buildingBlock.Unit.IsSome then
+//                    yield units()
+//            |]
+//        | None, None ->
+//            let searchString  = ""
+//            let termAccession = ""
+//            let colIndices = [|buildingBlock.MainColumn.Index|]
+//            let rowIndices = buildingBlock.MainColumn.Cells |> Array.map (fun x -> x.Index)
+//            [| Shared.SearchTermI.create colIndices searchString termAccession None rowIndices |]
+//        | _ -> failwith (sprintf "Encountered unknown reference column pattern. Building block (%s) can only contain both TSR and TAN or none." buildingBlock.MainColumn.Header.Value.Header)
 
-    let sortBuildingBlocksValuesToSearchTerm (buildingBlocks:BuildingBlock []) =
+//    let sortBuildingBlockToSearchTerm (buildingBlock:BuildingBlock) =
+//        let bbValuesToSearchTerm = sortBuildingBlockValuesToSearchTerm buildingBlock
+//        let bbHeaderToSearchTerm = sortHeaderToSearchTerm buildingBlock
+//        [|yield! bbValuesToSearchTerm; bbHeaderToSearchTerm|] 
 
-        buildingBlocks |> Array.collect (fun bb ->
-            sortBuildingBlockValuesToSearchTerm bb
-        )
+//    let sortBuildingBlocksValuesToSearchTerm (buildingBlocks:BuildingBlock []) =
+
+//        buildingBlocks |> Array.collect (fun bb ->
+//            sortBuildingBlockValuesToSearchTerm bb
+//        )
 
 open System
 open Fable.SimpleXml
