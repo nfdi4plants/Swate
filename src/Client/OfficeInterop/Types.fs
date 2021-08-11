@@ -11,65 +11,117 @@ open Browser
 open ExcelJS.Fable
 open Excel
 
-//[<Global>]
-//let Office : Office.IExports = jsNative
+[<RequireQualifiedAccess>]
+type BuildingBlockType =
+    | Parameter         
+    | Factor            
+    | Characteristics
+    | Source
+    | Sample            
+    | Data              
 
-//[<Global>]
-////[<CompiledName("Office.Excel")>]
-//let Excel : Excel.IExports = jsNative
+    static member ofString str =
+        match str with
+        | "Parameter"       -> Parameter
+        | "Factor"          -> Factor         
+        | "Characteristics" -> Characteristics
+        | "Sample Name"     -> Sample         
+        | "Data File Name"  -> Data           
+        | "Source Name"     -> Source
+        | anythingElse      -> failwith $"Error: Unable to parse {anythingElse} to BuildingBlockType!"
 
-//[<Global>]
-//let RangeLoadOptions : Interfaces.RangeLoadOptions = jsNative
+    static member tryOfString str =
+        match str with
+        | "Parameter"       -> Some Parameter
+        | "Factor"          -> Some Factor         
+        | "Characteristics" -> Some Characteristics
+        | "Sample Name"     -> Some Sample         
+        | "Data File Name"  -> Some Data           
+        | "Source Name"     -> Some Source
+        | anythingElse      -> None
 
-module ColumnCoreNames =
+    member this.toString =
+        match this with
+        | Parameter         -> "Parameter"
+        | Factor            -> "Factor"
+        | Characteristics   -> "Characteristics"
+        | Sample            -> "Sample Name"
+        | Data              -> "Data File Name"
+        | Source            -> "Source Name"
 
-    module Shown =
+    static member toShortExplanation = function
+        | Parameter         -> "Use parameter columns to annotate your experimental workflow. multiple parameters form a protocol. Example: centrifugation time, precipitate agent, ..."
+        | Factor            -> "Use factor columns to track the experimental conditions that govern your study. Example: temperature,light,..."
+        | Characteristics   -> "Use characteristics columns to annotate interesting properties of your organism. Example: strain,phenotype,... "
+        | Sample            -> "Use sample columns to mark the name of the sample that your experimental workflow produced."
+        | Data              -> "Use data columns to mark the data file name that your computational analysis produced"
+        | Source            -> "Attention: you normally dont have to add this manually if you initialize an annotation table. The Source column defines the organism that is subject to your study. It is the first column of every study file."
 
-        [<Literal>]
-        let Parameter       = "Parameter"
+    static member toLongExplanation = function
+        | Parameter         ->
+            "Use parameters to annotate your experimental workflow. You can group parameters to create a protocol."
+        | Factor            ->
+            "Use factor columns to track the experimental conditions that govern your study.
+            Most of the time, factors are the most important building blocks for downstream computational analysis."
+        | Characteristics   ->
+            "Use characteristics columns to annotate interesting properties of the source material.
+            You can use any number of characteristics columns."
+        | Sample            ->
+            "The Sample Name column defines the resulting biological material of the annotated workflow.
+            The name used must be a unique identifier.
+            Samples can again be sources for further experimental workflows."
+        | Data              ->
+            "The Data column describes data files that results from your experiments.
+            Additionally to the type of data, the annotated files must have a unique name.
+            Data files can be sources for computational workflows."
+        | Source            ->
+            "The Source Name column defines the source of biological material used for your experiments.
+            The name used must be a unique identifier. It can be an organism, a sample, or both.
+            Every annotation table must start with the Source Name column"
 
-        [<Literal>]
-        let Factor          = "Factor"
+    /// Checks if a string matches one of the single column core names exactly.
+    member this.isSingleColumn =
+        match this with
+        | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data -> true
+        | _ -> false
 
-        [<Literal>]
-        let Characteristics = "Characteristics"
+type BuildingBlockNamePrePrint = {
+    Type : BuildingBlockType
+    Name : string
+} with
+    static member init (t : BuildingBlockType) = {
+        Type = t
+        Name = ""
+    }
 
-        [<Literal>]
-        let Sample          = "Sample Name"
+    member this.toAnnotationTableHeader() =
+        match this.Type with
+        | BuildingBlockType.Parameter         -> sprintf "Parameter [%s]" this.Name
+        | BuildingBlockType.Factor            -> sprintf "Factor [%s]" this.Name
+        | BuildingBlockType.Characteristics   -> sprintf "Characteristics [%s]" this.Name
+        | BuildingBlockType.Sample            -> "Sample Name"
+        | BuildingBlockType.Data              -> "Data File Name"
+        | BuildingBlockType.Source            -> "Source Name"
 
-        [<Literal>]
-        let Data            = "Data File Name"
+    member this.toAnnotationTableHeader(id) =
+        match this.Type with
+        | BuildingBlockType.Parameter         -> $"Parameter [{this.Name}#{id}]"
+        | BuildingBlockType.Factor            -> $"Factor [{this.Name}#{id}]"
+        | BuildingBlockType.Characteristics   -> $"Characteristics [{this.Name}#{id}]"
+        | BuildingBlockType.Sample            -> "Sample Name"
+        | BuildingBlockType.Data              -> "Data File Name"
+        | BuildingBlockType.Source            -> "Source Name"
 
-        [<Literal>]
-        let Source          = "Source Name"
+type ColumnCoreNames =
+    | TermSourceRef
+    | TermAccessionNumber
+    | Unit
 
-    module Hidden =
-
-        [<Literal>]
-        let TermSourceREF = "Term Source REF"
-
-        [<Literal>]
-        let TermAccessionNumber = "Term Accession Number"
-
-        [<Literal>]
-        let Unit = "Unit"
-
-module ColumnTags =
-
-    [<Literal>]
-    let HiddenTag = "#h"
-
-    [<Literal>]
-    let UnitTag = "#u"
-
-    /// This has additional information afterwards so it needs to be parsed as 'StartsWith'
-    /// Not used
-    [<Literal>]
-    let GroupTag = "#g"
-
-    /// This has additional information afterwards so it needs to be parsed as 'StartsWith'
-    [<Literal>]
-    let TermAccessionTag = "#t"
+        member this.toString =
+            match this with
+            | TermSourceRef         -> "Term Source REF"
+            | TermAccessionNumber   -> "Term Accession Number"
+            | Unit                  -> "Unit"
 
 open System
 open Fable.SimpleXml
@@ -342,8 +394,6 @@ module Xml =
                 | GroupType v       -> sprintf "Protocol group (%s, %s)" v.AnnotationTable.Name v.AnnotationTable.Worksheet
                 | ValidationType v  -> sprintf "Table checklist (%s, %s)" v.AnnotationTable.Name v.AnnotationTable.Worksheet
 
-
-
 type TryFindAnnoTableResult =
 | Success of string
 | Error of string 
@@ -364,15 +414,33 @@ type TryFindAnnoTableResult =
                     Error "Could not process message. Swate was not able to identify the given annotation tables with a known case."
 
 open Shared
+open Regex
 
-type ColHeader = {
-    Header:     string
-    CoreName:   string option
-    Ontology:   OntologyInfo option
-    TagArr:     string [] option
+type SwateColumnHeader = {
+    SwateColumnHeader: string
 } with
-    member this.IsUnitCol =
-        this.TagArr.IsSome && this.TagArr.Value |> Array.exists (fun x -> x.StartsWith ColumnTags.UnitTag)
+    static member create headerString = { SwateColumnHeader = headerString }
+    member this.isSingleCol =
+        let bbType = parseCoreName this.SwateColumnHeader
+        match bbType with
+        | Some t    -> BuildingBlockType.ofString (t.Trim()) |> fun x -> x.isSingleColumn
+        | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
+    // Use this function to extract ontology term from inside square brackets in the main column header
+    member this.tryGetOntologyTerm =
+        let sqBrackets = parseSquaredBrackets this.SwateColumnHeader
+        match sqBrackets with
+        | Some str -> removeId str |> Some
+        | None -> None
+    member this.isUnitCol =
+        this.SwateColumnHeader.StartsWith ColumnCoreNames.Unit.toString
+    member this.isTANCol =
+        this.SwateColumnHeader.StartsWith ColumnCoreNames.TermAccessionNumber.toString
+    member this.isTSRCol =
+        this.SwateColumnHeader.StartsWith ColumnCoreNames.TermSourceRef.toString
+    member this.isHidden =
+        this.SwateColumnHeader.StartsWith ColumnCoreNames.TermSourceRef.toString
+        || this.SwateColumnHeader.StartsWith ColumnCoreNames.TermAccessionNumber.toString
+        || this.SwateColumnHeader.StartsWith ColumnCoreNames.Unit.toString
 
 /// This module contains types to handle value search for TSR and TAN columns.
 /// The types help to summarize and collect needed information about the column partitions (~ building block, e.g. 1 col for `Source Name`,
@@ -391,7 +459,7 @@ module BuildingBlockTypes =
 
     type Column = {
         Index: int
-        Header: ColHeader option
+        Header: SwateColumnHeader
         Cells: Cell []
     } with
         static member create ind headerOpt cellsArr = {
@@ -415,15 +483,15 @@ module BuildingBlockTypes =
             Unit        = unit
         }
 
-        member this.toColumnValidation : (Xml.ValidationTypes.ColumnValidation) =
+        //member this.toColumnValidation : (Xml.ValidationTypes.ColumnValidation) =
 
-            {
-                ColumnHeader        = this.MainColumn.Header.Value.Header
-                ColumnAdress        = this.MainColumn.Index |> Some
-                Importance          = None
-                ValidationFormat    = None
-                Unit                = if this.Unit.IsSome then this.Unit.Value.Header.Value.Ontology.Value.Name |> Some else None
-            }
+        //    {
+        //        ColumnHeader        = this.MainColumn.Header.Value.Header
+        //        ColumnAdress        = this.MainColumn.Index |> Some
+        //        Importance          = None
+        //        ValidationFormat    = None
+        //        Unit                = if this.Unit.IsSome then this.Unit.Value.Header.Value.Ontology.Value.Name |> Some else None
+        //    }
 
         member this.hasCompleteTSRTAN =
             match this.TAN, this.TSR with
@@ -432,11 +500,25 @@ module BuildingBlockTypes =
             | None, None ->
                 false
             | _, _ ->
-                failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN." this.MainColumn.Header.Value.Header)
+                failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN." this.MainColumn.Header.SwateColumnHeader)
 
         member this.hasUnit = this.Unit.IsSome
 
     open ISADotNetHelpers
+
+    type InsertBuildingBlock = {
+        Column      : BuildingBlockNamePrePrint
+        ColumnTerm  : TermMinimal option
+        UnitTerm    : TermMinimal option 
+    } with
+        static member create column columnTerm unitTerm= {
+            Column      = column
+            ColumnTerm  = columnTerm
+            UnitTerm    = unitTerm
+        }
+
+        member this.HasUnit = this.UnitTerm.IsSome
+        member this.HasExistingTerm = this.ColumnTerm.IsSome
 
     type MinimalBuildingBlock = {
         /// If 'IsAlreadyExisting' = false then this is just a core name + ont (e.g. Parameter [instrument model], so no id).
@@ -444,7 +526,7 @@ module BuildingBlockTypes =
         ColumnName          : string
         UnitName            : string option
         ColumnTermAccession : string option
-        Values              : OntologyInfo option
+        Values              : TermMinimal option
         /// When this type is given to 'AddBuildingBlocks' this parameter differentiates between term that were already found in the table and term that
         /// need to be added. This is important to correctly update existing protocols by their newest version from the DB
         IsAlreadyExisting       : bool
@@ -477,22 +559,22 @@ module BuildingBlockTypes =
         //        MinimalBuildingBlock.create mainColName (Some colTermAccession) unitName unitTermAccession values false
         //    )
 
-        static member ofBuildingBlockWithoutValues isExisting (buildingBlock:BuildingBlock) =
-            let bbHeader = buildingBlock.MainColumn.Header.Value
-            let colName =
-                let ont = if bbHeader.Ontology.IsSome then sprintf " [%s]" bbHeader.Ontology.Value.Name else ""
-                sprintf "%s%s" bbHeader.CoreName.Value ont
-            let colAccession =
-                if bbHeader.Ontology.IsSome then bbHeader.Ontology.Value.TermAccession |> Some else None
-            let unitName =
-                if buildingBlock.hasUnit then
-                    let unitHeader = buildingBlock.Unit.Value.Header.Value
-                    let unitColName =
-                        if unitHeader.Ontology.IsSome then unitHeader.Ontology.Value.Name |> Some else None
-                    unitColName
-                else
-                    None
-            MinimalBuildingBlock.create colName colAccession unitName None isExisting
+        //static member ofBuildingBlockWithoutValues isExisting (buildingBlock:BuildingBlock) =
+        //    let bbHeader = buildingBlock.MainColumn.Header.Value
+        //    let colName =
+        //        let ont = if bbHeader.Ontology.IsSome then sprintf " [%s]" bbHeader.Ontology.Value.Name else ""
+        //        sprintf "%s%s" bbHeader.CoreName.Value ont
+        //    let colAccession =
+        //        if bbHeader.Ontology.IsSome then bbHeader.Ontology.Value.TermAccession |> Some else None
+        //    let unitName =
+        //        if buildingBlock.hasUnit then
+        //            let unitHeader = buildingBlock.Unit.Value.Header.Value
+        //            let unitColName =
+        //                if unitHeader.Ontology.IsSome then unitHeader.Ontology.Value.Name |> Some else None
+        //            unitColName
+        //        else
+        //            None
+        //    MinimalBuildingBlock.create colName colAccession unitName None isExisting
 
 
 

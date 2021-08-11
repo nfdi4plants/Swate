@@ -187,13 +187,13 @@ let checkradioCheckssumElement (id:int) (contentTypeOpt:ContentType option) (col
         ]
     ]
 
-let findOntology (columnValidation:ColumnValidation) (buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []) =
-    buildingBlocks
-    |> Array.find (fun x -> x.MainColumn.Header.Value.Header = columnValidation.ColumnHeader)
-    |> fun x -> x.MainColumn.Header.Value.Ontology
+//let findOntology (columnValidation:ColumnValidation) (buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []) =
+//    buildingBlocks
+//    |> Array.find (fun x -> x.MainColumn.Header.Value.Header = columnValidation.ColumnHeader)
+//    |> fun x -> x.MainColumn.Header.Value.Ontology
 
 let checkradioList (ind:int) colVal model dispatch =
-    let hasOntology = findOntology colVal model.ValidationState.ActiveTableBuildingBlocks
+    //let hasOntology = findOntology colVal model.ValidationState.ActiveTableBuildingBlocks
 
     let unitContent =
         if colVal.Unit.IsSome then ContentType.UnitTerm colVal.Unit.Value |> Some else ContentType.UnitTerm "None" |> Some
@@ -201,8 +201,8 @@ let checkradioList (ind:int) colVal model dispatch =
     let checksumContent =
         if colVal.Unit.IsSome then ContentType.Checksum (colVal.Unit.Value,"") |> Some else ContentType.Checksum ("None","") |> Some
 
-    let ontologyContent =
-        if hasOntology.IsSome then ContentType.OntologyTerm hasOntology.Value.Name |> Some else ContentType.OntologyTerm "None" |> Some
+    //let ontologyContent =
+    //    if hasOntology.IsSome then ContentType.OntologyTerm hasOntology.Value.Name |> Some else ContentType.OntologyTerm "None" |> Some
 
     [
         checkradioElement ind   None                        colVal model dispatch
@@ -212,10 +212,11 @@ let checkradioList (ind:int) colVal model dispatch =
         checkradioElement ind   (Some ContentType.Text)     colVal model dispatch
         checkradioElement ind   (Some ContentType.Url)      colVal model dispatch
 
-        checkradioElement ind   ontologyContent             colVal model dispatch
+        str "Killed the ontology content element"
+        //checkradioElement ind   ontologyContent             colVal model dispatch
         checkradioElement ind   unitContent                 colVal model dispatch
 
-        checkradioCheckssumElement  ind checksumContent     colVal model dispatch
+        //checkradioCheckssumElement  ind checksumContent     colVal model dispatch
     ]
 
 

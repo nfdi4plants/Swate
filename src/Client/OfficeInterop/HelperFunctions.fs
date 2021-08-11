@@ -8,7 +8,6 @@ open GlobalBindings
 open System.Collections.Generic
 open System.Text.RegularExpressions
 
-open OfficeInterop.Regex
 open OfficeInterop.Types
 open BuildingBlockTypes
 open Shared
@@ -46,7 +45,7 @@ let getActiveAnnotationTableName() =
 // ExcelApi 1.1
 /// This function returns the names of all annotationTables in all worksheets.
 /// This function is used to pass a list of all table names to e.g. the 'createAnnotationTable()' function. 
-let getAllTableInfo() =
+let getAllTableNames() =
     Excel.run(fun context ->
 
         // Ref. 2
@@ -67,10 +66,10 @@ let getAllTableInfo() =
         )
     )
 
-let createEmptyMatrixForTables (colCount:int) (rowCount:int) value =
+let createMatrixForTables (colCount:int) (rowCount:int) value =
     [|
         for i in 0 .. rowCount-1 do
-            yield   [|
+            yield [|
                 for i in 0 .. colCount-1 do yield U3<bool,string,float>.Case2 value
             |] :> IList<U3<bool,string,float>>
     |] :> IList<IList<U3<bool,string,float>>>
@@ -82,149 +81,122 @@ let createValueMatrix (colCount:int) (rowCount:int) value =
             ResizeArray(tmp)
     ])
 
-let tryFindSpannedBuildingBlocks (currentProtocolGroup:Xml.GroupTypes.Protocol) (buildingBlocks: BuildingBlock []) =
-    let findAllSpannedBlocks =
-        currentProtocolGroup.SpannedBuildingBlocks
-        |> List.choose (fun spannedBlock ->
-            buildingBlocks
-            |> Array.tryFind (fun foundBuildingBlock ->
-                let isSameAccession =
-                    if spannedBlock.TermAccession <> "" || foundBuildingBlock.MainColumn.Header.Value.Ontology.IsSome then
-                        // As in the above only one option is that ontology is some we need a default in the next step.
-                        // We default to an empty termaccession, as 'spannedBlock' MUST be <> "" to trigger the default
-                        (Option.defaultValue (OntologyInfo.create "" "") foundBuildingBlock.MainColumn.Header.Value.Ontology).TermAccession = spannedBlock.TermAccession
-                    else
-                        true
-                foundBuildingBlock.MainColumn.Header.Value.Header = spannedBlock.ColumnName
-                && isSameAccession
-            )
-        )
-    //let reduce = findAllSpannedBlocks |> List.map (fun x -> x.MainColumn.Header.Value.Header)
-    if findAllSpannedBlocks.Length = currentProtocolGroup.SpannedBuildingBlocks.Length then
-        Some findAllSpannedBlocks
-    else
-        None
+//let tryFindSpannedBuildingBlocks (currentProtocolGroup:Xml.GroupTypes.Protocol) (buildingBlocks: BuildingBlock []) =
+//    let findAllSpannedBlocks =
+//        currentProtocolGroup.SpannedBuildingBlocks
+//        |> List.choose (fun spannedBlock ->
+//            buildingBlocks
+//            |> Array.tryFind (fun foundBuildingBlock ->
+//                let isSameAccession =
+//                    if spannedBlock.TermAccession <> "" || foundBuildingBlock.MainColumn.Header.Value.Ontology.IsSome then
+//                        // As in the above only one option is that ontology is some we need a default in the next step.
+//                        // We default to an empty termaccession, as 'spannedBlock' MUST be <> "" to trigger the default
+//                        (Option.defaultValue (TermMinimal.create "" "") foundBuildingBlock.MainColumn.Header.Value.Ontology).TermAccession = spannedBlock.TermAccession
+//                    else
+//                        true
+//                foundBuildingBlock.MainColumn.Header.Value.Header = spannedBlock.ColumnName
+//                && isSameAccession
+//            )
+//        )
+//    //let reduce = findAllSpannedBlocks |> List.map (fun x -> x.MainColumn.Header.Value.Header)
+//    if findAllSpannedBlocks.Length = currentProtocolGroup.SpannedBuildingBlocks.Length then
+//        Some findAllSpannedBlocks
+//    else
+//        None
 
-/// This will create the column header attributes for a unit block.
-/// as unit always has to be a term and cannot be for example "Source" or "Sample", both of which have a differen format than for exmaple "Parameter [TermName]",
-/// we only need one function to generate id and attributes and bring the unit term in the right format.
-let unitColAttributes (unitTermName:string) (unitAccessionOptt:string option) (id:int) =
-    match id with
-    | 1 ->
-        match unitAccessionOptt with
-        | Some accession    -> sprintf "[%s] (#h; #t%s; #u)" unitTermName accession
-        | None              -> sprintf "[%s] (#h; #u)" unitTermName
-    | _ ->
-        match unitAccessionOptt with
-        | Some accession    -> sprintf "[%s] (#%i; #h; #t%s; #u)" unitTermName id accession
-        | None              -> sprintf "[%s] (#%i; #h; #u)" unitTermName id
+open Indexing
 
-let findNewIdForUnit (allColHeaders:string []) (format:string option) (unitAccessionOpt:string option) =
-    let rec loopingCheck int =
-        let isExisting =
-            allColHeaders
-            // Should a column with the same name already exist, then count up the id tag.
-            |> Array.exists (fun existingHeader ->
-                // We don't need to check TSR or TAN, because the main column always starts with "Unit"
-                existingHeader = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt int)
-            )
-        if isExisting then
-            loopingCheck (int+1)
-        else
-            int
-    loopingCheck 1
+//// ExcelApi 1.1 OR 1.4 (columns.add)
+//let createUnitColumns (context:Excel.RequestContext) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
+//    let col = createEmptyMatrixForTables 1 rowCount ""
+//    if format.IsSome then
+//        promise {
+//            let! annoHeaderRange = context.sync().``then``(fun e ->
+//                let annoHeaderRange = annotationTable.getHeaderRowRange()
+//                let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
+//                annoHeaderRange
+//            )
+//            let! res = context.sync().``then``(fun e ->
+//                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+//                let allColHeaders =
+//                    headerVals
+//                    |> Array.choose id
+//                    |> Array.map string
 
-// ExcelApi 1.1 OR 1.4 (columns.add)
-let createUnitColumns (context:Excel.RequestContext) (annotationTable:Table) newBaseColIndex rowCount (format:string option) (unitAccessionOpt:string option) =
-    let col = createEmptyMatrixForTables 1 rowCount ""
-    if format.IsSome then
-        promise {
-            let! annoHeaderRange = context.sync().``then``(fun e ->
-                let annoHeaderRange = annotationTable.getHeaderRowRange()
-                let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
-                annoHeaderRange
-            )
-            let! res = context.sync().``then``(fun e ->
-                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-                let allColHeaders =
-                    headerVals
-                    |> Array.choose id
-                    |> Array.map string
+//                let newUnitId = Unit.findNewIdForUnit allColHeaders format
+//                /// create unit main column
+//                let createdUnitCol1 =
+//                    annotationTable.columns.add(
+//                        index = newBaseColIndex+3.,
+//                        values = U4.Case1 col,
+//                        name = sprintf "Unit %s" (Unit.createUnitColAttributes format.Value newUnitId)
+//                    )
 
-                let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
-                /// create unit main column
-                let createdUnitCol1 =
-                    annotationTable.columns.add(
-                        index = newBaseColIndex+3.,
-                        values = U4.Case1 col,
-                        name = sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
-                    )
+//                /// create unit TSR
+//                let createdUnitCol2 =
+//                    annotationTable.columns.add(
+//                        index = newBaseColIndex+4.,
+//                        values = U4.Case1 col,
+//                        name = sprintf "Term Source REF %s" (Unit.createUnitColAttributes format.Value newUnitId)
+//                    )
 
-                /// create unit TSR
-                let createdUnitCol2 =
-                    annotationTable.columns.add(
-                        index = newBaseColIndex+4.,
-                        values = U4.Case1 col,
-                        name = sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
-                    )
+//                /// create unit TAN
+//                let createdUnitCol3 =
+//                    annotationTable.columns.add(
+//                        index = newBaseColIndex+5.,
+//                        values = U4.Case1 col,
+//                        name = sprintf "Term Accession Number %s" (Unit.createUnitColAttributes format.Value newUnitId)
+//                    )
 
-                /// create unit TAN
-                let createdUnitCol3 =
-                    annotationTable.columns.add(
-                        index = newBaseColIndex+5.,
-                        values = U4.Case1 col,
-                        name = sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId)
-                    )
+//                Some (
+//                    sprintf " Added specified unit: %s" (format.Value),
+//                    sprintf "0.00 \"%s\"" (format.Value)
+//                )
+//            )
 
-                Some (
-                    sprintf " Added specified unit: %s" (format.Value),
-                    sprintf "0.00 \"%s\"" (format.Value)
-                )
-            )
+//            return res
+//        }
 
-            return res
-        }
+//    else
+//        promise {return None}
 
-    else
-        promise {return None}
+//let updateUnitColumns (context:RequestContext) (annotationTable:Table) newBaseColIndex (format:string option) (unitAccessionOpt:string option) =
+//    let col v= createValueMatrix 1 1 v
+//    if format.IsSome then
+//        let annoHeaderRange = annotationTable.getHeaderRowRange()
+//        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
 
-let updateUnitColumns (context:RequestContext) (annotationTable:Table) newBaseColIndex (format:string option) (unitAccessionOpt:string option) =
-    let col v= createValueMatrix 1 1 v
-    if format.IsSome then
-        let annoHeaderRange = annotationTable.getHeaderRowRange()
-        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
-
-        context.sync().``then``(fun e ->
-            let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+//        context.sync().``then``(fun e ->
+//            let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
             
-            let allColHeaders =
-                headerVals
-                |> Array.choose id
-                |> Array.map string
-            let newUnitId = findNewIdForUnit allColHeaders format unitAccessionOpt
+//            let allColHeaders =
+//                headerVals
+//                |> Array.choose id
+//                |> Array.map string
+//            let newUnitId = Unit.findNewIdForUnit allColHeaders format unitAccessionOpt
 
-            /// create unit main column
-            let updateUnitCol1 =
-                annoHeaderRange.getColumn(newBaseColIndex+3.)
-                |> fun c1 -> c1.values <- sprintf "Unit %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+//            /// create unit main column
+//            let updateUnitCol1 =
+//                annoHeaderRange.getColumn(newBaseColIndex+3.)
+//                |> fun c1 -> c1.values <- sprintf "Unit %s" (Unit.unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-            /// create unit TSR
-            let createdUnitCol2 =
-                annoHeaderRange.getColumn(newBaseColIndex+4.)
-                |> fun c2 -> c2.values <- sprintf "Term Source REF %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+//            /// create unit TSR
+//            let createdUnitCol2 =
+//                annoHeaderRange.getColumn(newBaseColIndex+4.)
+//                |> fun c2 -> c2.values <- sprintf "Term Source REF %s" (Unit.unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-            /// create unit TAN
-            let createdUnitCol3 =
-                annoHeaderRange.getColumn(newBaseColIndex+5.)
-                |> fun c3 -> c3.values <- sprintf "Term Accession Number %s" (unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
+//            /// create unit TAN
+//            let createdUnitCol3 =
+//                annoHeaderRange.getColumn(newBaseColIndex+5.)
+//                |> fun c3 -> c3.values <- sprintf "Term Accession Number %s" (Unit.unitColAttributes format.Value unitAccessionOpt newUnitId) |> col
 
-            Some (
-                sprintf " Added specified unit: %s" (format.Value),
-                sprintf "0.00 \"%s\"" (format.Value)
-            )
-        )
-    else
-        promise {return None}
+//            Some (
+//                sprintf " Added specified unit: %s" (format.Value),
+//                sprintf "0.00 \"%s\"" (format.Value)
+//            )
+//        )
+//    else
+//        promise {return None}
 
 /// Swaps 'Rows with column values' to 'Columns with row values'.
 let viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
@@ -243,11 +215,10 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
         headerVals
         |> Array.indexed
         |> Array.choose (fun (i,x) ->
-            let prep = parseColHeader (string x.Value) 
-            if x.IsSome && prep.TagArr.IsSome then
-                let checkIsHidden =
-                    prep.TagArr.Value |> Array.contains ColumnTags.HiddenTag
-                if checkIsHidden then 
+            let header = SwateColumnHeader.create (string x.Value) 
+            if x.IsSome then
+                let checkIsHidden = header.isHidden
+                if checkIsHidden then
                     Some (i|> float)
                 else
                     None

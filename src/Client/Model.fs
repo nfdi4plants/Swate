@@ -24,6 +24,12 @@ type LogItem =
     | Info  of (System.DateTime*string)
     | Error of (System.DateTime*string)
 
+    static member ofInteropLogginMsg (msg:InteropLogging.Msg) =
+        match msg.LogIdentifier with
+        | InteropLogging.Info   -> Debug(System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Debug  -> Info (System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Error  -> Error(System.DateTime.UtcNow,msg.MessageTxt)
+
     static member toTableRow = function
         | Debug (t,m) ->
             tr [] [
@@ -46,8 +52,8 @@ type LogItem =
 
     static member ofStringNow (level:string) (message: string) =
         match level with
-        | "Debug"| "debug" -> Debug(System.DateTime.UtcNow,message)
-        | "Info" | "info" -> Info (System.DateTime.UtcNow,message)
+        | "Debug"| "debug"  -> Debug(System.DateTime.UtcNow,message)
+        | "Info" | "info"   -> Info (System.DateTime.UtcNow,message)
         | "Error" | "error" -> Error(System.DateTime.UtcNow,message)
         | others -> Error(System.DateTime.UtcNow,sprintf "Swate found an unexpected log identifier: %s" others)
 
@@ -79,7 +85,7 @@ type TermSearchState = {
     SelectedTerm            : DbDomain.Term option
     TermSuggestions         : DbDomain.Term []
 
-    ParentOntology          : OntologyInfo option
+    ParentOntology          : TermMinimal option
     SearchByParentOntology  : bool
 
     HasSuggestionsLoading   : bool
@@ -238,80 +244,10 @@ type FilePickerState = {
         DNDDropped = true
     }
 
-
-/// If this is changed, see also OfficeInterop.Types.ColumnCoreNames
-type AnnotationBuildingBlockType =
-    | NoneSelected
-    | Parameter         
-    | Factor            
-    | Characteristics
-    | Source
-    | Sample            
-    | Data              
-
-    static member toString = function
-        | NoneSelected      -> "NoneSelected"
-        | Parameter         -> "Parameter"
-        | Factor            -> "Factor"
-        | Characteristics   -> "Characteristics"
-        | Sample            -> "Sample"
-        | Data              -> "Data"
-        | Source            -> "Source"
-
-    static member toShortExplanation = function
-        | Parameter         -> "Use parameter columns to annotate your experimental workflow. multiple parameters form a protocol. Example: centrifugation time, precipitate agent, ..."
-        | Factor            -> "Use factor columns to track the experimental conditions that govern your study. Example: temperature,light,..."
-        | Characteristics   -> "Use characteristics columns to annotate interesting properties of your organism. Example: strain,phenotype,... "
-        | Sample            -> "Use sample columns to mark the name of the sample that your experimental workflow produced."
-        | Data              -> "Use data columns to mark the data file name that your computational analysis produced"
-        | Source            -> "Attention: you normally dont have to add this manually if you initialize an annotation table. The Source column defines the organism that is subject to your study. It is the first column of every study file."
-        | _                 -> "Please select an annotation building block."
-
-    static member toLongExplanation = function
-        | Parameter         ->
-            "Use parameters to annotate your experimental workflow. You can group parameters to create a protocol."
-        | Factor            ->
-            "Use factor columns to track the experimental conditions that govern your study.
-            Most of the time, factors are the most important building blocks for downstream computational analysis."
-        | Characteristics   ->
-            "Use characteristics columns to annotate interesting properties of the source material.
-            You can use any number of characteristics columns."
-        | Sample            ->
-            "The Sample Name column defines the resulting biological material of the annotated workflow.
-            The name used must be a unique identifier.
-            Samples can again be sources for further experimental workflows."
-        | Data              ->
-            "The Data column describes data files that results from your experiments.
-            Additionally to the type of data, the annotated files must have a unique name.
-            Data files can be sources for computational workflows."
-        | Source            ->
-            "The Source Name column defines the source of biological material used for your experiments.
-            The name used must be a unique identifier. It can be an organism, a sample, or both.
-            Every annotation table must start with the Source Name column"
-        | _                 -> "You should not be able to see this text."
-
-type AnnotationBuildingBlock = {
-    Type : AnnotationBuildingBlockType
-    Name : string
-} with
-    static member init (t : AnnotationBuildingBlockType) = {
-        Type = t
-        Name = ""
-    }
-
-    static member toAnnotationTableHeader (block : AnnotationBuildingBlock) =
-        match block.Type with
-        | Parameter         -> sprintf "Parameter [%s]" block.Name
-        | Factor            -> sprintf "Factor [%s]" block.Name
-        | Characteristics   -> sprintf "Characteristics [%s]" block.Name
-        | Sample            -> "Sample Name"
-        | Data              -> "Data File Name"
-        | Source            -> "Source Name"
-        | _                 -> ""
-
+open OfficeInterop.Types
 
 type AddBuildingBlockState = {
-    CurrentBuildingBlock                    : AnnotationBuildingBlock
+    CurrentBuildingBlock                    : BuildingBlockNamePrePrint
 
     BuildingBlockSelectedTerm               : DbDomain.Term option
     BuildingBlockNameSuggestions            : DbDomain.Term []
@@ -338,7 +274,7 @@ type AddBuildingBlockState = {
     static member init () = {
         ShowBuildingBlockSelection              = false
 
-        CurrentBuildingBlock                    = AnnotationBuildingBlock.init AnnotationBuildingBlockType.Parameter
+        CurrentBuildingBlock                    = BuildingBlockNamePrePrint.init BuildingBlockType.Parameter
         BuildingBlockSelectedTerm               = None
         BuildingBlockNameSuggestions            = [||]
         ShowBuildingBlockTermSuggestions        = false

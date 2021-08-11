@@ -128,8 +128,8 @@ module PredefinedParams =
 
     module Examples =
 
-        let ontologyInfoExmp:OntologyInfo = OntologyInfo.create "Instrument Model" "MS:1000031"
-        let ontologyInfoExmp2:OntologyInfo = OntologyInfo.create "Q TRAP" "MS:1000187"
+        let ontologyInfoExmp:TermMinimal = TermMinimal.create "Instrument Model" "MS:1000031"
+        let ontologyInfoExmp2:TermMinimal = TermMinimal.create "Q TRAP" "MS:1000187"
         
         let unitOntologyExmp:DbDomain.Ontology = {
             Name = "uo"
@@ -141,7 +141,7 @@ module PredefinedParams =
 
         let searchTermExmp:SearchTermI = {
             ColIndices = [|2; 3|]
-            SearchQuery = Shared.OntologyInfo.create "Bruker Daltonics HCT Series" ""
+            SearchQuery = Shared.TermMinimal.create "Bruker Daltonics HCT Series" ""
             IsA = Some ontologyInfoExmp
             RowIndices = [|0 .. 10|]
             TermOpt = None

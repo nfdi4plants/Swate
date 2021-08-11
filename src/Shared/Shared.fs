@@ -39,18 +39,6 @@ module URLs =
     [<LiteralAttribute>]
     let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
 
-module HelperFunctions =
-
-    open System.Text.RegularExpressions
-
-    /// (|Regex|_|) pattern input
-    let (|Regex|_|) pattern input =
-        let m = Regex.Match(input, pattern)
-        if m.Success then Some(m.Value)
-        else None
-
-    let isAccessionPattern = "^[a-zA-Z]+:[0-9]+$"
-
 module Route =
     /// Defines how routes are generated on server and mapped from client
     //let builder typeName methodName =
@@ -118,6 +106,23 @@ module DbDomain =
         RelatedTermID       : int64
     }
 
+type TermMinimal = {
+    /// This is the Ontology Term Name
+    Name            : string
+    /// This is the Ontology Term Accession 'XX:aaaaaa'
+    TermAccession   : string
+} with
+    static member create name termAccession = {
+        Name            = name
+        TermAccession   = termAccession
+    }
+
+    static member ofTerm (term:DbDomain.Term) = {
+        Name            = term.Name
+        TermAccession   = term.Accession
+    }
+
+[<Obsolete("Do not use. Use TermMinimal instead.")>]
 type OntologyInfo = {
     /// This is the Ontology Name
     Name            : string
@@ -141,18 +146,14 @@ type AnnotationTable = {
 /// Used in OfficeInterop to effectively find possible Term names and search for them in db
 type SearchTermI = {
     ColIndices      : int []
-    SearchQuery     : OntologyInfo
-    ///// This is the Ontology Name
-    //SearchString    : string
-    ///// This is the Ontology Term Accession 'XX:aaaaaa'
-    //TermAccession   : string
-    IsA             : OntologyInfo option
+    SearchQuery     : TermMinimal
+    IsA             : TermMinimal option
     RowIndices      : int []
     TermOpt         : DbDomain.Term option
 } with
     static member create colIndices searchString termAccession ontologyInfoOpt rowIndices = {
         ColIndices      = colIndices
-        SearchQuery     = OntologyInfo.create searchString termAccession
+        SearchQuery     = TermMinimal.create searchString termAccession
         //SearchString    = searchString
         //TermAccession   = termAccession
         IsA             = ontologyInfoOpt
@@ -220,13 +221,13 @@ type IAnnotatorAPIv1 = {
     // Term related requests
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : (int*string*OntologyInfo)                                     -> Async<DbDomain.Term []>
+    getTermSuggestionsByParentTerm      : (int*string*TermMinimal)                                     -> Async<DbDomain.Term []>
     ///
-    getAllTermsByParentTerm             : OntologyInfo                                                  -> Async<DbDomain.Term []>
+    getAllTermsByParentTerm             : TermMinimal                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : (int*string*OntologyInfo)                                     -> Async<DbDomain.Term []>
+    getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                     -> Async<DbDomain.Term []>
     ///
-    getAllTermsByChildTerm              : OntologyInfo                                                  -> Async<DbDomain.Term []>
+    getAllTermsByChildTerm              : TermMinimal                                                  -> Async<DbDomain.Term []>
     /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
     getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
 

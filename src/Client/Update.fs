@@ -61,7 +61,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
             Cmd.OfPromise.either
                 OfficeInterop.autoFitTable
                 ()
-                (GenericLog >> Dev)
+                (GenericInteropLogs >> Dev)
                 (GenericError >> Dev)
         currentModel, cmd
 
@@ -120,20 +120,13 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
 
     | AddAnnotationBlock (minBuildingBlockInfo) ->
-        failwith """Function "AddAnnotationBlock" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.addAnnotationBlock  
-        //        (minBuildingBlockInfo)
-        //        (fun (newColName,format,msg) ->
-        //            Msg.Batch [
-        //                GenericLog ("Info",msg) |> Dev
-        //                FormatColumn (newColName,format) |> ExcelInterop
-        //                UpdateProtocolGroupHeader |> ExcelInterop
-        //            ]
-        //        )
-        //        (GenericError >> Dev)
-        currentModel, Cmd.none
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.addAnnotationBlock  
+                (minBuildingBlockInfo)
+                (GenericInteropLogs >> Dev)
+                (GenericError >> Dev)
+        currentModel, cmd
 
     | AddAnnotationBlocks (minBuildingBlockInfos, protocol, validationOpt) ->
         failwith """Function "AddAnnotationBlocks" is currently not supported."""
@@ -225,8 +218,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
             Cmd.OfPromise.either
                 OfficeInterop.createAnnotationTable  
                 (isDark)
-                (fun (res,msg) ->
-                    AnnotationtableCreated (msg) |> ExcelInterop
+                (fun msg ->
+                    Msg.Batch [
+                        GenericLog ("info", msg) |> Dev
+                        AnnotationtableCreated (msg) |> ExcelInterop
+                    ]
                 )
                 (GenericError >> Dev)
         currentModel,cmd
@@ -236,23 +232,24 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
             currentModel.ExcelState with
                 HasAnnotationTable = true
         }
-        let msg =
-            Msg.Batch [
-                AutoFitTable |> ExcelInterop
-                UpdateProtocolGroupHeader |> ExcelInterop
-                GenericLog ("info", range) |> Dev
-            ]
-        currentModel.updateByExcelState nextState, Cmd.ofMsg msg
+        //let msg =
+        //    Msg.Batch [
+        //        //AutoFitTable |> ExcelInterop
+        //        //UpdateProtocolGroupHeader |> ExcelInterop
+        //        GenericLog ("info", range) |> Dev
+        //    ]
+        currentModel.updateByExcelState nextState, Cmd.none
 
 
     | GetParentTerm ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getParentTerm
-                ()
-                (StoreParentOntologyFromOfficeInterop >> TermSearch)
-                (GenericError >> Dev)
-        currentModel, cmd
+        failwith """Function "GetParentTerm" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.getParentTerm
+        //        ()
+        //        (StoreParentOntologyFromOfficeInterop >> TermSearch)
+        //        (GenericError >> Dev)
+        currentModel, Cmd.none
     //
     | GetTableValidationXml ->
         failwith """Function "GetTableValidationXml" is currently not supported."""
@@ -280,18 +277,19 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
 
     | AddTableValidationtoExisting (newTableValidation, newColNames, protocolInfo) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.addTableValidationToExisting
-                (newTableValidation, newColNames)
-                (fun x ->
-                    Msg.Batch [
-                        GenericLog x |> Dev
-                        WriteProtocolToXml protocolInfo |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
+        failwith """Function "AddTableValidationtoExisting" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.addTableValidationToExisting
+        //        (newTableValidation, newColNames)
+        //        (fun x ->
+        //            Msg.Batch [
+        //                GenericLog x |> Dev
+        //                WriteProtocolToXml protocolInfo |> ExcelInterop
+        //            ]
+        //        )
+        //        (GenericError >> Dev)
+        currentModel, Cmd.none
 
     | WriteProtocolToXml protocolInfo ->
         let cmd =
@@ -476,8 +474,8 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
             (
                 if triggerNewSearch then
                     match currentState.ParentOntology, currentState.SearchByParentOntology with
-                    | Some parentOntology, true ->
-                        (newTerm,parentOntology) |> (GetNewTermSuggestionsByParentTerm >> Request >> Api)
+                    | Some termMin, true ->
+                        (newTerm,termMin) |> (GetNewTermSuggestionsByParentTerm >> Request >> Api)
                     | None,_ | _, false ->
                         newTerm  |> (GetNewTermSuggestions >> Request >> Api)
                 else
@@ -515,6 +513,7 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
         nextState,Cmd.none
 
     | StoreParentOntologyFromOfficeInterop parentTerm ->
+        failwith """Function "StoreParentOntologyFromOfficeInterop" is currently not supported."""
         let pOnt =
             // if none, no parentOntology was found by office.js.
             // this happens e.g. if a field outside the table is selected
@@ -522,9 +521,8 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
             then None
             else
                 let s = (string parentTerm.Value)
-                let res =
-                    OfficeInterop.Regex.parseColHeader s
-                res.Ontology
+                let res = SwateColumnHeader.create s 
+                TermMinimal.create (Option.defaultValue "" res.tryGetOntologyTerm) "" |> Some
 
         let nextState = {
             currentState with
@@ -670,6 +668,14 @@ let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> 
             }
         nextState, Cmd.none
 
+    | GenericInteropLogs (logs) ->
+        let parsedLogs = logs |> List.map LogItem.ofInteropLogginMsg
+        let nextState = {
+            currentState with
+                Log = parsedLogs@currentState.Log
+        }
+        nextState, Cmd.none
+
     | GenericError (e) ->
         OfficeInterop.consoleLog (sprintf "GenericError occured: %s" e.Message)
         let nextState = {
@@ -734,7 +740,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString (parentOntology:OntologyInfo) =
+    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString (termMin:TermMinimal) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -747,7 +753,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getTermSuggestionsByParentTerm
-                (5,queryString,parentOntology)
+                (5,queryString,termMin)
                 (responseHandler >> Api)
                 (ApiError >> Api)
 

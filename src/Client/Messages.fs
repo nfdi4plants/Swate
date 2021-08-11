@@ -14,7 +14,7 @@ open Model
 type ExcelInteropMsg =
     | Initialized                           of (string*string)
     | FillSelection                         of string * (DbDomain.Term option)
-    | AddAnnotationBlock                    of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
+    | AddAnnotationBlock                    of OfficeInterop.Types.BuildingBlockTypes.InsertBuildingBlock
     | AddAnnotationBlocks                   of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock
     | AddUnitToAnnotationBlock              of unitTermName:string option * unitTermAccession:string option
@@ -59,7 +59,7 @@ type TermSearchMsg =
     | NewSuggestions                        of DbDomain.Term []
     | StoreParentOntologyFromOfficeInterop  of obj option
     // Server
-    | GetAllTermsByParentTermRequest        of OntologyInfo 
+    | GetAllTermsByParentTermRequest        of TermMinimal 
     | GetAllTermsByParentTermResponse       of DbDomain.Term []
 
 type AdvancedSearchMsg =
@@ -80,13 +80,14 @@ type AdvancedSearchMsg =
 type DevMsg =
     | LogTableMetadata
     | GenericLog            of (string*string)
+    | GenericInteropLogs    of InteropLogging.Msg list
     | GenericError          of exn
     | UpdateLastFullError   of exn option
     
 type ApiRequestMsg =
     | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
-    | GetNewTermSuggestionsByParentTerm         of string*OntologyInfo
+    | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
     | GetNewBuildingBlockNameSuggestions        of string
     | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
@@ -129,7 +130,7 @@ type FilePickerMsg =
     | UpdateDNDDropped          of isDropped:bool
 
 type AddBuildingBlockMsg =
-    | NewBuildingBlockSelected  of AnnotationBuildingBlock
+    | NewBuildingBlockSelected  of BuildingBlockNamePrePrint
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown
 

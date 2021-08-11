@@ -14,12 +14,13 @@ open Messages
 open Shared
 open CustomComponents
 
+open OfficeInterop.Types
 
-let isValidBuildingBlock (block : AnnotationBuildingBlock) =
+let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
     match block.Type with
-    | Parameter | Characteristics | Factor ->
+    | BuildingBlockType.Parameter | BuildingBlockType.Characteristics | BuildingBlockType.Factor ->
         block.Name.Length > 0
-    | Sample | Data | Source ->
+    | BuildingBlockType.Sample | BuildingBlockType.Data | BuildingBlockType.Source ->
         true
     | _ -> false
 
@@ -50,12 +51,12 @@ let isValidBuildingBlock (block : AnnotationBuildingBlock) =
 //        ]
 
 
-let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block: AnnotationBuildingBlockType )  =
+let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block: BuildingBlockType )  =
     Dropdown.Item.a [
         Dropdown.Item.Props [
             TabIndex 0
-            OnClick (fun _ -> AnnotationBuildingBlock.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
-            OnKeyDown (fun k -> if (int k.which) = 13 then AnnotationBuildingBlock.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
+            OnClick (fun _ -> BuildingBlockNamePrePrint.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
+            OnKeyDown (fun k -> if (int k.which) = 13 then BuildingBlockNamePrePrint.init block |> NewBuildingBlockSelected |> AddBuildingBlock |> dispatch)
             colorControl model.SiteStyleState.ColorMode
         ]
 
@@ -63,23 +64,23 @@ let createBuildingBlockDropdownItem (model:Model) (dispatch:Msg -> unit) (block:
         Text.span [
             CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
             Props [
-                Tooltip.dataTooltip (block |> AnnotationBuildingBlockType.toShortExplanation)
+                Tooltip.dataTooltip (block |> BuildingBlockType.toShortExplanation)
                 Style [PaddingRight "10px"]
             ]
         ] [
             Fa.i [Fa.Solid.InfoCircle] []
         ]
         
-        Text.span [] [block |> AnnotationBuildingBlockType.toString |> str]
+        Text.span [] [str block.toString]
     ]
 
 let addBuildingBlockFooterComponent (model:Model) (dispatch:Msg -> unit) =
     Content.content [ ] [
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ 
-            str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString))
+            str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString ))
         ]
         Text.p [Props [Style [TextAlign TextAlignOptions.Justify]]][
-            span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toLongExplanation |> str]
+            span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> BuildingBlockType.toLongExplanation |> str]
             span [] [str " You can find more information on our "]
             a [Href Shared.URLs.AnnotationPrinciplesUrl; Target "_blank"][str "website"]
         ]
@@ -103,18 +104,18 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                 ] [
                     Dropdown.trigger [] [
                         Button.a [Button.OnClick (fun _ -> ToggleSelectionDropdown |> AddBuildingBlock |> dispatch)] [
-                            span [Style [MarginRight "5px"]] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString |> str]
+                            span [Style [MarginRight "5px"]] [str model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
                     Dropdown.menu [ ] [
                         Dropdown.content [Props [colorControl model.SiteStyleState.ColorMode]] ([
-                            Parameter       
-                            Factor          
-                            Characteristics 
-                            Sample          
-                            Data            
-                            Source          
+                            BuildingBlockType.Parameter       
+                            BuildingBlockType.Factor          
+                            BuildingBlockType.Characteristics 
+                            BuildingBlockType.Sample          
+                            BuildingBlockType.Data            
+                            BuildingBlockType.Source          
                         ]  |> List.map (createBuildingBlockDropdownItem model dispatch)
                         |> fun x ->
                             List.append x [
@@ -133,7 +134,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
             ]
             Control.div [Control.IsExpanded] [
                 match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
-                | Parameter | Characteristics | Factor ->
+                | BuildingBlockType.Parameter | BuildingBlockType.Characteristics | BuildingBlockType.Factor ->
                     AutocompleteSearch.autocompleteTermSearchComponent
                         dispatch
                         model.SiteStyleState.ColorMode
@@ -146,7 +147,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
             ]
         ]
         match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
-        | Parameter | Characteristics | Factor ->
+        | BuildingBlockType.Parameter | BuildingBlockType.Characteristics | BuildingBlockType.Factor ->
             Field.div [Field.HasAddons] [
                 Control.div [] [
                     Button.a [
@@ -169,7 +170,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                 ]
                 Control.p [] [
                     Button.button [Button.IsStatic true] [
-                        str (sprintf "This %s has a unit:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type |> AnnotationBuildingBlockType.toString ))
+                        str (sprintf "This %s has a unit:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString))
                     ]
                 ]
                 AutocompleteSearch.autocompleteTermSearchComponent
@@ -190,7 +191,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                     ]
                 ]
                 match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
-                | Parameter | Characteristics | Factor ->
+                | BuildingBlockType.Parameter | BuildingBlockType.Characteristics | BuildingBlockType.Factor ->
                     Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
                         a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).ModalId |> AdvancedSearch |> dispatch)] [
                             str "Use advanced search unit"
@@ -213,17 +214,17 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         Button.Props [Disabled true]
                     Button.IsFullWidth
                     Button.OnClick (fun e ->
-                        let colName     = model.AddBuildingBlockState.CurrentBuildingBlock |> AnnotationBuildingBlock.toAnnotationTableHeader
-                        let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome then Some model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value.Accession else None
-                        let unitName =
-                            match model.AddBuildingBlockState.BuildingBlockHasUnit, model.AddBuildingBlockState.UnitTermSearchText with
-                            | _,""              -> None //"0.00"
-                            | false, _          -> None //"0.00"
-                            | true, str         -> Some str
-                                //sprintf "0.00 \"%s\"" str
-                        let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome then Some model.AddBuildingBlockState.UnitSelectedTerm.Value.Accession else None
-                        let minBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.create colName colTerm unitName None false
-                        AddAnnotationBlock minBuildingBlock |> ExcelInterop |> dispatch
+                        let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
+                        let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome then TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some else None
+                        //let unitName =
+                        //    match model.AddBuildingBlockState.BuildingBlockHasUnit, model.AddBuildingBlockState.UnitTermSearchText with
+                        //    | _,""              -> None //"0.00"
+                        //    | false, _          -> None //"0.00"
+                        //    | true, str         -> Some str
+                        //        //sprintf "0.00 \"%s\"" str
+                        let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
+                        let newBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.InsertBuildingBlock.create colName colTerm unitTerm
+                        AddAnnotationBlock newBuildingBlock |> ExcelInterop |> dispatch
                     )
                 ] [
                     str "Insert annotation building block"

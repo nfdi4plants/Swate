@@ -183,7 +183,7 @@ let getTermSuggestionsByChildTerm cString (query:string, childTerm:string) =
                     (reader.GetBoolean(5))
     |]
 
-let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyInfo) =
+let getTermByParentTermOntologyInfo cString (query:string, parentTerm:TermMinimal) =
 
     let hasAccession = parentTerm.TermAccession <> ""
 
@@ -223,7 +223,7 @@ let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyIn
                     (reader.GetBoolean(5))
     |]
 
-let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
+let getAllTermsByParentTermOntologyInfo cString (parentTerm:TermMinimal) =
 
     let hasAccession = parentTerm.TermAccession <> ""
 
@@ -261,7 +261,7 @@ let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
                     (reader.GetBoolean(5))
     |]
 
-let getAllTermsByChildTermOntologyInfo cString (childTerm:OntologyInfo) =
+let getAllTermsByChildTermOntologyInfo cString (childTerm:TermMinimal) =
 
     let hasAccession = childTerm.TermAccession <> ""
 

@@ -40,7 +40,7 @@ let shortCutIconList model =
             ]
             (Msg.Batch [
                 AutoFitTable |> ExcelInterop
-                UpdateProtocolGroupHeader |> ExcelInterop
+                //UpdateProtocolGroupHeader |> ExcelInterop
             ])
             "Formatting"
         ShortCutIcon.create

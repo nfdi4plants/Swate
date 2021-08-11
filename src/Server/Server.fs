@@ -66,7 +66,7 @@ let annotatorApi cString = {
         async {
             let searchRes =
                 match typedSoFar with
-                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like = OntologyDB.getTermSuggestions cString (typedSoFar)
@@ -80,12 +80,12 @@ let annotatorApi cString = {
             return searchRes
         }
 
-    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:OntologyInfo) ->
+    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:TermMinimal) ->
         async {
 
             let searchRes =
                 match typedSoFar with
-                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like =
@@ -105,7 +105,7 @@ let annotatorApi cString = {
             return searchRes
         }
 
-    getAllTermsByParentTerm = fun (parentTerm:OntologyInfo) ->
+    getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
         async {
             let searchRes =
                 OntologyDB.getAllTermsByParentTermOntologyInfo cString parentTerm
@@ -113,12 +113,12 @@ let annotatorApi cString = {
             return searchRes  
         }
 
-    getTermSuggestionsByChildTerm = fun (max:int,typedSoFar:string,childTerm:OntologyInfo) ->
+    getTermSuggestionsByChildTerm = fun (max:int,typedSoFar:string,childTerm:TermMinimal) ->
         async {
 
             let searchRes =
                 match typedSoFar with
-                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like =
@@ -138,7 +138,7 @@ let annotatorApi cString = {
             return searchRes
         }
 
-    getAllTermsByChildTerm = fun (childTerm:OntologyInfo) ->
+    getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
         async {
             let searchRes =
                 OntologyDB.getAllTermsByChildTermOntologyInfo cString childTerm
@@ -161,7 +161,7 @@ let annotatorApi cString = {
         async {
             let searchRes =
                 match typedSoFar with
-                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like = OntologyDB.getUnitTermSuggestions cString (typedSoFar)

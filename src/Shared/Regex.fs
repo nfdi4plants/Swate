@@ -1,91 +1,83 @@
-module OfficeInterop.Regex
+namespace Shared
 
-open System
+module Regex =
 
-open Types
+    module Pattern =
 
-[<LiteralAttribute>]
-let HashNumberPattern = "#\d+"
+        [<LiteralAttribute>]
+        let HashNumberPattern = "#\d+"
 
-[<LiteralAttribute>]
-let SquaredBracketsPattern = "\[[^\]]*\]"
+        [<LiteralAttribute>]
+        /// This pattern captures all characters between squared brackets (with squared brackets).
+        let SquaredBracketsPattern = "\[.*\]"
 
-[<LiteralAttribute>]
-let BracketsPattern = "\([^\]]*\)"
+        [<LiteralAttribute>]
+        /// This pattern captures all characters between brackets (with brackets).
+        let BracketsPattern = "\([^\]]*\)"
 
-[<LiteralAttribute>]
-let CoreNamePattern = "^[^[(]*"
+        [<LiteralAttribute>]
+        /// This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
+        let CoreNamePattern = "^[^[(]*"
 
-[<LiteralAttribute>]
-let TermAccessionPattern = "#t[a-zA-Z0-9]+?:[a-zA-Z0-9]+"
+        [<LiteralAttribute>]
+        let TermAccessionPattern = "[a-zA-Z0-9]+?:[a-zA-Z0-9]+"
 
-// currently unused
-[<LiteralAttribute>]
-let GroupPattern = "#g[a-zA-Z0-9]+"
+    module Aux =
+    
+        open System.Text.RegularExpressions
+    
+        /// (|Regex|_|) pattern input
+        let (|Regex|_|) pattern input =
+            let m = Regex.Match(input, pattern)
+            if m.Success then Some(m.Value)
+            else None
 
-let parseSquaredBrackets (headerStr:string) =
-    match headerStr with
-    | Shared.HelperFunctions.Regex SquaredBracketsPattern value ->
-        // remove brackets
-        value.[1..value.Length-2]
-        |> Some
-    | _ ->
-        None
+    open Pattern
+    open Aux
+    open System
+    open System.Text.RegularExpressions
 
-let parseBrackets (headerStr:string) =
-    match headerStr with
-    | Shared.HelperFunctions.Regex BracketsPattern value ->
-        value
+    let parseSquaredBrackets (headerStr:string) =
+        match headerStr with
+        | Regex SquaredBracketsPattern value ->
             // remove brackets
-            .[1..value.Length-2]
-            // split by separator to get information array
-            // can consist of e.g. #h, #id, parentOntology
-            .Split([|"; "|], StringSplitOptions.None)
-        |> Some
-    | _ ->
-        None
+            value.[1..value.Length-2]
+            |> Some
+        | _ ->
+            None
 
-let parseCoreName (headerStr:string) =
-    match headerStr with
-    | Shared.HelperFunctions.Regex CoreNamePattern value ->
-        value.Trim()
-        |> Some
-    | _ ->
-        None
+    let parseBrackets (headerStr:string) =
+        match headerStr with
+        | Regex BracketsPattern value ->
+            value
+                // remove brackets
+                .[1..value.Length-2]
+                // split by separator to get information array
+                // can consist of e.g. #h, #id, parentOntology
+                .Split([|"; "|], StringSplitOptions.None)
+            |> Some
+        | _ ->
+            None
 
-let parseTermAccession (tag:string) =
-    match tag with
-    | Shared.HelperFunctions.Regex TermAccessionPattern value ->
-        value.Trim()
-        |> Some
-    | _ ->
-        None
+    let parseCoreName (headerStr:string) =
+        match headerStr with
+        | Regex CoreNamePattern value ->
+            value.Trim()
+            |> Some
+        | _ ->
+            None
 
-open Shared
+    let parseTermAccession (tag:string) =
+        match tag with
+        | Regex TermAccessionPattern value ->
+            value.Trim()
+            |> Some
+        | _ ->
+            None
 
-let parseColHeader (headerStr:string) =
-    let coreName = parseCoreName headerStr
-    let tagArr = parseBrackets headerStr
-    let ontology =
-        let hasOnt = parseSquaredBrackets headerStr
-        let termAccession =
-            match tagArr with
-            | None -> None
-            | Some ta ->
-                let hasAccession = ta |> Array.tryFind (fun x -> x.StartsWith ColumnTags.TermAccessionTag)
-                if hasAccession.IsSome && (parseTermAccession hasAccession.Value).IsSome
-                then hasAccession.Value.Replace(Types.ColumnTags.TermAccessionTag,"") |> Some
-                else None
-        match hasOnt,termAccession with
-        | Some ontName, None    -> OntologyInfo.create ontName "" |> Some
-        | Some ontName, Some ta -> OntologyInfo.create ontName ta |> Some
-        | _,_                   -> None
-    {
-        Header              = headerStr
-        CoreName            = coreName
-        Ontology            = ontology
-        TagArr              = tagArr
-    }
+    let removeId (squareBracket:string) =
+        Regex.Replace(squareBracket, HashNumberPattern, "") 
+       
 
 //module MinimalBuildingBlock =
 
