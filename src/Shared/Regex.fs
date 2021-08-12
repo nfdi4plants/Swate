@@ -48,16 +48,8 @@ module Regex =
 
     let parseBrackets (headerStr:string) =
         match headerStr with
-        | Regex BracketsPattern value ->
-            value
-                // remove brackets
-                .[1..value.Length-2]
-                // split by separator to get information array
-                // can consist of e.g. #h, #id, parentOntology
-                .Split([|"; "|], StringSplitOptions.None)
-            |> Some
-        | _ ->
-            None
+        | Regex BracketsPattern value   -> Some value.[1..value.Length-2] // remove brackets
+        | _                             -> None
 
     let parseCoreName (headerStr:string) =
         match headerStr with

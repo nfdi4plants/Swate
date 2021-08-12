@@ -447,6 +447,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                     tanColName
                 |]
 
+                /// This logic will only work if there is only one format change
                 let mutable formatChangedMsg : InteropLogging.Msg option = None
 
                 let createAllCols =
@@ -795,68 +796,87 @@ let changeTableColumnsFormat (colAndFormatList:(string*string) list) =
 // Reform this to onSelectionChanged (Even though we now know how to add eventHandlers we do not know how to pass info from handler to Swate app).
 /// This function will parse the header of a selected column to check for a parent ontology, which will then be used for a isA-directed term search.
 /// Any found parent ontology will also be displayed in a static field before the term search input field.
-//let getParentTerm () =
-//    Excel.run (fun context ->
+let getParentTerm () =
+    Excel.run (fun context ->
 
-//        promise {
-//            try
-//                let! annotationTable = getActiveAnnotationTableName()
-//                // Ref. 2
-//                let sheet = context.workbook.worksheets.getActiveWorksheet()
-//                let annotationTable = sheet.tables.getItem(annotationTable)
-//                let tableRange = annotationTable.getRange()
-//                let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"; "values"|]))
-//                let range = context.workbook.getSelectedRange()
-//                let _ = range.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"|]))
+        promise {
+            try
+                let! annotationTable = getActiveAnnotationTableName()
+                // Ref. 2
+                let sheet = context.workbook.worksheets.getActiveWorksheet()
+                let annotationTable = sheet.tables.getItem(annotationTable)
+                let tableRange = annotationTable.getRange()
+                let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"; "values"|]))
+                let range = context.workbook.getSelectedRange()
+                let _ = range.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"|]))
 
-//                let! res = context.sync().``then``( fun _ ->
+                let! res = context.sync().``then``( fun _ ->
 
-//                    // Ref. 3
-//                    /// recalculate the selected col index from a worksheet perspective to the table perspective.
-//                    let newColIndex =
-//                        let tableRangeColIndex = tableRange.columnIndex
-//                        let selectColIndex = range.columnIndex
-//                        selectColIndex - tableRangeColIndex |> int
+                    // Ref. 3
+                    /// recalculate the selected col index from a worksheet perspective to the table perspective.
+                    let newColIndex =
+                        let tableRangeColIndex = tableRange.columnIndex
+                        let selectColIndex = range.columnIndex
+                        selectColIndex - tableRangeColIndex |> int
 
-//                    let newRowIndex =
-//                        let tableRangeRowIndex = tableRange.rowIndex
-//                        let selectedRowIndex = range.rowIndex
-//                        selectedRowIndex - tableRangeRowIndex |> int
+                    let newRowIndex =
+                        let tableRangeRowIndex = tableRange.rowIndex
+                        let selectedRowIndex = range.rowIndex
+                        selectedRowIndex - tableRangeRowIndex |> int
 
-//                    /// Get all values from the table range
-//                    let colHeaderVals = tableRange.values.[0]
-//                    let rowVals = tableRange.values
-//                    /// Get the index of the last column in the table
-//                    let lastColInd = colHeaderVals.Count-1
-//                    /// Get the index of the last row in the table
-//                    let lastRowInd = rowVals.Count-1
-//                    let value =
-//                        // check if selected range is inside table 
-//                        if
-//                            newColIndex < 0
-//                            || newColIndex > lastColInd
-//                            || newRowIndex < 0
-//                            || newRowIndex > lastRowInd
-//                        then
-//                            None
-//                        else
-//                            // is selected range is in table then take header value from selected column
-//                            let header = tableRange.values.[0].[newColIndex]
-//                            let parsedHeader = SwateColumnHeader.create (string header.Value) 
-//                            /// as the reference columns also contain a accession tag we want to return the first reference column header
-//                            /// instead of the main column header, if the main column header does include an ontology
-//                            if parsedHeader.Ontology.IsSome then
-//                                tableRange.values.[0].[newColIndex+1]
-//                            else
-//                                None
-//                    // return header of selected col
-//                    value
-//                )
-//                return res
-//            with
-//                | exn -> return None
-//        }
-//    )
+                    /// Get all values from the table range
+                    let colHeaderVals = tableRange.values.[0]
+                    let rowVals = tableRange.values
+                    /// Get the index of the last column in the table
+                    let lastColInd = colHeaderVals.Count-1
+                    /// Get the index of the last row in the table
+                    let lastRowInd = rowVals.Count-1
+                    let value =
+                        // check if selected range is inside table 
+                        if
+                            newColIndex < 0
+                            || newColIndex > lastColInd
+                            || newRowIndex < 0
+                            || newRowIndex > lastRowInd
+                        then
+                            None
+                        else
+                            // is selected range is in table then take header value from selected column
+                            let header = tableRange.values.[0].[newColIndex]
+                            let parsedHeader = SwateColumnHeader.create (string header.Value)
+                            printfn $"parsedHeader: {parsedHeader}"
+                            /// as the reference columns also contain a accession tag we want to return the first reference column header
+                            /// instead of the main column header, if the main column header does include an ontology
+                            if not parsedHeader.isSingleCol || not parsedHeader.isTANCol || not parsedHeader.isTSRCol || not parsedHeader.isUnitCol then
+                                printfn "is not single, tsr, tan, uni"
+                                if parsedHeader.tryGetOntologyTerm.IsSome then
+                                    printfn "is ontology term"
+                                    let termName = parsedHeader.tryGetOntologyTerm.Value
+                                    let termAccession =
+                                        let headerIndexPlus1 = SwateColumnHeader.create ( Option.defaultValue (box "") tableRange.values.[0].[newColIndex+1] |> string )
+                                        let headerIndexPlus2 = SwateColumnHeader.create ( Option.defaultValue (box "") tableRange.values.[0].[newColIndex+2] |> string )
+                                        if not headerIndexPlus1.isUnitCol && headerIndexPlus1.isTSRCol then
+                                            headerIndexPlus1.getTermAccession
+                                        elif headerIndexPlus1.isUnitCol && headerIndexPlus2.isTSRCol then
+                                            headerIndexPlus2.getTermAccession
+                                        else
+                                            None
+
+                                    let parentTerm = TermMinimal.create termName (Option.defaultValue "" termAccession) |> Some
+                                    printfn $"parentTerm: {parentTerm}"
+                                    parentTerm
+                                else
+                                    None
+                            else
+                                None
+                    // return parent term of selected col
+                    value
+                )
+                return res
+            with
+                | exn -> return None
+        }
+    )
 
 /// This is used to insert terms into selected cells.
 /// 'term' is the value that will be written into the main column.

@@ -242,14 +242,13 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
 
 
     | GetParentTerm ->
-        failwith """Function "GetParentTerm" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.getParentTerm
-        //        ()
-        //        (StoreParentOntologyFromOfficeInterop >> TermSearch)
-        //        (GenericError >> Dev)
-        currentModel, Cmd.none
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getParentTerm
+                ()
+                (StoreParentOntologyFromOfficeInterop >> TermSearch)
+                (GenericError >> Dev)
+        currentModel, cmd
     //
     | GetTableValidationXml ->
         failwith """Function "GetTableValidationXml" is currently not supported."""
@@ -513,20 +512,9 @@ let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchS
         nextState,Cmd.none
 
     | StoreParentOntologyFromOfficeInterop parentTerm ->
-        failwith """Function "StoreParentOntologyFromOfficeInterop" is currently not supported."""
-        let pOnt =
-            // if none, no parentOntology was found by office.js.
-            // this happens e.g. if a field outside the table is selected
-            if parentTerm.IsNone
-            then None
-            else
-                let s = (string parentTerm.Value)
-                let res = SwateColumnHeader.create s 
-                TermMinimal.create (Option.defaultValue "" res.tryGetOntologyTerm) "" |> Some
-
         let nextState = {
             currentState with
-                ParentOntology = pOnt
+                ParentOntology = parentTerm
         }
         nextState, Cmd.none
 

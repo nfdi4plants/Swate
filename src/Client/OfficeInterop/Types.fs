@@ -431,6 +431,14 @@ type SwateColumnHeader = {
         match sqBrackets with
         | Some str -> removeId str |> Some
         | None -> None
+    member this.getTermAccession =
+        let brackets = parseBrackets this.SwateColumnHeader
+        match brackets with
+        | Some str ->
+            // this step is optional as "parseTermAccession should be able to get term accession even with appended #id"
+            removeId str
+            |> parseTermAccession
+        | None -> None
     member this.isUnitCol =
         this.SwateColumnHeader.StartsWith ColumnCoreNames.Unit.toString
     member this.isTANCol =

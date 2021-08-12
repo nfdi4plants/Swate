@@ -57,7 +57,7 @@ type TermSearchMsg =
     | SearchTermTextChange                  of string
     | TermSuggestionUsed                    of DbDomain.Term
     | NewSuggestions                        of DbDomain.Term []
-    | StoreParentOntologyFromOfficeInterop  of obj option
+    | StoreParentOntologyFromOfficeInterop  of TermMinimal option
     // Server
     | GetAllTermsByParentTermRequest        of TermMinimal 
     | GetAllTermsByParentTermResponse       of DbDomain.Term []
