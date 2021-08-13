@@ -1285,7 +1285,7 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
                 {
                 currentState with
                     BuildingBlockHasUnit = hasUnit
-                    //UnitTerm = None
+                    UnitSelectedTerm = None
                     UnitTermSearchText = ""
                     UnitTermSuggestions = [||]
                     ShowUnitTermSuggestions = false

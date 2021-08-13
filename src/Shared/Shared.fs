@@ -135,16 +135,26 @@ type TermMinimal = {
         with
             | :? NullReferenceException -> failwith $"Unable to parse given string {formatStr} to TermMinimal.Name."
 
-[<Obsolete("Do not use. Use TermMinimal instead.")>]
-type OntologyInfo = {
-    /// This is the Ontology Name
-    Name            : string
-    /// This is the Ontology Term Accession 'XX:aaaaaa'
-    TermAccession   : string
+type TermSearchable = {
+    // Contains information about the term to search itself. If term accession is known, search result is 100% correct.
+    Term                : TermMinimal
+    // If ParentTerm isSome, then the term name is first searched in a is_a directed search
+    ParentTerm          : TermMinimal option
+    // Is term ist used as unit, unit ontology is searched first.
+    IsUnit              : bool
+    // ColIndex in table
+    ColIndex            : int
+    // RowIndex in table
+    RowIndices          : int []
+    SearchResultTerm    : DbDomain.Term option
 } with
-    static member create name termAccession = {
-        Name            = name
-        TermAccession   = termAccession
+    static member create term parentTerm isUnit colInd rowIndices= {
+        Term                = term
+        ParentTerm          = parentTerm
+        IsUnit              = isUnit
+        ColIndex            = colInd
+        RowIndices          = rowIndices
+        SearchResultTerm    = None
     }
 
 type AnnotationTable = {
@@ -156,6 +166,7 @@ type AnnotationTable = {
         Worksheet   = worksheet
     }
 
+[<Obsolete>]
 /// Used in OfficeInterop to effectively find possible Term names and search for them in db
 type SearchTermI = {
     // ColIndex in table

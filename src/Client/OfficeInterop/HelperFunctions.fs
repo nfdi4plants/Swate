@@ -231,46 +231,6 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
 
 //    open System
 
-    //// ExcelApi 1.1
-    //let findSelectedBuildingBlockPreSync (context:RequestContext) annotationTableName =
-    //    let selectedRange = context.workbook.getSelectedRange()
-    //    let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
-
-    //    // Ref. 2
-    //    let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
-    //    selectedRange, annoHeaderRange, annoBodyRange
-
-    //// ExcelApi 1.1
-    //let findSelectedBuildingBlock (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) (context:RequestContext) =
-    //    context.sync().``then``( fun _ ->
-
-    //        if selectedRange.columnCount <> 1. then
-    //            failwith "To use this function please select a single column"
-
-    //        let errorMsg = "To use this function please select a single column of a Swate table."
-
-    //        let newSelectedColIndex =
-    //            // recalculate the selected range index based on table
-    //            let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex
-    //            // if index is smaller 0 it is outside of table range
-    //            if diff < 0. then failwith errorMsg
-    //            // if index is bigger than columnCount-1 then it is outside of tableRange
-    //            elif diff > annoHeaderRange.columnCount-1. then failwith errorMsg
-    //            else diff
-
-    //        /// Sort all columns into building blocks.
-    //        let buildingBlocks =
-    //            getBuildingBlocks annoHeaderRange annoBodyRange
-
-    //        /// find building block with the closest main column index from left
-    //        let findLeftClosestBuildingBlock =
-    //            buildingBlocks
-    //            |> Array.filter (fun x -> x.MainColumn.Index <= int newSelectedColIndex)
-    //            |> Array.minBy (fun x -> Math.Abs(x.MainColumn.Index - int newSelectedColIndex))
-
-    //        findLeftClosestBuildingBlock
-    //    )
-
 //    let private sortMainColValuesToSearchTerms (buildingBlock:BuildingBlock) =
 //        // get current col index
 //        let tsrTanColIndices = [|buildingBlock.TSR.Value.Index; buildingBlock.TAN.Value.Index|]
@@ -285,6 +245,7 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
 //                let rowIndices = cellArr |> Array.map (fun cell -> cell.Index)
 //                Shared.SearchTermI.create tsrTanColIndices searchStr "" bBlock.MainColumn.Header.Value.Ontology rowIndices
 //            )
+
 //        /// We differentiate between building blocks with and without unit as unit building blocks will not contain terms as values but e.g. numbers.
 //        /// In this case we do not want to search the database for the cell values but the parent ontology in the header.
 //        /// This will then be used for TSR and TAN.

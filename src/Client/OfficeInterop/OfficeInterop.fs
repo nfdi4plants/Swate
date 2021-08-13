@@ -462,15 +462,16 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                         let col = createCol (nextIndex + float i)
                         // add column header name
                         col.name <- colName
-
                         // add unit formatting to main column
-                        if newBB.UnitTerm.IsSome && colName = mainColName then
-                            
-                            let columnBody = col.getDataBodyRange()
-                            let format  = newBB.UnitTerm.Value.toNumberFormat
-                            let formats = createValueMatrix 1 (rowCount-1) format
-                            columnBody.numberFormat <- formats
-                            formatChangedMsg <- InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}" |> Some
+                        let columnBody = col.getDataBodyRange()
+                        let format  =
+                            if newBB.UnitTerm.IsSome && colName = mainColName then
+                                newBB.UnitTerm.Value.toNumberFormat
+                            else
+                                "General"
+                        let formats = createValueMatrix 1 (rowCount-1) format
+                        columnBody.numberFormat <- formats
+                        formatChangedMsg <- InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}" |> Some
                         col
                     )
 
@@ -685,20 +686,11 @@ let getAnnotationBlockDetails() =
 
             let! annotationTable = getActiveAnnotationTableName()
 
-            let selectedRange = context.workbook.getSelectedRange()
-            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
-        
-            // Ref. 2
-            let annoHeaderRange, annoBodyRange = OfficeInterop.BuildingBlockFunctions.getBuildingBlocksPreSync context annotationTable
+            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTable
 
-            let! buildingBlock = context.sync().``then``(fun x ->
-                OfficeInterop.BuildingBlockFunctions.getBuildingBlocksPostSync annoHeaderRange annoBodyRange
-            )
-            //let! selectedBuildingBlock = findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
+            let searchTerms = selectedBuildingBlock |> fun bb -> OfficeInterop.BuildingBlockFunctions.toTermSearchable bb
 
-            //let searchTerms = sortBuildingBlockToSearchTerm selectedBuildingBlock
-
-            return buildingBlock
+            return searchTerms
         }
     )
 

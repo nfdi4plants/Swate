@@ -216,12 +216,6 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                     Button.OnClick (fun e ->
                         let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
                         let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome then TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some else None
-                        //let unitName =
-                        //    match model.AddBuildingBlockState.BuildingBlockHasUnit, model.AddBuildingBlockState.UnitTermSearchText with
-                        //    | _,""              -> None //"0.00"
-                        //    | false, _          -> None //"0.00"
-                        //    | true, str         -> Some str
-                        //        //sprintf "0.00 \"%s\"" str
                         let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
                         let newBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.InsertBuildingBlock.create colName colTerm unitTerm
                         AddAnnotationBlock newBuildingBlock |> ExcelInterop |> dispatch
