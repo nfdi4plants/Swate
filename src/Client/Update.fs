@@ -401,20 +401,23 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
 
     //
     | GetSelectedBuildingBlockSearchTerms ->
-        failwith """Function "GetSelectedBuildingBlockSearchTerms" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.getAnnotationBlockDetails
-        //        ()
-        //        (GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
-        //        (fun x ->
-        //            Msg.Batch [
-        //                GenericError x |> Dev
-        //                UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails
-        //            ]
-        //        )
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getAnnotationBlockDetails
+                ()
+                (fun x ->
+                    let msg = InteropLogging.Msg.create InteropLogging.Debug $"{x}"
+                    GenericInteropLogs [msg] |> Dev
+                )
+                //(GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
+                (fun x ->
+                    Msg.Batch [
+                        GenericError x |> Dev
+                        UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails
+                    ]
+                )
         //let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
-        currentModel, Cmd.none//Cmd.batch [cmd;cmd2]
+        currentModel, cmd
     //
     | CreatePointerJson ->
         let cmd =

@@ -18,7 +18,9 @@ type BuildingBlockType =
     | Characteristics
     | Source
     | Sample            
-    | Data              
+    | Data
+
+    static member listAll = [ Parameter; Factor; Characteristics; Source; Sample; Data ]
 
     static member ofString str =
         match str with
@@ -420,18 +422,42 @@ type SwateColumnHeader = {
     SwateColumnHeader: string
 } with
     static member create headerString = { SwateColumnHeader = headerString }
+    member this.isMainColumn =
+        let isExistingType = BuildingBlockType.listAll |> List.tryFind (fun t -> this.SwateColumnHeader.StartsWith t.toString)
+        match isExistingType with
+        | Some t    -> true
+        | None      -> false
     member this.isSingleCol =
-        let bbType = parseCoreName this.SwateColumnHeader
-        match bbType with
-        | Some t    -> BuildingBlockType.ofString (t.Trim()) |> fun x -> x.isSingleColumn
-        | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
+        if this.isMainColumn then
+            let bbType = parseCoreName this.SwateColumnHeader
+            match bbType with
+            | Some t    -> BuildingBlockType.ofString (t.Trim()) |> fun x -> x.isSingleColumn
+            | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
+        else
+            false
+    member this.isUnitCol =
+        this.SwateColumnHeader.StartsWith ColumnCoreNames.Unit.toString
+    member this.isTANCol =
+        this.SwateColumnHeader.StartsWith ColumnCoreNames.TermAccessionNumber.toString
+    member this.isTSRCol =
+        this.SwateColumnHeader.StartsWith ColumnCoreNames.TermSourceRef.toString
+    member this.isReference =
+        this.isTSRCol
+        || this.isTANCol
+        || this.isUnitCol
+    member this.getColumnCoreName = parseCoreName this.SwateColumnHeader
+    member this.isSwateColumnHeader =         
+        match this with
+        | isMainCol when isMainCol.isMainColumn -> true
+        | isRefCol when isRefCol.isReference    -> true
+        | anythingelse                          -> false
     // Use this function to extract ontology term from inside square brackets in the main column header
     member this.tryGetOntologyTerm =
         let sqBrackets = parseSquaredBrackets this.SwateColumnHeader
         match sqBrackets with
         | Some str -> removeId str |> Some
         | None -> None
-    member this.getTermAccession =
+    member this.tryGetTermAccession =
         let brackets = parseBrackets this.SwateColumnHeader
         match brackets with
         | Some str ->
@@ -439,16 +465,7 @@ type SwateColumnHeader = {
             removeId str
             |> parseTermAccession
         | None -> None
-    member this.isUnitCol =
-        this.SwateColumnHeader.StartsWith ColumnCoreNames.Unit.toString
-    member this.isTANCol =
-        this.SwateColumnHeader.StartsWith ColumnCoreNames.TermAccessionNumber.toString
-    member this.isTSRCol =
-        this.SwateColumnHeader.StartsWith ColumnCoreNames.TermSourceRef.toString
-    member this.isHidden =
-        this.SwateColumnHeader.StartsWith ColumnCoreNames.TermSourceRef.toString
-        || this.SwateColumnHeader.StartsWith ColumnCoreNames.TermAccessionNumber.toString
-        || this.SwateColumnHeader.StartsWith ColumnCoreNames.Unit.toString
+
 
 /// This module contains types to handle value search for TSR and TAN columns.
 /// The types help to summarize and collect needed information about the column partitions (~ building block, e.g. 1 col for `Source Name`,
@@ -459,10 +476,12 @@ module BuildingBlockTypes =
     type Cell = {
         Index: int
         Value: string option
+        Unit: TermMinimal option
     } with
-        static member create ind value = {
+        static member create ind value unit= {
             Index = ind
             Value = value
+            Unit = unit
         }
 
     type Column = {
@@ -477,18 +496,20 @@ module BuildingBlockTypes =
         } 
 
     type BuildingBlock = {
-        MainColumn  : Column
-        Unit        : Column option
+        MainColumn      : Column
+        MainColumnTerm  : TermMinimal option
+        Unit            : Column option
         /// Term Source REF
-        TSR         : Column option
+        TSR             : Column option
         /// Term Accession Number
-        TAN         : Column option
+        TAN             : Column option
     } with
-        static member create mainCol tsr tan unit = {
-            MainColumn  = mainCol
-            TSR         = tsr
-            TAN         = tan
-            Unit        = unit
+        static member create mainCol tsr tan unit mainColTerm = {
+            MainColumn      = mainCol
+            MainColumnTerm  = mainColTerm
+            TSR             = tsr
+            TAN             = tan
+            Unit            = unit
         }
 
         //member this.toColumnValidation : (Xml.ValidationTypes.ColumnValidation) =
@@ -528,6 +549,7 @@ module BuildingBlockTypes =
         member this.HasUnit = this.UnitTerm.IsSome
         member this.HasExistingTerm = this.ColumnTerm.IsSome
 
+    [<Obsolete>]
     type MinimalBuildingBlock = {
         /// If 'IsAlreadyExisting' = false then this is just a core name + ont (e.g. Parameter [instrument model], so no id).
         /// If 'IsAlreadyExisting' = true this is the real value from the table.

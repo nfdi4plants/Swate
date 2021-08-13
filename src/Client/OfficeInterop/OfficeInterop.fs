@@ -280,7 +280,7 @@ let autoFitTable () =
                 // Find all columns to hide (with '#h' tag)
                 let colsToHide =
                     parsedHeaderArr
-                    |> Array.filter (fun header -> header.isHidden)
+                    |> Array.filter (fun header -> header.isReference)
                 // Get all column ranges (necessary to change 'columnHidden' attribute) for all headers with '#h' tag.
                 let ranges =
                     colsToHide
@@ -467,7 +467,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                         if newBB.UnitTerm.IsSome && colName = mainColName then
                             
                             let columnBody = col.getDataBodyRange()
-                            let format  = $"0.00 \"{newBB.UnitTerm.Value.Name}\""
+                            let format  = newBB.UnitTerm.Value.toNumberFormat
                             let formats = createValueMatrix 1 (rowCount-1) format
                             columnBody.numberFormat <- formats
                             formatChangedMsg <- InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}" |> Some
@@ -678,27 +678,29 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 //        }
 //    )
 
-//let getAnnotationBlockDetails() =
-//    Excel.run(fun context ->
+let getAnnotationBlockDetails() =
+    Excel.run(fun context ->
 
-//        promise {
+        promise {
 
-//            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTable = getActiveAnnotationTableName()
 
-//            let selectedRange = context.workbook.getSelectedRange()
-//            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+            let selectedRange = context.workbook.getSelectedRange()
+            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
         
-//            // Ref. 2
-//            let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTable
+            // Ref. 2
+            let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTable
 
-//            let! selectedBuildingBlock =
-//                findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
+            let! buildingBlock = context.sync().``then``(fun x ->
+                getBuildingBlocks annoHeaderRange annoBodyRange
+            )
+            //let! selectedBuildingBlock = findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
 
-//            let searchTerms = sortBuildingBlockToSearchTerm selectedBuildingBlock
+            //let searchTerms = sortBuildingBlockToSearchTerm selectedBuildingBlock
 
-//            return searchTerms
-//        }
-//    )
+            return buildingBlock
+        }
+    )
 
 let changeTableColumnFormat (colName:string) (format:string) =
     Excel.run(fun context ->
@@ -856,9 +858,9 @@ let getParentTerm () =
                                         let headerIndexPlus1 = SwateColumnHeader.create ( Option.defaultValue (box "") tableRange.values.[0].[newColIndex+1] |> string )
                                         let headerIndexPlus2 = SwateColumnHeader.create ( Option.defaultValue (box "") tableRange.values.[0].[newColIndex+2] |> string )
                                         if not headerIndexPlus1.isUnitCol && headerIndexPlus1.isTSRCol then
-                                            headerIndexPlus1.getTermAccession
+                                            headerIndexPlus1.tryGetTermAccession
                                         elif headerIndexPlus1.isUnitCol && headerIndexPlus2.isTSRCol then
-                                            headerIndexPlus2.getTermAccession
+                                            headerIndexPlus2.tryGetTermAccession
                                         else
                                             None
 

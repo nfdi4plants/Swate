@@ -16,6 +16,9 @@ module Regex =
         let BracketsPattern = "\([^\]]*\)"
 
         [<LiteralAttribute>]
+        let DoubleQuotesPattern = "\"(.*?)\""
+
+        [<LiteralAttribute>]
         /// This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
         let CoreNamePattern = "^[^[(]*"
 
@@ -59,10 +62,19 @@ module Regex =
         | _ ->
             None
 
-    let parseTermAccession (tag:string) =
-        match tag with
+    let parseTermAccession (headerStr:string) =
+        match headerStr with
         | Regex TermAccessionPattern value ->
             value.Trim()
+            |> Some
+        | _ ->
+            None
+
+    let parseDoubleQuotes (headerStr:string) =
+        match headerStr with
+        | Regex DoubleQuotesPattern value ->
+            // remove quotes at beginning and end of matched string
+            value.[1..value.Length-2].Trim()
             |> Some
         | _ ->
             None

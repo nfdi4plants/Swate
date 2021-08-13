@@ -122,6 +122,19 @@ type TermMinimal = {
         TermAccession   = term.Accession
     }
 
+    /// The numberFormat attribute in Excel allows to create automatic unit extensions.
+    /// It uses a special input format which is created by this function and should be used for unit terms.
+    member this.toNumberFormat = $"0.00 \"{this.Name}\""
+
+    /// The numberFormat attribute in Excel allows to create automatic unit extensions.
+    /// The format is created as $"0.00 \"{MinimalTerm.Name}\"", this function is meant to reverse this, altough term accession is lost.
+    static member ofNumberFormat (formatStr:string) =
+        let unitNameOpt = Regex.parseDoubleQuotes formatStr
+        try
+            TermMinimal.create unitNameOpt.Value ""
+        with
+            | :? NullReferenceException -> failwith $"Unable to parse given string {formatStr} to TermMinimal.Name."
+
 [<Obsolete("Do not use. Use TermMinimal instead.")>]
 type OntologyInfo = {
     /// This is the Ontology Name
@@ -145,19 +158,22 @@ type AnnotationTable = {
 
 /// Used in OfficeInterop to effectively find possible Term names and search for them in db
 type SearchTermI = {
+    // ColIndex in table
     ColIndices      : int []
-    SearchQuery     : TermMinimal
-    IsA             : TermMinimal option
+    // RowIndex in table
     RowIndices      : int []
+    // Query Term
+    SearchQuery     : TermMinimal
+    // Parent Term
+    IsA             : TermMinimal option
+    // This attribute displays a found ontology term, if any
     TermOpt         : DbDomain.Term option
 } with
     static member create colIndices searchString termAccession ontologyInfoOpt rowIndices = {
         ColIndices      = colIndices
-        SearchQuery     = TermMinimal.create searchString termAccession
-        //SearchString    = searchString
-        //TermAccession   = termAccession
-        IsA             = ontologyInfoOpt
         RowIndices      = rowIndices
+        SearchQuery     = TermMinimal.create searchString termAccession
+        IsA             = ontologyInfoOpt
         TermOpt         = None
     }
 
