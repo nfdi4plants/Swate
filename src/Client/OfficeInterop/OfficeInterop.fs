@@ -689,10 +689,10 @@ let getAnnotationBlockDetails() =
             let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
         
             // Ref. 2
-            let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTable
+            let annoHeaderRange, annoBodyRange = OfficeInterop.BuildingBlockFunctions.getBuildingBlocksPreSync context annotationTable
 
             let! buildingBlock = context.sync().``then``(fun x ->
-                getBuildingBlocks annoHeaderRange annoBodyRange
+                OfficeInterop.BuildingBlockFunctions.getBuildingBlocksPostSync annoHeaderRange annoBodyRange
             )
             //let! selectedBuildingBlock = findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
 

@@ -15,6 +15,7 @@
         <Compile Include="OfficeInterop\InteropLogging.fs" />
         <Compile Include="OfficeInterop\Types.fs" />
         <Compile Include="OfficeInterop\AuxFunctions\ColHeaderIndexing.fs" />
+        <Compile Include="OfficeInterop\AuxFunctions\BuildingBlockFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="Api.fs" />
