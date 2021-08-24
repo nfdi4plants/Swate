@@ -230,14 +230,14 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
 let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
     div [
         Style [
-            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
+            BorderLeft $"5px solid {NFDIColors.Mint.Base}" 
             //BorderRadius "0 0 15px 15px"
             Padding "0.25rem 1rem"
     ]] [
         Field.div [Field.HasAddons] [
             Control.p [] [
                 Button.button [Button.IsStatic true] [
-                    str ("Add unit")
+                    str "Add unit"
                 ]
             ]
             AutocompleteSearch.autocompleteTermSearchComponent
@@ -268,15 +268,18 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         Button.Props [Disabled true]
                     Button.IsFullWidth
                     Button.OnClick (fun e ->
-                        let unitTermOpt = if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some model.AddBuildingBlockState.Unit2SelectedTerm.Value.Accession else None
+                        let unitTerm =
+                            if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
                         match model.AddBuildingBlockState.Unit2TermSearchText with
                         | "" ->
                             GenericLog ("Error", "Cannot execute function with empty unit input") |> Dev |> dispatch
-                        | str ->
-                            AddUnitToAnnotationBlock (Some str, unitTermOpt) |> ExcelInterop |> dispatch
+                        | hasUnitTerm when model.AddBuildingBlockState.Unit2SelectedTerm.IsSome ->
+                            UpdateUnitForCells unitTerm.Value |> ExcelInterop |> dispatch
+                        | freeText ->
+                            UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> ExcelInterop |> dispatch
                     )
                 ] [
-                    str "Add unit to existing building block"
+                    str "Update unit for cells"
                 ]
             ]
         ]

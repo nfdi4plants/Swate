@@ -170,20 +170,14 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
                 (GenericError >> Dev)
         currentModel, cmd
 
-    | AddUnitToAnnotationBlock (format, unitTermOpt) ->
-        failwith """Function "AddUnitToAnnotationBlock" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.addUnitToExistingBuildingBlock
-        //        (format,unitTermOpt)
-        //        (fun (newColName,format) ->
-        //            Msg.Batch [
-        //                FormatColumn (newColName, format) |> ExcelInterop
-        //                UpdateProtocolGroupHeader |> ExcelInterop
-        //            ]
-        //        )
-        //        (GenericError >> Dev)
-        currentModel, Cmd.none
+    | UpdateUnitForCells (unitTerm) ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.updateUnitForCells
+                unitTerm
+                (GenericInteropLogs >> Dev)
+                (GenericError >> Dev)
+        currentModel, cmd
 
     | FormatColumn (colName,format) ->
         let cmd =

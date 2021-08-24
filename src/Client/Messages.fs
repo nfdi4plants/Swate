@@ -17,7 +17,7 @@ type ExcelInteropMsg =
     | AddAnnotationBlock                    of OfficeInterop.Types.BuildingBlockTypes.InsertBuildingBlock
     | AddAnnotationBlocks                   of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock
-    | AddUnitToAnnotationBlock              of unitTermName:string option * unitTermAccession:string option
+    | UpdateUnitForCells                    of unitTerm:TermMinimal
     | FormatColumn                          of colname:string * formatString:string
     | FormatColumns                         of (string * string) list
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.

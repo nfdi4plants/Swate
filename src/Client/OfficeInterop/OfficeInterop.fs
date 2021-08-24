@@ -462,7 +462,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                         col.name <- colName
                         // add unit formatting to main column
                         let columnBody = col.getDataBodyRange()
-                        let format  =
+                        let format =
                             if newBB.UnitTerm.IsSome && colName = mainColName then
                                 newBB.UnitTerm.Value.toNumberFormat
                             else
@@ -604,7 +604,7 @@ let removeAnnotationBlock (tableName:string) (annotationBlock:BuildingBlock) =
 
             let sheet = context.workbook.worksheets.getActiveWorksheet()
             let table = sheet.tables.getItem(tableName)
-        
+
             // Ref. 2
             let _ = table.load(U2.Case1 "columns")
             let tableCols = table.columns.load(propertyNames = U2.Case1 "items")
@@ -612,9 +612,9 @@ let removeAnnotationBlock (tableName:string) (annotationBlock:BuildingBlock) =
             let targetedColIndices =
                 let refColIndices =
                     if annotationBlock.hasUnit then
-                        [|annotationBlock.Unit.Value.Index; annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index|]
+                        [| annotationBlock.Unit.Value.Index; annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index |]
                     elif annotationBlock.hasCompleteTSRTAN then
-                        [|annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index|]
+                        [| annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index |]
                     else
                         [| |]
                 [|  annotationBlock.MainColumn.Index
@@ -649,7 +649,7 @@ let removeSelectedAnnotationBlock () =
 
             let! deleteCols = removeAnnotationBlock annotationTable selectedBuildingBlock
 
-            let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols}]"  
+            let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols})"  
 
             return [resultMsg]
         }
@@ -1522,59 +1522,68 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
 //        }
 //    )
 
-///// This function is used to add unit reference columns to an existing building block without unit reference columns
-//let addUnitToExistingBuildingBlock (format:string option,unitAccessionOpt:string option) =
-//    Excel.run(fun context ->
+/// This function is used to add unit reference columns to an existing building block without unit reference columns
+let updateUnitForCells (unitTerm:TermMinimal) =
+    Excel.run(fun context ->
 
-//        promise {
+        promise {
 
-//            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTableName = getActiveAnnotationTableName()
+            
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let annotationTable = sheet.tables.getItem(annotationTableName)
 
-//            let sheet = context.workbook.worksheets.getActiveWorksheet()
-//            let table = sheet.tables.getItem(annotationTable)
+            let selectedRange = context.workbook.getSelectedRange()
+            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "rowCount";])))
 
-//            // Ref. 2
+            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTableName
 
-//            // This is necessary to place new columns next to selected col
-//            let annoHeaderRange = table.getHeaderRowRange()
-//            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"rowIndex"|]))
+            /// Check if building block has existing unit
+            let! updateWithUnit =
+                if selectedBuildingBlock.hasUnit then
+                    context.sync().``then``(fun _ ->
+                        let format = unitTerm.toNumberFormat
+                        let formats = createValueMatrix 1 (int selectedRange.rowCount) format
+                        selectedRange.numberFormat <- formats
+                        InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}"
+                    )
+                else
+                    context.sync().``then``(fun _ ->
+                        InteropLogging.Msg.create InteropLogging.Error "NAH YOU SHOULD NAAAT HIT THIS."
+                    )
 
-//            let tableRange = table.getRange()
-//            let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+            //InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}" |> Some
 
-//            let selectedRange = context.workbook.getSelectedRange()
-//            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+            //// Ref. 2
+            //let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
 
-//            // Ref. 2
-//            let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
+            //let! selectedBuildingBlock =
+            //    BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
 
-//            let! selectedBuildingBlock =
-//                BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
+            //if selectedBuildingBlock.hasCompleteTSRTAN |> not then
+            //    failwith (
+            //        sprintf
+            //            "Swate can only add a unit to columns of the type: %s, %s, %s."
+            //            OfficeInterop.Types.ColumnCoreNames.Shown.Parameter
+            //            OfficeInterop.Types.ColumnCoreNames.Shown.Characteristics
+            //            OfficeInterop.Types.ColumnCoreNames.Shown.Factor
+            //    )
 
-//            if selectedBuildingBlock.hasCompleteTSRTAN |> not then
-//                failwith (
-//                    sprintf
-//                        "Swate can only add a unit to columns of the type: %s, %s, %s."
-//                        OfficeInterop.Types.ColumnCoreNames.Shown.Parameter
-//                        OfficeInterop.Types.ColumnCoreNames.Shown.Characteristics
-//                        OfficeInterop.Types.ColumnCoreNames.Shown.Factor
-//                )
+            //let! unitColumnResult = 
+            //    if selectedBuildingBlock.Unit.IsSome then
+            //        updateUnitColumns context table (float selectedBuildingBlock.MainColumn.Index) format unitAccessionOpt
+            //    else
+            //        createUnitColumns context table (float selectedBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
 
-//            let! unitColumnResult = 
-//                if selectedBuildingBlock.Unit.IsSome then
-//                    updateUnitColumns context table (float selectedBuildingBlock.MainColumn.Index) format unitAccessionOpt
-//                else
-//                    createUnitColumns context table (float selectedBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
+            //let maincolName = selectedBuildingBlock.MainColumn.Header.Value.Header
 
-//            let maincolName = selectedBuildingBlock.MainColumn.Header.Value.Header
+            ///// If unit block was added then return some msg information
+            ////let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""
+            //let unitColFormat = if unitColumnResult.IsSome then snd unitColumnResult.Value else "0.00"
 
-//            /// If unit block was added then return some msg information
-//            //let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""
-//            let unitColFormat = if unitColumnResult.IsSome then snd unitColumnResult.Value else "0.00"
-
-//            return maincolName, unitColFormat
-//        }
-//    )
+            return [updateWithUnit]
+        }
+    )
 
 let getAllValidationXmlParsed() =
     Excel.run(fun context ->
