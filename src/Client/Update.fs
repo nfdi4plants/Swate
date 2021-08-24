@@ -155,20 +155,20 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, Cmd.none
 
     | RemoveAnnotationBlock ->
-        failwith """Function "RemoveAnnotationBlock" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.removeSelectedAnnotationBlock
-        //        ()
-        //        (fun msg ->
-        //            Msg.Batch [
-        //                GenericLog ("Info",msg) |> Dev
-        //                AutoFitTable |> ExcelInterop
-        //                UpdateProtocolGroupHeader |> ExcelInterop
-        //            ]
-        //        )
-        //        (GenericError >> Dev)
-        currentModel, Cmd.none
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.removeSelectedAnnotationBlock
+                ()
+                (GenericInteropLogs >> Dev)
+                //(fun msg ->
+                //    Msg.Batch [
+                //        GenericInteropLogs msg |> Dev
+                //        //AutoFitTable |> ExcelInterop
+                //        //UpdateProtocolGroupHeader |> ExcelInterop
+                //    ]
+                //)
+                (GenericError >> Dev)
+        currentModel, cmd
 
     | AddUnitToAnnotationBlock (format, unitTermOpt) ->
         failwith """Function "AddUnitToAnnotationBlock" is currently not supported."""

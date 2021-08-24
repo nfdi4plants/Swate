@@ -427,11 +427,9 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
                 /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
                 /// This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
-                let checkIdForMainCol() =
-                    OfficeInterop.Indexing.Column.findNewIdForColumn allColHeaders newBB
+                let checkIdForMainCol() = OfficeInterop.Indexing.Column.findNewIdForColumn allColHeaders newBB
 
-                let checkIdForUnitCol() =
-                    OfficeInterop.Indexing.Unit.findNewIdForUnit allColHeaders
+                let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit allColHeaders
 
                 let mainColId = checkIdForMainCol()
                 let unitColId = checkIdForUnitCol()
@@ -598,43 +596,41 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 //        return (blockResults,completeProtocolInfo)
 //    }
 
-///// This function removes a given building block from a given annotation table.
-///// It returns the affected column indices.
-//let removeAnnotationBlock (tableName:string) (annotationBlock:BuildingBlock) =
-//    Excel.run(fun context ->
-//        promise {
+/// This function removes a given building block from a given annotation table.
+/// It returns the affected column indices.
+let removeAnnotationBlock (tableName:string) (annotationBlock:BuildingBlock) =
+    Excel.run(fun context ->
+        promise {
 
-//            let sheet = context.workbook.worksheets.getActiveWorksheet()
-//            let table = sheet.tables.getItem(tableName)
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let table = sheet.tables.getItem(tableName)
         
-//            // Ref. 2
-        
-//            let _ = table.load(U2.Case1 "columns")
-//            let tableCols = table.columns.load(propertyNames = U2.Case1 "items")
+            // Ref. 2
+            let _ = table.load(U2.Case1 "columns")
+            let tableCols = table.columns.load(propertyNames = U2.Case1 "items")
 
-//            let targetedColIndices =
-//                let hasTSRAndTan =
-//                    if annotationBlock.hasCompleteTSRTAN then [|annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index|] else [||]
-//                let hasUnit =
-//                    if annotationBlock.hasCompleteUnitBlock then
-//                        [|annotationBlock.Unit.Value.MainColumn.Index;annotationBlock.Unit.Value.TSR.Value.Index;annotationBlock.Unit.Value.TAN.Value.Index|]
-//                    else
-//                        [||]
-//                [|  annotationBlock.MainColumn.Index
-//                    yield! hasTSRAndTan
-//                    yield! hasUnit
-//                |] |> Array.sort
+            let targetedColIndices =
+                let refColIndices =
+                    if annotationBlock.hasUnit then
+                        [|annotationBlock.Unit.Value.Index; annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index|]
+                    elif annotationBlock.hasCompleteTSRTAN then
+                        [|annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index|]
+                    else
+                        [| |]
+                [|  annotationBlock.MainColumn.Index
+                    yield! refColIndices
+                |] |> Array.sort
 
-//            let! deleteCols =
-//                context.sync().``then``(fun e ->
-//                    targetedColIndices |> Array.map (fun targetIndex ->
-//                        tableCols.items.[targetIndex].delete()
-//                    )
-//                )
+            let! deleteCols =
+                context.sync().``then``(fun e ->
+                    targetedColIndices |> Array.map (fun targetIndex ->
+                        tableCols.items.[targetIndex].delete()
+                    )
+                )
 
-//            return targetedColIndices
-//        }
-//    )
+            return targetedColIndices
+        }
+    )
 
 //let removeAnnotationBlocks (tableName:string) (annotationBlocks:BuildingBlock [])  =
 //    annotationBlocks
@@ -642,42 +638,22 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 //    |> Array.map (removeAnnotationBlock tableName)
 //    |> Promise.all
 
-//let removeSelectedAnnotationBlock () =
-//    Excel.run(fun context ->
+let removeSelectedAnnotationBlock () =
+    Excel.run(fun context ->
 
-//        promise {
+        promise {
 
-//            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTable = getActiveAnnotationTableName()
 
-//            let sheet = context.workbook.worksheets.getActiveWorksheet()
-//            let table = sheet.tables.getItem(annotationTable)
+            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTable
 
-//            // Ref. 2
+            let! deleteCols = removeAnnotationBlock annotationTable selectedBuildingBlock
 
-//            let _ = table.load(U2.Case1 "columns")
-//            let tableCols = table.columns.load(propertyNames = U2.Case1 "items")
+            let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols}]"  
 
-//            // This is necessary to place new columns next to selected col
-//            let annoHeaderRange = table.getHeaderRowRange()
-//            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"rowIndex"|]))
-
-//            let tableRange = table.getRange()
-//            let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
-
-//            let selectedRange = context.workbook.getSelectedRange()
-//            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
-
-//            // Ref. 2
-//            let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
-
-//            let! selectedBuildingBlock =
-//                BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
-
-//            let! deleteCols = removeAnnotationBlock annotationTable selectedBuildingBlock
-
-//            return sprintf "Delete Building Block %s (Cols: %A]" selectedBuildingBlock.MainColumn.Header.Value.Header deleteCols
-//        }
-//    )
+            return [resultMsg]
+        }
+    )
 
 let getAnnotationBlockDetails() =
     Excel.run(fun context ->
