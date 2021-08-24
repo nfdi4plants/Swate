@@ -419,6 +419,38 @@ let getTermByName cString (queryStr:string) =
                (reader.GetBoolean(5))
     |]
 
+let getTermByNameAndOntology cString (queryStr:string, ontologyShortName:string) =
+    
+    use connection = establishConnection cString
+    connection.Open()
+
+    use getTermByNameAndOntologyCmd = connection.CreateCommand()
+    getTermByNameAndOntologyCmd
+        .CommandText <- """
+            SELECT * FROM Term WHERE Term.Name = @name && Term.FK_OntologyName = @ontologyShortName
+        """
+
+    let ontologyShortNameParam = getTermByNameAndOntologyCmd.Parameters.Add("ontologyShortName", MySqlDbType.VarChar)
+    let queryParam = getTermByNameAndOntologyCmd.Parameters.Add("name",MySqlDbType.VarChar)
+
+    queryParam.Value                <- queryStr
+    ontologyShortNameParam.Value    <- ontologyShortName
+
+    use reader = getTermByNameAndOntologyCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            DbDomain.createTerm
+               (reader.GetString(0))
+               (reader.GetString(1))
+               (reader.GetString(2))
+               (reader.GetString(3))
+               (if (reader.IsDBNull(4)) then
+                   None
+               else
+                   Some (reader.GetString(4)))
+               (reader.GetBoolean(5))
+    |]
+
 let getTermByNameAndAccession cString (queryStr:string,accessionString:string) =
     
     use connection = establishConnection cString

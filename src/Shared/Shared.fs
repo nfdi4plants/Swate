@@ -146,6 +146,7 @@ type TermSearchable = {
     ColIndex            : int
     // RowIndex in table
     RowIndices          : int []
+    // Search result
     SearchResultTerm    : DbDomain.Term option
 } with
     static member create term parentTerm isUnit colInd rowIndices= {
@@ -260,7 +261,7 @@ type IAnnotatorAPIv1 = {
 
     getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<DbDomain.Term [] * UnitSearchRequest>
 
-    getTermsByNames                     : SearchTermI []                                                -> Async<SearchTermI []>
+    getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
 
     // Protocol apis
     getAllProtocolsWithoutXml       : unit                      -> Async<ProtocolTemplate []>

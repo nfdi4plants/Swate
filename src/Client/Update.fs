@@ -361,24 +361,25 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, Cmd.none
 
     | FillHiddenColumns (tableName,insertTerms) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.UpdateTableBySearchTermsI
-                (tableName,insertTerms)
-                (fun msg ->
-                    Msg.Batch [
-                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-                        GenericLog ("info",msg) |> Dev
-                    ]
-                )
-                (fun e ->
-                    Msg.Batch [
-                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-                        GenericError e |> Dev
-                    ] )
-        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelWriteFoundTerms |> ExcelInterop |> Cmd.ofMsg
-        let cmds = Cmd.batch [cmd; cmd2]
-        currentModel, cmds
+        failwith """Function "FillHiddenColumns" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.UpdateTableBySearchTermsI
+        //        (tableName,insertTerms)
+        //        (fun msg ->
+        //            Msg.Batch [
+        //                UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+        //                GenericLog ("info",msg) |> Dev
+        //            ]
+        //        )
+        //        (fun e ->
+        //            Msg.Batch [
+        //                UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+        //                GenericError e |> Dev
+        //            ] )
+        //let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelWriteFoundTerms |> ExcelInterop |> Cmd.ofMsg
+        //let cmds = Cmd.batch [cmd; cmd2]
+        currentModel, Cmd.none //cmds
 
 
     | UpdateFillHiddenColsState newState ->
@@ -400,14 +401,17 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
 
     //
-    | GetSelectedBuildingBlockSearchTerms ->
+    | GetSelectedBuildingBlockTerms ->
         let cmd =
             Cmd.OfPromise.either
                 OfficeInterop.getAnnotationBlockDetails
                 ()
                 (fun x ->
                     let msg = InteropLogging.Msg.create InteropLogging.Debug $"{x}"
-                    GenericInteropLogs [msg] |> Dev
+                    Msg.Batch [
+                        GenericInteropLogs [msg] |> Dev
+                        GetSelectedBuildingBlockTermsRequest x |> BuildingBlockDetails
+                    ]
                 )
                 //(GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
                 (fun x ->
@@ -1482,7 +1486,7 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
         }
         nextState, Cmd.none
     // Server
-    | GetSelectedBuildingBlockSearchTermsRequest searchTerms ->
+    | GetSelectedBuildingBlockTermsRequest searchTerms ->
         let nextState = {
             currentState with
                 CurrentRequestState = RequestBuildingBlockInfoStates.RequestDataBaseInformation
@@ -1491,7 +1495,7 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
             Cmd.OfAsync.either
                 Api.api.getTermsByNames
                 searchTerms
-                (GetSelectedBuildingBlockSearchTermsResponse >> BuildingBlockDetails)
+                (GetSelectedBuildingBlockTermsResponse >> BuildingBlockDetails)
                 (fun x ->
                     Msg.Batch [
                         GenericError x |> Dev
@@ -1499,7 +1503,7 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
                     ]
                 )
         nextState, cmd
-    | GetSelectedBuildingBlockSearchTermsResponse searchTermResults ->
+    | GetSelectedBuildingBlockTermsResponse searchTermResults ->
         let nextState = {
             currentState with
                 ShowDetails         = true

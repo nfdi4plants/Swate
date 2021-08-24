@@ -979,99 +979,99 @@ let fillValue (term,termBackground:Shared.DbDomain.Term option) =
 
 //    )
 
-/// This function will be executed after the SearchTerm types from 'createSearchTermsFromTable' where send to the server to search the database for them.
-/// Here the results will be written into the table by the stored col and row indices.
-let UpdateTableBySearchTermsI (annotationTable,terms:SearchTermI []) =
-    Excel.run(fun context ->
+///// This function will be executed after the SearchTerm types from 'createSearchTermsFromTable' where send to the server to search the database for them.
+///// Here the results will be written into the table by the stored col and row indices.
+//let UpdateTableBySearchTermsI (annotationTable,terms:TermSearchable []) =
+//    Excel.run(fun context ->
 
-        /// This will create a single cell value arr
-        let createCellValueInput str =
-            ResizeArray([
-                ResizeArray([
-                    str |> box |> Some
-                ])
-            ])
+//        /// This will create a single cell value arr
+//        let createCellValueInput str =
+//            ResizeArray([
+//                ResizeArray([
+//                    str |> box |> Some
+//                ])
+//            ])
 
-        // Ref. 2
-        let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let annotationTable = sheet.tables.getItem(annotationTable)
-        let annoBodyRange = annotationTable.getDataBodyRange()
-        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+//        // Ref. 2
+//        let sheet = context.workbook.worksheets.getActiveWorksheet()
+//        let annotationTable = sheet.tables.getItem(annotationTable)
+//        let annoBodyRange = annotationTable.getDataBodyRange()
+//        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
 
-        // Ref. 1
-        let r = context.runtime.load(U2.Case1 "enableEvents")
+//        // Ref. 1
+//        let r = context.runtime.load(U2.Case1 "enableEvents")
 
-        context.sync().
-            ``then``(fun _ ->
-                r.enableEvents <- false
-                /// Filter for only terms which returned a result and therefore were not custom user input.
-                let foundTerms = terms |> Array.filter (fun x -> x.TermOpt.IsSome)
-                /// Insert terms into related cells for all stored row-/ col-indices
-                let insert() =
-                    terms
-                    // iterate over all found terms
-                    |> Array.map (
-                        fun term ->
-                            let t,ont,accession =
-                                if term.TermOpt.IsSome then
-                                    /// Term search result from database
-                                    let t = term.TermOpt.Value
-                                    /// Get ontology and accession from Term.Accession
-                                    let ont, accession =
-                                        let a = t.Accession
-                                        let splitA = a.Split":"
-                                        let accession = Shared.URLs.TermAccessionBaseUrl + a.Replace(":","_")
-                                        splitA.[0], accession
-                                    t.Name,ont,accession
-                                elif term.SearchQuery.Name = "" then
-                                    let t = ""
-                                    let ont = ""
-                                    let accession = ""
-                                    t, ont, accession
-                                elif term.TermOpt = None then
-                                    let t = term.SearchQuery.Name
-                                    let ont = "user-specific"
-                                    let accession = "user-specific"
-                                    t, ont, accession
-                                else
-                                    failwith "Swate encountered an error in (UpdateTableBySearchTermsI.insert()) trying to parse database search results to Swate table."
-                            /// Distinguish between core building blocks and unit buildingblocks.
-                            let inputVals = [|
-                                /// if the n of cols is 2 then it is a core building block.
-                                if term.ColIndices.Length = 2 then
-                                    createCellValueInput ont
-                                    createCellValueInput accession
-                                /// if the n of cols is 3 then it is a unit building block.
-                                elif term.ColIndices.Length = 3 then
-                                    createCellValueInput t
-                                    createCellValueInput ont
-                                    createCellValueInput accession
-                            |]
+//        context.sync().
+//            ``then``(fun _ ->
+//                r.enableEvents <- false
+//                /// Filter for only terms which returned a result and therefore were not custom user input.
+//                let foundTerms = terms |> Array.filter (fun x -> x.SearchResultTerm.IsSome)
+//                /// Insert terms into related cells for all stored row-/ col-indices
+//                let insert() =
+//                    terms
+//                    // iterate over all found terms
+//                    |> Array.map (
+//                        fun term ->
+//                            let t,ont,accession =
+//                                if term.SearchResultTerm.IsSome then
+//                                    /// Term search result from database
+//                                    let t = term.SearchResultTerm.Value
+//                                    /// Get ontology and accession from Term.Accession
+//                                    let ont, accession =
+//                                        let a = t.Accession
+//                                        let splitA = a.Split":"
+//                                        let accession = Shared.URLs.TermAccessionBaseUrl + a.Replace(":","_")
+//                                        splitA.[0], accession
+//                                    t.Name,ont,accession
+//                                elif term.Term.Name = "" then
+//                                    let t = ""
+//                                    let ont = ""
+//                                    let accession = ""
+//                                    t, ont, accession
+//                                elif term.SearchResultTerm = None then
+//                                    let t = term.Term.Name
+//                                    let ont = "user-specific"
+//                                    let accession = "user-specific"
+//                                    t, ont, accession
+//                                else
+//                                    failwith "Swate encountered an error in (UpdateTableBySearchTermsI.insert()) trying to parse database search results to Swate table."
+//                            /// Distinguish between core building blocks and unit buildingblocks.
+//                            let inputVals = [|
+//                                /// if the n of cols is 2 then it is a core building block.
+//                                if term.ColIndex.Length = 2 then
+//                                    createCellValueInput ont
+//                                    createCellValueInput accession
+//                                /// if the n of cols is 3 then it is a unit building block.
+//                                elif term.ColIndex.Length = 3 then
+//                                    createCellValueInput t
+//                                    createCellValueInput ont
+//                                    createCellValueInput accession
+//                            |]
 
-                            /// ATTENTION!! The following seems to be a strange interaction between office.js and fable.
-                            /// In an example with 2 colIndices i had a mistake in the code to access: 'for i in 0 .. insertTerm.ColIndices.Length do'
-                            /// so i actually accessed 3 colIndices which should have led to the classic 'System.IndexOutOfRangeException', but it didnt.
-                            /// for 'inputVals.[2]' it returned 'undefined' and for 'insertTerm.ColIndices.[2]' it returned '0'.
-                            /// This led to the first column to be erased for the same rows that were found to be replaced.
+//                            /// ATTENTION!! The following seems to be a strange interaction between office.js and fable.
+//                            /// In an example with 2 colIndices i had a mistake in the code to access: 'for i in 0 .. insertTerm.ColIndices.Length do'
+//                            /// so i actually accessed 3 colIndices which should have led to the classic 'System.IndexOutOfRangeException', but it didnt.
+//                            /// for 'inputVals.[2]' it returned 'undefined' and for 'insertTerm.ColIndices.[2]' it returned '0'.
+//                            /// This led to the first column to be erased for the same rows that were found to be replaced.
 
-                            // iterate over all columns (in this case in form of the index of their array. as we need the index to access the correct 'inputVal' value
-                            for i in 0 .. term.ColIndices.Length-1 do
+//                            // iterate over all columns (in this case in form of the index of their array. as we need the index to access the correct 'inputVal' value
+//                            for i in 0 .. term.ColIndices.Length-1 do
 
-                                // iterate over all rows and insert the correct inputVal
-                                for rowInd in term.RowIndices do
+//                                // iterate over all rows and insert the correct inputVal
+//                                for rowInd in term.RowIndices do
 
-                                    let cell = annoBodyRange.getCell(float rowInd, float term.ColIndices.[i])
-                                    cell.values <- inputVals.[i]
-                    )
+//                                    let cell = annoBodyRange.getCell(float rowInd, float term.ColIndices.[i])
+//                                    cell.values <- inputVals.[i]
+//                    )
 
-                let _ = insert()
+//                let _ = insert()
 
-                r.enableEvents <- true
+//                r.enableEvents <- true
 
-                // return print msg
-                sprintf "Filled information for terms: %s" (foundTerms |> Array.map (fun x -> x.TermOpt.Value.Name) |> String.concat ", ")
-            )
-    )
+//                // return print msg
+//                sprintf "Filled information for terms: %s" (foundTerms |> Array.map (fun x -> x.TermOpt.Value.Name) |> String.concat ", ")
+//            )
+//    )
 
 /// This function is used to insert file names into the selected range.
 let insertFileNamesFromFilePicker (fileNameList:string list) =

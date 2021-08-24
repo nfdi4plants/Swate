@@ -11,49 +11,151 @@ open Messages
 open Shared
 open CustomComponents
 
+let getBuildingBlockHeader (terms:TermSearchable []) =
+    terms |> Array.tryFind (fun x -> x.RowIndices = [|0|])
+
+let getBodyRows (terms:TermSearchable []) =
+    terms |> Array.filter (fun x -> x.RowIndices <> [|0|])
+
+/// used to parse rowIndices into subsequent windows e.g. "1..3, 5..8"
+let windowRowIndices (rowIndices:int [])=
+    let splitArrToContinous (l: int []) =
+        l 
+        |> Array.indexed 
+        |> Array.groupBy (fun (i,x) -> i-x)
+        |> Array.map (fun (key,valArr) ->
+            valArr |> Array.map snd
+        )
+    let separatedIndices = splitArrToContinous rowIndices
+    let sprintedRowIndices =
+        [ for contRowIndices in separatedIndices do
+            let isMultiple = contRowIndices.Length > 1
+            let sprinted =
+                if isMultiple then
+                    let min = Array.min contRowIndices
+                    let max = Array.max contRowIndices
+                    sprintf "%i-%i" min max
+                else
+                    $"{contRowIndices.[0]}"
+            yield sprinted
+        ]
+    sprintedRowIndices |> String.concat ", "
+
+/// parses rowIndices to a nicely formatted sting
+let rowIndicesToReadable (rowIndices:int []) =
+    if rowIndices.Length > 1 then
+        windowRowIndices rowIndices
+    else
+        $"{rowIndices.[0]}"
+
+let infoIcon (txt:string) =
+    span [
+        Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"; OverflowY OverflowOptions.Visible]
+        Class (Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
+        Tooltip.dataTooltip txt
+    ][
+        Fa.i [
+            Fa.Solid.InfoCircle
+        ][]
+    ]
+
+[<Literal>]
+let userSpecificTermMsg = "This Term was not found in the database."
+
+/// Parses TermSearchable to table row only for HEADERS. Addresses found search results and free text input.
+let searchResultTermToTableHeaderElement (term:TermSearchable option) =
+    match term with
+    | Some isEmpty when isEmpty.Term.Name = "" && isEmpty.Term.TermAccession = "" ->
+        tr [][
+            th [][str "-"]
+            th [][str "-"]
+            th [][str (rowIndicesToReadable isEmpty.RowIndices)]
+        ]
+    | Some hasResult when hasResult.SearchResultTerm.IsSome ->
+        tr [ ] [
+            th [][
+                str hasResult.SearchResultTerm.Value.Name
+                infoIcon hasResult.SearchResultTerm.Value.Definition
+            ]
+            th [][str hasResult.SearchResultTerm.Value.Accession]
+            th [][str (rowIndicesToReadable hasResult.RowIndices)]
+        ]
+    | Some hasNoResult when hasNoResult.SearchResultTerm.IsNone ->
+        tr [ ] [
+            th [ Style [Color NFDIColors.Red.Lighter20] ] [
+                str hasNoResult.Term.Name
+                infoIcon userSpecificTermMsg
+            ]
+            th [][str hasNoResult.Term.TermAccession]
+            th [][str (rowIndicesToReadable hasNoResult.RowIndices)]
+        ]
+    | None ->
+        tr [ ] [
+            th [][str "-"]
+            th [][str "-"]
+            th [][str "Header"]
+        ]
+    | anythingElse -> failwith $"""Swate encountered an error when trying to parse {anythingElse} to search results."""
+
+
+/// Parses TermSearchable to table row. Addresses found search results and free text input.
+let searchResultTermToTableElement (term:TermSearchable) =
+    match term with
+    | isEmpty when term.Term.Name = "" && term.Term.TermAccession = "" ->
+        tr [][
+            td [][str "-"]
+            td [][str "-"]
+            td [][str (rowIndicesToReadable isEmpty.RowIndices)]
+        ]
+    | hasResult when term.SearchResultTerm.IsSome ->
+        tr [ ] [
+            td [][
+                str hasResult.SearchResultTerm.Value.Name
+                infoIcon hasResult.SearchResultTerm.Value.Definition
+            ]
+            td [][str hasResult.SearchResultTerm.Value.Accession]
+            td [][str (rowIndicesToReadable hasResult.RowIndices)]
+        ]
+    | hasNoResult when term.SearchResultTerm.IsNone ->
+        tr [ ] [
+            td [ Style [Color NFDIColors.Red.Lighter20] ] [
+                str hasNoResult.Term.Name
+                infoIcon userSpecificTermMsg
+            ]
+            td [][str hasNoResult.Term.TermAccession]
+            td [][str (rowIndicesToReadable hasNoResult.RowIndices)]
+        ]
+    | anythingElse -> failwith $"""Swate encountered an error when trying to parse {anythingElse} to search results."""
+
+/// This element is used if the TermSearchable types for the selected building block do not contain a unit.
+let tableElement (terms:TermSearchable []) =
+    let rowHeader = getBuildingBlockHeader terms
+    let bodyRows = getBodyRows terms
+    Table.table [
+        Table.IsFullWidth
+        Table.IsStriped
+    ][
+        thead [][
+            tr [][
+                th [Class "toExcelColor"][str "Name"]
+                th [Class "toExcelColor"][str "TAN"]
+                th [Class "toExcelColor"][str "RowIndex"]
+            ]
+        ]
+        thead [][
+            searchResultTermToTableHeaderElement rowHeader
+        ]
+        tbody [][
+            for term in bodyRows do 
+                yield
+                    searchResultTermToTableElement term
+        ]
+    ]
+
 let buildingBlockDetailModal (model:Model) dispatch =
     let closeMsg = (fun e -> ToggleShowDetails |> BuildingBlockDetails |> dispatch)
 
-    let baseArr =
-        model.BuildingBlockDetailsState.BuildingBlockValues |> Array.sortBy (fun x -> x.ColIndices)
-
-    let minColIndex = baseArr |> Array.collect (fun x -> x.ColIndices) |> Seq.min
-
-    let mainColHeader =
-        baseArr |> Array.find (fun t -> t.ColIndices |> Array.contains minColIndex)
-
-    let unitHeaderOpt =
-        baseArr |> Array.tryFind (fun t -> t.ColIndices |> Array.contains (minColIndex+3) )
-
-    let valueArr =
-        baseArr
-        |> Array.except [mainColHeader; if unitHeaderOpt.IsSome then unitHeaderOpt.Value]
-
-    let sprintableRowIndices (rowIndices:int [])=
-        let splitArrToContinous (l: int []) =
-            l 
-            |> Array.indexed 
-            |> Array.groupBy (fun (i,x) -> i-x)
-            |> Array.map (fun (key,valArr) ->
-                valArr |> Array.map snd
-            )
-        let separatedIndices = splitArrToContinous rowIndices
-        let sprintedRowIndices =
-            [for contRowIndices in separatedIndices do
-                let isLong = contRowIndices.Length >= 3
-                let sprinted =
-                    if isLong then
-                        let min = Array.min contRowIndices
-                        let max = Array.max contRowIndices
-                        sprintf "%i-%i" min max
-                    else
-                        contRowIndices
-                        |> Array.map string |> String.concat ", "
-                yield sprinted
-            ]
-        sprintedRowIndices |> String.concat ", "
-
-        
+    let baseArr = model.BuildingBlockDetailsState.BuildingBlockValues |> Array.sortBy (fun x -> x.RowIndices |> Array.min)
 
     Modal.modal [ Modal.IsActive true ] [
         Modal.background [
@@ -63,88 +165,6 @@ let buildingBlockDetailModal (model:Model) dispatch =
             Notification.Props [Style [Width "80%"; MaxHeight "80%"; OverflowX OverflowOptions.Auto ]]
         ] [
             Notification.delete [Props [OnClick closeMsg]][]
-            Table.table [
-                Table.IsFullWidth
-                Table.IsStriped
-            ][
-                thead [][
-                    tr [][
-                        th [Class "toExcelColor"][str "Name"]
-                        th [Class "toExcelColor"][str "TAN"]
-                        th [Class "toExcelColor"][str "ColIndex"]
-                        th [Class "toExcelColor"][str "RowIndex"]
-                    ]
-                    tr [][
-                        th [][
-                            str mainColHeader.SearchQuery.Name
-                            if mainColHeader.TermOpt.IsSome then
-                                span [
-                                    Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"; OverflowY OverflowOptions.Visible]
-                                    Class (Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
-                                    Tooltip.dataTooltip mainColHeader.TermOpt.Value.Definition
-                                ][
-                                    Fa.i [
-                                        Fa.Solid.InfoCircle
-                                    ][]
-                                ]
-                        ]
-                        th [][
-                            a [ Href (Shared.URLs.termAccessionUrlOfAccessionStr mainColHeader.SearchQuery.TermAccession)] [ str mainColHeader.SearchQuery.TermAccession ]
-                        ]
-                        th [][str (mainColHeader.ColIndices |> Seq.min |> string)]
-                        th [][str "Header"]
-                    ]
-                    if unitHeaderOpt.IsSome then
-                        let unitHeader = unitHeaderOpt.Value
-                        tr [][
-                            th [][
-                                str unitHeader.SearchQuery.Name
-                                if unitHeader.TermOpt.IsSome then
-                                    span [
-                                        Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"; OverflowY OverflowOptions.Visible]
-                                        Class (Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
-                                        Tooltip.dataTooltip unitHeader.TermOpt.Value.Definition
-                                    ][
-                                        Fa.i [
-                                            Fa.Solid.InfoCircle
-                                        ][]
-                                    ]
-                            ]
-                            th [][
-                                a [ Href (Shared.URLs.termAccessionUrlOfAccessionStr unitHeader.SearchQuery.TermAccession)] [ str unitHeader.SearchQuery.TermAccession]
-                            ]
-                            th [][str (unitHeader.ColIndices |> Seq.min |> string)]
-                            th [][str "Unit"]
-                        ]
-                ]
-                tbody [][
-                    for t in valueArr do
-                        yield
-                            tr [] [
-                                td [][
-                                    str (if t.SearchQuery.Name = "" then "none" else t.SearchQuery.Name)
-                                    if t.TermOpt.IsSome then
-                                        span [
-                                            Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"; OverflowY OverflowOptions.Visible]
-                                            Class (Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
-                                            Tooltip.dataTooltip t.TermOpt.Value.Definition
-                                        ][
-                                            Fa.i [
-                                                Fa.Solid.InfoCircle
-                                            ][]
-                                        ]
-                                ]
-                                td [][
-                                    if t.TermOpt.IsSome then
-                                        a [ Href (Shared.URLs.termAccessionUrlOfAccessionStr t.TermOpt.Value.Accession)] [ str t.TermOpt.Value.Accession  ]
-                                    else
-                                        str "none"
-                                ]
-                                td [][str (mainColHeader.ColIndices |> Seq.min |> string)]
-                                td [][str (sprintf "%A" (sprintableRowIndices t.RowIndices) ) ]
-                        ]
-                ]
-            ]
-
+            tableElement baseArr
         ]
     ]

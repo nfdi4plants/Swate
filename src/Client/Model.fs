@@ -367,7 +367,7 @@ type RequestBuildingBlockInfoStates =
 type BuildingBlockDetailsState = {
     CurrentRequestState : RequestBuildingBlockInfoStates
     ShowDetails         : bool
-    BuildingBlockValues : Shared.SearchTermI []
+    BuildingBlockValues : Shared.TermSearchable []
 } with
     static member init () = {
         CurrentRequestState = Inactive

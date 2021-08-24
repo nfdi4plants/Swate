@@ -38,12 +38,12 @@ type ExcelInteropMsg =
     | UpdateSwateCustomXml                  of string
     //
     | FillHiddenColsRequest
-    | FillHiddenColumns                     of tableName:string*SearchTermI []
+    | FillHiddenColumns                     of tableName:string*TermSearchable []
     | UpdateFillHiddenColsState             of FillHiddenColsState
     //
     | InsertFileNames                       of fileNameList:string list
     // Show Details to selected BuildingBlock
-    | GetSelectedBuildingBlockSearchTerms
+    | GetSelectedBuildingBlockTerms
     //
     | CreatePointerJson
     //
@@ -94,7 +94,7 @@ type ApiRequestMsg =
     | FetchAllOntologies
     /// This function is used to search for all values found in the table main columns.
     /// InsertTerm [] is created by officeInterop and passed to server for db search.
-    | SearchForInsertTermsRequest              of tableName:string*SearchTermI []
+    | SearchForInsertTermsRequest              of tableName:string*TermSearchable []
     //
     | GetAppVersion
 
@@ -104,7 +104,7 @@ type ApiResponseMsg =
     | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
     | UnitTermSuggestionResponse                of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
-    | SearchForInsertTermsResponse              of tableName:string*SearchTermI []  
+    | SearchForInsertTermsResponse              of tableName:string*TermSearchable []  
     //
     | GetAppVersionResponse                     of string
 
@@ -177,10 +177,10 @@ type ProtocolInsertMsg =
     | UpdateLoading                     of bool
 
 type BuildingBlockDetailsMsg =
-    | GetSelectedBuildingBlockSearchTermsRequest    of Shared.SearchTermI []
-    | GetSelectedBuildingBlockSearchTermsResponse   of Shared.SearchTermI []
+    | GetSelectedBuildingBlockTermsRequest      of Shared.TermSearchable []
+    | GetSelectedBuildingBlockTermsResponse     of Shared.TermSearchable []
     | ToggleShowDetails
-    | UpdateCurrentRequestState                     of RequestBuildingBlockInfoStates
+    | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
 
 type SettingsXmlMsg =
     // // Client // //

@@ -232,6 +232,6 @@ let annotatorApiDocsv1 =
                 "Returns the parameter array posted to it with the search result in <code>SearchTerm.TermOpt</code>."
                 (Parameter.create "SearchTermI []" (PredefinedParams.SearchTermType |> ParameterType.ParamArray) "")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getTermsByNames ([|PredefinedParams.Examples.searchTermExmp|]) @>
+        |> annotatorDocsv1.example <@ fun api -> api.getTermsByNames ([|PredefinedParams.Examples.termSearchableExmp|]) @>
     ]
 

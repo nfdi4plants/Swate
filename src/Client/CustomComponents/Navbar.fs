@@ -67,7 +67,7 @@ let shortCutIconList model =
                 span [][str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
                 Fa.span [Fa.Solid.Columns][]
             ]
-            (GetSelectedBuildingBlockSearchTerms |> ExcelInterop)
+            (GetSelectedBuildingBlockTerms |> ExcelInterop)
             "BuildingBlock"
     ]
     

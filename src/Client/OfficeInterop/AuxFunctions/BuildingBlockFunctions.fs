@@ -275,7 +275,7 @@ let toTermSearchable (buildingBlock:BuildingBlock) =
         else
             [||]
     let allTermValues =
-        if buildingBlock.hasCompleteTSRTAN then
+        if buildingBlock.hasCompleteTSRTAN && not buildingBlock.hasUnit then
             buildingBlock.MainColumn.Cells
             // get all units from cells
             |> Array.map (fun cell -> cell.Value, cell.Index)

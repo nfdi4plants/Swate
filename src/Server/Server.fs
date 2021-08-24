@@ -181,25 +181,36 @@ let annotatorApi cString = {
             let result =
                 queryArr |> Array.map (fun searchTerm ->
                     {searchTerm with
-                        TermOpt =
+                        SearchResultTerm =
                             // check if search string is empty. This case should delete TAN- and TSR- values in table
-                            if searchTerm.SearchQuery.Name = "" then None
+                            if searchTerm.Term.Name = "" then None
                             // check if term accession was found. If so search also by this as it is unique
-                            elif searchTerm.SearchQuery.TermAccession <> "" then
-                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchQuery.Name,searchTerm.SearchQuery.TermAccession)
+                            elif searchTerm.Term.TermAccession <> "" then
+                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.Term.Name,searchTerm.Term.TermAccession)
                                 if Array.isEmpty searchRes then
                                     None
                                 else
                                     searchRes |> Array.head |> Some
-                            elif searchTerm.IsA.IsSome then
-                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchQuery.Name,searchTerm.IsA.Value)
+                            // check if parent term was found and try find term via parent term
+                            elif searchTerm.ParentTerm.IsSome then
+                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.Term.Name,searchTerm.ParentTerm.Value)
                                 if Array.isEmpty searchRes then
-                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.SearchQuery.Name
+                                    // if no term can be found by is_a directed search do standard search by name
+                                    // no need to search for name and accession, as accession is the clearly defines a term and is checked in the if branch above.
+                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.Term.Name
                                     if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
                                 else
                                     searchRes |> Array.head |> Some
+                            // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
+                            elif searchTerm.IsUnit then
+                                let searchRes = OntologyDB.getTermByNameAndOntology cString (searchTerm.Term.Name,"uo")
+                                if Array.isEmpty searchRes then
+                                    None
+                                else
+                                    searchRes |> Array.head |> Some
+                            // if none of the above apply we do a standard term search
                             else
-                                let searchRes = OntologyDB.getTermByName cString searchTerm.SearchQuery.Name
+                                let searchRes = OntologyDB.getTermByName cString searchTerm.Term.Name
                                 if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
                     }
                 )

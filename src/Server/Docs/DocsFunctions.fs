@@ -139,12 +139,13 @@ module PredefinedParams =
             UserID = "gkoutos"
         }
 
-        let searchTermExmp:SearchTermI = {
-            ColIndices = [|2; 3|]
-            SearchQuery = Shared.TermMinimal.create "Bruker Daltonics HCT Series" ""
-            IsA = Some ontologyInfoExmp
+        let termSearchableExmp:TermSearchable = {
+            Term = Shared.TermMinimal.create "Bruker Daltonics HCT Series" ""
+            ParentTerm = Some ontologyInfoExmp
+            IsUnit = false
+            ColIndex = 2
             RowIndices = [|0 .. 10|]
-            TermOpt = None
+            SearchResultTerm = None
         }
 
         let test = System.DateTime(2020,11,17)
