@@ -493,6 +493,77 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
         } 
     )
 
+/// This function is used to add unit reference columns to an existing building block without unit reference columns
+let updateUnitForCells (unitTerm:TermMinimal) =
+    Excel.run(fun context ->
+
+        promise {
+
+            let! annotationTableName = getActiveAnnotationTableName()
+            
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let annotationTable = sheet.tables.getItem(annotationTableName)
+            let _ = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
+
+            let selectedRange = context.workbook.getSelectedRange()
+            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"rowIndex"; "rowCount";])))
+
+            let annoHeaderRange = annotationTable.getHeaderRowRange()
+            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
+            let tableRange = annotationTable.getRange()
+            let _ = tableRange.load(U2.Case2 (ResizeArray(["rowCount"])))
+
+            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTableName
+
+            let! headerVals = context.sync().``then``(fun e ->
+                /// Get an array of the headers
+                annoHeaderRange.values.[0] |> Array.ofSeq
+            )
+
+            /// Check if building block has existing unit
+            let! updateWithUnit =
+                if selectedBuildingBlock.hasUnit then
+                    context.sync().``then``(fun _ ->
+                        
+                        let format = unitTerm.toNumberFormat
+                        let formats = createValueMatrix 1 (int selectedRange.rowCount) format
+                        selectedRange.numberFormat <- formats
+                        InteropLogging.Msg.create InteropLogging.Info $"Updated specified cells with unit: {format}."
+                    )
+                elif selectedBuildingBlock.hasCompleteTSRTAN && selectedBuildingBlock.hasUnit |> not then
+                    context.sync().``then``(fun _ ->
+                        // Create unit column
+                        /// Create unit column name
+                        let allColHeaders =
+                            headerVals
+                            |> Array.choose id
+                            |> Array.map string
+                        let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit allColHeaders
+                        let unitColId = checkIdForUnitCol()
+                        let unitColName = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+                        /// add column at correct index
+                        let unitColumn =
+                            annotationTable.columns.add(
+                                index = float selectedBuildingBlock.MainColumn.Index + 1.
+                            )
+                        /// Add column name
+                        unitColumn.name <- unitColName
+                        // Change number format for main column
+                        /// Get main column table body range
+                        let mainCol = annotationTable.columns.items.[selectedBuildingBlock.MainColumn.Index].getDataBodyRange()
+                        // Create unitTerm number format
+                        let format = unitTerm.toNumberFormat
+                        let formats = createValueMatrix 1 (int tableRange.rowCount - 1) format
+                        mainCol.numberFormat <- formats
+                        InteropLogging.Msg.create InteropLogging.Info $"Created Unit Column {unitColName} for building block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader}."
+                    )
+                else
+                    failwith $"You can only add unit to building blocks of the type: {OfficeInterop.Types.BuildingBlockType.Parameter}, {OfficeInterop.Types.BuildingBlockType.Characteristics}, {OfficeInterop.Types.BuildingBlockType.Factor}"
+
+            return [updateWithUnit]
+        }
+    )
+
 //let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock list, protocol:Xml.GroupTypes.Protocol) =
   
 //    let chainBuildingBlocks (buildingBlockInfoList:MinimalBuildingBlock list) =
@@ -1522,68 +1593,6 @@ let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,cu
 //        }
 //    )
 
-/// This function is used to add unit reference columns to an existing building block without unit reference columns
-let updateUnitForCells (unitTerm:TermMinimal) =
-    Excel.run(fun context ->
-
-        promise {
-
-            let! annotationTableName = getActiveAnnotationTableName()
-            
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
-
-            let selectedRange = context.workbook.getSelectedRange()
-            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "rowCount";])))
-
-            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTableName
-
-            /// Check if building block has existing unit
-            let! updateWithUnit =
-                if selectedBuildingBlock.hasUnit then
-                    context.sync().``then``(fun _ ->
-                        let format = unitTerm.toNumberFormat
-                        let formats = createValueMatrix 1 (int selectedRange.rowCount) format
-                        selectedRange.numberFormat <- formats
-                        InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}"
-                    )
-                else
-                    context.sync().``then``(fun _ ->
-                        InteropLogging.Msg.create InteropLogging.Error "NAH YOU SHOULD NAAAT HIT THIS."
-                    )
-
-            //InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}" |> Some
-
-            //// Ref. 2
-            //let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
-
-            //let! selectedBuildingBlock =
-            //    BuildingBlockTypes.findSelectedBuildingBlock selectedRange annoHeaderRange annoBodyRange context
-
-            //if selectedBuildingBlock.hasCompleteTSRTAN |> not then
-            //    failwith (
-            //        sprintf
-            //            "Swate can only add a unit to columns of the type: %s, %s, %s."
-            //            OfficeInterop.Types.ColumnCoreNames.Shown.Parameter
-            //            OfficeInterop.Types.ColumnCoreNames.Shown.Characteristics
-            //            OfficeInterop.Types.ColumnCoreNames.Shown.Factor
-            //    )
-
-            //let! unitColumnResult = 
-            //    if selectedBuildingBlock.Unit.IsSome then
-            //        updateUnitColumns context table (float selectedBuildingBlock.MainColumn.Index) format unitAccessionOpt
-            //    else
-            //        createUnitColumns context table (float selectedBuildingBlock.MainColumn.Index) (int tableRange.rowCount) format unitAccessionOpt
-
-            //let maincolName = selectedBuildingBlock.MainColumn.Header.Value.Header
-
-            ///// If unit block was added then return some msg information
-            ////let unitColCreationMsg = if unitColumnResult.IsSome then fst unitColumnResult.Value else ""
-            //let unitColFormat = if unitColumnResult.IsSome then snd unitColumnResult.Value else "0.00"
-
-            return [updateWithUnit]
-        }
-    )
 
 let getAllValidationXmlParsed() =
     Excel.run(fun context ->
