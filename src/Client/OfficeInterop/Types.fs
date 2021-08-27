@@ -565,6 +565,7 @@ module BuildingBlockTypes =
 
         member this.HasUnit = this.UnitTerm.IsSome
         member this.HasExistingTerm = this.ColumnTerm.IsSome
+        member this.HasCompleteTerm = this.ColumnTerm.IsSome && this.ColumnTerm.Value.Name <> "" && this.ColumnTerm.Value.TermAccession <> ""
 
     [<Obsolete>]
     type MinimalBuildingBlock = {

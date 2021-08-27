@@ -202,8 +202,8 @@ type ProtocolTemplate = {
     CustomXml       : string
     TableXml        : string
     Tags            : string []
-    // WIP
     Used            : int
+    // WIP
     Rating          : int  
 } with
     static member create name version created author desc docs tags customXml tableXml used rating = {
@@ -216,8 +216,8 @@ type ProtocolTemplate = {
         Tags            = tags
         CustomXml       = customXml
         TableXml        = tableXml
-        // WIP          
         Used            = used
+        // WIP          
         Rating          = rating
     }
 
