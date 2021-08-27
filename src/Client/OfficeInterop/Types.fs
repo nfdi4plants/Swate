@@ -125,6 +125,10 @@ type ColumnCoreNames =
             | TermAccessionNumber   -> "Term Accession Number"
             | Unit                  -> "Unit"
 
+/// Used to fill in TSR and TAN if main column contains free-text input
+[<Literal>]
+let FreeTextInput = "user-specific"
+
 open System
 open Fable.SimpleXml
 open Fable.SimpleXml.Generator
@@ -451,12 +455,13 @@ type SwateColumnHeader = {
         | isMainCol when isMainCol.isMainColumn -> true
         | isRefCol when isRefCol.isReference    -> true
         | anythingelse                          -> false
-    // Use this function to extract ontology term from inside square brackets in the main column header
+    /// Use this function to extract ontology term name from inside square brackets in the main column header
     member this.tryGetOntologyTerm =
         let sqBrackets = parseSquaredBrackets this.SwateColumnHeader
         match sqBrackets with
         | Some str -> removeId str |> Some
         | None -> None
+    /// Get term Accession in TSR or TAN from column header
     member this.tryGetTermAccession =
         let brackets = parseBrackets this.SwateColumnHeader
         match brackets with
@@ -465,6 +470,18 @@ type SwateColumnHeader = {
             removeId str
             |> parseTermAccession
         | None -> None
+    /// Get column header hash id from main column. E.g. Parameter [Instrument Model#2]
+    member this.tryGetMainColumnHeaderId =
+        let brackets = parseSquaredBrackets this.SwateColumnHeader
+        match brackets with
+        | Some str  -> getId str
+        | None      -> None
+    /// Get column header hash id from main column. E.g. Term Source REF (MS:1000031#2)
+    member this.tryGetRefColumnHeaderId =
+        let brackets = parseBrackets this.SwateColumnHeader
+        match brackets with
+        | Some str  -> getId str
+        | None      -> None
 
 
 /// This module contains types to handle value search for TSR and TAN columns.

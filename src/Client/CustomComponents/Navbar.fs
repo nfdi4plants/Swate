@@ -38,15 +38,12 @@ let shortCutIconList model =
             [
                 Fa.i [Fa.Solid.SyncAlt][]
             ]
-            (Msg.Batch [
-                AutoFitTable |> ExcelInterop
-                //UpdateProtocolGroupHeader |> ExcelInterop
-            ])
+            (AutoFitTable |> ExcelInterop)
             "Formatting"
         ShortCutIcon.create
-            "Update Reference Columns"
+            "Update Ontology Terms"
             [
-                Fa.span [Fa.Solid.EyeSlash][]
+                Fa.span [Fa.Solid.SpellCheck][]
                 span [][str model.ExcelState.FillHiddenColsStateStore.toReadableString]
                 Fa.span [Fa.Solid.Pen][]
             ]

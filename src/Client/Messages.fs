@@ -38,7 +38,7 @@ type ExcelInteropMsg =
     | UpdateSwateCustomXml                  of string
     //
     | FillHiddenColsRequest
-    | FillHiddenColumns                     of tableName:string*TermSearchable []
+    | FillHiddenColumns                     of TermSearchable []
     | UpdateFillHiddenColsState             of FillHiddenColsState
     //
     | InsertFileNames                       of fileNameList:string list
@@ -92,9 +92,8 @@ type ApiRequestMsg =
     | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
     | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
     | FetchAllOntologies
-    /// This function is used to search for all values found in the table main columns.
-    /// InsertTerm [] is created by officeInterop and passed to server for db search.
-    | SearchForInsertTermsRequest              of tableName:string*TermSearchable []
+    /// TermSearchable [] is created by officeInterop and passed to server for db search.
+    | SearchForInsertTermsRequest              of TermSearchable []
     //
     | GetAppVersion
 
@@ -104,7 +103,7 @@ type ApiResponseMsg =
     | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
     | UnitTermSuggestionResponse                of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
-    | SearchForInsertTermsResponse              of tableName:string*TermSearchable []  
+    | SearchForInsertTermsResponse              of TermSearchable []  
     //
     | GetAppVersionResponse                     of string
 

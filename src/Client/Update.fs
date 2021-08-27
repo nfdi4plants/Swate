@@ -15,6 +15,7 @@ open OfficeInterop.Types
 /// This function matches a OfficeInterop.TryFindAnnoTableResult to either Success or Error
 /// If Success it will pipe the tableName on to the msg input paramter.
 /// If Error it will pipe the error message to GenericLog ("Error",errorMsg).
+[<System.ObsoleteAttribute>]
 let matchActiveTableResToMsg activeTableNameRes (msg:string -> Cmd<Msg>) =
     match activeTableNameRes with
     | Success tableName ->
@@ -160,13 +161,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
                 OfficeInterop.removeSelectedAnnotationBlock
                 ()
                 (GenericInteropLogs >> Dev)
-                //(fun msg ->
-                //    Msg.Batch [
-                //        GenericInteropLogs msg |> Dev
-                //        //AutoFitTable |> ExcelInterop
-                //        //UpdateProtocolGroupHeader |> ExcelInterop
-                //    ]
-                //)
                 (GenericError >> Dev)
         currentModel, cmd
 
@@ -179,33 +173,33 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
                 (GenericError >> Dev)
         currentModel, cmd
 
-    | FormatColumn (colName,format) ->
-        let cmd =
-            Cmd.OfPromise.either
-                (OfficeInterop.changeTableColumnFormat colName)
-                format
-                (fun x ->
-                    Msg.Batch [
-                        AutoFitTable |> ExcelInterop
-                        GenericLog x |> Dev
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel,cmd
+    //| FormatColumn (colName,format) ->
+    //    let cmd =
+    //        Cmd.OfPromise.either
+    //            (OfficeInterop.changeTableColumnFormat colName)
+    //            format
+    //            (fun x ->
+    //                Msg.Batch [
+    //                    AutoFitTable |> ExcelInterop
+    //                    GenericLog x |> Dev
+    //                ]
+    //            )
+    //            (GenericError >> Dev)
+    //    currentModel,cmd
 
-    | FormatColumns (resList) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.changeTableColumnsFormat
-                resList
-                (fun x ->
-                    Msg.Batch [
-                        AutoFitTable |> ExcelInterop
-                        GenericLog x |> Dev
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel,cmd
+    //| FormatColumns (resList) ->
+    //    let cmd =
+    //        Cmd.OfPromise.either
+    //            OfficeInterop.changeTableColumnsFormat
+    //            resList
+    //            (fun x ->
+    //                Msg.Batch [
+    //                    AutoFitTable |> ExcelInterop
+    //                    GenericLog x |> Dev
+    //                ]
+    //            )
+    //            (GenericError >> Dev)
+    //    currentModel,cmd
 
     | CreateAnnotationTable (isDark) ->
         let cmd =
@@ -339,41 +333,41 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
     //
     | FillHiddenColsRequest ->
-        failwith """Function "FillHiddenColsRequest" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.createSearchTermsIFromTable 
-        //        ()
-        //        (SearchForInsertTermsRequest >> Request >> Api)
-        //        (fun e ->
-        //            Msg.Batch [
-        //                UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-        //                GenericError e |> Dev
-        //            ] )
-        //let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> ExcelInterop |> Cmd.ofMsg
-        //let cmds = Cmd.batch [cmd; cmd2]
-        currentModel, Cmd.none
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getAllAnnotationBlockDetails 
+                ()
+                (SearchForInsertTermsRequest >> Request >> Api)
+                (fun e ->
+                    Msg.Batch [
+                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+                        GenericError e |> Dev
+                    ] )
+        let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> ExcelInterop |> Cmd.ofMsg
+        let cmds = Cmd.batch [cmd; stateCmd]
+        currentModel, cmds
 
-    | FillHiddenColumns (tableName,insertTerms) ->
-        failwith """Function "FillHiddenColumns" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.UpdateTableBySearchTermsI
-        //        (tableName,insertTerms)
-        //        (fun msg ->
-        //            Msg.Batch [
-        //                UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-        //                GenericLog ("info",msg) |> Dev
-        //            ]
-        //        )
-        //        (fun e ->
-        //            Msg.Batch [
-        //                UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-        //                GenericError e |> Dev
-        //            ] )
-        //let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelWriteFoundTerms |> ExcelInterop |> Cmd.ofMsg
-        //let cmds = Cmd.batch [cmd; cmd2]
-        currentModel, Cmd.none //cmds
+    | FillHiddenColumns (termsWithSearchResult) ->
+        let nextState = {
+            currentModel.ExcelState with
+                FillHiddenColsStateStore = FillHiddenColsState.ExcelWriteFoundTerms
+        }
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.UpdateTableByTermsSearchable
+                (termsWithSearchResult)
+                (fun msg ->
+                    Msg.Batch [
+                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+                        GenericInteropLogs msg |> Dev
+                    ]
+                )
+                (fun e ->
+                    Msg.Batch [
+                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+                        GenericError e |> Dev
+                    ] )
+        currentModel.updateByExcelState nextState, cmd
 
 
     | UpdateFillHiddenColsState newState ->
@@ -847,7 +841,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             (FetchAllOntologiesResponse >> Response >> Api)
             (ApiError >> Api)
 
-    | SearchForInsertTermsRequest (tableName,insertTerms) ->
+    | SearchForInsertTermsRequest (tableTerms) ->
         let currentCall = {
             FunctionName = "getTermsByNames"
             Status = Pending
@@ -859,16 +853,15 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let cmd =
             Cmd.OfAsync.either
                 Api.api.getTermsByNames
-                insertTerms
-                ((fun newTerms -> SearchForInsertTermsResponse (tableName,newTerms) ) >> Response >> Api)
+                tableTerms
+                (SearchForInsertTermsResponse >> Response >> Api)
                 (fun e ->
                     Msg.Batch [
                         UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
                         ApiError e |> Api
                     ] )
-        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ServerSearchDatabase |> ExcelInterop |> Cmd.ofMsg
-        //let cmd3 = GenericLog ("Debug", sprintf "%A" insertTerms) |> Dev |> Cmd.ofMsg
-        let cmds = Cmd.batch [cmd; cmd2; (*cmd3*)]
+        let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ServerSearchDatabase |> ExcelInterop |> Cmd.ofMsg
+        let cmds = Cmd.batch [cmd; stateCmd]
         nextState, cmds
     //
     | GetAppVersion ->
@@ -991,7 +984,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-    | SearchForInsertTermsResponse (tableName,insertTerms) ->
+    | SearchForInsertTermsResponse (termsWithSearchResult) ->
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -1002,12 +995,10 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
                 callHistory = finishedCall::currentState.callHistory
         }
         let cmd =
-            FillHiddenColumns (tableName,insertTerms) |> ExcelInterop |> Cmd.ofMsg
-        let cmd2 =
+            FillHiddenColumns (termsWithSearchResult) |> ExcelInterop |> Cmd.ofMsg
+        let loggingCmd =
              ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-        let cmds =
-            Cmd.batch [cmd; cmd2]
-        nextState, cmds
+        nextState, Cmd.batch [cmd; loggingCmd]
 
     //
     | GetAppVersionResponse appVersion ->

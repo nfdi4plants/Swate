@@ -79,6 +79,14 @@ module Regex =
         | _ ->
             None
 
+    let getId (headerStr:string) =
+        match headerStr with
+        | Regex HashNumberPattern value ->
+            value.Trim()
+            |> Some
+        | _ ->
+            None
+
     let removeId (squareBracket:string) =
         Regex.Replace(squareBracket, HashNumberPattern, "") 
        

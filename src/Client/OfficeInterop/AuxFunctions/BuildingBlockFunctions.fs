@@ -176,12 +176,18 @@ let getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRange:Excel
                     let tsrTermAccession = tsr.Header.tryGetTermAccession
                     let tanTermAccession = tan.Header.tryGetTermAccession
                     let termName        = bb.MainColumn.Header.tryGetOntologyTerm
-                    match tsrTermAccession, tanTermAccession with
-                    | Some accession1, Some accession2 ->
+                    match termName, tsrTermAccession, tanTermAccession with
+                    // complete term
+                    | Some termName, Some accession1, Some accession2 ->
                         if accession1 <> accession2 then failwith $"Swate found mismatching term accession in building block {bb.MainColumn.Header}: {accession1}, {accession2}"
-                        if termName.IsNone then failwith $"Swate found mismatching ontology term infor in building block {bb.MainColumn.Header}: Found term accession in reference columns, but no ontology ref in main column."
-                        TermMinimal.create termName.Value accession1 |> Some
-                    | None, None -> None
+                        TermMinimal.create termName accession1 |> Some
+                    // free text input term
+                    | Some termName, None, None ->
+                        TermMinimal.create termName "" |> Some
+                    // this is a uncomplete column with no found term name but term accession. Column needs manual curation
+                    | None, Some _, Some _ ->
+                        failwith $"Swate found mismatching ontology term infor in building block {bb.MainColumn.Header}: Found term accession in reference columns, but no ontology ref in main column."
+                    | None, None, None -> None
                     | _ -> failwith $"Swate found mismatching reference columns in building block {bb.MainColumn.Header}: Found TSR and TAN column but no complete term accessions."
                 | _ -> failwith $"Swate found mismatching reference columns in building block {bb.MainColumn.Header}: Found only TSR or TAN."
             { bb with MainColumnTerm = termOpt }
@@ -296,3 +302,4 @@ let toTermSearchable (buildingBlock:BuildingBlock) =
         yield! allUnits
         yield! allTermValues
     |]
+    |> Array.filter (fun x -> x.hasEmptyTerm |> not)

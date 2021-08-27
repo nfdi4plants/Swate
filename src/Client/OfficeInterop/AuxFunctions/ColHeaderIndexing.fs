@@ -47,7 +47,7 @@ module Column =
     let createMainColName (newBB:Types.BuildingBlockTypes.InsertBuildingBlock) (id:int) =
         match id with
         | 1             -> newBB.Column.toAnnotationTableHeader()
-        | anyOtherId    -> $"{newBB.Column.toAnnotationTableHeader(anyOtherId)})" 
+        | anyOtherId    -> $"{newBB.Column.toAnnotationTableHeader(anyOtherId)}" 
 
     let createTSRColName (newBB:Types.BuildingBlockTypes.InsertBuildingBlock) (id:int) =
         let bracketAttributes = createHiddenColAttributes newBB id

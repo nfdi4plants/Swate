@@ -158,6 +158,9 @@ type TermSearchable = {
         SearchResultTerm    = None
     }
 
+    member this.hasEmptyTerm =
+        this.Term.Name = "" && this.Term.TermAccession = ""
+
 type AnnotationTable = {
     Name            : string
     Worksheet       : string

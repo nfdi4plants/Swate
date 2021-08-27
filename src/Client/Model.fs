@@ -26,8 +26,8 @@ type LogItem =
 
     static member ofInteropLogginMsg (msg:InteropLogging.Msg) =
         match msg.LogIdentifier with
-        | InteropLogging.Info   -> Debug(System.DateTime.UtcNow,msg.MessageTxt)
-        | InteropLogging.Debug  -> Info (System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Info   -> Info (System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Debug  -> Debug(System.DateTime.UtcNow,msg.MessageTxt)
         | InteropLogging.Error  -> Error(System.DateTime.UtcNow,msg.MessageTxt)
 
     static member toTableRow = function

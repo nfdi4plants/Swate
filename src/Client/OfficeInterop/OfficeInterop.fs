@@ -522,6 +522,7 @@ let updateUnitForCells (unitTerm:TermMinimal) =
 
             /// Check if building block has existing unit
             let! updateWithUnit =
+                // is unit column already exists we want to update selected cells
                 if selectedBuildingBlock.hasUnit then
                     context.sync().``then``(fun _ ->
                         
@@ -530,6 +531,7 @@ let updateUnitForCells (unitTerm:TermMinimal) =
                         selectedRange.numberFormat <- formats
                         InteropLogging.Msg.create InteropLogging.Info $"Updated specified cells with unit: {format}."
                     )
+                // if no unit column exists for the selected building block we want to add a unit column and update the whole main column with the unit.
                 elif selectedBuildingBlock.hasCompleteTSRTAN && selectedBuildingBlock.hasUnit |> not then
                     context.sync().``then``(fun _ ->
                         // Create unit column
@@ -722,6 +724,8 @@ let removeSelectedAnnotationBlock () =
 
             let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols})"  
 
+            let! format = autoFitTable ()
+
             return [resultMsg]
         }
     )
@@ -741,98 +745,112 @@ let getAnnotationBlockDetails() =
         }
     )
 
-let changeTableColumnFormat (colName:string) (format:string) =
-    Excel.run(fun context ->
-        
-        promise {
-
-            let! annotationTable = getActiveAnnotationTableName()
-
-            // Ref. 2 
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTable)
-            
-            // get ranged of main column that was previously created
-            let colBodyRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
-            let _ = colBodyRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
-            
-            
-            // Ref. 1
-            let r = context.runtime.load(U2.Case1 "enableEvents")
-
-            let! res = context.sync().``then``( fun _ ->
-                
-                r.enableEvents <- false
-                
-                let rowCount = colBodyRange.rowCount |> int
-                // create a format column to insert
-                let formats = createValueMatrix 1 rowCount format
-                
-                // add unit format to previously created main column
-                colBodyRange.numberFormat <- formats
-                
-                r.enableEvents <- true
-                
-                // return msg
-                "Info",sprintf "Format of %s was changed to %s" colName format
-            )
-
-            return res
-        }        
-    )
-
-let changeTableColumnsFormat (colAndFormatList:(string*string) list) =
+let getAllAnnotationBlockDetails() =
     Excel.run(fun context ->
 
         promise {
 
-            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTableName = getActiveAnnotationTableName()
 
-            let colNames = colAndFormatList |> List.map fst
-            let formats = colAndFormatList |> List.map snd
-            // Ref. 2 
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTable)
+            let! buildingBlocks = OfficeInterop.BuildingBlockFunctions.getBuildingBlocks context annotationTableName
 
-            // get ranged of main column that was previously created
-            let colBodyRanges =
-                colNames
-                |> List.map (fun colName ->
-                    let colBodyRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
-                    let _ = colBodyRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
-                    colBodyRange
-                )
+            let searchTerms = buildingBlocks |> Array.collect OfficeInterop.BuildingBlockFunctions.toTermSearchable 
 
-            // Ref. 1
-            let r = context.runtime.load(U2.Case1 "enableEvents")
-
-            let! res = context.sync().``then``( fun _ ->
-
-                 r.enableEvents <- false
-
-                 let formatCols() =
-                    List.map2 (fun (colBodyRange:Excel.Range) format ->
-                        let rowCount = colBodyRange.rowCount |> int
-                        let formats = createValueMatrix 1 rowCount format
-                        colBodyRange.numberFormat <- formats
-                    ) colBodyRanges formats
-
-                 // create a format column to insert
-
-                 // add unit format to previously created main column
-
-                 let _ = formatCols()
-
-                 r.enableEvents <- true
-
-                 // return msg
-                 "Info",sprintf "Columns were updated with related format: %A" colAndFormatList
-            )
-
-            return res
+            return searchTerms
         }
-
     )
+
+//let changeTableColumnFormat (colName:string) (format:string) =
+//    Excel.run(fun context ->
+        
+//        promise {
+
+//            let! annotationTable = getActiveAnnotationTableName()
+
+//            // Ref. 2 
+//            let sheet = context.workbook.worksheets.getActiveWorksheet()
+//            let annotationTable = sheet.tables.getItem(annotationTable)
+            
+//            // get ranged of main column that was previously created
+//            let colBodyRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
+//            let _ = colBodyRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+            
+            
+//            // Ref. 1
+//            let r = context.runtime.load(U2.Case1 "enableEvents")
+
+//            let! res = context.sync().``then``( fun _ ->
+                
+//                r.enableEvents <- false
+                
+//                let rowCount = colBodyRange.rowCount |> int
+//                // create a format column to insert
+//                let formats = createValueMatrix 1 rowCount format
+                
+//                // add unit format to previously created main column
+//                colBodyRange.numberFormat <- formats
+                
+//                r.enableEvents <- true
+                
+//                // return msg
+//                "Info",sprintf "Format of %s was changed to %s" colName format
+//            )
+
+//            return res
+//        }        
+//    )
+
+//let changeTableColumnsFormat (colAndFormatList:(string*string) list) =
+//    Excel.run(fun context ->
+
+//        promise {
+
+//            let! annotationTable = getActiveAnnotationTableName()
+
+//            let colNames = colAndFormatList |> List.map fst
+//            let formats = colAndFormatList |> List.map snd
+//            // Ref. 2 
+//            let sheet = context.workbook.worksheets.getActiveWorksheet()
+//            let annotationTable = sheet.tables.getItem(annotationTable)
+
+//            // get ranged of main column that was previously created
+//            let colBodyRanges =
+//                colNames
+//                |> List.map (fun colName ->
+//                    let colBodyRange = (annotationTable.columns.getItem (U2.Case2 colName)).getDataBodyRange()
+//                    let _ = colBodyRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+//                    colBodyRange
+//                )
+
+//            // Ref. 1
+//            let r = context.runtime.load(U2.Case1 "enableEvents")
+
+//            let! res = context.sync().``then``( fun _ ->
+
+//                 r.enableEvents <- false
+
+//                 let formatCols() =
+//                    List.map2 (fun (colBodyRange:Excel.Range) format ->
+//                        let rowCount = colBodyRange.rowCount |> int
+//                        let formats = createValueMatrix 1 rowCount format
+//                        colBodyRange.numberFormat <- formats
+//                    ) colBodyRanges formats
+
+//                 // create a format column to insert
+
+//                 // add unit format to previously created main column
+
+//                 let _ = formatCols()
+
+//                 r.enableEvents <- true
+
+//                 // return msg
+//                 "Info",sprintf "Columns were updated with related format: %A" colAndFormatList
+//            )
+
+//            return res
+//        }
+//    )
 
 // Reform this to onSelectionChanged (Even though we now know how to add eventHandlers we do not know how to pass info from handler to Swate app).
 /// This function will parse the header of a selected column to check for a parent ontology, which will then be used for a isA-directed term search.
@@ -885,13 +903,10 @@ let getParentTerm () =
                             // is selected range is in table then take header value from selected column
                             let header = tableRange.values.[0].[newColIndex]
                             let parsedHeader = SwateColumnHeader.create (string header.Value)
-                            printfn $"parsedHeader: {parsedHeader}"
                             /// as the reference columns also contain a accession tag we want to return the first reference column header
                             /// instead of the main column header, if the main column header does include an ontology
                             if not parsedHeader.isSingleCol || not parsedHeader.isTANCol || not parsedHeader.isTSRCol || not parsedHeader.isUnitCol then
-                                printfn "is not single, tsr, tan, uni"
                                 if parsedHeader.tryGetOntologyTerm.IsSome then
-                                    printfn "is ontology term"
                                     let termName = parsedHeader.tryGetOntologyTerm.Value
                                     let termAccession =
                                         let headerIndexPlus1 = SwateColumnHeader.create ( Option.defaultValue (box "") tableRange.values.[0].[newColIndex+1] |> string )
@@ -904,7 +919,6 @@ let getParentTerm () =
                                             None
 
                                     let parentTerm = TermMinimal.create termName (Option.defaultValue "" termAccession) |> Some
-                                    printfn $"parentTerm: {parentTerm}"
                                     parentTerm
                                 else
                                     None
@@ -927,7 +941,6 @@ let fillValue (term,termBackground:Shared.DbDomain.Term option) =
     Excel.run(fun context ->
 
         // Ref. 2
-        let sheet = context.workbook.worksheets.getActiveWorksheet()
         let range = context.workbook.getSelectedRange()
         let _ = range.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
         /// This is for TSR and TAN
@@ -992,9 +1005,9 @@ let fillValue (term,termBackground:Shared.DbDomain.Term option) =
         }
     )
 
-///// This is used to create a full representation of all building blocks in the table. This representation is then split into unit building blocks and regular building blocks.
-///// These are then filtered for search terms and aggregated into an 'SearchTermI []', which is used to search the database for missing values.
-///// 'annotationTable'' gets passed by 'tryFindActiveAnnotationTable'.
+/// This is used to create a full representation of all building blocks in the table. This representation is then split into unit building blocks and regular building blocks.
+/// These are then filtered for search terms and aggregated into an 'SearchTermI []', which is used to search the database for missing values.
+/// 'annotationTable'' gets passed by 'tryFindActiveAnnotationTable'.
 //let createSearchTermsIFromTable () =
 //    Excel.run(fun context ->
 
@@ -1026,99 +1039,170 @@ let fillValue (term,termBackground:Shared.DbDomain.Term option) =
 
 //    )
 
-///// This function will be executed after the SearchTerm types from 'createSearchTermsFromTable' where send to the server to search the database for them.
-///// Here the results will be written into the table by the stored col and row indices.
-//let UpdateTableBySearchTermsI (annotationTable,terms:TermSearchable []) =
-//    Excel.run(fun context ->
+/// This function will be executed after the SearchTerm types from 'createSearchTermsFromTable' where send to the server to search the database for them.
+/// Here the results will be written into the table by the stored col and row indices.
+let UpdateTableByTermsSearchable (terms:TermSearchable []) =
+    Excel.run(fun context ->
 
-//        /// This will create a single cell value arr
-//        let createCellValueInput str =
-//            ResizeArray([
-//                ResizeArray([
-//                    str |> box |> Some
-//                ])
-//            ])
+        /// This will create a single cell value arr
+        let createCellValueInput str =
+            ResizeArray([
+                ResizeArray([
+                    str |> box |> Some
+                ])
+            ])
 
-//        // Ref. 2
-//        let sheet = context.workbook.worksheets.getActiveWorksheet()
-//        let annotationTable = sheet.tables.getItem(annotationTable)
-//        let annoBodyRange = annotationTable.getDataBodyRange()
-//        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+        let getBodyRows (terms:TermSearchable []) =
+            terms |> Array.filter (fun x -> x.RowIndices <> [|0|])
 
-//        // Ref. 1
-//        let r = context.runtime.load(U2.Case1 "enableEvents")
+        let getHeaderRows (terms:TermSearchable []) =
+            terms |> Array.filter (fun x -> x.RowIndices = [|0|])
 
-//        context.sync().
-//            ``then``(fun _ ->
-//                r.enableEvents <- false
-//                /// Filter for only terms which returned a result and therefore were not custom user input.
-//                let foundTerms = terms |> Array.filter (fun x -> x.SearchResultTerm.IsSome)
-//                /// Insert terms into related cells for all stored row-/ col-indices
-//                let insert() =
-//                    terms
-//                    // iterate over all found terms
-//                    |> Array.map (
-//                        fun term ->
-//                            let t,ont,accession =
-//                                if term.SearchResultTerm.IsSome then
-//                                    /// Term search result from database
-//                                    let t = term.SearchResultTerm.Value
-//                                    /// Get ontology and accession from Term.Accession
-//                                    let ont, accession =
-//                                        let a = t.Accession
-//                                        let splitA = a.Split":"
-//                                        let accession = Shared.URLs.TermAccessionBaseUrl + a.Replace(":","_")
-//                                        splitA.[0], accession
-//                                    t.Name,ont,accession
-//                                elif term.Term.Name = "" then
-//                                    let t = ""
-//                                    let ont = ""
-//                                    let accession = ""
-//                                    t, ont, accession
-//                                elif term.SearchResultTerm = None then
-//                                    let t = term.Term.Name
-//                                    let ont = "user-specific"
-//                                    let accession = "user-specific"
-//                                    t, ont, accession
-//                                else
-//                                    failwith "Swate encountered an error in (UpdateTableBySearchTermsI.insert()) trying to parse database search results to Swate table."
-//                            /// Distinguish between core building blocks and unit buildingblocks.
-//                            let inputVals = [|
-//                                /// if the n of cols is 2 then it is a core building block.
-//                                if term.ColIndex.Length = 2 then
-//                                    createCellValueInput ont
-//                                    createCellValueInput accession
-//                                /// if the n of cols is 3 then it is a unit building block.
-//                                elif term.ColIndex.Length = 3 then
-//                                    createCellValueInput t
-//                                    createCellValueInput ont
-//                                    createCellValueInput accession
-//                            |]
+        let createMainColName coreName searchResultName columnHeaderId = $"{coreName} [{searchResultName}{columnHeaderId}]"
+        let createTSRColName searchResultTermAccession columnHeaderId = $"{ColumnCoreNames.TermSourceRef.toString} ({searchResultTermAccession}{columnHeaderId})"
+        let createTANColName searchResultTermAccession columnHeaderId = $"{ColumnCoreNames.TermAccessionNumber.toString} ({searchResultTermAccession}{columnHeaderId})"
 
-//                            /// ATTENTION!! The following seems to be a strange interaction between office.js and fable.
-//                            /// In an example with 2 colIndices i had a mistake in the code to access: 'for i in 0 .. insertTerm.ColIndices.Length do'
-//                            /// so i actually accessed 3 colIndices which should have led to the classic 'System.IndexOutOfRangeException', but it didnt.
-//                            /// for 'inputVals.[2]' it returned 'undefined' and for 'insertTerm.ColIndices.[2]' it returned '0'.
-//                            /// This led to the first column to be erased for the same rows that were found to be replaced.
+        promise {
+            let! annotationTableName = getActiveAnnotationTableName()
+            // Ref. 2
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let annotationTable = sheet.tables.getItem(annotationTableName)
+            // Ref. 2
+            let tableBodyRange = annotationTable.getDataBodyRange()
+            let _ = tableBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
 
-//                            // iterate over all columns (in this case in form of the index of their array. as we need the index to access the correct 'inputVal' value
-//                            for i in 0 .. term.ColIndices.Length-1 do
+            let tableHeaderRange = annotationTable.getHeaderRowRange()
+            let _ = tableHeaderRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
 
-//                                // iterate over all rows and insert the correct inputVal
-//                                for rowInd in term.RowIndices do
+            // Ref. 1
+            let r = context.runtime.load(U2.Case1 "enableEvents")
 
-//                                    let cell = annoBodyRange.getCell(float rowInd, float term.ColIndices.[i])
-//                                    cell.values <- inputVals.[i]
-//                    )
+            let bodyTerms = terms |> getBodyRows
+            let headerTerms = terms |> getHeaderRows
 
-//                let _ = insert()
+            let! buildingBlocks = OfficeInterop.BuildingBlockFunctions.getBuildingBlocks context annotationTableName
 
-//                r.enableEvents <- true
+            let! resultMsg =
+                context.sync().``then``(fun _ ->
+                    r.enableEvents <- false
+                    /// Update only table column headers
+                    let numberOfUpdatedHeaderTerms =
+                        headerTerms
+                        |> Array.map (fun headerTerm ->
+                            let relBuildingBlock = buildingBlocks |> Array.find (fun bb -> bb.MainColumn.Index = headerTerm.ColIndex)
+                            let columnHeaderId =
+                                let opt = relBuildingBlock.MainColumn.Header.tryGetMainColumnHeaderId
+                                match opt with
+                                | Some id   -> id
+                                | None      -> ""
+                            let columnCoreName =
+                                let opt = relBuildingBlock.MainColumn.Header.getColumnCoreName
+                                match opt with
+                                | Some t    -> t
+                                | None      -> failwith $"Could not get Swate compatible column name from {relBuildingBlock.MainColumn.Header.SwateColumnHeader}."
+                            match headerTerm with
+                            | hasSearchResult when headerTerm.SearchResultTerm.IsSome ->
+                                let searchResult = TermMinimal.ofTerm hasSearchResult.SearchResultTerm.Value
+                                let mainColName = createMainColName columnCoreName searchResult.Name columnHeaderId 
+                                let tsrColName = createTSRColName searchResult.TermAccession columnHeaderId
+                                let tanColName = createTANColName searchResult.TermAccession columnHeaderId
+                                /// if building block has unit, then tsr and tan are one index further to the right
+                                let baseShift = if relBuildingBlock.hasUnit then float headerTerm.ColIndex + 1. else float headerTerm.ColIndex + 0.
+                                if relBuildingBlock.MainColumnTerm.IsSome && relBuildingBlock.MainColumnTerm.Value = searchResult then
+                                    // return 0 as nothing needs be to be changed
+                                    0
+                                elif relBuildingBlock.MainColumnTerm.IsSome && relBuildingBlock.MainColumnTerm.Value <> searchResult then
+                                    let mainColHeader= tableHeaderRange.getCell(0., float headerTerm.ColIndex)
+                                    let tsrColHeader= tableHeaderRange.getCell(0., baseShift + 1.)
+                                    let tanColHeader= tableHeaderRange.getCell(0., baseShift + 2.)
+                                    mainColHeader.values   <- createCellValueInput mainColName
+                                    tsrColHeader.values    <- createCellValueInput tsrColName
+                                    tanColHeader.values    <- createCellValueInput tanColName
+                                    1
+                                else
+                                    failwith $"Swate enocuntered an unknown term pattern. Found term {hasSearchResult.Term} for building block {relBuildingBlock.MainColumn.Header.SwateColumnHeader}"
+                            /// This is hit when free text input is entered as building block
+                            | hasNoSearchResult when headerTerm.SearchResultTerm.IsNone ->
+                                if
+                                    relBuildingBlock.MainColumnTerm.IsSome
+                                    && relBuildingBlock.MainColumnTerm.Value.Name = hasNoSearchResult.Term.Name
+                                    && relBuildingBlock.MainColumnTerm.Value.Name <> ""
+                                    && relBuildingBlock.MainColumnTerm.Value.TermAccession = ""
+                                then
+                                    0
+                                elif
+                                    relBuildingBlock.MainColumnTerm.IsSome
+                                    && relBuildingBlock.MainColumnTerm.Value.Name = hasNoSearchResult.Term.Name
+                                    && relBuildingBlock.MainColumnTerm.Value.Name <> ""
+                                then
+                                    let mainColName = createMainColName columnCoreName hasNoSearchResult.Term.Name columnHeaderId
+                                    let tsrColName = createTSRColName "" columnHeaderId
+                                    let tanColName = createTANColName "" columnHeaderId
+                                    let baseShift = if relBuildingBlock.hasUnit then float headerTerm.ColIndex + 1. else float headerTerm.ColIndex + 0.
+                                    let mainColHeader= tableHeaderRange.getCell(0., float headerTerm.ColIndex)
+                                    let tsrColHeader= tableHeaderRange.getCell(0., baseShift + 1.)
+                                    let tanColHeader= tableHeaderRange.getCell(0., baseShift + 2.)
+                                    mainColHeader.values   <- createCellValueInput mainColName
+                                    tsrColHeader.values    <- createCellValueInput tsrColName
+                                    tanColHeader.values    <- createCellValueInput tanColName
+                                    1
+                                else
+                                    failwith $"Swate enocuntered an unknown term pattern. Found no term in database for building block {relBuildingBlock.MainColumn.Header.SwateColumnHeader}"
+                            | anythingElse -> failwith $"Swate encountered an unknown term pattern. Search result: {anythingElse} for buildingBlock {relBuildingBlock.MainColumn.Header.SwateColumnHeader}"
+                                
+                        )
 
-//                // return print msg
-//                sprintf "Filled information for terms: %s" (foundTerms |> Array.map (fun x -> x.TermOpt.Value.Name) |> String.concat ", ")
-//            )
-//    )
+                    /// Insert table body terms into related cells for all stored row-/ col-indices
+                    let numberOfUpdatedBodyTerms =
+                        bodyTerms
+                        // iterate over all found terms
+                        |> Array.map (
+                            fun term ->
+                                let t,tsr,tan=
+                                    if term.SearchResultTerm.IsSome then
+                                        /// Term search result from database
+                                        let t = term.SearchResultTerm.Value
+                                        /// Get ontology and accession from Term.Accession
+                                        let tsr, tan =
+                                            let splitAccession = t.Accession.Split":"
+                                            let tan = Shared.URLs.termAccessionUrlOfAccessionStr t.Accession
+                                            splitAccession.[0], tan
+                                        t.Name, tsr, tan
+                                    elif term.Term.Name = "" then
+                                        let t = ""
+                                        let ont = ""
+                                        let accession = ""
+                                        t, ont, accession
+                                    elif term.SearchResultTerm = None then
+                                        let t = term.Term.Name
+                                        let ont = FreeTextInput
+                                        let accession = FreeTextInput
+                                        t, ont, accession
+                                    else
+                                        failwith $"Swate could not parse database search results for term: {term.Term.Name}."
+                                // iterate over all rows and insert the correct inputVal
+                                for rowInd in term.RowIndices do
+                                    /// ColIndex saves the column index of the main column. In case of a unit term the term gets inserted at maincolumn index + 1.
+                                    /// TSR and TAN are also shifted to the right by 1.
+                                    let termNameIndex = if term.IsUnit then float term.ColIndex + 1. else float term.ColIndex
+                                    /// Terms are saved based on rowIndex for the whole table. As the following works on the TableBodyRange we need to reduce the indices by 1.
+                                    let tableBodyRowIndex = float rowInd - 1.
+                                    let mainColumnCell = tableBodyRange.getCell(tableBodyRowIndex, termNameIndex)
+                                    let tsrColumnCell = tableBodyRange.getCell(tableBodyRowIndex, termNameIndex + 1.)
+                                    let tanColumnCell = tableBodyRange.getCell(tableBodyRowIndex, termNameIndex + 2.)
+                                    mainColumnCell.values   <- createCellValueInput t
+                                    tsrColumnCell.values    <- createCellValueInput tsr
+                                    tanColumnCell.values    <- createCellValueInput tan
+                                1
+                        )
+
+                    r.enableEvents <- true
+
+                    InteropLogging.Msg.create InteropLogging.Info $"Updated {numberOfUpdatedBodyTerms |> Array.sum} terms in table body. Updated {numberOfUpdatedHeaderTerms |> Array.sum} terms in table column headers."
+                )
+            return [resultMsg]
+        }
+    )
 
 /// This function is used to insert file names into the selected range.
 let insertFileNamesFromFilePicker (fileNameList:string list) =
