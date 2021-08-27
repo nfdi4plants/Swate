@@ -230,10 +230,15 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
 let addUnitToExistingBlockElements (model:Model) (dispatch:Msg -> unit) =
     div [
         Style [
-            BorderLeft $"5px solid {NFDIColors.Mint.Base}" 
-            //BorderRadius "0 0 15px 15px"
+            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
             Padding "0.25rem 1rem"
+            MarginBottom "1rem"
     ]] [
+        Field.div [][
+            Help.help [][
+                str "Adds a unit to a the complete building block. If the building block already has a unit assigned, the new unit is only applied to selected rows of the selected column."
+            ]
+        ]
         Field.div [Field.HasAddons] [
             Control.p [] [
                 Button.button [Button.IsStatic true] [
