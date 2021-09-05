@@ -111,11 +111,11 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
 
         currentModel.updateByExcelState nextState,Cmd.none
 
-    | FillSelection (fillValue,fillTerm) ->
+    | InsertOntologyTerm (term) ->
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.fillValue  
-                (fillValue,fillTerm)
+                OfficeInterop.insertOntologyTerm  
+                term
                 (GenericLog >> Dev)
                 (GenericError >> Dev)
         currentModel, cmd

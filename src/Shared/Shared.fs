@@ -135,6 +135,9 @@ type TermMinimal = {
         with
             | :? NullReferenceException -> failwith $"Unable to parse given string {formatStr} to TermMinimal.Name."
 
+    member this.accessionToTSR = this.TermAccession.Split(@":").[0] 
+    member this.accessionToTAN = URLs.TermAccessionBaseUrl + this.TermAccession.Replace(@":",@"_")
+
 type TermSearchable = {
     // Contains information about the term to search itself. If term accession is known, search result is 100% correct.
     Term                : TermMinimal

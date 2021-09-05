@@ -108,7 +108,8 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
                             Button.IsFullWidth
                             Button.OnClick (fun _ ->
                                 if hasText then
-                                    FillSelection (model.TermSearchState.TermSearchText, model.TermSearchState.SelectedTerm) |> ExcelInterop |> dispatch
+                                    let term = if model.TermSearchState.SelectedTerm.IsSome then TermMinimal.ofTerm model.TermSearchState.SelectedTerm.Value else TermMinimal.create model.TermSearchState.TermSearchText ""
+                                    InsertOntologyTerm term |> ExcelInterop |> dispatch
                             )
                         ] [
                             str "Fill selected cells with this term"

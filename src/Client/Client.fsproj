@@ -14,6 +14,7 @@
         <Compile Include="ExcelColors.fs" />
         <Compile Include="OfficeInterop\InteropLogging.fs" />
         <Compile Include="OfficeInterop\Types.fs" />
+        <Compile Include="OfficeInterop\AuxFunctions\TermCollectionFunctions.fs" />
         <Compile Include="OfficeInterop\AuxFunctions\ColHeaderIndexing.fs" />
         <Compile Include="OfficeInterop\AuxFunctions\BuildingBlockFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />

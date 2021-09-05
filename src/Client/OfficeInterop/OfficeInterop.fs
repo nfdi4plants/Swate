@@ -53,15 +53,44 @@ let consoleLog (message: string): unit = jsNative
 
 open System
 
+open Fable.Core.JsInterop
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction1 () =
     Excel.run(fun context ->
-              
-        promise {
-        
-            return (sprintf "0" )
-        }
+
+        let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray [|"dataValidation"|]))
+
+        let selectedRangeValidation = selectedRange.dataValidation.load(U2.Case2 (ResizeArray [|"rule"|]))
+
+        OfficeInterop.TermCollectionFunctions.addUpdateSelectedCellToQueryParamHandler context
+
+        //promise {
+            
+            //let! termNamerange = OfficeInterop.TermCollectionFunctions.getSwateTermCollectionNameCol context
+
+            //let! addValidation = context.sync().``then``(fun _ ->
+
+            //    // https://fable.io/docs/communicate/js-from-fable.html
+            //    let t1 = createEmpty<ListDataValidation>
+            //    t1.inCellDropDown <- true
+            //    t1.source <- U2.Case1 "=SwateTermCollection!$D$2#"
+
+            //    let t2 = createEmpty<DataValidationRule>
+            //    t2.list <- Some t1
+
+            //    //https://stackoverflow.com/questions/37881457/how-to-implement-data-validation-in-excel-using-office-js-api
+            //    //https://docs.microsoft.com/de-de/javascript/api/excel/excel.datavalidation?view=excel-js-preview#rule
+            //    selectedRangeValidation.rule <- t2
+
+            //    $"{selectedRangeValidation.rule.list.Value.inCellDropDown},{selectedRangeValidation.rule.list.Value.source}"
+            //)
+
+            //let! mySync = context.sync().``then``(fun _ -> ())
+
+            //return addValidation
+        //}
+
     )
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
@@ -937,7 +966,7 @@ let getParentTerm () =
 /// 'term' is the value that will be written into the main column.
 /// 'termBackground' needs to be spearate from 'term' in case the user uses the fill function for a custom term.
 /// Should the user write a real term with this function 'termBackground'.isSome and can be used to fill TSR and TAN.
-let fillValue (term,termBackground:Shared.DbDomain.Term option) =
+let insertOntologyTerm (term:TermMinimal) =
     Excel.run(fun context ->
 
         // Ref. 2
@@ -964,7 +993,7 @@ let fillValue (term,termBackground:Shared.DbDomain.Term option) =
                 // create new values for selected range 
                 let newVals = ResizeArray([
                     for arr in range.values do
-                        let tmp = arr |> Seq.map (fun _ -> Some (term |> box))
+                        let tmp = arr |> Seq.map (fun _ -> Some (term.Name |> box))
                         ResizeArray(tmp)
                 ])
 
@@ -976,16 +1005,15 @@ let fillValue (term,termBackground:Shared.DbDomain.Term option) =
                             nextColsRange.values.[ind]
                             // iterate over cols
                             |> Seq.mapi (fun i _ ->
-                                match i, termBackground with
-                                | 0, None | 1, None ->
+                                match i, term.TermAccession = String.Empty with
+                                | 0, true | 1, true ->
                                     Some ("user-specific" |> box)
-                                | 1, Some term ->
-                                    //add "Term Accession Number"
-                                    let replace = Shared.URLs.TermAccessionBaseUrl + term.Accession.Replace(@":",@"_")
-                                    Some ( replace |> box )
-                                | 0, Some term ->
+                                | 0, false ->
                                     //add "Term Source REF"
-                                    Some (term.Accession.Split(@":").[0] |> box)
+                                    Some (term.accessionToTSR |> box)
+                                | 1, false ->
+                                    //add "Term Accession Number"
+                                    Some ( term.accessionToTAN |> box )
                                 | _, _ ->
                                     r.enableEvents <- true
                                     failwith "The insert should never add more than two extra columns."

@@ -13,7 +13,7 @@ open Model
 
 type ExcelInteropMsg =
     | Initialized                           of (string*string)
-    | FillSelection                         of string * (DbDomain.Term option)
+    | InsertOntologyTerm                    of TermMinimal
     | AddAnnotationBlock                    of OfficeInterop.Types.BuildingBlockTypes.InsertBuildingBlock
     | AddAnnotationBlocks                   of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock

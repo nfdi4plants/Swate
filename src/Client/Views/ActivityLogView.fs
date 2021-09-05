@@ -16,33 +16,33 @@ open Browser.Types
 
 let debugBox model dispatch =
     Box.box' [][
-        //Button.button [
-        //    Button.Color Color.IsInfo
-        //    Button.IsFullWidth
-        //    Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
-        //    Button.Props [Style [MarginBottom "1rem"]]
-        //] [
-        //    str "Try Excel"
-        //]
         Button.button [
             Button.Color Color.IsInfo
             Button.IsFullWidth
-            Button.OnClick (fun e -> TryExcel2 |> ExcelInterop |> dispatch )
+            Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
             Button.Props [Style [MarginBottom "1rem"]]
         ] [
-            str "Try Excel2"
+            str "Try Excel"
         ]
-        Button.a [
-            Button.IsFullWidth
-            Button.OnClick (fun e ->
-                let msg = UpdateWarningModal None
-                let message = "This is a warning modal. Be careful if you know what you are doing."
-                let nM = {|ModalMessage = message; NextMsg = msg|} |> Some
-                UpdateWarningModal nM |> dispatch
-            )
-        ][
-            str "Test"
-        ]
+        //Button.button [
+        //    Button.Color Color.IsInfo
+        //    Button.IsFullWidth
+        //    Button.OnClick (fun e -> TryExcel2 |> ExcelInterop |> dispatch )
+        //    Button.Props [Style [MarginBottom "1rem"]]
+        //] [
+        //    str "Try Excel2"
+        //]
+        //Button.a [
+        //    Button.IsFullWidth
+        //    Button.OnClick (fun e ->
+        //        let msg = UpdateWarningModal None
+        //        let message = "This is a warning modal. Be careful if you know what you are doing."
+        //        let nM = {|ModalMessage = message; NextMsg = msg|} |> Some
+        //        UpdateWarningModal nM |> dispatch
+        //    )
+        //][
+        //    str "Test"
+        //]
         Label.label [][str "Dangerzone"]
         Container.container [
             Container.Props [Style [
@@ -81,7 +81,7 @@ let activityLogComponent (model:Model) dispatch =
 
         Label.label [Label.Size IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Activity Log"]
 
-        //debugBox model dispatch
+        debugBox model dispatch
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display all recorded activities of this session."]
         div [
