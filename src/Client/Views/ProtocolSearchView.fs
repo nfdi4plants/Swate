@@ -231,11 +231,16 @@ let protocolElementContainer (model:Model) dispatch =
             let queryBigram = model.ProtocolInsertState.ProtocolNameSearchQuery |> Shared.Suggestion.createBigrams 
             let bigrams =
                 protocol
-                |> Array.sortByDescending (fun x ->
-                    x.Name
-                    |> Shared.Suggestion.createBigrams
-                    |> Shared.Suggestion.sorensenDice queryBigram
+                |> Array.map (fun prot ->
+                    let score =
+                        prot.Name
+                        |> Shared.Suggestion.createBigrams
+                        |> Shared.Suggestion.sorensenDice queryBigram
+                    score,prot
                 )
+                |> Array.filter (fun (score,prot) -> score > 0.1)
+                |> Array.sortByDescending fst
+                |> Array.map snd
             bigrams
         else
             protocol
@@ -244,7 +249,7 @@ let protocolElementContainer (model:Model) dispatch =
             protocol |> Array.filter (fun x ->
                 let protTagSet = x.Tags |> Set.ofArray
                 let filterTags = model.ProtocolInsertState.ProtocolSearchTags |> Set.ofList
-                Set.intersect protTagSet filterTags |> Set.isEmpty |> not
+                Set.intersect protTagSet filterTags |> fun intersectSet -> intersectSet.Count = filterTags.Count
             )
         else
             protocol
