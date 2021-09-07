@@ -14,7 +14,7 @@ let serviceApi : IServiceAPIv1 =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IServiceAPIv1>
 
-//let isaDotNetApi : IISADotNetAPIv1 =
-//    Remoting.createApi()
-//    |> Remoting.withRouteBuilder Route.builder
-//    |> Remoting.buildProxy<IISADotNetAPIv1>
+let isaDotNetCommonApi : IISADotNetCommonAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<IISADotNetCommonAPIv1>

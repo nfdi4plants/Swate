@@ -36,6 +36,7 @@
         <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
+        <Compile Include="Views\XLSXConverterView.fs" />
         <Compile Include="Views\BaseView.fs" />
         <Compile Include="Views\LandingPageView.fs" />
         <Compile Include="Views\AdvancedSearchView.fs" />

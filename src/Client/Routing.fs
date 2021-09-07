@@ -15,6 +15,7 @@ type Route =
 | Info
 | ProtocolInsert
 | ProtocolSearch
+| XLSXConverter
 | ActivityLog
 | Settings
 | SettingsXml
@@ -31,6 +32,7 @@ type Route =
         | Route.FilePicker          -> "/#FilePicker"
         | Route.ProtocolInsert      -> "/#ProtocolInsert"
         | Route.ProtocolSearch      -> "/#ProtocolSearch"
+        | Route.XLSXConverter       -> "/#XLSXConverter"      
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
@@ -48,6 +50,7 @@ type Route =
         | Route.FilePicker          -> "File Picker"
         | Route.ProtocolInsert      -> "Protocol Insert"
         | Route.ProtocolSearch      -> "Protocol Search"
+        | Route.XLSXConverter       -> "XLSX Converter"
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
@@ -73,6 +76,7 @@ type Route =
         | Route.AddBuildingBlock    -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
         | Route.ProtocolInsert      -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
         | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
+        | Route.XLSXConverter       -> createElem [Fa.Brand.Microsoft; Fa.Solid.Cogs        ]   (p.toStringRdbl)
         | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
         | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
         | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  
@@ -97,6 +101,7 @@ module Routing =
             map Route.Info                  (s "Info")
             map Route.ProtocolInsert        (s "ProtocolInsert")
             map Route.ProtocolSearch        (s "ProtocolSearch")
+            map Route.XLSXConverter         (s "XLSXConverter")
             map Route.ActivityLog           (s "ActivityLog")
             map Route.Settings              (s "Settings")
             map Route.SettingsXml           (s "Settings" </> s "Xml")

@@ -175,6 +175,11 @@ type ProtocolInsertMsg =
     | RemoveSelectedProtocol
     | UpdateLoading                     of bool
 
+type XLSXConverterMsg =
+    | StoreXLSXByteArray                of byte []
+    | GetAssayJsonRequest               of byte []
+    | GetAssayJsonResponse              of string
+
 type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockTermsRequest      of Shared.TermSearchable []
     | GetSelectedBuildingBlockTermsResponse     of Shared.TermSearchable []
@@ -272,6 +277,9 @@ type Model = {
     SettingsProtocolState       : SettingsProtocolState
 
     WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
+
+    XLSXByteArray               : byte []
+    XLSXJSONResult              : string
 } with
     member this.updateByExcelState (s:ExcelState) =
         { this with ExcelState = s}
@@ -290,6 +298,7 @@ and Msg =
     | AddBuildingBlock      of AddBuildingBlockMsg
     | Validation            of ValidationMsg
     | ProtocolInsert        of ProtocolInsertMsg
+    | XLSXConverterMsg      of XLSXConverterMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
     | SettingsXmlMsg        of SettingsXmlMsg
     | SettingDataStewardMsg of SettingsDataStewardMsg
@@ -338,4 +347,6 @@ let initializeModel (pageOpt: Route option) =
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
         SettingsProtocolState       = SettingsProtocolState     .init ()
         WarningModal                = None
+        XLSXByteArray               = [||]
+        XLSXJSONResult              = ""
     }

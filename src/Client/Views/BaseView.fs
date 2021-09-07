@@ -62,12 +62,11 @@ let firstRowTabs (model:Model) dispatch =
         createNavigationTab Routing.Route.FilePicker            model dispatch
         createNavigationTab Routing.Route.ProtocolInsert        model dispatch
         createNavigationTab Routing.Route.Info                  model dispatch
+        createNavigationTab Routing.Route.XLSXConverter        model dispatch
     ]
 
-let sndRowTabs (model:Model) dispatch =
-    tabRow model dispatch [
-        
-    ]
+//let sndRowTabs (model:Model) dispatch =
+//    tabRow model dispatch [ ]
 
 let footerContentStatic (model:Model) dispatch =
     div [][

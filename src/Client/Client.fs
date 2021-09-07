@@ -87,6 +87,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
             //Text.p [] [str ""]
         ]
 
+    | Routing.Route.XLSXConverter ->
+        BaseView.baseViewComponent model dispatch [
+            XLSXConverterView.xlsxConverterMainView model dispatch
+        ] [
+            //Text.p [] [str ""]
+        ]
+
     | Routing.Route.ProtocolSearch ->
         BaseView.baseViewComponent model dispatch [
             ProtocolSearchView.protocolSearchViewComponent model dispatch

@@ -242,6 +242,10 @@ type IServiceAPIv1 = {
     getAppVersion           : unit      -> Async<string>
 }
 
+type IISADotNetCommonAPIv1 = {
+    convertISAXLSXToAssayJSON : byte [] -> Async<string>
+    printNumber : int -> Async<string>
+}
 
 type IAnnotatorAPIv1 = {
     // Development
@@ -255,13 +259,13 @@ type IAnnotatorAPIv1 = {
     // Term related requests
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : (int*string*TermMinimal)                                     -> Async<DbDomain.Term []>
+    getTermSuggestionsByParentTerm      : (int*string*TermMinimal)                                      -> Async<DbDomain.Term []>
     ///
-    getAllTermsByParentTerm             : TermMinimal                                                  -> Async<DbDomain.Term []>
+    getAllTermsByParentTerm             : TermMinimal                                                   -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                     -> Async<DbDomain.Term []>
+    getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                      -> Async<DbDomain.Term []>
     ///
-    getAllTermsByChildTerm              : TermMinimal                                                  -> Async<DbDomain.Term []>
+    getAllTermsByChildTerm              : TermMinimal                                                   -> Async<DbDomain.Term []>
     /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
     getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
 

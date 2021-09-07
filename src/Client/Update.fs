@@ -1664,6 +1664,30 @@ let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentSt
         }
         nextState, Cmd.none
 
+let handleXLSXConverterMsg (msg:XLSXConverterMsg) (currentModel: Model) : Model * Cmd<Msg> =
+    match msg with
+    // Client
+    | StoreXLSXByteArray byteArr ->
+        let nextModel = {
+            currentModel with
+                XLSXByteArray = byteArr
+        }
+        nextModel, Cmd.none
+    | GetAssayJsonRequest byteArr ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.isaDotNetCommonApi.convertISAXLSXToAssayJSON
+                byteArr
+                (GetAssayJsonResponse >> XLSXConverterMsg)
+                (ApiError >> Api)
+        currentModel, cmd
+    | GetAssayJsonResponse jsonStr ->
+        let nextModel = {
+            currentModel with
+                XLSXJSONResult = jsonStr
+        }
+        nextModel, Cmd.none
+
 let handleSettingsProtocolMsg (topLevelMsg:SettingsProtocolMsg) (currentState: SettingsProtocolState) : SettingsProtocolState * Cmd<Msg> =
     match topLevelMsg with
     // Client
@@ -1920,6 +1944,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 ProtocolInsertState = nextFileUploadJsonState
             }
         nextModel, nextCmd
+
+    | XLSXConverterMsg msg ->
+        let nextModel, nextMsg = handleXLSXConverterMsg msg currentModel
+        nextModel, nextMsg
 
     | BuildingBlockDetails buildingBlockDetailsMsg ->
         let nextState, nextCmd =

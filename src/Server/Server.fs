@@ -3,7 +3,6 @@ open System.Threading.Tasks
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
-//open FSharp.Control.Tasks.V2
 open Giraffe
 open Saturn
 open Shared
@@ -16,22 +15,23 @@ open Microsoft.Extensions.Configuration.Json
 open Microsoft.Extensions.Configuration.UserSecrets
 open Microsoft.AspNetCore.Hosting
 
-/// Was transferred into dev.json
-//[<Literal>]
-//let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
-
 let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
-//open ISADotNet
-
-//let isaDotNetApi = {
-//    parseJsonToProcess = fun jsonString -> async {
-//        let parsedJson = ISADotNet.Json.Process.fromString jsonString
-//        return parsedJson
-//    }
-//}
+let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 = {
+    convertISAXLSXToAssayJSON = fun byteArray -> async {
+        let ms = new MemoryStream(byteArray)
+        let assayJsonString =
+            ISADotNet.XLSX.AssayFile.AssayFile.fromStream ms
+            |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
+        return assayJsonString
+    }
+    printNumber = fun num -> async {
+        let res = $"Hey you just sent us a number. Is this your number {num}"
+        return res
+    }
+}
 
 let annotatorApi cString = {
 
@@ -247,16 +247,16 @@ let createIServiceAPIv1 =
     )
     |> Remoting.buildHttpHandler
 
-//let createISADotNetAPIv1 =
-//    Remoting.createApi()
-//    |> Remoting.withRouteBuilder Route.builder
-//    |> Remoting.fromValue isaDotNetApi
-//    |> Remoting.withDocs "/api/IISADotNetAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetApiDocsv1
-//    |> Remoting.withDiagnosticsLogger(printfn "%A")
-//    |> Remoting.withErrorHandler(
-//        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
-//    )
-//    |> Remoting.buildHttpHandler
+let createISADotNetCommonAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue isaDotNetCommonAPIv1
+    |> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler(
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+    )
+    |> Remoting.buildHttpHandler
 
 let createIAnnotatorApiv1 cString =
     Remoting.createApi()
@@ -302,10 +302,10 @@ let topLevelRouter = router {
         createIServiceAPIv1 next ctx
     )
 
-    //
-    //forward @"" (fun next ctx ->
-    //    createISADotNetAPIv1 next ctx
-    //)
+    
+    forward @"" (fun next ctx ->
+        createISADotNetCommonAPIv1 next ctx
+    )
 }
 
 let app = application {
