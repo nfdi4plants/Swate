@@ -19,25 +19,44 @@ let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
-let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 = {
-    convertISAXLSXToAssayJSON = fun byteArray -> async {
+
+
+let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
+    let assayFromByteArray (byteArray: byte []) =
         let ms = new MemoryStream(byteArray)
-        let assayJsonString =
+        let jsonStr =
             ISADotNet.XLSX.AssayFile.AssayFile.fromStream ms
-            |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
-        return assayJsonString
+        jsonStr
+    let investigationFromByteArray (byteArray: byte []) =
+        let ms = new MemoryStream(byteArray)
+        let jsonStr =
+            ISADotNet.XLSX.Investigation.fromStream ms
+        jsonStr
+    {
+        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
+        convertISAXLSXToAssayJSON = fun byteArray -> async {
+            let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
+            return assayJsonString
+        }
+        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
+        convertISAXLSXToInvestigationJSON = fun byteArray -> async {
+            let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
+            return investigationJson
+        }
+        convertISAXLSXToProcessJSON = fun byteArray -> async {
+            let assay = assayFromByteArray byteArray 
+            let processJSon = assay |> fun (_,_,_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
+            return processJSon
+        }
+        testPostNumber = fun num -> async {
+            let res = $"Hey you just sent us a number. Is this your number {num}?"
+            return res
+        }
     }
-    printNumber = fun num -> async {
-        let res = $"Hey you just sent us a number. Is this your number {num}"
-        return res
-    }
-}
 
 let annotatorApi cString = {
-
     //Development
     getTestNumber = fun () -> async { return 42 }
-    getTestString = fun strOpt -> async { return None }
 
     //Ontology related requests
     testOntologyInsert = fun (name,version,definition,created,user) ->
@@ -310,7 +329,6 @@ let topLevelRouter = router {
 
 let app = application {
     url "http://localhost:5000/"
-    //force_ssl
     use_router topLevelRouter
     memory_cache
     use_static "public"

@@ -58,7 +58,7 @@ let textFieldEle (model:Model) dispatch =
         Column.column [][
             Textarea.textarea [
                 Textarea.IsReadOnly true
-                Textarea.Value model.XLSXJSONResult.[0 .. 500]
+                Textarea.Value (model.XLSXJSONResult.[0 .. 500] + " ...")
             ][]
         ]
         Column.column [Column.Width (Screen.All, Column.IsNarrow)] [
@@ -112,6 +112,7 @@ let xlsxConverterMainView (model:Model) dispatch =
             fileUploadButton model dispatch inputId
 
             Button.button [
+                if model.XLSXByteArray |> Array.isEmpty then Button.IsStatic true
                 Button.IsFullWidth
                 Button.Color IsSuccess
                 Button.OnClick (fun e ->
@@ -122,7 +123,8 @@ let xlsxConverterMainView (model:Model) dispatch =
                 str "Parse XLSX to ISA-JSON Assay"
             ]
 
-            textFieldEle model dispatch
+            if model.XLSXJSONResult <> "" then
+                textFieldEle model dispatch
         ]
         
     ]

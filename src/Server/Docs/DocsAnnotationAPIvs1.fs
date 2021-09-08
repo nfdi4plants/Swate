@@ -30,22 +30,6 @@ let annotatorApiDocsv1 =
                     (Parameter.create "TestValue" ParamInteger "A single fixed integer value to test connectivity.")
             )
 
-        ////////
-        annotatorDocsv1.route <@ fun api -> api.getTestString @>
-        |> annotatorDocsv1.alias "Get Test String (<code>getTestString</code>)"
-        |> annotatorDocsv1.description 
-            (
-                createDocumentationDescription
-                    "This is used during development to test documentation for fsharp."
-                    ""
-                    (Some [|
-                        Parameter.create "TestParam" (ParamDateTime) "This Param will often change during development"
-                    |])
-                    "The result will contain the TestParam of some sort."
-                    (Parameter.create "TestValue" ParamString "")
-            )
-        |> annotatorDocsv1.example <@ fun api -> api.getTestString ("I am a small tester") @>
-
         ///////////////////////////////////////////////////////////// Ontology related requests /////////////////////////////////////////////////////////////
         ////////
         annotatorDocsv1.route <@ fun api -> api.testOntologyInsert @>

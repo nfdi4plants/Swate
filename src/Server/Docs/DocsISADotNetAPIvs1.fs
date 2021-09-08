@@ -32,6 +32,12 @@ let isaDotNetCommonApiDocsv1 =
 
         ///////////////////////////////////////////////////////////// Development /////////////////////////////////////////////////////////////
         ////////
+        docs.route <@ fun api -> api.testPostNumber @>
+        |> docs.description "
+            This route can be used to test post requests to the Server.
+        "
+        |> docs.alias "POST Test with integer"
+        |> docs.example <@ fun api -> api.testPostNumber (5) @>
         docs.route <@ fun api -> api.convertISAXLSXToAssayJSON @>
         |> docs.alias "Parse ISA-XLSX file to ISA-JSON's assay.json (<code>convertISAXLSXToAssayJSON</code>)"
         //|> docs.description
@@ -47,11 +53,5 @@ let isaDotNetCommonApiDocsv1 =
         //    )
         //|> docs.example <@ fun api -> api.parseJsonToProcess IsaDotNetExamples.jsonstring @>
 
-        docs.route <@ fun api -> api.printNumber @>
-        |> docs.description "
-            # Markdown Test
-            __TEST ME!__
-        "
-        |> docs.example <@ fun api -> api.printNumber (5) @>
 
 ]

@@ -243,14 +243,16 @@ type IServiceAPIv1 = {
 }
 
 type IISADotNetCommonAPIv1 = {
-    convertISAXLSXToAssayJSON : byte [] -> Async<string>
-    printNumber : int -> Async<string>
+    convertISAXLSXToAssayJSON           : byte [] -> Async<string>
+    convertISAXLSXToInvestigationJSON   : byte [] -> Async<string>
+    convertISAXLSXToProcessJSON         : byte [] -> Async<string>
+    testPostNumber                      : int -> Async<string>
 }
 
 type IAnnotatorAPIv1 = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>
-    getTestString               : string                                                -> Async<string option>
+
     // Ontology related requests
     /// (name,version,definition,created,user)
     testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>
