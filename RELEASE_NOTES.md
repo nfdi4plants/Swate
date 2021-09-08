@@ -1,3 +1,11 @@
+### 0.4.8+7960150 (Released 2021-9-8)
+* Additions:
+    * latest commit #7960150
+    * [[#4796598](https://github.com/nfdi4plants/Swate/commit/47965986e914f30b3b438bc44ede81308dc16d39)] Update SQL db dump for development.
+    * [[#78458db](https://github.com/nfdi4plants/Swate/commit/78458db2338863907ce258111511a7c8ad9232bb)] Merge pull request #144 from nfdi4plants/kevinf-patch-0.4.7
+    * [[#5b46ded](https://github.com/nfdi4plants/Swate/commit/5b46deda34e38fbd04f0f6f5693aa1a0bd9cfca6)] Update README.md
+    * [[#ef96958](https://github.com/nfdi4plants/Swate/commit/ef96958b4d0929f80273ddc7b90659274bdbcc91)] Update for demo server
+
 ### 0.4.7+23edde8 (Released 2021-5-12)
 * Additions:
     * latest commit #23edde8
