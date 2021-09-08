@@ -38,8 +38,8 @@ let isaDotNetCommonApiDocsv1 =
         "
         |> docs.alias "POST Test with integer"
         |> docs.example <@ fun api -> api.testPostNumber (5) @>
-        docs.route <@ fun api -> api.convertISAXLSXToAssayJSON @>
-        |> docs.alias "Parse ISA-XLSX file to ISA-JSON's assay.json (<code>convertISAXLSXToAssayJSON</code>)"
+        docs.route <@ fun api -> api.toAssayJSON @>
+        |> docs.alias "Parse ISA-XLSX file to ISA-JSON's assay.json"
         //|> docs.description
         //    (
         //        createDocumentationDescription

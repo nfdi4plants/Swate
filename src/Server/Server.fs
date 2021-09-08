@@ -19,8 +19,6 @@ let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
-
-
 let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
     let assayFromByteArray (byteArray: byte []) =
         let ms = new MemoryStream(byteArray)
@@ -34,18 +32,23 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         jsonStr
     {
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
-        convertISAXLSXToAssayJSON = fun byteArray -> async {
+        toAssayJSON = fun byteArray -> async {
             let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
             return assayJsonString
         }
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
-        convertISAXLSXToInvestigationJSON = fun byteArray -> async {
+        toInvestigationJSON = fun byteArray -> async {
             let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
             return investigationJson
         }
-        convertISAXLSXToProcessJSON = fun byteArray -> async {
+        toProcessSeqJSON = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
             let processJSon = assay |> fun (_,_,_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
+            return processJSon
+        }
+        toSimplifiedRowMajorJSON = fun byteArray -> async {
+            let assay = assayFromByteArray byteArray 
+            let processJSon = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) 
             return processJSon
         }
         testPostNumber = fun num -> async {

@@ -126,5 +126,10 @@ let xlsxConverterMainView (model:Model) dispatch =
             if model.XLSXJSONResult <> "" then
                 textFieldEle model dispatch
         ]
-        
+
+
+        iframe [
+            Src "/test.html"
+            Style [Width "100%"; Height "600px"]
+        ][ ]
     ]

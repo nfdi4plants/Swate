@@ -1676,7 +1676,7 @@ let handleXLSXConverterMsg (msg:XLSXConverterMsg) (currentModel: Model) : Model 
     | GetAssayJsonRequest byteArr ->
         let cmd =
             Cmd.OfAsync.either
-                Api.isaDotNetCommonApi.convertISAXLSXToProcessJSON
+                Api.isaDotNetCommonApi.toSimplifiedRowMajorJSON
                 byteArr
                 (GetAssayJsonResponse >> XLSXConverterMsg)
                 (ApiError >> Api)

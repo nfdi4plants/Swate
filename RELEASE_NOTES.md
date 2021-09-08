@@ -1,14 +1,39 @@
-### 0.5.0+131b395 (Released 2021-8-5)
+### 0.5.0+79da559 (Released 2021-9-8)
 * Additions:
-    * latest commit #131b395
+    * latest commit #79da559
+    * [[#79da559](https://github.com/nfdi4plants/Swate/commit/79da559a14d882a27c3c7d82d817d4aea3f98889)] Add ISA-XLSX to investigation, process list
+    * [[#b7f9920](https://github.com/nfdi4plants/Swate/commit/b7f9920dfe7653a482ee5af44687288eb7c9287d)] Add Common API to backend, and provide small frontend showcase.
+    * [[#e14c648](https://github.com/nfdi4plants/Swate/commit/e14c6482488c3755254f038015c6b2aba2b55d05)] Update Protocol search and filter functionality to improve usability.
+    * [[#214df04](https://github.com/nfdi4plants/Swate/commit/214df045b909833f61df60550ebae30ed0db6479)] Create proof of concept for excel autocomplete dropdown.
+    * [[#9b83725](https://github.com/nfdi4plants/Swate/commit/9b837251a9b63d71f8ff0042943ff5838e6badc0)] Update manifest.xml's as foundation for future core/experts split :construction:
+    * [[#ae7aa66](https://github.com/nfdi4plants/Swate/commit/ae7aa667248cacbacc1c1fa7363410ae1bc53d96)] Add short msg to add/update unit for existing building block
+    * [[#2aedf60](https://github.com/nfdi4plants/Swate/commit/2aedf60c032120ee389cc377c0e69d2a038f3b09)] Finish updating term update function :sparkles:
+    * [[#7a97cf9](https://github.com/nfdi4plants/Swate/commit/7a97cf943d5612f6f664a2d8d8597ad4fc4d5c5a)] Finish update unit for existing building block function :hammer:
+    * [[#3a81231](https://github.com/nfdi4plants/Swate/commit/3a81231b16a4f8280525b5e37a5b03fcf58ac1fa)] Finish first step of unit update
+    * [[#02e5d75](https://github.com/nfdi4plants/Swate/commit/02e5d75bf176547ef6e93d2b37d68ba955a33042)] Update building block information :construction:
+    * [[#9b8d657](https://github.com/nfdi4plants/Swate/commit/9b8d657bbb10ef8451826f9a3802e13b8c738a01)] Start updating database based search process of filled terms :construction:
+    * [[#4170945](https://github.com/nfdi4plants/Swate/commit/41709450cbd5fccc47603a99a45d9adf965cb55a)] Move building block functions :hammer:
+    * [[#d29dc9c](https://github.com/nfdi4plants/Swate/commit/d29dc9cf6cd15b8958d1d93281fa7e76961c71e4)] Update getBuildingBlocks :sparkles:
+    * [[#72950fe](https://github.com/nfdi4plants/Swate/commit/72950fefeccd8ba33d677a05469112e1050e8652)] Update is_a directed search :sparkles:
+    * [[#60d42ff](https://github.com/nfdi4plants/Swate/commit/60d42ff63b3e348be1e0a7dc1b29b36dd493cc64)] Major code refactor :hammer: new state working "add building block".
+    * [[#7194b96](https://github.com/nfdi4plants/Swate/commit/7194b96c386b665c7fd3ef254258b48d5a96d8f7)] Start updating unit to ISA conformity :fire:
+    * [[#3a38d7c](https://github.com/nfdi4plants/Swate/commit/3a38d7cc562cc5f1e3a3cb1e8144c2d2d0210b1c)] Add ExcelJS.Fable.
+    * [[#4eff065](https://github.com/nfdi4plants/Swate/commit/4eff0654f49b4a406eb416fe0e07de16a4e1bf51)] Testing new OfficeJS pakets.
+    * [[#b9e16fc](https://github.com/nfdi4plants/Swate/commit/b9e16fccfe3ad6e1c2fc7f69dc35ddfd320d6f3e)] Add OfficeJS Fable bindings as dependency.
+    * [[#c916a5d](https://github.com/nfdi4plants/Swate/commit/c916a5dc76785248caa90c65897e7ea39a978a09)] Update SwateDB.sql dump to directly insert into fresh docker image.
+    * [[#0ce857e](https://github.com/nfdi4plants/Swate/commit/0ce857ea8b0baf759160fc739c5831a0e02e477c)] Update install.cmd.
+    * [[#e48d947](https://github.com/nfdi4plants/Swate/commit/e48d9472b84215f9dea96b9d124b68f98b31d14f)] Reinsert variables after update to new SAFE stack
     * [[#4796598](https://github.com/nfdi4plants/Swate/commit/47965986e914f30b3b438bc44ede81308dc16d39)] Update SQL db dump for development.
     * [[#4c11f3e](https://github.com/nfdi4plants/Swate/commit/4c11f3ea09d28b566cd9cbfaaad9fc9eb05beba7)] Update db dump and readme according to prev. changes.
     * [[#344cb04](https://github.com/nfdi4plants/Swate/commit/344cb048730c2c41121a50d233f8dca7080d5fd8)] Set MariaDB to version 10.4, as 10.6 is not supported by .NET Core 3.1
     * [[#703b4aa](https://github.com/nfdi4plants/Swate/commit/703b4aa9c1fb3c95a1b1ab8b971c9917ca3e6c88)] Add .img folder und move designs.
     * [[#6ba34f2](https://github.com/nfdi4plants/Swate/commit/6ba34f2268267e4c7686f547dce707e8b4b93700)] Update to SAFE stack v3.
 * Deletions:
+    * [[#645b565](https://github.com/nfdi4plants/Swate/commit/645b565c504ae81bdb8c90cb473bb832f6b3e443)] Update remove building block function :construction:
     * [[#40318c1](https://github.com/nfdi4plants/Swate/commit/40318c1dc826d160258f4aa303b6274e4812b4f4)] Remove unused docs code.
     * [[#41ecd8d](https://github.com/nfdi4plants/Swate/commit/41ecd8da5e04424a8efb80f9fec66b7d4bdffdc0)] Remove unused code and setup files.
+* Bugfixes:
+    * [[#d53db10](https://github.com/nfdi4plants/Swate/commit/d53db10645ae71d1f73b6009c681eedeef096690)] Fix minor error in install.cmd.
 
 ### 0.4.8+7960150 (Released 2021-9-8)
 * Additions:

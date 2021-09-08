@@ -243,10 +243,11 @@ type IServiceAPIv1 = {
 }
 
 type IISADotNetCommonAPIv1 = {
-    convertISAXLSXToAssayJSON           : byte [] -> Async<string>
-    convertISAXLSXToInvestigationJSON   : byte [] -> Async<string>
-    convertISAXLSXToProcessJSON         : byte [] -> Async<string>
-    testPostNumber                      : int -> Async<string>
+    toAssayJSON                 : byte [] -> Async<string>
+    toInvestigationJSON         : byte [] -> Async<string>
+    toProcessSeqJSON            : byte [] -> Async<string>
+    toSimplifiedRowMajorJSON    : byte [] -> Async<string>
+    testPostNumber              : int -> Async<string>
 }
 
 type IAnnotatorAPIv1 = {
