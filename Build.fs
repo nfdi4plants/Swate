@@ -33,6 +33,35 @@ module ReleaseNoteTasks =
         Release.exists()
 
         Release.update(ProjectInfo.gitOwner, ProjectInfo.gitName, config)
+
+        let newRelease = ReleaseNotes.load "RELEASE_NOTES.md"
+        
+        let releaseDate =
+            if newRelease.Date.IsSome then newRelease.Date.Value.ToShortDateString() else "WIP"
+        
+        Fake.DotNet.AssemblyInfoFile.createFSharp  "src/Server/Version.fs"
+            [   Fake.DotNet.AssemblyInfo.Title "SWATE"
+                Fake.DotNet.AssemblyInfo.Version newRelease.AssemblyVersion
+                Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
+            ]
+
+        Trace.trace "Update Version.fs done!"
+        
+        /// Update maniefest.xmls
+        Trace.trace "Update manifest.xml"
+        
+        let _ =
+            let newVer = sprintf "<Version>%i.%i.%i</Version>" newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch
+            Shell.regexReplaceInFilesWithEncoding
+                "<Version>[0-9]+.[0-9]+.[0-9]+</Version>"
+                newVer
+                System.Text.Encoding.UTF8
+                [
+                    (Path.combine __SOURCE_DIRECTORY__ @".assets\assets\manifest.xml")
+                    (Path.combine __SOURCE_DIRECTORY__ "manifest.xml")
+                ]
+        
+        Trace.trace "Update manifest.xml done!"
     )
 
     let githubDraft = Target.create "GithubDraft" (fun config ->
