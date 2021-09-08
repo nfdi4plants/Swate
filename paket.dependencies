@@ -11,7 +11,6 @@ nuget Fulma.Extensions.Wikiki.Slider
 nuget Saturn
 nuget Expecto
 nuget MySql.Data 8.0.21
-nuget Microsoft.AspNetCore.Authentication.JwtBearer 3.1.10
 nuget Microsoft.Extensions.Configuration.UserSecrets
 nuget ISADotNet.Fable
 

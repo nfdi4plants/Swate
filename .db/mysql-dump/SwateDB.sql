@@ -1,9 +1,14 @@
--- Adminer 4.7.7 MySQL dump
+-- Adminer 4.8.1 MySQL 5.5.5-10.4.20-MariaDB-1:10.4.20+maria~focal dump
 
 SET NAMES utf8;
 SET time_zone = '+00:00';
 SET foreign_key_checks = 0;
 SET sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
+
+SET NAMES utf8mb4;
+
+CREATE DATABASE `SwateDB` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+USE `SwateDB`;
 
 DELIMITER ;;
 
@@ -742,8 +747,6 @@ END;;
 
 DELIMITER ;
 
-SET NAMES utf8mb4;
-
 DROP TABLE IF EXISTS `Ontology`;
 CREATE TABLE `Ontology` (
   `Name` varchar(256) NOT NULL,
@@ -759,6 +762,7 @@ INSERT INTO `Ontology` (`Name`, `CurrentVersion`, `Definition`, `DateCreated`, `
 ('chebi',	'194',	'Chemical Entities of Biological Interest',	'2020-11-27 18:55:00.000000',	'Pier Luigi Buttigieg'),
 ('envo',	'releases/2020-06-10',	'Environment Ontology',	'2020-06-10 00:00:00.000000',	'chebi'),
 ('go',	'releases/2020-11-18',	'gene_ontology',	'2020-11-18 00:00:00.000000',	'Suzi Aleksander'),
+('mod',	'1.031.2',	'PSI-MOD is an ontology consisting of terms that describe protein chemical modifications',	'2021-05-17 14:54:12.641765',	'Paul M. Thomas'),
 ('ms',	'4.1.35',	'Proteomics Standards Initiative Mass Spectrometry Vocabularies',	'2020-02-17 15:39:00.000000',	'Gerhard Mayer'),
 ('ncbitaxon',	'2020-04-18',	'NCBI organismal classification',	'2020-04-18 00:00:00.000000',	'Frederic Bastian'),
 ('nfdi4pso',	'init/2020-12-01',	'nfdi4pso',	'2020-12-01 00:00:00.000000',	'muehlhaus'),
@@ -855,11 +859,14 @@ CREATE TABLE `TermRelationship` (
   `FK_TermAccession` varchar(128) NOT NULL,
   `RelationshipType` varchar(64) NOT NULL,
   `FK_TermAccession_Related` varchar(128) NOT NULL,
+  `FK_OntologyName` varchar(256) NOT NULL,
   PRIMARY KEY (`ID`),
   UNIQUE KEY `IX_TermRelationship` (`FK_TermAccession`,`FK_TermAccession_Related`,`RelationshipType`),
   KEY `Ind_FK_TermRelationship_Term1` (`FK_TermAccession_Related`),
-  KEY `Ind_FK_TermID` (`FK_TermAccession`)
+  KEY `Ind_FK_TermID` (`FK_TermAccession`),
+  KEY `FK_OntologyName` (`FK_OntologyName`),
+  CONSTRAINT `TermRelationship_ibfk_1` FOREIGN KEY (`FK_OntologyName`) REFERENCES `Ontology` (`Name`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- 2021-05-12 07:23:36
+-- 2021-08-05 13:23:20
