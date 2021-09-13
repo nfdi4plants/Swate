@@ -345,37 +345,35 @@ let showDatabaseProtocolTemplate (model:Model) dispatch =
             
         toProtocolSearchElement model dispatch
 
-        Notification.notification [
-            Notification.Color IsDanger
+        div [
+            Style [OverflowX OverflowOptions.Auto]
         ][
-            str """Currently "model.ProtocolInsertState.ProtocolSelected" is not supported. Please check ProtocolInsertView.fs."""
-        ]
-
-        if model.ProtocolInsertState.ProtocolSelected.IsSome then
-            Table.table [
-                Table.IsFullWidth;
-                Table.IsBordered
-                Table.Props [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
-            ][
-                thead [][
-                    tr [][
-                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column"]
-                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column TAN"]
-                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit"]
-                        th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit TAN"]
+            if model.ProtocolInsertState.ProtocolSelected.IsSome then
+                Table.table [
+                    Table.IsFullWidth;
+                    Table.IsBordered
+                    Table.Props [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
+                ][
+                    thead [][
+                        tr [][
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column TAN"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit TAN"]
+                        ]
+                    ]
+                    tbody [][
+                        for insertBB in model.ProtocolInsertState.ProtocolSelected.Value.TemplateBuildingBlocks do
+                            yield
+                                tr [][
+                                    td [][str (insertBB.Column.toAnnotationTableHeader())]
+                                    td [][str (if insertBB.HasExistingTerm then insertBB.ColumnTerm.Value.TermAccession else "-")]
+                                    td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.Name else "-")]
+                                    td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
+                                ]
                     ]
                 ]
-                tbody [][
-                    for insertBB in model.ProtocolInsertState.ProtocolSelected.Value.TemplateBuildingBlocks do
-                        yield
-                            tr [][
-                                td [][str (insertBB.Column.toAnnotationTableHeader())]
-                                td [][str (if insertBB.HasExistingTerm then insertBB.ColumnTerm.Value.TermAccession else "-")]
-                                td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.Name else "-")]
-                                td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
-                            ]
-                ]
-            ]
+        ]
 
         addFromDBToTableButton model dispatch
     ]
