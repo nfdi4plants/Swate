@@ -301,13 +301,13 @@ type AddBuildingBlockState = {
 /// Validation scheme for Table
 type ValidationState = {
     ActiveTableBuildingBlocks   : BuildingBlockTypes.BuildingBlock []
-    TableValidationScheme       : OfficeInterop.Types.Xml.ValidationTypes.TableValidation
+    TableValidationScheme       : obj //OfficeInterop.CustomXmlTypes.ValidationTypes.TableValidation
     // Client view related
     DisplayedOptionsId      : int option
 } with
     static member init () = {
         ActiveTableBuildingBlocks   = [||]
-        TableValidationScheme       = OfficeInterop.Types.Xml.ValidationTypes.TableValidation.init()
+        TableValidationScheme       = ""//OfficeInterop.Types.Xml.ValidationTypes.TableValidation.init()
         DisplayedOptionsId          = None
     }
 
@@ -326,7 +326,7 @@ type ProtocolInsertState = {
 
     // Database protocol template
     ProtocolSelected        : ProtocolTemplate option
-    ValidationXml           : OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     // 
     ProtocolsAll            : ProtocolTemplate []
 
@@ -379,20 +379,20 @@ type BuildingBlockDetailsState = {
 type SettingsXmlState = {
     // // Client // //
     // Validation xml
-    ActiveSwateValidation                   : OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    ActiveSwateValidation                   : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     NextAnnotationTableForActiveValidation  : AnnotationTable option
     // Protocol group xml
-    ActiveProtocolGroup                     : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    ActiveProtocolGroup                     : obj option //OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
     NextAnnotationTableForActiveProtGroup   : AnnotationTable option
     // Protocol
-    ActiveProtocol                          : OfficeInterop.Types.Xml.GroupTypes.Protocol option
+    ActiveProtocol                          : obj option //OfficeInterop.Types.Xml.GroupTypes.Protocol option
     NextAnnotationTableForActiveProtocol    : AnnotationTable option
     //
     RawXml                                  : string
     NextRawXml                              : string
     FoundTables                             : Shared.AnnotationTable []
-    ProtocolGroupXmls                       : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
-    ValidationXmls                          : OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+    ProtocolGroupXmls                       : OfficeInterop.CustomXmlTypes.Templates.Protocol []
+    ValidationXmls                          : obj [] //OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
 } with
     static member init () = {
         // Client
@@ -419,7 +419,7 @@ type SettingsDataStewardState = {
     }
 
 type SettingsProtocolState = {
-    ProtocolsFromExcel  : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    ProtocolsFromExcel  : obj option //OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
     ProtocolsFromDB     : ProtocolTemplate []
 } with
     static member init () = {

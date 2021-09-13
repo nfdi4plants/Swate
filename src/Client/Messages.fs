@@ -7,7 +7,7 @@ open TermTypes
 open ProtocolTemplateTypes
 
 open ExcelColors
-open OfficeInterop.Types
+open OfficeInterop
 open OfficeInteropTypes
 open Model
 
@@ -17,7 +17,7 @@ type ExcelInteropMsg =
     | Initialized                           of (string*string)
     | InsertOntologyTerm                    of TermMinimal
     | AddAnnotationBlock                    of BuildingBlockTypes.InsertBuildingBlock
-    | AddAnnotationBlocks                   of BuildingBlockTypes.InsertBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | AddAnnotationBlocks                   of BuildingBlockTypes.InsertBuildingBlock list * CustomXmlTypes.Templates.Protocol //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | FormatColumn                          of colname:string * formatString:string
@@ -31,10 +31,10 @@ type ExcelInteropMsg =
     | UpdateProtocolGroupHeader
     //
     | GetTableValidationXml
-    | WriteTableValidationToXml             of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
+    //| WriteTableValidationToXml             of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
     /// needs to set newColNames separately as these validations come from templates for protocol group insert
-    | AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:OfficeInterop.Types.Xml.GroupTypes.Protocol
-    | WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
+    //| AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:CustomXmlTypes.Protocol.Protocol
+    //| WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
     | DeleteAllCustomXml
     | GetSwateCustomXml
     | UpdateSwateCustomXml                  of string
@@ -146,9 +146,9 @@ type AddBuildingBlockMsg =
 type ValidationMsg =
     // Client
     | UpdateDisplayedOptionsId of int option
-    | UpdateTableValidationScheme of Xml.ValidationTypes.TableValidation
+    //| UpdateTableValidationScheme of Xml.ValidationTypes.TableValidation
     // OfficeInterop
-    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock [] * msg:string
+    //| StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock [] * msg:string
 
 type ProtocolInsertMsg =
     // ------ Process from file ------
@@ -183,41 +183,41 @@ type BuildingBlockDetailsMsg =
     | ToggleShowDetails
     | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
 
-type SettingsXmlMsg =
-    // // Client // //
-    // Validation Xml
-    | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | UpdateNextAnnotationTableForActiveValidation  of AnnotationTable option
-    | UpdateValidationXmls                          of OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
-    // Protocol Group Xml
-    | UpdateProtocolGroupXmls                       of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
-    | UpdateActiveProtocolGroup                     of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    | UpdateNextAnnotationTableForActiveProtGroup   of AnnotationTable option
-    // Protocol Xml
-    | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
-    | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
-    //
-    | UpdateRawCustomXml                            of string
-    | UpdateNextRawCustomXml                        of string
-    // Excel Interop
-    | GetAllValidationXmlParsedRequest
-    | GetAllValidationXmlParsedResponse             of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
-    | GetAllProtocolGroupXmlParsedRequest
-    | GetAllProtocolGroupXmlParsedResponse          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
-    | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
-    | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypes
+//type SettingsXmlMsg =
+//    // // Client // //
+//    // Validation Xml
+//    | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+//    | UpdateNextAnnotationTableForActiveValidation  of AnnotationTable option
+//    | UpdateValidationXmls                          of OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+//    // Protocol Group Xml
+//    | UpdateProtocolGroupXmls                       of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
+//    | UpdateActiveProtocolGroup                     of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+//    | UpdateNextAnnotationTableForActiveProtGroup   of AnnotationTable option
+//    // Protocol Xml
+//    | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
+//    | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
+//    //
+//    | UpdateRawCustomXml                            of string
+//    | UpdateNextRawCustomXml                        of string
+//    // Excel Interop
+//    | GetAllValidationXmlParsedRequest
+//    | GetAllValidationXmlParsedResponse             of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
+//    | GetAllProtocolGroupXmlParsedRequest
+//    | GetAllProtocolGroupXmlParsedResponse          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
+//    | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
+//    | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypes
 
 type SettingsDataStewardMsg =
     // Client
     | UpdatePointerJson of string option
 
-type SettingsProtocolMsg =
-    | UpdateProtocolsFromExcel          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    | UpdateProtocolsFromDB             of ProtocolTemplate []
-    // ExcelInterop
-    | GetActiveProtocolGroupXmlParsed
-    | GetProtocolsFromDBRequest         of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    | UpdateProtocolByNewVersion        of OfficeInterop.Types.Xml.GroupTypes.Protocol * ProtocolTemplate
+//type SettingsProtocolMsg =
+//    | UpdateProtocolsFromExcel          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+//    | UpdateProtocolsFromDB             of ProtocolTemplate []
+//    // ExcelInterop
+//    | GetActiveProtocolGroupXmlParsed
+//    | GetProtocolsFromDBRequest         of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+//    | UpdateProtocolByNewVersion        of OfficeInterop.Types.Xml.GroupTypes.Protocol * ProtocolTemplate
 
 type TopLevelMsg =
     | CloseSuggestions
@@ -297,9 +297,9 @@ and Msg =
     | ProtocolInsert        of ProtocolInsertMsg
     | XLSXConverterMsg      of XLSXConverterMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
-    | SettingsXmlMsg        of SettingsXmlMsg
+    //| SettingsXmlMsg        of SettingsXmlMsg
     | SettingDataStewardMsg of SettingsDataStewardMsg
-    | SettingsProtocolMsg   of SettingsProtocolMsg
+    //| SettingsProtocolMsg   of SettingsProtocolMsg
     | TopLevelMsg           of TopLevelMsg
     | UpdatePageState       of Routing.Route option
     | Batch                 of seq<Msg>

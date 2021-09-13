@@ -198,8 +198,6 @@ let fileUploadButton (model:Model) dispatch id =
         ]
     ]
 
-open OfficeInterop.Types.Xml
-
 //let addFromFileToTableButton isValid (model:Model) dispatch =
 //    Columns.columns [Columns.IsMobile][
 //        Column.column [][
@@ -287,13 +285,15 @@ let toProtocolSearchElement (model:Model) dispatch =
         Button.Props [Style [Margin "1rem 0"]]
     ] [str "Browse protocol template database"]
 
+open OfficeInterop
+
 let addFromDBToTableButton (model:Model) dispatch =
     Columns.columns [Columns.IsMobile][
         Column.column [][
             Field.div [] [
                 Control.div [] [
                     Button.a [
-                        if model.ProtocolInsertState.ProtocolSelected.IsSome && model.ProtocolInsertState.ValidationXml.IsSome
+                        if model.ProtocolInsertState.ProtocolSelected.IsSome //&& model.ProtocolInsertState.ValidationXml.IsSome
                         then
                             Button.IsActive true
                         else
@@ -304,16 +304,17 @@ let addFromDBToTableButton (model:Model) dispatch =
                         Button.OnClick (fun e ->
                             let p = model.ProtocolInsertState.ProtocolSelected.Value
                             let preProtocol =
-                                let id = p.Name
+                                let id = "WIP-ID"
+                                let name = p.Name
                                 let version = p.Version
                                 let swateVersion = model.PersistentStorageState.AppVersion
-                                GroupTypes.Protocol.create id version swateVersion [] "" ""
+                                CustomXmlTypes.Templates.Protocol.create id name version swateVersion [] "" ""
                             let minBuildingBlockInfos = p.TemplateBuildingBlocks
                             /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
-                            let validation =
-                                model.ProtocolInsertState.ValidationXml.Value |> Some
+                            //let validation =
+                            //    model.ProtocolInsertState.ValidationXml.Value |> Some
                             ProtocolIncreaseTimesUsed preProtocol.Id |> ProtocolInsert |> dispatch
-                            AddAnnotationBlocks (minBuildingBlockInfos, preProtocol, validation) |> ExcelInterop |> dispatch
+                            AddAnnotationBlocks (minBuildingBlockInfos, preProtocol) |> ExcelInterop |> dispatch
                         )
                     ] [
                         str "Insert protocol annotation blocks"
@@ -334,20 +335,18 @@ let addFromDBToTableButton (model:Model) dispatch =
 
 let showDatabaseProtocolTemplate (model:Model) dispatch =
     div [ Style [
-            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-            Padding "0.25rem 1rem"
-            MarginBottom "1rem"
+        BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
+        Padding "0.25rem 1rem"
+        MarginBottom "1rem"
     ]] [
         Help.help [][
             b [] [str "Search the database for protocol templates."]
             str " The building blocks from these templates can be inserted into a Swate table as protocol."
         ]
-            
+
         toProtocolSearchElement model dispatch
 
-        div [
-            Style [OverflowX OverflowOptions.Auto]
-        ][
+        div [Style [OverflowX OverflowOptions.Auto; MarginBottom "1rem"]] [
             if model.ProtocolInsertState.ProtocolSelected.IsSome then
                 Table.table [
                     Table.IsFullWidth;
@@ -374,7 +373,6 @@ let showDatabaseProtocolTemplate (model:Model) dispatch =
                     ]
                 ]
         ]
-
         addFromDBToTableButton model dispatch
     ]
 
@@ -400,8 +398,6 @@ let fileUploadViewComponent (model:Model) dispatch =
         //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks from file."]
 
         //protocolInsertElement uploadId model dispatch
-
-
 
         //div [][
         //    str (

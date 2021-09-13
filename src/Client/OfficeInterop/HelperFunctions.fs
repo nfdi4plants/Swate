@@ -8,7 +8,6 @@ open GlobalBindings
 open System.Collections.Generic
 open System.Text.RegularExpressions
 
-open OfficeInterop.Types
 open Shared.OfficeInteropTypes
 open Shared
 
@@ -411,136 +410,136 @@ let getActiveTableXml (tableName:string) (worksheetName:string) (completeCustomX
         None
 
 
-let getAllSwateTableValidation (xmlParsed:XmlElement) =
-    let protocolGroups = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot xmlParsed
+//let getAllSwateTableValidation (xmlParsed:XmlElement) =
+//    let protocolGroups = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot xmlParsed
 
-    protocolGroups
-    |> List.map (
-        xmlElementToXmlString >> Xml.ValidationTypes.TableValidation.ofXml
-    )
+//    protocolGroups
+//    |> List.map (
+//        xmlElementToXmlString >> Xml.ValidationTypes.TableValidation.ofXml
+//    )
 
-let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
-    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
-    if activeTableXml.IsNone then
-        None
-    else
-        let v = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot activeTableXml.Value
-        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.ValidationTypes.ValidationXmlRoot)
-        if v.Length = 0 then
-            None
-        else
-            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
-            Xml.ValidationTypes.TableValidation.ofXml tableXmlAsString |> Some
+//let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
+//    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
+//    if activeTableXml.IsNone then
+//        None
+//    else
+//        let v = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot activeTableXml.Value
+//        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.ValidationTypes.ValidationXmlRoot)
+//        if v.Length = 0 then
+//            None
+//        else
+//            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
+//            Xml.ValidationTypes.TableValidation.ofXml tableXmlAsString |> Some
 
-/// Use the 'remove' parameter to remove any Swate table validation xml for the worksheet annotation table name combination in 'tableValidation'
-let private updateRemoveSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) (remove:bool) =
+///// Use the 'remove' parameter to remove any Swate table validation xml for the worksheet annotation table name combination in 'tableValidation'
+//let private updateRemoveSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) (remove:bool) =
 
-    let currentTableXml = getActiveTableXml tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet previousCompleteCustomXml
+//    let currentTableXml = getActiveTableXml tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet previousCompleteCustomXml
 
-    let nextTableXml =
-        let newValidationXml = tableValidation.toXml |> SimpleXml.parseElement
-        if currentTableXml.IsSome then
-            let filteredChildren =
-                currentTableXml.Value.Children
-                |> List.filter (fun x -> x.Name <> Xml.ValidationTypes.ValidationXmlRoot )
-            {currentTableXml.Value with
-                Children =
-                    if remove then
-                        filteredChildren
-                    else
-                        newValidationXml::filteredChildren
-            }
-        else
-            let initNewSwateTableXml =
-                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet
-            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
-            {swateTableXmlEle with
-                Children = [newValidationXml]
-            }
-    let filterPrevTableFromRootChildren =
-        previousCompleteCustomXml.Children
-        |> List.filter (fun x ->
-            let isExisting =
-                x.Name = "SwateTable"
-                && x.Attributes.["Table"] = tableValidation.AnnotationTable.Name
-                && x.Attributes.["Worksheet"] = tableValidation.AnnotationTable.Worksheet
-            isExisting |> not
-        )
-    {previousCompleteCustomXml with
-        Children = nextTableXml::filterPrevTableFromRootChildren
-    }
+//    let nextTableXml =
+//        let newValidationXml = tableValidation.toXml |> SimpleXml.parseElement
+//        if currentTableXml.IsSome then
+//            let filteredChildren =
+//                currentTableXml.Value.Children
+//                |> List.filter (fun x -> x.Name <> Xml.ValidationTypes.ValidationXmlRoot )
+//            {currentTableXml.Value with
+//                Children =
+//                    if remove then
+//                        filteredChildren
+//                    else
+//                        newValidationXml::filteredChildren
+//            }
+//        else
+//            let initNewSwateTableXml =
+//                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet
+//            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
+//            {swateTableXmlEle with
+//                Children = [newValidationXml]
+//            }
+//    let filterPrevTableFromRootChildren =
+//        previousCompleteCustomXml.Children
+//        |> List.filter (fun x ->
+//            let isExisting =
+//                x.Name = "SwateTable"
+//                && x.Attributes.["Table"] = tableValidation.AnnotationTable.Name
+//                && x.Attributes.["Worksheet"] = tableValidation.AnnotationTable.Worksheet
+//            isExisting |> not
+//        )
+//    {previousCompleteCustomXml with
+//        Children = nextTableXml::filterPrevTableFromRootChildren
+//    }
 
-let removeSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
-    updateRemoveSwateValidation tableValidation previousCompleteCustomXml true
+//let removeSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
+//    updateRemoveSwateValidation tableValidation previousCompleteCustomXml true
 
-let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
-    updateRemoveSwateValidation tableValidation previousCompleteCustomXml false
+//let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
+//    updateRemoveSwateValidation tableValidation previousCompleteCustomXml false
 
-let replaceValidationByValidation tableVal1 tableVal2 previousCompleteCustomXml =
-    let removeTableVal1 = removeSwateValidation tableVal1 previousCompleteCustomXml
-    let addTableVal2 = updateSwateValidation tableVal2 removeTableVal1
-    addTableVal2
+//let replaceValidationByValidation tableVal1 tableVal2 previousCompleteCustomXml =
+//    let removeTableVal1 = removeSwateValidation tableVal1 previousCompleteCustomXml
+//    let addTableVal2 = updateSwateValidation tableVal2 removeTableVal1
+//    addTableVal2
 
-let getAllSwateProtocolGroups (xmlParsed:XmlElement) =
-    let protocolGroups = SimpleXml.findElementsByName Xml.GroupTypes.ProtocolGroupXmlRoot xmlParsed
+//let getAllSwateProtocolGroups (xmlParsed:XmlElement) =
+//    let protocolGroups = SimpleXml.findElementsByName Xml.GroupTypes.ProtocolGroupXmlRoot xmlParsed
 
-    protocolGroups
-    |> List.map (
-        xmlElementToXmlString >> Xml.GroupTypes.ProtocolGroup.ofXml
-    )
+//    protocolGroups
+//    |> List.map (
+//        xmlElementToXmlString >> Xml.GroupTypes.ProtocolGroup.ofXml
+//    )
 
-let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
-    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
-    if activeTableXml.IsNone then
-        None
-    else
-        let v = SimpleXml.findElementsByName Xml.GroupTypes.ProtocolGroupXmlRoot activeTableXml.Value
-        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.GroupTypes.ProtocolGroupXmlRoot)
-        if v.Length = 0 then
-            None
-        else
-            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
-            Xml.GroupTypes.ProtocolGroup.ofXml tableXmlAsString |> Some
+//let getSwateProtocolGroupForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
+//    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
+//    if activeTableXml.IsNone then
+//        None
+//    else
+//        let v = SimpleXml.findElementsByName Xml.GroupTypes.ProtocolGroupXmlRoot activeTableXml.Value
+//        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.GroupTypes.ProtocolGroupXmlRoot)
+//        if v.Length = 0 then
+//            None
+//        else
+//            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
+//            Xml.GroupTypes.ProtocolGroup.ofXml tableXmlAsString |> Some
 
-/// Use the 'remove' parameter to remove any Swate protocol group xml for the worksheet annotation table name combination in 'protocolGroup'
-let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) (remove:bool) =
+///// Use the 'remove' parameter to remove any Swate protocol group xml for the worksheet annotation table name combination in 'protocolGroup'
+//let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) (remove:bool) =
 
-    let currentTableXml = getActiveTableXml protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet previousCompleteCustomXml
+//    let currentTableXml = getActiveTableXml protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet previousCompleteCustomXml
 
-    let nextTableXml =
-        let newProtocolGroupXml = protocolGroup.toXml |> SimpleXml.parseElement
-        if currentTableXml.IsSome then
-            let filteredChildren =
-                currentTableXml.Value.Children
-                |> List.filter (fun x -> x.Name <> Xml.GroupTypes.ProtocolGroupXmlRoot )
-            {currentTableXml.Value with
-                Children =
-                    if remove then
-                        filteredChildren
-                    else
-                        if filteredChildren.IsEmpty then [newProtocolGroupXml] else newProtocolGroupXml::filteredChildren
-            }
-        else
-            let initNewSwateTableXml =
-                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet
-            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
-            {swateTableXmlEle with
-                Children = [newProtocolGroupXml]
-            }
+//    let nextTableXml =
+//        let newProtocolGroupXml = protocolGroup.toXml |> SimpleXml.parseElement
+//        if currentTableXml.IsSome then
+//            let filteredChildren =
+//                currentTableXml.Value.Children
+//                |> List.filter (fun x -> x.Name <> Xml.GroupTypes.ProtocolGroupXmlRoot )
+//            {currentTableXml.Value with
+//                Children =
+//                    if remove then
+//                        filteredChildren
+//                    else
+//                        if filteredChildren.IsEmpty then [newProtocolGroupXml] else newProtocolGroupXml::filteredChildren
+//            }
+//        else
+//            let initNewSwateTableXml =
+//                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" protocolGroup.AnnotationTable.Name protocolGroup.AnnotationTable.Worksheet
+//            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
+//            {swateTableXmlEle with
+//                Children = [newProtocolGroupXml]
+//            }
 
-    let filterPrevTableFromRootChildren =
-        previousCompleteCustomXml.Children
-        |> List.filter (fun x ->
-            let isExisting =
-                x.Name = "SwateTable"
-                && x.Attributes.["Table"] = protocolGroup.AnnotationTable.Name
-                && x.Attributes.["Worksheet"] = protocolGroup.AnnotationTable.Worksheet
-            isExisting |> not
-        )
+//    let filterPrevTableFromRootChildren =
+//        previousCompleteCustomXml.Children
+//        |> List.filter (fun x ->
+//            let isExisting =
+//                x.Name = "SwateTable"
+//                && x.Attributes.["Table"] = protocolGroup.AnnotationTable.Name
+//                && x.Attributes.["Worksheet"] = protocolGroup.AnnotationTable.Worksheet
+//            isExisting |> not
+//        )
 
-    {previousCompleteCustomXml with
-        Children = nextTableXml::filterPrevTableFromRootChildren
-    }
+//    {previousCompleteCustomXml with
+//        Children = nextTableXml::filterPrevTableFromRootChildren
+//    }
 
 //let removeSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
 //    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml true
@@ -548,151 +547,151 @@ let updateRemoveSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) 
 //let updateSwateProtocolGroup (protocolGroup:Xml.GroupTypes.ProtocolGroup) (previousCompleteCustomXml:XmlElement) =
 //    updateRemoveSwateProtocolGroup protocolGroup previousCompleteCustomXml false
 
-let replaceProtGroupByProtGroup protGroup1 protGroup2 (previousCompleteCustomXml:XmlElement) =
-    let removeProtGroup1 = updateRemoveSwateProtocolGroup protGroup1 previousCompleteCustomXml true
-    let addProtGroup2 = updateRemoveSwateProtocolGroup protGroup2 removeProtGroup1 false
-    addProtGroup2
+//let replaceProtGroupByProtGroup protGroup1 protGroup2 (previousCompleteCustomXml:XmlElement) =
+//    let removeProtGroup1 = updateRemoveSwateProtocolGroup protGroup1 previousCompleteCustomXml true
+//    let addProtGroup2 = updateRemoveSwateProtocolGroup protGroup2 removeProtGroup1 false
+//    addProtGroup2
 
-/// Use the 'remove' parameter to remove any Swate protocol xml for the worksheet annotation table name combination in 'protocolGroup'
-let updateRemoveSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) (remove:bool)=
+///// Use the 'remove' parameter to remove any Swate protocol xml for the worksheet annotation table name combination in 'protocolGroup'
+//let updateRemoveSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) (remove:bool)=
 
-    let currentSwateProtocolGroup =
-        let isExisting = getSwateProtocolGroupForCurrentTable protocol.AnnotationTable.Name protocol.AnnotationTable.Worksheet previousCompleteCustomXml
-        if isExisting.IsNone then
-            Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion protocol.AnnotationTable.Name protocol.AnnotationTable.Worksheet []
-        else
-            isExisting.Value
+//    let currentSwateProtocolGroup =
+//        let isExisting = getSwateProtocolGroupForCurrentTable protocol.AnnotationTable.Name protocol.AnnotationTable.Worksheet previousCompleteCustomXml
+//        if isExisting.IsNone then
+//            Xml.GroupTypes.ProtocolGroup.create protocol.SwateVersion protocol.AnnotationTable.Name protocol.AnnotationTable.Worksheet []
+//        else
+//            isExisting.Value
 
-    let filteredProtocolChildren =
-        currentSwateProtocolGroup.Protocols
-        |> List.filter (fun x -> x.Id <> protocol.Id)
+//    let filteredProtocolChildren =
+//        currentSwateProtocolGroup.Protocols
+//        |> List.filter (fun x -> x.Id <> protocol.Id)
 
-    let nextProtocolGroup =
-        {currentSwateProtocolGroup with
-            Protocols =
-                if remove then
-                    filteredProtocolChildren
-                else
-                    if filteredProtocolChildren.IsEmpty then [protocol] else protocol::filteredProtocolChildren
-        }
+//    let nextProtocolGroup =
+//        {currentSwateProtocolGroup with
+//            Protocols =
+//                if remove then
+//                    filteredProtocolChildren
+//                else
+//                    if filteredProtocolChildren.IsEmpty then [protocol] else protocol::filteredProtocolChildren
+//        }
 
-    updateRemoveSwateProtocolGroup nextProtocolGroup previousCompleteCustomXml false
+//    updateRemoveSwateProtocolGroup nextProtocolGroup previousCompleteCustomXml false
 
-//let removeSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
-//    updateRemoveSwateProtocol protocol previousCompleteCustomXml true
+////let removeSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+////    updateRemoveSwateProtocol protocol previousCompleteCustomXml true
 
-//let updateSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
-//    updateRemoveSwateProtocol protocol previousCompleteCustomXml false
+////let updateSwateProtocol (protocol:Xml.GroupTypes.Protocol) (previousCompleteCustomXml:XmlElement) =
+////    updateRemoveSwateProtocol protocol previousCompleteCustomXml false
 
-let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
-    Excel.run(fun context ->
+//let updateProtocolFromXml (protocol:Xml.GroupTypes.Protocol) (remove:bool) =
+//    Excel.run(fun context ->
 
-        let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
+//        let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
 
-        // The first part accesses current CustomXml
-        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+//        // The first part accesses current CustomXml
+//        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+//        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
-        promise {
-            let! annotationTable = getActiveAnnotationTableName()
+//        promise {
+//            let! annotationTable = getActiveAnnotationTableName()
 
-            let! xmlParsed = getCustomXml customXmlParts context
+//            let! xmlParsed = getCustomXml customXmlParts context
 
-            // Not sure if this is necessary. Previously table and worksheet name were accessed at this point.
-            // Then AnnotationTable was added to protocol. So now we refresh these values at this point.
-            let securityUpdateForProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
+//            // Not sure if this is necessary. Previously table and worksheet name were accessed at this point.
+//            // Then AnnotationTable was added to protocol. So now we refresh these values at this point.
+//            let securityUpdateForProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
 
-            let nextCustomXml =
-                updateRemoveSwateProtocol securityUpdateForProtocol xmlParsed remove
+//            let nextCustomXml =
+//                updateRemoveSwateProtocol securityUpdateForProtocol xmlParsed remove
 
-            let nextCustomXmlString = nextCustomXml |> xmlElementToXmlString
+//            let nextCustomXmlString = nextCustomXml |> xmlElementToXmlString
 
-            let! deleteXml =
-                context.sync().``then``(fun e ->
-                    let items = customXmlParts.items
-                    let xmls = items |> Seq.map (fun x -> x.delete() )
+//            let! deleteXml =
+//                context.sync().``then``(fun e ->
+//                    let items = customXmlParts.items
+//                    let xmls = items |> Seq.map (fun x -> x.delete() )
                     
-                    xmls |> Array.ofSeq
-                )
+//                    xmls |> Array.ofSeq
+//                )
 
-            let! addNext =
-                context.sync().``then``(fun e ->
-                    customXmlParts.add(nextCustomXmlString)
-                )
+//            let! addNext =
+//                context.sync().``then``(fun e ->
+//                    customXmlParts.add(nextCustomXmlString)
+//                )
 
-            // This will be displayed in activity log
-            return
-                "Info",
-                sprintf
-                    "%s ProtocolGroup Scheme with '%s - %s - %s' "
-                    (if remove then "Remove Protocol from" else "Update")
-                    activeSheet.name
-                    annotationTable
-                    protocol.Id
-        }
-    )
+//            // This will be displayed in activity log
+//            return
+//                "Info",
+//                sprintf
+//                    "%s ProtocolGroup Scheme with '%s - %s - %s' "
+//                    (if remove then "Remove Protocol from" else "Update")
+//                    activeSheet.name
+//                    annotationTable
+//                    protocol.Id
+//        }
+//    )
 
-[<System.Obsolete>]
-/// range -> 'let groupHeader = annoHeaderRange.getRowsAbove(1.)'
-let formatGroupHeaderForRange (range:Excel.Range) (context:RequestContext) =
-    promise {
+//[<System.Obsolete>]
+///// range -> 'let groupHeader = annoHeaderRange.getRowsAbove(1.)'
+//let formatGroupHeaderForRange (range:Excel.Range) (context:RequestContext) =
+//    promise {
 
-        let! range = context.sync().``then``(fun e ->
-            range.load(U2.Case2 (ResizeArray(["format"])))
-        )
+//        let! range = context.sync().``then``(fun e ->
+//            range.load(U2.Case2 (ResizeArray(["format"])))
+//        )
 
-        let! colorAndGetBorderItems = context.sync().``then``(fun e ->
+//        let! colorAndGetBorderItems = context.sync().``then``(fun e ->
     
-            let f = range.format
+//            let f = range.format
     
-            f.fill.color <- "#70AD47"
-            f.font.color <- "white"
-            f.font.bold <- true
-            f.horizontalAlignment <- U2.Case2 "center"
+//            f.fill.color <- "#70AD47"
+//            f.font.color <- "white"
+//            f.font.bold <- true
+//            f.horizontalAlignment <- U2.Case2 "center"
     
-            let format = f.load(U2.Case2 (ResizeArray(["borders"])))
-            format.borders.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
-        )
+//            let format = f.load(U2.Case2 (ResizeArray(["borders"])))
+//            format.borders.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
+//        )
     
-        let! borderItems = context.sync().``then``(fun e ->
-            colorAndGetBorderItems.items |> Array.ofSeq |> Array.map (fun x -> x.load(propertyNames = U2.Case2 (ResizeArray(["sideIndex"; "color"]))) )
-        )
-        let! colorBorder = context.sync().``then``(fun e ->
-            let color = borderItems |> Array.map (fun x ->
-                if x.sideIndex = U2.Case2 "InsideVertical" then
-                    x.color <- "white"
-            )
-            color
-        )
-        ()
-    }
+//        let! borderItems = context.sync().``then``(fun e ->
+//            colorAndGetBorderItems.items |> Array.ofSeq |> Array.map (fun x -> x.load(propertyNames = U2.Case2 (ResizeArray(["sideIndex"; "color"]))) )
+//        )
+//        let! colorBorder = context.sync().``then``(fun e ->
+//            let color = borderItems |> Array.map (fun x ->
+//                if x.sideIndex = U2.Case2 "InsideVertical" then
+//                    x.color <- "white"
+//            )
+//            color
+//        )
+//        ()
+//    }
 
-[<System.Obsolete>]
-/// range -> 'let groupHeader = annoHeaderRange.getRowsAbove(1.)'
-let cleanGroupHeaderFormat (range:Excel.Range) (context:RequestContext) =
-    promise {
-        // unmerge group header
-        let! unmerge = context.sync().``then``(fun e ->
-            range.unmerge()
+//[<System.Obsolete>]
+///// range -> 'let groupHeader = annoHeaderRange.getRowsAbove(1.)'
+//let cleanGroupHeaderFormat (range:Excel.Range) (context:RequestContext) =
+//    promise {
+//        // unmerge group header
+//        let! unmerge = context.sync().``then``(fun e ->
+//            range.unmerge()
 
-        )
-        // empty group header
-        let! groupHeaderValues = context.sync().``then``(fun e ->
-            range.load(U2.Case1 "values")
-        )
-        // empty group header part 2
-        let! emptyGroupHeaderValues = context.sync().``then``(fun e ->
-            let nV =
-                groupHeaderValues.values
-                |> Seq.map (fun innerArr ->
-                    innerArr 
-                    |> Seq.map (fun _ ->
-                        "" |> box |> Some
-                    ) |> ResizeArray
-                ) |> ResizeArray
-            groupHeaderValues.values <- nV
-        )
+//        )
+//        // empty group header
+//        let! groupHeaderValues = context.sync().``then``(fun e ->
+//            range.load(U2.Case1 "values")
+//        )
+//        // empty group header part 2
+//        let! emptyGroupHeaderValues = context.sync().``then``(fun e ->
+//            let nV =
+//                groupHeaderValues.values
+//                |> Seq.map (fun innerArr ->
+//                    innerArr 
+//                    |> Seq.map (fun _ ->
+//                        "" |> box |> Some
+//                    ) |> ResizeArray
+//                ) |> ResizeArray
+//            groupHeaderValues.values <- nV
+//        )
 
-        return ()
-    }
+//        return ()
+//    }
 

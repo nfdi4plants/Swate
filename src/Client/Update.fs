@@ -127,7 +127,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
                 (GenericError >> Dev)
         currentModel, cmd
 
-    | AddAnnotationBlocks (minBuildingBlockInfos, protocol, validationOpt) ->
+    | AddAnnotationBlocks (minBuildingBlockInfos, protocol) ->
         failwith """Function "AddAnnotationBlocks" is currently not supported."""
         //let cmd =
         //    Cmd.OfPromise.either
@@ -246,50 +246,50 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         //            StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks, msg) |> Validation)
         //        (GenericError >> Dev)
         currentModel, Cmd.none
-    | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.writeTableValidationToXml
-                (newTableValidation, currentSwateVersion)
-                (fun x ->
-                    Msg.Batch [
-                        GenericLog x |> Dev
-                        GetTableValidationXml |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
+    //| WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
+    //    let cmd =
+    //        Cmd.OfPromise.either
+    //            OfficeInterop.writeTableValidationToXml
+    //            (newTableValidation, currentSwateVersion)
+    //            (fun x ->
+    //                Msg.Batch [
+    //                    GenericLog x |> Dev
+    //                    GetTableValidationXml |> ExcelInterop
+    //                ]
+    //            )
+    //            (GenericError >> Dev)
 
-        currentModel, cmd
+    //    currentModel, cmd
 
-    | AddTableValidationtoExisting (newTableValidation, newColNames, protocolInfo) ->
-        failwith """Function "AddTableValidationtoExisting" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.addTableValidationToExisting
-        //        (newTableValidation, newColNames)
-        //        (fun x ->
-        //            Msg.Batch [
-        //                GenericLog x |> Dev
-        //                WriteProtocolToXml protocolInfo |> ExcelInterop
-        //            ]
-        //        )
-        //        (GenericError >> Dev)
-        currentModel, Cmd.none
+    //| AddTableValidationtoExisting (newTableValidation, newColNames, protocolInfo) ->
+    //    failwith """Function "AddTableValidationtoExisting" is currently not supported."""
+    //    //let cmd =
+    //    //    Cmd.OfPromise.either
+    //    //        OfficeInterop.addTableValidationToExisting
+    //    //        (newTableValidation, newColNames)
+    //    //        (fun x ->
+    //    //            Msg.Batch [
+    //    //                GenericLog x |> Dev
+    //    //                WriteProtocolToXml protocolInfo |> ExcelInterop
+    //    //            ]
+    //    //        )
+    //    //        (GenericError >> Dev)
+    //    currentModel, Cmd.none
 
-    | WriteProtocolToXml protocolInfo ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.writeProtocolToXml
-                (protocolInfo)
-                (fun res ->
-                    Msg.Batch [
-                        GenericLog res |> Dev
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                        if currentModel.PageState.CurrentPage = Route.SettingsProtocol then GetActiveProtocolGroupXmlParsed |> SettingsProtocolMsg 
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
+    //| WriteProtocolToXml protocolInfo ->
+    //    let cmd =
+    //        Cmd.OfPromise.either
+    //            OfficeInterop.writeProtocolToXml
+    //            (protocolInfo)
+    //            (fun res ->
+    //                Msg.Batch [
+    //                    GenericLog res |> Dev
+    //                    UpdateProtocolGroupHeader |> ExcelInterop
+    //                    if currentModel.PageState.CurrentPage = Route.SettingsProtocol then GetActiveProtocolGroupXmlParsed |> SettingsProtocolMsg 
+    //                ]
+    //            )
+    //            (GenericError >> Dev)
+    //    currentModel, cmd
     | DeleteAllCustomXml ->
         let cmd =
             Cmd.OfPromise.either
@@ -304,18 +304,19 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
                 (GenericError >> Dev)
         currentModel, cmd
     | GetSwateCustomXml ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getSwateCustomXml
-                ()
-                (fun xml ->
-                    Msg.Batch [
-                        GenericLog xml |> Dev
-                        UpdateRawCustomXml (snd xml) |> SettingsXmlMsg
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
+        failwith """Function "GetSwateCustomXml" is currently not supported."""
+        //let cmd =
+        //    Cmd.OfPromise.either
+        //        OfficeInterop.getSwateCustomXml
+        //        ()
+        //        (fun xml ->
+        //            Msg.Batch [
+        //                GenericLog xml |> Dev
+        //                UpdateRawCustomXml (snd xml) |> SettingsXmlMsg
+        //            ]
+        //        )
+        //        (GenericError >> Dev)
+        currentModel, Cmd.none//cmd
     | UpdateSwateCustomXml newCustomXml ->
         let cmd =
             Cmd.OfPromise.either
@@ -1280,23 +1281,22 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
                 }
         nextState, Cmd.none
 
-open OfficeInterop.Types.Xml.ValidationTypes
 
 let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
     match validationMsg with
     /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
     /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
-    | StoreTableRepresentationFromOfficeInterop (tableValidation:TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock [], msg) ->
+    //| StoreTableRepresentationFromOfficeInterop (tableValidation:TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock [], msg) ->
 
-        let nextCmd =
-            GenericLog ("Info", msg) |> Dev |> Cmd.ofMsg
+    //    let nextCmd =
+    //        GenericLog ("Info", msg) |> Dev |> Cmd.ofMsg
 
-        let nextState = {
-            currentState with
-                ActiveTableBuildingBlocks = buildingBlocks
-                TableValidationScheme = tableValidation
-        }
-        nextState, nextCmd
+    //    let nextState = {
+    //        currentState with
+    //            ActiveTableBuildingBlocks = buildingBlocks
+    //            TableValidationScheme = tableValidation
+    //    }
+    //    nextState, nextCmd
 
     | UpdateDisplayedOptionsId intOpt ->
         let nextState = {
@@ -1304,12 +1304,12 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
                 DisplayedOptionsId = intOpt
         }
         nextState, Cmd.none
-    | UpdateTableValidationScheme tableValidation ->
-        let nextState = {
-            currentState with
-                TableValidationScheme   = tableValidation
-        }
-        nextState, Cmd.none
+    //| UpdateTableValidationScheme tableValidation ->
+    //    let nextState = {
+    //        currentState with
+    //            TableValidationScheme   = tableValidation
+    //    }
+    //    nextState, Cmd.none
 
 let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolInsertState) : ProtocolInsertState * Cmd<Msg> =
 
@@ -1480,162 +1480,162 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
         }
         nextState, Cmd.none
 
-let handleSettingsXmlMsg (msg:SettingsXmlMsg) (currentState: SettingsXmlState) : SettingsXmlState * Cmd<Msg> =
+//let handleSettingsXmlMsg (msg:SettingsXmlMsg) (currentState: SettingsXmlState) : SettingsXmlState * Cmd<Msg> =
 
-    let matchXmlTypeToUpdateMsg msg (xmlType:OfficeInterop.Types.Xml.XmlTypes) =
-        match xmlType with
-        | OfficeInterop.Types.Xml.XmlTypes.ValidationType v ->
-            Msg.Batch [
-                GenericLog ("Info", msg) |> Dev
-                GetAllValidationXmlParsedRequest |> SettingsXmlMsg
-            ]
-        | OfficeInterop.Types.Xml.XmlTypes.GroupType _ | OfficeInterop.Types.Xml.XmlTypes.ProtocolType _ ->
-            Msg.Batch [
-                GenericLog ("Info", msg) |> Dev
-                GetAllProtocolGroupXmlParsedRequest |> SettingsXmlMsg
-                UpdateProtocolGroupHeader |> ExcelInterop
-            ]
+//    let matchXmlTypeToUpdateMsg msg (xmlType:OfficeInterop.Types.Xml.XmlTypes) =
+//        match xmlType with
+//        | OfficeInterop.Types.Xml.XmlTypes.ValidationType v ->
+//            Msg.Batch [
+//                GenericLog ("Info", msg) |> Dev
+//                GetAllValidationXmlParsedRequest |> SettingsXmlMsg
+//            ]
+//        | OfficeInterop.Types.Xml.XmlTypes.GroupType _ | OfficeInterop.Types.Xml.XmlTypes.ProtocolType _ ->
+//            Msg.Batch [
+//                GenericLog ("Info", msg) |> Dev
+//                GetAllProtocolGroupXmlParsedRequest |> SettingsXmlMsg
+//                UpdateProtocolGroupHeader |> ExcelInterop
+//            ]
         
-    match msg with
-    // // Client // //
-    // Validation Xml
-    | UpdateActiveSwateValidation nextActiveTableValid ->
-        let nextState = {
-            currentState with
-                ActiveSwateValidation                   = nextActiveTableValid
-                NextAnnotationTableForActiveValidation  = None
-        }
-        nextState, Cmd.none
-    | UpdateNextAnnotationTableForActiveValidation nextAnnoTable ->
-        let nextState = {
-            currentState with
-                NextAnnotationTableForActiveValidation = nextAnnoTable
-        }
-        nextState, Cmd.none
-    | UpdateValidationXmls newValXmls ->
-        let nextState = {
-            currentState with
-                ActiveSwateValidation                   = None
-                NextAnnotationTableForActiveValidation  = None
-                ValidationXmls                          = newValXmls
-        }
-        nextState, Cmd.none
-    // Protocol group xml
-    | UpdateProtocolGroupXmls newProtXmls ->
-        let nextState = {
-            currentState with
-                ActiveProtocolGroup                     = None
-                NextAnnotationTableForActiveProtGroup   = None
-                ActiveProtocol                          = None
-                NextAnnotationTableForActiveProtocol    = None
-                ProtocolGroupXmls                       = newProtXmls
-        }
-        nextState, Cmd.none
-    | UpdateActiveProtocolGroup nextActiveProtGroup ->
-        let nextState= {
-            currentState with
-                ActiveProtocolGroup                     = nextActiveProtGroup
-                NextAnnotationTableForActiveProtGroup   = None
-        }
-        nextState, Cmd.none
-    | UpdateNextAnnotationTableForActiveProtGroup nextAnnoTable ->
-        let nextState = {
-            currentState with
-                NextAnnotationTableForActiveProtGroup = nextAnnoTable
-        }
-        nextState, Cmd.none
-    // Protocol xml
-    | UpdateActiveProtocol protocol ->
-        let nextState = {
-            currentState with
-                ActiveProtocol                          = protocol
-                NextAnnotationTableForActiveProtocol    = None
-        }
-        nextState, Cmd.none
-    | UpdateNextAnnotationTableForActiveProtocol nextAnnoTable ->
-        let nextState = {
-            currentState with
-                NextAnnotationTableForActiveProtocol = nextAnnoTable
-        }
-        nextState, Cmd.none
-    //
-    | UpdateRawCustomXml rawXmlStr ->
-        let nextState = {
-            currentState with
-                RawXml      = rawXmlStr
-                NextRawXml  = ""
-        }
-        nextState, Cmd.none
-    | UpdateNextRawCustomXml nextRawCustomXml ->
-        let nextState = {
-            currentState with
-                NextRawXml = nextRawCustomXml
-        }
-        nextState, Cmd.none
-    // OfficeInterop
-    | GetAllValidationXmlParsedRequest ->
-        let nextState = {
-            currentState with
-                ActiveSwateValidation                   = None
-                NextAnnotationTableForActiveValidation  = None
-        }
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getAllValidationXmlParsed
-                ()
-                (GetAllValidationXmlParsedResponse >> SettingsXmlMsg)
-                (GenericError >> Dev)
-        nextState, cmd
-    | GetAllValidationXmlParsedResponse (tableValidations, annoTables) ->
-        let nextState = {
-            currentState with
-                FoundTables = annoTables
-                ValidationXmls = tableValidations |> Array.ofList
-        }
-        let infoMsg = "Info", sprintf "Found %i checklist XML(s)." tableValidations.Length
-        let infoCmd = GenericLog infoMsg |> Dev |> Cmd.ofMsg
-        nextState, infoCmd
-    | GetAllProtocolGroupXmlParsedRequest ->
-        let nextState = {
-            currentState with
-                ActiveProtocolGroup                     = None
-                NextAnnotationTableForActiveProtGroup   = None
-                ActiveProtocol                          = None
-                NextAnnotationTableForActiveProtocol    = None
-        }
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getAllProtocolGroupXmlParsed
-                ()
-                (GetAllProtocolGroupXmlParsedResponse >> SettingsXmlMsg)
-                (GenericError >> Dev)
-        nextState, cmd
-    | GetAllProtocolGroupXmlParsedResponse (protocolGroupXmls, annoTables) ->
-        let nextState = {
-            currentState with
-                FoundTables = annoTables
-                ProtocolGroupXmls = protocolGroupXmls |> Array.ofList
-        }
-        let infoMsg = "Info", sprintf "Found %i protocol group XML(s)." protocolGroupXmls.Length
-        let infoCmd = GenericLog infoMsg |> Dev |> Cmd.ofMsg
-        nextState, infoCmd
-    | RemoveCustomXmlRequest xmlType ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.removeXmlType
-                xmlType
-                (fun msg ->  matchXmlTypeToUpdateMsg msg xmlType)
-                (GenericError >> Dev)
-        currentState, cmd
-    | ReassignCustomXmlRequest (prevXml,newXml) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.updateAnnotationTableByXmlType
-                (prevXml,newXml)
-                // can use prevXml or newXml. Both are checked during 'updateAnnotationTableByXmlType' to be of the same kind
-                (fun msg -> matchXmlTypeToUpdateMsg msg prevXml)
-                (GenericError >> Dev)
-        currentState, cmd
+//    match msg with
+//    // // Client // //
+//    // Validation Xml
+//    | UpdateActiveSwateValidation nextActiveTableValid ->
+//        let nextState = {
+//            currentState with
+//                ActiveSwateValidation                   = nextActiveTableValid
+//                NextAnnotationTableForActiveValidation  = None
+//        }
+//        nextState, Cmd.none
+//    | UpdateNextAnnotationTableForActiveValidation nextAnnoTable ->
+//        let nextState = {
+//            currentState with
+//                NextAnnotationTableForActiveValidation = nextAnnoTable
+//        }
+//        nextState, Cmd.none
+//    | UpdateValidationXmls newValXmls ->
+//        let nextState = {
+//            currentState with
+//                ActiveSwateValidation                   = None
+//                NextAnnotationTableForActiveValidation  = None
+//                ValidationXmls                          = newValXmls
+//        }
+//        nextState, Cmd.none
+//    // Protocol group xml
+//    | UpdateProtocolGroupXmls newProtXmls ->
+//        let nextState = {
+//            currentState with
+//                ActiveProtocolGroup                     = None
+//                NextAnnotationTableForActiveProtGroup   = None
+//                ActiveProtocol                          = None
+//                NextAnnotationTableForActiveProtocol    = None
+//                ProtocolGroupXmls                       = newProtXmls
+//        }
+//        nextState, Cmd.none
+//    | UpdateActiveProtocolGroup nextActiveProtGroup ->
+//        let nextState= {
+//            currentState with
+//                ActiveProtocolGroup                     = nextActiveProtGroup
+//                NextAnnotationTableForActiveProtGroup   = None
+//        }
+//        nextState, Cmd.none
+//    | UpdateNextAnnotationTableForActiveProtGroup nextAnnoTable ->
+//        let nextState = {
+//            currentState with
+//                NextAnnotationTableForActiveProtGroup = nextAnnoTable
+//        }
+//        nextState, Cmd.none
+//    // Protocol xml
+//    | UpdateActiveProtocol protocol ->
+//        let nextState = {
+//            currentState with
+//                ActiveProtocol                          = protocol
+//                NextAnnotationTableForActiveProtocol    = None
+//        }
+//        nextState, Cmd.none
+//    | UpdateNextAnnotationTableForActiveProtocol nextAnnoTable ->
+//        let nextState = {
+//            currentState with
+//                NextAnnotationTableForActiveProtocol = nextAnnoTable
+//        }
+//        nextState, Cmd.none
+//    //
+//    | UpdateRawCustomXml rawXmlStr ->
+//        let nextState = {
+//            currentState with
+//                RawXml      = rawXmlStr
+//                NextRawXml  = ""
+//        }
+//        nextState, Cmd.none
+//    | UpdateNextRawCustomXml nextRawCustomXml ->
+//        let nextState = {
+//            currentState with
+//                NextRawXml = nextRawCustomXml
+//        }
+//        nextState, Cmd.none
+//    // OfficeInterop
+//    | GetAllValidationXmlParsedRequest ->
+//        let nextState = {
+//            currentState with
+//                ActiveSwateValidation                   = None
+//                NextAnnotationTableForActiveValidation  = None
+//        }
+//        let cmd =
+//            Cmd.OfPromise.either
+//                OfficeInterop.getAllValidationXmlParsed
+//                ()
+//                (GetAllValidationXmlParsedResponse >> SettingsXmlMsg)
+//                (GenericError >> Dev)
+//        nextState, cmd
+//    | GetAllValidationXmlParsedResponse (tableValidations, annoTables) ->
+//        let nextState = {
+//            currentState with
+//                FoundTables = annoTables
+//                ValidationXmls = tableValidations |> Array.ofList
+//        }
+//        let infoMsg = "Info", sprintf "Found %i checklist XML(s)." tableValidations.Length
+//        let infoCmd = GenericLog infoMsg |> Dev |> Cmd.ofMsg
+//        nextState, infoCmd
+//    | GetAllProtocolGroupXmlParsedRequest ->
+//        let nextState = {
+//            currentState with
+//                ActiveProtocolGroup                     = None
+//                NextAnnotationTableForActiveProtGroup   = None
+//                ActiveProtocol                          = None
+//                NextAnnotationTableForActiveProtocol    = None
+//        }
+//        let cmd =
+//            Cmd.OfPromise.either
+//                OfficeInterop.getAllProtocolGroupXmlParsed
+//                ()
+//                (GetAllProtocolGroupXmlParsedResponse >> SettingsXmlMsg)
+//                (GenericError >> Dev)
+//        nextState, cmd
+//    | GetAllProtocolGroupXmlParsedResponse (protocolGroupXmls, annoTables) ->
+//        let nextState = {
+//            currentState with
+//                FoundTables = annoTables
+//                ProtocolGroupXmls = protocolGroupXmls |> Array.ofList
+//        }
+//        let infoMsg = "Info", sprintf "Found %i protocol group XML(s)." protocolGroupXmls.Length
+//        let infoCmd = GenericLog infoMsg |> Dev |> Cmd.ofMsg
+//        nextState, infoCmd
+//    | RemoveCustomXmlRequest xmlType ->
+//        let cmd =
+//            Cmd.OfPromise.either
+//                OfficeInterop.removeXmlType
+//                xmlType
+//                (fun msg ->  matchXmlTypeToUpdateMsg msg xmlType)
+//                (GenericError >> Dev)
+//        currentState, cmd
+//    | ReassignCustomXmlRequest (prevXml,newXml) ->
+//        let cmd =
+//            Cmd.OfPromise.either
+//                OfficeInterop.updateAnnotationTableByXmlType
+//                (prevXml,newXml)
+//                // can use prevXml or newXml. Both are checked during 'updateAnnotationTableByXmlType' to be of the same kind
+//                (fun msg -> matchXmlTypeToUpdateMsg msg prevXml)
+//                (GenericError >> Dev)
+//        currentState, cmd
 
 let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
     match topLevelMsg with
@@ -1671,58 +1671,58 @@ let handleXLSXConverterMsg (msg:XLSXConverterMsg) (currentModel: Model) : Model 
         }
         nextModel, Cmd.none
 
-let handleSettingsProtocolMsg (topLevelMsg:SettingsProtocolMsg) (currentState: SettingsProtocolState) : SettingsProtocolState * Cmd<Msg> =
-    match topLevelMsg with
-    // Client
-    | UpdateProtocolsFromDB nextProtFromDB ->
-        let nextState = {
-            currentState with
-                ProtocolsFromDB = nextProtFromDB
-        }
-        nextState, Cmd.none
-    | UpdateProtocolsFromExcel nextProtFromExcel ->
-        let nextState = {
-            currentState with
-                ProtocolsFromExcel = nextProtFromExcel
-        }
-        nextState, Cmd.none
-    // Excel
-    | GetActiveProtocolGroupXmlParsed ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getActiveProtocolGroupXmlParsed
-                ()
-                (fun x ->
-                    Msg.Batch [
-                        UpdateProtocolsFromExcel x |> SettingsProtocolMsg
-                        GetProtocolsFromDBRequest x |> SettingsProtocolMsg
-                    ]
-                )
-                (GenericError >> Dev)
-        currentState, cmd
-    | UpdateProtocolByNewVersion (prot, protTemplate) ->
-        failwith """Function "UpdateProtocolByNewVersion" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.updateProtocolByNewVersion
-        //        (prot,protTemplate)
-        //        (AddAnnotationBlocks >> ExcelInterop)
-        //        (GenericError >> Dev)
-        currentState, Cmd.none
-    // Server
-    | GetProtocolsFromDBRequest activeProtGroupOpt ->
-        let cmd =
-            match activeProtGroupOpt with
-            | Some protGroup ->
-                let protNames = protGroup.Protocols |> List.map (fun x -> x.Id) |> Array.ofList
-                Cmd.OfAsync.either
-                    Api.api.getProtocolsByName
-                    protNames
-                    (UpdateProtocolsFromDB >> SettingsProtocolMsg)
-                    (GenericError >> Dev)
-            | None ->
-                GenericLog ("Info", "No protocols found for active table") |> Dev |> Cmd.ofMsg
-        currentState, cmd
+//let handleSettingsProtocolMsg (topLevelMsg:SettingsProtocolMsg) (currentState: SettingsProtocolState) : SettingsProtocolState * Cmd<Msg> =
+//    match topLevelMsg with
+//    // Client
+//    | UpdateProtocolsFromDB nextProtFromDB ->
+//        let nextState = {
+//            currentState with
+//                ProtocolsFromDB = nextProtFromDB
+//        }
+//        nextState, Cmd.none
+//    | UpdateProtocolsFromExcel nextProtFromExcel ->
+//        let nextState = {
+//            currentState with
+//                ProtocolsFromExcel = nextProtFromExcel
+//        }
+//        nextState, Cmd.none
+//    // Excel
+//    | GetActiveProtocolGroupXmlParsed ->
+//        let cmd =
+//            Cmd.OfPromise.either
+//                OfficeInterop.getActiveProtocolGroupXmlParsed
+//                ()
+//                (fun x ->
+//                    Msg.Batch [
+//                        UpdateProtocolsFromExcel x |> SettingsProtocolMsg
+//                        GetProtocolsFromDBRequest x |> SettingsProtocolMsg
+//                    ]
+//                )
+//                (GenericError >> Dev)
+//        currentState, cmd
+//    | UpdateProtocolByNewVersion (prot, protTemplate) ->
+//        failwith """Function "UpdateProtocolByNewVersion" is currently not supported."""
+//        //let cmd =
+//        //    Cmd.OfPromise.either
+//        //        OfficeInterop.updateProtocolByNewVersion
+//        //        (prot,protTemplate)
+//        //        (AddAnnotationBlocks >> ExcelInterop)
+//        //        (GenericError >> Dev)
+//        currentState, Cmd.none
+//    // Server
+//    | GetProtocolsFromDBRequest activeProtGroupOpt ->
+//        let cmd =
+//            match activeProtGroupOpt with
+//            | Some protGroup ->
+//                let protNames = protGroup.Protocols |> List.map (fun x -> x.Id) |> Array.ofList
+//                Cmd.OfAsync.either
+//                    Api.api.getProtocolsByName
+//                    protNames
+//                    (UpdateProtocolsFromDB >> SettingsProtocolMsg)
+//                    (GenericError >> Dev)
+//            | None ->
+//                GenericLog ("Info", "No protocols found for active table") |> Dev |> Cmd.ofMsg
+//        currentState, cmd
             
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
@@ -1943,15 +1943,15 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             }
         nextModel, nextCmd
 
-    | SettingsXmlMsg msg ->
-        let nextState, nextCmd =
-            currentModel.SettingsXmlState
-            |> handleSettingsXmlMsg msg
-        let nextModel = {
-            currentModel with
-                SettingsXmlState = nextState
-        }
-        nextModel, nextCmd
+    //| SettingsXmlMsg msg ->
+    //    let nextState, nextCmd =
+    //        currentModel.SettingsXmlState
+    //        |> handleSettingsXmlMsg msg
+    //    let nextModel = {
+    //        currentModel with
+    //            SettingsXmlState = nextState
+    //    }
+    //    nextModel, nextCmd
 
     | SettingDataStewardMsg msg ->
         let nextState, nextCmd =
@@ -1963,15 +1963,15 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         }
         nextModel, nextCmd
 
-    | SettingsProtocolMsg msg ->
-        let nextState, nextCmd =
-            currentModel.SettingsProtocolState
-            |> handleSettingsProtocolMsg msg
-        let nextModel = {
-            currentModel with
-                SettingsProtocolState = nextState
-        }
-        nextModel, nextCmd
+    //| SettingsProtocolMsg msg ->
+    //    let nextState, nextCmd =
+    //        currentModel.SettingsProtocolState
+    //        |> handleSettingsProtocolMsg msg
+    //    let nextModel = {
+    //        currentModel with
+    //            SettingsProtocolState = nextState
+    //    }
+    //    nextModel, nextCmd
 
     | TopLevelMsg topLevelMsg ->
         let nextModel, nextCmd =
