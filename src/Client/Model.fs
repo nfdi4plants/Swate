@@ -4,6 +4,8 @@ open Fable.React
 open Fable.React.Props
 open Fulma
 open Shared
+open TermTypes
+open ProtocolTemplateTypes
 open Thoth.Elmish
 open Routing
 
@@ -244,7 +246,7 @@ type FilePickerState = {
         DNDDropped = true
     }
 
-open OfficeInterop.Types
+open OfficeInteropTypes
 
 type AddBuildingBlockState = {
     CurrentBuildingBlock                    : BuildingBlockNamePrePrint
@@ -298,7 +300,7 @@ type AddBuildingBlockState = {
 
 /// Validation scheme for Table
 type ValidationState = {
-    ActiveTableBuildingBlocks   : OfficeInterop.Types.BuildingBlockTypes.BuildingBlock []
+    ActiveTableBuildingBlocks   : BuildingBlockTypes.BuildingBlock []
     TableValidationScheme       : OfficeInterop.Types.Xml.ValidationTypes.TableValidation
     // Client view related
     DisplayedOptionsId      : int option
@@ -323,10 +325,10 @@ type ProtocolInsertState = {
     //ProcessModel            : ISADotNet.Process option
 
     // Database protocol template
-    ProtocolSelected        : Shared.ProtocolTemplate option
+    ProtocolSelected        : ProtocolTemplate option
     ValidationXml           : OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    BuildingBlockMinInfoList: OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
-    ProtocolsAll            : Shared.ProtocolTemplate []
+    // 
+    ProtocolsAll            : ProtocolTemplate []
 
     ProtocolNameSearchQuery : string
     ProtocolTagSearchQuery  : string
@@ -345,7 +347,6 @@ type ProtocolInsertState = {
         // Database protocol templates
         ProtocolSelected        = None
         ValidationXml           = None
-        BuildingBlockMinInfoList= []
         ProtocolsAll            = [||]
         ProtocolNameSearchQuery = ""
         ProtocolTagSearchQuery  = ""
@@ -367,7 +368,7 @@ type RequestBuildingBlockInfoStates =
 type BuildingBlockDetailsState = {
     CurrentRequestState : RequestBuildingBlockInfoStates
     ShowDetails         : bool
-    BuildingBlockValues : Shared.TermSearchable []
+    BuildingBlockValues : TermSearchable []
 } with
     static member init () = {
         CurrentRequestState = Inactive
@@ -419,7 +420,7 @@ type SettingsDataStewardState = {
 
 type SettingsProtocolState = {
     ProtocolsFromExcel  : OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    ProtocolsFromDB     : Shared.ProtocolTemplate []
+    ProtocolsFromDB     : ProtocolTemplate []
 } with
     static member init () = {
         ProtocolsFromExcel  = None

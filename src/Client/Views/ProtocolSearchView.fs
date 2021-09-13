@@ -9,6 +9,7 @@ open Fable.React.Props
 open Fable.FontAwesome
 
 open Shared
+open ProtocolTemplateTypes
 
 open Model
 open Messages
@@ -215,7 +216,7 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
                                 ]
                     ]
                     Button.a [
-                        Button.OnClick (fun e -> GetProtocolXmlByProtocolRequest prot |> ProtocolInsert |> dispatch)
+                        Button.OnClick (fun e -> GetProtocolByNameRequest prot.Name |> ProtocolInsert |> dispatch)
                         Button.IsFullWidth; Button.Color IsSuccess
                     ] [str "select"]
                 ]

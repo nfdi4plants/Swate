@@ -1,16 +1,14 @@
 module Update
 
 open Elmish
-open Elmish.Navigation
 open Thoth.Elmish
-open System.Text.RegularExpressions
 
 open Shared
+open TermTypes
+open OfficeInteropTypes
 open Routing
 open Model
 open Messages
-
-open OfficeInterop.Types
 
 /// This function matches a OfficeInterop.TryFindAnnoTableResult to either Success or Error
 /// If Success it will pipe the tableName on to the msg input paramter.
@@ -20,7 +18,7 @@ let matchActiveTableResToMsg activeTableNameRes (msg:string -> Cmd<Msg>) =
     match activeTableNameRes with
     | Success tableName ->
         msg tableName
-    | Error eMsg ->
+    | OfficeInteropTypes.TryFindAnnoTableResult.Error eMsg ->
         Msg.Batch [
             UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
             GenericLog ("Error",eMsg) |> Dev
@@ -1363,34 +1361,20 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
                 Loading = false
         }
         nextState, Cmd.none
-    | GetProtocolXmlByProtocolRequest prot ->
+    | GetProtocolByNameRequest protocolName ->
         let cmd =
             Cmd.OfAsync.either
-                Api.api.getProtocolXmlForProtocol
-                prot
-                (ParseProtocolXmlByProtocolRequest >> ProtocolInsert)
+                Api.api.getProtocolByName
+                protocolName
+                (GetProtocolByNameResponse >> ProtocolInsert)
                 (GenericError >> Dev)
         currentState, cmd
-    | ParseProtocolXmlByProtocolRequest prot ->
-        failwith """Function "ParseProtocolXmlByProtocolRequest" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfFunc.either
-        //        parseDBProtocol
-        //        (prot)
-        //        (GetProtocolXmlByProtocolResponse >> ProtocolInsert)
-        //        (fun e ->
-        //            Msg.Batch [
-        //                GenericError e |> Dev
-        //                UpdateLoading false |> ProtocolInsert 
-        //            ]
-        //        )
-        currentState, Cmd.none
-    | GetProtocolXmlByProtocolResponse (prot,validation,minBBInfoList) -> 
+    | GetProtocolByNameResponse (prot) -> 
         let nextState = {
             currentState with
                 ProtocolSelected = Some prot
-                BuildingBlockMinInfoList = minBBInfoList
-                ValidationXml = Some validation
+                //BuildingBlockMinInfoList = minBBInfoList
+                //ValidationXml = Some validation
 
                 DisplayedProtDetailsId = None
         }
@@ -1441,7 +1425,7 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
     | RemoveProtocolTag tagStr ->
         let nextState = {
             currentState with
-                ProtocolSearchTags      = currentState.ProtocolSearchTags |> List.filter (fun x -> x <> tagStr)
+                ProtocolSearchTags = currentState.ProtocolSearchTags |> List.filter (fun x -> x <> tagStr)
         }
         nextState, Cmd.none
     | RemoveSelectedProtocol ->
@@ -1449,7 +1433,6 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
             currentState with
                 ProtocolSelected = None
                 ValidationXml = None
-                BuildingBlockMinInfoList = []
         }
         nextState, Cmd.none
 
@@ -1676,7 +1659,7 @@ let handleXLSXConverterMsg (msg:XLSXConverterMsg) (currentModel: Model) : Model 
     | GetAssayJsonRequest byteArr ->
         let cmd =
             Cmd.OfAsync.either
-                Api.isaDotNetCommonApi.toSimplifiedRowMajorJSON
+                Api.isaDotNetCommonApi.toAssayJSON
                 byteArr
                 (GetAssayJsonResponse >> XLSXConverterMsg)
                 (ApiError >> Api)

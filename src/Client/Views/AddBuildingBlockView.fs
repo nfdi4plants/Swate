@@ -12,9 +12,10 @@ open ExcelColors
 open Model
 open Messages
 open Shared
+open TermTypes
 open CustomComponents
 
-open OfficeInterop.Types
+open OfficeInteropTypes
 
 let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
     match block.Type with
@@ -217,7 +218,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
                         let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome then TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some else None
                         let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
-                        let newBuildingBlock = OfficeInterop.Types.BuildingBlockTypes.InsertBuildingBlock.create colName colTerm unitTerm
+                        let newBuildingBlock = BuildingBlockTypes.InsertBuildingBlock.create colName colTerm unitTerm
                         AddAnnotationBlock newBuildingBlock |> ExcelInterop |> dispatch
                     )
                 ] [

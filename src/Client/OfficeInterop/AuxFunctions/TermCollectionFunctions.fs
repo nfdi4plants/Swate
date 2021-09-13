@@ -5,8 +5,8 @@ open ExcelJS.Fable
 open Excel
 open GlobalBindings
 
-open OfficeInterop.Types
-open Shared
+open Shared.OfficeInteropTypes
+open Shared.TermTypes
 
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.

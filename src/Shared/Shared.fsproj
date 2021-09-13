@@ -4,8 +4,12 @@
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="URLs.fs" />
     <None Include="paket.references" />
     <Compile Include="Regex.fs" />
+    <Compile Include="TermTypes.fs" />
+    <Compile Include="OfficeInteropTypes.fs" />
+    <Compile Include="ProtocolTemplateTypes.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

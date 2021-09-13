@@ -1,10 +1,6 @@
 module DocsServiceAPIvs1
 
 open Shared
-open Giraffe
-open Saturn
-open Shared
-open Shared.DbDomain
 
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe

@@ -8,7 +8,7 @@ open Fable.FontAwesome
 //open Fable.Core.JS
 open Fable.Core.JsInterop
 
-open Shared
+open Shared.ProtocolTemplateTypes
 
 open Model
 open Messages
@@ -63,7 +63,7 @@ let splitVersion (str:string) =
 
 open OfficeInterop.Types.Xml.GroupTypes
 
-let applyNewestVersionButton (protocol:Protocol) (dbProtocolTemplate:Shared.ProtocolTemplate) dispatch =
+let applyNewestVersionButton (protocol:Protocol) (dbProtocolTemplate:ProtocolTemplate) dispatch =
     Button.a [
         Button.IsStatic (protocol.ProtocolVersion = dbProtocolTemplate.Version)
         Button.Size IsSmall

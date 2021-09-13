@@ -6,11 +6,14 @@ open Excel
 open GlobalBindings
 
 open Shared
+open OfficeInteropTypes
+open TermTypes
 
 open OfficeInterop.Types
 open Xml
 open OfficeInterop.HelperFunctions
-open BuildingBlockTypes
+open OfficeInteropTypes
+open OfficeInteropTypes.BuildingBlockTypes
 
 /// Reoccuring Comment Defitinitions
 
@@ -589,7 +592,7 @@ let updateUnitForCells (unitTerm:TermMinimal) =
                         InteropLogging.Msg.create InteropLogging.Info $"Created Unit Column {unitColName} for building block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader}."
                     )
                 else
-                    failwith $"You can only add unit to building blocks of the type: {OfficeInterop.Types.BuildingBlockType.Parameter}, {OfficeInterop.Types.BuildingBlockType.Characteristics}, {OfficeInterop.Types.BuildingBlockType.Factor}"
+                    failwith $"You can only add unit to building blocks of the type: {BuildingBlockType.Parameter}, {BuildingBlockType.Characteristics}, {BuildingBlockType.Factor}"
 
             return [updateWithUnit]
         }

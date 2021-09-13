@@ -5,7 +5,8 @@ open MySql.Data.MySqlClient
 open System.Data
 open System
 
-open Shared
+open Shared.TermTypes
+open Shared.ProtocolTemplateTypes
 open OntologyDB
 
 type XmlType =
@@ -41,12 +42,13 @@ let getAllProtocols cString =
                     (reader.GetString(3))       // author
                     (reader.GetString(4))       // description
                     (reader.GetString(5))       // docs link
-                    tags
-                    ""                          // customXml
-                    ""                          // tableXml
+                    tags                        // tag array
+                    []                          // tableJson
                     (reader.GetInt32(7))        // used
                     (reader.GetInt32(8))        // rating
     |]
+
+open ISADotNet
 
 // Returns Protocols by name with empty protocol blocks
 let getProtocolByName cString (queryStr:string) =
@@ -67,6 +69,8 @@ let getProtocolByName cString (queryStr:string) =
     use reader = cmd.ExecuteReader()
     reader.Read() |> ignore
     let tags = reader.GetString(6).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
+    /// Parse assay.json in database to insertbuildingblocks.
+    let insertBuildingBlockList = (reader.GetString(9) |> rowMajorOfTemplateJson).toInsertBuildingBlockList
     ProtocolTemplate.create
         (reader.GetString(0))       // name
         (reader.GetString(1))       // version
@@ -75,45 +79,44 @@ let getProtocolByName cString (queryStr:string) =
         (reader.GetString(4))       // description
         (reader.GetString(5))       // docs link
         tags
-        ""                          // customXml
-        ""                          // tableXml
+        insertBuildingBlockList     
         (reader.GetInt32(7))        // used
         (reader.GetInt32(8))        // rating
 
-let getXmlByProtocol cString (protocol:ProtocolTemplate) =
-    use connection = establishConnection cString
-    connection.Open()
+//let getXmlByProtocol cString (protocol:ProtocolTemplate) =
+//    use connection = establishConnection cString
+//    connection.Open()
 
-    use cmd = connection.CreateCommand()
-    cmd
-        .CommandText <- """
-            SELECT * FROM ProtocolXml
-            WHERE FK_Name = @name
-        """
+//    use cmd = connection.CreateCommand()
+//    cmd
+//        .CommandText <- """
+//            SELECT * FROM ProtocolXml
+//            WHERE FK_Name = @name
+//        """
 
-    let nameParam = cmd.Parameters.Add("name",MySqlDbType.VarChar)
+//    let nameParam = cmd.Parameters.Add("name",MySqlDbType.VarChar)
 
-    nameParam.Value <- protocol.Name
+//    nameParam.Value <- protocol.Name
 
-    use reader = cmd.ExecuteReader()
-    let res = [|
-        while reader.Read() do
-            yield
-                reader.GetString(2), reader.GetString(3)
-    |]
+//    use reader = cmd.ExecuteReader()
+//    let res = [|
+//        while reader.Read() do
+//            yield
+//                reader.GetString(2), reader.GetString(3)
+//    |]
 
-    let customXml = res |> Array.tryFind (fun (xmlType,xml) ->
-        xmlType = string CustomXml
-    )
+//    let customXml = res |> Array.tryFind (fun (xmlType,xml) ->
+//        xmlType = string CustomXml
+//    )
 
-    let tableXml = res |> Array.tryFind (fun (xmlType,xml) ->
-        xmlType = string TableXml
-    )
+//    let tableXml = res |> Array.tryFind (fun (xmlType,xml) ->
+//        xmlType = string TableXml
+//    )
 
-    { protocol with
-        CustomXml = if customXml.IsSome then customXml.Value |> snd else ""
-        TableXml = if tableXml.IsSome then tableXml.Value |> snd else ""
-    }
+//    { protocol with
+//        CustomXml = if customXml.IsSome then customXml.Value |> snd else ""
+//        TableXml = if tableXml.IsSome then tableXml.Value |> snd else ""
+//    }
 
 let increaseTimesUsed cString (templateName) =
     use connection = establishConnection cString

@@ -3,10 +3,12 @@ module Messages
 open Elmish
 open Thoth.Elmish
 open Shared
+open TermTypes
+open ProtocolTemplateTypes
 
 open ExcelColors
-open OfficeInterop
 open OfficeInterop.Types
+open OfficeInteropTypes
 open Model
 
 //open ISADotNet
@@ -14,8 +16,8 @@ open Model
 type ExcelInteropMsg =
     | Initialized                           of (string*string)
     | InsertOntologyTerm                    of TermMinimal
-    | AddAnnotationBlock                    of OfficeInterop.Types.BuildingBlockTypes.InsertBuildingBlock
-    | AddAnnotationBlocks                   of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | AddAnnotationBlock                    of BuildingBlockTypes.InsertBuildingBlock
+    | AddAnnotationBlocks                   of BuildingBlockTypes.InsertBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | FormatColumn                          of colname:string * formatString:string
@@ -146,7 +148,7 @@ type ValidationMsg =
     | UpdateDisplayedOptionsId of int option
     | UpdateTableValidationScheme of Xml.ValidationTypes.TableValidation
     // OfficeInterop
-    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
+    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock [] * msg:string
 
 type ProtocolInsertMsg =
     // ------ Process from file ------
@@ -157,13 +159,8 @@ type ProtocolInsertMsg =
     // ------ Protocol from Database ------
     | GetAllProtocolsRequest
     | GetAllProtocolsResponse           of ProtocolTemplate []
-    // Access xml from db and parse it
-    /// Get Protocol Xml from db
-    | GetProtocolXmlByProtocolRequest   of ProtocolTemplate
-    /// On return parse Protocol Xml
-    | ParseProtocolXmlByProtocolRequest of ProtocolTemplate
-    /// Store Result from ParseProtocolXmlByProtocolRequest in model
-    | GetProtocolXmlByProtocolResponse  of ProtocolTemplate * OfficeInterop.Types.Xml.ValidationTypes.TableValidation * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
+    | GetProtocolByNameRequest          of string
+    | GetProtocolByNameResponse         of ProtocolTemplate
     | ProtocolIncreaseTimesUsed         of protocolName:string
     // Client
     | UpdateUploadData                  of string
@@ -181,8 +178,8 @@ type XLSXConverterMsg =
     | GetAssayJsonResponse              of string
 
 type BuildingBlockDetailsMsg =
-    | GetSelectedBuildingBlockTermsRequest      of Shared.TermSearchable []
-    | GetSelectedBuildingBlockTermsResponse     of Shared.TermSearchable []
+    | GetSelectedBuildingBlockTermsRequest      of TermSearchable []
+    | GetSelectedBuildingBlockTermsResponse     of TermSearchable []
     | ToggleShowDetails
     | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
 
@@ -216,11 +213,11 @@ type SettingsDataStewardMsg =
 
 type SettingsProtocolMsg =
     | UpdateProtocolsFromExcel          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    | UpdateProtocolsFromDB             of Shared.ProtocolTemplate []
+    | UpdateProtocolsFromDB             of ProtocolTemplate []
     // ExcelInterop
     | GetActiveProtocolGroupXmlParsed
     | GetProtocolsFromDBRequest         of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    | UpdateProtocolByNewVersion        of OfficeInterop.Types.Xml.GroupTypes.Protocol * Shared.ProtocolTemplate
+    | UpdateProtocolByNewVersion        of OfficeInterop.Types.Xml.GroupTypes.Protocol * ProtocolTemplate
 
 type TopLevelMsg =
     | CloseSuggestions

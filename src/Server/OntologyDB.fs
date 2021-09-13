@@ -1,6 +1,8 @@
 module OntologyDB
 
-open MySql.Data
+open Shared
+open TermTypes
+open OfficeInteropTypes
 open MySql.Data.MySqlClient
 open System.Data
 open System

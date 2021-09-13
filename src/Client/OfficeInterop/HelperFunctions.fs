@@ -9,7 +9,7 @@ open System.Collections.Generic
 open System.Text.RegularExpressions
 
 open OfficeInterop.Types
-open BuildingBlockTypes
+open Shared.OfficeInteropTypes
 open Shared
 
 // ExcelApi 1.1

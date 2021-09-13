@@ -22,8 +22,9 @@ module Regex =
         /// This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
         let CoreNamePattern = "^[^[(]*"
 
+        // Hits: ENVO:01001831
         [<LiteralAttribute>]
-        let TermAccessionPattern = "[a-zA-Z0-9]+?:[a-zA-Z0-9]+"
+        let TermAccessionPattern = "[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
 
     module Aux =
     
@@ -65,7 +66,7 @@ module Regex =
     let parseTermAccession (headerStr:string) =
         match headerStr with
         | Regex TermAccessionPattern value ->
-            value.Trim()
+            value.Trim().Replace('_',':')
             |> Some
         | _ ->
             None

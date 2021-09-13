@@ -6,6 +6,7 @@ open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open Saturn
 open Shared
+open Shared.TermTypes
 
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
@@ -30,11 +31,32 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         let jsonStr =
             ISADotNet.XLSX.Investigation.fromStream ms
         jsonStr
+    let customXmlFromByteArray (byteArray: byte []) =
+        let ms = new MemoryStream(byteArray)
+        let jsonStr =
+            ISADotNet.XLSX.AssayFile.SwateTable.SwateTable.readSwateTablesFromStream ms
+            |> Array.ofSeq
+            |> Array.map (fun x -> ISADotNet.JsonExtensions.toString x)
+        jsonStr
     {
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJSON = fun byteArray -> async {
             let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
             return assayJsonString
+        }
+        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay with it's customXml.
+        toAssayJSONWithCustomXml = fun byteArray -> async {
+            failwith "toAssayJSONWithCustomXml is not yet implemented"
+            //let swateCustomXmlArr = customXmlFromByteArray byteArray
+            //let assay =
+            //    assayFromByteArray byteArray
+            //    |> fun (_,_,_,assay) ->
+            //        let prevCommentList = Option.defaultValue [] assay.Comments
+            //        let nextCommentList =
+            //            if swateCustomXmlArr |> Array.isEmpty then
+                            
+            //        ISADotNet.API.Assay.setComments assay 
+            return ""
         }
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
         toInvestigationJSON = fun byteArray -> async {
@@ -97,7 +119,6 @@ let annotatorApi cString = {
                     |> Array.sortByDescending (fun sugg ->
                             Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
                     )
-                
                     |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
             return searchRes
         }
@@ -123,7 +144,6 @@ let annotatorApi cString = {
                     )
                     
                     |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
-
             return searchRes
         }
 
@@ -244,12 +264,12 @@ let annotatorApi cString = {
         return protocols
     }
 
-    getProtocolXmlForProtocol = fun prot -> async { return ProtocolDB.getXmlByProtocol cString prot }
+    getProtocolByName = fun prot -> async { return ProtocolDB.getProtocolByName cString prot }
 
     getProtocolsByName = fun (names) -> async {
-        let protsWithoutXml = names |> Array.map (fun x -> ProtocolDB.getProtocolByName cString x)
-        let protsWithXml = protsWithoutXml |> Array.map (ProtocolDB.getXmlByProtocol cString)
-        return protsWithXml
+        let prot = names |> Array.map (fun x -> ProtocolDB.getProtocolByName cString x)
+        //let protsWithXml = protsWithoutXml |> Array.map (ProtocolDB.getXmlByProtocol cString)
+        return prot
     }
 
     increaseTimesUsed = fun templateName -> async {
@@ -258,11 +278,22 @@ let annotatorApi cString = {
     }
 }
 
+let createIAnnotatorApiv1 cString =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue (annotatorApi cString)
+    |> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.annotatorApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler(
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+    ) 
+    |> Remoting.buildHttpHandler
+
 let createIServiceAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue serviceApi
-    |> Remoting.withDocs "/api/IServiceAPIv1/docs" DocsServiceAPIvs1.serviceApiDocsv1
+    |> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
         (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
@@ -274,17 +305,6 @@ let createISADotNetCommonAPIv1 =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue isaDotNetCommonAPIv1
     |> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
-    |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
-    )
-    |> Remoting.buildHttpHandler
-
-let createIAnnotatorApiv1 cString =
-    Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (annotatorApi cString)
-    |> Remoting.withDocs "/api/IAnnotatorAPIv1/docs" DocsAnnotationAPIvs1.annotatorApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
         (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
@@ -334,9 +354,10 @@ let app = application {
     url "http://localhost:5000/"
     use_router topLevelRouter
     memory_cache
+    //logging 
     use_static "public"
     use_gzip
-    logging (fun (builder: ILoggingBuilder) -> builder.SetMinimumLevel(LogLevel.Warning) |> ignore)
+    logging (fun (builder: ILoggingBuilder) -> builder.SetMinimumLevel(LogLevel.Debug) |> ignore)
 }
 
 app

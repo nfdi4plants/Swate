@@ -9,7 +9,8 @@ open ExcelColors
 open Model
 open Messages
 open Shared
-open CustomComponents
+open TermTypes
+
 
 let getBuildingBlockHeader (terms:TermSearchable []) =
     terms |> Array.tryFind (fun x -> x.RowIndices = [|0|])

@@ -4,9 +4,9 @@ open Fable.Core
 open ExcelJS.Fable
 open Excel
 
-open OfficeInterop.Types
-open BuildingBlockTypes
-open Shared
+open Shared.OfficeInteropTypes
+open Shared.OfficeInteropTypes.BuildingBlockTypes
+open Shared.TermTypes
 open Indexing
 
 /// Swaps 'Rows with column values' to 'Columns with row values'.

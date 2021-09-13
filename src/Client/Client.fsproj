@@ -25,7 +25,6 @@
         <Compile Include="Update.fs" />
         <Compile Include="CustomComponents\ResponsiveFA.fs" />
         <Compile Include="CustomComponents\DwnButton.fs" />
-        <Compile Include="CustomComponents\Footer.fs" />
         <Compile Include="CustomComponents\Button.fs" />
         <Compile Include="CustomComponents\AnnotationTableMissingWarning.fs" />
         <Compile Include="CustomComponents\Navbar.fs" />
@@ -38,8 +37,6 @@
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
         <Compile Include="Views\XLSXConverterView.fs" />
         <Compile Include="Views\BaseView.fs" />
-        <Compile Include="Views\LandingPageView.fs" />
-        <Compile Include="Views\AdvancedSearchView.fs" />
         <Compile Include="Views\AddBuildingBlockView.fs" />
         <Compile Include="Views\TermSearchView.fs" />
         <Compile Include="Views\ValidationView.fs" />

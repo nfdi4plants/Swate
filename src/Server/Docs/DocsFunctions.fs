@@ -2,7 +2,7 @@ module DocsFunctions
 
 open System
 
-open Shared
+open Shared.TermTypes
 
 type ParameterType =
 | ParamInteger
@@ -140,7 +140,7 @@ module PredefinedParams =
         }
 
         let termSearchableExmp:TermSearchable = {
-            Term = Shared.TermMinimal.create "Bruker Daltonics HCT Series" ""
+            Term = TermMinimal.create "Bruker Daltonics HCT Series" ""
             ParentTerm = Some ontologyInfoExmp
             IsUnit = false
             ColIndex = 2
