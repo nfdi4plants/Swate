@@ -74,7 +74,7 @@ If you have administrative access in your organization, you can create a network
 ### Excel online
 
 - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
-- Launch Excel online, open a (blank) workbook 
+- Launch [Excel Online](https://office.live.com/start/Excel.aspx) (this requires a Microsoft account), open a (blank) workbook 
 - Under the `Insert` tab, select `Add-Ins`
 - Go to `Manage my Add-Ins` and select `Upload my Add-In`
 - select and upload the `manifest.xml` file contained in the test release archive.
