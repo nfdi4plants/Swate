@@ -276,7 +276,7 @@ let autoFitTable () =
             let sheet = context.workbook.worksheets.getActiveWorksheet()
 
             let annotationTable = sheet.tables.getItem(annotationTable)
-            let allCols = annotationTable.columns.load(propertyNames = U2.Case1 "items")
+            let allCols = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
     
             let annoHeaderRange = annotationTable.getHeaderRowRange()
             let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
@@ -288,32 +288,17 @@ let autoFitTable () =
                 // Ref. 1
                 r.enableEvents <- false
                 // Auto fit on all columns to fit cols and rows to their values.
-                let allTableCols = allCols.items |> Array.ofSeq
-                let _ =
-                    allTableCols
-                    |> Array.map (fun col -> col.getRange())
-                    |> Array.map (fun x ->
-                        // make all columns visible, we will later selectively hide all with '#h' tag
-                        x.columnHidden <- false
-                        x.format.autofitColumns()
-                        x.format.autofitRows()
+                let updateColumns =
+                    allCols.items
+                    |> Array.ofSeq
+                    |> Array.map (fun col ->
+                        let r = col.getRange()
+                        if (SwateColumnHeader.create col.name).isReference then
+                            r.columnHidden <- true
+                        else
+                            r.format.autofitColumns()
+                            r.format.autofitRows()  
                     )
-                // Get all column headers
-                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-                // Get only column headers with values inside and map object to string
-                let headerArr = headerVals |> Array.choose id |> Array.map string
-                // Parse header elements into record type
-                let parsedHeaderArr = headerArr |> Array.map SwateColumnHeader.create
-                // Find all columns to hide (with '#h' tag)
-                let colsToHide =
-                    parsedHeaderArr
-                    |> Array.filter (fun header -> header.isReference)
-                // Get all column ranges (necessary to change 'columnHidden' attribute) for all headers with '#h' tag.
-                let ranges =
-                    colsToHide
-                    |> Array.map (fun header -> (annotationTable.columns.getItem (U2.Case2 header.SwateColumnHeader)).getRange())
-                // Hide columns
-                let _ = ranges |> Array.map (fun x -> x.columnHidden <- true)
 
                 r.enableEvents <- true
 
@@ -444,7 +429,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             //create an empty column to insert
             let col value = createMatrixForTables 1 rowCount value
 
-            let! colNames, formatChangedMsg = context.sync().``then``( fun _ ->
+            let! mainColName, formatChangedMsg = context.sync().``then``( fun _ ->
 
                 let allColHeaders =
                     headerVals
@@ -487,34 +472,25 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                         // add column header name
                         col.name <- colName
                         let columnBody = col.getDataBodyRange()
-                        // add unit formatting to main column
-                        let format =
-                            if newBB.UnitTerm.IsSome && colName = mainColName then
-                                newBB.UnitTerm.Value.toNumberFormat
-                            else
-                                "General"
-                        let formats = createValueMatrix 1 (rowCount-1) format
-                        columnBody.numberFormat <- formats
-                        formatChangedMsg <- (InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}")::formatChangedMsg
+                        // Fit column width to content
+                        columnBody.format.autofitColumns()
+                        // Update mainColumn body rows with number format IF building block has unit.
+                        if newBB.UnitTerm.IsSome && colName = mainColName then
+                            // create numberFormat for unit columns
+                            let format = newBB.UnitTerm.Value.toNumberFormat
+                            let formats = createValueMatrix 1 (rowCount-1) format
+                            formatChangedMsg <- (InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}")::formatChangedMsg
+                            columnBody.numberFormat <- formats
+                        // hide freshly created column if it is a reference column
+                        if colName <> mainColName then
+                            columnBody.columnHidden <- true
                         col
                     )
 
-                colNames, formatChangedMsg
+                mainColName, formatChangedMsg
             )
 
-            let! hideReferenceColumns = context.sync().``then``( fun _ ->
-                colNames
-                |> Array.map (fun headerStr ->
-                    if (SwateColumnHeader.create headerStr).isReference then
-                        let range = (annotationTable.columns.getItem (U2.Case2 headerStr)).getRange()
-                        range.columnHidden <- true
-                        headerStr
-                    else
-                        headerStr
-                )
-            )
-
-            let createColsMsg = InteropLogging.Msg.create InteropLogging.Info $"{colNames.[0]} was added." 
+            let createColsMsg = InteropLogging.Msg.create InteropLogging.Info $"{mainColName} was added." 
 
             let logging = [
                 if not formatChangedMsg.IsEmpty then yield! formatChangedMsg
@@ -610,17 +586,18 @@ let addAnnotationBlocks (newBBs:InsertBuildingBlock list) =
                     let col = createCol (currentNextIndex + float i)
                     // add column header name
                     col.name <- colName
-                    // add unit formatting to main column
                     let columnBody = col.getDataBodyRange()
-                    // fit column width
+                    // Fit column width to content
                     columnBody.format.autofitColumns()
-                    let format =
-                        if bb.UnitTerm.IsSome && colName = mainColName then
-                            bb.UnitTerm.Value.toNumberFormat
-                        else
-                            "General"
-                    let formats = createValueMatrix 1 (rowCount-1) format
-                    columnBody.numberFormat <- formats
+                    // Update mainColumn body rows with number format IF building block has unit.
+                    if bb.UnitTerm.IsSome && colName = mainColName then
+                        // create numberFormat for unit columns
+                        let format = bb.UnitTerm.Value.toNumberFormat
+                        let formats = createValueMatrix 1 (rowCount-1) format
+                        columnBody.numberFormat <- formats
+                    // hide freshly created column if it is a reference column
+                    if colName <> mainColName then
+                        columnBody.columnHidden <- true
                     col
                 )
             
@@ -635,17 +612,17 @@ let addAnnotationBlocks (newBBs:InsertBuildingBlock list) =
             )
         )
 
-        let! hideReferenceColumns = context.sync().``then``( fun _ ->
-            addBuildingBlocks
-            |> List.map (fun headerStr ->
-                if (SwateColumnHeader.create headerStr).isReference then
-                    let range = (annotationTable.columns.getItem (U2.Case2 headerStr)).getRange()
-                    range.columnHidden <- true
-                    headerStr
-                else
-                    headerStr
-            )
-        )
+        //let! hideReferenceColumns = context.sync().``then``( fun _ ->
+        //    addBuildingBlocks
+        //    |> List.map (fun headerStr ->
+        //        if (SwateColumnHeader.create headerStr).isReference then
+        //            let range = (annotationTable.columns.getItem (U2.Case2 headerStr)).getRange()
+        //            range.columnHidden <- true
+        //            headerStr
+        //        else
+        //            headerStr
+        //    )
+        //)
 
         let createColsMsg = InteropLogging.Msg.create InteropLogging.Info $"Added protocol building blocks successfully." 
     
