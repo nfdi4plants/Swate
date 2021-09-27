@@ -31,13 +31,13 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         let jsonStr =
             ISADotNet.XLSX.Investigation.fromStream ms
         jsonStr
-    let customXmlFromByteArray (byteArray: byte []) =
-        let ms = new MemoryStream(byteArray)
-        let jsonStr =
-            ISADotNet.XLSX.AssayFile.SwateTable.SwateTable.readSwateTablesFromStream ms
-            |> Array.ofSeq
-            |> Array.map (fun x -> ISADotNet.JsonExtensions.toString x)
-        jsonStr
+    //let customXmlFromByteArray (byteArray: byte []) =
+    //    let ms = new MemoryStream(byteArray)
+    //    let jsonStr =
+    //        ISADotNet.XLSX.AssayFile.SwateTable.SwateTable.readSwateTablesFromStream ms
+    //        |> Array.ofSeq
+    //        |> Array.map (fun x -> ISADotNet.JsonExtensions.toString x)
+    //    jsonStr
     {
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJSON = fun byteArray -> async {
@@ -76,6 +76,9 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         testPostNumber = fun num -> async {
             let res = $"Hey you just sent us a number. Is this your number {num}?"
             return res
+        }
+        getTestNumber = fun () -> async {
+            return "42"
         }
     }
 

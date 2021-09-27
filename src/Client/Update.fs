@@ -127,8 +127,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
                 (GenericError >> Dev)
         currentModel, cmd
 
-    | AddAnnotationBlocks (minBuildingBlockInfos, protocol) ->
-        failwith """Function "AddAnnotationBlocks" is currently not supported."""
+    | AddAnnotationBlocks minBuildingBlockInfos ->
         //let cmd =
         //    Cmd.OfPromise.either
         //        OfficeInterop.addAnnotationBlocksAsProtocol
@@ -151,7 +150,13 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         //            ]
         //        )
         //        (GenericError >> Dev)
-        currentModel, Cmd.none
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.addAnnotationBlocks
+                minBuildingBlockInfos
+                (GenericInteropLogs >> Dev)
+                (GenericError >> Dev)
+        currentModel, cmd
 
     | RemoveAnnotationBlock ->
         let cmd =
@@ -1375,7 +1380,6 @@ let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolIn
                 ProtocolSelected = Some prot
                 //BuildingBlockMinInfoList = minBBInfoList
                 //ValidationXml = Some validation
-
                 DisplayedProtDetailsId = None
         }
         nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.ProtocolInsert)

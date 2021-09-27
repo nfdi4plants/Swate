@@ -303,18 +303,11 @@ let addFromDBToTableButton (model:Model) dispatch =
                         Button.Color IsSuccess
                         Button.OnClick (fun e ->
                             let p = model.ProtocolInsertState.ProtocolSelected.Value
-                            let preProtocol =
-                                let id = "WIP-ID"
-                                let name = p.Name
-                                let version = p.Version
-                                let swateVersion = model.PersistentStorageState.AppVersion
-                                CustomXmlTypes.Templates.Protocol.create id name version swateVersion [] "" ""
-                            let minBuildingBlockInfos = p.TemplateBuildingBlocks
                             /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
                             //let validation =
                             //    model.ProtocolInsertState.ValidationXml.Value |> Some
-                            ProtocolIncreaseTimesUsed preProtocol.Id |> ProtocolInsert |> dispatch
-                            AddAnnotationBlocks (minBuildingBlockInfos, preProtocol) |> ExcelInterop |> dispatch
+                            ProtocolIncreaseTimesUsed p.Name |> ProtocolInsert |> dispatch
+                            AddAnnotationBlocks p.TemplateBuildingBlocks |> ExcelInterop |> dispatch
                         )
                     ] [
                         str "Insert protocol annotation blocks"

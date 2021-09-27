@@ -81,6 +81,7 @@ type IISADotNetCommonAPIv1 = {
     toProcessSeqJSON            : byte [] -> Async<string>
     toSimplifiedRowMajorJSON    : byte [] -> Async<string>
     testPostNumber              : int -> Async<string>
+    getTestNumber               : unit -> Async<string>
 }
 
 type IAnnotatorAPIv1 = {

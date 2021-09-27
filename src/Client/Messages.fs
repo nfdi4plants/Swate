@@ -17,7 +17,7 @@ type ExcelInteropMsg =
     | Initialized                           of (string*string)
     | InsertOntologyTerm                    of TermMinimal
     | AddAnnotationBlock                    of BuildingBlockTypes.InsertBuildingBlock
-    | AddAnnotationBlocks                   of BuildingBlockTypes.InsertBuildingBlock list * CustomXmlTypes.Templates.Protocol //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | AddAnnotationBlocks                   of BuildingBlockTypes.InsertBuildingBlock list //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | FormatColumn                          of colname:string * formatString:string
