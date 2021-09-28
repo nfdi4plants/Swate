@@ -81,7 +81,7 @@ let activityLogComponent (model:Model) dispatch =
 
         Label.label [Label.Size IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Activity Log"]
 
-        debugBox model dispatch
+        //debugBox model dispatch
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display all recorded activities of this session."]
         div [

@@ -36,13 +36,13 @@ type LogItem =
         | Debug (t,m) ->
             tr [] [
                 td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "green"; FontWeight "bold"]] [str "Debug"]
+                td [Style [Color "lightblue"; FontWeight "bold"]] [str "Debug"]
                 td [] [str m]
             ]
         | Info  (t,m) ->
             tr [] [
                 td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "lightblue"; FontWeight "bold"]] [str "Info"]
+                td [Style [Color "green"; FontWeight "bold"]] [str "Info"]
                 td [] [str m]
             ]
         | Error (t,m) ->
