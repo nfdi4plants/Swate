@@ -417,15 +417,31 @@ let rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range)
 
 open BuildingBlockFunctions
 
-let private isBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
-    existingBuildingBlocks
-    |> Array.choose (fun x ->
-        if x.MainColumn.Header.isMainColumn then
-            x.MainColumn.Header.toBuildingBlockNamePrePrint
-        else
-            None
-    )
-    |> Array.contains newBB.Column
+/// Check column type and term if combination already exists
+let private checkIfBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
+    let mainColumnPrints =
+        existingBuildingBlocks
+        |> Array.choose (fun x ->
+            if x.MainColumn.Header.isMainColumn then
+                x.MainColumn.Header.toBuildingBlockNamePrePrint
+            else
+                None
+        )
+    if mainColumnPrints |> Array.contains newBB.Column then failwith $"Swate table contains already building block \"{newBB.Column.toAnnotationTableHeader()}\" in worksheet."
+
+/// Check column type and term if combination already exists
+let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
+    if newBB.Column.isOutputColumn then
+        let existingOutputOpt =
+            existingBuildingBlocks
+            |> Array.tryFind (fun x ->
+                if x.MainColumn.Header.isMainColumn then 
+                    let pp = x.MainColumn.Header.toBuildingBlockNamePrePrint 
+                    pp.IsSome && pp.Value.isOutputColumn
+                else
+                    false
+            )
+        if existingOutputOpt.IsSome then failwith $"Swate table contains already one output column \"{existingOutputOpt.Value.MainColumn.Header.SwateColumnHeader}\". Each Swate table can only contain exactly one output column type."
 
 /// This function is used to add a new building block to the active annotationTable.
 let addAnnotationBlock (newBB:InsertBuildingBlock) =
@@ -438,9 +454,8 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             let annotationTable = sheet.tables.getItem(annotationTableName)
             let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
 
-            let isExisting = isBuildingBlockExisting newBB existingBuildingBlocks
-            if isExisting then
-                failwith $"Building Block \"{newBB.Column.toAnnotationTableHeader()}\" exists already in worksheet."
+            checkIfBuildingBlockExisting newBB existingBuildingBlocks
+            checkHasExistingOutput newBB existingBuildingBlocks
             
 
             // Ref. 2
