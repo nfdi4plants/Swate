@@ -388,6 +388,19 @@ let rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range)
         diff
     |> float
 
+open BuildingBlockFunctions
+
+let isBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
+    existingBuildingBlocks
+    |> Array.choose (fun x ->
+        if x.MainColumn.Header.isMainColumn then
+            x.MainColumn.Header.toBuildingBlockNamePrePrint
+        else
+            None
+    )
+    |> Array.contains newBB.Column
+
+
 /// This function is used to add a new building block to the active annotationTable.
 let addAnnotationBlock (newBB:InsertBuildingBlock) =
     Excel.run(fun context ->
@@ -395,12 +408,15 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
         promise {
 
             let! annotationTableName = getActiveAnnotationTableName()
-
             let sheet = context.workbook.worksheets.getActiveWorksheet()
             let annotationTable = sheet.tables.getItem(annotationTableName)
+            let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
+
+            let isExisting = isBuildingBlockExisting newBB existingBuildingBlocks
+            if isExisting then
+                failwith $"Building Block \"{newBB.Column.toAnnotationTableHeader()}\" exists already in worksheet."
 
             // Ref. 2
-
             // This is necessary to place new columns next to selected col
             let annoHeaderRange = annotationTable.getHeaderRowRange()
             let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
@@ -446,14 +462,17 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                 let unitColId = checkIdForUnitCol()
 
                 let mainColName = OfficeInterop.Indexing.Column.createMainColName newBB mainColId
-                let tsrColName = OfficeInterop.Indexing.Column.createTSRColName newBB mainColId
-                let tanColName = OfficeInterop.Indexing.Column.createTANColName newBB mainColId
+                let tsrColName() = OfficeInterop.Indexing.Column.createTSRColName newBB mainColId
+                let tanColName() = OfficeInterop.Indexing.Column.createTANColName newBB mainColId
+                let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
 
                 let colNames = [|
                     mainColName
-                    if newBB.UnitTerm.IsSome then OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
-                    tsrColName
-                    tanColName
+                    if newBB.UnitTerm.IsSome then
+                        unitColName()
+                    if not newBB.Column.Type.isSingleColumn then
+                        tsrColName()
+                        tanColName()
                 |]
 
                 /// This logic will only work if there is only one format change
@@ -555,23 +574,25 @@ let addAnnotationBlocks (newBBs:InsertBuildingBlock list) =
             let unitColId = checkIdForUnitCol()
             
             let mainColName = OfficeInterop.Indexing.Column.createMainColName bb mainColId
-            let tsrColName = OfficeInterop.Indexing.Column.createTSRColName bb mainColId
-            let tanColName = OfficeInterop.Indexing.Column.createTANColName bb mainColId
-            
+            let tsrColName() = OfficeInterop.Indexing.Column.createTSRColName bb mainColId
+            let tanColName() = OfficeInterop.Indexing.Column.createTANColName bb mainColId
+            let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+
             let colNames = [|
                 mainColName
                 if bb.UnitTerm.IsSome then OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
-                tsrColName
-                tanColName
+                if not bb.Column.Type.isSingleColumn then
+                    tsrColName()
+                    tanColName()
             |]
         
             /// Update storage for variables
             nextIndex <- currentNextIndex + float colNames.Length
             let updatedHeaderList =
                 if bb.UnitTerm.IsSome then
-                    (OfficeInterop.Indexing.Unit.createUnitColHeader unitColId)::mainColName::tsrColName::tanColName::allColumnHeaders
+                    unitColName()::mainColName::tsrColName()::tanColName()::allColumnHeaders
                 else
-                    mainColName::tsrColName::tanColName::allColumnHeaders 
+                    mainColName::tsrColName()::tanColName()::allColumnHeaders 
             allColumnHeaders <-  updatedHeaderList
             
             let createAllCols =

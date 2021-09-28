@@ -208,9 +208,9 @@ let quickAccessListElement model dispatch =
 
 let navbarComponent (model : Model) (dispatch : Msg -> unit) =
     Navbar.navbar [
-        Navbar.IsTransparent
         Navbar.IsFixedTop
         Navbar.Props [Props.Role "navigation"; AriaLabel "main navigation" ; ExcelColors.colorElement model.SiteStyleState.ColorMode]
+        Navbar.IsTransparent
     ] [
         Navbar.Brand.div [] [
             Navbar.Item.a [
@@ -228,17 +228,16 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                 Navbar.Burger.OnClick (fun e -> ToggleBurger |> StyleChange |> dispatch)
                 Navbar.Burger.Modifiers [Modifier.TextColor IsWhite]
                 Navbar.Burger.Props [
-                        Role "button"
-                        AriaLabel "menu"
-                        Props.AriaExpanded false
-
+                    Role "button"
+                    AriaLabel "menu"
+                    Props.AriaExpanded false
             ]] [
                 span [AriaHidden true] [ ]
                 span [AriaHidden true] [ ]
                 span [AriaHidden true] [ ]
             ]
         ]
-        Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu") ; ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
+        Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu"); ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
             Navbar.Dropdown.div [ ] [
                 Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.DocsFeatureUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                     str "How to use"

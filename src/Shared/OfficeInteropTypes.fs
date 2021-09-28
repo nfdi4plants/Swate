@@ -175,6 +175,15 @@ type SwateColumnHeader = {
         || this.isTANCol
         || this.isUnitCol
     member this.getColumnCoreName = parseCoreName this.SwateColumnHeader
+    member this.toBuildingBlockNamePrePrint =
+        match this.getColumnCoreName, this.tryGetOntologyTerm with
+        | Some swatecore, None ->
+            let t = BuildingBlockType.tryOfString swatecore
+            if t.IsSome then BuildingBlockNamePrePrint.create t.Value "" |> Some else None
+        | Some swatecore, Some term ->
+            let t = BuildingBlockType.tryOfString swatecore
+            if t.IsSome then BuildingBlockNamePrePrint.create t.Value term |> Some else None
+        | None, _ -> None
     member this.isSwateColumnHeader =         
         match this with
         | isMainCol when isMainCol.isMainColumn -> true

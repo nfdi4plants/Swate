@@ -110,26 +110,21 @@ let addBuildingBlockElements (model:Model) (dispatch:Msg -> unit) =
                         ]
                     ]
                     Dropdown.menu [ ] [
-                        Dropdown.content [Props [colorControl model.SiteStyleState.ColorMode]] ([
-                            BuildingBlockType.Parameter       
-                            BuildingBlockType.Factor          
-                            BuildingBlockType.Characteristics 
-                            BuildingBlockType.Sample          
-                            BuildingBlockType.Data            
-                            BuildingBlockType.Source          
-                        ]  |> List.map (createBuildingBlockDropdownItem model dispatch)
-                        |> fun x ->
-                            List.append x [
-                                Dropdown.Item.div [
-                                    Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)]
-                                ][
-                                    a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank" ] [
-                                        str "more"
-                                    ]
-                                ]
+                        Dropdown.content [Props [colorControl model.SiteStyleState.ColorMode]] [
+                            BuildingBlockType.Source            |> createBuildingBlockDropdownItem model dispatch
+                            Dropdown.divider []
+                            BuildingBlockType.Parameter         |> createBuildingBlockDropdownItem model dispatch
+                            BuildingBlockType.Factor            |> createBuildingBlockDropdownItem model dispatch
+                            BuildingBlockType.Characteristics   |> createBuildingBlockDropdownItem model dispatch
+                            Dropdown.divider []
+                            BuildingBlockType.Sample            |> createBuildingBlockDropdownItem model dispatch
+                            BuildingBlockType.Data              |> createBuildingBlockDropdownItem model dispatch
+                            Dropdown.Item.div [
+                                Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)]
+                            ][
+                                a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank" ] [ str "more" ]
                             ]
-
-                        )
+                        ] 
                     ]
                 ]
             ]

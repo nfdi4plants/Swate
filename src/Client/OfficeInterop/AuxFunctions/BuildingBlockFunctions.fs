@@ -21,9 +21,16 @@ let private viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
 /// This function is part 1 to get a 'BuildingBlock []' representation of a Swate table.
 /// It should be used as follows: 'let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable'
 /// This function will load all necessery excel properties.
-let getBuildingBlocksPreSync (context:RequestContext) annotationTable =
+let private getBuildingBlocksPreSync (context:RequestContext) annotationTable =
     let sheet = context.workbook.worksheets.getActiveWorksheet()
     let annotationTable = sheet.tables.getItem(annotationTable)
+    let annoHeaderRange = annotationTable.getHeaderRowRange()
+    let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+    let annoBodyRange = annotationTable.getDataBodyRange()
+    let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+    annoHeaderRange, annoBodyRange
+
+let private getBuildingBlocksPreSyncFromTable (annotationTable:Table) =
     let annoHeaderRange = annotationTable.getHeaderRowRange()
     let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
     let annoBodyRange = annotationTable.getDataBodyRange()
@@ -34,7 +41,7 @@ let getBuildingBlocksPreSync (context:RequestContext) annotationTable =
 /// This function is part 2 to get a 'BuildingBlock []' representation of a Swate table.
 /// It's parameters are the output of 'getBuildingBlocksPreSync' and it will return a full 'BuildingBlock []'.
 /// It MUST be used either in or after 'context.sync().``then``(fun e -> ..)' after 'getBuildingBlocksPreSync'.
-let getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) (context:RequestContext) =
+let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRange:Excel.Range) (context:RequestContext) =
 
     context.sync().``then``(fun _ ->
         /// Get the table by 'Columns [| Rows [|Values|] |]'
@@ -201,6 +208,15 @@ let getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRange:Excel
 
         buildingBlocks
     )
+
+type BuildingBlock with
+    static member getFromContext(context:RequestContext,annotationTableName:string) =
+        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
+        getBuildingBlocksPostSync annoHeaderRange annoBodyRange context
+
+    static member getFromContext(context:RequestContext,annotationTable:Table) =
+        let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSyncFromTable annotationTable
+        getBuildingBlocksPostSync annoHeaderRange annoBodyRange context
 
 let getBuildingBlocks (context:RequestContext) (annotationTableName:string) =
 
