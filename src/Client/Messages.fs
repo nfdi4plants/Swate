@@ -28,7 +28,6 @@ type ExcelInteropMsg =
     | AnnotationTableExists                 of TryFindAnnoTableResult
     | GetParentTerm
     | AutoFitTable
-    | UpdateProtocolGroupHeader
     //
     | GetTableValidationXml
     //| WriteTableValidationToXml             of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string

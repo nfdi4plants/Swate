@@ -32,6 +32,12 @@ type BuildingBlockType =
 
     static member listAll = [ Parameter; Factor; Characteristics; Source; Sample; Data ]
 
+    member this.isInputColumn =
+        match this with | Source -> true | anythingElse -> false
+
+    member this.isOutputColumn =
+        match this with | Data | Sample -> true | anythingElse -> false
+
     static member ofString str =
         match str with
         | "Parameter"       -> Parameter
@@ -128,6 +134,13 @@ type BuildingBlockNamePrePrint = {
         | BuildingBlockType.Sample            -> "Sample Name"
         | BuildingBlockType.Data              -> "Data File Name"
         | BuildingBlockType.Source            -> "Source Name"
+
+    /// Check if .Type is single column type
+    member this.isSingleColumn = this.Type.isSingleColumn
+    /// Check if .Type is input column type
+    member this.isInputColumn = this.Type.isInputColumn
+    /// Check if .Type is output column type
+    member this.isOutputColumn = this.Type.isOutputColumn
 
 type ColumnCoreNames =
     | TermSourceRef

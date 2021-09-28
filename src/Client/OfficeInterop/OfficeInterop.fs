@@ -417,7 +417,7 @@ let rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range)
 
 open BuildingBlockFunctions
 
-let isBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
+let private isBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
     existingBuildingBlocks
     |> Array.choose (fun x ->
         if x.MainColumn.Header.isMainColumn then
@@ -426,7 +426,6 @@ let isBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBuildingBlocks:
             None
     )
     |> Array.contains newBB.Column
-
 
 /// This function is used to add a new building block to the active annotationTable.
 let addAnnotationBlock (newBB:InsertBuildingBlock) =
@@ -442,6 +441,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             let isExisting = isBuildingBlockExisting newBB existingBuildingBlocks
             if isExisting then
                 failwith $"Building Block \"{newBB.Column.toAnnotationTableHeader()}\" exists already in worksheet."
+            
 
             // Ref. 2
             // This is necessary to place new columns next to selected col
@@ -567,7 +567,6 @@ let addAnnotationBlocks (newBBs:InsertBuildingBlock list) =
         let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
         let selectedRange = context.workbook.getSelectedRange()
         let _ = selectedRange.load(U2.Case1 "columnIndex")
-    
     
         let! startIndex, headerVals = context.sync().``then``(fun e ->
             // Ref. 3

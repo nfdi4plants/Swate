@@ -56,23 +56,14 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
     match excelInteropMsg with
 
     | AutoFitTable ->
+        let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run OfficeInterop.autoFitTable
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.autoFitTable
+                p
                 ()
                 (GenericInteropLogs >> Dev)
                 (GenericError >> Dev)
         currentModel, cmd
-
-    | UpdateProtocolGroupHeader ->
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.updateProtocolGroupHeader
-        //        ()
-        //        (GenericLog >> Dev)
-        //        (GenericError >> Dev)
-        failwith """Function "UpdateProtocolGroupHeader" is currently not supported."""
-        currentModel, Cmd.none
 
     | Initialized (h,p) ->
         let welcomeMsg = sprintf "Ready to go in %s running on %s" h p
@@ -300,12 +291,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
             Cmd.OfPromise.either
                 OfficeInterop.deleteAllCustomXml
                 ()
-                (fun res ->
-                    Msg.Batch [
-                        GenericLog res |> Dev
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                    ]
-                )
+                (GenericLog >> Dev)
                 (GenericError >> Dev)
         currentModel, cmd
     | GetSwateCustomXml ->
@@ -1119,10 +1105,10 @@ let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (current
     match addBuildingBlockMsg with
     | NewBuildingBlockSelected nextBB ->
         let nextState = {
-            AddBuildingBlockState.init() with
-                CurrentBuildingBlock        = nextBB
+            currentState with
+                CurrentBuildingBlock = if not nextBB.isSingleColumn && currentState.BuildingBlockSelectedTerm.IsSome then {nextBB with Name = currentState.BuildingBlockSelectedTerm.Value.Name} else nextBB
+                ShowBuildingBlockSelection = false
         }
-
         nextState,Cmd.none
 
     | ToggleSelectionDropdown ->
