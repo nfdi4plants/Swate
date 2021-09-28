@@ -12,57 +12,52 @@ open Shared.OfficeInteropTypes
 open Shared
 
 // ExcelApi 1.1
-let getActiveAnnotationTableName() =
-    Excel.run(fun context ->
+let getActiveAnnotationTableName (context:RequestContext) =
+    // Ref. 2
 
-        // Ref. 2
+    let sheet = context.workbook.worksheets.getActiveWorksheet()
+    let t = sheet.load(U2.Case2 (ResizeArray[|"tables"|]))
+    let tableItems = t.tables.load(propertyNames=U2.Case1 "items")
+    context.sync()
+        .``then``( fun _ ->
+            /// access names of all tables in the active worksheet.
+            let tables =
+                tableItems.items
+                |> Seq.toArray
+                |> Array.map (fun x -> x.name)
+            /// filter all table names for tables starting with "annotationTable"
+            let annoTables =
+                tables
+                |> Array.filter (fun x -> x.StartsWith "annotationTable")
+            /// Get the correct error message if we have <> 1 annotation table. Only returns success and the table name if annoTables.Length = 1
+            let res = TryFindAnnoTableResult.exactlyOneAnnotationTable annoTables
 
-        let sheet = context.workbook.worksheets.getActiveWorksheet()
-        let t = sheet.load(U2.Case2 (ResizeArray[|"tables"|]))
-        let tableItems = t.tables.load(propertyNames=U2.Case1 "items")
-        context.sync()
-            .``then``( fun _ ->
-                /// access names of all tables in the active worksheet.
-                let tables =
-                    tableItems.items
-                    |> Seq.toArray
-                    |> Array.map (fun x -> x.name)
-                /// filter all table names for tables starting with "annotationTable"
-                let annoTables =
-                    tables
-                    |> Array.filter (fun x -> x.StartsWith "annotationTable")
-                /// Get the correct error message if we have <> 1 annotation table. Only returns success and the table name if annoTables.Length = 1
-                let res = TryFindAnnoTableResult.exactlyOneAnnotationTable annoTables
-
-                // return result
-                match res with
-                | Success tableName -> tableName
-                | TryFindAnnoTableResult.Error msg -> failwith msg
-        )
+            // return result
+            match res with
+            | Success tableName -> tableName
+            | TryFindAnnoTableResult.Error msg -> failwith msg
     )
+
 
 // ExcelApi 1.1
 /// This function returns the names of all annotationTables in all worksheets.
 /// This function is used to pass a list of all table names to e.g. the 'createAnnotationTable()' function. 
-let getAllTableNames() =
-    Excel.run(fun context ->
+let getAllTableNames (context:RequestContext) =
+    // Ref. 2
 
-        // Ref. 2
+    let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+    let _ = tables.load(propertyNames = U2.Case1 "name")
 
-        let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
-        let _ = tables.load(propertyNames = U2.Case1 "name")
+    context.sync()
+        .``then``( fun _ ->
 
-        context.sync()
-            .``then``( fun _ ->
+            /// Get all names of all tables in the whole workbook.
+            let tableNames =
+                tables.items
+                |> Seq.toArray
+                |> Array.map (fun x -> x.name)
 
-                /// Get all names of all tables in the whole workbook.
-                let tableNames =
-                    tables.items
-                    |> Seq.toArray
-                    |> Array.map (fun x -> x.name)
-
-                tableNames
-        )
+            tableNames
     )
 
 let createMatrixForTables (colCount:int) (rowCount:int) value =

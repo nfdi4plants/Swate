@@ -168,7 +168,7 @@ let createAnnotationTable (isDark:bool) =
         promise {
 
 
-            let! allTableNames = getAllTableNames()
+            let! allTableNames = getAllTableNames context
 
             //sync with proxy objects after loading values from excel
             let! r = context.sync().``then``( fun _ ->
@@ -227,9 +227,6 @@ let createAnnotationTable (isDark:bool) =
                 /// Return info message
                 sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." tableRange.address (tableRange.rowCount - 1.)
             )
-            //.catch (fun e -> e |> unbox<System.Exception> |> fun x -> x.Message)
-
-            let! sync = context.sync().``then``(fun e -> ())
 
             return r
         }
@@ -266,48 +263,78 @@ let tryFindActiveAnnotationTable() =
 
 /// This function is used to hide all reference columns and to fit rows and columns to their values.
 /// The main goal is to improve readability of the table with this function.
-let autoFitTable () =
-    Excel.run(fun context ->
+let autoFitTable (context:RequestContext) =
+    promise {
+        let! annotationTable = getActiveAnnotationTableName context
 
-        promise {
-            let! annotationTable = getActiveAnnotationTableName()
+        // Ref. 2
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
 
-            // Ref. 2
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-
-            let annotationTable = sheet.tables.getItem(annotationTable)
-            let allCols = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
+        let annotationTable = sheet.tables.getItem(annotationTable)
+        let allCols = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
     
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
 
-            let r = context.runtime.load(U2.Case1 "enableEvents")
+        let r = context.runtime.load(U2.Case1 "enableEvents")
 
-            let! res = context.sync().``then``(fun _ ->
+        let! res = context.sync().``then``(fun _ ->
 
-                // Ref. 1
-                r.enableEvents <- false
-                // Auto fit on all columns to fit cols and rows to their values.
-                let updateColumns =
-                    allCols.items
-                    |> Array.ofSeq
-                    |> Array.map (fun col ->
-                        let r = col.getRange()
-                        if (SwateColumnHeader.create col.name).isReference then
-                            r.columnHidden <- true
-                        else
-                            r.format.autofitColumns()
-                            r.format.autofitRows()  
-                    )
+            // Ref. 1
+            r.enableEvents <- false
+            // Auto fit on all columns to fit cols and rows to their values.
+            let updateColumns =
+                allCols.items
+                |> Array.ofSeq
+                |> Array.map (fun col ->
+                    let r = col.getRange()
+                    if (SwateColumnHeader.create col.name).isReference then
+                        r.columnHidden <- true
+                    else
+                        r.format.autofitColumns()
+                        r.format.autofitRows()  
+                )
 
-                r.enableEvents <- true
+            r.enableEvents <- true
 
-                // return message
-                [InteropLogging.Msg.create InteropLogging.Info "Autoformat Table"]
+            // return message
+            [InteropLogging.Msg.create InteropLogging.Info "Autoformat Table"]
+        )
+        return res
+    }
+
+let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
+
+    let allCols = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
+    
+    let annoHeaderRange = annotationTable.getHeaderRowRange()
+    let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
+
+    let r = context.runtime.load(U2.Case1 "enableEvents")
+
+    context.sync().``then``(fun _ ->
+
+        // Ref. 1
+        r.enableEvents <- false
+        // Auto fit on all columns to fit cols and rows to their values.
+        let updateColumns =
+            allCols.items
+            |> Array.ofSeq
+            |> Array.map (fun col ->
+                let r = col.getRange()
+                if (SwateColumnHeader.create col.name).isReference then
+                    r.columnHidden <- true
+                else
+                    r.format.autofitColumns()
+                    r.format.autofitRows()  
             )
-            return res
-        }
+
+        r.enableEvents <- true
+
+        // return message
+        [InteropLogging.Msg.create InteropLogging.Info "Autoformat Table"]
     )
+    
 
 /// This is currently used to get information about the table for the table validation feature.
 /// Might be necessary to redesign this to use the newer 'BuildingBlock' or get completly replaced by parts of 'getInsertTermsToFillHiddenCols'
@@ -407,7 +434,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
         promise {
 
-            let! annotationTableName = getActiveAnnotationTableName()
+            let! annotationTableName = getActiveAnnotationTableName context
             let sheet = context.workbook.worksheets.getActiveWorksheet()
             let annotationTable = sheet.tables.getItem(annotationTableName)
             let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
@@ -509,6 +536,8 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                 mainColName, formatChangedMsg
             )
 
+            let! fit = autoFitTableByTable annotationTable context
+
             let createColsMsg = InteropLogging.Msg.create InteropLogging.Info $"{mainColName} was added." 
 
             let logging = [
@@ -524,7 +553,7 @@ let addAnnotationBlocks (newBBs:InsertBuildingBlock list) =
     Excel.run(fun context ->
         promise {
     
-        let! annotationTableName = getActiveAnnotationTableName()
+        let! annotationTableName = getActiveAnnotationTableName context
     
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let annotationTable = sheet.tables.getItem(annotationTableName)
@@ -624,31 +653,23 @@ let addAnnotationBlocks (newBBs:InsertBuildingBlock list) =
             
             colNames
 
-        let! addBuildingBlocks = context.sync().``then``( fun _ ->
-            newBBs
-            |> List.collect (fun bb ->
-                let colHeadersArr = allColumnHeaders |> Array.ofList
-                let addedBlockName = addBuildingBlock bb nextIndex colHeadersArr
-                addedBlockName |> List.ofArray
+        let! addBuildingBlocks = 
+            context.sync().``then``(fun _ ->
+                newBBs
+                |> List.collect (fun bb ->
+                    let colHeadersArr = allColumnHeaders |> Array.ofList
+                    let addedBlockName = addBuildingBlock bb nextIndex colHeadersArr
+                    addedBlockName |> List.ofArray
+                )
             )
-        )
 
-        //let! hideReferenceColumns = context.sync().``then``( fun _ ->
-        //    addBuildingBlocks
-        //    |> List.map (fun headerStr ->
-        //        if (SwateColumnHeader.create headerStr).isReference then
-        //            let range = (annotationTable.columns.getItem (U2.Case2 headerStr)).getRange()
-        //            range.columnHidden <- true
-        //            headerStr
-        //        else
-        //            headerStr
-        //    )
-        //)
+        let! fit = autoFitTableByTable annotationTable context
 
         let createColsMsg = InteropLogging.Msg.create InteropLogging.Info $"Added protocol building blocks successfully." 
     
         let logging = [
             createColsMsg
+            yield! fit
         ]
     
         return logging
@@ -661,7 +682,7 @@ let updateUnitForCells (unitTerm:TermMinimal) =
 
         promise {
 
-            let! annotationTableName = getActiveAnnotationTableName()
+            let! annotationTableName = getActiveAnnotationTableName context
             
             let sheet = context.workbook.worksheets.getActiveWorksheet()
             let annotationTable = sheet.tables.getItem(annotationTableName)
@@ -833,39 +854,37 @@ let updateUnitForCells (unitTerm:TermMinimal) =
 
 /// This function removes a given building block from a given annotation table.
 /// It returns the affected column indices.
-let removeAnnotationBlock (tableName:string) (annotationBlock:BuildingBlock) =
-    Excel.run(fun context ->
-        promise {
+let removeAnnotationBlock (tableName:string) (annotationBlock:BuildingBlock) (context:RequestContext) =
+    promise {
 
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let table = sheet.tables.getItem(tableName)
+        let sheet = context.workbook.worksheets.getActiveWorksheet()
+        let table = sheet.tables.getItem(tableName)
 
-            // Ref. 2
-            let _ = table.load(U2.Case1 "columns")
-            let tableCols = table.columns.load(propertyNames = U2.Case1 "items")
+        // Ref. 2
+        let _ = table.load(U2.Case1 "columns")
+        let tableCols = table.columns.load(propertyNames = U2.Case1 "items")
 
-            let targetedColIndices =
-                let refColIndices =
-                    if annotationBlock.hasUnit then
-                        [| annotationBlock.Unit.Value.Index; annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index |]
-                    elif annotationBlock.hasCompleteTSRTAN then
-                        [| annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index |]
-                    else
-                        [| |]
-                [|  annotationBlock.MainColumn.Index
-                    yield! refColIndices
-                |] |> Array.sort
+        let targetedColIndices =
+            let refColIndices =
+                if annotationBlock.hasUnit then
+                    [| annotationBlock.Unit.Value.Index; annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index |]
+                elif annotationBlock.hasCompleteTSRTAN then
+                    [| annotationBlock.TAN.Value.Index; annotationBlock.TSR.Value.Index |]
+                else
+                    [| |]
+            [|  annotationBlock.MainColumn.Index
+                yield! refColIndices
+            |] |> Array.sort
 
-            let! deleteCols =
-                context.sync().``then``(fun e ->
-                    targetedColIndices |> Array.map (fun targetIndex ->
-                        tableCols.items.[targetIndex].delete()
-                    )
+        let! deleteCols =
+            context.sync().``then``(fun e ->
+                targetedColIndices |> Array.map (fun targetIndex ->
+                    tableCols.items.[targetIndex].delete()
                 )
+            )
 
-            return targetedColIndices
-        }
-    )
+        return targetedColIndices
+    }
 
 //let removeAnnotationBlocks (tableName:string) (annotationBlocks:BuildingBlock [])  =
 //    annotationBlocks
@@ -878,15 +897,15 @@ let removeSelectedAnnotationBlock () =
 
         promise {
 
-            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTable = getActiveAnnotationTableName context
 
             let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTable
 
-            let! deleteCols = removeAnnotationBlock annotationTable selectedBuildingBlock
+            let! deleteCols = removeAnnotationBlock annotationTable selectedBuildingBlock context
 
             let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols})"  
 
-            let! format = autoFitTable ()
+            let! format = autoFitTable context
 
             return [resultMsg]
         }
@@ -897,7 +916,7 @@ let getAnnotationBlockDetails() =
 
         promise {
 
-            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTable = getActiveAnnotationTableName context
 
             let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTable
 
@@ -912,7 +931,7 @@ let getAllAnnotationBlockDetails() =
 
         promise {
 
-            let! annotationTableName = getActiveAnnotationTableName()
+            let! annotationTableName = getActiveAnnotationTableName context
 
             let! buildingBlocks = OfficeInterop.BuildingBlockFunctions.getBuildingBlocks context annotationTableName
 
@@ -1022,7 +1041,7 @@ let getParentTerm () =
 
         promise {
             try
-                let! annotationTable = getActiveAnnotationTableName()
+                let! annotationTable = getActiveAnnotationTableName context
                 // Ref. 2
                 let sheet = context.workbook.worksheets.getActiveWorksheet()
                 let annotationTable = sheet.tables.getItem(annotationTable)
@@ -1224,7 +1243,7 @@ let UpdateTableByTermsSearchable (terms:TermSearchable []) =
         let createTANColName searchResultTermAccession columnHeaderId = $"{ColumnCoreNames.TermAccessionNumber.toString} ({searchResultTermAccession}{columnHeaderId})"
 
         promise {
-            let! annotationTableName = getActiveAnnotationTableName()
+            let! annotationTableName = getActiveAnnotationTableName context
             // Ref. 2
             let sheet = context.workbook.worksheets.getActiveWorksheet()
             let annotationTable = sheet.tables.getItem(annotationTableName)
@@ -1416,7 +1435,7 @@ let getTableMetaData () =
 
         promise {
 
-            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTable = getActiveAnnotationTableName context
             let sheet = context.workbook.worksheets.getActiveWorksheet()
             let annotationTable = sheet.tables.getItem(annotationTable)
             let _ =annotationTable.columns.load(propertyNames = U2.Case1 "count") |> ignore
@@ -2127,7 +2146,7 @@ let createPointerJson() =
     let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
         
     promise {
-        let! annotationTable = getActiveAnnotationTableName()
+        let! annotationTable = getActiveAnnotationTableName context
         let workbook = context.workbook.load(U2.Case1 "name")
 
         let! json = context.sync().``then``(fun e -> 
