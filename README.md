@@ -6,6 +6,9 @@
 
 Swate aims to provide a low-friction workflow annotation experience that makes the usage of controlled vocabularies (ontologies) as easy and intuitive as possible. It is designed to integrate in the familiar spreadsheet environment that is the center of a great deal of data-focused wetlab work.
 
+![image](https://user-images.githubusercontent.com/39732517/135290851-cacd8626-2cc3-4c58-a343-c5ad037e3c5c.png)
+
+
 <!-- TOC -->
 
 - [Swate](#swate)
