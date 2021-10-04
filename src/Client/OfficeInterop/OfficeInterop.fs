@@ -139,12 +139,11 @@ let createAnnotationTable (isDark:bool) =
         /// The function then tests if the freshly created name already exists and if it does it rec executes itself againn with (ind+1)
         /// Due to how this function is written, the tables will not always count up. E.g. annotationTable2 gets deleted then the next table will not be
         /// annotationTable3 or higher but annotationTable2 again. This could in the future lead to problems if information is saved with the table name as identifier.
-        let rec findNewTableName allTableNames ind =
-            let newTestName =
-                if ind = 0 then "annotationTable" else sprintf "annotationTable%i" ind
+        let rec findNewTableName allTableNames =
+            let newTestName = $"annotationTable{Guid.NewGuid().ToString()}"
             let existsAlready = allTableNames |> Array.exists (fun x -> x = newTestName)
             if existsAlready then
-                findNewTableName allTableNames (ind+1)
+                findNewTableName allTableNames
             else
                 newTestName
 
@@ -209,7 +208,7 @@ let createAnnotationTable (isDark:bool) =
                 (annotationTable.columns.getItemAt 1.).name <- "Sample Name"
 
                 /// Create new annotationTable name
-                let newName = findNewTableName allTableNames 0
+                let newName = findNewTableName allTableNames
                 /// Update annotationTable name
                 annotationTable.name <- newName
 
