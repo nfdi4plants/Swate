@@ -12,7 +12,7 @@ type SwateEntry =
 [<RequireQualifiedAccess>]
 type Route =
 | Home
-| AddBuildingBlock
+| BuildingBlock
 | TermSearch
 | Validation
 | FilePicker
@@ -29,7 +29,7 @@ type Route =
     static member toRouteUrl (route:Route) =
         match route with
         | Route.Home                -> "/"
-        | Route.AddBuildingBlock    -> "/#AddBuildingBlock"
+        | Route.BuildingBlock       -> "/#BuildingBlock"
         | Route.TermSearch          -> "/#TermSearch"
         | Route.Validation          -> "/#Validation"   
         | Route.FilePicker          -> "/#FilePicker"
@@ -46,7 +46,7 @@ type Route =
     member this.toStringRdbl =
         match this with
         | Route.Home                -> ""
-        | Route.AddBuildingBlock    -> "Manage Building Blocks"
+        | Route.BuildingBlock       -> "Manage Building Blocks"
         | Route.TermSearch          -> "Manage Terms"
         | Route.Validation          -> "Checklist Editor"
         | Route.FilePicker          -> "File Picker"
@@ -79,7 +79,7 @@ type Route =
         | Route.Home                -> createElem [Fa.Solid.Home                            ]   (p.toStringRdbl)
         | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
         | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
-        | Route.AddBuildingBlock    -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
+        | Route.BuildingBlock       -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
         | Route.ProtocolInsert      -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
         | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
         | Route.XLSXConverter       -> createElem [Fa.Brand.Microsoft; Fa.Solid.Cogs        ]   (p.toStringRdbl)
@@ -101,7 +101,7 @@ module Routing =
         oneOf [
             map Route.Home                  (s "")
             map Route.TermSearch            (s "TermSearch")
-            map Route.AddBuildingBlock      (s "AddBuildingBlock")
+            map Route.BuildingBlock         (s "BuildingBlock")
             map Route.Validation            (s "Validation")
             map Route.FilePicker            (s "FilePicker")
             map Route.Info                  (s "Info")

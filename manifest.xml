@@ -107,7 +107,7 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
-        <bt:Url id="Swate.Core.Url" DefaultValue="https://localhost:3000/#AddBuildingBlock"/>
+        <bt:Url id="Swate.Core.Url" DefaultValue="https://localhost:3000/#BuildingBlock"/>
         <bt:Url id="Swate.Experts.Url" DefaultValue="https://localhost:3000/#Validation"/>
       </bt:Urls>
       <bt:ShortStrings>
