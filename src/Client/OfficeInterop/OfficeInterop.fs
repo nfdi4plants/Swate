@@ -117,8 +117,6 @@ let exampleExcelFunction2 () =
 
             let! xmlParsed = getCustomXml customXmlParts context
 
-            //let protocolGroups = getAllSwateProtocolGroups xmlParsed
-
             //let tableValidations = getAllSwateTableValidation xmlParsed
             
             return (sprintf "%A"  allTables)
@@ -140,7 +138,8 @@ let createAnnotationTable (isDark:bool) =
         /// Due to how this function is written, the tables will not always count up. E.g. annotationTable2 gets deleted then the next table will not be
         /// annotationTable3 or higher but annotationTable2 again. This could in the future lead to problems if information is saved with the table name as identifier.
         let rec findNewTableName allTableNames =
-            let newTestName = $"annotationTable{Guid.NewGuid().ToString()}"
+            let id = HumanReadableIds.tableName()
+            let newTestName = $"annotationTable{id}"
             let existsAlready = allTableNames |> Array.exists (fun x -> x = newTestName)
             if existsAlready then
                 findNewTableName allTableNames

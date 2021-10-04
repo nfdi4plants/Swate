@@ -5,7 +5,6 @@ open Fable
 open Fable.React
 open Fable.React.Props
 open Fable.FontAwesome
-open Fable.Core.JS
 open Fable.Core.JsInterop
 
 open Model

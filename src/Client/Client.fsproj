@@ -5,6 +5,7 @@
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <Compile Include="HumanReadableIds.fs" />
         <Compile Include="NFDIColors.fs" />
         <None Include="index.html" />
         <None Include="paket.references" />
