@@ -305,7 +305,7 @@ and Msg =
 
 open Routing
 
-let initializeModel (pageOpt: Route option) =
+let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
     let isDarkMode =
         let cookies = Browser.Dom.document.cookie
         let cookiesSplit = cookies.Split([|";"|], System.StringSplitOptions.RemoveEmptyEntries)
@@ -324,7 +324,7 @@ let initializeModel (pageOpt: Route option) =
     {
         DebouncerState              = Debouncer                 .create ()
         PageState                   = PageState                 .init pageOpt
-        PersistentStorageState      = PersistentStorageState    .init ()
+        PersistentStorageState      = PersistentStorageState    .init (pageEntry=pageEntry)
         DevState                    = DevState                  .init ()
         SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
         TermSearchState             = TermSearchState           .init ()

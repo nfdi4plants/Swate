@@ -4,6 +4,10 @@ open Elmish.UrlParser
 open Fable.FontAwesome
 open Fulma.Extensions.Wikiki
 
+type SwateEntry =
+| Core
+| Expert
+
 /// The different pages of the application. If you add a new page, then add an entry here.
 [<RequireQualifiedAccess>]
 type Route =
@@ -56,6 +60,11 @@ type Route =
         | Route.SettingsDataStewards-> "Settings for Data Stewards"
         | Route.NotFound            -> "NotFound"
 
+    member this.toSwateEntry =
+        match this with
+        | Route.Validation | Route.SettingsDataStewards | Route.XLSXConverter -> SwateEntry.Expert
+        | _ -> SwateEntry.Core
+
     static member toIcon (p: Route)=
         let createElem icons name =
             Fable.React.Standard.span [
@@ -84,7 +93,7 @@ type Route =
 
 module Routing =
 
-    open Elmish.UrlParser
+    open Elmish
     open Elmish.Navigation
 
     /// The URL is turned into a Result.
@@ -105,8 +114,5 @@ module Routing =
             map Route.SettingsDataStewards  (s "Settings" </> s "DataStewards")
             map Route.NotFound              (s "NotFound")
         ]
-
-    //this would be the way to got if we would use push based routing, but i decided to use hash based routing. Ill leave this here for now as a note.
-    //let urlParser location = parsePath pageParser location
 
 

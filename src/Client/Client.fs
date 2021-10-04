@@ -26,11 +26,11 @@ module Server =
 
 let initializeAddIn () = Office.onReady()
 
-
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
-    let initialModel = initializeModel pageOpt
     let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
+    let pageEntry = if route.IsSome then route.Value.toSwateEntry else Routing.SwateEntry.Core
+    let initialModel = initializeModel (pageOpt,pageEntry)
     // The initial command from urlUpdate is not needed yet. As we use a reduced variant of subModels with no own Msg system.
     let model, _ = urlUpdate route initialModel
     let initialCmd =
@@ -47,90 +47,90 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     match model.PageState.CurrentPage with
     | Routing.Route.AddBuildingBlock ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             AddBuildingBlockView.addBuildingBlockComponent model dispatch
         ] [
             AddBuildingBlockView.addBuildingBlockFooterComponent model dispatch
         ]
 
     | Routing.Route.TermSearch ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             TermSearchView.termSearchComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.Validation ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             ValidationView.validationComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.FilePicker ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             FilePickerView.filePickerComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.ProtocolInsert ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             ProtocolInsertView.fileUploadViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.XLSXConverter ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             XLSXConverterView.xlsxConverterMainView model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.ProtocolSearch ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             ProtocolSearchView.protocolSearchViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.ActivityLog ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             ActivityLogView.activityLogComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.Settings ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             SettingsView.settingsViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.SettingsXml ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             SettingsXmlView.settingsXmlViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
     | Routing.Route.SettingsDataStewards ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             SettingsDataStewardView.settingsDataStewardViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.Info ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             InfoView.infoComponent model dispatch
         ][
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.NotFound ->
-        BaseView.baseViewComponent model dispatch [
+        BaseView.baseViewMainElement model dispatch [
             NotFoundView.notFoundComponent model dispatch
         ] [
             //Text.p [] [str ""]
@@ -142,10 +142,10 @@ let view (model : Model) (dispatch : Msg -> unit) =
             a [ Href (Routing.Route.toRouteUrl Routing.Route.TermSearch) ] [ str "Termsearch" ]
         ]
 
-
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
+
 #endif
 
 Program.mkProgram init Update.update view
@@ -153,7 +153,7 @@ Program.mkProgram init Update.update view
 |> Program.withConsoleTrace
 #endif
 |> Program.toNavigable (parseHash Routing.Routing.route) Update.urlUpdate
-|> Program.withReactSynchronous "elmish-app"
+|> Program.withReactBatched "elmish-app"
 #if DEBUG
 |> Program.withDebugger
 #endif

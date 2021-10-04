@@ -5,11 +5,11 @@
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="HumanReadableIds.fs" />
-        <Compile Include="NFDIColors.fs" />
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
+        <Compile Include="HumanReadableIds.fs" />
+        <Compile Include="NFDIColors.fs" />
         <Compile Include="ISADotNetHelpers.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="ExcelColors.fs" />
@@ -38,7 +38,6 @@
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
         <Compile Include="Views\XLSXConverterView.fs" />
-        <Compile Include="Views\BaseView.fs" />
         <Compile Include="Views\AddBuildingBlockView.fs" />
         <Compile Include="Views\TermSearchView.fs" />
         <Compile Include="Views\ValidationView.fs" />
@@ -51,6 +50,7 @@
         <Compile Include="Views\SettingsXmlView.fs" />
         <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
+        <Compile Include="Views\BaseView.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
     <ItemGroup>

@@ -159,12 +159,14 @@ type DevState = {
 type PersistentStorageState = {
     SearchableOntologies    : (Set<string>*DbDomain.Ontology) []
     AppVersion              : string
-    HasOntologiesLoaded     : bool 
+    HasOntologiesLoaded     : bool
+    PageEntry               : SwateEntry
 } with
-    static member init () = {
+    static member init (?pageEntry:SwateEntry) = {
         SearchableOntologies    = [||]
         AppVersion              = ""
         HasOntologiesLoaded     = false
+        PageEntry               = if pageEntry.IsSome then pageEntry.Value else SwateEntry.Core
     }
 
 type FillHiddenColsState =
