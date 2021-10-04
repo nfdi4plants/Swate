@@ -9,7 +9,6 @@ open ExcelColors
 open Api
 open Model
 open Messages
-open Update
 open Shared
 open Shared.TermTypes
 
@@ -90,11 +89,11 @@ with
         DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str, Unit1) |> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnInputChangeMsg        = (fun str -> BuildingBlock.Msg.SearchUnitTermTextChange (str, Unit1) |> BuildingBlockMsg)
+        OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
     static member ofAddBuildingBlockUnit2State (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
@@ -108,11 +107,11 @@ with
         DropDownIsLoading       = state.HasUnit2TermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str,Unit2) |> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> (sugg, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnInputChangeMsg        = (fun str -> BuildingBlock.Msg.SearchUnitTermTextChange (str,Unit2) |> BuildingBlockMsg)
+        OnSuggestionSelect      = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
     static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
@@ -125,12 +124,12 @@ with
         DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
         DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
 
-        OnInputChangeMsg        = (BuildingBlockNameChange >> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
+        OnInputChangeMsg        = (BuildingBlock.Msg.BuildingBlockNameChange >> BuildingBlockMsg)
+        OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
     }
 
 

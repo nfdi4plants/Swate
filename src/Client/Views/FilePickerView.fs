@@ -12,7 +12,6 @@ open ExcelColors
 open Api
 open Model
 open Messages
-open Update
 open Shared
 open Browser.Types
 

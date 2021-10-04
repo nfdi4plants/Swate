@@ -48,9 +48,9 @@ let view (model : Model) (dispatch : Msg -> unit) =
     match model.PageState.CurrentPage with
     | Routing.Route.AddBuildingBlock ->
         BaseView.baseViewMainElement model dispatch [
-            AddBuildingBlockView.addBuildingBlockComponent model dispatch
+            BuildingBlock.addBuildingBlockComponent model dispatch
         ] [
-            AddBuildingBlockView.addBuildingBlockFooterComponent model dispatch
+            BuildingBlock.addBuildingBlockFooterComponent model dispatch
         ]
 
     | Routing.Route.TermSearch ->

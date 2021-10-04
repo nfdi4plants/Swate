@@ -10,20 +10,6 @@ open Routing
 open Model
 open Messages
 
-/// This function matches a OfficeInterop.TryFindAnnoTableResult to either Success or Error
-/// If Success it will pipe the tableName on to the msg input paramter.
-/// If Error it will pipe the error message to GenericLog ("Error",errorMsg).
-[<System.ObsoleteAttribute>]
-let matchActiveTableResToMsg activeTableNameRes (msg:string -> Cmd<Msg>) =
-    match activeTableNameRes with
-    | Success tableName ->
-        msg tableName
-    | OfficeInteropTypes.TryFindAnnoTableResult.Error eMsg ->
-        Msg.Batch [
-            UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-            GenericLog ("Error",eMsg) |> Dev
-        ] |> Cmd.ofMsg
-
 let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
     match route with
     | Some page ->
@@ -924,7 +910,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
     | UnitTermSuggestionResponse (suggestions,relUnit) ->
 
         handleUnitTermSuggestionResponse
-            (NewUnitTermSuggestions >> AddBuildingBlock)
+            (BuildingBlock.Msg.NewUnitTermSuggestions >> BuildingBlockMsg)
             suggestions
             relUnit
             
@@ -932,7 +918,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
     | BuildingBlockNameSuggestionsResponse suggestions ->
 
         handleTermSuggestionResponse
-            (NewBuildingBlockNameSuggestions >> AddBuildingBlock)
+            (BuildingBlock.Msg.NewBuildingBlockNameSuggestions >> BuildingBlockMsg)
             suggestions
 
     | AdvancedTermSearchResultsResponse results ->
@@ -1099,178 +1085,6 @@ let handleFilePickerMsg (filePickerMsg:FilePickerMsg) (currentState: FilePickerS
                 DNDDropped = isDropped
         }
         nextState, Cmd.none
-
-let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (currentState: AddBuildingBlockState) : AddBuildingBlockState * Cmd<Msg> =
-    match addBuildingBlockMsg with
-    | NewBuildingBlockSelected nextBB ->
-        let nextState = {
-            currentState with
-                CurrentBuildingBlock = if not nextBB.isSingleColumn && currentState.BuildingBlockSelectedTerm.IsSome then {nextBB with Name = currentState.BuildingBlockSelectedTerm.Value.Name} else nextBB
-                ShowBuildingBlockSelection = false
-        }
-        nextState,Cmd.none
-
-    | ToggleSelectionDropdown ->
-        let nextState = {
-            currentState with
-                ShowBuildingBlockSelection = not currentState.ShowBuildingBlockSelection
-        }
-
-        nextState,Cmd.none
-
-    | SearchUnitTermTextChange (newTerm,relUnit) ->
-
-        let triggerNewSearch =
-            newTerm.Length > 2
-       
-        let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
-            "GetNewUnitTermSuggestions",
-            (
-                if triggerNewSearch then
-                    (newTerm,relUnit) |> (GetNewUnitTermSuggestions >> Request >> Api)
-                else
-                    DoNothing
-            )
-
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { currentState with
-                    UnitTermSearchText                  = newTerm
-                    UnitSelectedTerm                    = None
-                    ShowUnitTermSuggestions             = triggerNewSearch
-                    HasUnitTermSuggestionsLoading       = true
-                }
-            | Unit2 ->
-                { currentState with
-                    Unit2TermSearchText                  = newTerm
-                    Unit2SelectedTerm                    = None
-                    ShowUnit2TermSuggestions             = triggerNewSearch
-                    HasUnit2TermSuggestionsLoading       = true
-                }
-
-        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
-
-    | NewUnitTermSuggestions (suggestions,relUnit) ->
-
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { currentState with
-                        UnitTermSuggestions             = suggestions
-                        ShowUnitTermSuggestions         = true
-                        HasUnitTermSuggestionsLoading   = false
-                }
-            | Unit2 ->
-                { currentState with
-                    Unit2TermSuggestions             = suggestions
-                    ShowUnit2TermSuggestions         = true
-                    HasUnit2TermSuggestionsLoading   = false
-                }
-
-        nextState,Cmd.none
-
-    | UnitTermSuggestionUsed (suggestion, relUnit) ->
-
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { currentState with
-                    UnitTermSearchText              = suggestion.Name
-                    UnitSelectedTerm                = Some suggestion
-                    ShowUnitTermSuggestions         = false
-                    HasUnitTermSuggestionsLoading   = false
-                }
-            | Unit2 ->
-                { currentState with
-                    Unit2TermSearchText             = suggestion.Name
-                    Unit2SelectedTerm               = Some suggestion
-                    ShowUnit2TermSuggestions        = false
-                    HasUnit2TermSuggestionsLoading  = false
-                }
-        nextState, Cmd.none
-
-    | BuildingBlockNameChange newName ->
-
-        let triggerNewSearch =
-            newName.Length > 2
-   
-        let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
-            "GetNewBuildingBlockNameTermSuggestions",
-            (
-                if triggerNewSearch then
-                    newName  |> (GetNewBuildingBlockNameSuggestions >> Request >> Api)
-                else
-                    DoNothing
-            )
-
-        let nextBB = {
-            currentState.CurrentBuildingBlock with
-                Name = newName
-        }
-
-        let nextState = {
-            currentState with
-                CurrentBuildingBlock                    = nextBB
-                BuildingBlockSelectedTerm               = None
-                ShowBuildingBlockTermSuggestions        = triggerNewSearch
-                HasBuildingBlockTermSuggestionsLoading  = true
-        }
-
-        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
-
-    | NewBuildingBlockNameSuggestions suggestions ->
-
-        let nextState = {
-            currentState with
-                BuildingBlockNameSuggestions            = suggestions
-                ShowBuildingBlockTermSuggestions        = true
-                HasBuildingBlockTermSuggestionsLoading  = false
-        }
-
-        nextState,Cmd.none
-
-    | BuildingBlockNameSuggestionUsed suggestion ->
-        
-        let nextBB = {
-            currentState.CurrentBuildingBlock with
-                Name = suggestion.Name
-        }
-
-        let nextState = {
-            currentState with
-                CurrentBuildingBlock                    = nextBB
-
-                BuildingBlockSelectedTerm               = Some suggestion
-                ShowBuildingBlockTermSuggestions        = false
-                HasBuildingBlockTermSuggestionsLoading  = false
-        }
-        nextState, Cmd.none
-
-    | ToggleBuildingBlockHasUnit ->
-
-        let hasUnit = not currentState.BuildingBlockHasUnit
-
-        let nextState =
-            if hasUnit then
-                {
-                    currentState with
-                        BuildingBlockHasUnit = hasUnit
-                }
-            else
-                {
-                currentState with
-                    BuildingBlockHasUnit = hasUnit
-                    UnitSelectedTerm = None
-                    UnitTermSearchText = ""
-                    UnitTermSuggestions = [||]
-                    ShowUnitTermSuggestions = false
-                    HasUnitTermSuggestionsLoading = false
-                }
-        nextState, Cmd.none
-
 
 let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
     match validationMsg with
@@ -1880,10 +1694,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
 
         nextModel,nextCmd
 
-    | AddBuildingBlock addBuildingBlockMsg ->
+    | BuildingBlockMsg addBuildingBlockMsg ->
         let nextAddBuildingBlockState,nextCmd = 
             currentModel.AddBuildingBlockState
-            |> handleAddBuildingBlockMsg addBuildingBlockMsg
+            |> BuildingBlock.update addBuildingBlockMsg
 
         let nextModel = {
             currentModel with

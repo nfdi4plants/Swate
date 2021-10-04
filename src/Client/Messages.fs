@@ -129,7 +129,9 @@ type FilePickerMsg =
     ///
     | UpdateDNDDropped          of isDropped:bool
 
-type AddBuildingBlockMsg =
+module BuildingBlock =
+
+    type Msg =
     | NewBuildingBlockSelected  of BuildingBlockNamePrePrint
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown
@@ -288,7 +290,7 @@ and Msg =
     | StyleChange           of StyleChangeMsg
     | PersistentStorage     of PersistentStorageMsg
     | FilePicker            of FilePickerMsg
-    | AddBuildingBlock      of AddBuildingBlockMsg
+    | BuildingBlockMsg      of BuildingBlock.Msg
     | Validation            of ValidationMsg
     | ProtocolInsert        of ProtocolInsertMsg
     | XLSXConverterMsg      of XLSXConverterMsg
