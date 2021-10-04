@@ -110,7 +110,7 @@ let exampleExcelFunction2 () =
                 let tableNames =
                     tables.items
                     |> Seq.toArray
-                    |> Array.map (fun x -> Shared.AnnotationTable.create x.name x.worksheet.name)
+                    |> Array.map (fun x -> x.name, x.worksheet.name)
 
                 tableNames
             )
@@ -335,71 +335,60 @@ let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
         [InteropLogging.Msg.create InteropLogging.Info "Autoformat Table"]
     )
     
-
 /// This is currently used to get information about the table for the table validation feature.
-/// Might be necessary to redesign this to use the newer 'BuildingBlock' or get completly replaced by parts of 'getInsertTermsToFillHiddenCols'
-/// As this function creates a complete representation of the table. 
-//let getTableRepresentation() =
-//    Excel.run(fun context ->
+let getTableRepresentation() =
+    Excel.run(fun context ->
 
-//        promise {
+        promise {
 
-//            let! annotationTable = getActiveAnnotationTableName()
+            let! annotationTable = getActiveAnnotationTableName(context)
 
-//            // Ref. 2
-//            let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "name")
-//            let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable
+            // Ref. 2
+            let! buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context annotationTable
 
-//            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-//            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
 
-//            let! xmlParsed = getCustomXml customXmlParts context
-//            let currentTableValidation = getSwateValidationForCurrentTable annotationTable activeWorksheet.name xmlParsed
+            let! xmlParsed = getCustomXml customXmlParts context
+            let currentTableValidation = CustomXmlFunctions.Validation.getSwateValidationForCurrentTable annotationTable xmlParsed
 
-//            let! buildingBlocks =
-//                context.sync().``then``( fun _ ->
-//                    let buildingBlocks = getBuildingBlocks annoHeaderRange annoBodyRange
+            /// This function updates the current SwateValidation xml with all found building blocks.
+            let updateCurrentTableValidationXml =
+                /// We start by transforming all building blocks into ColumnValidations
+                let existingBuildingBlocks = buildingBlocks |> Array.map (fun buildingBlock -> CustomXmlTypes.Validation.ColumnValidation.ofBuildingBlock buildingBlock)
+                /// Map over all newColumnValidations and see if they exist in the currentTableValidation xml. If they do, then update them by their validation parameters.
+                let updateTableValidation =
+                    /// Check if a TableValidation for the active table AND worksheet exists, else return the newly build colValidations.
+                    if currentTableValidation.IsSome then
+                        let updatedNewColumnValidations =
+                            existingBuildingBlocks
+                            |> Array.map (fun newColVal ->
+                                let tryFindCurrentColVal = currentTableValidation.Value.ColumnValidations |> List.tryFind (fun x -> x.ColumnHeader = newColVal.ColumnHeader)
+                                if tryFindCurrentColVal.IsSome then
+                                    {newColVal with
+                                        Importance = tryFindCurrentColVal.Value.Importance
+                                        ValidationFormat = tryFindCurrentColVal.Value.ValidationFormat
+                                    }
+                                else
+                                    newColVal
+                            )
+                            |> List.ofArray
+                        /// Update TableValidation with updated ColumnValidations
+                        {currentTableValidation.Value with
+                            ColumnValidations = updatedNewColumnValidations}
+                    else
+                        /// Should no current TableValidation xml exist, create a new one
+                        CustomXmlTypes.Validation.TableValidation.create
+                            ""
+                            annotationTable
+                            (System.DateTime.Now.ToUniversalTime())
+                            []
+                            (List.ofArray existingBuildingBlocks)
+                updateTableValidation
 
-//                    buildingBlocks 
-//                )
-
-//            /// This function updates the current SwateValidation xml with all found building blocks.
-//            let updateCurrentTableValidationXml =
-//                /// We start by transforming all building blocks into ColumnValidations
-//                let newColumnValidations = buildingBlocks |> Array.map (fun buildingBlock -> buildingBlock.toColumnValidation) |> List.ofArray
-//                /// Map over all newColumnValidations and see if they exist in the currentTableValidation xml. If they do, then update them by their validation parameters.
-//                let updateTableValidation =
-//                    /// Check if a TableValidation for the active table AND worksheet exists, else return the newly build colValidations.
-//                    if currentTableValidation.IsSome then
-//                        let updatedNewColumnValidations =
-//                            newColumnValidations
-//                            |> List.map (fun newColVal ->
-//                                let tryFindCurrentColVal = currentTableValidation.Value.ColumnValidations |> List.tryFind (fun x -> x.ColumnHeader = newColVal.ColumnHeader)
-//                                if tryFindCurrentColVal.IsSome then
-//                                    {newColVal with
-//                                        Importance = tryFindCurrentColVal.Value.Importance
-//                                        ValidationFormat = tryFindCurrentColVal.Value.ValidationFormat
-//                                    }
-//                                else
-//                                    newColVal
-//                            )
-//                        /// Update TableValidation with updated ColumnValidations
-//                        {currentTableValidation.Value with
-//                            ColumnValidations = updatedNewColumnValidations}
-//                    else
-//                        /// Should no current TableValidation xml exist, create a new one
-//                        ValidationTypes.TableValidation.create
-//                            ""
-//                            activeWorksheet.name
-//                            annotationTable
-//                            (System.DateTime.Now.ToUniversalTime())
-//                            []
-//                            newColumnValidations
-//                updateTableValidation
-
-//            return updateCurrentTableValidationXml, buildingBlocks, "Update table representation."
-//        }
-//    )
+            return updateCurrentTableValidationXml, buildingBlocks, "Update table representation."
+        }
+    )
 
 
 /// selected ranged returns indices always from a worksheet perspective but we need the related table index. This is calculated here.
@@ -1760,52 +1749,51 @@ let updateSwateCustomXml(newXmlString:String) =
 //        }
 //    )
 
-//let writeTableValidationToXml(tableValidation:ValidationTypes.TableValidation,currentSwateVersion:string) =
-//    Excel.run(fun context ->
+let writeTableValidationToXml(tableValidation:CustomXmlTypes.Validation.TableValidation,currentSwateVersion:string) =
+    Excel.run(fun context ->
 
-//        // Update DateTime 
-//        let newTableValidation = {
-//            tableValidation with
-//                // This line is used to give freshly created TableValidations the current Swate Version
-//                SwateVersion = if tableValidation.SwateVersion = "" then currentSwateVersion else tableValidation.SwateVersion
-//                DateTime = System.DateTime.Now.ToUniversalTime()
-//            }
+        // Update DateTime 
+        let newTableValidation = {
+            tableValidation with
+                // This line is used to give freshly created TableValidations the current Swate Version
+                SwateVersion = currentSwateVersion
+                DateTime = System.DateTime.Now.ToUniversalTime()
+            }
 
-//        // The first part accesses current CustomXml
-//        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-//        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
+        // The first part accesses current CustomXml
+        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
+        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
     
-//        promise {
+        promise {
     
-//            let! xmlParsed = getCustomXml customXmlParts context
+            let! xmlParsed = getCustomXml customXmlParts context
     
-//            let nextCustomXml = updateSwateValidation newTableValidation xmlParsed
+            let nextCustomXml = CustomXmlFunctions.Validation.updateSwateValidation newTableValidation xmlParsed
 
-//            let nextCustomXmlString = nextCustomXml |> OfficeInterop.HelperFunctions.xmlElementToXmlString
+            let nextCustomXmlString = nextCustomXml |> Fable.SimpleXml.Generator.ofXmlElement |> Fable.SimpleXml.Generator.serializeXml
                         
-//            let! deleteXml =
-//                context.sync().``then``(fun e ->
-//                    let items = customXmlParts.items
-//                    let xmls = items |> Seq.map (fun x -> x.delete() )
+            let! deleteXml =
+                context.sync().``then``(fun e ->
+                    let items = customXmlParts.items
+                    let xmls = items |> Seq.map (fun x -> x.delete() )
     
-//                    xmls |> Array.ofSeq
-//                )
+                    xmls |> Array.ofSeq
+                )
     
-//            let! addNext =
-//                context.sync().``then``(fun e ->
-//                    customXmlParts.add(nextCustomXmlString)
-//                )
+            let! addNext =
+                context.sync().``then``(fun e ->
+                    customXmlParts.add(nextCustomXmlString)
+                )
 
-//            // This will be displayed in activity log
-//            return
-//                "Info",
-//                sprintf
-//                    "Update Validation Scheme with '%s - %s' @%s"
-//                    newTableValidation.AnnotationTable.Worksheet
-//                    newTableValidation.AnnotationTable.Name
-//                    ( newTableValidation.DateTime.ToString("yyyy-MM-dd HH:mm") )
-//        }
-//    )
+            // This will be displayed in activity log
+            return
+                "Info",
+                sprintf
+                    "Update Validation Scheme with '%s' @%s"
+                    newTableValidation.AnnotationTable
+                    ( newTableValidation.DateTime.ToString("yyyy-MM-dd HH:mm") )
+        }
+    )
 
 //let addTableValidationToExisting (tableValidation:ValidationTypes.TableValidation, colNames: string list) =
 //    Excel.run(fun context ->

@@ -324,34 +324,6 @@ open System
 open Fable.SimpleXml
 open Fable.SimpleXml.Generator
 
-let xmlElementToXmlString (root:XmlElement) =
-    let rec createChildren (child:XmlElement) =
-        match child.SelfClosing with
-        | true ->
-            leaf child.Name [
-                for cAttr in child.Attributes do
-                    yield attr.value(cAttr.Key,cAttr.Value)
-            ]
-        | false ->
-            node child.Name [
-                for cAttr in child.Attributes do
-                    yield attr.value(cAttr.Key,cAttr.Value)
-            ][
-                for grandChild in child.Children do
-                    yield createChildren grandChild
-                yield
-                    text child.Content
-            ]
-    node root.Name [
-        for rAttr in root.Attributes do
-            yield attr.value(rAttr.Key,rAttr.Value)
-    ] [
-        for child in root.Children do
-            yield createChildren child
-        yield
-            text root.Content
-    ] |> serializeXml
-
 let getCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
     promise {
         let! getXml =
@@ -391,20 +363,6 @@ let getCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContex
         return xmlParsed
     }
 
-let getActiveTableXml (tableName:string) (worksheetName:string) (completeCustomXmlParsed:XmlElement) =
-    let tablexml=
-        completeCustomXmlParsed
-        |> SimpleXml.findElementsByName "SwateTable"
-        |> List.tryFind (fun swateTableXml ->
-            swateTableXml.Attributes.["Table"] = tableName
-            && swateTableXml.Attributes.["Worksheet"] = worksheetName
-        )
-    if tablexml.IsSome then
-        tablexml.Value |> Some
-    else
-        None
-
-
 //let getAllSwateTableValidation (xmlParsed:XmlElement) =
 //    let protocolGroups = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot xmlParsed
 
@@ -413,62 +371,6 @@ let getActiveTableXml (tableName:string) (worksheetName:string) (completeCustomX
 //        xmlElementToXmlString >> Xml.ValidationTypes.TableValidation.ofXml
 //    )
 
-//let getSwateValidationForCurrentTable tableName worksheetName (xmlParsed:XmlElement) =
-//    let activeTableXml = getActiveTableXml tableName worksheetName xmlParsed
-//    if activeTableXml.IsNone then
-//        None
-//    else
-//        let v = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot activeTableXml.Value
-//        if v.Length > 1 then failwith (sprintf "Swate found multiple '<%s>' xml elements. Please contact the developer." Xml.ValidationTypes.ValidationXmlRoot)
-//        if v.Length = 0 then
-//            None
-//        else
-//            let tableXmlAsString = activeTableXml.Value |> xmlElementToXmlString
-//            Xml.ValidationTypes.TableValidation.ofXml tableXmlAsString |> Some
-
-///// Use the 'remove' parameter to remove any Swate table validation xml for the worksheet annotation table name combination in 'tableValidation'
-//let private updateRemoveSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) (remove:bool) =
-
-//    let currentTableXml = getActiveTableXml tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet previousCompleteCustomXml
-
-//    let nextTableXml =
-//        let newValidationXml = tableValidation.toXml |> SimpleXml.parseElement
-//        if currentTableXml.IsSome then
-//            let filteredChildren =
-//                currentTableXml.Value.Children
-//                |> List.filter (fun x -> x.Name <> Xml.ValidationTypes.ValidationXmlRoot )
-//            {currentTableXml.Value with
-//                Children =
-//                    if remove then
-//                        filteredChildren
-//                    else
-//                        newValidationXml::filteredChildren
-//            }
-//        else
-//            let initNewSwateTableXml =
-//                sprintf """<SwateTable Table="%s" Worksheet="%s"></SwateTable>""" tableValidation.AnnotationTable.Name tableValidation.AnnotationTable.Worksheet
-//            let swateTableXmlEle = initNewSwateTableXml |> SimpleXml.parseElement
-//            {swateTableXmlEle with
-//                Children = [newValidationXml]
-//            }
-//    let filterPrevTableFromRootChildren =
-//        previousCompleteCustomXml.Children
-//        |> List.filter (fun x ->
-//            let isExisting =
-//                x.Name = "SwateTable"
-//                && x.Attributes.["Table"] = tableValidation.AnnotationTable.Name
-//                && x.Attributes.["Worksheet"] = tableValidation.AnnotationTable.Worksheet
-//            isExisting |> not
-//        )
-//    {previousCompleteCustomXml with
-//        Children = nextTableXml::filterPrevTableFromRootChildren
-//    }
-
-//let removeSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
-//    updateRemoveSwateValidation tableValidation previousCompleteCustomXml true
-
-//let updateSwateValidation (tableValidation:Xml.ValidationTypes.TableValidation) (previousCompleteCustomXml:XmlElement) =
-//    updateRemoveSwateValidation tableValidation previousCompleteCustomXml false
 
 //let replaceValidationByValidation tableVal1 tableVal2 previousCompleteCustomXml =
 //    let removeTableVal1 = removeSwateValidation tableVal1 previousCompleteCustomXml

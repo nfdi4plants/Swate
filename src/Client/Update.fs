@@ -233,29 +233,28 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
         currentModel, cmd
     //
     | GetTableValidationXml ->
-        failwith """Function "GetTableValidationXml" is currently not supported."""
-        //let cmd =
-        //    Cmd.OfPromise.either
-        //        OfficeInterop.getTableRepresentation
-        //        ()
-        //        (fun (currentTableValidation, buildingBlocks,msg) ->
-        //            StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks, msg) |> Validation)
-        //        (GenericError >> Dev)
-        currentModel, Cmd.none
-    //| WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
-    //    let cmd =
-    //        Cmd.OfPromise.either
-    //            OfficeInterop.writeTableValidationToXml
-    //            (newTableValidation, currentSwateVersion)
-    //            (fun x ->
-    //                Msg.Batch [
-    //                    GenericLog x |> Dev
-    //                    GetTableValidationXml |> ExcelInterop
-    //                ]
-    //            )
-    //            (GenericError >> Dev)
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getTableRepresentation
+                ()
+                (fun (currentTableValidation, buildingBlocks,msg) ->
+                    StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks) |> Validation)
+                (GenericError >> Dev)
+        currentModel, cmd
+    | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.writeTableValidationToXml
+                (newTableValidation, currentSwateVersion)
+                (fun x ->
+                    Msg.Batch [
+                        GenericLog x |> Dev
+                        GetTableValidationXml |> ExcelInterop
+                    ]
+                )
+                (GenericError >> Dev)
 
-    //    currentModel, cmd
+        currentModel, cmd
 
     //| AddTableValidationtoExisting (newTableValidation, newColNames, protocolInfo) ->
     //    failwith """Function "AddTableValidationtoExisting" is currently not supported."""
@@ -1277,17 +1276,13 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
     match validationMsg with
     /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
     /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
-    //| StoreTableRepresentationFromOfficeInterop (tableValidation:TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock [], msg) ->
-
-    //    let nextCmd =
-    //        GenericLog ("Info", msg) |> Dev |> Cmd.ofMsg
-
-    //    let nextState = {
-    //        currentState with
-    //            ActiveTableBuildingBlocks = buildingBlocks
-    //            TableValidationScheme = tableValidation
-    //    }
-    //    nextState, nextCmd
+    | StoreTableRepresentationFromOfficeInterop (tableValidation:OfficeInterop.CustomXmlTypes.Validation.TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock []) ->
+        let nextState = {
+            currentState with
+                ActiveTableBuildingBlocks = buildingBlocks
+                TableValidationScheme = tableValidation
+        }
+        nextState, Cmd.none
 
     | UpdateDisplayedOptionsId intOpt ->
         let nextState = {
@@ -1295,12 +1290,12 @@ let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationS
                 DisplayedOptionsId = intOpt
         }
         nextState, Cmd.none
-    //| UpdateTableValidationScheme tableValidation ->
-    //    let nextState = {
-    //        currentState with
-    //            TableValidationScheme   = tableValidation
-    //    }
-    //    nextState, Cmd.none
+    | UpdateTableValidationScheme tableValidation ->
+        let nextState = {
+            currentState with
+                TableValidationScheme   = tableValidation
+        }
+        nextState, Cmd.none
 
 let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolInsertState) : ProtocolInsertState * Cmd<Msg> =
 

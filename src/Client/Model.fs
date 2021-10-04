@@ -301,13 +301,13 @@ type AddBuildingBlockState = {
 /// Validation scheme for Table
 type ValidationState = {
     ActiveTableBuildingBlocks   : BuildingBlockTypes.BuildingBlock []
-    TableValidationScheme       : obj //OfficeInterop.CustomXmlTypes.ValidationTypes.TableValidation
+    TableValidationScheme       : OfficeInterop.CustomXmlTypes.Validation.TableValidation
     // Client view related
     DisplayedOptionsId      : int option
 } with
     static member init () = {
         ActiveTableBuildingBlocks   = [||]
-        TableValidationScheme       = ""//OfficeInterop.Types.Xml.ValidationTypes.TableValidation.init()
+        TableValidationScheme       = OfficeInterop.CustomXmlTypes.Validation.TableValidation.init()
         DisplayedOptionsId          = None
     }
 
@@ -380,18 +380,17 @@ type SettingsXmlState = {
     // // Client // //
     // Validation xml
     ActiveSwateValidation                   : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    NextAnnotationTableForActiveValidation  : AnnotationTable option
+    NextAnnotationTableForActiveValidation  : string option
     // Protocol group xml
     ActiveProtocolGroup                     : obj option //OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    NextAnnotationTableForActiveProtGroup   : AnnotationTable option
+    NextAnnotationTableForActiveProtGroup   : string option
     // Protocol
     ActiveProtocol                          : obj option //OfficeInterop.Types.Xml.GroupTypes.Protocol option
-    NextAnnotationTableForActiveProtocol    : AnnotationTable option
+    NextAnnotationTableForActiveProtocol    : string option
     //
     RawXml                                  : string
     NextRawXml                              : string
-    FoundTables                             : Shared.AnnotationTable []
-    ProtocolGroupXmls                       : OfficeInterop.CustomXmlTypes.Templates.Protocol []
+    FoundTables                             : string []
     ValidationXmls                          : obj [] //OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
 } with
     static member init () = {
@@ -407,7 +406,6 @@ type SettingsXmlState = {
         RawXml                                  = ""
         NextRawXml                              = ""
         FoundTables                             = [||]
-        ProtocolGroupXmls                       = [||]
         ValidationXmls                          = [||]
     }
 
@@ -416,15 +414,6 @@ type SettingsDataStewardState = {
 } with
     static member init () = {
         PointerJson = None
-    }
-
-type SettingsProtocolState = {
-    ProtocolsFromExcel  : obj option //OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    ProtocolsFromDB     : ProtocolTemplate []
-} with
-    static member init () = {
-        ProtocolsFromExcel  = None
-        ProtocolsFromDB     = [||]
     }
 
 /// The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

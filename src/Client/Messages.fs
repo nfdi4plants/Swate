@@ -30,7 +30,7 @@ type ExcelInteropMsg =
     | AutoFitTable
     //
     | GetTableValidationXml
-    //| WriteTableValidationToXml             of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
+    | WriteTableValidationToXml             of newTableValidation:CustomXmlTypes.Validation.TableValidation * currentSwateVersion:string
     /// needs to set newColNames separately as these validations come from templates for protocol group insert
     //| AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:CustomXmlTypes.Protocol.Protocol
     //| WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
@@ -145,9 +145,9 @@ type AddBuildingBlockMsg =
 type ValidationMsg =
     // Client
     | UpdateDisplayedOptionsId of int option
-    //| UpdateTableValidationScheme of Xml.ValidationTypes.TableValidation
+    | UpdateTableValidationScheme of CustomXmlTypes.Validation.TableValidation
     // OfficeInterop
-    //| StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock [] * msg:string
+    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock []
 
 type ProtocolInsertMsg =
     // ------ Process from file ------
@@ -269,9 +269,6 @@ type Model = {
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
 
-    ///Used to manage protocols
-    SettingsProtocolState       : SettingsProtocolState
-
     WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
 
     XLSXByteArray               : byte []
@@ -341,7 +338,6 @@ let initializeModel (pageOpt: Route option) =
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
         SettingsXmlState            = SettingsXmlState          .init ()
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
-        SettingsProtocolState       = SettingsProtocolState     .init ()
         WarningModal                = None
         XLSXByteArray               = [||]
         XLSXJSONResult              = ""

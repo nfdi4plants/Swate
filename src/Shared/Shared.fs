@@ -25,15 +25,6 @@ module Suggestion =
         |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
         |> set
 
-type AnnotationTable = {
-    Name            : string
-    Worksheet       : string
-} with
-    static member create name worksheet = {
-        Name        = name
-        Worksheet   = worksheet
-    }
-
 [<Obsolete>]
 /// Used in OfficeInterop to effectively find possible Term names and search for them in db
 type SearchTermI = {

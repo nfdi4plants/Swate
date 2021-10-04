@@ -660,8 +660,6 @@ let showRawCustomXmlButton model dispatch =
 //    ]
 
 let showProtocolGroupXmlEle (model:Model) dispatch =
-    let tryFindMap =
-        model.SettingsXmlState.FoundTables |> Array.map (fun x -> x.Name, x.Worksheet) |> Map.ofArray
         
     div [
         Style [

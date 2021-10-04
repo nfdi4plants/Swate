@@ -286,6 +286,8 @@ module BuildingBlockTypes =
                 failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN." this.MainColumn.Header.SwateColumnHeader)
 
         member this.hasUnit = this.Unit.IsSome
+        member this.hasTerm = this.MainColumnTerm.IsSome
+        member this.hasCompleteTerm = this.MainColumnTerm.IsSome && this.MainColumnTerm.Value.Name <> "" && this.MainColumnTerm.Value.TermAccession <> ""
 
     type InsertBuildingBlock = {
         Column      : BuildingBlockNamePrePrint

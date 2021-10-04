@@ -17,6 +17,7 @@
         <Compile Include="OfficeInterop\AuxFunctions\TermCollectionFunctions.fs" />
         <Compile Include="OfficeInterop\AuxFunctions\ColHeaderIndexing.fs" />
         <Compile Include="OfficeInterop\AuxFunctions\BuildingBlockFunctions.fs" />
+        <Compile Include="OfficeInterop\AuxFunctions\CustomXmlFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="Api.fs" />
@@ -47,7 +48,6 @@
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\SettingsView.fs" />
         <Compile Include="Views\SettingsXmlView.fs" />
-        <Compile Include="Views\SettingsProtocolView.fs" />
         <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Client.fs" />
