@@ -17,7 +17,7 @@ type Route =
 | Validation
 | FilePicker
 | Info
-| ProtocolInsert
+| Protocol
 | ProtocolSearch
 | XLSXConverter
 | ActivityLog
@@ -33,8 +33,8 @@ type Route =
         | Route.TermSearch          -> "/#TermSearch"
         | Route.Validation          -> "/#Validation"   
         | Route.FilePicker          -> "/#FilePicker"
-        | Route.ProtocolInsert      -> "/#ProtocolInsert"
-        | Route.ProtocolSearch      -> "/#ProtocolSearch"
+        | Route.Protocol            -> "/#ProtocolInsert"
+        | Route.ProtocolSearch      -> "/#Protocol/Search"
         | Route.XLSXConverter       -> "/#XLSXConverter"      
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
@@ -50,7 +50,7 @@ type Route =
         | Route.TermSearch          -> "Manage Terms"
         | Route.Validation          -> "Checklist Editor"
         | Route.FilePicker          -> "File Picker"
-        | Route.ProtocolInsert      -> "Protocol Insert"
+        | Route.Protocol            -> "Protocol Insert"
         | Route.ProtocolSearch      -> "Protocol Search"
         | Route.XLSXConverter       -> "XLSX Converter"
         | Route.Info                -> "Info"
@@ -80,7 +80,7 @@ type Route =
         | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
         | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
         | Route.BuildingBlock       -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
-        | Route.ProtocolInsert      -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
+        | Route.Protocol            -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
         | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
         | Route.XLSXConverter       -> createElem [Fa.Brand.Microsoft; Fa.Solid.Cogs        ]   (p.toStringRdbl)
         | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
@@ -105,8 +105,8 @@ module Routing =
             map Route.Validation            (s "Validation")
             map Route.FilePicker            (s "FilePicker")
             map Route.Info                  (s "Info")
-            map Route.ProtocolInsert        (s "ProtocolInsert")
-            map Route.ProtocolSearch        (s "ProtocolSearch")
+            map Route.Protocol              (s "ProtocolInsert")
+            map Route.ProtocolSearch        (s "Protocol" </> s "Search")
             map Route.XLSXConverter         (s "XLSXConverter")
             map Route.ActivityLog           (s "ActivityLog")
             map Route.Settings              (s "Settings")

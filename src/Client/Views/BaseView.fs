@@ -60,7 +60,7 @@ let tabs (model:Model) dispatch =
         if model.PersistentStorageState.PageEntry = Routing.SwateEntry.Core then
             createNavigationTab Routing.Route.BuildingBlock         model dispatch
             createNavigationTab Routing.Route.TermSearch            model dispatch
-            createNavigationTab Routing.Route.ProtocolInsert        model dispatch
+            createNavigationTab Routing.Route.Protocol              model dispatch
             createNavigationTab Routing.Route.FilePicker            model dispatch
             createNavigationTab Routing.Route.Info                  model dispatch
         else

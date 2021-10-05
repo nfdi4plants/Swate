@@ -316,46 +316,46 @@ module Validation =
 
 //open ISADotNet
 
-
-/// This model is used for both protocol insert and protocol search
-type ProtocolInsertState = {
-    // Client view
-    DisplayedProtDetailsId  : int option
-
-    // Process.json file upload
-    UploadData              : string
-    //ProcessModel            : ISADotNet.Process option
-
-    // Database protocol template
-    ProtocolSelected        : ProtocolTemplate option
-    ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    // 
-    ProtocolsAll            : ProtocolTemplate []
-
-    ProtocolNameSearchQuery : string
-    ProtocolTagSearchQuery  : string
-    ProtocolSearchTags      : string list
-    Loading                 : bool
-
-} with
-    static member init () = {
+module Protocol =
+    /// This model is used for both protocol insert and protocol search
+    type Model = {
         // Client view
-        DisplayedProtDetailsId  = None
+        DisplayedProtDetailsId  : int option
 
-        // ISADotNet Process.json file upload
-        UploadData              = ""
-        //ProcessModel            = None
+        // Process.json file upload
+        UploadData              : string
+        //ProcessModel            : ISADotNet.Process option
 
-        // Database protocol templates
-        ProtocolSelected        = None
-        ValidationXml           = None
-        ProtocolsAll            = [||]
-        ProtocolNameSearchQuery = ""
-        ProtocolTagSearchQuery  = ""
-        ProtocolSearchTags      = []
+        // Database protocol template
+        ProtocolSelected        : ProtocolTemplate option
+        ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+        // 
+        ProtocolsAll            : ProtocolTemplate []
 
-        Loading                 = false
-    }
+        ProtocolNameSearchQuery : string
+        ProtocolTagSearchQuery  : string
+        ProtocolSearchTags      : string list
+        Loading                 : bool
+
+    } with
+        static member init () = {
+            // Client view
+            DisplayedProtDetailsId  = None
+
+            // ISADotNet Process.json file upload
+            UploadData              = ""
+            //ProcessModel            = None
+
+            // Database protocol templates
+            ProtocolSelected        = None
+            ValidationXml           = None
+            ProtocolsAll            = [||]
+            ProtocolNameSearchQuery = ""
+            ProtocolTagSearchQuery  = ""
+            ProtocolSearchTags      = []
+
+            Loading                 = false
+        }
 
 type RequestBuildingBlockInfoStates =
 | Inactive

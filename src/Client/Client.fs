@@ -74,9 +74,9 @@ let view (model : Model) (dispatch : Msg -> unit) =
             //Text.p [] [str ""]
         ]
 
-    | Routing.Route.ProtocolInsert ->
+    | Routing.Route.Protocol ->
         BaseView.baseViewMainElement model dispatch [
-            ProtocolInsertView.fileUploadViewComponent model dispatch
+            Protocol.fileUploadViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
@@ -90,7 +90,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.ProtocolSearch ->
         BaseView.baseViewMainElement model dispatch [
-            ProtocolSearchView.protocolSearchViewComponent model dispatch
+            Protocol.Search.protocolSearchViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]

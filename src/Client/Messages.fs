@@ -153,27 +153,28 @@ module Validation =
         // OfficeInterop
         | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock []
 
-type ProtocolInsertMsg =
-    // ------ Process from file ------
-    //| ParseJsonToProcessRequest         of string
-    //| ParseJsonToProcessResult          of Result<ISADotNet.Process,exn>
-    // Client
-    | RemoveProcessFromModel
-    // ------ Protocol from Database ------
-    | GetAllProtocolsRequest
-    | GetAllProtocolsResponse           of ProtocolTemplate []
-    | GetProtocolByNameRequest          of string
-    | GetProtocolByNameResponse         of ProtocolTemplate
-    | ProtocolIncreaseTimesUsed         of protocolName:string
-    // Client
-    | UpdateUploadData                  of string
-    | UpdateDisplayedProtDetailsId      of int option
-    | UpdateProtocolNameSearchQuery     of string
-    | UpdateProtocolTagSearchQuery      of string
-    | AddProtocolTag                    of string
-    | RemoveProtocolTag                 of string
-    | RemoveSelectedProtocol
-    | UpdateLoading                     of bool
+module Protocol =
+    type Msg =
+        // ------ Process from file ------
+        //| ParseJsonToProcessRequest         of string
+        //| ParseJsonToProcessResult          of Result<ISADotNet.Process,exn>
+        // Client
+        | RemoveProcessFromModel
+        // ------ Protocol from Database ------
+        | GetAllProtocolsRequest
+        | GetAllProtocolsResponse           of ProtocolTemplate []
+        | GetProtocolByNameRequest          of string
+        | GetProtocolByNameResponse         of ProtocolTemplate
+        | ProtocolIncreaseTimesUsed         of protocolName:string
+        // Client
+        | UpdateUploadData                  of string
+        | UpdateDisplayedProtDetailsId      of int option
+        | UpdateProtocolNameSearchQuery     of string
+        | UpdateProtocolTagSearchQuery      of string
+        | AddProtocolTag                    of string
+        | RemoveProtocolTag                 of string
+        | RemoveSelectedProtocol
+        | UpdateLoading                     of bool
 
 type XLSXConverterMsg =
     | StoreXLSXByteArray                of byte []
@@ -256,7 +257,7 @@ type Model = {
     ///States regarding File picker functionality
     FilePickerState         : FilePicker.Model
 
-    ProtocolInsertState     : ProtocolInsertState
+    ProtocolState           : Protocol.Model
 
     ///Insert annotation columns
     AddBuildingBlockState   : BuildingBlock.Model
@@ -294,7 +295,7 @@ and Msg =
     | FilePickerMsg         of FilePicker.Msg
     | BuildingBlockMsg      of BuildingBlock.Msg
     | ValidationMsg         of Validation.Msg
-    | ProtocolInsert        of ProtocolInsertMsg
+    | ProtocolMsg           of Protocol.Msg
     | XLSXConverterMsg      of XLSXConverterMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
     //| SettingsXmlMsg        of SettingsXmlMsg
@@ -338,7 +339,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         FilePickerState             = FilePicker.Model          .init ()
         AddBuildingBlockState       = BuildingBlock.Model       .init ()
         ValidationState             = Validation.Model          .init ()
-        ProtocolInsertState         = ProtocolInsertState       .init ()
+        ProtocolState               = Protocol.Model            .init ()
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
         SettingsXmlState            = SettingsXmlState          .init ()
         SettingsDataStewardState    = SettingsDataStewardState  .init ()

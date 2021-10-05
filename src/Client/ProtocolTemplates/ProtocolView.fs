@@ -1,4 +1,4 @@
-module ProtocolInsertView
+module Protocol
 
 open System
 
@@ -19,8 +19,7 @@ open Fulma.Extensions.Wikiki
 
 open Shared
 open ISADotNetHelpers
-
-// https://www.growingwiththeweb.com/2016/07/enabling-pull-requests-on-github-wikis.html
+open Protocol
 
 //let isViableISADotNetProcess (isaProcess:ISADotNet.Process) =
 
@@ -164,6 +163,8 @@ open ISADotNetHelpers
 //            ]
 //        ]
 
+open Messages
+
 let fileUploadButton (model:Model) dispatch id =
     Label.label [Label.Props [Style [FontWeight "normal";Margin "1rem 0"]]][
         Input.input [
@@ -180,7 +181,7 @@ let fileUploadButton (model:Model) dispatch id =
                     let reader = Browser.Dom.FileReader.Create()
 
                     reader.onload <- fun evt ->
-                        UpdateUploadData evt.target?result |> ProtocolInsert |> dispatch
+                        UpdateUploadData evt.target?result |> ProtocolMsg |> dispatch
                                    
                     reader.onerror <- fun evt ->
                         GenericLog ("Error", evt.Value) |> Dev |> dispatch
@@ -293,7 +294,7 @@ let addFromDBToTableButton (model:Model) dispatch =
             Field.div [] [
                 Control.div [] [
                     Button.a [
-                        if model.ProtocolInsertState.ProtocolSelected.IsSome //&& model.ProtocolInsertState.ValidationXml.IsSome
+                        if model.ProtocolState.ProtocolSelected.IsSome //&& model.ProtocolInsertState.ValidationXml.IsSome
                         then
                             Button.IsActive true
                         else
@@ -302,11 +303,11 @@ let addFromDBToTableButton (model:Model) dispatch =
                         Button.IsFullWidth
                         Button.Color IsSuccess
                         Button.OnClick (fun e ->
-                            let p = model.ProtocolInsertState.ProtocolSelected.Value
+                            let p = model.ProtocolState.ProtocolSelected.Value
                             /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
                             //let validation =
                             //    model.ProtocolInsertState.ValidationXml.Value |> Some
-                            ProtocolIncreaseTimesUsed p.Name |> ProtocolInsert |> dispatch
+                            ProtocolIncreaseTimesUsed p.Name |> ProtocolMsg |> dispatch
                             AddAnnotationBlocks p.TemplateBuildingBlocks |> ExcelInterop |> dispatch
                         )
                     ] [
@@ -315,10 +316,10 @@ let addFromDBToTableButton (model:Model) dispatch =
                 ]
             ]
         ]
-        if model.ProtocolInsertState.ProtocolSelected.IsSome then
+        if model.ProtocolState.ProtocolSelected.IsSome then
             Column.column [Column.Width(Screen.All, Column.IsNarrow)][
                 Button.a [
-                    Button.OnClick (fun e -> RemoveSelectedProtocol |> ProtocolInsert |> dispatch)
+                    Button.OnClick (fun e -> RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
                     Button.Color IsDanger
                 ][
                     Fa.i [Fa.Solid.Times][]
@@ -340,7 +341,7 @@ let showDatabaseProtocolTemplate (model:Model) dispatch =
         toProtocolSearchElement model dispatch
 
         div [Style [OverflowX OverflowOptions.Auto; MarginBottom "1rem"]] [
-            if model.ProtocolInsertState.ProtocolSelected.IsSome then
+            if model.ProtocolState.ProtocolSelected.IsSome then
                 Table.table [
                     Table.IsFullWidth;
                     Table.IsBordered
@@ -355,7 +356,7 @@ let showDatabaseProtocolTemplate (model:Model) dispatch =
                         ]
                     ]
                     tbody [][
-                        for insertBB in model.ProtocolInsertState.ProtocolSelected.Value.TemplateBuildingBlocks do
+                        for insertBB in model.ProtocolState.ProtocolSelected.Value.TemplateBuildingBlocks do
                             yield
                                 tr [][
                                     td [][str (insertBB.Column.toAnnotationTableHeader())]

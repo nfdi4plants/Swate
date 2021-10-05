@@ -1,4 +1,4 @@
-module ProtocolSearchView
+module Protocol.Search
 
 open System
 
@@ -12,6 +12,7 @@ open Shared
 open ProtocolTemplateTypes
 
 open Model
+open Messages.Protocol
 open Messages
 
 
@@ -19,9 +20,9 @@ let breadcrumbEle (model:Model) dispatch =
     Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
         Breadcrumb.item [][
             a [
-                OnClick (fun e -> UpdatePageState (Some Routing.Route.ProtocolInsert) |> dispatch)
+                OnClick (fun e -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
             ][
-                str (Routing.Route.ProtocolInsert.toStringRdbl)
+                str (Routing.Route.Protocol.toStringRdbl)
             ]
         ]
         Breadcrumb.item [
@@ -29,7 +30,7 @@ let breadcrumbEle (model:Model) dispatch =
         ][
             a [
                 Style [Color model.SiteStyleState.ColorMode.Text]
-                OnClick (fun e -> UpdatePageState (Some Routing.Route.ProtocolInsert) |> dispatch)
+                OnClick (fun e -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
             ][
                 str Routing.Route.ProtocolSearch.toStringRdbl
             ]
@@ -46,11 +47,11 @@ let sortButton icon msg =
     ]
 
 let fileSortElements (model:Model) dispatch =
-    let allTags = model.ProtocolInsertState.ProtocolsAll |> Array.collect (fun x -> x.Tags) |> Array.distinct |> Array.filter (fun x -> model.ProtocolInsertState.ProtocolSearchTags |> List.contains x |> not )
+    let allTags = model.ProtocolState.ProtocolsAll |> Array.collect (fun x -> x.Tags) |> Array.distinct |> Array.filter (fun x -> model.ProtocolState.ProtocolSearchTags |> List.contains x |> not )
     let hitTagList =
-        if model.ProtocolInsertState.ProtocolTagSearchQuery <> ""
+        if model.ProtocolState.ProtocolTagSearchQuery <> ""
         then
-            let queryBigram = model.ProtocolInsertState.ProtocolTagSearchQuery |> Shared.Suggestion.createBigrams 
+            let queryBigram = model.ProtocolState.ProtocolTagSearchQuery |> Shared.Suggestion.createBigrams 
             let bigrams =
                 allTags
                 |> Array.map (fun x ->
@@ -75,8 +76,8 @@ let fileSortElements (model:Model) dispatch =
                     Input.text [
                         Input.Placeholder ".. protocol name"
                         Input.Color IsPrimary
-                        Input.ValueOrDefault model.ProtocolInsertState.ProtocolNameSearchQuery
-                        Input.OnChange (fun e -> UpdateProtocolNameSearchQuery e.Value |> ProtocolInsert |> dispatch)
+                        Input.ValueOrDefault model.ProtocolState.ProtocolNameSearchQuery
+                        Input.OnChange (fun e -> UpdateProtocolNameSearchQuery e.Value |> ProtocolMsg |> dispatch)
                     ]
                     Icon.icon [ Icon.Size IsSmall; Icon.IsRight ]
                         [ Fa.i [ Fa.Solid.Search ]
@@ -91,8 +92,8 @@ let fileSortElements (model:Model) dispatch =
                     Input.text [
                         Input.Placeholder ".. protocol tag"
                         Input.Color IsPrimary
-                        Input.ValueOrDefault model.ProtocolInsertState.ProtocolTagSearchQuery
-                        Input.OnChange (fun e -> UpdateProtocolTagSearchQuery e.Value |> ProtocolInsert |> dispatch)
+                        Input.ValueOrDefault model.ProtocolState.ProtocolTagSearchQuery
+                        Input.OnChange (fun e -> UpdateProtocolTagSearchQuery e.Value |> ProtocolMsg |> dispatch)
                     ]
                     Icon.icon [ Icon.Size IsSmall; Icon.IsRight ]
                         [ Fa.i [ Fa.Solid.Search ]
@@ -111,7 +112,7 @@ let fileSortElements (model:Model) dispatch =
                                     Tag.tag [
                                         Tag.CustomClass "clickableTag"
                                         Tag.Color IsInfo
-                                        Tag.Props [ OnClick (fun e -> AddProtocolTag tagSuggestion |> ProtocolInsert |> dispatch) ]
+                                        Tag.Props [ OnClick (fun e -> AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch) ]
                                     ][
                                         str tagSuggestion
                                     ]
@@ -121,7 +122,7 @@ let fileSortElements (model:Model) dispatch =
             ]
         ]
         Field.div [Field.IsGroupedMultiline][
-            for selectedTag in model.ProtocolInsertState.ProtocolSearchTags do
+            for selectedTag in model.ProtocolState.ProtocolSearchTags do
                 yield
                     Control.div [ ] [
                         Tag.list [Tag.List.HasAddons][
@@ -130,7 +131,7 @@ let fileSortElements (model:Model) dispatch =
                                 Tag.CustomClass "clickableTagDelete"
                                 //Tag.Color IsWarning;
                                 Tag.Props [
-                                    OnClick (fun e -> RemoveProtocolTag selectedTag |> ProtocolInsert |> dispatch)
+                                    OnClick (fun e -> RemoveProtocolTag selectedTag |> ProtocolMsg |> dispatch)
                                 ]
                             ] []
                         ]
@@ -140,7 +141,7 @@ let fileSortElements (model:Model) dispatch =
 
 let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
     let isActive =
-        match model.ProtocolInsertState.DisplayedProtDetailsId with
+        match model.ProtocolState.DisplayedProtDetailsId with
         | Some id when id = i ->
             true
         | _ ->
@@ -162,9 +163,9 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
             OnClick (fun e ->
                 e.preventDefault()
                 if isActive then
-                    UpdateDisplayedProtDetailsId None |> ProtocolInsert |> dispatch
+                    UpdateDisplayedProtDetailsId None |> ProtocolMsg |> dispatch
                 else
-                    UpdateDisplayedProtDetailsId (Some i) |> ProtocolInsert |> dispatch
+                    UpdateDisplayedProtDetailsId (Some i) |> ProtocolMsg |> dispatch
             )
 
         ] [
@@ -216,7 +217,7 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
                                 ]
                     ]
                     Button.a [
-                        Button.OnClick (fun e -> GetProtocolByNameRequest prot.Name |> ProtocolInsert |> dispatch)
+                        Button.OnClick (fun e -> GetProtocolByNameRequest prot.Name |> ProtocolMsg |> dispatch)
                         Button.IsFullWidth; Button.Color IsSuccess
                     ] [str "select"]
                 ]
@@ -227,9 +228,9 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
 let protocolElementContainer (model:Model) dispatch =
     
     let sortTableBySearchQuery (protocol:ProtocolTemplate []) =
-        if model.ProtocolInsertState.ProtocolNameSearchQuery <> ""
+        if model.ProtocolState.ProtocolNameSearchQuery <> ""
         then
-            let queryBigram = model.ProtocolInsertState.ProtocolNameSearchQuery |> Shared.Suggestion.createBigrams 
+            let queryBigram = model.ProtocolState.ProtocolNameSearchQuery |> Shared.Suggestion.createBigrams 
             let bigrams =
                 protocol
                 |> Array.map (fun prot ->
@@ -246,17 +247,17 @@ let protocolElementContainer (model:Model) dispatch =
         else
             protocol
     let filterTableByTags (protocol:ProtocolTemplate []) =
-        if model.ProtocolInsertState.ProtocolSearchTags |> List.isEmpty |> not then
+        if model.ProtocolState.ProtocolSearchTags |> List.isEmpty |> not then
             protocol |> Array.filter (fun x ->
                 let protTagSet = x.Tags |> Set.ofArray
-                let filterTags = model.ProtocolInsertState.ProtocolSearchTags |> Set.ofList
+                let filterTags = model.ProtocolState.ProtocolSearchTags |> Set.ofList
                 Set.intersect protTagSet filterTags |> fun intersectSet -> intersectSet.Count = filterTags.Count
             )
         else
             protocol
 
     let sortedTable =
-        model.ProtocolInsertState.ProtocolsAll
+        model.ProtocolState.ProtocolsAll
         |> filterTableByTags
         |> sortTableBySearchQuery 
 
@@ -302,8 +303,8 @@ let protocolElementContainer (model:Model) dispatch =
     ]
 
 let protocolSearchViewComponent (model:Model) dispatch =
-    let isEmpty = model.ProtocolInsertState.ProtocolsAll |> isNull || model.ProtocolInsertState.ProtocolsAll |> Array.isEmpty
-    let isLoading = model.ProtocolInsertState.Loading
+    let isEmpty = model.ProtocolState.ProtocolsAll |> isNull || model.ProtocolState.ProtocolsAll |> Array.isEmpty
+    let isLoading = model.ProtocolState.Loading
     form [
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
