@@ -260,7 +260,9 @@ let autocompleteTermSearchComponent
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
-            Input.Props [Style [BorderColor ExcelColors.Colorfull.gray40]]
+            Input.Props [Style [
+                if isDisabled then BorderColor ExcelColors.Colorfull.gray40
+            ]]
             Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
             Input.ValueOrDefault autocompleteParams.StateBinding
@@ -298,6 +300,7 @@ let autocompleteTermSearchComponentOfParentOntology
     let parentOntologyNotificationElement show =
         Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]][
             Button.button [
+                Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]
                 Button.IsStatic true
                 match inputSize with
                 | Some size -> Button.Size size

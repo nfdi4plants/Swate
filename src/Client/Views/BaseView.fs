@@ -131,7 +131,7 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
                 ]
         ]
 
-        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"]][
+        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]][
             footerContentStatic model dispatch
         ]
     ]

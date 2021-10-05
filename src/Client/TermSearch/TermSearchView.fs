@@ -129,7 +129,6 @@ let simpleSearchComponent model dispatch =
                 "Start typing to search for terms"
                 (Some Size.IsLarge)
                 (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
-
         ]
 
         div [][

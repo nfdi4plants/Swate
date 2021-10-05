@@ -27,6 +27,7 @@ module Colorfull =
         let gray40  = "#e1dfdd"
         let gray30  = "#edebe9"
         let gray20  = "#f3f2f1"
+        let gray10  = "#e5e5e5"
         let white   = "#ffffff"
 
 
@@ -75,7 +76,7 @@ let darkMode = {
 
 let colorfullMode = {
     Name                    = "Colorfull"
-    BodyBackground          = Colorfull.gray20
+    BodyBackground          = Colorfull.white
     BodyForeground          = Colorfull.gray20
     ControlBackground       = Colorfull.white
     ControlForeground       = Colorfull.gray40

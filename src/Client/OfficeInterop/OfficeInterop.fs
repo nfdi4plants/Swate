@@ -17,20 +17,20 @@ open OfficeInteropTypes.BuildingBlockTypes
 /// Reoccuring Comment Defitinitions
 
 /// 'annotationTables'      -> For a workbook (NOT! worksheet) all tables must have unique names. Therefore not all our tables can be called 'annotationTable'.
-///                             Instead we add numbers to keep them unique. 'annotationTables' references all of those tables.
+///                             Instead we add human readable ids to keep them unique. 'annotationTables' references all of those tables.
 
 /// 'active annotationTable' -> The annotationTable present on the active worksheet. This is not trivial to access an is most of the time passed to a function by
 ///                             running 'tryFindActiveAnnotationTable()' in another message before.
 
 /// 'TSR'/'TAN'             -> Term Source Ref - column / Term Accession Number - column
 
-/// 'Reference Columns'     -> Meant are the hidden columns including TSR, TAN and Unit columns
+/// 'Reference Columns'     -> The hidden columns including TSR, TAN and Unit columns
 
 /// 'Main Column'           -> Non hidden column of a building block. Each building block only contains one main column
 
 /// 'Id Tag'                -> Column headers in Excel must be unique. Therefore Swate adds #integer to headers.
 
-/// 'Unit column'           -> This references the unit block of a building block. It is a optional addition and not every building block must contain it. 
+/// 'Unit column'           -> This references the unit column of a building block. It is a optional addition and not every building block must contain it. 
 
 /// REFERENCES (often used functions with the same comment)
 
@@ -46,9 +46,6 @@ open OfficeInteropTypes.BuildingBlockTypes
 
 [<Emit("console.log($0)")>]
 let consoleLog (message: string): unit = jsNative
-        //ranges.format.fill.color <- "red"
-        //let ranges = context.workbook.getSelectedRanges()
-        //let x = ranges.load(U2.Case1 "address")
 
 open System
 

@@ -337,7 +337,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                     ]
                 ]
                 Control.p [] [
-                    Button.button [Button.IsStatic true] [
+                    Button.button [Button.IsStatic true; Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]] [
                         str (sprintf "This %s has a unit:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString))
                     ]
                 ]
@@ -409,7 +409,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
         ]
         Field.div [Field.HasAddons] [
             Control.p [] [
-                Button.button [Button.IsStatic true] [
+                Button.button [Button.IsStatic true; Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]] [
                     str "Add unit"
                 ]
             ]

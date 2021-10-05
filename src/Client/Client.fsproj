@@ -9,9 +9,8 @@
         <None Include="paket.references" />
         <None Include="style.scss" />
         <Compile Include="HumanReadableIds.fs" />
-        <Compile Include="NFDIColors.fs" />
-        <Compile Include="ExcelColors.fs" />
-        <Compile Include="ISADotNetHelpers.fs" />
+        <Compile Include="Colors\ExcelColors.fs" />
+        <Compile Include="Colors\NFDIColors.fs" />
         <Compile Include="Api.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="OfficeInterop\InteropLogging.fs" />
