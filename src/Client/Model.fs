@@ -300,17 +300,18 @@ module BuildingBlock =
         }
 
 /// Validation scheme for Table
-type ValidationState = {
-    ActiveTableBuildingBlocks   : BuildingBlockTypes.BuildingBlock []
-    TableValidationScheme       : OfficeInterop.CustomXmlTypes.Validation.TableValidation
-    // Client view related
-    DisplayedOptionsId      : int option
-} with
-    static member init () = {
-        ActiveTableBuildingBlocks   = [||]
-        TableValidationScheme       = OfficeInterop.CustomXmlTypes.Validation.TableValidation.init()
-        DisplayedOptionsId          = None
-    }
+module Validation =
+    type Model = {
+        ActiveTableBuildingBlocks   : BuildingBlockTypes.BuildingBlock []
+        TableValidationScheme       : OfficeInterop.CustomXmlTypes.Validation.TableValidation
+        // Client view related
+        DisplayedOptionsId      : int option
+    } with
+        static member init () = {
+            ActiveTableBuildingBlocks   = [||]
+            TableValidationScheme       = OfficeInterop.CustomXmlTypes.Validation.TableValidation.init()
+            DisplayedOptionsId          = None
+        }
 
 
 //open ISADotNet

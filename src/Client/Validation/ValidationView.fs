@@ -1,4 +1,4 @@
-module ValidationView
+module Validation
 
 open Fable.React
 open Fable.React.Props
@@ -9,6 +9,7 @@ open Fable.Core.JsInterop
 open Browser
 open Browser.MediaQueryList
 open Browser.MediaQueryListExtensions
+open Elmish
 
 open Shared
 
@@ -20,6 +21,34 @@ open CustomComponents
 
 open OfficeInterop.CustomXmlTypes.Validation
 open Shared.OfficeInteropTypes
+open Validation
+
+let update (validationMsg:Validation.Msg) (currentState: Validation.Model) : Validation.Model * Cmd<Messages.Msg> =
+    match validationMsg with
+    /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
+    /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
+    | StoreTableRepresentationFromOfficeInterop (tableValidation:OfficeInterop.CustomXmlTypes.Validation.TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock []) ->
+        let nextState = {
+            currentState with
+                ActiveTableBuildingBlocks = buildingBlocks
+                TableValidationScheme = tableValidation
+        }
+        nextState, Cmd.none
+
+    | UpdateDisplayedOptionsId intOpt ->
+        let nextState = {
+            currentState with
+                DisplayedOptionsId = intOpt
+        }
+        nextState, Cmd.none
+    | UpdateTableValidationScheme tableValidation ->
+        let nextState = {
+            currentState with
+                TableValidationScheme   = tableValidation
+        }
+        nextState, Cmd.none
+
+open Messages
 
 let columnListElement ind (columnValidation:ColumnValidation) (model:Model) dispatch =
     let isActive =
@@ -47,9 +76,9 @@ let columnListElement ind (columnValidation:ColumnValidation) (model:Model) disp
         OnClick (fun e ->
             e.preventDefault()
             if isActive then
-                UpdateDisplayedOptionsId None |> Validation |> dispatch
+                UpdateDisplayedOptionsId None |> ValidationMsg |> dispatch
             else
-                UpdateDisplayedOptionsId (Some ind) |> Validation |> dispatch
+                UpdateDisplayedOptionsId (Some ind) |> ValidationMsg |> dispatch
         )
     ][
         td [][str columnValidation.ColumnHeader.SwateColumnHeader]
@@ -99,7 +128,7 @@ let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValida
                 }
                 let nextTableValidation =
                     updateTableValidationByColValidation model nextColumnValidation
-                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
             )
             Checked (contentTypeOpt = columnValidation.ValidationFormat)
 
@@ -157,7 +186,7 @@ let sliderElements id columnValidation model dispatch =
                                 }
                                 let nextTableValidation =
                                     updateTableValidationByColValidation model nextColumnValidation
-                                UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                                UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
                                 )
                         ][
                             Fa.span [
@@ -182,7 +211,7 @@ let sliderElements id columnValidation model dispatch =
                         }
                         let nextTableValidation =
                             updateTableValidationByColValidation model nextColumnValidation
-                        UpdateTableValidationScheme nextTableValidation |> Validation |> dispatch
+                        UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
                         )
                 ][
                     Fa.span [

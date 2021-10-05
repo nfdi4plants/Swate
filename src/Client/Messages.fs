@@ -145,12 +145,13 @@ module BuildingBlock =
     | NewUnitTermSuggestions    of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | ToggleBuildingBlockHasUnit
 
-type ValidationMsg =
-    // Client
-    | UpdateDisplayedOptionsId of int option
-    | UpdateTableValidationScheme of CustomXmlTypes.Validation.TableValidation
-    // OfficeInterop
-    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock []
+module Validation =
+    type Msg =
+        // Client
+        | UpdateDisplayedOptionsId of int option
+        | UpdateTableValidationScheme of CustomXmlTypes.Validation.TableValidation
+        // OfficeInterop
+        | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock []
 
 type ProtocolInsertMsg =
     // ------ Process from file ------
@@ -261,7 +262,7 @@ type Model = {
     AddBuildingBlockState   : BuildingBlock.Model
 
     ///Create Validation scheme for Table
-    ValidationState         : ValidationState
+    ValidationState         : Validation.Model
 
     ///Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
@@ -292,7 +293,7 @@ and Msg =
     | PersistentStorage     of PersistentStorageMsg
     | FilePickerMsg         of FilePicker.Msg
     | BuildingBlockMsg      of BuildingBlock.Msg
-    | Validation            of ValidationMsg
+    | ValidationMsg         of Validation.Msg
     | ProtocolInsert        of ProtocolInsertMsg
     | XLSXConverterMsg      of XLSXConverterMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
@@ -336,7 +337,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         ApiState                    = ApiState                  .init ()
         FilePickerState             = FilePicker.Model          .init ()
         AddBuildingBlockState       = BuildingBlock.Model       .init ()
-        ValidationState             = ValidationState           .init ()
+        ValidationState             = Validation.Model          .init ()
         ProtocolInsertState         = ProtocolInsertState       .init ()
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
         SettingsXmlState            = SettingsXmlState          .init ()

@@ -224,7 +224,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
                 OfficeInterop.getTableRepresentation
                 ()
                 (fun (currentTableValidation, buildingBlocks,msg) ->
-                    StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks) |> Validation)
+                    Validation.StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks) |> ValidationMsg)
                 (GenericError >> Dev)
         currentModel, cmd
     | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
@@ -969,31 +969,6 @@ let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyle
         }
         nextState,Cmd.none
 
-let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
-    match validationMsg with
-    /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
-    /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
-    | StoreTableRepresentationFromOfficeInterop (tableValidation:OfficeInterop.CustomXmlTypes.Validation.TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock []) ->
-        let nextState = {
-            currentState with
-                ActiveTableBuildingBlocks = buildingBlocks
-                TableValidationScheme = tableValidation
-        }
-        nextState, Cmd.none
-
-    | UpdateDisplayedOptionsId intOpt ->
-        let nextState = {
-            currentState with
-                DisplayedOptionsId = intOpt
-        }
-        nextState, Cmd.none
-    | UpdateTableValidationScheme tableValidation ->
-        let nextState = {
-            currentState with
-                TableValidationScheme   = tableValidation
-        }
-        nextState, Cmd.none
-
 let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolInsertState) : ProtocolInsertState * Cmd<Msg> =
 
     //let parseDBProtocol (prot:Shared.ProtocolTemplate) =
@@ -1588,10 +1563,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             }
         nextModel, nextCmd
 
-    | Validation validationMsg ->
+    | ValidationMsg validationMsg ->
         let nextValidationState, nextCmd =
             currentModel.ValidationState
-            |> handleValidationMsg validationMsg
+            |> Validation.update validationMsg
 
         let nextModel = {
             currentModel with

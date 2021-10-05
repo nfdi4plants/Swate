@@ -39,11 +39,11 @@
         <Compile Include="BuildingBlock\BuildingBlockView.fs" />
         <Compile Include="TermSearch\TermSearchView.fs" />
         <Compile Include="FilePicker\FilePickerView.fs" />
+        <Compile Include="Validation\ValidationView.fs" />
+        <Compile Include="Info\InfoView.fs" />
         <Compile Include="Views\XLSXConverterView.fs" />
-        <Compile Include="Views\ValidationView.fs" />
         <Compile Include="Views\ProtocolInsertView.fs" />
         <Compile Include="Views\ProtocolSearchView.fs" />
-        <Compile Include="Views\InfoView.fs" />
         <Compile Include="Views\ActivityLogView.fs" />
         <Compile Include="Views\SettingsView.fs" />
         <Compile Include="Views\SettingsXmlView.fs" />

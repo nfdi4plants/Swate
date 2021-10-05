@@ -62,7 +62,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.Validation ->
         BaseView.baseViewMainElement model dispatch [
-            ValidationView.validationComponent model dispatch
+            Validation.validationComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
