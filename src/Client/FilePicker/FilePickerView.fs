@@ -462,7 +462,7 @@ let fileNameElements (model:Messages.Model) dispatch =
                 else
                     Button.Color Color.IsSuccess
                 Button.OnClick (fun e ->
-                    InsertFileNames (model.FilePickerState.FileNames |> List.map snd) |> ExcelInterop |> dispatch 
+                    OfficeInterop.InsertFileNames (model.FilePickerState.FileNames |> List.map snd) |> OfficeInteropMsg |> dispatch 
                 )
 
             ][

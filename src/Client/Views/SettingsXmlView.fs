@@ -26,7 +26,7 @@ let dangerZone (model:Model) dispatch =
             Button.a [
                 Button.Color Color.IsDanger
                 Button.IsFullWidth
-                Button.OnClick (fun e -> DeleteAllCustomXml |> ExcelInterop |> dispatch )
+                Button.OnClick (fun e -> OfficeInterop.DeleteAllCustomXml |> OfficeInteropMsg |> dispatch )
                 Button.Props [Style []; Title "Be sure you know what you do. This cannot be undone!"]
             ] [
                 Icon.icon [ ] [
@@ -64,7 +64,7 @@ let showRawCustomXmlButton model dispatch =
         Button.a [
             Button.Color Color.IsInfo
             Button.IsFullWidth
-            Button.OnClick (fun e -> GetSwateCustomXml |> ExcelInterop |> dispatch )
+            Button.OnClick (fun e -> OfficeInterop.GetSwateCustomXml |> OfficeInteropMsg |> dispatch )
             Button.Props [Title "Show record type data of Swate custom Xml"]
         ] [
             span [] [str "Load raw custom xml"]

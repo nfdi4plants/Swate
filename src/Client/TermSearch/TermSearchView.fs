@@ -180,7 +180,7 @@ let simpleSearchComponent model dispatch =
                             Button.OnClick (fun _ ->
                                 if hasText then
                                     let term = if model.TermSearchState.SelectedTerm.IsSome then TermMinimal.ofTerm model.TermSearchState.SelectedTerm.Value else TermMinimal.create model.TermSearchState.TermSearchText ""
-                                    InsertOntologyTerm term |> ExcelInterop |> dispatch
+                                    OfficeInterop.InsertOntologyTerm term |> OfficeInteropMsg |> dispatch
                             )
                         ] [
                             str "Fill selected cells with this term"

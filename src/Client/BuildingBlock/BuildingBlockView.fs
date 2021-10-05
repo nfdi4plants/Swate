@@ -386,7 +386,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                         let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some else None
                         let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && not colName.isSingleColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
                         let newBuildingBlock = BuildingBlockTypes.InsertBuildingBlock.create colName colTerm unitTerm
-                        AddAnnotationBlock newBuildingBlock |> ExcelInterop |> dispatch
+                        OfficeInterop.AddAnnotationBlock newBuildingBlock |> OfficeInteropMsg |> dispatch
                     )
                 ] [
                     str "Insert annotation building block"
@@ -447,9 +447,9 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
                         | "" ->
                             GenericLog ("Error", "Cannot execute function with empty unit input") |> Dev |> dispatch
                         | hasUnitTerm when model.AddBuildingBlockState.Unit2SelectedTerm.IsSome ->
-                            UpdateUnitForCells unitTerm.Value |> ExcelInterop |> dispatch
+                            OfficeInterop.UpdateUnitForCells unitTerm.Value |> OfficeInteropMsg |> dispatch
                         | freeText ->
-                            UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> ExcelInterop |> dispatch
+                            OfficeInterop.UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> OfficeInteropMsg |> dispatch
                     )
                 ] [
                     str "Update unit for cells"

@@ -22,6 +22,7 @@
         <Compile Include="OfficeInterop\AuxFunctions\CustomXmlFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
+        <Compile Include="OfficeInterop\OfficeInteropState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
         <Compile Include="CustomComponents\ResponsiveFA.fs" />
@@ -51,6 +52,7 @@
         <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Views\BaseView.fs" />
+        <Compile Include="Update\OfficeInteropUpdate.fs" />
         <Compile Include="Update.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>

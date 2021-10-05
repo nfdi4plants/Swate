@@ -12,9 +12,6 @@ open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Configuration
-open Microsoft.Extensions.Configuration.Json
-open Microsoft.Extensions.Configuration.UserSecrets
-open Microsoft.AspNetCore.Hosting
 
 let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }

@@ -18,7 +18,7 @@ let debugBox model dispatch =
         Button.button [
             Button.Color Color.IsInfo
             Button.IsFullWidth
-            Button.OnClick (fun e -> TryExcel |> ExcelInterop |> dispatch )
+            Button.OnClick (fun e -> OfficeInterop.TryExcel |> OfficeInteropMsg |> dispatch )
             Button.Props [Style [MarginBottom "1rem"]]
         ] [
             str "Try Excel"
@@ -53,7 +53,7 @@ let debugBox model dispatch =
             Button.a [
                 Button.Color Color.IsWarning
                 Button.IsFullWidth
-                Button.OnClick (fun e -> GetSwateCustomXml |> ExcelInterop |> dispatch )
+                Button.OnClick (fun e -> OfficeInterop.GetSwateCustomXml |> OfficeInteropMsg |> dispatch )
                 Button.Props [Style [MarginBottom "1rem"]; Title "Show record type data of Swate custom Xml"]
             ] [
                 span [] [str "Show Custom Xml!"]
@@ -61,7 +61,7 @@ let debugBox model dispatch =
             Button.a [
                 Button.Color Color.IsDanger
                 Button.IsFullWidth
-                Button.OnClick (fun e -> DeleteAllCustomXml |> ExcelInterop |> dispatch )
+                Button.OnClick (fun e -> OfficeInterop.DeleteAllCustomXml |> OfficeInteropMsg |> dispatch )
                 Button.Props [Style []; Title "Be sure you know what you do. This cannot be undone!"]
             ] [
                 Icon.icon [ ] [

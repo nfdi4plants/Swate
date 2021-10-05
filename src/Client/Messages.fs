@@ -13,46 +13,6 @@ open Model
 
 //open ISADotNet
 
-type ExcelInteropMsg =
-    | Initialized                           of (string*string)
-    | InsertOntologyTerm                    of TermMinimal
-    | AddAnnotationBlock                    of BuildingBlockTypes.InsertBuildingBlock
-    | AddAnnotationBlocks                   of BuildingBlockTypes.InsertBuildingBlock list //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | RemoveAnnotationBlock
-    | UpdateUnitForCells                    of unitTerm:TermMinimal
-    | FormatColumn                          of colname:string * formatString:string
-    | FormatColumns                         of (string * string) list
-    /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
-    | CreateAnnotationTable                 of isDark:bool
-    | AnnotationtableCreated                of string
-    | AnnotationTableExists                 of TryFindAnnoTableResult
-    | GetParentTerm
-    | AutoFitTable
-    //
-    | GetTableValidationXml
-    | WriteTableValidationToXml             of newTableValidation:CustomXmlTypes.Validation.TableValidation * currentSwateVersion:string
-    /// needs to set newColNames separately as these validations come from templates for protocol group insert
-    //| AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:CustomXmlTypes.Protocol.Protocol
-    //| WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
-    | DeleteAllCustomXml
-    | GetSwateCustomXml
-    | UpdateSwateCustomXml                  of string
-    //
-    | FillHiddenColsRequest
-    | FillHiddenColumns                     of TermSearchable []
-    | UpdateFillHiddenColsState             of FillHiddenColsState
-    //
-    | InsertFileNames                       of fileNameList:string list
-    // Show Details to selected BuildingBlock
-    | GetSelectedBuildingBlockTerms
-    //
-    | CreatePointerJson
-    //
-    // Development
-    | TryExcel
-    | TryExcel2
-    //| ExcelSubscriptionMsg          of OfficeInterop.Types.Subscription.Msg
-
 module TermSearch =
 
     type Msg =
@@ -66,14 +26,15 @@ module TermSearch =
         | GetAllTermsByParentTermResponse       of DbDomain.Term []
 
 module AdvancedSearch =
+
     type Msg =
         // Client
         | ResetAdvancedSearchState
         | ResetAdvancedSearchOptions
-        | UpdateAdvancedTermSearchSubpage   of AdvancedTermSearchSubpages
+        | UpdateAdvancedTermSearchSubpage   of AdvancedSearch.AdvancedSearchSubpages
         | ToggleModal                       of string
         | ToggleOntologyDropdown
-        | UpdateAdvancedTermSearchOptions   of AdvancedTermSearchOptions
+        | UpdateAdvancedTermSearchOptions   of AdvancedSearch.AdvancedSearchOptions
         | OntologySuggestionUsed            of DbDomain.Ontology option
         | ChangePageinationIndex            of int
         // Server
@@ -94,7 +55,7 @@ type ApiRequestMsg =
     | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
     | GetNewBuildingBlockNameSuggestions        of string
     | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
-    | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
+    | GetNewAdvancedTermSearchResults           of AdvancedSearch.AdvancedSearchOptions
     | FetchAllOntologies
     /// TermSearchable [] is created by officeInterop and passed to server for db search.
     | SearchForInsertTermsRequest              of TermSearchable []
@@ -147,6 +108,7 @@ module BuildingBlock =
     | ToggleBuildingBlockHasUnit
 
 module Validation =
+
     type Msg =
         // Client
         | UpdateDisplayedOptionsId of int option
@@ -250,7 +212,7 @@ type Model = {
     AdvancedSearchState     : AdvancedSearch.Model
 
     ///Use this in the future to model excel stuff like table data
-    ExcelState              : ExcelState
+    ExcelState              : OfficeInterop.Model
 
     ///Use this to log Api calls and maybe handle them better
     ApiState                : ApiState
@@ -280,7 +242,7 @@ type Model = {
     XLSXByteArray               : byte []
     XLSXJSONResult              : string
 } with
-    member this.updateByExcelState (s:ExcelState) =
+    member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
 
 and Msg =
@@ -290,7 +252,7 @@ and Msg =
     | Dev                   of DevMsg
     | TermSearchMsg         of TermSearch.Msg
     | AdvancedSearchMsg     of AdvancedSearch.Msg
-    | ExcelInterop          of ExcelInteropMsg
+    | OfficeInteropMsg      of OfficeInterop.Msg
     | StyleChange           of StyleChangeMsg
     | PersistentStorage     of PersistentStorageMsg
     | FilePickerMsg         of FilePicker.Msg
@@ -335,7 +297,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
         TermSearchState             = TermSearch.Model          .init ()
         AdvancedSearchState         = AdvancedSearch.Model      .init ()
-        ExcelState                  = ExcelState                .init ()
+        ExcelState                  = OfficeInterop.Model       .init ()
         ApiState                    = ApiState                  .init ()
         FilePickerState             = FilePicker.Model          .init ()
         AddBuildingBlockState       = BuildingBlock.Model       .init ()

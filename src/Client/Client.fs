@@ -38,7 +38,7 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
             Cmd.OfPromise.either
                 initializeAddIn
                 ()
-                (fun x -> (x.host.ToString(),x.platform.ToString()) |> Initialized |> ExcelInterop )
+                (fun x -> (x.host.ToString(),x.platform.ToString()) |> OfficeInterop.Initialized |> OfficeInteropMsg )
                 (fun x -> x |> GenericError |> Dev)
         ]
     model, initialCmd

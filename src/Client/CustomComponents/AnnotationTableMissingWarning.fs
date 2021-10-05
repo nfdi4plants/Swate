@@ -22,7 +22,7 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
     ] [
         Notification.delete [ Props [
             OnClick (fun e ->
-                AnnotationTableExists (Shared.OfficeInteropTypes.TryFindAnnoTableResult.Success "Remove Warning Notification") |> ExcelInterop |> dispatch
+                OfficeInterop.AnnotationTableExists (Shared.OfficeInteropTypes.TryFindAnnoTableResult.Success "Remove Warning Notification") |> OfficeInteropMsg |> dispatch
             )
         ]] [ ]
         Heading.h5 [] [str "Warning: No Annotation table found in worksheet"]
@@ -34,6 +34,6 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
                 model.SiteStyleState.ColorMode
                 model.SiteStyleState.IsDarkMode
                 "create annotation table"
-                (fun _ -> CreateAnnotationTable model.SiteStyleState.IsDarkMode |> ExcelInterop |> dispatch )
+                (fun _ -> OfficeInterop.CreateAnnotationTable model.SiteStyleState.IsDarkMode |> OfficeInteropMsg |> dispatch )
         ]
     ]

@@ -1,35 +1,37 @@
-module Shared.URLs
+namespace Shared
 
-[<LiteralAttribute>]
-let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
+module URLs =
 
-/// accession string needs to have format: PO:0007131
-let termAccessionUrlOfAccessionStr (accessionStr:string) =
-    let replaced = accessionStr.Replace(":","_")
-    TermAccessionBaseUrl + replaced
+    [<LiteralAttribute>]
+    let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
 
-[<LiteralAttribute>]
-let Nfdi4psoOntologyUrl = @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"
+    /// accession string needs to have format: PO:0007131
+    let termAccessionUrlOfAccessionStr (accessionStr:string) =
+        let replaced = accessionStr.Replace(":","_")
+        TermAccessionBaseUrl + replaced
 
-[<LiteralAttribute>]
-let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
+    [<LiteralAttribute>]
+    let Nfdi4psoOntologyUrl = @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"
 
-[<LiteralAttribute>]
-let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate/wiki"
+    [<LiteralAttribute>]
+    let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
-[<LiteralAttribute>]
-let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
+    [<LiteralAttribute>]
+    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate/wiki"
 
-/// This will only be needed as long there is no documentation on where to find all api docs.
-/// As soon as that link exists it will replace DocsApiUrl and DocsApiUrl2
-[<LiteralAttribute>]
-let DocsApiUrl2 = @"/api/IServiceAPIv1/docs"
+    [<LiteralAttribute>]
+    let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
 
-[<LiteralAttribute>]
-let CSBTwitterUrl = @"https://twitter.com/cs_biology"
+    /// This will only be needed as long there is no documentation on where to find all api docs.
+    /// As soon as that link exists it will replace DocsApiUrl and DocsApiUrl2
+    [<LiteralAttribute>]
+    let DocsApiUrl2 = @"/api/IServiceAPIv1/docs"
 
-[<LiteralAttribute>]
-let NFDITwitterUrl = @"https://twitter.com/nfdi4plants"
+    [<LiteralAttribute>]
+    let CSBTwitterUrl = @"https://twitter.com/cs_biology"
 
-[<LiteralAttribute>]
-let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
+    [<LiteralAttribute>]
+    let NFDITwitterUrl = @"https://twitter.com/nfdi4plants"
+
+    [<LiteralAttribute>]
+    let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"

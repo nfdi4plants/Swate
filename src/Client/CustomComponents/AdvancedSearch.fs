@@ -21,8 +21,8 @@ let update (advancedTermSearchMsg: AdvancedSearch.Msg) (currentState:AdvancedSea
     | ResetAdvancedSearchOptions ->
         let nextState = {
             currentState with
-                AdvancedSearchOptions = AdvancedTermSearchOptions.init()
-                AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.InputFormSubpage
+                AdvancedSearchOptions = AdvancedSearchOptions.init()
+                AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage
         }
 
         nextState,Cmd.none
@@ -81,7 +81,7 @@ let update (advancedTermSearchMsg: AdvancedSearch.Msg) (currentState:AdvancedSea
 
         let nextState = {
             currentState with
-                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.ResultsSubpage
+                AdvancedTermSearchSubpage       = AdvancedSearchSubpages.ResultsSubpage
                 HasAdvancedSearchResultsLoading = true
             
         }
@@ -104,7 +104,7 @@ let update (advancedTermSearchMsg: AdvancedSearch.Msg) (currentState:AdvancedSea
         let nextState = {
             currentState with
                 AdvancedSearchTermResults       = results
-                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.ResultsSubpage
+                AdvancedTermSearchSubpage       = AdvancedSearchSubpages.ResultsSubpage
                 HasAdvancedSearchResultsLoading = false
         }
 
@@ -129,7 +129,7 @@ let createLinkOfAccession (accession:string) =
         str accession
     ]
 
-let isValidAdancedSearchOptions (opt:AdvancedTermSearchOptions) =
+let isValidAdancedSearchOptions (opt:AdvancedSearchOptions) =
     ((
         opt.SearchTermName.Length
         + opt.SearchTermDefinition.Length
@@ -333,10 +333,10 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
         div [
             Style [Margin "1rem"]
         ][
-            Button.buttonComponent model.SiteStyleState.ColorMode true "Change search options" (fun _ -> UpdateAdvancedTermSearchSubpage AdvancedTermSearchSubpages.InputFormSubpage |> AdvancedSearchMsg |> dispatch)
+            Button.buttonComponent model.SiteStyleState.ColorMode true "Change search options" (fun _ -> UpdateAdvancedTermSearchSubpage AdvancedSearchSubpages.InputFormSubpage |> AdvancedSearchMsg |> dispatch)
         ]
         Label.label [Label.Props [colorControl model.SiteStyleState.ColorMode]] [str "Results:"]
-        if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.ResultsSubpage then
+        if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.ResultsSubpage then
             if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
                 div [
                     Style [Width "100%"; Display DisplayOptions.Flex; JustifyContent "center"]
@@ -352,7 +352,7 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
                         dispatch
                         /// The following line defines which message is executed onClick on one of the terms in the result table.
                         ((fun t ->
-                            UpdateAdvancedTermSearchSubpage <| AdvancedTermSearchSubpages.SelectedResultSubpage t) >> AdvancedSearchMsg
+                            UpdateAdvancedTermSearchSubpage <| AdvancedSearchSubpages.SelectedResultSubpage t) >> AdvancedSearchMsg
                         )
                     )
     ]
@@ -399,11 +399,11 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
             ]
             Modal.Card.body [Props [colorControl model.SiteStyleState.ColorMode]] [
                 match model.AdvancedSearchState.AdvancedTermSearchSubpage with
-                | AdvancedTermSearchSubpages.InputFormSubpage ->
+                | AdvancedSearchSubpages.InputFormSubpage ->
                     advancedTermSearchComponent model dispatch
-                | AdvancedTermSearchSubpages.ResultsSubpage ->
+                | AdvancedSearchSubpages.ResultsSubpage ->
                     advancedSearchResultTable model dispatch
-                | AdvancedTermSearchSubpages.SelectedResultSubpage r ->
+                | AdvancedSearchSubpages.SelectedResultSubpage r ->
                     advancedSearchSelectedResultDisplay model r
                 //else
                 //    match model.AdvancedSearchState.SelectedResult with
@@ -442,7 +442,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                         ]
                         Level.item [][
                             match model.AdvancedSearchState.AdvancedTermSearchSubpage with
-                            | AdvancedTermSearchSubpages.SelectedResultSubpage sth ->
+                            | AdvancedSearchSubpages.SelectedResultSubpage sth ->
                                 Button.button   [
                                     let hasText = model.AdvancedSearchState.SelectedResult.IsSome
                                     if hasText then

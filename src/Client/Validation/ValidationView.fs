@@ -339,7 +339,7 @@ let validationElements (model:Model) dispatch =
                     let header = Browser.Dom.document.getElementById("TableRepresentationInfoHeader")
                     header?style?transition <- "0.3s ease"
                     header?style?opacity <- 0
-                    WriteTableValidationToXml (model.ValidationState.TableValidationScheme, model.PersistentStorageState.AppVersion) |> ExcelInterop |> dispatch
+                    OfficeInterop.WriteTableValidationToXml (model.ValidationState.TableValidationScheme, model.PersistentStorageState.AppVersion) |> OfficeInteropMsg |> dispatch
                 )
                 Button.Props [Tooltip.dataTooltip "Write checklist info to excel worksheet."]
                 Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
@@ -364,7 +364,7 @@ let validationComponent model dispatch =
         Button.a [
             Button.Color Color.IsInfo
             Button.IsFullWidth
-            Button.OnClick (fun e -> GetTableValidationXml |> ExcelInterop |> dispatch )
+            Button.OnClick (fun e -> OfficeInterop.GetTableValidationXml |> OfficeInteropMsg |> dispatch )
             Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
             Button.Props [Style [Margin "1rem 0"]; Tooltip.dataTooltip "Get checklist info for currently shown annotation table."]
         ] [

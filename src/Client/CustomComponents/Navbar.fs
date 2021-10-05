@@ -31,14 +31,14 @@ let shortCutIconList model =
                 Fa.span [Fa.Solid.Plus][]
                 Fa.span [Fa.Solid.Table][]
             ]
-            (CreateAnnotationTable (model.SiteStyleState.IsDarkMode) |> ExcelInterop)
+            (OfficeInterop.CreateAnnotationTable (model.SiteStyleState.IsDarkMode) |> OfficeInteropMsg)
             "Table"
         ShortCutIcon.create
             "Autoformat Table"
             [
                 Fa.i [Fa.Solid.SyncAlt][]
             ]
-            (AutoFitTable |> ExcelInterop)
+            (OfficeInterop.AutoFitTable |> OfficeInteropMsg)
             "Formatting"
         ShortCutIcon.create
             "Update Ontology Terms"
@@ -47,7 +47,7 @@ let shortCutIconList model =
                 span [][str model.ExcelState.FillHiddenColsStateStore.toReadableString]
                 Fa.span [Fa.Solid.Pen][]
             ]
-            (FillHiddenColsRequest |> ExcelInterop)
+            (OfficeInterop.FillHiddenColsRequest |> OfficeInteropMsg)
             "Formatting"
         ShortCutIcon.create
             "Remove Building Block"
@@ -55,7 +55,7 @@ let shortCutIconList model =
                 Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]][]
                 Fa.span [Fa.Solid.Columns][]
             ]
-            (RemoveAnnotationBlock |> ExcelInterop)
+            (OfficeInterop.RemoveAnnotationBlock |> OfficeInteropMsg)
             "BuildingBlock"
         ShortCutIcon.create
             "Get Building Block Information"
@@ -64,7 +64,7 @@ let shortCutIconList model =
                 span [][str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
                 Fa.span [Fa.Solid.Columns][]
             ]
-            (GetSelectedBuildingBlockTerms |> ExcelInterop)
+            (OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg)
             "BuildingBlock"
     ]
     

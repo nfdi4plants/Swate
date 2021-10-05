@@ -18,6 +18,8 @@ open Browser.Types
 open Fulma.Extensions.Wikiki
 
 open Shared
+
+open OfficeInterop
 open ISADotNetHelpers
 open Protocol
 
@@ -286,9 +288,7 @@ let toProtocolSearchElement (model:Model) dispatch =
         Button.Props [Style [Margin "1rem 0"]]
     ] [str "Browse protocol template database"]
 
-open OfficeInterop
-
-let addFromDBToTableButton (model:Model) dispatch =
+let addFromDBToTableButton (model:Messages.Model) dispatch =
     Columns.columns [Columns.IsMobile][
         Column.column [][
             Field.div [] [
@@ -308,7 +308,7 @@ let addFromDBToTableButton (model:Model) dispatch =
                             //let validation =
                             //    model.ProtocolInsertState.ValidationXml.Value |> Some
                             ProtocolIncreaseTimesUsed p.Name |> ProtocolMsg |> dispatch
-                            AddAnnotationBlocks p.TemplateBuildingBlocks |> ExcelInterop |> dispatch
+                            AddAnnotationBlocks p.TemplateBuildingBlocks |> OfficeInteropMsg |> dispatch
                         )
                     ] [
                         str "Insert protocol annotation blocks"
@@ -327,7 +327,7 @@ let addFromDBToTableButton (model:Model) dispatch =
             ]
     ]
 
-let showDatabaseProtocolTemplate (model:Model) dispatch =
+let showDatabaseProtocolTemplate (model:Messages.Model) dispatch =
     div [ Style [
         BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
         Padding "0.25rem 1rem"
@@ -371,7 +371,7 @@ let showDatabaseProtocolTemplate (model:Model) dispatch =
     ]
 
 
-let fileUploadViewComponent (model:Model) dispatch =
+let fileUploadViewComponent (model:Messages.Model) dispatch =
     let uploadId = "UploadFiles_ElementId"
     form [
         OnSubmit (fun e -> e.preventDefault())

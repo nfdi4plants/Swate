@@ -39,7 +39,7 @@ let createPointerJsonButton (model:Model) dispatch =
             Button.a [
                 Button.Color IsInfo
                 Button.IsFullWidth
-                Button.OnClick (fun e -> CreatePointerJson |> ExcelInterop |> dispatch)
+                Button.OnClick (fun e -> OfficeInterop.CreatePointerJson |> OfficeInteropMsg |> dispatch)
             ][
                 str "Create pointer json"
             ]

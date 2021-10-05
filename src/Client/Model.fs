@@ -63,23 +63,6 @@ type TermSearchMode =
     | Simple
     | Advanced
 
-type AdvancedTermSearchOptions = {
-    Ontology                : DbDomain.Ontology option
-    SearchTermName          : string
-    MustContainName         : string 
-    SearchTermDefinition    : string
-    MustContainDefinition   : string
-    KeepObsolete            : bool
-    } with
-        static member init() = {
-            Ontology                = None
-            SearchTermName          = ""
-            MustContainName         = "" 
-            SearchTermDefinition    = ""
-            MustContainDefinition   = ""
-            KeepObsolete            = true
-        }
-
 module TermSearch =
 
     type Model = {
@@ -106,21 +89,38 @@ module TermSearch =
             ShowSuggestions             = false
         }
 
-type AdvancedTermSearchSubpages =
-| InputFormSubpage
-| ResultsSubpage
-| SelectedResultSubpage of DbDomain.Term
-
 module AdvancedSearch =
-    
+
+    type AdvancedSearchOptions = {
+        Ontology                : DbDomain.Ontology option
+        SearchTermName          : string
+        MustContainName         : string 
+        SearchTermDefinition    : string
+        MustContainDefinition   : string
+        KeepObsolete            : bool
+        } with
+            static member init() = {
+                Ontology                = None
+                SearchTermName          = ""
+                MustContainName         = "" 
+                SearchTermDefinition    = ""
+                MustContainDefinition   = ""
+                KeepObsolete            = true
+            }
+
+    type AdvancedSearchSubpages =
+    | InputFormSubpage
+    | ResultsSubpage
+    | SelectedResultSubpage of DbDomain.Term
+
     type Model = {
         ModalId                             : string
         ///
-        AdvancedSearchOptions               : AdvancedTermSearchOptions
+        AdvancedSearchOptions               : AdvancedSearchOptions
         AdvancedSearchTermResults           : DbDomain.Term []
         SelectedResult                      : DbDomain.Term option
         // Client visual design
-        AdvancedTermSearchSubpage           : AdvancedTermSearchSubpages
+        AdvancedTermSearchSubpage           : AdvancedSearchSubpages
         HasModalVisible                     : bool
         HasOntologyDropdownVisible          : bool
         HasAdvancedSearchResultsLoading     : bool
@@ -130,7 +130,7 @@ module AdvancedSearch =
             ModalId                             = ""
             HasModalVisible                     = false
             HasOntologyDropdownVisible          = false
-            AdvancedSearchOptions               = AdvancedTermSearchOptions.init ()
+            AdvancedSearchOptions               = AdvancedSearchOptions.init ()
             AdvancedSearchTermResults           = [||]
             HasAdvancedSearchResultsLoading     = false
             AdvancedTermSearchSubpage           = InputFormSubpage
@@ -171,33 +171,6 @@ type PersistentStorageState = {
         AppVersion              = ""
         HasOntologiesLoaded     = false
         PageEntry               = if pageEntry.IsSome then pageEntry.Value else SwateEntry.Core
-    }
-
-type FillHiddenColsState =
-| Inactive
-| ExcelCheckHiddenCols
-| ServerSearchDatabase
-| ExcelWriteFoundTerms
-    member this.toReadableString =
-        match this with
-        | Inactive          -> ""
-        | ExcelCheckHiddenCols  -> "Check Hidden Cols"
-        | ServerSearchDatabase  -> "Search Database"
-        | ExcelWriteFoundTerms  -> "Write Terms"
-
-type ExcelState = {
-    Host                        : string
-    Platform                    : string
-    HasAnnotationTable          : bool
-    TablesHaveAutoEditHandler   : bool
-    FillHiddenColsStateStore    : FillHiddenColsState
-} with
-    static member init () = {
-        Host                = ""
-        Platform            = ""
-        HasAnnotationTable  = false
-        TablesHaveAutoEditHandler = false
-        FillHiddenColsStateStore = Inactive
     }
 
 type ApiCallStatus =

@@ -322,7 +322,7 @@ let autocompleteTermSearchComponentOfParentOntology
                     Input.Props [
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
-                            GetParentTerm |> ExcelInterop |> dispatch
+                            OfficeInterop.GetParentTerm |> OfficeInteropMsg |> dispatch
                             let el = Browser.Dom.document.getElementById autocompleteParams.InputId
                             el.focus()
                         )

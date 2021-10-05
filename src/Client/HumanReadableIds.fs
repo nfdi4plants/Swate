@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 type HRI =
     abstract member random : unit -> string
 
-
 // https://www.npmjs.com/package/human-readable-ids
 let hri : HRI = (importDefault "human-readable-ids")?hri
 
