@@ -32,12 +32,6 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
                 FileNames = newFileNames
         }
         nextState, Cmd.none
-    | UpdateDNDDropped isDropped ->
-        let nextState = {
-            currentState with
-                DNDDropped = isDropped
-        }
-        nextState, Cmd.none
 
 
 [<Literal>]
@@ -188,7 +182,6 @@ let dragAndDropElement (model:Messages.Model) (dispatch: Messages.Msg -> unit) i
         Draggable true
         OnDragStart (fun eve ->
             dropped <- false
-            UpdateDNDDropped false |> FilePickerMsg |> dispatch
             eve.stopPropagation()
             let offset = child().getBoundingClientRect()
             let windowScrollY = Browser.Dom.window.scrollY
@@ -248,14 +241,12 @@ let dragAndDropElement (model:Messages.Model) (dispatch: Messages.Msg -> unit) i
                     clone?style?top         <- sprintf "%.0fpx" coordinates.Value.y
                     coordinates <- None
                     dropped <- true
-                    UpdateDNDDropped true |> FilePickerMsg |> dispatch
             ()
         )
         OnDrop (fun eve ->
             //eve.stopPropagation()
             eve.preventDefault()
             dropped <- true
-            UpdateDNDDropped true |> FilePickerMsg |> dispatch
             parent()?style?backgroundColor  <- model.SiteStyleState.ColorMode.BodyBackground
             parent()?style?borderBottom     <- "0px solid darkgrey"
 
@@ -356,7 +347,6 @@ let placeOnTopElement model dispatch =
             eve.preventDefault()
             eve.target?style?borderBottom <- "2px solid white" //(sprintf "2px solid %s" ExcelColors.colorfullMode.BodyBackground)
             dropped <- true
-            UpdateDNDDropped true |> FilePickerMsg |> dispatch
             let prevId      = eve.dataTransfer.getData("text")
             let prevWrapper = Browser.Dom.document.getElementById(createWrapperId prevId)
             let prevClone   = Browser.Dom.document.getElementById(createCloneId prevId)

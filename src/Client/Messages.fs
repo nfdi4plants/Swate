@@ -129,8 +129,6 @@ module FilePicker =
     type Msg =
         | LoadNewFiles              of string list
         | UpdateFileNames           of newFileNames:(int*string) list
-        ///
-        | UpdateDNDDropped          of isDropped:bool
 
 module BuildingBlock =
 
