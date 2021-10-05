@@ -1,4 +1,4 @@
-module ActivityLogView
+module ActivityLog
 
 open Fulma
 open Fable

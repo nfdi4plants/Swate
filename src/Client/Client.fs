@@ -97,7 +97,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.ActivityLog ->
         BaseView.baseViewMainElement model dispatch [
-            ActivityLogView.activityLogComponent model dispatch
+            ActivityLog.activityLogComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]

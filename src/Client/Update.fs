@@ -420,108 +420,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
     //    printfn "Hit currently non existing message"
     //    currentState, Cmd.none
 
-let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (currentState:AdvancedSearchState) : AdvancedSearchState * Cmd<Msg> =
-    match advancedTermSearchMsg with
-    | ResetAdvancedSearchOptions ->
-        let nextState = {
-            currentState with
-                AdvancedSearchOptions = AdvancedTermSearchOptions.init()
-                AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.InputFormSubpage
-        }
-
-        nextState,Cmd.none
-    | UpdateAdvancedTermSearchSubpage subpage ->
-        let tOpt =
-            match subpage with
-            |SelectedResultSubpage t   -> Some t
-            | _                 -> None
-        let nextState = {
-            currentState with
-                SelectedResult = tOpt
-                AdvancedTermSearchSubpage = subpage
-        }
-        nextState, Cmd.none
-
-    | ToggleModal modalId ->
-        let nextState = {
-            currentState with
-                ModalId = modalId
-                HasModalVisible = (not currentState.HasModalVisible)
-        }
-
-        nextState,Cmd.none
-
-    | ToggleOntologyDropdown ->
-        let nextState = {
-            currentState with
-                HasOntologyDropdownVisible = (not currentState.HasOntologyDropdownVisible)
-        }
-
-        nextState,Cmd.none
-
-    | OntologySuggestionUsed suggestion ->
-
-        let nextAdvancedSearchOptions = {
-            currentState.AdvancedSearchOptions with
-                Ontology = suggestion
-        }
-
-        let nextState = {
-            currentState with
-                AdvancedSearchOptions   = nextAdvancedSearchOptions
-            }
-        nextState, Cmd.ofMsg (AdvancedSearch ToggleOntologyDropdown)
-
-    | UpdateAdvancedTermSearchOptions opts ->
-
-        let nextState = {
-            currentState with
-                AdvancedSearchOptions = opts
-        }
-
-        nextState,Cmd.none
-
-    | StartAdvancedSearch ->
-
-        let nextState = {
-            currentState with
-                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.ResultsSubpage
-                HasAdvancedSearchResultsLoading = true
-            
-        }
-
-        let nextCmd =
-            currentState.AdvancedSearchOptions
-            |> GetNewAdvancedTermSearchResults
-            |> Request
-            |> Api
-            |> Cmd.ofMsg
-
-        nextState,nextCmd
-
-    | ResetAdvancedSearchState ->
-        let nextState = AdvancedSearchState.init()
-
-        nextState,Cmd.none
-
-    | NewAdvancedSearchResults results ->
-        let nextState = {
-            currentState with
-                AdvancedSearchTermResults       = results
-                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.ResultsSubpage
-                HasAdvancedSearchResultsLoading = false
-        }
-
-        nextState,Cmd.none
-
-    | ChangePageinationIndex index ->
-        let nextState = {
-            currentState with
-                AdvancedSearchResultPageinationIndex = index
-        }
-
-        nextState,Cmd.none
-
 let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> =
     match devMsg with
     | GenericLog (level,logText) ->
@@ -840,7 +738,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         let cmds = Cmd.batch [
             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            results |> NewAdvancedSearchResults |> AdvancedSearch |> Cmd.ofMsg
+            results |> AdvancedSearch.NewAdvancedSearchResults |> AdvancedSearchMsg |> Cmd.ofMsg
         ]
 
         nextState, cmds
@@ -1360,10 +1258,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         }
         nextModel,nextCmd
 
-    | AdvancedSearch advancedSearchMsg ->
+    | AdvancedSearchMsg advancedSearchMsg ->
         let nextAdvancedSearchState,nextCmd =
             currentModel.AdvancedSearchState
-            |> handleAdvancedTermSearchMsg advancedSearchMsg
+            |> AdvancedSearch.update advancedSearchMsg
 
         let nextModel = {
             currentModel with

@@ -25,7 +25,7 @@ let createPaginationLinkFromIndex (dispatch:Msg->unit) (pageIndex:int) (currentP
             Style [
                 if isActve then Color "white"; BackgroundColor NFDIColors.Mint.Base; BorderColor NFDIColors.Mint.Base;
             ]
-            OnClick (fun _ -> pageIndex |> ChangePageinationIndex |> AdvancedSearch |> dispatch)
+            OnClick (fun _ -> pageIndex |> AdvancedSearch.ChangePageinationIndex |> AdvancedSearchMsg |> dispatch)
         ]
     ] [
         span [] [str (string (pageIndex+1))]
@@ -57,7 +57,7 @@ let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elements:Reac
             Pagination.pagination [Pagination.IsCentered] [
                 Pagination.previous [
                     Props [
-                        OnClick (fun _ -> (max (currentPageinationIndex - 1) 0) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )
+                        OnClick (fun _ -> (max (currentPageinationIndex - 1) 0) |> AdvancedSearch.ChangePageinationIndex |> AdvancedSearchMsg |> dispatch )
                         Disabled (currentPageinationIndex = 0)
                     ]
                 ] [
@@ -72,7 +72,7 @@ let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elements:Reac
                 ]
                 Pagination.next [
                     Props [
-                        OnClick (fun _ -> (min (currentPageinationIndex + 1) (len - 1)) |> ChangePageinationIndex |> AdvancedSearch |> dispatch )
+                        OnClick (fun _ -> (min (currentPageinationIndex + 1) (len - 1)) |> AdvancedSearch.ChangePageinationIndex |> AdvancedSearchMsg |> dispatch )
                         Disabled (currentPageinationIndex = len - 1)
                     ]
                 ] [str "Next"]

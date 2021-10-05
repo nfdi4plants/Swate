@@ -111,30 +111,32 @@ type AdvancedTermSearchSubpages =
 | ResultsSubpage
 | SelectedResultSubpage of DbDomain.Term
 
-type AdvancedSearchState = {
-    ModalId                             : string
-    ///
-    AdvancedSearchOptions               : AdvancedTermSearchOptions
-    AdvancedSearchTermResults           : DbDomain.Term []
-    SelectedResult                      : DbDomain.Term option
-    // Client visual design
-    AdvancedTermSearchSubpage           : AdvancedTermSearchSubpages
-    HasModalVisible                     : bool
-    HasOntologyDropdownVisible          : bool
-    HasAdvancedSearchResultsLoading     : bool
-    AdvancedSearchResultPageinationIndex: int
-} with
-    static member init () = {
-        ModalId                             = ""
-        HasModalVisible                     = false
-        HasOntologyDropdownVisible          = false
-        AdvancedSearchOptions               = AdvancedTermSearchOptions.init ()
-        AdvancedSearchTermResults           = [||]
-        HasAdvancedSearchResultsLoading     = false
-        AdvancedTermSearchSubpage           = InputFormSubpage
-        AdvancedSearchResultPageinationIndex= 0
-        SelectedResult                      = None
-    }
+module AdvancedSearch =
+    
+    type Model = {
+        ModalId                             : string
+        ///
+        AdvancedSearchOptions               : AdvancedTermSearchOptions
+        AdvancedSearchTermResults           : DbDomain.Term []
+        SelectedResult                      : DbDomain.Term option
+        // Client visual design
+        AdvancedTermSearchSubpage           : AdvancedTermSearchSubpages
+        HasModalVisible                     : bool
+        HasOntologyDropdownVisible          : bool
+        HasAdvancedSearchResultsLoading     : bool
+        AdvancedSearchResultPageinationIndex: int
+    } with
+        static member init () = {
+            ModalId                             = ""
+            HasModalVisible                     = false
+            HasOntologyDropdownVisible          = false
+            AdvancedSearchOptions               = AdvancedTermSearchOptions.init ()
+            AdvancedSearchTermResults           = [||]
+            HasAdvancedSearchResultsLoading     = false
+            AdvancedTermSearchSubpage           = InputFormSubpage
+            AdvancedSearchResultPageinationIndex= 0
+            SelectedResult                      = None
+        }
 
 type SiteStyleState = {
     QuickAcessIconsShown : bool

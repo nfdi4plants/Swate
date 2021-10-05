@@ -20,7 +20,6 @@ let rowMajorOfTemplateJson jsonString =
 
 type OntologyAnnotation with
     member this.toTermMinimal : TermMinimal option =
-        printfn $"{this.TermAccessionNumber}"
         match this.Name, Option.bind Regex.parseTermAccession this.TermAccessionNumber with
         | Some name, Some tan   -> TermMinimal.create (AnnotationValue.toString name) tan |> Some
         | Some name, None       -> TermMinimal.create (AnnotationValue.toString name) "" |> Some

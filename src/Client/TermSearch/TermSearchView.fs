@@ -150,7 +150,7 @@ let simpleSearchComponent model dispatch =
             ] [ str "Use related term directed search." ]
 
             Help.help [ Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]] ] [
-                a [OnClick (fun _ -> ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearch |> dispatch)] [
+                a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearchMsg |> dispatch)] [
                     str "Use advanced search"
                 ] 
             ]

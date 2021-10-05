@@ -65,20 +65,21 @@ module TermSearch =
         | GetAllTermsByParentTermRequest        of TermMinimal 
         | GetAllTermsByParentTermResponse       of DbDomain.Term []
 
-type AdvancedSearchMsg =
-    // Client
-    | ResetAdvancedSearchState
-    | ResetAdvancedSearchOptions
-    | UpdateAdvancedTermSearchSubpage   of AdvancedTermSearchSubpages
-    | ToggleModal                       of string
-    | ToggleOntologyDropdown
-    | UpdateAdvancedTermSearchOptions   of AdvancedTermSearchOptions
-    | OntologySuggestionUsed            of DbDomain.Ontology option
-    | ChangePageinationIndex            of int
-    // Server
-    /// Main function. Forward request to Request Api -> Server.
-    | StartAdvancedSearch
-    | NewAdvancedSearchResults          of DbDomain.Term []
+module AdvancedSearch =
+    type Msg =
+        // Client
+        | ResetAdvancedSearchState
+        | ResetAdvancedSearchOptions
+        | UpdateAdvancedTermSearchSubpage   of AdvancedTermSearchSubpages
+        | ToggleModal                       of string
+        | ToggleOntologyDropdown
+        | UpdateAdvancedTermSearchOptions   of AdvancedTermSearchOptions
+        | OntologySuggestionUsed            of DbDomain.Ontology option
+        | ChangePageinationIndex            of int
+        // Server
+        /// Main function. Forward request to Request Api -> Server.
+        | StartAdvancedSearch
+        | NewAdvancedSearchResults          of DbDomain.Term []
 
 type DevMsg =
     | LogTableMetadata
@@ -246,7 +247,7 @@ type Model = {
     ///States regarding term search
     TermSearchState         : TermSearch.Model
 
-    AdvancedSearchState     : AdvancedSearchState
+    AdvancedSearchState     : AdvancedSearch.Model
 
     ///Use this in the future to model excel stuff like table data
     ExcelState              : ExcelState
@@ -288,7 +289,7 @@ and Msg =
     | Api                   of ApiMsg
     | Dev                   of DevMsg
     | TermSearchMsg         of TermSearch.Msg
-    | AdvancedSearch        of AdvancedSearchMsg
+    | AdvancedSearchMsg     of AdvancedSearch.Msg
     | ExcelInterop          of ExcelInteropMsg
     | StyleChange           of StyleChangeMsg
     | PersistentStorage     of PersistentStorageMsg
@@ -333,7 +334,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         DevState                    = DevState                  .init ()
         SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
         TermSearchState             = TermSearch.Model          .init ()
-        AdvancedSearchState         = AdvancedSearchState       .init ()
+        AdvancedSearchState         = AdvancedSearch.Model      .init ()
         ExcelState                  = ExcelState                .init ()
         ApiState                    = ApiState                  .init ()
         FilePickerState             = FilePicker.Model          .init ()
