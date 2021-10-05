@@ -19,7 +19,7 @@ open CustomComponents
 open OfficeInteropTypes
 open Elmish
 
-let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: AddBuildingBlockState) : AddBuildingBlockState * Cmd<Messages.Msg> =
+let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
     match addBuildingBlockMsg with
     | NewBuildingBlockSelected nextBB ->
         let nextState = {

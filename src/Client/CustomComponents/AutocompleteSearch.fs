@@ -60,7 +60,7 @@ type AutocompleteParameters<'SearchResult> = {
     OnAdvancedSearch        : ('SearchResult -> Msg)
 }
 with
-    static member ofTermSearchState (state:TermSearchState) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofTermSearchState (state:TermSearch.Model) : AutocompleteParameters<DbDomain.Term> = {
         ModalId                 = "TermSearch_ID"
         InputId                 = "TermSearchInput_ID"
 
@@ -70,15 +70,15 @@ with
         DropDownIsVisible       = state.ShowSuggestions
         DropDownIsLoading       = state.HasSuggestionsLoading
 
-        OnInputChangeMsg        = (SearchTermTextChange >> TermSearch )
-        OnSuggestionSelect      = ( fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch)
+        OnInputChangeMsg        = (TermSearch.SearchTermTextChange >> TermSearchMsg )
+        OnSuggestionSelect      = ( fun (term:DbDomain.Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch )
+        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg )
     }
 
-    static member ofAddBuildingBlockUnitState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockUnitState (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
         ModalId                 = "UnitSearch_ID"
         InputId                 = "UnitSearchInput_ID"
 
@@ -96,7 +96,7 @@ with
         OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockUnit2State (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockUnit2State (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
         ModalId                 = "Unit2Search_ID"
         InputId                 = "Unit2SearchInput_ID"
 
@@ -114,7 +114,7 @@ with
         OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockState (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
         ModalId                 = "BlockNameSearch_ID"
         InputId                 = "BlockNameSearchInput_ID"
 
@@ -330,7 +330,7 @@ let autocompleteTermSearchComponentOfParentOntology
                             if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.TermSearchText = "" then
                                 let parentOnt = model.TermSearchState.ParentOntology.Value
                                 let (parentOntInfo:TermMinimal) = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
-                                GetAllTermsByParentTermRequest parentOntInfo |> TermSearch |> dispatch
+                                TermSearch.GetAllTermsByParentTermRequest parentOntInfo |> TermSearchMsg |> dispatch
                             else
                                 let v = Browser.Dom.document.getElementById autocompleteParams.InputId
                                 v?value |> autocompleteParams.OnInputChangeMsg |> dispatch

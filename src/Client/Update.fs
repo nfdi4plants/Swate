@@ -214,7 +214,7 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
             Cmd.OfPromise.either
                 OfficeInterop.getParentTerm
                 ()
-                (StoreParentOntologyFromOfficeInterop >> TermSearch)
+                (TermSearch.StoreParentOntologyFromOfficeInterop >> TermSearchMsg)
                 (GenericError >> Dev)
         currentModel, cmd
     //
@@ -419,101 +419,6 @@ let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model
     //| _ ->
     //    printfn "Hit currently non existing message"
     //    currentState, Cmd.none
-        
-let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchState) : TermSearchState * Cmd<Msg> =
-    match termSearchMsg with
-    /// Toggle the search by parent ontology option on/off by clicking on a checkbox
-    | ToggleSearchByParentOntology ->
-
-        let nextState = {
-            currentState with
-                SearchByParentOntology = currentState.SearchByParentOntology |> not
-        }
-
-        nextState, Cmd.none
-
-    | SearchTermTextChange newTerm ->
-
-        let triggerNewSearch =
-            newTerm.Length > 2
-           
-        let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
-            "GetNewTermSuggestions",
-            (
-                if triggerNewSearch then
-                    match currentState.ParentOntology, currentState.SearchByParentOntology with
-                    | Some termMin, true ->
-                        (newTerm,termMin) |> (GetNewTermSuggestionsByParentTerm >> Request >> Api)
-                    | None,_ | _, false ->
-                        newTerm  |> (GetNewTermSuggestions >> Request >> Api)
-                else
-                    DoNothing
-            )
-
-        let nextState = {
-            currentState with
-                TermSearchText = newTerm
-                SelectedTerm = None
-                ShowSuggestions = triggerNewSearch
-                HasSuggestionsLoading = true
-        }
-
-        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
-
-    | TermSuggestionUsed suggestion ->
-
-        let nextState = {
-            TermSearchState.init() with
-                SelectedTerm = Some suggestion
-                TermSearchText = suggestion.Name
-        }
-        nextState, Cmd.none
-
-    | NewSuggestions suggestions ->
-
-        let nextState = {
-            currentState with
-                TermSuggestions         = suggestions
-                ShowSuggestions         = true
-                HasSuggestionsLoading   = false
-        }
-
-        nextState,Cmd.none
-
-    | StoreParentOntologyFromOfficeInterop parentTerm ->
-        let nextState = {
-            currentState with
-                ParentOntology = parentTerm
-        }
-        nextState, Cmd.none
-
-    // Server
-
-    | GetAllTermsByParentTermRequest ontInfo ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.api.getAllTermsByParentTerm
-                ontInfo
-                (GetAllTermsByParentTermResponse >> TermSearch)
-                (GenericError >> Dev)
-
-        let nextState = {
-            currentState with
-                HasSuggestionsLoading = true
-        }
-
-        nextState, cmd
-
-    | GetAllTermsByParentTermResponse terms ->
-        let nextState = {
-            currentState with
-                TermSuggestions = terms
-                HasSuggestionsLoading = false
-                ShowSuggestions = true
-                
-        }
-        nextState, Cmd.none
 
 let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (currentState:AdvancedSearchState) : AdvancedSearchState * Cmd<Msg> =
     match advancedTermSearchMsg with
@@ -904,7 +809,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
     | TermSuggestionResponse suggestions ->
 
         handleTermSuggestionResponse
-            (NewSuggestions >> TermSearch)
+            (TermSearch.NewSuggestions >> TermSearchMsg)
             suggestions
 
     | UnitTermSuggestionResponse (suggestions,relUnit) ->
@@ -1615,10 +1520,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             |> handleExcelInteropMsg excelMsg
         nextModel,nextCmd
 
-    | TermSearch termSearchMsg ->
+    | TermSearchMsg termSearchMsg ->
         let nextTermSearchState,nextCmd =
             currentModel.TermSearchState
-            |> handleTermSearchMsg termSearchMsg
+            |> TermSearch.update termSearchMsg
 
         let nextModel = {
             currentModel with

@@ -80,29 +80,31 @@ type AdvancedTermSearchOptions = {
             KeepObsolete            = true
         }
 
-type TermSearchState = {
+module TermSearch =
 
-    TermSearchText          : string
+    type Model = {
 
-    SelectedTerm            : DbDomain.Term option
-    TermSuggestions         : DbDomain.Term []
+        TermSearchText          : string
 
-    ParentOntology          : TermMinimal option
-    SearchByParentOntology  : bool
+        SelectedTerm            : DbDomain.Term option
+        TermSuggestions         : DbDomain.Term []
 
-    HasSuggestionsLoading   : bool
-    ShowSuggestions         : bool
+        ParentOntology          : TermMinimal option
+        SearchByParentOntology  : bool
 
-} with
-    static member init () = {
-        TermSearchText              = ""
-        SelectedTerm                = None
-        TermSuggestions             = [||]
-        ParentOntology              = None
-        SearchByParentOntology      = true
-        HasSuggestionsLoading       = false
-        ShowSuggestions             = false
-    }
+        HasSuggestionsLoading   : bool
+        ShowSuggestions         : bool
+
+    } with
+        static member init () = {
+            TermSearchText              = ""
+            SelectedTerm                = None
+            TermSuggestions             = [||]
+            ParentOntology              = None
+            SearchByParentOntology      = true
+            HasSuggestionsLoading       = false
+            ShowSuggestions             = false
+        }
 
 type AdvancedTermSearchSubpages =
 | InputFormSubpage
@@ -250,55 +252,56 @@ type FilePickerState = {
 
 open OfficeInteropTypes
 
-type AddBuildingBlockState = {
-    CurrentBuildingBlock                    : BuildingBlockNamePrePrint
+module BuildingBlock =
+    type Model = {
+        CurrentBuildingBlock                    : BuildingBlockNamePrePrint
 
-    BuildingBlockSelectedTerm               : DbDomain.Term option
-    BuildingBlockNameSuggestions            : DbDomain.Term []
-    ShowBuildingBlockSelection              : bool
-    BuildingBlockHasUnit                    : bool
-    ShowBuildingBlockTermSuggestions        : bool
-    HasBuildingBlockTermSuggestionsLoading  : bool
-
-    /// This section is used to add a unit directly to a freshly created building block.
-    UnitTermSearchText                      : string
-    UnitSelectedTerm                        : DbDomain.Term option
-    UnitTermSuggestions                     : DbDomain.Term []
-    HasUnitTermSuggestionsLoading           : bool
-    ShowUnitTermSuggestions                 : bool
-
-    /// This section is used to add a unit directly to an already existing building block
-    Unit2TermSearchText                     : string
-    Unit2SelectedTerm                       : DbDomain.Term option
-    Unit2TermSuggestions                    : DbDomain.Term []
-    HasUnit2TermSuggestionsLoading          : bool
-    ShowUnit2TermSuggestions                : bool
-
-} with
-    static member init () = {
-        ShowBuildingBlockSelection              = false
-
-        CurrentBuildingBlock                    = BuildingBlockNamePrePrint.init BuildingBlockType.Parameter
-        BuildingBlockSelectedTerm               = None
-        BuildingBlockNameSuggestions            = [||]
-        ShowBuildingBlockTermSuggestions        = false
-        HasBuildingBlockTermSuggestionsLoading  = false
-        BuildingBlockHasUnit                    = false
+        BuildingBlockSelectedTerm               : DbDomain.Term option
+        BuildingBlockNameSuggestions            : DbDomain.Term []
+        ShowBuildingBlockSelection              : bool
+        BuildingBlockHasUnit                    : bool
+        ShowBuildingBlockTermSuggestions        : bool
+        HasBuildingBlockTermSuggestionsLoading  : bool
 
         /// This section is used to add a unit directly to a freshly created building block.
-        UnitTermSearchText                      = ""
-        UnitSelectedTerm                        = None
-        UnitTermSuggestions                     = [||]
-        ShowUnitTermSuggestions                 = false
-        HasUnitTermSuggestionsLoading           = false
+        UnitTermSearchText                      : string
+        UnitSelectedTerm                        : DbDomain.Term option
+        UnitTermSuggestions                     : DbDomain.Term []
+        HasUnitTermSuggestionsLoading           : bool
+        ShowUnitTermSuggestions                 : bool
 
         /// This section is used to add a unit directly to an already existing building block
-        Unit2TermSearchText                     = ""
-        Unit2SelectedTerm                       = None
-        Unit2TermSuggestions                    = [||]
-        ShowUnit2TermSuggestions                = false
-        HasUnit2TermSuggestionsLoading          = false
-    }
+        Unit2TermSearchText                     : string
+        Unit2SelectedTerm                       : DbDomain.Term option
+        Unit2TermSuggestions                    : DbDomain.Term []
+        HasUnit2TermSuggestionsLoading          : bool
+        ShowUnit2TermSuggestions                : bool
+
+    } with
+        static member init () = {
+            ShowBuildingBlockSelection              = false
+
+            CurrentBuildingBlock                    = BuildingBlockNamePrePrint.init BuildingBlockType.Parameter
+            BuildingBlockSelectedTerm               = None
+            BuildingBlockNameSuggestions            = [||]
+            ShowBuildingBlockTermSuggestions        = false
+            HasBuildingBlockTermSuggestionsLoading  = false
+            BuildingBlockHasUnit                    = false
+
+            /// This section is used to add a unit directly to a freshly created building block.
+            UnitTermSearchText                      = ""
+            UnitSelectedTerm                        = None
+            UnitTermSuggestions                     = [||]
+            ShowUnitTermSuggestions                 = false
+            HasUnitTermSuggestionsLoading           = false
+
+            /// This section is used to add a unit directly to an already existing building block
+            Unit2TermSearchText                     = ""
+            Unit2SelectedTerm                       = None
+            Unit2TermSuggestions                    = [||]
+            ShowUnit2TermSuggestions                = false
+            HasUnit2TermSuggestionsLoading          = false
+        }
 
 /// Validation scheme for Table
 type ValidationState = {

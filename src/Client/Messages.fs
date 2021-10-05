@@ -53,15 +53,17 @@ type ExcelInteropMsg =
     | TryExcel2
     //| ExcelSubscriptionMsg          of OfficeInterop.Types.Subscription.Msg
 
-type TermSearchMsg =
-    | ToggleSearchByParentOntology
-    | SearchTermTextChange                  of string
-    | TermSuggestionUsed                    of DbDomain.Term
-    | NewSuggestions                        of DbDomain.Term []
-    | StoreParentOntologyFromOfficeInterop  of TermMinimal option
-    // Server
-    | GetAllTermsByParentTermRequest        of TermMinimal 
-    | GetAllTermsByParentTermResponse       of DbDomain.Term []
+module TermSearch =
+
+    type Msg =
+        | ToggleSearchByParentOntology
+        | SearchTermTextChange                  of string
+        | TermSuggestionUsed                    of DbDomain.Term
+        | NewSuggestions                        of DbDomain.Term []
+        | StoreParentOntologyFromOfficeInterop  of TermMinimal option
+        // Server
+        | GetAllTermsByParentTermRequest        of TermMinimal 
+        | GetAllTermsByParentTermResponse       of DbDomain.Term []
 
 type AdvancedSearchMsg =
     // Client
@@ -241,7 +243,7 @@ type Model = {
     SiteStyleState          : SiteStyleState
 
     ///States regarding term search
-    TermSearchState         : TermSearchState
+    TermSearchState         : TermSearch.Model
 
     AdvancedSearchState     : AdvancedSearchState
 
@@ -257,7 +259,7 @@ type Model = {
     ProtocolInsertState     : ProtocolInsertState
 
     ///Insert annotation columns
-    AddBuildingBlockState   : AddBuildingBlockState
+    AddBuildingBlockState   : BuildingBlock.Model
 
     ///Create Validation scheme for Table
     ValidationState         : ValidationState
@@ -284,7 +286,7 @@ and Msg =
     | DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
     | Api                   of ApiMsg
     | Dev                   of DevMsg
-    | TermSearch            of TermSearchMsg
+    | TermSearchMsg         of TermSearch.Msg
     | AdvancedSearch        of AdvancedSearchMsg
     | ExcelInterop          of ExcelInteropMsg
     | StyleChange           of StyleChangeMsg
@@ -329,12 +331,12 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         PersistentStorageState      = PersistentStorageState    .init (pageEntry=pageEntry)
         DevState                    = DevState                  .init ()
         SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
-        TermSearchState             = TermSearchState           .init ()
+        TermSearchState             = TermSearch.Model          .init ()
         AdvancedSearchState         = AdvancedSearchState       .init ()
         ExcelState                  = ExcelState                .init ()
         ApiState                    = ApiState                  .init ()
         FilePickerState             = FilePickerState           .init ()
-        AddBuildingBlockState       = AddBuildingBlockState     .init ()
+        AddBuildingBlockState       = BuildingBlock.Model       .init ()
         ValidationState             = ValidationState           .init ()
         ProtocolInsertState         = ProtocolInsertState       .init ()
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()

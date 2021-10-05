@@ -1,4 +1,4 @@
-module TermSearchView
+module TermSearch
 
 open Fable.React
 open Fable.React.Props
@@ -11,39 +11,109 @@ open Messages
 open Shared
 open TermTypes
 open CustomComponents
+open Elmish
 
+open TermSearch
 
-//let createTermSuggestions (model:Model) (dispatch: Msg -> unit) =
-//    if model.TermSearchState.TermSuggestions.Length > 0 then
-//        model.TermSearchState.TermSuggestions
-//        |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
-//        |> Array.map (fun sugg ->
-//            tr [OnClick (fun _ -> sugg.Name |> TermSuggestionUsed |> Simple |> TermSearch |> dispatch)
-//                colorControl model.SiteStyleState.ColorMode
-//                Class "suggestion"
-//            ] [
-//                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
-//                    Fa.i [Fa.Solid.InfoCircle] []
-//                ]
-//                td [] [
-//                    b [] [str sugg.Name]
-//                ]
-//                td [Style [Color ""]] [if sugg.IsObsolete then str "obsolete"]
-//                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
-//            ])
-//        |> List.ofArray
-//    else
-//        [
-//            tr [] [
-//                td [] [str "No terms found matching your input."]
-//            ]
-//        ]
+let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : TermSearch.Model * Cmd<Messages.Msg> =
+    match termSearchMsg with
+    /// Toggle the search by parent ontology option on/off by clicking on a checkbox
+    | TermSearch.ToggleSearchByParentOntology ->
+        let nextState = {
+            currentState with
+                SearchByParentOntology = currentState.SearchByParentOntology |> not
+        }
+
+        nextState, Cmd.none
+
+    | SearchTermTextChange newTerm ->
+
+        let triggerNewSearch =
+            newTerm.Length > 2
+       
+        let (delay, bounceId, msgToBounce) =
+            (System.TimeSpan.FromSeconds 0.5),
+            "GetNewTermSuggestions",
+            (
+                if triggerNewSearch then
+                    match currentState.ParentOntology, currentState.SearchByParentOntology with
+                    | Some termMin, true ->
+                        (newTerm,termMin) |> (GetNewTermSuggestionsByParentTerm >> Request >> Api)
+                    | None,_ | _, false ->
+                        newTerm  |> (GetNewTermSuggestions >> Request >> Api)
+                else
+                    DoNothing
+            )
+
+        let nextState = {
+            currentState with
+                TermSearchText = newTerm
+                SelectedTerm = None
+                ShowSuggestions = triggerNewSearch
+                HasSuggestionsLoading = true
+        }
+
+        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
+
+    | TermSuggestionUsed suggestion ->
+
+        let nextState = {
+            Model.init() with
+                SelectedTerm = Some suggestion
+                TermSearchText = suggestion.Name
+        }
+        nextState, Cmd.none
+
+    | NewSuggestions suggestions ->
+
+        let nextState = {
+            currentState with
+                TermSuggestions         = suggestions
+                ShowSuggestions         = true
+                HasSuggestionsLoading   = false
+        }
+
+        nextState,Cmd.none
+
+    | StoreParentOntologyFromOfficeInterop parentTerm ->
+        let nextState = {
+            currentState with
+                ParentOntology = parentTerm
+        }
+        nextState, Cmd.none
+
+    // Server
+
+    | GetAllTermsByParentTermRequest ontInfo ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.api.getAllTermsByParentTerm
+                ontInfo
+                (GetAllTermsByParentTermResponse >> TermSearchMsg)
+                (GenericError >> Dev)
+
+        let nextState = {
+            currentState with
+                HasSuggestionsLoading = true
+        }
+
+        nextState, cmd
+
+    | GetAllTermsByParentTermResponse terms ->
+        let nextState = {
+            currentState with
+                TermSuggestions = terms
+                HasSuggestionsLoading = false
+                ShowSuggestions = true
+            
+        }
+        nextState, Cmd.none
 
 
 open Fable.Core
 open Fable.Core.JsInterop
 
-let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
+let simpleSearchComponent model dispatch =
     div [
         Style [
             BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
@@ -68,7 +138,7 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
                 Switch.Id "switch-1"
                 Switch.Checked model.TermSearchState.SearchByParentOntology
                 Switch.OnChange (fun e ->
-                    ToggleSearchByParentOntology |> TermSearch |> dispatch
+                    TermSearch.ToggleSearchByParentOntology |> TermSearchMsg |> dispatch
                     let _ =
                         let inpId = (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).InputId
                         let e = Browser.Dom.document.getElementById inpId
@@ -155,9 +225,7 @@ let simpleSearchComponent (model:Model) (dispatch: Msg -> unit) =
         ]
     ]
 
-
-
-let termSearchComponent (model : Model) (dispatch : Msg -> unit) =
+let termSearchComponent (model:Messages.Model) dispatch =
     form [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())

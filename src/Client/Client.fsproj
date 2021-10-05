@@ -37,8 +37,8 @@
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
         <Compile Include="BuildingBlock\BuildingBlockView.fs" />
+        <Compile Include="TermSearch\TermSearchView.fs" />
         <Compile Include="Views\XLSXConverterView.fs" />
-        <Compile Include="Views\TermSearchView.fs" />
         <Compile Include="Views\ValidationView.fs" />
         <Compile Include="Views\FilePickerView.fs" />
         <Compile Include="Views\ProtocolInsertView.fs" />

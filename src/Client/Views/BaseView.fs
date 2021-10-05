@@ -58,7 +58,7 @@ let tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
 let tabs (model:Model) dispatch =
     tabRow model dispatch [
         if model.PersistentStorageState.PageEntry = Routing.SwateEntry.Core then
-            createNavigationTab Routing.Route.AddBuildingBlock      model dispatch
+            createNavigationTab Routing.Route.BuildingBlock         model dispatch
             createNavigationTab Routing.Route.TermSearch            model dispatch
             createNavigationTab Routing.Route.ProtocolInsert        model dispatch
             createNavigationTab Routing.Route.FilePicker            model dispatch
