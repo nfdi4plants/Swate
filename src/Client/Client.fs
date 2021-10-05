@@ -69,7 +69,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.FilePicker ->
         BaseView.baseViewMainElement model dispatch [
-            FilePickerView.filePickerComponent model dispatch
+            FilePicker.filePickerComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]

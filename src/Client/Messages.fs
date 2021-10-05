@@ -125,11 +125,12 @@ type PersistentStorageMsg =
     | NewSearchableOntologies of DbDomain.Ontology []
     | UpdateAppVersion of string
 
-type FilePickerMsg =
-    | LoadNewFiles              of string list
-    | UpdateFileNames           of newFileNames:(int*string) list
-    ///
-    | UpdateDNDDropped          of isDropped:bool
+module FilePicker =
+    type Msg =
+        | LoadNewFiles              of string list
+        | UpdateFileNames           of newFileNames:(int*string) list
+        ///
+        | UpdateDNDDropped          of isDropped:bool
 
 module BuildingBlock =
 
@@ -254,7 +255,7 @@ type Model = {
     ApiState                : ApiState
 
     ///States regarding File picker functionality
-    FilePickerState         : FilePickerState
+    FilePickerState         : FilePicker.Model
 
     ProtocolInsertState     : ProtocolInsertState
 
@@ -291,7 +292,7 @@ and Msg =
     | ExcelInterop          of ExcelInteropMsg
     | StyleChange           of StyleChangeMsg
     | PersistentStorage     of PersistentStorageMsg
-    | FilePicker            of FilePickerMsg
+    | FilePickerMsg         of FilePicker.Msg
     | BuildingBlockMsg      of BuildingBlock.Msg
     | Validation            of ValidationMsg
     | ProtocolInsert        of ProtocolInsertMsg
@@ -335,7 +336,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         AdvancedSearchState         = AdvancedSearchState       .init ()
         ExcelState                  = ExcelState                .init ()
         ApiState                    = ApiState                  .init ()
-        FilePickerState             = FilePickerState           .init ()
+        FilePickerState             = FilePicker.Model          .init ()
         AddBuildingBlockState       = BuildingBlock.Model       .init ()
         ValidationState             = ValidationState           .init ()
         ProtocolInsertState         = ProtocolInsertState       .init ()

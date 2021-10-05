@@ -1,4 +1,4 @@
-module FilePickerView
+module FilePicker
 
 open Fable.React
 open Fable.React.Props
@@ -11,9 +11,34 @@ open Thoth.Elmish
 open ExcelColors
 open Api
 open Model
-open Messages
 open Shared
 open Browser.Types
+open Elmish
+open Messages
+open FilePicker
+
+let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : FilePicker.Model * Cmd<Messages.Msg> =
+    match filePickerMsg with
+    | LoadNewFiles fileNames ->
+        let nextState = {
+            FilePicker.Model.init() with
+                FileNames = fileNames |> List.mapi (fun i x -> i+1,x)
+        }
+        let nextCmd = UpdatePageState (Some Routing.Route.FilePicker) |> Cmd.ofMsg
+        nextState, nextCmd
+    | UpdateFileNames newFileNames ->
+        let nextState = {
+            currentState with
+                FileNames = newFileNames
+        }
+        nextState, Cmd.none
+    | UpdateDNDDropped isDropped ->
+        let nextState = {
+            currentState with
+                DNDDropped = isDropped
+        }
+        nextState, Cmd.none
+
 
 [<Literal>]
 let fileTileHeight = "50px"
@@ -78,7 +103,7 @@ let mutable coordinates : {|x:float; y:float|} option = None
 let mutable dropped: bool = true
 let mutable mustUpdateModel: bool = false
 
-let dragAndDropClone (model:Model) dispatch id =
+let dragAndDropClone (model:Messages.Model) dispatch id =
     let cloneId = createCloneId id
     let eleId = createEleId id
     let clone() = Browser.Dom.document.getElementById(cloneId)
@@ -116,7 +141,7 @@ let dragAndDropClone (model:Model) dispatch id =
                                     )
                             ] |> fun updatedOrderList ->
                                     let sortedList = List.sortBy fst updatedOrderList
-                                    UpdateFileNames ( sortedList ) |> FilePicker |> dispatch
+                                    UpdateFileNames ( sortedList ) |> FilePickerMsg |> dispatch
                         mustUpdateModel <- false
                         clone?style?opacity <- 0
                         //clone?style?visibility <- "hidden"
@@ -139,10 +164,10 @@ let dragAndDropClone (model:Model) dispatch id =
         str (sprintf "%s" fileName)
     ]
 
-let findIndByFileName (model:Model) id =
+let findIndByFileName (model:Messages.Model) id =
     model.FilePickerState.FileNames |> List.find (fun (ind,name) -> name = id) |> fst
 
-let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
+let dragAndDropElement (model:Messages.Model) (dispatch: Messages.Msg -> unit) id =
     let eleId = createEleId id
     let wrapperId = createWrapperId id
     let cloneId = createCloneId id
@@ -163,7 +188,7 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
         Draggable true
         OnDragStart (fun eve ->
             dropped <- false
-            UpdateDNDDropped false |> FilePicker |> dispatch
+            UpdateDNDDropped false |> FilePickerMsg |> dispatch
             eve.stopPropagation()
             let offset = child().getBoundingClientRect()
             let windowScrollY = Browser.Dom.window.scrollY
@@ -223,14 +248,14 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
                     clone?style?top         <- sprintf "%.0fpx" coordinates.Value.y
                     coordinates <- None
                     dropped <- true
-                    UpdateDNDDropped true |> FilePicker |> dispatch
+                    UpdateDNDDropped true |> FilePickerMsg |> dispatch
             ()
         )
         OnDrop (fun eve ->
             //eve.stopPropagation()
             eve.preventDefault()
             dropped <- true
-            UpdateDNDDropped true |> FilePicker |> dispatch
+            UpdateDNDDropped true |> FilePickerMsg |> dispatch
             parent()?style?backgroundColor  <- model.SiteStyleState.ColorMode.BodyBackground
             parent()?style?borderBottom     <- "0px solid darkgrey"
 
@@ -286,7 +311,7 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
                     |> List.map snd
                     |> List.filter (fun name -> name <> id)
                     |> List.mapi (fun i name -> i+1,name)
-                newList |> UpdateFileNames |> FilePicker |> dispatch
+                newList |> UpdateFileNames |> FilePickerMsg |> dispatch
             )
             Delete.Props [ Style [
                 if dropped = false then PointerEvents "none"
@@ -300,7 +325,7 @@ let dragAndDropElement (model:Model) (dispatch: Msg -> unit) id =
     ]
     
 
-let fileElement (model:Model) dispatch (id:string) =
+let fileElement (model:Messages.Model) dispatch (id:string) =
     let wrapperId   = createWrapperId id
     let order       = model.FilePickerState.FileNames |> List.find (fun (ind,name) -> name = id) |> fst
     // wrapper
@@ -331,7 +356,7 @@ let placeOnTopElement model dispatch =
             eve.preventDefault()
             eve.target?style?borderBottom <- "2px solid white" //(sprintf "2px solid %s" ExcelColors.colorfullMode.BodyBackground)
             dropped <- true
-            UpdateDNDDropped true |> FilePicker |> dispatch
+            UpdateDNDDropped true |> FilePickerMsg |> dispatch
             let prevId      = eve.dataTransfer.getData("text")
             let prevWrapper = Browser.Dom.document.getElementById(createWrapperId prevId)
             let prevClone   = Browser.Dom.document.getElementById(createCloneId prevId)
@@ -375,7 +400,7 @@ let placeOnTopElement model dispatch =
         ]
     ][]
     
-let fileElementContainer (model:Model) dispatch =
+let fileElementContainer (model:Messages.Model) dispatch =
     div [
         Style [Display DisplayOptions.Flex; FlexDirection "column"]
         Id fileElementContainerId
@@ -389,7 +414,7 @@ let fileElementContainer (model:Model) dispatch =
                 dragAndDropClone model dispatch (ele)
     ]
 
-let uploadButton (model:Model) dispatch inputId =
+let uploadButton (model:Messages.Model) dispatch inputId =
     File.file [
         File.Color IsInfo
         File.IsCentered
@@ -408,7 +433,7 @@ let uploadButton (model:Model) dispatch inputId =
                             [ for i=0 to (files.length - 1) do yield files.item i ]
                             |> List.map (fun f -> f.name)
 
-                        fileNames |> LoadNewFiles |> FilePicker |> dispatch
+                        fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
 
                         let picker = Browser.Dom.document.getElementById(inputId)
                         // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
@@ -431,7 +456,7 @@ let uploadButton (model:Model) dispatch inputId =
     ]
 
 
-let fileNameElements (model:Model) dispatch =
+let fileNameElements (model:Messages.Model) dispatch =
     div [ ][
         if model.FilePickerState.FileNames <> [] then
             fileElementContainer model dispatch
@@ -467,7 +492,7 @@ let sortButton icon msg =
         Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
     ]
 
-let fileSortElements (model:Model) dispatch =
+let fileSortElements (model:Messages.Model) dispatch =
     div [Style [MarginBottom "1rem"; Display DisplayOptions.Flex]][
         Button.a [
             Button.Props [Title "Copy to Clipboard"]
@@ -501,16 +526,16 @@ let fileSortElements (model:Model) dispatch =
         ][
             sortButton Fa.Solid.SortAlphaDown (fun e ->
                 let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i,snd x)
-                UpdateFileNames sortedList |> FilePicker |> dispatch
+                UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
             sortButton Fa.Solid.SortAlphaDownAlt (fun e ->
                 let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i,snd x)
-                UpdateFileNames sortedList |> FilePicker |> dispatch
+                UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
         ]
     ]
 
-let fileContainer (model:Model) dispatch inputId=
+let fileContainer (model:Messages.Model) dispatch inputId=
     div [
         Style [
             BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
@@ -524,7 +549,7 @@ let fileContainer (model:Model) dispatch inputId=
         fileNameElements model dispatch
     ]
 
-let filePickerComponent (model:Model) (dispatch:Msg -> unit) =
+let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
     let inputId = "filePicker_OnFilePickerMainFunc"
     Content.content [ ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "File Picker"]

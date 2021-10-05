@@ -969,28 +969,6 @@ let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyle
         }
         nextState,Cmd.none
 
-let handleFilePickerMsg (filePickerMsg:FilePickerMsg) (currentState: FilePickerState) : FilePickerState * Cmd<Msg> =
-    match filePickerMsg with
-    | LoadNewFiles fileNames ->
-        let nextState = {
-            FilePickerState.init() with
-                FileNames = fileNames |> List.mapi (fun i x -> i+1,x)
-        }
-        let nextCmd = UpdatePageState (Some Routing.Route.FilePicker) |> Cmd.ofMsg
-        nextState, nextCmd
-    | UpdateFileNames newFileNames ->
-        let nextState = {
-            currentState with
-                FileNames = newFileNames
-        }
-        nextState, Cmd.none
-    | UpdateDNDDropped isDropped ->
-        let nextState = {
-            currentState with
-                DNDDropped = isDropped
-        }
-        nextState, Cmd.none
-
 let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
     match validationMsg with
     /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
@@ -1587,10 +1565,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
 
         nextModel,nextCmd
 
-    | FilePicker filePickerMsg ->
+    | FilePickerMsg filePickerMsg ->
         let nextFilePickerState,nextCmd =
             currentModel.FilePickerState
-            |> handleFilePickerMsg filePickerMsg
+            |> FilePicker.update filePickerMsg
 
         let nextModel = {
             currentModel with
