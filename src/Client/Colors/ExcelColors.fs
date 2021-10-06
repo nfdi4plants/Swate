@@ -94,6 +94,13 @@ let colorElement (mode:ColorMode) =
         Color           mode.Text
     ]
 
+let colorElementInArray (mode:ColorMode) =
+    [
+        BackgroundColor mode.ElementBackground
+        BorderColor     mode.ElementForeground
+        Color           mode.Text
+    ]
+
 /// This color control element can be used to assign multiple css props at once.
 /// If used as html element this will be overwritten by any other used Style [].
 /// If you want to use additional Style [], then use "Style [... yield! colorControlInArray mode]".

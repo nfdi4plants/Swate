@@ -69,82 +69,55 @@ let shortCutIconList model =
     ]
     
 let navbarShortCutIconList model dispatch =
-    let padding = "0.5rem"
     [
         for icon in shortCutIconList model do
-            yield 
-                Button.a [
-                    Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-                    Button.Props [ Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; PaddingLeft padding; PaddingRight padding]; Tooltip.dataTooltip (icon.Description) ]
-                    Button.OnClick (fun _ ->
-                        icon.Msg |> dispatch
-                    )
-                    Button.Color Color.IsWhite
-                    Button.IsInverted
-                ] icon.FaList
+            yield
+                Navbar.Item.a [Navbar.Item.Props [Style [Padding "0"; Width "45px"]]] [
+                    Button.button [
+                        Button.Props [Title icon.Description; Style [BackgroundColor "transparent"]]
+                        Button.OnClick (fun _ -> icon.Msg |> dispatch)
+                        Button.Color Color.IsWhite
+                        Button.IsInverted
+                        Button.IsFullWidth
+                    ] icon.FaList
+                ]
     ]
 
-let dropdownShortCutIconList model dispatch =
-    Table.table [
-        Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.ElementBackground; Color "white"; Cursor "default" ]]
-    ][
-        tbody [][
-            for icon in shortCutIconList model do
-                yield
-                    tr [][
-                        td [][Help.help [][ str icon.Description]]
-                        td [][
-                            let padding = "0.5rem"
-                            Button.a [
-                                Button.Props [ Style [
-                                    if model.SiteStyleState.IsDarkMode |> not then
-                                        BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
-                                    PaddingLeft padding; PaddingRight padding
-                                ]]
-                                Button.OnClick (fun _ ->
-                                    icon.Msg |> dispatch
-                                )
-                                Button.Color Color.IsWhite
-                                Button.IsInverted
-                            ] icon.FaList
-                        ]
-                    ]
-        ]
-    ]
-
-let quickAccessDropdownElement model dispatch =
-    Navbar.Item.div [
+let quickAccessDropdownElement model dispatch (isSndNavbar:bool)=
+    Navbar.Item.a [
         Navbar.Item.Props [
             OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)
-            Style [ Color model.SiteStyleState.ColorMode.Text]
+            Style [
+                Padding "0px";
+                if isSndNavbar then
+                    MarginLeft "auto"
+            ]
+            Title (if model.SiteStyleState.QuickAcessIconsShown then "Close quick access" else "Open quick access")
         ]
         Navbar.Item.CustomClass "hideOver575px"
     ] [
         div [Style [
+            Width "100%"
+            Height "100%"
             Position PositionOptions.Relative
-            BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
             if model.SiteStyleState.IsDarkMode then
                 BorderColor model.SiteStyleState.ColorMode.ControlForeground
             else
                 BorderColor model.SiteStyleState.ColorMode.Fade
         ]] [
             Button.a [
-                Button.Props [Style [
-                    if model.SiteStyleState.IsDarkMode |> not then
-                        BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
-                    PaddingLeft "0"; PaddingRight "0"]
-                ]
+                Button.Props [Style [ BackgroundColor "transparent"; Height "100%"; if model.SiteStyleState.QuickAcessIconsShown then Color NFDIColors.Yellow.Base]]
                 Button.Color Color.IsWhite
                 Button.IsInverted
             ][
                 div [Style [
+                    Display DisplayOptions.InlineFlex
                     Position PositionOptions.Relative
+                    JustifyContent "center"
                 ]] [
                     Fa.i [
                         Fa.Props [Style [
                             Position PositionOptions.Absolute
-                            Top "0"
-                            Left "0"
                             Display DisplayOptions.Block
                             Transition "opacity 0.25s, transform 0.25s"
                             if model.SiteStyleState.QuickAcessIconsShown then Opacity "1" else Opacity "0"
@@ -155,8 +128,6 @@ let quickAccessDropdownElement model dispatch =
                     Fa.i [
                         Fa.Props [Style [
                             Position PositionOptions.Absolute
-                            Top "0"
-                            Left "0"
                             Display DisplayOptions.Block
                             Transition "opacity 0.25s, transform 0.25s"
                             if model.SiteStyleState.QuickAcessIconsShown then Opacity "0" else Opacity "1"
@@ -173,43 +144,42 @@ let quickAccessDropdownElement model dispatch =
                     ][]
                 ]
             ]
-            div [
-                Class "arrow_box"
-                Style [
-                    Display (if model.SiteStyleState.QuickAcessIconsShown then DisplayOptions.Block else DisplayOptions.None)
-                    Position PositionOptions.Absolute
-                    ZIndex "20"
-                ]
-            ][
-                dropdownShortCutIconList model dispatch
-                //for subList in prepIconLists do
-                //    yield
-                //        div [Style [
-                //            Color model.SiteStyleState.ColorMode.Text
-                //            Display DisplayOptions.Flex
-                //            JustifyContent "space-between"
-                //        ]] [
-                //            subList |> List.tryItem 0 |> fun x -> if x.IsSome then x.Value else placerholderInvis
-                //            subList |> List.tryItem 1 |> fun x -> if x.IsSome then x.Value else placerholderInvis
-                //            subList |> List.tryItem 2 |> fun x -> if x.IsSome then x.Value else placerholderInvis
-                //        ]
-            ]
         ]
     ]
 
 let quickAccessListElement model dispatch =
-    Navbar.Item.div [
-        Navbar.Item.Props [Style [ Color model.SiteStyleState.ColorMode.Text]]
-        Navbar.Item.CustomClass "hideUnder575px"
-    ] [
-        yield! navbarShortCutIconList model dispatch 
+    div [Style [Display DisplayOptions.Flex; FlexDirection "row"]; Class "hideUnder575px"][
+        yield! navbarShortCutIconList model dispatch
     ]
 
+
+open Fable.Core.JsInterop
+
+let quickAccessScalableNavbar (model:Messages.Model) dispatch =
+    Navbar.navbar [
+        Navbar.CustomClass "wrapFlexBox"
+        Navbar.Props [
+            Style [
+                if model.SiteStyleState.QuickAcessIconsShown |> not then
+                    Display DisplayOptions.None
+                else Display DisplayOptions.Flex
+                yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode
+                BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
+            ]
+        ]
+    ][
+        Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [Flex "1"]]] [
+            yield! navbarShortCutIconList model dispatch
+            //quickAccessDropdownElement model dispatch true
+        ]
+    ]
+    //div [Class "hideOver575px"][
+    //]
 
 let navbarComponent (model : Model) (dispatch : Msg -> unit) =
     Navbar.navbar [
         Navbar.IsFixedTop
-        Navbar.Props [Props.Role "navigation"; AriaLabel "main navigation" ; ExcelColors.colorElement model.SiteStyleState.ColorMode]
+        Navbar.Props [Id "swate-mainNavbar"; Props.Role "navigation"; AriaLabel "main navigation" ; ExcelColors.colorElement model.SiteStyleState.ColorMode]
         Navbar.IsTransparent
     ] [
         Navbar.Brand.div [] [
@@ -221,8 +191,7 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
 
             quickAccessListElement model dispatch
 
-            quickAccessDropdownElement model dispatch
-
+            quickAccessDropdownElement model dispatch false
             Navbar.burger [
                 Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible
                 Navbar.Burger.OnClick (fun e -> ToggleBurger |> StyleChange |> dispatch)

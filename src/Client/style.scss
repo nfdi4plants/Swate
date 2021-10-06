@@ -49,6 +49,11 @@ a:hover {
     color: #3f8fae
 }
 
+.wrapFlexBox {
+    flex-wrap: wrap;
+    flex-shrink: unset;
+}
+
 .button {
     @extend .button;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
@@ -119,45 +124,6 @@ a.navbar-item:hover {
 
 .toExcelColor {
     color: $excelPrimary !important
-}
-
-/////////// Custom Box with Arrow in the middle of top side /////////////////
-
-// credits go to: https://cssarrowplease.com/
-
-.arrow_box {
-    position: relative;
-    background: inherit;
-    border: 4px solid;
-    border-color: inherit;
-    border-radius: 10px;
-    padding: 1rem;
-    transform: translateX(calc(8px - 50%));
-}
-
-.arrow_box:after, .arrow_box:before {
-    bottom: 100%;
-    left: 50%;
-    border: solid transparent;
-    content: "";
-    height: 0;
-    width: 0;
-    position: absolute;
-    pointer-events: none;
-}
-
-.arrow_box:after {
-    border-color: rgba(33, 115, 70, 0);
-    border-bottom-color: inherit;
-    border-width: 5px;
-    margin-left: -5px;
-}
-
-.arrow_box:before {
-    border-color: rgba(14, 92, 47, 0);
-    border-bottom-color: inherit;
-    border-width: 11px;
-    margin-left: -11px;
 }
 
 /////////// Custom simple checkbox, due to issue #54 ///////////////////

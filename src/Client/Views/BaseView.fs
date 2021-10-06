@@ -99,6 +99,7 @@ let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement
 let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
     viewContainer model dispatch [
         Navbar.navbarComponent model dispatch
+        Navbar.quickAccessScalableNavbar model dispatch
         Container.container [
             Container.IsFluid
         ] [
