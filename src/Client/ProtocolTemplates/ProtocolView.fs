@@ -378,11 +378,11 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
         
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Protocol driven building block insert"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Templates"]
 
 
         /// Box 1
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add protocol template from database."]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add template from database."]
 
         showDatabaseProtocolTemplate model dispatch
 
