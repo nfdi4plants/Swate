@@ -155,7 +155,10 @@ let createAutocompleteSuggestions
                     colorControl colorMode
                     Class "suggestion"
                 ] [
-                    td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.TooltipText] [
+                    td [
+                        Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline); Tooltip.dataTooltip sugg.TooltipText
+                        Style [FontSize "1.1rem"; Padding "0 0 0 .4rem"; TextAlign TextAlignOptions.Center; VerticalAlign "middle"; Color NFDIColors.Yellow.Darker20]
+                    ] [
                         Fa.i [Fa.Solid.InfoCircle] []
                     ]
                     td [] [

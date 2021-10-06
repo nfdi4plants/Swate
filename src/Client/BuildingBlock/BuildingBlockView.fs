@@ -228,7 +228,10 @@ let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit
     Dropdown.Item.a [
         Dropdown.Item.Props [
             TabIndex 0
-            OnClick (fun _ -> BuildingBlockNamePrePrint.init block |> NewBuildingBlockSelected |> BuildingBlockMsg |> dispatch)
+            OnClick (fun e ->
+                e.stopPropagation()
+                BuildingBlockNamePrePrint.init block |> NewBuildingBlockSelected |> BuildingBlockMsg |> dispatch
+            )
             OnKeyDown (fun k -> if (int k.which) = 13 then BuildingBlockNamePrePrint.init block |> NewBuildingBlockSelected |> BuildingBlockMsg |> dispatch)
             colorControl model.SiteStyleState.ColorMode
         ]

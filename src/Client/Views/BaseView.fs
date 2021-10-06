@@ -91,6 +91,8 @@ let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement
                 || model.AddBuildingBlockState.ShowBuildingBlockTermSuggestions
             then
                 TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
+            if model.AddBuildingBlockState.ShowBuildingBlockSelection then
+                BuildingBlockMsg BuildingBlock.ToggleSelectionDropdown |> dispatch
         )
         Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"]
     ] children

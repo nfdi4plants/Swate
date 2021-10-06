@@ -35,6 +35,21 @@ $switch-background-active: $excelPrimary;
     background: $mint
 }
 
+[data-tooltip]:not(.is-loading)::before, [data-tooltip]:not(.is-loading)::after, [data-tooltip]:not(.is-disabled)::before, [data-tooltip]:not(.is-disabled)::after, [data-tooltip]:not([disabled])::before, [data-tooltip]:not([disabled])::after {
+    box-sizing: border-box;
+    color: #fff;
+    display: inline-block;
+    font-family: BlinkMacSystemFont,-apple-system,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue","Helvetica","Arial",sans-serif;
+    font-size: .75rem;
+    hyphens: auto;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    visibility: hidden;
+    z-index: 1020;
+}
+
 html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     font-size: 14px;
