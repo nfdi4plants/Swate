@@ -28,7 +28,7 @@ let toggleDarkModeElement (model:Model) dispatch =
                     Browser.Dom.document.cookie <-
                         let isDarkMode b =
                             let expire = System.DateTime.Now.AddYears 100
-                            sprintf "%s=%b; expires=%A; path=/" Cookies.IsDarkMode.toCookieString b expire
+                            $"{Cookies.IsDarkMode.toCookieString}={b.ToString()}; expires={expire.ToUniversalTime()}; path=/"
                         not model.SiteStyleState.IsDarkMode |> isDarkMode
                     ToggleColorMode |> StyleChange |> dispatch
                 )

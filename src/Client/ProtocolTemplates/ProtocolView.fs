@@ -20,7 +20,6 @@ open Fulma.Extensions.Wikiki
 open Shared
 
 open OfficeInterop
-open ISADotNetHelpers
 open Protocol
 
 //let isViableISADotNetProcess (isaProcess:ISADotNet.Process) =

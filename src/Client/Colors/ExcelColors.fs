@@ -69,19 +69,19 @@ let darkMode = {
     ControlForeground       = Black.gray100
     ElementBackground       = Black.Primary
     ElementForeground       = Black.gray140
-    Text                    = Black.white
-    Accent                  = Black.white
+    Text                    = NFDIColors.white
+    Accent                  = NFDIColors.white
     Fade                    = Black.gray70
 }
 
 let colorfullMode = {
     Name                    = "Colorfull"
-    BodyBackground          = Colorfull.white
+    BodyBackground          = NFDIColors.white
     BodyForeground          = Colorfull.gray20
-    ControlBackground       = Colorfull.white
+    ControlBackground       = NFDIColors.white
     ControlForeground       = Colorfull.gray40
     ElementBackground       = Excel.Tint10
-    ElementForeground       = Colorfull.white
+    ElementForeground       = NFDIColors.white
     Text                    = Colorfull.gray180
     Accent                  = Excel.Primary
     Fade                    = Excel.Tint30

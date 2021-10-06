@@ -74,7 +74,7 @@ module OfficeInteropTypes =
             | Factor            -> "Use factor columns to track the experimental conditions that govern your study. Example: temperature,light,..."
             | Characteristics   -> "Use characteristics columns to annotate interesting properties of your organism. Example: strain,phenotype,... "
             | Sample            -> "Use sample columns to mark the name of the sample that your experimental workflow produced."
-            | Data              -> "Use data columns to mark the data file name that your computational analysis produced"
+            | Data              -> "Use data columns to mark the data file name that your computational analysis produced."
             | Source            -> "Attention: you normally dont have to add this manually if you initialize an annotation table. The Source column defines the organism that is subject to your study. It is the first column of every study file."
 
         static member toLongExplanation = function
@@ -97,7 +97,7 @@ module OfficeInteropTypes =
             | Source            ->
                 "The Source Name column defines the source of biological material used for your experiments.
                 The name used must be a unique identifier. It can be an organism, a sample, or both.
-                Every annotation table must start with the Source Name column"
+                Every annotation table must start with the Source Name column."
 
         /// Checks if a string matches one of the single column core names exactly.
         member this.isSingleColumn =

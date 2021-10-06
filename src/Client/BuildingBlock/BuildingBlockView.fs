@@ -256,6 +256,7 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit
             span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> BuildingBlockType.toLongExplanation |> str]
             span [] [str " You can find more information on our "]
             a [Href Shared.URLs.AnnotationPrinciplesUrl; Target "_blank"][str "website"]
+            span [][str "."]
         ]
     ]
 

@@ -1,6 +1,12 @@
 /// Colors used from nfdi4plants Branding repository on GitHub
 // https://github.com/nfdi4plants/Branding#dataplant
 module NFDIColors
+[<Literal>]
+let white = "#FEFEFE"
+[<Literal>]
+let lightgray = "#ECEBEB"
+[<Literal>]
+let black = "#3A3A3A"
 
 module Mint =
 
@@ -215,4 +221,5 @@ module Red =
     [<Literal>]
     let Darker80 =     "#26060B"
     [<Literal>]
-    let Darker90 =     "#130305" 
+    let Darker90 =     "#130305"
+

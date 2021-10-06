@@ -46,12 +46,12 @@ type Route =
     member this.toStringRdbl =
         match this with
         | Route.Home                -> ""
-        | Route.BuildingBlock       -> "Manage Building Blocks"
-        | Route.TermSearch          -> "Manage Terms"
+        | Route.BuildingBlock       -> "Building Blocks"
+        | Route.TermSearch          -> "Terms"
         | Route.Validation          -> "Checklist Editor"
         | Route.FilePicker          -> "File Picker"
-        | Route.Protocol            -> "Protocol Insert"
-        | Route.ProtocolSearch      -> "Protocol Search"
+        | Route.Protocol            -> "Templates"
+        | Route.ProtocolSearch      -> "Template Search"
         | Route.XLSXConverter       -> "XLSX Converter"
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
