@@ -156,25 +156,25 @@ let quickAccessListElement model dispatch =
 open Fable.Core.JsInterop
 
 let quickAccessScalableNavbar (model:Messages.Model) dispatch =
-    Navbar.navbar [
-        Navbar.CustomClass "wrapFlexBox"
-        Navbar.Props [
-            Style [
-                if model.SiteStyleState.QuickAcessIconsShown |> not then
-                    Display DisplayOptions.None
-                else Display DisplayOptions.Flex
-                yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode
-                BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
+    div [Class "hideOver575px"][
+        Navbar.navbar [
+            Navbar.CustomClass "wrapFlexBox"
+            Navbar.Props [
+                Style [
+                    if model.SiteStyleState.QuickAcessIconsShown |> not then
+                        Display DisplayOptions.None
+                    else Display DisplayOptions.Flex
+                    yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode
+                    BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
+                ]
+            ]
+        ][
+            Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [Flex "1"]]] [
+                yield! navbarShortCutIconList model dispatch
+                //quickAccessDropdownElement model dispatch true
             ]
         ]
-    ][
-        Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [Flex "1"]]] [
-            yield! navbarShortCutIconList model dispatch
-            //quickAccessDropdownElement model dispatch true
-        ]
     ]
-    //div [Class "hideOver575px"][
-    //]
 
 let navbarComponent (model : Model) (dispatch : Msg -> unit) =
     Navbar.navbar [

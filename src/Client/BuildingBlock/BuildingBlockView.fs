@@ -261,14 +261,7 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit
     ]
 
 let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
-    div [
-        Style [
-            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-            //BorderRadius "15px 15px 0 0"
-            Padding "0.25rem 1rem"
-            MarginBottom "1rem"
-        ]
-    ] [
+    mainFunctionContainer [
         Field.div [
             Field.HasAddons
         ] [
@@ -397,12 +390,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
     ]
 
 let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
-    div [
-        Style [
-            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-            Padding "0.25rem 1rem"
-            MarginBottom "1rem"
-    ]] [
+    mainFunctionContainer [
         Field.div [][
             Help.help [][
                 str "Adds a unit to a the complete building block. If the building block already has a unit assigned, the new unit is only applied to selected rows of the selected column."
@@ -475,5 +463,6 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add/Update unit reference to existing building block."]
         // Input forms, etc related to add unit to existing building block.
         addUnitToExistingBlockElements model dispatch
+
 
     ]

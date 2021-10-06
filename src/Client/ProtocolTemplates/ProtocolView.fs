@@ -327,11 +327,7 @@ let addFromDBToTableButton (model:Messages.Model) dispatch =
     ]
 
 let showDatabaseProtocolTemplate (model:Messages.Model) dispatch =
-    div [ Style [
-        BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-        Padding "0.25rem 1rem"
-        MarginBottom "1rem"
-    ]] [
+    mainFunctionContainer [
         Help.help [][
             b [] [str "Search the database for protocol templates."]
             str " The building blocks from these templates can be inserted into a Swate table as protocol."

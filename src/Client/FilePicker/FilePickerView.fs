@@ -526,14 +526,7 @@ let fileSortElements (model:Messages.Model) dispatch =
     ]
 
 let fileContainer (model:Messages.Model) dispatch inputId=
-    div [
-        Style [
-            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-            //BorderRadius "15px 15px 0 0"
-            Padding "0.25rem 1rem"
-            MarginBottom "1rem"
-        ]
-    ][
+    mainFunctionContainer [
         fileSortElements model dispatch
 
         fileNameElements model dispatch

@@ -261,14 +261,7 @@ let protocolElementContainer (model:Model) dispatch =
         |> filterTableByTags
         |> sortTableBySearchQuery 
 
-    div [
-        Style [
-            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-            //BorderRadius "15px 15px 0 0"
-            Padding "0.25rem 1rem"
-            MarginBottom "1rem"
-        ]
-    ] [
+    mainFunctionContainer [
         Field.div [][
             Help.help [][
                 b [][str "Search for protocol templates."]

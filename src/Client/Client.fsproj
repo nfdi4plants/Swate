@@ -24,6 +24,7 @@
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="CustomComponents\FunctionContainer.fs" />
         <Compile Include="CustomComponents\ResponsiveFA.fs" />
         <Compile Include="CustomComponents\DwnButton.fs" />
         <Compile Include="CustomComponents\Button.fs" />
@@ -38,11 +39,11 @@
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
         <Compile Include="BuildingBlock\BuildingBlockView.fs" />
         <Compile Include="TermSearch\TermSearchView.fs" />
-        <Compile Include="FilePicker\FilePickerView.fs" />
-        <Compile Include="Validation\ValidationView.fs" />
         <Compile Include="ProtocolTemplates\ProtocolState.fs" />
         <Compile Include="ProtocolTemplates\ProtocolView.fs" />
         <Compile Include="ProtocolTemplates\ProtocolSearchView.fs" />
+        <Compile Include="FilePicker\FilePickerView.fs" />
+        <Compile Include="Validation\ValidationView.fs" />
         <Compile Include="Info\InfoView.fs" />
         <Compile Include="ActivityLog\ActivityLogView.fs" />
         <Compile Include="Views\XLSXConverterView.fs" />
