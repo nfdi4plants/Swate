@@ -67,9 +67,7 @@ type Route =
 
     static member toIcon (p: Route)=
         let createElem icons name =
-            Fable.React.Standard.span [
-                Fable.React.Props.Class (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-                Tooltip.dataTooltip (name)
+            Fable.React.Standard.span [ Fable.React.Props.HTMLAttr.Title name
             ] (
                 icons
                 |> List.map ( fun icon -> Fa.span [icon] [] )
