@@ -25,7 +25,7 @@ let mainFunctionContainer children =
     div [
         Class "mainFunctionContainer"
         Style [
-            let rndVal = rnd.Next(100)
+            let rndVal = rnd.Next(35,65)
             let shuffle (seq: 'a []) =
                 for i in 0 .. seq.Length - 1 do
                     let j = rnd.Next(i, seq.Length)
@@ -34,7 +34,7 @@ let mainFunctionContainer children =
                     seq.[j] <- pom
             let colorArr =
                 let arr = [|NFDIColors.LightBlue.Lighter10; NFDIColors.Mint.Lighter10;|]
-                //let expArr = [|NFDIColors.LightBlue.Lighter10; NFDIColors.Mint.Lighter10; NFDIColors.Red.Base; NFDIColors.Yellow.Base; NFDIColors.DarkBlue.Base; ExcelColors.Excel.Primary|]
+                //let expArr = [|NFDIColors.LightBlue.Lighter10; NFDIColors.Mint.Lighter10; NFDIColors.Red.Lighter40; NFDIColors.Yellow.Base|]
                 shuffle arr
                 arr
             BorderImageSource $"linear-gradient({colorArr.[0]} {100-rndVal}%%, {colorArr.[1]})"

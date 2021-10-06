@@ -273,7 +273,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                     Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection
                 ] [
                     Dropdown.trigger [] [
-                        Button.a [Button.OnClick (fun _ -> ToggleSelectionDropdown |> BuildingBlockMsg |> dispatch)] [
+                        Button.a [Button.OnClick (fun e -> e.stopPropagation(); ToggleSelectionDropdown |> BuildingBlockMsg |> dispatch)] [
                             span [Style [MarginRight "5px"]] [str model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
@@ -327,10 +327,14 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                             ToggleBuildingBlockHasUnit |> BuildingBlockMsg |> dispatch
                         )
                     ] [
-                        if model.AddBuildingBlockState.BuildingBlockHasUnit then
-                            Fa.i [ Fa.Size Fa.FaLarge; Fa.Solid.Check ][ ]
-                        else
-                            Fa.i [ Fa.Size Fa.FaLarge ; Fa.Solid.Ban ][ ]
+                        Fa.i [
+                            Fa.Size Fa.FaLarge;
+                            Fa.Props [Style [AlignSelf AlignSelfOptions.Center; Transform "translateY(1px)"]]
+                            if model.AddBuildingBlockState.BuildingBlockHasUnit then
+                                Fa.Solid.Check
+                            else
+                                Fa.Solid.Ban
+                        ][ ]
                     ]
                 ]
                 Control.p [] [
@@ -386,7 +390,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                         OfficeInterop.AddAnnotationBlock newBuildingBlock |> OfficeInteropMsg |> dispatch
                     )
                 ] [
-                    str "Insert annotation building block"
+                    str "Add building block"
                 ]
             ]
         ]

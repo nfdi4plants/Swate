@@ -51,7 +51,7 @@ let rowIndicesToReadable (rowIndices:int []) =
 
 let infoIcon (txt:string) =
     span [
-        Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"; OverflowY OverflowOptions.Visible]
+        Style [Color NFDIColors.LightBlue.Base; OverflowY OverflowOptions.Visible]
         Class (Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
         Tooltip.dataTooltip txt
     ][
@@ -70,28 +70,26 @@ let searchResultTermToTableHeaderElement (term:TermSearchable option) =
         tr [][
             th [][str "-"]
             th [][str "-"]
+            th [ Style [TextAlign TextAlignOptions.Center] ][str "-"]
             th [][str (rowIndicesToReadable isEmpty.RowIndices)]
         ]
     | Some hasResult when hasResult.SearchResultTerm.IsSome ->
         tr [ ] [
-            th [][
-                str hasResult.SearchResultTerm.Value.Name
-                infoIcon hasResult.SearchResultTerm.Value.Definition
-            ]
+            th [][str hasResult.SearchResultTerm.Value.Name]
+            th [ Style [TextAlign TextAlignOptions.Center] ][infoIcon hasResult.SearchResultTerm.Value.Definition]
             th [][str hasResult.SearchResultTerm.Value.Accession]
             th [][str (rowIndicesToReadable hasResult.RowIndices)]
         ]
     | Some hasNoResult when hasNoResult.SearchResultTerm.IsNone ->
         tr [ ] [
-            th [ Style [Color NFDIColors.Red.Lighter20] ] [
-                str hasNoResult.Term.Name
-                infoIcon userSpecificTermMsg
-            ]
+            th [ Style [Color NFDIColors.Red.Lighter20] ] [str hasNoResult.Term.Name]
+            th [ Style [TextAlign TextAlignOptions.Center] ][infoIcon userSpecificTermMsg]
             th [][str hasNoResult.Term.TermAccession]
             th [][str (rowIndicesToReadable hasNoResult.RowIndices)]
         ]
     | None ->
         tr [ ] [
+            th [][str "-"]
             th [][str "-"]
             th [][str "-"]
             th [][str "Header"]
@@ -105,24 +103,21 @@ let searchResultTermToTableElement (term:TermSearchable) =
     | isEmpty when term.Term.Name = "" && term.Term.TermAccession = "" ->
         tr [][
             td [][str "-"]
+            td [ Style [TextAlign TextAlignOptions.Center] ][str "-"]
             td [][str "-"]
             td [][str (rowIndicesToReadable isEmpty.RowIndices)]
         ]
     | hasResult when term.SearchResultTerm.IsSome ->
         tr [ ] [
-            td [][
-                str hasResult.SearchResultTerm.Value.Name
-                infoIcon hasResult.SearchResultTerm.Value.Definition
-            ]
+            td [][str hasResult.SearchResultTerm.Value.Name]
+            td [ Style [TextAlign TextAlignOptions.Center] ][infoIcon hasResult.SearchResultTerm.Value.Definition]
             td [][str hasResult.SearchResultTerm.Value.Accession]
             td [][str (rowIndicesToReadable hasResult.RowIndices)]
         ]
     | hasNoResult when term.SearchResultTerm.IsNone ->
         tr [ ] [
-            td [ Style [Color NFDIColors.Red.Lighter20] ] [
-                str hasNoResult.Term.Name
-                infoIcon userSpecificTermMsg
-            ]
+            td [ Style [Color NFDIColors.Red.Lighter20] ] [str hasNoResult.Term.Name]
+            td [ Style [TextAlign TextAlignOptions.Center] ][infoIcon userSpecificTermMsg]
             td [][str hasNoResult.Term.TermAccession]
             td [][str (rowIndicesToReadable hasNoResult.RowIndices)]
         ]
@@ -139,8 +134,9 @@ let tableElement (terms:TermSearchable []) =
         thead [][
             tr [][
                 th [Class "toExcelColor"][str "Name"]
+                th [Class "toExcelColor"][str "Desc."]
                 th [Class "toExcelColor"][str "TAN"]
-                th [Class "toExcelColor"][str "RowIndex"]
+                th [Class "toExcelColor"][str "Row"]
             ]
         ]
         thead [][
@@ -163,7 +159,7 @@ let buildingBlockDetailModal (model:Model) dispatch =
             Props [ OnClick closeMsg ]
         ] [ ]
         Notification.notification [
-            Notification.Props [Style [Width "80%"; MaxHeight "80%"; OverflowX OverflowOptions.Auto ]]
+            Notification.Props [Style [Width "90%"; MaxHeight "80%"; OverflowX OverflowOptions.Auto ]]
         ] [
             Notification.delete [Props [OnClick closeMsg]][]
             tableElement baseArr
