@@ -44,11 +44,11 @@ html, body {
 }
 
 a {
-    color: $info
+    color: $lightBlue
 }
 
 a:hover {
-    color: #3f8fae
+    color: $lightBlueLighter20
 }
 
 .mainFunctionContainer {
@@ -110,7 +110,7 @@ a.navbar-item:hover {
 
 .hoverTableEle:hover {
     /*background-color: #E8E8E8 !important*/
-    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4));
+    background-color: rgba(0, 0, 0, 0.2)
 }
 
 .clickableTag {

@@ -170,9 +170,9 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
 
         ] [
             td [ ] [ str prot.Name ]
-            td [ ] [ Tag.tag [] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank" ] [str "docs"] ] ]
-            td [ ] [ str prot.Version ]
-            td [ ] [ str (string prot.Used) ]
+            td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt][]] ]
+            td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str prot.Version ]
+            td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string prot.Used) ]
             td [][
                 Icon.icon [][
                     Fa.i [Fa.Solid.ChevronDown][]
@@ -281,9 +281,9 @@ let protocolElementContainer (model:Model) dispatch =
             thead [][
                 tr [][
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Protocol Name"      ]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Documentation"      ]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Protocol Version"   ]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Uses"               ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Documentation"      ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Protocol Version"   ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Uses"               ]
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][]
                 ]
             ]
