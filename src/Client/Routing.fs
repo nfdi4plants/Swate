@@ -116,6 +116,9 @@ module Routing =
             map Route.SettingsXml           (s "Settings" </> s "Xml")
             map Route.SettingsDataStewards  (s "Settings" </> s "DataStewards")
             map Route.NotFound              (s "NotFound")
+            /// Redirect
+            map Route.Validation            (s "Experts")
+            map Route.BuildingBlock         (s "Core")
         ]
 
 

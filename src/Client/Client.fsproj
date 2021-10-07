@@ -8,6 +8,7 @@
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
+        <Compile Include="PageTemplate.md" />
         <Compile Include="HumanReadableIds.fs" />
         <Compile Include="Colors\NFDIColors.fs" />
         <Compile Include="Colors\ExcelColors.fs" />
@@ -15,15 +16,17 @@
         <Compile Include="Routing.fs" />
         <Compile Include="OfficeInterop\InteropLogging.fs" />
         <Compile Include="OfficeInterop\CustomXmlTypes.fs" />
-        <Compile Include="OfficeInterop\AuxFunctions\TermCollectionFunctions.fs" />
-        <Compile Include="OfficeInterop\AuxFunctions\ColHeaderIndexing.fs" />
-        <Compile Include="OfficeInterop\AuxFunctions\BuildingBlockFunctions.fs" />
-        <Compile Include="OfficeInterop\AuxFunctions\CustomXmlFunctions.fs" />
+        <Compile Include="OfficeInterop\Functions\TermCollectionFunctions.fs" />
+        <Compile Include="OfficeInterop\Functions\ColHeaderIndexing.fs" />
+        <Compile Include="OfficeInterop\Functions\BuildingBlockFunctions.fs" />
+        <Compile Include="OfficeInterop\Functions\CustomXmlFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
+        <Compile Include="States\JSONExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="CustomComponents\ActionButton.fs" />
         <Compile Include="CustomComponents\FunctionContainer.fs" />
         <Compile Include="CustomComponents\ResponsiveFA.fs" />
         <Compile Include="CustomComponents\DwnButton.fs" />
@@ -37,7 +40,6 @@
         <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
-        <Compile Include="PageTemplate.md" />
         <Compile Include="BuildingBlock\BuildingBlockView.fs" />
         <Compile Include="TermSearch\TermSearchView.fs" />
         <Compile Include="ProtocolTemplates\ProtocolState.fs" />

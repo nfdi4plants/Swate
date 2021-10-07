@@ -24,7 +24,7 @@ let update (validationMsg:Validation.Msg) (currentState: Validation.Model) : Val
     match validationMsg with
     /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
     /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
-    | StoreTableRepresentationFromOfficeInterop (tableValidation:OfficeInterop.CustomXmlTypes.Validation.TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock []) ->
+    | StoreTableRepresentationFromOfficeInterop (tableValidation:OfficeInterop.CustomXmlTypes.Validation.TableValidation, buildingBlocks:BuildingBlock []) ->
         let nextState = {
             currentState with
                 ActiveTableBuildingBlocks = buildingBlocks
@@ -141,7 +141,7 @@ let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValida
     ]
 
 
-let findTerm (columnValidation:ColumnValidation) (buildingBlocks:BuildingBlockTypes.BuildingBlock []) =
+let findTerm (columnValidation:ColumnValidation) (buildingBlocks:BuildingBlock []) =
     buildingBlocks
     |> Array.find (fun x -> x.MainColumn.Header = columnValidation.ColumnHeader)
 

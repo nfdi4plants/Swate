@@ -35,8 +35,8 @@ type Model = {
 type Msg =
     | Initialized                           of (string*string)
     | InsertOntologyTerm                    of TermMinimal
-    | AddAnnotationBlock                    of BuildingBlockTypes.InsertBuildingBlock
-    | AddAnnotationBlocks                   of BuildingBlockTypes.InsertBuildingBlock list //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | AddAnnotationBlock                    of InsertBuildingBlock
+    | AddAnnotationBlocks                   of InsertBuildingBlock list //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | FormatColumn                          of colname:string * formatString:string

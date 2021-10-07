@@ -31,7 +31,7 @@ module Column =
 
     /// This is used to create the bracket information for reference (hidden) columns. This function has two modi, one with id tag and one without.
     /// This time no core name is needed as this will always be TSR or TAN.
-    let createHiddenColAttributes (newBB:BuildingBlockTypes.InsertBuildingBlock) (id:int) =
+    let createHiddenColAttributes (newBB:InsertBuildingBlock) (id:int) =
         /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
         let isSingleCol = newBB.Column.Type.isSingleColumn
         if isSingleCol then
@@ -44,22 +44,22 @@ module Column =
 
     /// This function will create the mainColumn name from the base name (e.g. 'Parameter [instrument model]' -> Parameter [instrument model] (#1)).
     /// The possible addition of an id tag is needed, because column headers need to be unique in excel.
-    let createMainColName (newBB:BuildingBlockTypes.InsertBuildingBlock) (id:int) =
+    let createMainColName (newBB:InsertBuildingBlock) (id:int) =
         match id with
         | 1             -> newBB.Column.toAnnotationTableHeader()
         | anyOtherId    -> $"{newBB.Column.toAnnotationTableHeader(anyOtherId)}" 
 
-    let createTSRColName (newBB:BuildingBlockTypes.InsertBuildingBlock) (id:int) =
+    let createTSRColName (newBB:InsertBuildingBlock) (id:int) =
         let bracketAttributes = createHiddenColAttributes newBB id
         $"{ColumnCoreNames.TermSourceRef.toString} {bracketAttributes}"  
 
-    let createTANColName (newBB:BuildingBlockTypes.InsertBuildingBlock) (id:int) =
+    let createTANColName (newBB:InsertBuildingBlock) (id:int) =
         let bracketAttributes = createHiddenColAttributes newBB id
         $"{ColumnCoreNames.TermAccessionNumber.toString} {bracketAttributes}"  
 
     /// This function checks if the would be col names already exist. If they do, it ticks up the id tag to keep col names unique.
     /// This function returns the id for the main column and related reference columns.
-    let findNewIdForColumn (allColHeaders:string []) (newBB:BuildingBlockTypes.InsertBuildingBlock) =
+    let findNewIdForColumn (allColHeaders:string []) (newBB:InsertBuildingBlock) =
 
         /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
         let isSingleCol = newBB.Column.Type.isSingleColumn

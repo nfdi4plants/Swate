@@ -386,7 +386,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                         let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
                         let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some else None
                         let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && not colName.isSingleColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
-                        let newBuildingBlock = BuildingBlockTypes.InsertBuildingBlock.create colName colTerm unitTerm
+                        let newBuildingBlock = InsertBuildingBlock.create colName colTerm unitTerm
                         OfficeInterop.AddAnnotationBlock newBuildingBlock |> OfficeInteropMsg |> dispatch
                     )
                 ] [

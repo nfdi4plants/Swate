@@ -232,76 +232,69 @@ module OfficeInteropTypes =
             | Some str  -> getId str
             | None      -> None
 
+    type Cell = {
+        Index: int
+        Value: string option
+        Unit: TermMinimal option
+    } with
+        static member create ind value unit= {
+            Index = ind
+            Value = value
+            Unit = unit
+        }
 
-    /// This module contains types to handle value search for TSR and TAN columns.
-    /// The types help to summarize and collect needed information about the column partitions (~ building block, e.g. 1 col for `Source Name`,
-    /// 3 cols for standard `Parameter`, 6 cols for `Parameter` with unit). As excel allows to drag 'n drop values down for a column we need these types
-    /// to find such occurrences and fill in the missing TSR, TAN and unit cols.
-    module BuildingBlockTypes =
+    type Column = {
+        Index: int
+        Header: SwateColumnHeader
+        Cells: Cell []
+    } with
+        static member create ind headerOpt cellsArr = {
+            Index   =  ind
+            Header  = headerOpt
+            Cells   = cellsArr
+        } 
 
-        type Cell = {
-            Index: int
-            Value: string option
-            Unit: TermMinimal option
-        } with
-            static member create ind value unit= {
-                Index = ind
-                Value = value
-                Unit = unit
-            }
+    type BuildingBlock = {
+        MainColumn      : Column
+        MainColumnTerm  : TermMinimal option
+        Unit            : Column option
+        /// Term Source REF
+        TSR             : Column option
+        /// Term Accession Number
+        TAN             : Column option
+    } with
+        static member create mainCol tsr tan unit mainColTerm = {
+            MainColumn      = mainCol
+            MainColumnTerm  = mainColTerm
+            TSR             = tsr
+            TAN             = tan
+            Unit            = unit
+        }
 
-        type Column = {
-            Index: int
-            Header: SwateColumnHeader
-            Cells: Cell []
-        } with
-            static member create ind headerOpt cellsArr = {
-                Index   =  ind
-                Header  = headerOpt
-                Cells   = cellsArr
-            } 
+        member this.hasCompleteTSRTAN =
+            match this.TAN, this.TSR with
+            | Some tan, Some tsr ->
+                true
+            | None, None ->
+                false
+            | _, _ ->
+                failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN." this.MainColumn.Header.SwateColumnHeader)
 
-        type BuildingBlock = {
-            MainColumn      : Column
-            MainColumnTerm  : TermMinimal option
-            Unit            : Column option
-            /// Term Source REF
-            TSR             : Column option
-            /// Term Accession Number
-            TAN             : Column option
-        } with
-            static member create mainCol tsr tan unit mainColTerm = {
-                MainColumn      = mainCol
-                MainColumnTerm  = mainColTerm
-                TSR             = tsr
-                TAN             = tan
-                Unit            = unit
-            }
+        member this.hasUnit = this.Unit.IsSome
+        member this.hasTerm = this.MainColumnTerm.IsSome
+        member this.hasCompleteTerm = this.MainColumnTerm.IsSome && this.MainColumnTerm.Value.Name <> "" && this.MainColumnTerm.Value.TermAccession <> ""
 
-            member this.hasCompleteTSRTAN =
-                match this.TAN, this.TSR with
-                | Some tan, Some tsr ->
-                    true
-                | None, None ->
-                    false
-                | _, _ ->
-                    failwith (sprintf "Swate found unknown building block pattern in building block %s. Found only TSR or TAN." this.MainColumn.Header.SwateColumnHeader)
+    type InsertBuildingBlock = {
+        Column      : BuildingBlockNamePrePrint
+        ColumnTerm  : TermMinimal option
+        UnitTerm    : TermMinimal option 
+    } with
+        static member create column columnTerm unitTerm= {
+            Column      = column
+            ColumnTerm  = columnTerm
+            UnitTerm    = unitTerm
+        }
 
-            member this.hasUnit = this.Unit.IsSome
-            member this.hasTerm = this.MainColumnTerm.IsSome
-            member this.hasCompleteTerm = this.MainColumnTerm.IsSome && this.MainColumnTerm.Value.Name <> "" && this.MainColumnTerm.Value.TermAccession <> ""
-
-        type InsertBuildingBlock = {
-            Column      : BuildingBlockNamePrePrint
-            ColumnTerm  : TermMinimal option
-            UnitTerm    : TermMinimal option 
-        } with
-            static member create column columnTerm unitTerm= {
-                Column      = column
-                ColumnTerm  = columnTerm
-                UnitTerm    = unitTerm
-            }
-
-            member this.HasUnit = this.UnitTerm.IsSome
-            member this.HasExistingTerm = this.ColumnTerm.IsSome
-            member this.HasCompleteTerm = this.ColumnTerm.IsSome && this.ColumnTerm.Value.Name <> "" && this.ColumnTerm.Value.TermAccession <> ""
+        member this.HasUnit = this.UnitTerm.IsSome
+        member this.HasExistingTerm = this.ColumnTerm.IsSome
+        member this.HasCompleteTerm = this.ColumnTerm.IsSome && this.ColumnTerm.Value.Name <> "" && this.ColumnTerm.Value.TermAccession <> ""

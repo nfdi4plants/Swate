@@ -114,7 +114,7 @@ module Validation =
         | UpdateDisplayedOptionsId of int option
         | UpdateTableValidationScheme of CustomXmlTypes.Validation.TableValidation
         // OfficeInterop
-        | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlockTypes.BuildingBlock []
+        | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlock []
 
 module Protocol =
     type Msg =
@@ -179,10 +179,6 @@ type SettingsDataStewardMsg =
     // Client
     | UpdatePointerJson of string option
 
-
-module JSONExporter =
-    type Msg =
-    | DefaultMsg
 
 type TopLevelMsg =
     | CloseSuggestions

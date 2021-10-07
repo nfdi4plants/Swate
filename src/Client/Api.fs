@@ -18,3 +18,8 @@ let isaDotNetCommonApi : IISADotNetCommonAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IISADotNetCommonAPIv1>
+
+let expertAPIv1 : IExpertAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<IExpertAPIv1>

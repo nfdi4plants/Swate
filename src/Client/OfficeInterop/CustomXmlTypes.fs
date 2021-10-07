@@ -70,7 +70,7 @@ module Validation =
             Unit                = None
         }
 
-        static member ofBuildingBlock (buildingBlock: BuildingBlockTypes.BuildingBlock) =
+        static member ofBuildingBlock (buildingBlock: BuildingBlock) =
             let colHeader = buildingBlock.MainColumn.Header.SwateColumnHeader
             let adress = buildingBlock.MainColumn.Index
             ColumnValidation.init(colHeader,colAdress = Some adress)

@@ -11,8 +11,6 @@ open TermTypes
 
 open OfficeInterop
 open OfficeInterop.HelperFunctions
-open OfficeInteropTypes
-open OfficeInteropTypes.BuildingBlockTypes
 
 /// Reoccuring Comment Defitinitions
 

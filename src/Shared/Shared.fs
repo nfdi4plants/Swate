@@ -75,6 +75,10 @@ type IISADotNetCommonAPIv1 = {
     getTestNumber               : unit -> Async<string>
 }
 
+type IExpertAPIv1 = {
+    parseBuildingBlocksToProcessJson    : OfficeInteropTypes.BuildingBlock []   ->  Async<string>
+}
+
 type IAnnotatorAPIv1 = {
     // Development
     getTestNumber               : unit                                                  -> Async<int>

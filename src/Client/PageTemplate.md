@@ -18,7 +18,6 @@ type Msg =
 | DefaultMsg
 ```
 
-
 3. Add the submodel to `Messages.Model` and the subrouting to `Messages.Msg` (`Messages.fs`)
 
 ```fsharp

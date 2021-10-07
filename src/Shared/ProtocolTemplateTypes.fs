@@ -10,7 +10,7 @@ module ProtocolTemplateTypes =
         Description             : string
         DocsLink                : string
         Tags                    : string []
-        TemplateBuildingBlocks  : OfficeInteropTypes.BuildingBlockTypes.InsertBuildingBlock list
+        TemplateBuildingBlocks  : OfficeInteropTypes.InsertBuildingBlock list
         Used                    : int
         // WIP
         Rating                  : int  

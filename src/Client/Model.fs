@@ -277,7 +277,7 @@ module BuildingBlock =
 /// Validation scheme for Table
 module Validation =
     type Model = {
-        ActiveTableBuildingBlocks   : BuildingBlockTypes.BuildingBlock []
+        ActiveTableBuildingBlocks   : BuildingBlock []
         TableValidationScheme       : OfficeInterop.CustomXmlTypes.Validation.TableValidation
         // Client view related
         DisplayedOptionsId      : int option
@@ -393,14 +393,5 @@ type SettingsDataStewardState = {
     static member init () = {
         PointerJson = None
     }
-
-module JSONExporter =
-
-    type Model = {
-        Default: obj
-    } with
-        static member init() = {
-            Default = ""
-        }
 
 /// The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

@@ -5,7 +5,6 @@ open ExcelJS.Fable
 open Excel
 
 open Shared.OfficeInteropTypes
-open Shared.OfficeInteropTypes.BuildingBlockTypes
 open Shared.TermTypes
 open Indexing
 

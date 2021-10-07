@@ -15,20 +15,41 @@ open Model
 
 open Shared.OfficeInteropTypes
 open Validation
-open Messages.JSONExporter
+open JSONExporter
 
 let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
-    | DefaultMsg ->
-        Fable.Core.JS.console.log "Default Msg"
+    | ParseTableOfficeInteropRequest ->
+        currentModel, Cmd.none
+    | ParseTableServerRequest buildingBlocks ->
+        currentModel, Cmd.none
+    | ParseTableServerResponse parsedJson ->
         currentModel, Cmd.none
 
 open Messages
 
+open Browser.Dom
+open Fable.Core.JS
+open Fable.Core.JsInterop
+
+let download(filename, text) =
+  let element = document.createElement("a");
+  element.setAttribute("href", "data:text/plain;charset=utf-8," +  encodeURIComponent(text));
+  element.setAttribute("download", filename);
+
+  element?style?display <- "None";
+  let _ = document.body.appendChild(element);
+
+  element.click();
+
+  document.body.removeChild(element);
+
 let defaultMessageEle (model:Model) dispatch =
     mainFunctionContainer [
         Button.a [
-            Button.OnClick(fun e -> DefaultMsg |> JSONExporterMsg |> dispatch)
+            Button.OnClick(fun e ->
+               ()
+            )
         ][
             str "Click me!"
         ]

@@ -8,7 +8,6 @@ open GlobalBindings
 open Shared.OfficeInteropTypes
 open Shared.TermTypes
 
-
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let getSwateTermCollectionNameCol (context:RequestContext) =
 
