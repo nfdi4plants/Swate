@@ -2,31 +2,24 @@ How to add a new page to the project (For example page **"NewName"**)
 
 1. Start by adding a route to the new page in ``Routing.fs``
 (multiple steps, work from top to bottom and add to all)
-2. Go to ``Model.fs`` and add:
-
+2. Create a new file in the `States` folder with the page `Model` and `Msg`:
 
 ```fsharp
-module NewName =
+namespace NewName
 
-    type Model = {
-        Default: obj
-    } with
-        static member init() = {
-            Default = ""
-        }
+type Model = {
+    Default: obj
+} with
+    static member init() = {
+        Default = ""
+    }
+
+type Msg =
+| DefaultMsg
 ```
 
 
-3. Go to Messages.fs and add the following somewhere above `Messages.Model`:
-
-```fsharp
-module NewName =
-
-    type Msg =
-    | DefaultMsg
-```
-
-1. 1 Add the submodel to `Messages.Model` and the subrouting to `Messages.Msg`
+3. Add the submodel to `Messages.Model` and the subrouting to `Messages.Msg` (`Messages.fs`)
 
 ```fsharp
 type Model = {
@@ -40,7 +33,7 @@ type Msg =
 
 ```
 
-3. 2 Update the ``Model.init()`` function accordingly.
+3. 1 Update the ``Model.init()`` function accordingly.
 
 4. Create a new folder ``NewName`` and add ``NewName.fs``. Move the folder above the ``Update``. folder.
 5. Add the following to ``NewName.fs``.
