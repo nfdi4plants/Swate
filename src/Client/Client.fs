@@ -84,9 +84,12 @@ let view (model : Model) (dispatch : Msg -> unit) =
     | Routing.Route.XLSXConverter ->
         BaseView.baseViewMainElement model dispatch [
             XLSXConverterView.xlsxConverterMainView model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
+        ] [ (*Footer*) ]
+
+    | Routing.Route.JSONExporter ->
+        BaseView.baseViewMainElement model dispatch [
+            JSONExporter.jsonExporterMainElement model dispatch
+        ] [ (*Footer*) ]
 
     | Routing.Route.ProtocolSearch ->
         BaseView.baseViewMainElement model dispatch [

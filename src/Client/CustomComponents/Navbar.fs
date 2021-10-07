@@ -183,8 +183,11 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
         Navbar.IsTransparent
     ] [
         Navbar.Brand.div [] [
-            Navbar.Item.a [
-                Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"; Target "_Blank"; Style [Width "100px"]]
+            Navbar.Item.div [
+                Navbar.Item.Props [
+                    OnClick (fun e -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
+                    Style [Width "100px"; Cursor "pointer"]
+                ]
             ] [
                 img [Props.Src @"assets\Swate_logo_for_excel.svg"]
             ]

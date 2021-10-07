@@ -394,4 +394,13 @@ type SettingsDataStewardState = {
         PointerJson = None
     }
 
+module JSONExporter =
+
+    type Model = {
+        Default: obj
+    } with
+        static member init() = {
+            Default = ""
+        }
+
 /// The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

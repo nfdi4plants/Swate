@@ -702,9 +702,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         nextModel, debouncerCmd
 
     | OfficeInteropMsg excelMsg ->
-        let nextModel,nextCmd =
-            currentModel
-            |> Update.OfficeInterop.update excelMsg
+        let nextModel,nextCmd = currentModel |> Update.OfficeInterop.update excelMsg
         nextModel,nextCmd
 
     | TermSearchMsg termSearchMsg ->
@@ -852,6 +850,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             currentModel with
                 SettingsDataStewardState = nextState
         }
+        nextModel, nextCmd
+
+    | JSONExporterMsg msg ->
+        let nextModel, nextCmd = currentModel |> JSONExporter.update msg
         nextModel, nextCmd
 
     //| SettingsProtocolMsg msg ->

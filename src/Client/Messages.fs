@@ -179,13 +179,10 @@ type SettingsDataStewardMsg =
     // Client
     | UpdatePointerJson of string option
 
-//type SettingsProtocolMsg =
-//    | UpdateProtocolsFromExcel          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-//    | UpdateProtocolsFromDB             of ProtocolTemplate []
-//    // ExcelInterop
-//    | GetActiveProtocolGroupXmlParsed
-//    | GetProtocolsFromDBRequest         of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-//    | UpdateProtocolByNewVersion        of OfficeInterop.Types.Xml.GroupTypes.Protocol * ProtocolTemplate
+
+module JSONExporter =
+    type Msg =
+    | DefaultMsg
 
 type TopLevelMsg =
     | CloseSuggestions
@@ -235,6 +232,8 @@ type Model = {
     ///Used to manage all custom xml settings
     SettingsXmlState            : SettingsXml.Model
 
+    JSONExporterModel           : JSONExporter.Model
+
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
 
@@ -245,6 +244,8 @@ type Model = {
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
+    member this.updateByJSONExporterModel (m:JSONExporter.Model) =
+        { this with JSONExporterModel = m}
 
 and Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
@@ -261,6 +262,7 @@ and Msg =
     | ValidationMsg         of Validation.Msg
     | ProtocolMsg           of Protocol.Msg
     | XLSXConverterMsg      of XLSXConverterMsg
+    | JSONExporterMsg       of JSONExporter.Msg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
     | SettingsXmlMsg        of SettingsXml.Msg
     | SettingDataStewardMsg of SettingsDataStewardMsg
@@ -307,6 +309,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
         SettingsXmlState            = SettingsXml.Model         .init ()
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
+        JSONExporterModel           = JSONExporter.Model        .init ()
         WarningModal                = None
         XLSXByteArray               = [||]
         XLSXJSONResult              = ""

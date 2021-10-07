@@ -37,6 +37,7 @@
         <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
+        <Compile Include="PageTemplate.md" />
         <Compile Include="BuildingBlock\BuildingBlockView.fs" />
         <Compile Include="TermSearch\TermSearchView.fs" />
         <Compile Include="ProtocolTemplates\ProtocolState.fs" />
@@ -48,6 +49,7 @@
         <Compile Include="ActivityLog\ActivityLogView.fs" />
         <Compile Include="Settings\SettingsXml\SettingsXmlView.fs" />
         <Compile Include="Settings\SettingsView.fs" />
+        <Compile Include="JSONExporter\JSONExporter.fs" />
         <Compile Include="Views\XLSXConverterView.fs" />
         <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />

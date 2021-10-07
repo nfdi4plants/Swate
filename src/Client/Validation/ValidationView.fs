@@ -6,9 +6,6 @@ open Fulma
 open Fulma.Extensions.Wikiki
 open Fable.FontAwesome
 open Fable.Core.JsInterop
-open Browser
-open Browser.MediaQueryList
-open Browser.MediaQueryListExtensions
 open Elmish
 
 open Shared
