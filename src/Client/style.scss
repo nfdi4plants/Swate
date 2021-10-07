@@ -31,6 +31,26 @@ $switch-background-active: $excelPrimary;
 @import "~bulma-checkradio";
 @import "~bulma-slider";
 
+/*body {
+    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    background-size: 400% 400%;
+    animation: gradient 10s ease infinite;
+}
+
+@keyframes gradient {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}*/
+
 [type=checkbox]:checked.switch.is-primary + label::before, [type=checkbox]:checked.switch.is-primary + label::before {
     background: $mint
 }
@@ -58,7 +78,7 @@ $switch-background-active: $excelPrimary;
 html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     font-size: 14px;
-    background: #F0F2F4;
+/*    background: #F0F2F4;*/
     min-width: 355px;
     overflow-x: auto
 }

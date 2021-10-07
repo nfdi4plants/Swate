@@ -255,19 +255,13 @@ module OfficeInterop =
                     (GenericError >> Dev)
             currentModel, cmd
         | GetSwateCustomXml ->
-            failwith """Function "GetSwateCustomXml" is currently not supported."""
-            //let cmd =
-            //    Cmd.OfPromise.either
-            //        OfficeInterop.getSwateCustomXml
-            //        ()
-            //        (fun xml ->
-            //            Msg.Batch [
-            //                GenericLog xml |> Dev
-            //                UpdateRawCustomXml (snd xml) |> SettingsXmlMsg
-            //            ]
-            //        )
-            //        (GenericError >> Dev)
-            currentModel, Cmd.none//cmd
+            let cmd =
+                Cmd.OfPromise.either
+                    OfficeInterop.getSwateCustomXml
+                    ()
+                    (Some >> SettingsXml.UpdateRawCustomXml >> SettingsXmlMsg)
+                    (GenericError >> Dev)
+            currentModel, cmd
         | UpdateSwateCustomXml newCustomXml ->
             let cmd =
                 Cmd.OfPromise.either

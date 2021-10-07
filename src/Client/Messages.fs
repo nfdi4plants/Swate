@@ -150,29 +150,30 @@ type BuildingBlockDetailsMsg =
     | ToggleShowDetails
     | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
 
-//type SettingsXmlMsg =
-//    // // Client // //
-//    // Validation Xml
-//    | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-//    | UpdateNextAnnotationTableForActiveValidation  of AnnotationTable option
-//    | UpdateValidationXmls                          of OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
-//    // Protocol Group Xml
-//    | UpdateProtocolGroupXmls                       of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
-//    | UpdateActiveProtocolGroup                     of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-//    | UpdateNextAnnotationTableForActiveProtGroup   of AnnotationTable option
-//    // Protocol Xml
-//    | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
-//    | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
-//    //
-//    | UpdateRawCustomXml                            of string
-//    | UpdateNextRawCustomXml                        of string
-//    // Excel Interop
-//    | GetAllValidationXmlParsedRequest
-//    | GetAllValidationXmlParsedResponse             of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
-//    | GetAllProtocolGroupXmlParsedRequest
-//    | GetAllProtocolGroupXmlParsedResponse          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
-//    | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
-//    | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypes
+module SettingsXml =
+    type Msg =
+    //    // // Client // //
+    //    // Validation Xml
+    //    | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    //    | UpdateNextAnnotationTableForActiveValidation  of AnnotationTable option
+    //    | UpdateValidationXmls                          of OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+    //    // Protocol Group Xml
+    //    | UpdateProtocolGroupXmls                       of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
+    //    | UpdateActiveProtocolGroup                     of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+    //    | UpdateNextAnnotationTableForActiveProtGroup   of AnnotationTable option
+    //    // Protocol Xml
+    //    | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
+    //    | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
+    //    //
+        | UpdateRawCustomXml                            of string option
+        | UpdateNextRawCustomXml                        of string option
+    //    // Excel Interop
+    //    | GetAllValidationXmlParsedRequest
+    //    | GetAllValidationXmlParsedResponse             of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
+    //    | GetAllProtocolGroupXmlParsedRequest
+    //    | GetAllProtocolGroupXmlParsedResponse          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
+    //    | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
+    //    | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypesUpdateSwateCustomXml
 
 type SettingsDataStewardMsg =
     // Client
@@ -232,7 +233,7 @@ type Model = {
     BuildingBlockDetailsState   : BuildingBlockDetailsState
 
     ///Used to manage all custom xml settings
-    SettingsXmlState            : SettingsXmlState
+    SettingsXmlState            : SettingsXml.Model
 
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
@@ -261,7 +262,7 @@ and Msg =
     | ProtocolMsg           of Protocol.Msg
     | XLSXConverterMsg      of XLSXConverterMsg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
-    //| SettingsXmlMsg        of SettingsXmlMsg
+    | SettingsXmlMsg        of SettingsXml.Msg
     | SettingDataStewardMsg of SettingsDataStewardMsg
     //| SettingsProtocolMsg   of SettingsProtocolMsg
     | TopLevelMsg           of TopLevelMsg
@@ -304,7 +305,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         ValidationState             = Validation.Model          .init ()
         ProtocolState               = Protocol.Model            .init ()
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
-        SettingsXmlState            = SettingsXmlState          .init ()
+        SettingsXmlState            = SettingsXml.Model         .init ()
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
         WarningModal                = None
         XLSXByteArray               = [||]

@@ -528,163 +528,6 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
         }
         nextState, Cmd.none
 
-//let handleSettingsXmlMsg (msg:SettingsXmlMsg) (currentState: SettingsXmlState) : SettingsXmlState * Cmd<Msg> =
-
-//    let matchXmlTypeToUpdateMsg msg (xmlType:OfficeInterop.Types.Xml.XmlTypes) =
-//        match xmlType with
-//        | OfficeInterop.Types.Xml.XmlTypes.ValidationType v ->
-//            Msg.Batch [
-//                GenericLog ("Info", msg) |> Dev
-//                GetAllValidationXmlParsedRequest |> SettingsXmlMsg
-//            ]
-//        | OfficeInterop.Types.Xml.XmlTypes.GroupType _ | OfficeInterop.Types.Xml.XmlTypes.ProtocolType _ ->
-//            Msg.Batch [
-//                GenericLog ("Info", msg) |> Dev
-//                GetAllProtocolGroupXmlParsedRequest |> SettingsXmlMsg
-//                UpdateProtocolGroupHeader |> ExcelInterop
-//            ]
-        
-//    match msg with
-//    // // Client // //
-//    // Validation Xml
-//    | UpdateActiveSwateValidation nextActiveTableValid ->
-//        let nextState = {
-//            currentState with
-//                ActiveSwateValidation                   = nextActiveTableValid
-//                NextAnnotationTableForActiveValidation  = None
-//        }
-//        nextState, Cmd.none
-//    | UpdateNextAnnotationTableForActiveValidation nextAnnoTable ->
-//        let nextState = {
-//            currentState with
-//                NextAnnotationTableForActiveValidation = nextAnnoTable
-//        }
-//        nextState, Cmd.none
-//    | UpdateValidationXmls newValXmls ->
-//        let nextState = {
-//            currentState with
-//                ActiveSwateValidation                   = None
-//                NextAnnotationTableForActiveValidation  = None
-//                ValidationXmls                          = newValXmls
-//        }
-//        nextState, Cmd.none
-//    // Protocol group xml
-//    | UpdateProtocolGroupXmls newProtXmls ->
-//        let nextState = {
-//            currentState with
-//                ActiveProtocolGroup                     = None
-//                NextAnnotationTableForActiveProtGroup   = None
-//                ActiveProtocol                          = None
-//                NextAnnotationTableForActiveProtocol    = None
-//                ProtocolGroupXmls                       = newProtXmls
-//        }
-//        nextState, Cmd.none
-//    | UpdateActiveProtocolGroup nextActiveProtGroup ->
-//        let nextState= {
-//            currentState with
-//                ActiveProtocolGroup                     = nextActiveProtGroup
-//                NextAnnotationTableForActiveProtGroup   = None
-//        }
-//        nextState, Cmd.none
-//    | UpdateNextAnnotationTableForActiveProtGroup nextAnnoTable ->
-//        let nextState = {
-//            currentState with
-//                NextAnnotationTableForActiveProtGroup = nextAnnoTable
-//        }
-//        nextState, Cmd.none
-//    // Protocol xml
-//    | UpdateActiveProtocol protocol ->
-//        let nextState = {
-//            currentState with
-//                ActiveProtocol                          = protocol
-//                NextAnnotationTableForActiveProtocol    = None
-//        }
-//        nextState, Cmd.none
-//    | UpdateNextAnnotationTableForActiveProtocol nextAnnoTable ->
-//        let nextState = {
-//            currentState with
-//                NextAnnotationTableForActiveProtocol = nextAnnoTable
-//        }
-//        nextState, Cmd.none
-//    //
-//    | UpdateRawCustomXml rawXmlStr ->
-//        let nextState = {
-//            currentState with
-//                RawXml      = rawXmlStr
-//                NextRawXml  = ""
-//        }
-//        nextState, Cmd.none
-//    | UpdateNextRawCustomXml nextRawCustomXml ->
-//        let nextState = {
-//            currentState with
-//                NextRawXml = nextRawCustomXml
-//        }
-//        nextState, Cmd.none
-//    // OfficeInterop
-//    | GetAllValidationXmlParsedRequest ->
-//        let nextState = {
-//            currentState with
-//                ActiveSwateValidation                   = None
-//                NextAnnotationTableForActiveValidation  = None
-//        }
-//        let cmd =
-//            Cmd.OfPromise.either
-//                OfficeInterop.getAllValidationXmlParsed
-//                ()
-//                (GetAllValidationXmlParsedResponse >> SettingsXmlMsg)
-//                (GenericError >> Dev)
-//        nextState, cmd
-//    | GetAllValidationXmlParsedResponse (tableValidations, annoTables) ->
-//        let nextState = {
-//            currentState with
-//                FoundTables = annoTables
-//                ValidationXmls = tableValidations |> Array.ofList
-//        }
-//        let infoMsg = "Info", sprintf "Found %i checklist XML(s)." tableValidations.Length
-//        let infoCmd = GenericLog infoMsg |> Dev |> Cmd.ofMsg
-//        nextState, infoCmd
-//    | GetAllProtocolGroupXmlParsedRequest ->
-//        let nextState = {
-//            currentState with
-//                ActiveProtocolGroup                     = None
-//                NextAnnotationTableForActiveProtGroup   = None
-//                ActiveProtocol                          = None
-//                NextAnnotationTableForActiveProtocol    = None
-//        }
-//        let cmd =
-//            Cmd.OfPromise.either
-//                OfficeInterop.getAllProtocolGroupXmlParsed
-//                ()
-//                (GetAllProtocolGroupXmlParsedResponse >> SettingsXmlMsg)
-//                (GenericError >> Dev)
-//        nextState, cmd
-//    | GetAllProtocolGroupXmlParsedResponse (protocolGroupXmls, annoTables) ->
-//        let nextState = {
-//            currentState with
-//                FoundTables = annoTables
-//                ProtocolGroupXmls = protocolGroupXmls |> Array.ofList
-//        }
-//        let infoMsg = "Info", sprintf "Found %i protocol group XML(s)." protocolGroupXmls.Length
-//        let infoCmd = GenericLog infoMsg |> Dev |> Cmd.ofMsg
-//        nextState, infoCmd
-//    | RemoveCustomXmlRequest xmlType ->
-//        let cmd =
-//            Cmd.OfPromise.either
-//                OfficeInterop.removeXmlType
-//                xmlType
-//                (fun msg ->  matchXmlTypeToUpdateMsg msg xmlType)
-//                (GenericError >> Dev)
-//        currentState, cmd
-//    | ReassignCustomXmlRequest (prevXml,newXml) ->
-//        let cmd =
-//            Cmd.OfPromise.either
-//                OfficeInterop.updateAnnotationTableByXmlType
-//                (prevXml,newXml)
-//                // can use prevXml or newXml. Both are checked during 'updateAnnotationTableByXmlType' to be of the same kind
-//                (fun msg -> matchXmlTypeToUpdateMsg msg prevXml)
-//                (GenericError >> Dev)
-//        currentState, cmd
-
 let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
     match topLevelMsg with
     // Client
@@ -991,15 +834,15 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             }
         nextModel, nextCmd
 
-    //| SettingsXmlMsg msg ->
-    //    let nextState, nextCmd =
-    //        currentModel.SettingsXmlState
-    //        |> handleSettingsXmlMsg msg
-    //    let nextModel = {
-    //        currentModel with
-    //            SettingsXmlState = nextState
-    //    }
-    //    nextModel, nextCmd
+    | SettingsXmlMsg msg ->
+        let nextState, nextCmd =
+            currentModel.SettingsXmlState
+            |> SettingsXml.update msg
+        let nextModel = {
+            currentModel with
+                SettingsXmlState = nextState
+        }
+        nextModel, nextCmd
 
     | SettingDataStewardMsg msg ->
         let nextState, nextCmd =

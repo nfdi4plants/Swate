@@ -77,7 +77,6 @@ let settingsViewComponent (model:Model) dispatch =
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Customize Swate"]
         toggleDarkModeElement model dispatch
 
-
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Advanced Settings"]
         customXmlSettings model dispatch
         dataStewardsSettings model dispatch

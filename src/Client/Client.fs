@@ -111,7 +111,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.SettingsXml ->
         BaseView.baseViewMainElement model dispatch [
-            SettingsXmlView.settingsXmlViewComponent model dispatch
+            SettingsXml.settingsXmlViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]

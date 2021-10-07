@@ -353,38 +353,39 @@ type BuildingBlockDetailsState = {
         BuildingBlockValues = [||]
     }
 
-type SettingsXmlState = {
-    // // Client // //
-    // Validation xml
-    ActiveSwateValidation                   : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    NextAnnotationTableForActiveValidation  : string option
-    // Protocol group xml
-    ActiveProtocolGroup                     : obj option //OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    NextAnnotationTableForActiveProtGroup   : string option
-    // Protocol
-    ActiveProtocol                          : obj option //OfficeInterop.Types.Xml.GroupTypes.Protocol option
-    NextAnnotationTableForActiveProtocol    : string option
-    //
-    RawXml                                  : string
-    NextRawXml                              : string
-    FoundTables                             : string []
-    ValidationXmls                          : obj [] //OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
-} with
-    static member init () = {
-        // Client
-        ActiveSwateValidation                   = None
-        NextAnnotationTableForActiveValidation  = None
-        ActiveProtocolGroup                     = None
-        NextAnnotationTableForActiveProtGroup   = None
-        ActiveProtocol                          = None
-        /// Unused
-        NextAnnotationTableForActiveProtocol    = None
+module SettingsXml =
+    type Model = {
+        // // Client // //
+        // Validation xml
+        ActiveSwateValidation                   : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+        NextAnnotationTableForActiveValidation  : string option
+        // Protocol group xml
+        ActiveProtocolGroup                     : obj option //OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
+        NextAnnotationTableForActiveProtGroup   : string option
+        // Protocol
+        ActiveProtocol                          : obj option //OfficeInterop.Types.Xml.GroupTypes.Protocol option
+        NextAnnotationTableForActiveProtocol    : string option
         //
-        RawXml                                  = ""
-        NextRawXml                              = ""
-        FoundTables                             = [||]
-        ValidationXmls                          = [||]
-    }
+        RawXml                                  : string option
+        NextRawXml                              : string option
+        FoundTables                             : string []
+        ValidationXmls                          : obj [] //OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
+    } with
+        static member init () = {
+            // Client
+            ActiveSwateValidation                   = None
+            NextAnnotationTableForActiveValidation  = None
+            ActiveProtocolGroup                     = None
+            NextAnnotationTableForActiveProtGroup   = None
+            ActiveProtocol                          = None
+            /// Unused
+            NextAnnotationTableForActiveProtocol    = None
+            //
+            RawXml                                  = None
+            NextRawXml                              = None
+            FoundTables                             = [||]
+            ValidationXmls                          = [||]
+        }
 
 type SettingsDataStewardState = {
     PointerJson : string option

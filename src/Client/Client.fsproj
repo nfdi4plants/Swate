@@ -46,9 +46,9 @@
         <Compile Include="Validation\ValidationView.fs" />
         <Compile Include="Info\InfoView.fs" />
         <Compile Include="ActivityLog\ActivityLogView.fs" />
+        <Compile Include="Settings\SettingsXml\SettingsXmlView.fs" />
+        <Compile Include="Settings\SettingsView.fs" />
         <Compile Include="Views\XLSXConverterView.fs" />
-        <Compile Include="Views\SettingsView.fs" />
-        <Compile Include="Views\SettingsXmlView.fs" />
         <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Views\BaseView.fs" />

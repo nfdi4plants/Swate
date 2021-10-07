@@ -88,7 +88,9 @@ let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement
             if model.AddBuildingBlockState.ShowBuildingBlockSelection then
                 BuildingBlockMsg BuildingBlock.ToggleSelectionDropdown |> dispatch
         )
-        Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"]
+        Style [
+            MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"
+        ]
     ] children
 
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.

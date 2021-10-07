@@ -1516,8 +1516,6 @@ let getSwateCustomXml() =
 
         promise {
 
-            //let! xmlParsed, currentSwateValidationXml = getCurrentValidationXml customXmlParts context
-
             let! getXml =
                 context.sync().``then``(fun e ->
                     let items = customXmlParts.items
@@ -1536,7 +1534,7 @@ let getSwateCustomXml() =
                     xml
                 )
 
-            return "Info",sprintf "%A" xml
+            return xml
         }
     )
 
