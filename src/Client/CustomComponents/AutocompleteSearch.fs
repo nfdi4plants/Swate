@@ -34,7 +34,7 @@ with
     static member ofOntology (ont:DbDomain.Ontology) : AutocompleteSuggestion<DbDomain.Ontology> = {
         Name            = ont.Name
         ID              = ont.CurrentVersion
-        TooltipText     = ont.Definition
+        TooltipText     = ""
         Status          = ""
         StatusIsWarning = false
         Data            = ont

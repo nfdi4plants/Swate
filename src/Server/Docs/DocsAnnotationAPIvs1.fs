@@ -45,7 +45,7 @@ let annotatorApiDocsv1 =
                     "Creates a <code>DbDomain.Ontology</code> from the given params and returns it."
                     (Parameter.create "Ontology" PredefinedParams.OntologyType "A database Ontology entry. This one is not from the database and is currently <b>not</b> created. <code>ID</code> is a set value for this version.")
             )
-        |> annotatorDocsv1.example <@ fun api -> api.testOntologyInsert ("TO","releases/testdate","Test Ontology",PredefinedParams.Examples.test,"UserTestId") @>
+        |> annotatorDocsv1.example <@ fun api -> api.testOntologyInsert ("TO","releases/testdate",PredefinedParams.Examples.test,"UserTestId") @>
 
         ////////
         annotatorDocsv1.route <@ fun api -> api.getAllOntologies @>

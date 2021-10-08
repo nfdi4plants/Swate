@@ -83,41 +83,6 @@ let getProtocolByName cString (queryStr:string) =
         (reader.GetInt32(7))        // used
         (reader.GetInt32(8))        // rating
 
-//let getXmlByProtocol cString (protocol:ProtocolTemplate) =
-//    use connection = establishConnection cString
-//    connection.Open()
-
-//    use cmd = connection.CreateCommand()
-//    cmd
-//        .CommandText <- """
-//            SELECT * FROM ProtocolXml
-//            WHERE FK_Name = @name
-//        """
-
-//    let nameParam = cmd.Parameters.Add("name",MySqlDbType.VarChar)
-
-//    nameParam.Value <- protocol.Name
-
-//    use reader = cmd.ExecuteReader()
-//    let res = [|
-//        while reader.Read() do
-//            yield
-//                reader.GetString(2), reader.GetString(3)
-//    |]
-
-//    let customXml = res |> Array.tryFind (fun (xmlType,xml) ->
-//        xmlType = string CustomXml
-//    )
-
-//    let tableXml = res |> Array.tryFind (fun (xmlType,xml) ->
-//        xmlType = string TableXml
-//    )
-
-//    { protocol with
-//        CustomXml = if customXml.IsSome then customXml.Value |> snd else ""
-//        TableXml = if tableXml.IsSome then tableXml.Value |> snd else ""
-//    }
-
 let increaseTimesUsed cString (templateName) =
     use connection = establishConnection cString
     connection.Open()

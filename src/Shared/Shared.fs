@@ -81,28 +81,25 @@ type IExpertAPIv1 = {
 
 type IAnnotatorAPIv1 = {
     // Development
-    getTestNumber               : unit                                                  -> Async<int>
+    getTestNumber               : unit                                          -> Async<int>
 
     // Ontology related requests
     /// (name,version,definition,created,user)
-    testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>
-    getAllOntologies            : unit                                                  -> Async<DbDomain.Ontology []>
+    testOntologyInsert          : (string*string*System.DateTime*string)        -> Async<DbDomain.Ontology>
+    getAllOntologies            : unit                                          -> Async<DbDomain.Ontology []>
 
     // Term related requests
+    ///
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
     getTermSuggestionsByParentTerm      : (int*string*TermMinimal)                                      -> Async<DbDomain.Term []>
-    ///
     getAllTermsByParentTerm             : TermMinimal                                                   -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
     getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                      -> Async<DbDomain.Term []>
-    ///
     getAllTermsByChildTerm              : TermMinimal                                                   -> Async<DbDomain.Term []>
     /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
     getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
-
     getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<DbDomain.Term [] * UnitSearchRequest>
-
     getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
 
     // Protocol apis

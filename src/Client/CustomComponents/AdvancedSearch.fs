@@ -146,16 +146,6 @@ let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: DbD
             OnKeyDown (fun k -> if k.key = "Enter" then ontOpt |> OntologySuggestionUsed |> AdvancedSearchMsg |> dispatch)
         ]
     ][
-        Text.span [
-            CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
-            Props [
-                if ontOpt.IsSome then Tooltip.dataTooltip (ontOpt.Value.Definition)
-                Style [PaddingRight "10px"]
-            ]
-        ] [
-            Fa.i [Fa.Solid.InfoCircle] []
-        ]
-        
         Text.span [] [
             if ontOpt.IsSome then
                 ontOpt.Value.Name |> str

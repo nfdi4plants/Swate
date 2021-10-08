@@ -10,15 +10,13 @@ module TermTypes =
         type Ontology = {
             Name            : string
             CurrentVersion  : string
-            Definition      : string
             DateCreated     : System.DateTime
             UserID          : string
         }
 
-        let createOntology name currentVersion definition dateCreated userID = {     
+        let createOntology name currentVersion dateCreated userID = {     
             Name            = name          
             CurrentVersion  = currentVersion
-            Definition      = definition    
             DateCreated     = dateCreated   
             UserID          = userID        
         }

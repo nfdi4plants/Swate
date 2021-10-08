@@ -84,7 +84,7 @@ let annotatorApi cString = {
     getTestNumber = fun () -> async { return 42 }
 
     //Ontology related requests
-    testOntologyInsert = fun (name,version,definition,created,user) ->
+    testOntologyInsert = fun (name,version,created,user) ->
         async {
             /// Don't allow users to access this part!! At least for now
             //let createdEntry = OntologyDB.insertOntology cString name version definition created user
@@ -92,7 +92,6 @@ let annotatorApi cString = {
                 DbDomain.createOntology 
                     name
                     version
-                    definition
                     created
                     user
             printfn "created pseudo ontology entry: \t%A. No actual db insert has happened." onto

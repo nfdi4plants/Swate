@@ -20,19 +20,17 @@ let insertOntology cString (name:string) (currentVersion:string) (definition:str
 
     insertOntologyCmd
         .CommandText <-"""
-INSERT INTO Ontology (Name,CurrentVersion,Definition,DateCreated,UserID)
+INSERT INTO Ontology (Name,CurrentVersion,DateCreated,UserID)
 VALUES (@name,@cv,@def,@dc,@uid);
 SELECT max(ID) FROM Ontology"""
 
     let nameParam           = insertOntologyCmd.Parameters.Add("name",MySqlDbType.VarChar)
     let currentVersionParam = insertOntologyCmd.Parameters.Add("cv",MySqlDbType.VarChar)
-    let definitionParam     = insertOntologyCmd.Parameters.Add("def",MySqlDbType.VarChar)
     let dateCreatedParam    = insertOntologyCmd.Parameters.Add("dc",MySqlDbType.DateTime)
     let userIDParam         = insertOntologyCmd.Parameters.Add("uid",MySqlDbType.VarChar)
 
     nameParam           .Value <- name
     currentVersionParam .Value <- currentVersion
-    definitionParam     .Value <- definition
     dateCreatedParam    .Value <- System.DateTimeOffset.UtcNow
     userIDParam         .Value <- userID
 
@@ -42,7 +40,6 @@ SELECT max(ID) FROM Ontology"""
         DbDomain.createOntology 
             name
             currentVersion
-            definition
             dateCreated
             userID
     | false -> failwith "Inserting ontology failed."
@@ -61,7 +58,7 @@ VALUES (@acc,@ontId,@name,@def,@xrv,@iO);
 SELECT max(ID) FROM Term"""
 
     let accessionParam      = insertTermCmd.Parameters.Add("acc",MySqlDbType.VarChar)
-    let ontologyNameParam     = insertTermCmd.Parameters.Add("ontId",MySqlDbType.VarChar)
+    let ontologyNameParam   = insertTermCmd.Parameters.Add("ontId",MySqlDbType.VarChar)
     let nameParam           = insertTermCmd.Parameters.Add("name",MySqlDbType.VarChar)
     let definitionParam     = insertTermCmd.Parameters.Add("def",MySqlDbType.VarChar)
     let xRefValueTypeParam  = insertTermCmd.Parameters.Add("xrv",MySqlDbType.VarChar)
@@ -532,9 +529,8 @@ let getAllOntologies cString () =
                 DbDomain.createOntology
                     (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetString(2))
-                    (reader.GetDateTime(3)) // TODO:
-                    (reader.GetString(4))
+                    (reader.GetDateTime(2))
+                    (reader.GetString(3))
     |]
 
 let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (searchName : string) (mustContainName:string) (searchDef:string) (mustContainDef:string) (keepObsolete:bool) =
