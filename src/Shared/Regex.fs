@@ -4,27 +4,45 @@ module Regex =
 
     module Pattern =
 
-        [<LiteralAttribute>]
-        let HashNumberPattern = "#\d+"
+        // Checks
+
+        //Source Name
+        //Sample Name
+        //Characteristics [Sample type]
+        //Characteristics [biological replicate]
+        //Factor [Sample type#2]
+        //Parameter [biological replicate#2]
+        //Data File Name
+        //Term Source REF (NFDI4PSO:0000064)
+        //Term Source REF (NFDI4PSO:0000064#2)
+        //Term Accession Number (MS:1001809)
+        //Term Accession Number (MS:1001809#2)
+        //Unit
+        //Unit (#3)
+        //"http://purl.obolibrary.org/obo/NFDI4PSO_0000064"
 
         [<LiteralAttribute>]
-        /// This pattern captures all characters between squared brackets (with squared brackets).
-        let SquaredBracketsPattern = "\[.*\]"
+        let IdPattern = @"(?<=#)\d+(?=[\)\]])"//"#\d+"
 
         [<LiteralAttribute>]
-        /// This pattern captures all characters between brackets (with brackets).
-        let BracketsPattern = "\([^\]]*\)"
+        /// This pattern captures characters between squared brackets, without id: Parameter [biological replicate#2] -> biological replicate
+        let SquaredBracketsTermNamePattern = @"(?<= \[)[^#\]]*(?=[\]#])"//"\[.*\]"
 
         [<LiteralAttribute>]
+        /// Used to get unit name from Excel numberFormat: 0.00 "degree Celsius"
         let DoubleQuotesPattern = "\"(.*?)\""
 
         [<LiteralAttribute>]
         /// This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
         let CoreNamePattern = "^[^[(]*"
 
-        // Hits: ENVO:01001831
+        // Hits term accession, without id, NEEDS brackets before and after: ENVO:01001831
         [<LiteralAttribute>]
-        let TermAccessionPattern = "[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
+        let TermAccessionPattern = @"(?<=\()\S+[:_][^;)#]*(?=[\)\#])" //"[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
+
+        // Hits term accession, without id: ENVO:01001831
+        [<LiteralAttribute>]
+        let TermAccessionPatternSimplified = @"[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
 
     module Aux =
     
@@ -41,19 +59,11 @@ module Regex =
     open System
     open System.Text.RegularExpressions
 
-    let parseSquaredBrackets (headerStr:string) =
+    let parseSquaredTermNameBrackets (headerStr:string) =
         match headerStr with
-        | Regex SquaredBracketsPattern value ->
-            // remove brackets
-            value.[1..value.Length-2]
-            |> Some
+        | Regex SquaredBracketsTermNamePattern value -> value.Trim() |> Some 
         | _ ->
             None
-
-    let parseBrackets (headerStr:string) =
-        match headerStr with
-        | Regex BracketsPattern value   -> Some value.[1..value.Length-2] // remove brackets
-        | _                             -> None
 
     let parseCoreName (headerStr:string) =
         match headerStr with
@@ -71,6 +81,14 @@ module Regex =
         | _ ->
             None
 
+    let parseTermAccessionSimplified (headerStr:string) =
+        match headerStr with
+        | Regex TermAccessionPatternSimplified value ->
+            value.Trim().Replace('_',':')
+            |> Some
+        | _ ->
+            None
+
     let parseDoubleQuotes (headerStr:string) =
         match headerStr with
         | Regex DoubleQuotesPattern value ->
@@ -82,98 +100,6 @@ module Regex =
 
     let getId (headerStr:string) =
         match headerStr with
-        | Regex HashNumberPattern value ->
-            value.Trim()
-            |> Some
+        | Regex IdPattern value -> value.Trim() |> Some
         | _ ->
             None
-
-    let removeId (squareBracket:string) =
-        Regex.Replace(squareBracket, HashNumberPattern, "") 
-       
-
-//module MinimalBuildingBlock =
-
-//    open Fable.Core
-
-//    open Types
-//    open Types.BuildingBlockTypes
-
-//    open System
-//    open Fable.SimpleXml
-//    open Fable.SimpleXml.Generator
-
-//    let ofExcelTableXml (xml:string) =
-//        let tableTag = "table"
-//        let xml = xml |> SimpleXml.parseDocument |> fun x -> x.Root
-//        let table = xml |> SimpleXml.tryFindElementByName tableTag
-//        if table.IsNone then failwith (sprintf "Could not find existing <%s> tag." tableTag)
-//        let tableName = table.Value.Attributes.["name"]
-//        //let tableLocation = table.Value.Attributes.["ref"]
-//        let cols = xml |> SimpleXml.findElementsByName "tableColumn"
-//        let colHeaders = cols |> List.map (fun x -> parseColHeader x.Attributes.["name"]) |> Array.ofList
-//        let rec parseToMinBB iterator (currentMinBBCol:MinimalBuildingBlock option) (minBBColList:MinimalBuildingBlock list) =
-//            if iterator >= colHeaders.Length then
-//                if currentMinBBCol.IsSome then currentMinBBCol.Value::minBBColList else minBBColList
-//            else
-//                let currentCol = colHeaders.[iterator]
-//                /// skip source name and sample name. These are always auto generated
-//                if
-//                    currentCol.CoreName.Value = ColumnCoreNames.Shown.Source
-//                    || currentCol.CoreName.Value = ColumnCoreNames.Shown.Sample
-//                then
-//                    let newMinBBColList =
-//                        if currentMinBBCol.IsSome then currentMinBBCol.Value::minBBColList else minBBColList
-//                    parseToMinBB (iterator+1) None newMinBBColList
-//                /// This case checks for non hidden main columns
-//                elif
-//                    currentCol.TagArr.IsNone
-//                    || currentCol.TagArr.Value |> Array.contains Types.ColumnTags.HiddenTag |> not
-//                then
-//                    let newCurrentMinBBCol =
-//                        let ont = if currentCol.Ontology.IsSome then sprintf " [%s]" currentCol.Ontology.Value.Name else ""
-//                        let name = sprintf "%s%s" currentCol.CoreName.Value ont
-//                        MinimalBuildingBlock.create name None None None false |> Some
-//                    let newMinBBColList =
-//                        if currentMinBBCol.IsSome then currentMinBBCol.Value::minBBColList else minBBColList
-//                    parseToMinBB (iterator+1) newCurrentMinBBCol newMinBBColList
-//                /// This checks main col TSR and TAN
-//                elif
-//                    ( currentCol.CoreName.Value = Types.ColumnCoreNames.Hidden.TermAccessionNumber
-//                        || currentCol.CoreName.Value = Types.ColumnCoreNames.Hidden.TermSourceREF )
-//                    && currentCol.TagArr.IsSome && not currentCol.IsUnitCol
-//                then
-//                    let newCurrentMinBBCol =
-//                        let hasAccession = if currentCol.Ontology.IsSome then Some currentCol.Ontology.Value.TermAccession else None
-//                        if currentMinBBCol.IsNone then
-//                            failwith (sprintf "TableXml parser found unknown column pattern and tried to add column (%s) without previous main column." currentCol.Header)
-//                        { currentMinBBCol.Value with ColumnTermAccession = hasAccession } |> Some
-//                    parseToMinBB (iterator+1) newCurrentMinBBCol minBBColList
-//                /// Check unit main col
-//                elif
-//                    currentCol.IsUnitCol && currentCol.CoreName.Value = ColumnCoreNames.Hidden.Unit
-//                then
-//                    let newCurrentMinBBCol =
-//                        let name = if currentCol.Ontology.IsSome then currentCol.Ontology.Value.Name else ""
-//                        if currentMinBBCol.IsNone then
-//                            failwith (sprintf "TableXml parser found unknown column pattern and tried to add column (%s) without previous main column." currentCol.Header)
-//                        { currentMinBBCol.Value with UnitName = Some name } |> Some
-//                    parseToMinBB (iterator+1) newCurrentMinBBCol minBBColList
-//                ///// check unit TSR and TAN
-//                //elif
-//                //    currentCol.IsUnitCol && (currentCol.CoreName.Value = ColumnCoreNames.Hidden.TermAccessionNumber || currentCol.CoreName.Value = ColumnCoreNames.Hidden.TermSourceREF)
-//                //then
-//                //    let newCurrentMinBBCol =
-//                //        if currentMinBBCol.IsNone then
-//                //            failwith (sprintf "TableXml parser found unknown column pattern and tried to add column (%s) without previous main column." currentCol.Header)
-//                //        { currentMinBBCol.Value with UnitTermAccession = hasAccession } |> Some
-//                //    parseToMinBB (iterator+1) newCurrentMinBBCol minBBColList
-//                else
-//                    failwith (sprintf "TableXml parser could not recognize column pattern (%s)" currentCol.Header)
-
-//        let reorderedMinBBList = parseToMinBB 0 None [] |> List.rev
-
-//        tableName,reorderedMinBBList
-                                
-                    
-                

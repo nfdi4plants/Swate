@@ -72,13 +72,10 @@ let navbarShortCutIconList model dispatch =
     [
         for icon in shortCutIconList model do
             yield
-                Navbar.Item.a [Navbar.Item.Props [Style [Padding "0"; Width "45px"]]] [
-                    Button.button [
-                        Button.Props [Title icon.Description; Style [BackgroundColor "transparent"]]
-                        Button.OnClick (fun _ -> icon.Msg |> dispatch)
-                        Button.Color Color.IsWhite
-                        Button.IsInverted
-                        Button.IsFullWidth
+                Navbar.Item.a [Navbar.Item.CustomClass "myNavbarButtonContainer";Navbar.Item.Props [Style [Padding "0px"; MinWidth "45px"]]] [
+                    div [
+                        Class "myNavbarButton"
+                        OnClick (fun _ -> icon.Msg |> dispatch)
                     ] icon.FaList
                 ]
     ]

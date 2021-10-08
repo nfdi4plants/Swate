@@ -438,7 +438,8 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
             checkIfBuildingBlockExisting newBB existingBuildingBlocks
             checkHasExistingOutput newBB existingBuildingBlocks
-            
+
+            let t = existingBuildingBlocks 
 
             // Ref. 2
             // This is necessary to place new columns next to selected col
@@ -562,13 +563,17 @@ let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
                 let newSet = newBuildingBlocks |> List.map (fun x -> x.Column) |> Set.ofList
                 let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint )|> Set.ofArray
                 let bbsToAdd = Set.difference newSet prevSet |> Set.toArray
+                //printfn $"{newBuildingBlocks}"
+                //printfn $"prevSet {prevSet.ToString()}"
+                //printfn $"newSet {newSet.ToString()}"
                 // These building blocks do not exist in table and will be added
-                newBuildingBlocks |> List.filter (fun x -> bbsToAdd |> Array.contains x.Column) |> List.filter (fun x -> not x.Column.isOutputColumn && not x.Column.isInputColumn)
-                ,
+                let newBBs = newBuildingBlocks |> List.filter (fun x -> bbsToAdd |> Array.contains x.Column) |> List.filter (fun x -> not x.Column.isOutputColumn && not x.Column.isInputColumn)
                 // These building blocks exist in table and are part of building block list. Keep them to push them as info msg.
-                Set.intersect newSet prevSet |> Set.toList
+                let existingBBs = Set.intersect newSet prevSet |> Set.toList
+                //printfn $"prevSet {newBBs.Length}"
+                //printfn $"newSet {existingBBs.Length}"
+                newBBs, existingBBs
 
-            printfn $"{newBBs.Length}"
 
             // Ref. 2
     
@@ -766,109 +771,6 @@ let updateUnitForCells (unitTerm:TermMinimal) =
             return [updateWithUnit]
         }
     )
-
-//let addAnnotationBlocksAsProtocol (buildingBlockInfoList:MinimalBuildingBlock list, protocol:Xml.GroupTypes.Protocol) =
-  
-//    let chainBuildingBlocks (buildingBlockInfoList:MinimalBuildingBlock list) =
-//        let state bb = promise {
-//            let! baseAsync = bb |> addAnnotationBlock
-//            return [baseAsync]
-//        }
-//        /// include isEmpty check to avoid errors during protocol update without any building blocks to add
-//        if buildingBlockInfoList.IsEmpty then
-//            promise {return []}
-//        else
-//            buildingBlockInfoList.Tail
-//            |> List.fold (fun (previousPromise:JS.Promise<(string*string*string) list>) nextID ->
-//                promise {
-//                    let! prev,nextPromise =
-//                        previousPromise.``then``(fun e ->
-//                            e,state nextID
-//                        )
-//                    let! next = nextPromise
-//                    return next@prev
-//                }            
-//            ) (state buildingBlockInfoList.Head)
-
-//    let infoProm =
-
-//        Excel.run(fun context ->
-//            promise {
-
-//                let! annotationTable = getActiveAnnotationTableName()
-
-//                let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-//                let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
-//                let activeSheet = context.workbook.worksheets.getActiveWorksheet().load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
-
-//                let annoHeaderRange,annoBodyRange = getBuildingBlocksPreSync context annotationTable
-
-//                let! xmlParsed = getCustomXml customXmlParts context
-                
-//                let currentProtocolGroup = getSwateProtocolGroupForCurrentTable annotationTable activeSheet.name xmlParsed
-
-//                let! buildingBlocks = context.sync().``then``( fun e -> getBuildingBlocks annoHeaderRange annoBodyRange )
-
-//                if currentProtocolGroup.IsSome then
-//                    let existsAlready =
-//                        currentProtocolGroup.Value.Protocols
-//                        |> List.tryFind ( fun existingProtocol ->
-//                            if buildingBlockInfoList |> List.exists (fun x -> x.IsAlreadyExisting = true) then
-//                                existingProtocol.Id = protocol.Id && existingProtocol.ProtocolVersion = protocol.ProtocolVersion
-//                            else
-//                                false
-//                        )
-//                    let isComplete =
-//                        if existsAlready.IsSome then
-//                            (tryFindSpannedBuildingBlocks existsAlready.Value buildingBlocks).IsSome
-//                        else
-//                            true
-//                    if existsAlready.IsSome then
-//                        if isComplete then
-//                            failwith ( sprintf "Protocol %s exists already in %s - %s." existsAlready.Value.Id currentProtocolGroup.Value.AnnotationTable.Name currentProtocolGroup.Value.AnnotationTable.Worksheet)
-
-//                /// filter out building blocks that are only passed to keep the colNames
-//                let onlyNonExistingBuildingBlocks = buildingBlockInfoList |> List.filter (fun x -> x.IsAlreadyExisting <> true)
-//                let alreadyExistingBlocks =
-//                    buildingBlockInfoList
-//                    |> List.filter (fun x -> x.IsAlreadyExisting = true)
-//                    |> List.map (fun x ->
-//                        x.MainColumnName, "0.00", ""
-//                    )
-
-//                let! chainProm = chainBuildingBlocks onlyNonExistingBuildingBlocks
-
-//                let updateProtocol = {protocol with AnnotationTable = AnnotationTable.create annotationTable activeSheet.name}
-
-//                return (chainProm@alreadyExistingBlocks,updateProtocol)
-//            }
-//        )
-
-//    promise {
-//        let! blockResults,info = infoProm
-//        let createSpannedBlocks =
-//            [
-//                for ind in 0 .. blockResults.Length-1 do
-//                    let colName                     = blockResults |> List.item ind |> (fun (x,_,_) -> x)
-//                    let relatedTermAccession        =
-//                        buildingBlockInfoList
-//                        |> List.tryFind ( fun x -> colName.Contains(x.MainColumnName) )
-//                        |> fun x ->
-//                            if x.IsNone then
-//                                failwith (
-//                                    sprintf
-//                                        "Could not find created building block information %s in given list: %A"
-//                                        colName
-//                                        (buildingBlockInfoList|> List.map (fun y -> y.MainColumnName))
-//                                )
-//                            else
-//                                if x.IsSome && x.Value.MainColumnTermAccession.IsSome then x.Value.MainColumnTermAccession.Value else ""
-//                    yield
-//                        Xml.GroupTypes.SpannedBuildingBlock.create colName relatedTermAccession
-//            ]
-//        let completeProtocolInfo = {info with SpannedBuildingBlocks = createSpannedBlocks}
-//        return (blockResults,completeProtocolInfo)
-//    }
 
 /// This function removes a given building block from a given annotation table.
 /// It returns the affected column indices.
@@ -1289,7 +1191,7 @@ let UpdateTableByTermsSearchable (terms:TermSearchable []) =
                         |> Array.map (fun headerTerm ->
                             let relBuildingBlock = buildingBlocks |> Array.find (fun bb -> bb.MainColumn.Index = headerTerm.ColIndex)
                             let columnHeaderId =
-                                let opt = relBuildingBlock.MainColumn.Header.tryGetMainColumnHeaderId
+                                let opt = relBuildingBlock.MainColumn.Header.tryGetHeaderId
                                 match opt with
                                 | Some id   -> id
                                 | None      -> ""

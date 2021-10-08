@@ -20,7 +20,7 @@ let rowMajorOfTemplateJson jsonString =
 
 type OntologyAnnotation with
     member this.toTermMinimal : TermMinimal option =
-        match this.Name, Option.bind Regex.parseTermAccession this.TermAccessionNumber with
+        match this.Name, Option.bind Regex.parseTermAccessionSimplified this.TermAccessionNumber with
         | Some name, Some tan   -> TermMinimal.create (AnnotationValue.toString name) tan |> Some
         | Some name, None       -> TermMinimal.create (AnnotationValue.toString name) "" |> Some
         | _,_                   -> None
@@ -77,4 +77,6 @@ type AssayCommonAPI.RowWiseSheet with
         let factors = headerRow.FactorValues |> List.map (fun fv -> fv.toInsertBuildingBlock)
         let parameters = headerRow.ParameterValues |> List.map (fun ppv -> ppv.toInsertBuildingBlock)
         let characteristics = headerRow.CharacteristicValues |> List.map (fun mav -> mav.toInsertBuildingBlock)
-        factors@parameters@characteristics
+        let newList = factors@parameters@characteristics
+        printfn $"{newList.ToString()}"
+        newList

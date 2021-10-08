@@ -189,47 +189,34 @@ module OfficeInteropTypes =
             this.isTSRCol
             || this.isTANCol
             || this.isUnitCol
-        member this.getColumnCoreName = parseCoreName this.SwateColumnHeader
+        member this.getColumnCoreName = parseCoreName this.SwateColumnHeader |> Option.bind (fun x -> x.Trim() |> Some)
         member this.toBuildingBlockNamePrePrint =
             match this.getColumnCoreName, this.tryGetOntologyTerm with
             | Some swatecore, None ->
                 let t = BuildingBlockType.tryOfString swatecore
-                if t.IsSome then BuildingBlockNamePrePrint.create t.Value "" |> Some else None
+                if t.IsSome then BuildingBlockNamePrePrint.create t.Value "" |> Some
+                else None
             | Some swatecore, Some term ->
                 let t = BuildingBlockType.tryOfString swatecore
-                if t.IsSome then BuildingBlockNamePrePrint.create t.Value term |> Some else None
+                if t.IsSome then
+                    let tv = BuildingBlockNamePrePrint.create t.Value term
+                    BuildingBlockNamePrePrint.create t.Value term |> Some
+                else None
             | None, _ -> None
-        member this.isSwateColumnHeader =         
+        member this.isSwateColumnHeader =
             match this with
             | isMainCol when isMainCol.isMainColumn -> true
             | isRefCol when isRefCol.isReference    -> true
             | anythingelse                          -> false
         /// Use this function to extract ontology term name from inside square brackets in the main column header
-        member this.tryGetOntologyTerm =
-            let sqBrackets = parseSquaredBrackets this.SwateColumnHeader
-            match sqBrackets with
-            | Some str -> removeId str |> Some
-            | None -> None
+        member this.tryGetOntologyTerm = parseSquaredTermNameBrackets this.SwateColumnHeader
         /// Get term Accession in TSR or TAN from column header
-        member this.tryGetTermAccession =
-            let brackets = parseBrackets this.SwateColumnHeader
-            match brackets with
-            | Some str ->
-                // this step is optional as "parseTermAccession should be able to get term accession even with appended #id"
-                removeId str
-                |> parseTermAccession
-            | None -> None
+        member this.tryGetTermAccession = parseTermAccession this.SwateColumnHeader
         /// Get column header hash id from main column. E.g. Parameter [Instrument Model#2]
-        member this.tryGetMainColumnHeaderId =
-            let brackets = parseSquaredBrackets this.SwateColumnHeader
+        member this.tryGetHeaderId =
+            let brackets = parseSquaredTermNameBrackets this.SwateColumnHeader
             match brackets with
-            | Some str  -> getId str
-            | None      -> None
-        /// Get column header hash id from main column. E.g. Term Source REF (MS:1000031#2)
-        member this.tryGetRefColumnHeaderId =
-            let brackets = parseBrackets this.SwateColumnHeader
-            match brackets with
-            | Some str  -> getId str
+            | Some str  -> getId str |> Option.bind (fun x -> "#" + x |> Some)
             | None      -> None
 
     type Cell = {

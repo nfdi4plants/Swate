@@ -46,6 +46,8 @@ let windowRowIndices (rowIndices:int [])=
 let rowIndicesToReadable (rowIndices:int []) =
     if rowIndices.Length > 1 then
         windowRowIndices rowIndices
+    elif rowIndices = [|0|] then
+        "Header"
     else
         $"{rowIndices.[0]}"
 
