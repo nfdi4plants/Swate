@@ -158,6 +158,7 @@ let quickAccessScalableNavbar (model:Messages.Model) dispatch =
             Navbar.CustomClass "wrapFlexBox"
             Navbar.Props [
                 Style [
+                    ZIndex 29
                     if model.SiteStyleState.QuickAcessIconsShown |> not then
                         Display DisplayOptions.None
                     else Display DisplayOptions.Flex
@@ -183,10 +184,11 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.div [
                 Navbar.Item.Props [
                     OnClick (fun e -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
-                    Style [Width "100px"; Cursor "pointer"]
+                    Style [Width "100px"; Cursor "pointer"; Padding "0 0.4rem"]
                 ]
             ] [
-                img [Props.Src @"assets\Swate_logo_for_excel.svg"]
+                let path = if model.PersistentStorageState.PageEntry = Routing.Expert then "_e" else ""
+                Image.image [] [img [Props.Src @$"assets\Swate_logo_for_excel{path}.svg"]]
             ]
 
             quickAccessListElement model dispatch
