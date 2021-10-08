@@ -51,6 +51,22 @@ $switch-background-active: $excelPrimary;
     }
 }*/
 
+html, body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    /*    background: #F0F2F4;*/
+    min-width: 300px;
+    height: 100vh
+}
+
+a {
+    color: $lightBlue
+}
+
+a:hover {
+    color: $lightBlueLighter20
+}
+
 [type=checkbox]:checked.switch.is-primary + label::before, [type=checkbox]:checked.switch.is-primary + label::before {
     background: $mint
 }
@@ -68,6 +84,12 @@ $switch-background-active: $excelPrimary;
     position: absolute;
     visibility: hidden;
     z-index: 1020;
+}
+
+.myNavbarSticky {
+    position: sticky;
+    position: -webkit-sticky;
+    top: 0
 }
 
 .myNavbarButtonContainer:focus, .myNavbarButtonContainer:focus-within, .myNavbarButtonContainer:hover, .myNavbarButtonContainer.is-active {
@@ -93,21 +115,6 @@ $switch-background-active: $excelPrimary;
     font-size: 0.85rem;
 }
 
-html, body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    font-size: 14px;
-/*    background: #F0F2F4;*/
-    min-width: 300px;
-    overflow-x: auto
-}
-
-a {
-    color: $lightBlue
-}
-
-a:hover {
-    color: $lightBlueLighter20
-}
 
 .mainFunctionContainer {
     border-left-width: 5px;

@@ -176,11 +176,13 @@ let quickAccessScalableNavbar (model:Messages.Model) dispatch =
 
 let navbarComponent (model : Model) (dispatch : Msg -> unit) =
     Navbar.navbar [
-        Navbar.IsFixedTop
-        Navbar.Props [Id "swate-mainNavbar"; Props.Role "navigation"; AriaLabel "main navigation" ; ExcelColors.colorElement model.SiteStyleState.ColorMode]
-        Navbar.IsTransparent
+        Navbar.CustomClass "myNavbarSticky"
+        Navbar.Props [
+            Id "swate-mainNavbar"; Props.Role "navigation"; AriaLabel "main navigation" ;
+            Style [yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode]
+        ]
     ] [
-        Navbar.Brand.div [] [
+        Navbar.Brand.div [Props [Style [Width "100%"]]] [
             Navbar.Item.div [
                 Navbar.Item.Props [
                     OnClick (fun e -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
@@ -206,6 +208,16 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                 span [AriaHidden true] [ ]
                 span [AriaHidden true] [ ]
                 span [AriaHidden true] [ ]
+            ]
+        ]
+        div [Class "hideOver575px "][
+            Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [
+                BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
+                if model.SiteStyleState.QuickAcessIconsShown |> not then
+                    Display DisplayOptions.None
+                else Display DisplayOptions.Flex
+            ]]] [
+                yield! navbarShortCutIconList model dispatch
             ]
         ]
         Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu"); ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
