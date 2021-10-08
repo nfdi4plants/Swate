@@ -39,7 +39,7 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
                 initializeAddIn
                 ()
                 (fun x -> (x.host.ToString(),x.platform.ToString()) |> OfficeInterop.Initialized |> OfficeInteropMsg )
-                (fun x -> x |> GenericError |> Dev)
+                (curry GenericError Cmd.none >> Dev)
         ]
     model, initialCmd
 

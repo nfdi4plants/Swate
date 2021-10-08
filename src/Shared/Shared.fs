@@ -1,6 +1,7 @@
 namespace Shared
 
 open System
+open Shared
 open TermTypes
 open ProtocolTemplateTypes
 
@@ -8,7 +9,6 @@ module Route =
 
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
-
 
 module Suggestion =
     

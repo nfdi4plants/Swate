@@ -441,7 +441,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
                             if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
                         match model.AddBuildingBlockState.Unit2TermSearchText with
                         | "" ->
-                            GenericLog ("Error", "Cannot execute function with empty unit input") |> Dev |> dispatch
+                            curry GenericLog Cmd.none ("Error", "Cannot execute function with empty unit input") |> Dev |> dispatch
                         | hasUnitTerm when model.AddBuildingBlockState.Unit2SelectedTerm.IsSome ->
                             OfficeInterop.UpdateUnitForCells unitTerm.Value |> OfficeInteropMsg |> dispatch
                         | freeText ->

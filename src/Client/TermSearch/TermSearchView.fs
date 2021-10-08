@@ -90,7 +90,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
                 Api.api.getAllTermsByParentTerm
                 ontInfo
                 (GetAllTermsByParentTermResponse >> TermSearchMsg)
-                (GenericError >> Dev)
+                (curry GenericError Cmd.none >> Dev)
 
         let nextState = {
             currentState with

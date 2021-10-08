@@ -165,6 +165,7 @@ open Protocol
 //        ]
 
 open Messages
+open Elmish
 
 let fileUploadButton (model:Model) dispatch id =
     Label.label [Label.Props [Style [FontWeight "normal";Margin "1rem 0"]]][
@@ -185,7 +186,7 @@ let fileUploadButton (model:Model) dispatch id =
                         UpdateUploadData evt.target?result |> ProtocolMsg |> dispatch
                                    
                     reader.onerror <- fun evt ->
-                        GenericLog ("Error", evt.Value) |> Dev |> dispatch
+                        curry GenericLog Cmd.none ("Error", evt.Value) |> Dev |> dispatch
 
                     reader.readAsText(fileNames |> List.head)
 

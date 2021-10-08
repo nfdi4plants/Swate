@@ -9,6 +9,7 @@ open Fulma
 open ExcelColors
 open Model
 open Messages
+open Elmish
 
 let fileUploadButton (model:Model) dispatch id =
     Label.label [Label.Props [Style [FontWeight "normal";MarginBottom "0.5rem"]]][
@@ -35,7 +36,7 @@ let fileUploadButton (model:Model) dispatch id =
                         StoreXLSXByteArray byteArr |> XLSXConverterMsg |> dispatch
                                    
                     reader.onerror <- fun evt ->
-                        GenericLog ("Error", evt.Value) |> Dev |> dispatch
+                        curry GenericLog Cmd.none ("Error", evt.Value) |> Dev |> dispatch
 
                     reader.readAsArrayBuffer(blobs |> List.head)
 

@@ -48,7 +48,7 @@ module Protocol =
                     Api.api.getAllProtocolsWithoutXml
                     ()
                     (GetAllProtocolsResponse >> ProtocolMsg)
-                    (GenericError >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             nextState, cmd
         | GetAllProtocolsResponse protocols ->
             let nextState = {
@@ -63,7 +63,7 @@ module Protocol =
                     Api.api.getProtocolByName
                     protocolName
                     (GetProtocolByNameResponse >> ProtocolMsg)
-                    (GenericError >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentState, cmd
         | GetProtocolByNameResponse (prot) -> 
             let nextState = {
@@ -79,7 +79,7 @@ module Protocol =
                 Cmd.OfAsync.attempt
                     Api.api.increaseTimesUsed
                     protocolTemplateName
-                    (GenericError >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentState, cmd
                 
         // Client

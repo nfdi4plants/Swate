@@ -22,8 +22,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     p
                     ()
-                    (GenericInteropLogs >> Dev)
-                    (GenericError >> Dev)
+                    (curry GenericInteropLogs Cmd.none >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
 
         | Initialized (h,p) ->
@@ -43,8 +43,8 @@ module OfficeInterop =
                         OfficeInterop.tryFindActiveAnnotationTable
                         ()
                         (AnnotationTableExists >> OfficeInteropMsg)
-                        (GenericError >> Dev)
-                    Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
+                        (curry GenericError Cmd.none >> Dev)
+                    Cmd.ofMsg (curry GenericLog Cmd.none ("Info",welcomeMsg) |> Dev)
                 ]
 
             currentModel.updateByExcelState nextModel, cmd
@@ -66,8 +66,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.insertOntologyTerm  
                     term
-                    (GenericLog >> Dev)
-                    (GenericError >> Dev)
+                    (curry GenericLog Cmd.none >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
 
         | AddAnnotationBlock (minBuildingBlockInfo) ->
@@ -75,8 +75,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.addAnnotationBlock  
                     (minBuildingBlockInfo)
-                    (GenericInteropLogs >> Dev)
-                    (GenericError >> Dev)
+                    (curry GenericInteropLogs Cmd.none >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
 
         | AddAnnotationBlocks minBuildingBlockInfos ->
@@ -106,8 +106,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.addAnnotationBlocks
                     minBuildingBlockInfos
-                    (GenericInteropLogs >> Dev)
-                    (GenericError >> Dev)
+                    (curry GenericInteropLogs Cmd.none >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
 
         | RemoveAnnotationBlock ->
@@ -115,8 +115,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.removeSelectedAnnotationBlock
                     ()
-                    (GenericInteropLogs >> Dev)
-                    (GenericError >> Dev)
+                    (curry GenericInteropLogs Cmd.none >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
 
         | UpdateUnitForCells (unitTerm) ->
@@ -124,8 +124,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.updateUnitForCells
                     unitTerm
-                    (GenericInteropLogs >> Dev)
-                    (GenericError >> Dev)
+                    (curry GenericInteropLogs Cmd.none >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
 
         //| FormatColumn (colName,format) ->
@@ -161,26 +161,15 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.createAnnotationTable  
                     (isDark)
-                    (fun msg ->
-                        Msg.Batch [
-                            GenericLog ("info", msg) |> Dev
-                            AnnotationtableCreated (msg) |> OfficeInteropMsg
-                        ]
-                    )
-                    (GenericError >> Dev)
+                    (curry GenericLog (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel,cmd
 
-        | AnnotationtableCreated (range) ->
+        | AnnotationtableCreated ->
             let nextState = {
                 currentModel.ExcelState with
                     HasAnnotationTable = true
             }
-            //let msg =
-            //    Msg.Batch [
-            //        //AutoFitTable |> ExcelInterop
-            //        //UpdateProtocolGroupHeader |> ExcelInterop
-            //        GenericLog ("info", range) |> Dev
-            //    ]
             currentModel.updateByExcelState nextState, Cmd.none
 
 
@@ -190,7 +179,7 @@ module OfficeInterop =
                     OfficeInterop.getParentTerm
                     ()
                     (TermSearch.StoreParentOntologyFromOfficeInterop >> TermSearchMsg)
-                    (GenericError >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
         //
         | GetTableValidationXml ->
@@ -198,22 +187,16 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.getTableRepresentation
                     ()
-                    (fun (currentTableValidation, buildingBlocks,msg) ->
-                        Validation.StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks) |> ValidationMsg)
-                    (GenericError >> Dev)
+                    (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
         | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.writeTableValidationToXml
                     (newTableValidation, currentSwateVersion)
-                    (fun x ->
-                        Msg.Batch [
-                            GenericLog x |> Dev
-                            GetTableValidationXml |> OfficeInteropMsg
-                        ]
-                    )
-                    (GenericError >> Dev)
+                    (curry GenericLog (GetTableValidationXml |> OfficeInteropMsg |> Cmd.ofMsg) >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
 
             currentModel, cmd
 
@@ -251,8 +234,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.deleteAllCustomXml
                     ()
-                    (GenericLog >> Dev)
-                    (GenericError >> Dev)
+                    (curry GenericLog Cmd.none >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
         | GetSwateCustomXml ->
             let cmd =
@@ -260,20 +243,15 @@ module OfficeInterop =
                     OfficeInterop.getSwateCustomXml
                     ()
                     (Some >> SettingsXml.UpdateRawCustomXml >> SettingsXmlMsg)
-                    (GenericError >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
         | UpdateSwateCustomXml newCustomXml ->
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.updateSwateCustomXml
                     newCustomXml
-                    (fun x ->
-                        Msg.Batch [
-                            x |> (GenericLog >> Dev)
-                            GetSwateCustomXml |> OfficeInteropMsg
-                        ]
-                    )
-                    (GenericError >> Dev)
+                    (curry GenericLog (OfficeInteropMsg GetSwateCustomXml |> Cmd.ofMsg) >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
         //
         | FillHiddenColsRequest ->
@@ -282,11 +260,7 @@ module OfficeInterop =
                     OfficeInterop.getAllAnnotationBlockDetails 
                     ()
                     (SearchForInsertTermsRequest >> Request >> Api)
-                    (fun e ->
-                        Msg.Batch [
-                            UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg
-                            GenericError e |> Dev
-                        ] )
+                    (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> Dev)
             let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
             let cmds = Cmd.batch [cmd; stateCmd]
             currentModel, cmds
@@ -300,17 +274,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.UpdateTableByTermsSearchable
                     (termsWithSearchResult)
-                    (fun msg ->
-                        Msg.Batch [
-                            UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg
-                            GenericInteropLogs msg |> Dev
-                        ]
-                    )
-                    (fun e ->
-                        Msg.Batch [
-                            UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg
-                            GenericError e |> Dev
-                        ] )
+                    (curry GenericInteropLogs (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> Dev)
+                    (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> Dev)
             currentModel.updateByExcelState nextState, cmd
 
 
@@ -326,10 +291,8 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.insertFileNamesFromFilePicker 
                     (fileNameList)
-                    ((fun x -> 
-                        ("Debug",x) |> GenericLog) >> Dev
-                    )
-                    (GenericError >> Dev)
+                    (curry GenericLog Cmd.none >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
 
         //
@@ -341,18 +304,11 @@ module OfficeInterop =
                     (fun x ->
                         let msg = InteropLogging.Msg.create InteropLogging.Debug $"{x}"
                         Msg.Batch [
-                            GenericInteropLogs [msg] |> Dev
+                            curry GenericInteropLogs Cmd.none [msg] |> Dev
                             GetSelectedBuildingBlockTermsRequest x |> BuildingBlockDetails
                         ]
                     )
-                    //(GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
-                    (fun x ->
-                        Msg.Batch [
-                            GenericError x |> Dev
-                            UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails
-                        ]
-                    )
-            //let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
+                    (curry GenericError (UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails |> Cmd.ofMsg) >> Dev)
             currentModel, cmd
         //
         | CreatePointerJson ->
@@ -361,7 +317,7 @@ module OfficeInterop =
                     OfficeInterop.createPointerJson
                     ()
                     (fun x -> Some x |> UpdatePointerJson |> SettingDataStewardMsg)
-                    (GenericError >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
 
         /// DEV
@@ -370,20 +326,16 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.exampleExcelFunction1
                     ()
-                    ((fun x -> 
-                        ("Debug",x) |> GenericLog) >> Dev
-                    )
-                    (GenericError >> Dev)
+                    ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
         | TryExcel2 ->
             let cmd = 
                 Cmd.OfPromise.either
                     OfficeInterop.exampleExcelFunction2 
                     ()
-                    ((fun x -> 
-                        ("Debug",x) |> GenericLog) >> Dev
-                    )
-                    (GenericError >> Dev)
+                    ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> Dev)
+                    (curry GenericError Cmd.none >> Dev)
             currentModel, cmd
         //| _ ->
         //    printfn "Hit currently non existing message"

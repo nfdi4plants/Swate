@@ -15,12 +15,27 @@ open Model
 
 open Shared.OfficeInteropTypes
 open Validation
+open Messages
 open JSONExporter
 
 let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
+    // Style
+    | UpdateLoading isLoading ->
+        let nextModel = {
+            currentModel.JSONExporterModel with
+                Loading = isLoading
+        }
+        currentModel.updateByJSONExporterModel nextModel, Cmd.none
+    //
     | ParseTableOfficeInteropRequest ->
-        currentModel, Cmd.none
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getTableRepresentation
+                ()
+                (snd >> ParseTableServerRequest >> JSONExporterMsg)
+                (curry GenericError (UpdateLoading false |> JSONExporterMsg |> Cmd.ofMsg) >> Dev)
+        currentModel, cmd
     | ParseTableServerRequest buildingBlocks ->
         currentModel, Cmd.none
     | ParseTableServerResponse parsedJson ->
@@ -48,7 +63,7 @@ let defaultMessageEle (model:Model) dispatch =
     mainFunctionContainer [
         Button.a [
             Button.OnClick(fun e ->
-               ()
+                ()
             )
         ][
             str "Click me!"

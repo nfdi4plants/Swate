@@ -221,7 +221,7 @@ let createAnnotationTable (isDark:bool) =
                 sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." tableRange.address (tableRange.rowCount - 1.)
             )
 
-            return r
+            return ("Info",r)
         }
     )
 
@@ -379,7 +379,7 @@ let getTableRepresentation() =
                             (List.ofArray existingBuildingBlocks)
                 updateTableValidation
 
-            return updateCurrentTableValidationXml, buildingBlocks, "Update table representation."
+            return updateCurrentTableValidationXml, buildingBlocks
         }
     )
 
@@ -1346,7 +1346,7 @@ let insertFileNamesFromFilePicker (fileNameList:string list) =
             //sprintf "%s filled with %s; ExtraCols: %s" range.address v nextColsRange.address
 
             // return print msg
-            sprintf "%A, %A" range.values.Count newVals
+            "Info",sprintf "%A, %A" range.values.Count newVals
         )
     )
 

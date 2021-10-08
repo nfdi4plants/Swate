@@ -39,28 +39,29 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
 
 let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> =
     match devMsg with
-    | GenericLog (level,logText) ->
+    | GenericLog (nextCmd,(level,logText)) ->
         let nextState = {
             currentState with
                 Log = (LogItem.ofStringNow level logText)::currentState.Log
-            }
-        nextState, Cmd.none
+        }
+        nextState, nextCmd
 
-    | GenericInteropLogs (logs) ->
+    | GenericInteropLogs (nextCmd,logs) ->
         let parsedLogs = logs |> List.map LogItem.ofInteropLogginMsg
         let nextState = {
             currentState with
                 Log = parsedLogs@currentState.Log
         }
-        nextState, Cmd.none
+        nextState, nextCmd
 
-    | GenericError (e) ->
+    | GenericError (nextCmd, e) ->
         OfficeInterop.consoleLog (sprintf "GenericError occured: %s" e.Message)
         let nextState = {
             currentState with
                 Log = LogItem.Error(System.DateTime.Now,e.Message)::currentState.Log
+                LastFullError = Some e
             }
-        nextState, Cmd.ofMsg (UpdateLastFullError (Some e) |> Dev)
+        nextState, nextCmd
 
     | UpdateLastFullError (eOpt) ->
         let nextState = {
@@ -74,8 +75,8 @@ let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> 
             Cmd.OfPromise.either
                 OfficeInterop.getTableMetaData
                 ()
-                (GenericLog >> Dev)
-                (GenericError >> Dev)
+                (curry GenericLog Cmd.none >> Dev)
+                (curry GenericError Cmd.none >> Dev)
         currentState, cmd
 
 let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Msg> =
@@ -428,12 +429,10 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Msg> =
                 callHistory = failedCall::currentState.callHistory
         }
 
-        nextState,
-        ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName e.Message)|> GenericLog |> Dev |> Cmd.ofMsg
+        nextState, curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName e.Message) |> Dev |> Cmd.ofMsg
 
     | ApiSuccess (level,logMsg) ->
-        currentState,
-        (level,logMsg) |> GenericLog |> Dev |> Cmd.ofMsg
+        currentState, curry GenericLog Cmd.none (level,logMsg) |> Dev |> Cmd.ofMsg
 
     | Request req ->
         handleApiRequestMsg req currentState
@@ -513,7 +512,7 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
                 (GetSelectedBuildingBlockTermsResponse >> BuildingBlockDetails)
                 (fun x ->
                     Msg.Batch [
-                        GenericError x |> Dev
+                        curry GenericError Cmd.none x |> Dev
                         UpdateCurrentRequestState Inactive |> BuildingBlockDetails
                     ]
                 )

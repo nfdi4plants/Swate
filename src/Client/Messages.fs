@@ -1,4 +1,4 @@
-module Messages
+module rec Messages
 
 open Elmish
 open Thoth.Elmish
@@ -10,8 +10,9 @@ open ExcelColors
 open OfficeInterop
 open OfficeInteropTypes
 open Model
+open Routing
 
-//open ISADotNet
+let curry f a b = f (a,b)
 
 module TermSearch =
 
@@ -44,9 +45,9 @@ module AdvancedSearch =
 
 type DevMsg =
     | LogTableMetadata
-    | GenericLog            of (string*string)
-    | GenericInteropLogs    of InteropLogging.Msg list
-    | GenericError          of exn
+    | GenericLog            of Cmd<Messages.Msg> * (string*string)
+    | GenericInteropLogs    of Cmd<Messages.Msg> * InteropLogging.Msg list
+    | GenericError          of Cmd<Messages.Msg> * exn
     | UpdateLastFullError   of exn option
     
 type ApiRequestMsg =
@@ -269,8 +270,6 @@ and Msg =
     /// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
     | UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
     | DoNothing
-
-open Routing
 
 let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
     let isDarkMode =

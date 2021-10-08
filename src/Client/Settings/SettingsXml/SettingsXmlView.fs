@@ -295,7 +295,7 @@ let textAreaEle (model:Model) dispatch =
                             let nM = {|ModalMessage = modalBody; NextMsg = msg|} |> Some
                             UpdateWarningModal nM |> dispatch
                         else
-                            DevMsg.GenericError (System.Exception("Could not parse element to valid xml.")) |> Dev |> dispatch
+                            curry DevMsg.GenericError Cmd.none (System.Exception("Could not parse element to valid xml.")) |> Dev |> dispatch
                             
                     )
                 ] [
