@@ -52,8 +52,9 @@ open ExcelColors
 open Model
 open Messages
 
+open NewName //!
 
-let update (msg:NewName.Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
+let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
     | NewName.DefaultMsg ->
         Fable.Core.JS.console.log "Default Msg"

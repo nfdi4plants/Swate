@@ -25,27 +25,10 @@ module Suggestion =
         |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
         |> set
 
-[<Obsolete>]
-/// Used in OfficeInterop to effectively find possible Term names and search for them in db
-type SearchTermI = {
-    // ColIndex in table
-    ColIndices      : int []
-    // RowIndex in table
-    RowIndices      : int []
-    // Query Term
-    SearchQuery     : TermMinimal
-    // Parent Term
-    IsA             : TermMinimal option
-    // This attribute displays a found ontology term, if any
-    TermOpt         : DbDomain.Term option
-} with
-    static member create colIndices searchString termAccession ontologyInfoOpt rowIndices = {
-        ColIndices      = colIndices
-        RowIndices      = rowIndices
-        SearchQuery     = TermMinimal.create searchString termAccession
-        IsA             = ontologyInfoOpt
-        TermOpt         = None
-    }
+type JSONExportType =
+| ProcessSeq
+| Assay
+| RowMajor
 
 /// This type is used to define target for unit term search.
 type UnitSearchRequest =
@@ -76,7 +59,8 @@ type IISADotNetCommonAPIv1 = {
 }
 
 type IExpertAPIv1 = {
-    parseBuildingBlocksToProcessJson    : OfficeInteropTypes.BuildingBlock []   ->  Async<string>
+    parseAnnotationTableToISAJson       : JSONExportType * string * OfficeInteropTypes.BuildingBlock []         ->  Async<string>
+    parseAnnotationTablesToISAJson      : JSONExportType * (string * OfficeInteropTypes.BuildingBlock []) []    ->  Async<string>
 }
 
 type IAnnotatorAPIv1 = {

@@ -91,6 +91,11 @@ let view (model : Model) (dispatch : Msg -> unit) =
             JSONExporter.jsonExporterMainElement model dispatch
         ] [ (*Footer*) ]
 
+    | Routing.Route.TemplateMetadata ->
+        BaseView.baseViewMainElement model dispatch [
+            TemplateMetadata.newNameMainElement model dispatch
+        ] [ (*Footer*) ]
+
     | Routing.Route.ProtocolSearch ->
         BaseView.baseViewMainElement model dispatch [
             Protocol.Search.protocolSearchViewComponent model dispatch

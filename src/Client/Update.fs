@@ -854,15 +854,9 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel, nextCmd = currentModel |> JSONExporter.update msg
         nextModel, nextCmd
 
-    //| SettingsProtocolMsg msg ->
-    //    let nextState, nextCmd =
-    //        currentModel.SettingsProtocolState
-    //        |> handleSettingsProtocolMsg msg
-    //    let nextModel = {
-    //        currentModel with
-    //            SettingsProtocolState = nextState
-    //    }
-    //    nextModel, nextCmd
+    | TemplateMetadataMsg msg ->
+        let nextModel, nextCmd = currentModel |> TemplateMetadata.update msg
+        nextModel, nextCmd
 
     | TopLevelMsg topLevelMsg ->
         let nextModel, nextCmd =

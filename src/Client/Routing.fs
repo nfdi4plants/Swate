@@ -21,6 +21,7 @@ type Route =
 | ProtocolSearch
 | XLSXConverter
 | JSONExporter
+| TemplateMetadata
 | ActivityLog
 | Settings
 | SettingsXml
@@ -38,6 +39,7 @@ type Route =
         | Route.ProtocolSearch      -> "/#Protocol/Search"
         | Route.XLSXConverter       -> "/#XLSXConverter"
         | Route.JSONExporter        -> "/#JSONExporter"
+        | Route.TemplateMetadata    -> "/#TemplateMetadata"
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
@@ -56,6 +58,7 @@ type Route =
         | Route.ProtocolSearch      -> "Template Search"
         | Route.XLSXConverter       -> "XLSX Converter"
         | Route.JSONExporter        -> "JSON Exporter"
+        | Route.TemplateMetadata    -> "Template Metadata"
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
@@ -65,7 +68,7 @@ type Route =
 
     member this.toSwateEntry =
         match this with
-        | Route.Validation | Route.SettingsDataStewards | Route.XLSXConverter -> SwateEntry.Expert
+        | Route.Validation | Route.SettingsDataStewards | Route.XLSXConverter | Route.TemplateMetadata -> SwateEntry.Expert
         | _ -> SwateEntry.Core
 
     static member toIcon (p: Route)=
@@ -85,6 +88,7 @@ type Route =
         | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
         | Route.XLSXConverter       -> createElem [Fa.Brand.Microsoft; Fa.Solid.Cogs        ]   (p.toStringRdbl)
         | Route.JSONExporter        -> createElem [Fa.Solid.FileExport                      ]   (p.toStringRdbl)
+        | Route.TemplateMetadata    -> createElem [Fa.Solid.Table; Fa.Solid.Edit            ]   (p.toStringRdbl)     
         | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
         | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
         | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  
@@ -111,6 +115,7 @@ module Routing =
             map Route.ProtocolSearch        (s "Protocol" </> s "Search")
             map Route.XLSXConverter         (s "XLSXConverter")
             map Route.JSONExporter          (s "JSONExporter")
+            map Route.TemplateMetadata      (s "TemplateMetadata")
             map Route.ActivityLog           (s "ActivityLog")
             map Route.Settings              (s "Settings")
             map Route.SettingsXml           (s "Settings" </> s "Xml")

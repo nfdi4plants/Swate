@@ -23,6 +23,7 @@
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
+        <Compile Include="States\TemplateMetadata.fs" />
         <Compile Include="States\JSONExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
@@ -52,6 +53,7 @@
         <Compile Include="Settings\SettingsXml\SettingsXmlView.fs" />
         <Compile Include="Settings\SettingsView.fs" />
         <Compile Include="JSONExporter\JSONExporter.fs" />
+        <Compile Include="TemplateMetadata\TemplateMetadata.fs" />
         <Compile Include="Views\XLSXConverterView.fs" />
         <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />

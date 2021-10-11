@@ -231,6 +231,8 @@ type Model = {
 
     JSONExporterModel           : JSONExporter.Model
 
+    TemplateMetadataModel       : TemplateMetadata.Model
+
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
 
@@ -260,6 +262,7 @@ and Msg =
     | ProtocolMsg           of Protocol.Msg
     | XLSXConverterMsg      of XLSXConverterMsg
     | JSONExporterMsg       of JSONExporter.Msg
+    | TemplateMetadataMsg   of TemplateMetadata.Msg
     | BuildingBlockDetails  of BuildingBlockDetailsMsg
     | SettingsXmlMsg        of SettingsXml.Msg
     | SettingDataStewardMsg of SettingsDataStewardMsg
@@ -305,6 +308,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         SettingsXmlState            = SettingsXml.Model         .init ()
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
         JSONExporterModel           = JSONExporter.Model        .init ()
+        TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         WarningModal                = None
         XLSXByteArray               = [||]
         XLSXJSONResult              = ""
