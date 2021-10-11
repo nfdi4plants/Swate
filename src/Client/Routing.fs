@@ -88,7 +88,7 @@ type Route =
         | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
         | Route.XLSXConverter       -> createElem [Fa.Brand.Microsoft; Fa.Solid.Cogs        ]   (p.toStringRdbl)
         | Route.JSONExporter        -> createElem [Fa.Solid.FileExport                      ]   (p.toStringRdbl)
-        | Route.TemplateMetadata    -> createElem [Fa.Solid.Table; Fa.Solid.Edit            ]   (p.toStringRdbl)     
+        | Route.TemplateMetadata    -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)     
         | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
         | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
         | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  

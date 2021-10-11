@@ -18,16 +18,21 @@ open TemplateMetadata
 
 let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
-    | DefaultMsg ->
-        Fable.Core.JS.console.log "Default Msg"
-        currentModel, Cmd.none
+    | CreateTemplateMetadataWorksheet ->
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.TemplateMetadataFunctions.createTemplateMetadataWorksheet
+                ()
+                (curry GenericLog Cmd.none >> Dev)
+                (curry GenericError Cmd.none >> Dev)
+        currentModel, cmd
 
 open Messages
 
 let defaultMessageEle (model:Model) dispatch =
     mainFunctionContainer [
         Button.a [
-            Button.OnClick(fun e -> DefaultMsg |> TemplateMetadataMsg |> dispatch)
+            Button.OnClick(fun e -> CreateTemplateMetadataWorksheet |> TemplateMetadataMsg |> dispatch)
         ][
             str "Click me!"
         ]
