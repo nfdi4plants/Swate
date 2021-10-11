@@ -383,6 +383,65 @@ let getTableRepresentation() =
         }
     )
 
+let getBuildingBlocksAndSheet() =
+    Excel.run(fun context ->
+        promise {
+            let! annotationTable = getActiveAnnotationTableName(context)
+            
+            // Ref. 2
+            let! buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context annotationTable
+
+            let worksheet = context.workbook.worksheets.getActiveWorksheet()
+            let _ = worksheet.load(U2.Case1 "name")
+
+            let! name = context.sync().``then``(fun _ -> worksheet.name)
+
+            return (name, buildingBlocks)
+        }
+    )
+
+open BuildingBlockFunctions
+
+let getBuildingBlocksAndSheets() =
+    Excel.run(fun context ->
+        promise {
+
+            let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+            let tables = context.workbook.tables
+            let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "values"|]))
+
+            let! worksheetAnnotationTableNames = context.sync().``then``(fun e ->
+                /// Get all names of all tables in the whole workbook.
+                let worksheetTableNames =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.choose (fun x ->
+                        if x.name.StartsWith("annotationTable") then
+                            Some (x.worksheet.name ,x.name)
+                        else
+                            None
+                    )
+                worksheetTableNames
+            )
+
+            // Ref. 2
+            let! worksheetBuildingBlocks =
+                worksheetAnnotationTableNames
+                |> Array.map (fun (worksheetName,tableName) ->
+                    // This function will not work without explicit calling Excel.run.
+                    // My guess is, loading multiple values parallel on the same context will overwrite or cancel each other.
+                    // By creating multiplete instances of context this problem is circumvented.
+                    // ONLY use multiple context instances when reading
+                    Excel.run (fun context ->
+                        let buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context tableName
+                        buildingBlocks |> Promise.map (fun res -> worksheetName, res)
+                    )
+                )
+                |> Promise.all
+
+            return worksheetBuildingBlocks
+        }
+    )
 
 /// selected ranged returns indices always from a worksheet perspective but we need the related table index. This is calculated here.
 let rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) =
@@ -1096,7 +1155,11 @@ let insertOntologyTerm (term:TermMinimal) =
                 range.values <- newVals
                 // fill TSR and TAN with new values
                 nextColsRange.values <- nextNewVals
+                range.format.autofitColumns()
+                nextColsRange.format.autofitColumns()
+
                 r.enableEvents <- true
+
                 // return print msg
                 "Info",sprintf "Insert %A %Ax" term nextColsRange.values.Count
             )

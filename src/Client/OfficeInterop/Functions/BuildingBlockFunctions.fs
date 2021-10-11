@@ -21,8 +21,8 @@ let private viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
 /// It should be used as follows: 'let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable'
 /// This function will load all necessery excel properties.
 let private getBuildingBlocksPreSync (context:RequestContext) annotationTable =
-    let sheet = context.workbook.worksheets.getActiveWorksheet()
-    let annotationTable = sheet.tables.getItem(annotationTable)
+    let _ = context.workbook.load(U2.Case1 "tables")
+    let annotationTable = context.workbook.tables.getItem(annotationTable)
     let annoHeaderRange = annotationTable.getHeaderRowRange()
     let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
     let annoBodyRange = annotationTable.getDataBodyRange()
@@ -45,10 +45,8 @@ let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRan
     context.sync().``then``(fun _ ->
         /// Get the table by 'Columns [| Rows [|Values|] |]'
         let columnBodies = annoBodyRange.values |> viewRowsByColumns
-
         /// Get the table number formats (units) by 'Columns [| Rows [|Values|] |]'
         let numberFormats = annoBodyRange.numberFormat |> viewRowsByColumns
-
         /// Write columns into 'BuildingBlockTypes.Column'
         let columns =
             [|
@@ -218,9 +216,7 @@ type BuildingBlock with
         getBuildingBlocksPostSync annoHeaderRange annoBodyRange context
 
 let getBuildingBlocks (context:RequestContext) (annotationTableName:string) =
-
     let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
-
     getBuildingBlocksPostSync annoHeaderRange annoBodyRange context
 
 

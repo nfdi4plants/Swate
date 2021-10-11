@@ -78,5 +78,4 @@ type AssayCommonAPI.RowWiseSheet with
         let parameters = headerRow.ParameterValues |> List.map (fun ppv -> ppv.toInsertBuildingBlock)
         let characteristics = headerRow.CharacteristicValues |> List.map (fun mav -> mav.toInsertBuildingBlock)
         let newList = factors@parameters@characteristics
-        printfn $"{newList.ToString()}"
         newList

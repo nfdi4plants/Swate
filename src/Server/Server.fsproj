@@ -9,6 +9,7 @@
         <None Include="paket.references" />
         <Compile Include="Version.fs" />
         <Compile Include="ISADotNet.fs" />
+        <Compile Include="JSONExport.fs" />
         <Compile Include="OntologyDB.fs" />
         <Compile Include="ProtocolDB.fs" />
         <Compile Include="Docs\DocsFunctions.fs" />

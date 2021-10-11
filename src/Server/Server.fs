@@ -17,6 +17,34 @@ let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
+let expertAPIv1 = {
+    parseAnnotationTableToISAJson = fun (exportType,worksheetName,buildingblocks) -> async {
+        let materials, factors, protocol, processes = JSONExport.parseBuildingBlockToProtocol worksheetName buildingblocks
+        let parsedJsonStr =
+            match exportType with
+            | ProcessSeq -> 
+                List.ofSeq processes |> ISADotNet.Json.ProcessSequence.toString
+            | _ -> failwith "not supported yet"
+        return parsedJsonStr
+    }
+    parseAnnotationTablesToISAJson = fun (exportType,worksheetBuildingBlocks) -> async {
+        failwith "NOT YET SUPPORTED; NEEDS NEXT ISADotNet preview"
+        let isaTypes =
+            worksheetBuildingBlocks
+            |> Array.map (fun (worksheetName,buildingblocks) ->
+                let materials, factors, protocol, processes = JSONExport.parseBuildingBlockToProtocol worksheetName buildingblocks
+                let parsedJsonStr =
+                    match exportType with
+                    | ProcessSeq -> 
+                        List.ofSeq processes |> ISADotNet.Json.ProcessSequence.toString
+                    | _ -> failwith "not supported yet"
+                parsedJsonStr
+            )
+        
+        return ""
+    }
+}
+
 let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
     let assayFromByteArray (byteArray: byte []) =
         let ms = new MemoryStream(byteArray)
@@ -310,6 +338,16 @@ let createISADotNetCommonAPIv1 =
     )
     |> Remoting.buildHttpHandler
 
+let createExpertAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue expertAPIv1
+    //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler(
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+    )
+    |> Remoting.buildHttpHandler
 
 /// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
 let mainApiController = router {
@@ -346,6 +384,10 @@ let topLevelRouter = router {
     
     forward @"" (fun next ctx ->
         createISADotNetCommonAPIv1 next ctx
+    )
+
+    forward @"" (fun next ctx ->
+        createExpertAPIv1 next ctx
     )
 }
 
