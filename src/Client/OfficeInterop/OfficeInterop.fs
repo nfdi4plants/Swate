@@ -1162,7 +1162,12 @@ let insertOntologyTerm (term:TermMinimal) =
                 "Info",sprintf "Insert %A %Ax" term nextColsRange.values.Count
             )
 
-            let! fit = autoFitTable context
+            let! tryTable = tryFindActiveAnnotationTable()
+
+            let! fit =
+                match tryTable with
+                | Success table -> autoFitTable context
+                | Error e       -> JS.Constructors.Promise.resolve([])
 
             return res
         }
