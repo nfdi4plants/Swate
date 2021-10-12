@@ -3,32 +3,30 @@ namespace JSONExporter
 open Shared
 open Shared.OfficeInteropTypes
 
-type JSONExportMode =
-| ActiveTable
-
 type Model = {
-    JSONExportMode              : JSONExportMode
-    JSONExportType              : JSONExportType
-    Loading                     : bool
-    ShowExportTypeDropdown      : bool
-    ActiveWorksheetName         : string
-    ExportJsonString            : string
+    TableJSONExportType             : JSONExportType
+    WorkbookJSONExportType          : JSONExportType
+    Loading                         : bool
+    ShowTableExportTypeDropdown     : bool
+    ShowWorkbookExportTypeDropdown  : bool
+    CurrentExportType               : JSONExportType option
 } with
     static member init() = {
-        JSONExportMode          = ActiveTable
-        JSONExportType          = Assay
-        Loading                 = false
-        ShowExportTypeDropdown  = false
-        ActiveWorksheetName     = ""
-        ExportJsonString        = ""
+        TableJSONExportType             = Assay
+        WorkbookJSONExportType          = Assay
+        Loading                         = false
+        ShowTableExportTypeDropdown     = false
+        ShowWorkbookExportTypeDropdown  = false
+        CurrentExportType               = None
     }
 
 type Msg =
 // Style
-| UpdateLoading                     of bool
-| UpdateShowExportTypeDropdown      of bool
-| UpdateJSONExportType              of JSONExportType
-| UpdateJSONExportMode              of JSONExportMode
+| UpdateLoading                         of bool
+| UpdateShowTableExportTypeDropdown     of bool
+| UpdateShowWorkbookExportTypeDropdown  of bool
+| UpdateTableJSONExportType             of JSONExportType
+| UpdateWorkbookJSONExportType          of JSONExportType
 //
 | ParseTableOfficeInteropRequest
 /// parse active annotation table to building blocks

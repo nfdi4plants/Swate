@@ -28,7 +28,12 @@ module Suggestion =
 type JSONExportType =
 | ProcessSeq
 | Assay
-| RowMajor
+| Table
+    member this.toExplanation =
+        match this with
+        | ProcessSeq    -> ""
+        | Assay         -> ""
+        | Table         -> ""
 
 /// This type is used to define target for unit term search.
 type UnitSearchRequest =

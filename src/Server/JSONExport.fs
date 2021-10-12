@@ -9,10 +9,10 @@ type Column with
         let header = this.Header.SwateColumnHeader
         this.Cells
         |> Array.map (fun cell ->
-            (header, cell.Index), Option.defaultValue "" cell.Value
+            (cell.Index, header), Option.defaultValue "" cell.Value
         )
 
-let parseBuildingBlockToProtocol (protocolName:string) (buildingBlocks:BuildingBlock []) =
+let parseBuildingBlockToMatrix (protocolName:string) (buildingBlocks:BuildingBlock []) =
     let matrixHeaders =
         buildingBlocks
         |> Array.collect (fun bb -> [|
@@ -33,7 +33,18 @@ let parseBuildingBlockToProtocol (protocolName:string) (buildingBlocks:BuildingB
                 yield! bb.TSR.Value.toMatrixElement()
                 yield! bb.TAN.Value.toMatrixElement()
         |])
-    let matrixLength = matrixArr |> Array.maxBy (fst >> snd) |> (fst >> snd)
-    let matrix = Collections.Generic.Dictionary<(string*int),string>(Map.ofArray matrixArr)
-    (*let materials, factors, protocol, processes = *)
-    ISADotNet.XLSX.AssayFile.AssayFile.fromSparseMatrix protocolName matrixHeaders matrixLength matrix
+    let matrix = Collections.Generic.Dictionary<(int*string),string>(Map.ofArray matrixArr)
+    matrixHeaders, matrix
+
+let parseBuildingBlockToAssay (protocolName:string) (buildingBlocks:BuildingBlock []) =
+    let matrixHeaders, matrix = parseBuildingBlockToMatrix protocolName buildingBlocks
+    ISADotNet.XLSX.AssayFile.Assay.fromSparseMatrix protocolName matrixHeaders matrix
+
+let parseBuildingBlockSeqsToAssay (worksheetNameBuildingBlocks: (string*BuildingBlock []) []) =
+    let matrices =
+        worksheetNameBuildingBlocks
+        |> Array.map (fun (protocolName, buildingBlocks) ->
+            let matrixHeaders, matrix = parseBuildingBlockToMatrix protocolName buildingBlocks
+            protocolName, Seq.ofArray matrixHeaders, matrix
+        )
+    ISADotNet.XLSX.AssayFile.Assay.fromSparseMatrices matrices

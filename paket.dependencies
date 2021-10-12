@@ -4,7 +4,7 @@ storage: none
 
 nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
-nuget ISADotNet.XLSX 0.3.3-preview.4
+nuget ISADotNet.XLSX 0.3.3-preview.5
 nuget Saturn
 nuget Expecto
 nuget FSharp.Data

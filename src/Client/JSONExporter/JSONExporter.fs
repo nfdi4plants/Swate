@@ -44,23 +44,32 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 Loading = isLoading
         }
         currentModel.updateByJSONExporterModel nextModel, Cmd.none
-    | UpdateShowExportTypeDropdown nextVal ->
+    | UpdateShowTableExportTypeDropdown nextVal ->
         let nextModel = {
             currentModel.JSONExporterModel with
-                ShowExportTypeDropdown = nextVal
+                ShowTableExportTypeDropdown = nextVal
+                ShowWorkbookExportTypeDropdown = false
         }
         currentModel.updateByJSONExporterModel nextModel, Cmd.none
-    | UpdateJSONExportType nextType ->
+    | UpdateShowWorkbookExportTypeDropdown nextVal ->
         let nextModel = {
             currentModel.JSONExporterModel with
-                JSONExportType          = nextType
-                ShowExportTypeDropdown  = false
+                ShowTableExportTypeDropdown = false
+                ShowWorkbookExportTypeDropdown = nextVal
         }
         currentModel.updateByJSONExporterModel nextModel, Cmd.none
-    | UpdateJSONExportMode nextMode ->
+    | UpdateTableJSONExportType nextType ->
         let nextModel = {
             currentModel.JSONExporterModel with
-                JSONExportMode = nextMode
+                TableJSONExportType             = nextType
+                ShowTableExportTypeDropdown     = false
+        }
+        currentModel.updateByJSONExporterModel nextModel, Cmd.none
+    | UpdateWorkbookJSONExportType nextType ->
+        let nextModel = {
+            currentModel.JSONExporterModel with
+                WorkbookJSONExportType          = nextType
+                ShowWorkbookExportTypeDropdown  = false
         }
         currentModel.updateByJSONExporterModel nextModel, Cmd.none
     //
@@ -75,12 +84,12 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
     | ParseTableServerRequest (worksheetName, buildingBlocks) ->
         let nextModel = {
             currentModel.JSONExporterModel with
-                ActiveWorksheetName = worksheetName
+                CurrentExportType   = Some currentModel.JSONExporterModel.TableJSONExportType
         }
         let cmd =
             Cmd.OfAsync.either
                 Api.expertAPIv1.parseAnnotationTableToISAJson
-                (currentModel.JSONExporterModel.JSONExportType, worksheetName, buildingBlocks)
+                (currentModel.JSONExporterModel.TableJSONExportType, worksheetName, buildingBlocks)
                 (ParseTableServerResponse >> JSONExporterMsg)
                 (curry GenericError (UpdateLoading false |> JSONExporterMsg |> Cmd.ofMsg) >> Dev)
 
@@ -95,45 +104,51 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 (curry GenericError (UpdateLoading false |> JSONExporterMsg |> Cmd.ofMsg) >> Dev)
         currentModel, cmd
     | ParseTablesServerRequest (worksheetBuildingBlocksTuple) ->
+        let nextModel = {
+            currentModel.JSONExporterModel with
+                CurrentExportType   = Some currentModel.JSONExporterModel.WorkbookJSONExportType
+        }
         let cmd =
             Cmd.OfAsync.either
                 Api.expertAPIv1.parseAnnotationTablesToISAJson
-                (currentModel.JSONExporterModel.JSONExportType, worksheetBuildingBlocksTuple)
+                (currentModel.JSONExporterModel.WorkbookJSONExportType, worksheetBuildingBlocksTuple)
                 (ParseTableServerResponse >> JSONExporterMsg)
                 (curry GenericError (UpdateLoading false |> JSONExporterMsg |> Cmd.ofMsg) >> Dev)
 
-        currentModel, cmd
+        currentModel.updateByJSONExporterModel nextModel, cmd
     //
     | ParseTableServerResponse parsedJson ->
         let n = System.DateTime.Now.ToUniversalTime().ToString("yyyymmdd_hhMMss")
-        let _ = download ($"{n}_isa.json",parsedJson)
+        let jsonName = Option.bind (fun x -> Some <| "_" + x.ToString()) currentModel.JSONExporterModel.CurrentExportType |> Option.defaultValue ""
+        let _ = download ($"{n}{jsonName}.json",parsedJson)
         let nextModel = {
             currentModel.JSONExporterModel with
-                ExportJsonString = parsedJson
-                Loading = false
+                Loading             = false
+                CurrentExportType   = None
         }
         currentModel.updateByJSONExporterModel nextModel, Cmd.none
 
 open Messages
 
-let dropdownItem (exportType:JSONExportType) (model:Model) dispatch =
+let dropdownItem (exportType:JSONExportType) (model:Model) msg (isActive:bool) =
     Dropdown.Item.a [
         Dropdown.Item.Props [
             TabIndex 0
             OnClick (fun e ->
                 e.stopPropagation()
-                UpdateJSONExportType exportType  |> JSONExporterMsg |> dispatch
+                exportType |> msg
             )
-            OnKeyDown (fun k -> if (int k.which) = 13 then UpdateJSONExportType exportType  |> JSONExporterMsg |> dispatch)
-            colorControl model.SiteStyleState.ColorMode
+            OnKeyDown (fun k -> if (int k.which) = 13 then exportType |> msg)
+            Style [if isActive then BackgroundColor model.SiteStyleState.ColorMode.ControlForeground]
+            //colorControl model.SiteStyleState.ColorMode
         ]
 
     ][
         Text.span [
             CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
             Props [
-                Tooltip.dataTooltip ("Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.")
-                Style [PaddingRight "10px"]
+                Tooltip.dataTooltip (exportType.toExplanation)
+                Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
             ]
         ] [
             Fa.i [Fa.Solid.InfoCircle] []
@@ -147,21 +162,22 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
         Field.div [Field.HasAddons][
             Control.div [][
                 Dropdown.dropdown [
-                    Dropdown.IsActive model.JSONExporterModel.ShowExportTypeDropdown
+                    Dropdown.IsActive model.JSONExporterModel.ShowTableExportTypeDropdown
                 ][
                     Dropdown.trigger [][
                         Button.a [
-                            Button.OnClick (fun e -> e.stopPropagation(); UpdateShowExportTypeDropdown (not model.JSONExporterModel.ShowExportTypeDropdown) |> JSONExporterMsg |> dispatch )
+                            Button.OnClick (fun e -> e.stopPropagation(); UpdateShowTableExportTypeDropdown (not model.JSONExporterModel.ShowTableExportTypeDropdown) |> JSONExporterMsg |> dispatch )
                         ][
-                            span [Style [MarginRight "5px"]] [str (model.JSONExporterModel.JSONExportType.ToString())]
+                            span [Style [MarginRight "5px"]] [str (model.JSONExporterModel.TableJSONExportType.ToString())]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
                     Dropdown.menu [][
                         Dropdown.content [][
-                            dropdownItem JSONExportType.Assay model dispatch
-                            dropdownItem JSONExportType.RowMajor model dispatch
-                            dropdownItem JSONExportType.ProcessSeq model dispatch
+                            let msg = (UpdateTableJSONExportType >> JSONExporterMsg >> dispatch)
+                            dropdownItem JSONExportType.Assay model msg (model.JSONExporterModel.TableJSONExportType = JSONExportType.Assay)
+                            dropdownItem JSONExportType.Table model msg (model.JSONExporterModel.TableJSONExportType = JSONExportType.Table)
+                            dropdownItem JSONExportType.ProcessSeq model msg (model.JSONExporterModel.TableJSONExportType = JSONExportType.ProcessSeq)
                         ]
                     ]
                 ]
@@ -183,27 +199,28 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
 let parseTablesToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
     mainFunctionContainer [
         Field.div [Field.HasAddons][
-            //Control.div [][
-            //    Dropdown.dropdown [
-            //        Dropdown.IsActive model.JSONExporterModel.ShowExportTypeDropdown
-            //    ][
-            //        Dropdown.trigger [][
-            //            Button.a [
-            //                Button.OnClick (fun e -> e.stopPropagation(); UpdateShowExportTypeDropdown (not model.JSONExporterModel.ShowExportTypeDropdown) |> JSONExporterMsg |> dispatch )
-            //            ][
-            //                span [Style [MarginRight "5px"]] [str (model.JSONExporterModel.JSONExportType.ToString())]
-            //                Fa.i [Fa.Solid.AngleDown] []
-            //            ]
-            //        ]
-            //        Dropdown.menu [][
-            //            Dropdown.content [][
-            //                dropdownItem JSONExportType.Assay model dispatch
-            //                dropdownItem JSONExportType.RowMajor model dispatch
-            //                dropdownItem JSONExportType.ProcessSeq model dispatch
-            //            ]
-            //        ]
-            //    ]
-            //]
+            Control.div [][
+                Dropdown.dropdown [
+                    Dropdown.IsActive model.JSONExporterModel.ShowWorkbookExportTypeDropdown
+                ][
+                    Dropdown.trigger [][
+                        Button.a [
+                            Button.OnClick (fun e -> e.stopPropagation(); UpdateShowWorkbookExportTypeDropdown (not model.JSONExporterModel.ShowWorkbookExportTypeDropdown) |> JSONExporterMsg |> dispatch )
+                        ][
+                            span [Style [MarginRight "5px"]] [str (model.JSONExporterModel.WorkbookJSONExportType.ToString())]
+                            Fa.i [Fa.Solid.AngleDown] []
+                        ]
+                    ]
+                    Dropdown.menu [][
+                        Dropdown.content [][
+                            let msg = (UpdateWorkbookJSONExportType >> JSONExporterMsg >> dispatch)
+                            dropdownItem JSONExportType.Assay model msg (model.JSONExporterModel.WorkbookJSONExportType = JSONExportType.Assay)
+                            dropdownItem JSONExportType.Table model msg (model.JSONExporterModel.WorkbookJSONExportType = JSONExportType.Table)
+                            dropdownItem JSONExportType.ProcessSeq model msg (model.JSONExporterModel.WorkbookJSONExportType = JSONExportType.ProcessSeq)
+                        ]
+                    ]
+                ]
+            ]
             Control.div [Control.IsExpanded][
                 Button.a [
                     Button.Color IsInfo
@@ -222,7 +239,10 @@ let jsonExporterMainElement (model:Messages.Model) (dispatch: Messages.Msg -> un
     form [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
-        OnClick     (fun e -> UpdateShowExportTypeDropdown false |> JSONExporterMsg |> dispatch)
+        OnClick     (fun e ->
+            UpdateShowTableExportTypeDropdown false |> JSONExporterMsg |> dispatch
+            UpdateShowWorkbookExportTypeDropdown false |> JSONExporterMsg |> dispatch
+        )
         Style [Height "100vh"]
     ] [
 

@@ -19,29 +19,28 @@ let serviceApi = {
 
 let expertAPIv1 = {
     parseAnnotationTableToISAJson = fun (exportType,worksheetName,buildingblocks) -> async {
-        let materials, factors, protocol, processes = JSONExport.parseBuildingBlockToProtocol worksheetName buildingblocks
+        let factors, protocol, assay = JSONExport.parseBuildingBlockToAssay worksheetName buildingblocks
         let parsedJsonStr =
             match exportType with
-            | ProcessSeq -> 
-                List.ofSeq processes |> ISADotNet.Json.ProcessSequence.toString
-            | _ -> failwith "not supported yet"
+            | ProcessSeq ->
+                ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
+            | Assay ->
+                ISADotNet.Json.Assay.toString assay
+            | Table ->
+                (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
         return parsedJsonStr
     }
     parseAnnotationTablesToISAJson = fun (exportType,worksheetBuildingBlocks) -> async {
-        failwith "NOT YET SUPPORTED; NEEDS NEXT ISADotNet preview"
-        let isaTypes =
-            worksheetBuildingBlocks
-            |> Array.map (fun (worksheetName,buildingblocks) ->
-                let materials, factors, protocol, processes = JSONExport.parseBuildingBlockToProtocol worksheetName buildingblocks
-                let parsedJsonStr =
-                    match exportType with
-                    | ProcessSeq -> 
-                        List.ofSeq processes |> ISADotNet.Json.ProcessSequence.toString
-                    | _ -> failwith "not supported yet"
-                parsedJsonStr
-            )
-        
-        return ""
+        let factors, protocol, assay =  JSONExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let parsedJsonStr =
+            match exportType with
+            | ProcessSeq ->
+                ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
+            | Assay ->
+                ISADotNet.Json.Assay.toString assay
+            | Table ->
+                (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+        return parsedJsonStr
     }
 }
 
@@ -49,7 +48,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
     let assayFromByteArray (byteArray: byte []) =
         let ms = new MemoryStream(byteArray)
         let jsonStr =
-            ISADotNet.XLSX.AssayFile.AssayFile.fromStream ms
+            ISADotNet.XLSX.AssayFile.Assay.fromStream ms
         jsonStr
     let investigationFromByteArray (byteArray: byte []) =
         let ms = new MemoryStream(byteArray)

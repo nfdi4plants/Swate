@@ -1155,14 +1155,14 @@ let insertOntologyTerm (term:TermMinimal) =
                 range.values <- newVals
                 // fill TSR and TAN with new values
                 nextColsRange.values <- nextNewVals
-                range.format.autofitColumns()
-                nextColsRange.format.autofitColumns()
 
                 r.enableEvents <- true
 
                 // return print msg
                 "Info",sprintf "Insert %A %Ax" term nextColsRange.values.Count
             )
+
+            let! fit = autoFitTable context
 
             return res
         }
