@@ -72,15 +72,17 @@ let navbarShortCutIconList model dispatch =
     [
         for icon in shortCutIconList model do
             yield
-                Navbar.Item.a [Navbar.Item.CustomClass "myNavbarButtonContainer";Navbar.Item.Props [Style [Padding "0px"; MinWidth "45px"]]] [
+                Navbar.Item.a [Navbar.Item.CustomClass "myNavbarButtonContainer";Navbar.Item.Props [Title icon.Description ;Style [Padding "0px"; MinWidth "45px"]]] [
                     div [
                         Class "myNavbarButton"
-                        OnClick (fun _ -> icon.Msg |> dispatch)
+                        OnClick (fun e ->
+                            icon.Msg |> dispatch
+                        )
                     ] icon.FaList
                 ]
     ]
 
-let quickAccessDropdownElement model dispatch (isSndNavbar:bool)=
+let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
     Navbar.Item.a [
         Navbar.Item.Props [
             OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)

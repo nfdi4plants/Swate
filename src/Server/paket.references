@@ -4,3 +4,5 @@ MySql.Data
 Microsoft.Extensions.Configuration.UserSecrets
 ISADotNet.XLSX
 ISADotNet
+Newtonsoft.Json
+Newtonsoft.Json.Schema

@@ -241,7 +241,7 @@ let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit
             CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
             Props [
                 Tooltip.dataTooltip (block |> BuildingBlockType.toShortExplanation)
-                Style [PaddingRight "10px"]
+                Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
             ]
         ] [
             Fa.i [Fa.Solid.InfoCircle] []

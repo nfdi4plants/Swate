@@ -31,9 +31,9 @@ type JSONExportType =
 | Table
     member this.toExplanation =
         match this with
-        | ProcessSeq    -> ""
-        | Assay         -> ""
-        | Table         -> ""
+        | ProcessSeq    -> "Export to sequence of process.json."
+        | Assay         -> "Export to assay.json"
+        | Table         -> "Export to access layer type. table.json utilizes minor isa json types in a more accessible model."
 
 /// This type is used to define target for unit term search.
 type UnitSearchRequest =
@@ -55,7 +55,7 @@ type IServiceAPIv1 = {
 
 type IISADotNetCommonAPIv1 = {
     toAssayJSON                 : byte [] -> Async<string>
-    toAssayJSONWithCustomXml    : byte [] -> Async<string>
+    toParsedSwateTemplate       : byte [] -> Async<string>
     toInvestigationJSON         : byte [] -> Async<string>
     toProcessSeqJSON            : byte [] -> Async<string>
     toSimplifiedRowMajorJSON    : byte [] -> Async<string>
@@ -66,6 +66,7 @@ type IISADotNetCommonAPIv1 = {
 type IExpertAPIv1 = {
     parseAnnotationTableToISAJson       : JSONExportType * string * OfficeInteropTypes.BuildingBlock []         ->  Async<string>
     parseAnnotationTablesToISAJson      : JSONExportType * (string * OfficeInteropTypes.BuildingBlock []) []    ->  Async<string>
+    getTemplateMetadataJsonSchema       : unit                                                                  -> Async<string>
 }
 
 type IAnnotatorAPIv1 = {

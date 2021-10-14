@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://raw.githubusercontent.com/nfdi4plants/SWATE_templates/FormattingDocs/templates/TemplatingSchema.json",
+  "title": "Template Metadata Schema",
+  "description": "The schema regarding Swate templating-related JSON files.",
+  "type": "object",
+  "properties": {
+    "templateId": {
+      "description": "The unique identifier of this template. It will be auto generated.",
+      "type": "string"
+    },
+    "name": {
+      "description": "The name of the Swate template.",
+      "type": "string"
+    },
+    "version": {
+      "description": "The current version of this template in SemVer notation.",
+      "type": "string"
+    },
+    "description": {
+      "description": "The description of this template. Use few sentences for succinctness.",
+      "type": "string"
+    },
+    "docslink": {
+      "description": "The URL to the documentation page.",
+      "type": "string"
+    },
+    "organisation": {
+      "description": "The name of the template associated organisation.",
+      "type": "string"
+    },
+    "table": {
+      "description": "The name of the Swate annotation table in the worksheet of the template's excel file.",
+      "type": "string"
+    },
+    "er": {
+      "description": "A list of all ERs (endpoint repositories) targeted with this template. ERs are realized as Terms: <term ref here>",
+      "type": "array",
+      "items": {
+        "$ref": "https://raw.githubusercontent.com/ISA-tools/isa-api/master/isatools/resources/schemas/isa_model_version_1_0_schemas/core/ontology_annotation_schema.json"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "tags": {
+      "description": "A list of all tags associated with this template. Tags are realized as Terms: <term ref here>",
+      "type": "array",
+      "items": {
+        "$ref": "https://raw.githubusercontent.com/ISA-tools/isa-api/master/isatools/resources/schemas/isa_model_version_1_0_schemas/core/ontology_annotation_schema.json"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "authors": {
+      "description": "The author(s) of this template.",
+      "type": "array",
+      "items": {
+        "$ref": "https://raw.githubusercontent.com/ISA-tools/isa-api/master/isatools/resources/schemas/isa_model_version_1_0_schemas/core/person_schema.json"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "description",
+    "docslink",
+    "organisation",
+    "table",
+    "er",
+    "tags",
+    "authors"
+  ]
+}

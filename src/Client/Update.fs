@@ -548,9 +548,9 @@ let handleXLSXConverterMsg (msg:XLSXConverterMsg) (currentModel: Model) : Model 
     | GetAssayJsonRequest byteArr ->
         let cmd =
             Cmd.OfAsync.either
-                Api.isaDotNetCommonApi.toAssayJSON
+                Api.isaDotNetCommonApi.toParsedSwateTemplate
                 byteArr
-                (GetAssayJsonResponse >> XLSXConverterMsg)
+                (fun x -> x.ToString() |> (GetAssayJsonResponse >> XLSXConverterMsg))
                 (ApiError >> Api)
         currentModel, cmd
     | GetAssayJsonResponse jsonStr ->

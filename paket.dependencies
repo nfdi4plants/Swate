@@ -5,6 +5,7 @@ storage: none
 nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
 nuget ISADotNet.XLSX 0.3.3-preview.5
+nuget Newtonsoft.Json.Schema 3.0.14
 nuget Saturn
 nuget Expecto
 nuget FSharp.Data

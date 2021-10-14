@@ -9,14 +9,6 @@ open Shared.TermTypes
 open Shared.ProtocolTemplateTypes
 open OntologyDB
 
-type XmlType =
-| CustomXml
-| TableXml
-    static member ofString str =
-        match str with
-        | "CustomXml" -> CustomXml
-        | "TableXml"  -> TableXml
-        | anyOther -> failwith (sprintf "Cannot parse string (%s) to ProtocolDB.XmlType" anyOther)
 
 /// Returns Protocols with empty protocol blocks
 let getAllProtocols cString =
@@ -33,19 +25,19 @@ let getAllProtocols cString =
     use reader = cmd.ExecuteReader()
     [|
         while reader.Read() do
-            let tags = reader.GetString(6).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
+            let tags = reader.GetString(7).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
             yield
                 ProtocolTemplate.create
-                    (reader.GetString(0))       // name
-                    (reader.GetString(1))       // version
-                    (reader.GetDateTime(2))     // created
-                    (reader.GetString(3))       // author
-                    (reader.GetString(4))       // description
-                    (reader.GetString(5))       // docs link
+                    (reader.GetString(1))       // name
+                    (reader.GetString(2))       // version
+                    (reader.GetDateTime(3))     // created
+                    (reader.GetString(4))       // author
+                    (reader.GetString(5))       // description
+                    (reader.GetString(6))       // docs link
                     tags                        // tag array
                     []                          // tableJson
-                    (reader.GetInt32(7))        // used
-                    (reader.GetInt32(8))        // rating
+                    (reader.GetInt32(8))        // used
+                    (reader.GetInt32(9))        // rating
     |]
 
 open ISADotNet
@@ -68,20 +60,20 @@ let getProtocolByName cString (queryStr:string) =
 
     use reader = cmd.ExecuteReader()
     reader.Read() |> ignore
-    let tags = reader.GetString(6).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
+    let tags = reader.GetString(7).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
     /// Parse assay.json in database to insertbuildingblocks.
-    let insertBuildingBlockList = (reader.GetString(9) |> rowMajorOfTemplateJson).toInsertBuildingBlockList
+    let insertBuildingBlockList = (reader.GetString(10) |> rowMajorOfTemplateJson).toInsertBuildingBlockList
     ProtocolTemplate.create
-        (reader.GetString(0))       // name
-        (reader.GetString(1))       // version
-        (reader.GetDateTime(2))     // created
-        (reader.GetString(3))       // author
-        (reader.GetString(4))       // description
-        (reader.GetString(5))       // docs link
+        (reader.GetString(1))       // name
+        (reader.GetString(2))       // version
+        (reader.GetDateTime(3))     // created
+        (reader.GetString(4))       // author
+        (reader.GetString(5))       // description
+        (reader.GetString(6))       // docs link
         tags
         insertBuildingBlockList     
-        (reader.GetInt32(7))        // used
-        (reader.GetInt32(8))        // rating
+        (reader.GetInt32(8))        // used
+        (reader.GetInt32(9))        // rating
 
 let increaseTimesUsed cString (templateName) =
     use connection = establishConnection cString

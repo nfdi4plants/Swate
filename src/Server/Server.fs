@@ -42,6 +42,10 @@ let expertAPIv1 = {
                 (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
         return parsedJsonStr
     }
+    getTemplateMetadataJsonSchema = fun () -> async {
+        let xmlStr = TemplateMetadata.getJsonSchemaAsXml
+        return xmlStr
+    }
 }
 
 let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
@@ -69,17 +73,12 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             return assayJsonString
         }
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay with it's customXml.
-        toAssayJSONWithCustomXml = fun byteArray -> async {
-            failwith "toAssayJSONWithCustomXml is not yet implemented"
-            //let swateCustomXmlArr = customXmlFromByteArray byteArray
-            //let assay =
-            //    assayFromByteArray byteArray
-            //    |> fun (_,_,_,assay) ->
-            //        let prevCommentList = Option.defaultValue [] assay.Comments
-            //        let nextCommentList =
-            //            if swateCustomXmlArr |> Array.isEmpty then
-                            
-            //        ISADotNet.API.Assay.setComments assay 
+        toParsedSwateTemplate = fun byteArray -> async {
+            failwith "toParsedSwateTemplate is not implemented yet"
+            let assay = assayFromByteArray byteArray 
+            let tableJson = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString)
+            //let metadata = ISADotNet.TemplateMetadata.parseMetadataFromByteArr byteArray
+            //let metadataWithTableJson = { metadata with TableJson = tableJson}
             return ""
         }
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.

@@ -25,9 +25,9 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
                 OfficeInterop.AnnotationTableExists (Shared.OfficeInteropTypes.TryFindAnnoTableResult.Success "Remove Warning Notification") |> OfficeInteropMsg |> dispatch
             )
         ]] [ ]
-        Heading.h5 [] [str "Warning: No Annotation table found in worksheet"]
+        Heading.h5 [] [str "Warning: No annotation table found in worksheet"]
         Field.div [] [
-            str "Your worksheet seems to contain no annotation table. You can create one by pressing the button below"
+            str "Your worksheet seems to contain no annotation table. You can create one by pressing the button below."
         ]
         Field.div [][
             Button.buttonComponent

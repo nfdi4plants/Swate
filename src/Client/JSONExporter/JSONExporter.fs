@@ -248,6 +248,14 @@ let jsonExporterMainElement (model:Messages.Model) (dispatch: Messages.Msg -> un
 
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "JSON Exporter"]
 
+        Help.help [][
+            str "Export swate annotation tables to "
+            a [Href @"https://en.wikipedia.org/wiki/JSON"][str "JSON"]
+            str " format. Official ISA-JSON types can be found "
+            a [Href @"https://isa-specs.readthedocs.io/en/latest/isajson.html#"][str "here"]
+            str "."
+        ]
+
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Export active table"]
 
         parseTableToISAJsonEle model dispatch

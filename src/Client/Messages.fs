@@ -245,6 +245,8 @@ type Model = {
         { this with ExcelState = s}
     member this.updateByJSONExporterModel (m:JSONExporter.Model) =
         { this with JSONExporterModel = m}
+    member this.updateByTemplateMetadataModel (m:TemplateMetadata.Model) =
+        { this with TemplateMetadataModel = m}
 
 and Msg =
     | Bounce                of (System.TimeSpan*string*Msg)
