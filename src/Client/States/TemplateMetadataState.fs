@@ -1,10 +1,11 @@
 namespace TemplateMetadata
 
 open Shared
+open ProtocolTemplateTypes.TemplateMetadata
 
 type Model = {
     Default: obj
-    MetadataFields : ProtocolTemplateTypes.MetadataField option
+    MetadataFields : MetadataField option
 } with
     static member init() = {
         Default     = ""
@@ -12,6 +13,6 @@ type Model = {
     }
 
 type Msg =
-| CreateTemplateMetadataWorksheet of ProtocolTemplateTypes.MetadataField option
-| GetTemplateMetadataJsonSchemaRequest
-| GetTemplateMetadataJsonSchemaResponse of string
+| CreateTemplateMetadataWorksheet of MetadataField
+//| GetTemplateMetadataJsonSchemaRequest
+//| GetTemplateMetadataJsonSchemaResponse of string

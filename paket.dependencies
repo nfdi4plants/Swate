@@ -2,10 +2,10 @@ source https://api.nuget.org/v3/index.json
 framework: net5.0
 storage: none
 
+nuget DynamicObj 0.2.1
 nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
 nuget ISADotNet.XLSX 0.3.3-preview.5
-nuget Newtonsoft.Json.Schema 3.0.14
 nuget Saturn
 nuget Expecto
 nuget FSharp.Data

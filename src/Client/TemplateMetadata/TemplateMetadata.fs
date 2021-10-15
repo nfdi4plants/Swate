@@ -18,64 +18,64 @@ open TemplateMetadata
 
 open ProtocolTemplateTypes
 
-module ParseTemplateMetadataSchema =
-    open Fable.SimpleJson
+//module ParseTemplateMetadataSchema =
+//    open Fable.SimpleJson
     
-    let parseJsonSchema (str:string) =
-        SimpleJson.tryParse str
+//    let parseJsonSchema (str:string) =
+//        SimpleJson.tryParse str
 
-    let Description = "description"
-    let JType       = "type"
-    let Properties  = "properties"
-    let Items       = "items"
+//    let Description = "description"
+//    let JType       = "type"
+//    let Properties  = "properties"
+//    let Items       = "items"
 
-    let JArrayStr   = "array"
-    let JObjectStr  = "object"
+//    let JArrayStr   = "array"
+//    let JObjectStr  = "object"
 
-    let getJStringValue (JString v) = v
+//    let getJStringValue (JString v) = v
 
-    let rec parseJsonToMetadataFields keyName (json:Json) =
-        let parseObjectSchemaChildren (JObject json:Json) =
-            let l = Map.toList json
-            l
-            |> List.map (fun (k,v) ->
-                parseJsonToMetadataFields k v
-            )
-        match json with
-        | JObject dict ->
-            //printfn $"new {keyName}"
-            let description = dict |> Map.tryFind Description |> Option.bind (getJStringValue >> Some)
-            let jsonType    =
-                dict
-                |> Map.tryFind JType
-                /// Cannot be found in case of "anyOf". 
-                |> Option.defaultValue (JString "string")
-                |> getJStringValue
-            let properties  = dict |> Map.tryFind Properties
-            let items       = dict |> Map.tryFind Items
-            let list        =
-                if jsonType = JArrayStr then
-                    parseJsonToMetadataFields keyName items.Value
-                    |> Some
-                else
-                    None
-            let children =
-                if jsonType = JObjectStr then
-                    //printfn $"parse children as object {keyName}"
-                    parseObjectSchemaChildren properties.Value 
-                else []
-            //printfn $"solved: {keyName}"
-            MetadataField.create
-                keyName
-                list
-                description
-                children
-        | bottomEle ->
-            MetadataField.create
-                keyName
-                None
-                None
-                []
+//    let rec parseJsonToMetadataFields keyName (json:Json) =
+//        let parseObjectSchemaChildren (JObject json:Json) =
+//            let l = Map.toList json
+//            l
+//            |> List.map (fun (k,v) ->
+//                parseJsonToMetadataFields k v
+//            )
+//        match json with
+//        | JObject dict ->
+//            //printfn $"new {keyName}"
+//            let description = dict |> Map.tryFind Description |> Option.bind (getJStringValue >> Some)
+//            let jsonType    =
+//                dict
+//                |> Map.tryFind JType
+//                /// Cannot be found in case of "anyOf". 
+//                |> Option.defaultValue (JString "string")
+//                |> getJStringValue
+//            let properties  = dict |> Map.tryFind Properties
+//            let items       = dict |> Map.tryFind Items
+//            let list        =
+//                if jsonType = JArrayStr then
+//                    parseJsonToMetadataFields keyName items.Value
+//                    |> Some
+//                else
+//                    None
+//            let children =
+//                if jsonType = JObjectStr then
+//                    //printfn $"parse children as object {keyName}"
+//                    parseObjectSchemaChildren properties.Value 
+//                else []
+//            //printfn $"solved: {keyName}"
+//            MetadataField.create
+//                keyName
+//                list
+//                description
+//                children
+//        | bottomEle ->
+//            MetadataField.create
+//                keyName
+//                None
+//                None
+//                []
 
 let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
@@ -87,24 +87,24 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 (curry GenericLog Cmd.none >> Dev)
                 (curry GenericError Cmd.none >> Dev)
         currentModel, cmd
-    | GetTemplateMetadataJsonSchemaRequest ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.expertAPIv1.getTemplateMetadataJsonSchema
-                ()
-                (GetTemplateMetadataJsonSchemaResponse >> TemplateMetadataMsg)
-                (curry GenericError Cmd.none >> Dev)
-        currentModel, cmd
-    | GetTemplateMetadataJsonSchemaResponse json ->
-        let tryJson =
-            ParseTemplateMetadataSchema.parseJsonSchema json
-            |> Option.bind (ParseTemplateMetadataSchema.parseJsonToMetadataFields "Root" >> Some)
-        let nextModel = {
-            currentModel.TemplateMetadataModel with
-                MetadataFields = tryJson
-        }
-        let cmd = CreateTemplateMetadataWorksheet tryJson |> TemplateMetadataMsg |> Cmd.ofMsg
-        currentModel.updateByTemplateMetadataModel nextModel, cmd
+    //| GetTemplateMetadataJsonSchemaRequest ->
+    //    let cmd =
+    //        Cmd.OfAsync.either
+    //            Api.expertAPIv1.getTemplateMetadataJsonSchema
+    //            ()
+    //            (GetTemplateMetadataJsonSchemaResponse >> TemplateMetadataMsg)
+    //            (curry GenericError Cmd.none >> Dev)
+    //    currentModel, cmd
+    //| GetTemplateMetadataJsonSchemaResponse json ->
+    //    let tryJson =
+    //        ParseTemplateMetadataSchema.parseJsonSchema json
+    //        |> Option.bind (ParseTemplateMetadataSchema.parseJsonToMetadataFields "Root" >> Some)
+    //    let nextModel = {
+    //        currentModel.TemplateMetadataModel with
+    //            MetadataFields = tryJson
+    //    }
+    //    let cmd = CreateTemplateMetadataWorksheet tryJson |> TemplateMetadataMsg |> Cmd.ofMsg
+    //    currentModel.updateByTemplateMetadataModel nextModel, cmd
 
 open Messages
 
@@ -112,18 +112,10 @@ let defaultMessageEle (model:Model) dispatch =
     
     mainFunctionContainer [
         Button.a [
-            Button.OnClick(fun e -> GetTemplateMetadataJsonSchemaRequest |> TemplateMetadataMsg |> dispatch)
+            Button.OnClick(fun e -> CreateTemplateMetadataWorksheet TemplateMetadata.root |> TemplateMetadataMsg |> dispatch)
         ][
             str "Click me!"
         ]
-
-        if model.TemplateMetadataModel.MetadataFields.IsSome then 
-            Text.div [][
-                str (model.TemplateMetadataModel.MetadataFields.Value.ToString())
-            ]
-        else
-            str "not parsable"
-
     ]
 
 let newNameMainElement (model:Messages.Model) dispatch =

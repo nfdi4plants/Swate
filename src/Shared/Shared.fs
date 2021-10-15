@@ -64,9 +64,9 @@ type IISADotNetCommonAPIv1 = {
 }
 
 type IExpertAPIv1 = {
-    parseAnnotationTableToISAJson       : JSONExportType * string * OfficeInteropTypes.BuildingBlock []         ->  Async<string>
-    parseAnnotationTablesToISAJson      : JSONExportType * (string * OfficeInteropTypes.BuildingBlock []) []    ->  Async<string>
-    getTemplateMetadataJsonSchema       : unit                                                                  -> Async<string>
+    parseAnnotationTableToISAJson       : JSONExportType * string * OfficeInteropTypes.BuildingBlock []         -> Async<string>
+    parseAnnotationTablesToISAJson      : JSONExportType * (string * OfficeInteropTypes.BuildingBlock []) []    -> Async<string>
+    //getTemplateMetadataJsonSchema       : unit                                                                  -> Async<string>
 }
 
 type IAnnotatorAPIv1 = {
