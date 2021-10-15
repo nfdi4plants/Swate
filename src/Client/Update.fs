@@ -536,7 +536,22 @@ let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentSt
         }
         nextState, Cmd.none
 
+open Browser
+open Fable.Core.JS
+open Fable.Core.JsInterop
+
 let handleXLSXConverterMsg (msg:XLSXConverterMsg) (currentModel: Model) : Model * Cmd<Msg> =
+    let download(filename, text) =
+      let element = document.createElement("a");
+      element.setAttribute("href", "data:text/plain;charset=utf-8," +  encodeURIComponent(text));
+      element.setAttribute("download", filename);
+    
+      element?style?display <- "None";
+      let _ = document.body.appendChild(element);
+    
+      element.click();
+    
+      document.body.removeChild(element);
     match msg with
     // Client
     | StoreXLSXByteArray byteArr ->
@@ -554,6 +569,7 @@ let handleXLSXConverterMsg (msg:XLSXConverterMsg) (currentModel: Model) : Model 
                 (ApiError >> Api)
         currentModel, cmd
     | GetAssayJsonResponse jsonStr ->
+        let _ = download("test.json",jsonStr)
         let nextModel = {
             currentModel with
                 XLSXJSONResult = jsonStr

@@ -76,9 +76,10 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         toParsedSwateTemplate = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
             let tableJson = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString)
-            let metadata = TemplateMetadata.parseMetadataFromByteArr byteArray
-            //let metadataWithTableJson = { metadata with TableJson = tableJson}
-            return metadata
+            let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
+            metadata.SetValue("TemplateJson",tableJson)
+            let jsonExp = metadata.toJson()
+            return jsonExp
         }
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
         toInvestigationJSON = fun byteArray -> async {

@@ -59,7 +59,7 @@ let textFieldEle (model:Model) dispatch =
         Column.column [][
             Textarea.textarea [
                 Textarea.IsReadOnly true
-                Textarea.Value (model.XLSXJSONResult.[0 .. 500] + " ...")
+                Textarea.ValueOrDefault (model.XLSXJSONResult)
             ][]
         ]
         Column.column [Column.Width (Screen.All, Column.IsNarrow)] [

@@ -40,23 +40,25 @@ type TemplateMetadataJsonExport() =
 
     member this.print() = DynObj.print this
 
-let maxColumnByRows (rows:DocumentFormat.OpenXml.Spreadsheet.Row []) =
+    member this.toJson() = this |> JsonConvert.SerializeObject
+
+let private maxColumnByRows (rows:DocumentFormat.OpenXml.Spreadsheet.Row []) =
     rows
     |> Array.map (fun row -> (Row.Spans.toBoundaries >> snd) row.Spans)
     |> (Array.max >> int)
 
-let findRowByKey (key:string) (rowValues: string option [][])=
+let private findRowByKey (key:string) (rowValues: string option [][])=
     rowValues
     |> Array.find (fun row ->
         row.[0].IsSome && row.[0].Value = key
     )
 
-let findRowValuesByKey (key:string) (rowValues: string option [][])=
+let private findRowValuesByKey (key:string) (rowValues: string option [][])=
     findRowByKey key rowValues
     |> Array.tail
 
 /// Also gets rows from children
-let getAllRelatedRowsValues (metadata:TemplateMetadata.MetadataField) (rows: string option [][]) =
+let private getAllRelatedRowsValues (metadata:TemplateMetadata.MetadataField) (rows: string option [][]) =
     let rec collectRows (crMetadata:TemplateMetadata.MetadataField) =
         if crMetadata.Children.IsEmpty then
             let row = rows |> findRowValuesByKey crMetadata.ExtendedNameKey
@@ -66,7 +68,7 @@ let getAllRelatedRowsValues (metadata:TemplateMetadata.MetadataField) (rows: str
             childRows
     collectRows metadata
 
-let convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.SheetData) sst (metadata:TemplateMetadata.MetadataField) =
+let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.SheetData) sst (metadata:TemplateMetadata.MetadataField) =
     let rows = SheetData.getRows sheetData |> Array.ofSeq
     let rowValues =
         rows
@@ -136,18 +138,11 @@ let convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.SheetData) 
             output
     convertDynamic None None metadata
 
-let parseMetadataFromByteArr (byteArray:byte []) =
-    printfn "START"
+let parseDynMetadataFromByteArr (byteArray:byte []) =
     let ms = new MemoryStream(byteArray)
     let spreadsheet = Spreadsheet.fromStream ms false
     let sst = Spreadsheet.tryGetSharedStringTable spreadsheet
     let sheetOpt = Spreadsheet.tryGetSheetBySheetName ProtocolTemplateTypes.TemplateMetadata.TemplateMetadataWorksheetName spreadsheet
     if sheetOpt.IsNone then failwith $"Could not find template metadata worksheet: {ProtocolTemplateTypes.TemplateMetadata.TemplateMetadataWorksheetName}"
 
-    let res = convertToDynObject sheetOpt.Value sst TemplateMetadata.root
-
-    //printfn $"{extendedNames.ToString()}"
-
-    let realJson = res |> JsonConvert.SerializeObject
-
-    realJson
+    convertToDynObject sheetOpt.Value sst TemplateMetadata.root
