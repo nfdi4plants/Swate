@@ -256,7 +256,7 @@ let tryFindActiveAnnotationTable() =
 
 /// This function is used to hide all reference columns and to fit rows and columns to their values.
 /// The main goal is to improve readability of the table with this function.
-let autoFitTable (context:RequestContext) =
+let autoFitTable (hideRefCols:bool) (context:RequestContext) =
     promise {
         let! annotationTable = getActiveAnnotationTableName context
 
@@ -281,7 +281,7 @@ let autoFitTable (context:RequestContext) =
                 |> Array.ofSeq
                 |> Array.map (fun col ->
                     let r = col.getRange()
-                    if (SwateColumnHeader.create col.name).isReference then
+                    if (SwateColumnHeader.create col.name).isReference && hideRefCols then
                         r.columnHidden <- true
                     else
                         r.format.autofitColumns()
@@ -295,6 +295,11 @@ let autoFitTable (context:RequestContext) =
         )
         return res
     }
+
+/// This function is used to hide all reference columns and to fit rows and columns to their values.
+/// The main goal is to improve readability of the table with this function.
+let autoFitTableHide (context:RequestContext) =
+    autoFitTable true context
 
 let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
 
@@ -884,7 +889,7 @@ let removeSelectedAnnotationBlock () =
 
             let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols})"  
 
-            let! format = autoFitTable context
+            let! format = autoFitTableHide context
 
             return [resultMsg]
         }
@@ -1166,7 +1171,7 @@ let insertOntologyTerm (term:TermMinimal) =
 
             let! fit =
                 match tryTable with
-                | Success table -> autoFitTable context
+                | Success table -> autoFitTableHide context
                 | Error e       -> JS.Constructors.Promise.resolve([])
 
             return res

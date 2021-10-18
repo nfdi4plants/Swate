@@ -46,7 +46,7 @@ type Msg =
     | AnnotationtableCreated
     | AnnotationTableExists                 of TryFindAnnoTableResult
     | GetParentTerm
-    | AutoFitTable
+    | AutoFitTable                          of hideRefCols:bool
     //
     | GetTableValidationXml
     | WriteTableValidationToXml             of newTableValidation:CustomXmlTypes.Validation.TableValidation * currentSwateVersion:string

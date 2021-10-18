@@ -53,7 +53,7 @@ let rowIndicesToReadable (rowIndices:int []) =
 
 let infoIcon (txt:string) =
     span [
-        Style [Color NFDIColors.LightBlue.Base; OverflowY OverflowOptions.Visible]
+        Style [Color NFDIColors.Yellow.Base; OverflowY OverflowOptions.Visible]
         Class (Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
         Tooltip.dataTooltip txt
     ][
@@ -136,7 +136,7 @@ let tableElement (terms:TermSearchable []) =
         thead [][
             tr [][
                 th [Class "toExcelColor"][str "Name"]
-                th [Class "toExcelColor"][str "Desc."]
+                th [Class "toExcelColor"; Style [TextAlign TextAlignOptions.Center] ][str "Desc."]
                 th [Class "toExcelColor"][str "TAN"]
                 th [Class "toExcelColor"][str "Row"]
             ]

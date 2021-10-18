@@ -16,8 +16,8 @@ module OfficeInterop =
 
         match excelInteropMsg with
 
-        | AutoFitTable ->
-            let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run OfficeInterop.autoFitTable
+        | AutoFitTable hidecols ->
+            let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run (OfficeInterop.autoFitTable hidecols)
             let cmd =
                 Cmd.OfPromise.either
                     p

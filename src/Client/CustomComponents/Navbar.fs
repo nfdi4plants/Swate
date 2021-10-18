@@ -13,7 +13,7 @@ open Messages
 type ShortCutIcon = {
     Description : string
     FaList      : ReactElement list
-    Msg         : Msg
+    Msg         : Browser.Types.MouseEvent -> unit
     Category    : string
 } with
     static member create description faList msg category = {
@@ -23,7 +23,7 @@ type ShortCutIcon = {
         Category    = category
     }
 
-let shortCutIconList model =
+let shortCutIconList model dispatch =
     [
         ShortCutIcon.create
             "Add Annotation Table"
@@ -31,14 +31,14 @@ let shortCutIconList model =
                 Fa.span [Fa.Solid.Plus][]
                 Fa.span [Fa.Solid.Table][]
             ]
-            (OfficeInterop.CreateAnnotationTable (model.SiteStyleState.IsDarkMode) |> OfficeInteropMsg)
+            (fun _ -> OfficeInterop.CreateAnnotationTable (model.SiteStyleState.IsDarkMode) |> OfficeInteropMsg |> dispatch)
             "Table"
         ShortCutIcon.create
             "Autoformat Table"
             [
                 Fa.i [Fa.Solid.SyncAlt][]
             ]
-            (OfficeInterop.AutoFitTable |> OfficeInteropMsg)
+            (fun e -> OfficeInterop.AutoFitTable (not e.ctrlKey) |> OfficeInteropMsg |> dispatch)
             "Formatting"
         ShortCutIcon.create
             "Update Ontology Terms"
@@ -47,7 +47,7 @@ let shortCutIconList model =
                 span [][str model.ExcelState.FillHiddenColsStateStore.toReadableString]
                 Fa.span [Fa.Solid.Pen][]
             ]
-            (OfficeInterop.FillHiddenColsRequest |> OfficeInteropMsg)
+            (fun _ -> OfficeInterop.FillHiddenColsRequest |> OfficeInteropMsg |> dispatch)
             "Formatting"
         ShortCutIcon.create
             "Remove Building Block"
@@ -55,7 +55,7 @@ let shortCutIconList model =
                 Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]][]
                 Fa.span [Fa.Solid.Columns][]
             ]
-            (OfficeInterop.RemoveAnnotationBlock |> OfficeInteropMsg)
+            (fun _ -> OfficeInterop.RemoveAnnotationBlock |> OfficeInteropMsg |> dispatch)
             "BuildingBlock"
         ShortCutIcon.create
             "Get Building Block Information"
@@ -64,20 +64,19 @@ let shortCutIconList model =
                 span [][str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
                 Fa.span [Fa.Solid.Columns][]
             ]
-            (OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg)
+            (fun _ -> OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg |> dispatch)
             "BuildingBlock"
     ]
     
 let navbarShortCutIconList model dispatch =
     [
-        for icon in shortCutIconList model do
+        for icon in shortCutIconList model dispatch do
             yield
                 Navbar.Item.a [Navbar.Item.CustomClass "myNavbarButtonContainer";Navbar.Item.Props [Title icon.Description ;Style [Padding "0px"; MinWidth "45px"]]] [
                     div [
                         Class "myNavbarButton"
-                        OnClick (fun e ->
-                            icon.Msg |> dispatch
-                        )
+                        OnClick icon.Msg
+                       
                     ] icon.FaList
                 ]
     ]
