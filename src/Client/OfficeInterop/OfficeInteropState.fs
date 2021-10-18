@@ -42,7 +42,7 @@ type Msg =
     | FormatColumn                          of colname:string * formatString:string
     | FormatColumns                         of (string * string) list
     /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
-    | CreateAnnotationTable                 of isDark:bool
+    | CreateAnnotationTable                 of isDark:bool * tryUsePrevOutput:bool 
     | AnnotationtableCreated
     | AnnotationTableExists                 of TryFindAnnoTableResult
     | GetParentTerm

@@ -34,6 +34,6 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
                 model.SiteStyleState.ColorMode
                 model.SiteStyleState.IsDarkMode
                 "create annotation table"
-                (fun _ -> OfficeInterop.CreateAnnotationTable model.SiteStyleState.IsDarkMode |> OfficeInteropMsg |> dispatch )
+                (fun e -> OfficeInterop.CreateAnnotationTable (model.SiteStyleState.IsDarkMode, e.ctrlKey) |> OfficeInteropMsg |> dispatch )
         ]
     ]

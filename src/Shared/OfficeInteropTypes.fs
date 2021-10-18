@@ -179,6 +179,22 @@ module OfficeInteropTypes =
                 | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
             else
                 false
+        member this.isOutputCol = 
+            if this.isMainColumn then
+                let bbType = parseCoreName this.SwateColumnHeader
+                match bbType with
+                | Some t    -> BuildingBlockType.ofString (t.Trim()) |> fun x -> x.isOutputColumn
+                | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
+            else
+                false
+        member this.isInputCol = 
+            if this.isMainColumn then
+                let bbType = parseCoreName this.SwateColumnHeader
+                match bbType with
+                | Some t    -> BuildingBlockType.ofString (t.Trim()) |> fun x -> x.isInputColumn
+                | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
+            else
+                false
         member this.isUnitCol =
             this.SwateColumnHeader.StartsWith ColumnCoreNames.Unit.toString
         member this.isTANCol =

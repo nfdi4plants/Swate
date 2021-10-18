@@ -156,11 +156,11 @@ module OfficeInterop =
         //            (GenericError >> Dev)
         //    currentModel,cmd
 
-        | CreateAnnotationTable (isDark) ->
+        | CreateAnnotationTable (isDark, tryUsePrevOutput) ->
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.createAnnotationTable  
-                    (isDark)
+                    (isDark,tryUsePrevOutput)
                     (curry GenericLog (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> Dev)
                     (curry GenericError Cmd.none >> Dev)
             currentModel,cmd

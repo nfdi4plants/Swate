@@ -121,10 +121,63 @@ let exampleExcelFunction2 () =
 let swateSync (context:RequestContext) =
     context.sync().``then``(fun _ -> ()) |> Promise.start
 
+/// Will return Some tableName if any annotationTable exists in a worksheet before the active one.
+let getPrevAnnotationTable (context:RequestContext) =
+    promise {
+    
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+        let tables = context.workbook.tables
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "position"; "values"|]))
+
+        let! prevTable = context.sync().``then``(fun e ->
+            let activeWorksheetPosition = activeWorksheet.position
+            /// Get all names of all tables in the whole workbook.
+            let prevTable =
+                tables.items
+                |> Seq.toArray
+                |> Array.choose (fun x ->
+                    if x.name.StartsWith("annotationTable") then
+                        Some (x.worksheet.position ,x.name)
+                    else
+                        None
+                )
+                |> Array.filter(fun (wp,tableName) -> activeWorksheetPosition - wp > 0.)
+                |> Array.sortBy(fun (wp,tableName) ->
+                    activeWorksheetPosition - wp
+                )
+                |> Array.tryHead
+            Option.bind (snd >> Some) prevTable
+        )
+
+        return prevTable
+    }
+
+/// 
+let getPrevTableOutput (context:RequestContext) =
+    promise {
+        let! prevTableName = getPrevAnnotationTable context
+
+        if prevTableName.IsSome then
+            // Ref. 2
+            let! buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context prevTableName.Value
+
+            let outputCol = buildingBlocks |> Array.tryFind (fun x -> x.MainColumn.Header.isOutputCol)
+
+            let values =
+                if outputCol.IsSome then
+                    outputCol.Value.MainColumn.Cells
+                else [||]
+
+            return values
+        else
+            return [||]
+    }
+
 /// This function is used to create a new annotation table.
 /// 'allTableNames' is a array of all currently existing annotationTables.
 /// 'isDark' refers to the current styling of excel (darkmode, or not).
-let createAnnotationTable (isDark:bool) =
+let createAnnotationTable (isDark:bool, tryUseLastOutput:bool) =
     Excel.run(fun context ->
 
         /// This function is used to create the "next" annotationTable name.
@@ -160,6 +213,13 @@ let createAnnotationTable (isDark:bool) =
 
         promise {
 
+            /// Is user input signals to try and find+reuse the output from the previous annotationTable do this, otherwise just return empty array
+            let! prevTableOutput = if tryUseLastOutput then getPrevTableOutput context else promise {return Array.empty}
+
+            /// If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
+            let useExistingPrevOutput = tryUseLastOutput && Array.isEmpty >> not <| prevTableOutput
+
+            printfn $"{useExistingPrevOutput}"
 
             let! allTableNames = getAllTableNames context
 
@@ -191,7 +251,15 @@ let createAnnotationTable (isDark:bool) =
                 /// Therefore we recreate the tableRange but with a columncount of 2. The 2 Basic columns in any annotation table.
                 /// "Source Name" | "Sample Name"
                 let adaptedRange =
-                    let rowCount = if tableRange.isEntireColumn then 21. else (if tableRange.rowCount <= 1. then 1. else tableRange.rowCount)
+                    let rowCount =
+                        if useExistingPrevOutput then
+                            (float prevTableOutput.Length + 1.)
+                        elif tableRange.isEntireColumn then
+                            21.
+                        elif tableRange.rowCount <= 2. then
+                            2.
+                        else
+                            tableRange.rowCount
                     activeSheet.getRangeByIndexes(tableRange.rowIndex,tableRange.columnIndex,rowCount,2.)
 
                 /// Create table in current worksheet
@@ -200,6 +268,12 @@ let createAnnotationTable (isDark:bool) =
                 /// Update annotationTable column headers
                 (annotationTable.columns.getItemAt 0.).name <- "Source Name"
                 (annotationTable.columns.getItemAt 1.).name <- "Sample Name"
+
+                if useExistingPrevOutput then
+                    let newColValues = prevTableOutput |> Array.map (fun cell -> ResizeArray[|Option.bind (box >> Some) cell.Value|] ) |> ResizeArray
+                    let col1 = (annotationTable.columns.getItemAt 0.)
+                    let body = col1.getDataBodyRange()
+                    body.values <- newColValues
 
                 /// Create new annotationTable name
                 let newName = findNewTableName allTableNames
@@ -480,13 +554,7 @@ let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuilding
     if newBB.Column.isOutputColumn then
         let existingOutputOpt =
             existingBuildingBlocks
-            |> Array.tryFind (fun x ->
-                if x.MainColumn.Header.isMainColumn then 
-                    let pp = x.MainColumn.Header.toBuildingBlockNamePrePrint 
-                    pp.IsSome && pp.Value.isOutputColumn
-                else
-                    false
-            )
+            |> Array.tryFind (fun x -> x.MainColumn.Header.isMainColumn && x.MainColumn.Header.isOutputCol)
         if existingOutputOpt.IsSome then failwith $"Swate table contains already one output column \"{existingOutputOpt.Value.MainColumn.Header.SwateColumnHeader}\". Each Swate table can only contain exactly one output column type."
 
 /// This function is used to add a new building block to the active annotationTable.
