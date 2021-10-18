@@ -236,7 +236,7 @@ let parseTablesToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
     ]
 
 let jsonExporterMainElement (model:Messages.Model) (dispatch: Messages.Msg -> unit) =
-    form [
+    Content.content [ Content.Props [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
         OnClick     (fun e ->
@@ -244,7 +244,7 @@ let jsonExporterMainElement (model:Messages.Model) (dispatch: Messages.Msg -> un
             UpdateShowWorkbookExportTypeDropdown false |> JSONExporterMsg |> dispatch
         )
         Style [Height "100vh"]
-    ] [
+    ]] [
 
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "JSON Exporter"]
 

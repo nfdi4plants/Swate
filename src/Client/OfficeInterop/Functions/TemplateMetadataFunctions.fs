@@ -28,8 +28,11 @@ open Fable.Core.JsInterop
 
 let rec extendMetadataFields (metadatafields:MetadataField) =
     let children = metadatafields.Children |> List.collect extendMetadataFields
-    if metadatafields.Key <> "" && metadatafields.Children.IsEmpty |> not then
-        let metadatafields' = {metadatafields with ExtendedNameKey = metadatafields.ExtendedNameKey.ToUpper()}
+    if metadatafields.Key <> "" && metadatafields.Children.IsEmpty |> not && metadatafields.List then
+        let metadatafields' = {metadatafields with ExtendedNameKey = $"#{metadatafields.ExtendedNameKey.ToUpper()} list"}
+        metadatafields'::children
+    elif metadatafields.Key <> "" && metadatafields.Children.IsEmpty |> not then
+        let metadatafields' = {metadatafields with ExtendedNameKey = "#" + metadatafields.ExtendedNameKey.ToUpper()}
         metadatafields'::children
     elif metadatafields.Key <> "" then
         metadatafields::children

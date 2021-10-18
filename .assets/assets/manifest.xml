@@ -108,7 +108,7 @@
             <bt:Urls>
                 <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
                 <bt:Url id="Swate.Core.Url" DefaultValue="https://swate.denbi.uni-tuebingen.de/#BuildingBlock"/>
-                <bt:Url id="Swate.Experts.Url" DefaultValue="https://swate.denbi.uni-tuebingen.de/#Validation"/>
+                <bt:Url id="Swate.Experts.Url" DefaultValue="https://swate.denbi.uni-tuebingen.de/#JSONExporter"/>
             </bt:Urls>
             <bt:ShortStrings>
                 <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>
