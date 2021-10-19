@@ -563,7 +563,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextCmd =
             match pageOpt with
             | Some Routing.Route.Validation ->
-                OfficeInterop.GetTableValidationXml |> OfficeInteropMsg |> Cmd.ofMsg
+                Cmd.OfPromise.perform
+                    OfficeInterop.getTableRepresentation
+                    ()
+                    (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
             | Some Routing.Route.ProtocolSearch ->
                 Protocol.GetAllProtocolsRequest |> ProtocolMsg |> Cmd.ofMsg
             | _ ->
