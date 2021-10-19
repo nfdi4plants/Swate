@@ -153,7 +153,11 @@ let getPrevAnnotationTable (context:RequestContext) =
         return prevTable
     }
 
-/// 
+/// I retrieve the index of the currently opened worksheet, here the new table should be created.
+/// I retrieve all annotationTables in the workbook. I filter out all annotationTables that are on a worksheet with a lower index than the index of the currently opened worksheet.
+/// I subtract from the index of the current worksheet the indices of the other found worksheets with annotationTable.
+/// I sort by the resulting lowest number (since the worksheet is then closest to the active one), I find the output column in the particular
+/// annotationTable and use the values it contains for the new annotationTable in the active worksheet.
 let getPrevTableOutput (context:RequestContext) =
     promise {
         let! prevTableName = getPrevAnnotationTable context

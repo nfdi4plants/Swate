@@ -3,7 +3,6 @@ namespace OfficeInterop
 open Shared
 open TermTypes
 open OfficeInteropTypes
-open OfficeInteropTypes
 
 type FillHiddenColsState =
 | Inactive
@@ -33,40 +32,40 @@ type Model = {
     }
 
 type Msg =
+    // create and update table element functions
     | Initialized                           of (string*string)
+    | CreateAnnotationTable                 of isDark:bool * tryUsePrevOutput:bool 
+    | AnnotationtableCreated
+    | AnnotationTableExists                 of TryFindAnnoTableResult
     | InsertOntologyTerm                    of TermMinimal
     | AddAnnotationBlock                    of InsertBuildingBlock
     | AddAnnotationBlocks                   of InsertBuildingBlock list //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
-    | FormatColumn                          of colname:string * formatString:string
-    | FormatColumns                         of (string * string) list
-    /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
-    | CreateAnnotationTable                 of isDark:bool * tryUsePrevOutput:bool 
-    | AnnotationtableCreated
-    | AnnotationTableExists                 of TryFindAnnoTableResult
-    | GetParentTerm
     | AutoFitTable                          of hideRefCols:bool
-    //
+    // Term search functions
+    | GetParentTerm
+    // custom xml functions
     | GetTableValidationXml
     | WriteTableValidationToXml             of newTableValidation:CustomXmlTypes.Validation.TableValidation * currentSwateVersion:string
-    /// needs to set newColNames separately as these validations come from templates for protocol group insert
-    //| AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:CustomXmlTypes.Protocol.Protocol
-    //| WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
     | DeleteAllCustomXml
     | GetSwateCustomXml
     | UpdateSwateCustomXml                  of string
-    //
+    // table+database interconnected functions
+    /// 
     | FillHiddenColsRequest
+    ///
     | FillHiddenColumns                     of TermSearchable []
+    ///
     | UpdateFillHiddenColsState             of FillHiddenColsState
-    //
-    | InsertFileNames                       of fileNameList:string list
-    // Show Details to selected BuildingBlock
+    /// Show Details to selected BuildingBlock
     | GetSelectedBuildingBlockTerms
     //
+    ///
+    | InsertFileNames                       of fileNameList:string list
+    // Swate expert functions
+    ///
     | CreatePointerJson
-    //
     // Development
     | TryExcel
     | TryExcel2

@@ -186,7 +186,7 @@ let fileUploadButton (model:Model) dispatch id =
                         UpdateUploadData evt.target?result |> ProtocolMsg |> dispatch
                                    
                     reader.onerror <- fun evt ->
-                        curry GenericLog Cmd.none ("Error", evt.Value) |> Dev |> dispatch
+                        curry GenericLog Cmd.none ("Error", evt.Value) |> DevMsg |> dispatch
 
                     reader.readAsText(fileNames |> List.head)
 

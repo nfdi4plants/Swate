@@ -39,7 +39,7 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
                 initializeAddIn
                 ()
                 (fun x -> (x.host.ToString(),x.platform.ToString()) |> OfficeInterop.Initialized |> OfficeInteropMsg )
-                (curry GenericError Cmd.none >> Dev)
+                (curry GenericError Cmd.none >> DevMsg)
         ]
     model, initialCmd
 
@@ -80,11 +80,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ] [
             //Text.p [] [str ""]
         ]
-
-    | Routing.Route.XLSXConverter ->
-        BaseView.baseViewMainElement model dispatch [
-            XLSXConverterView.xlsxConverterMainView model dispatch
-        ] [ (*Footer*) ]
 
     | Routing.Route.JSONExporter ->
         BaseView.baseViewMainElement model dispatch [

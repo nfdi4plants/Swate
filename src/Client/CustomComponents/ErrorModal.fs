@@ -12,7 +12,7 @@ open Shared
 open CustomComponents
 
 let errorModal (model:Model) dispatch =
-    let closeMsg = (fun e -> UpdateLastFullError None |> Dev |> dispatch) 
+    let closeMsg = (fun e -> UpdateLastFullError None |> DevMsg |> dispatch) 
     Modal.modal [ Modal.IsActive true ] [
         Modal.background [
             Props [ OnClick closeMsg ]

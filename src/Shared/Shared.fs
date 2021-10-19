@@ -25,15 +25,18 @@ module Suggestion =
         |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
         |> set
 
+[<RequireQualifiedAccess>]
 type JSONExportType =
 | ProcessSeq
 | Assay
 | Table
+| ProtocolTemplate
     member this.toExplanation =
         match this with
-        | ProcessSeq    -> "Export to sequence of process.json."
-        | Assay         -> "Export to assay.json"
-        | Table         -> "Export to access layer type. table.json utilizes minor isa json types in a more accessible model."
+        | ProcessSeq        -> "Export to sequence of process.json."
+        | Assay             -> "Export to assay.json"
+        | Table             -> "Export to access layer type. table.json utilizes minor isa json types in a more accessible model."
+        | ProtocolTemplate  -> "Export to Swate protocol template schema, with template metadata and table json."
 
 /// This type is used to define target for unit term search.
 type UnitSearchRequest =
@@ -58,7 +61,7 @@ type IISADotNetCommonAPIv1 = {
     toParsedSwateTemplate       : byte [] -> Async<string>
     toInvestigationJSON         : byte [] -> Async<string>
     toProcessSeqJSON            : byte [] -> Async<string>
-    toSimplifiedRowMajorJSON    : byte [] -> Async<string>
+    toTableJSON                 : byte [] -> Async<string>
     testPostNumber              : int -> Async<string>
     getTestNumber               : unit -> Async<string>
 }

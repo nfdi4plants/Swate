@@ -22,24 +22,26 @@ let expertAPIv1 = {
         let factors, protocol, assay = JSONExport.parseBuildingBlockToAssay worksheetName buildingblocks
         let parsedJsonStr =
             match exportType with
-            | ProcessSeq ->
+            | JSONExportType.ProcessSeq ->
                 ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
-            | Assay ->
+            | JSONExportType.Assay ->
                 ISADotNet.Json.Assay.toString assay
-            | Table ->
+            | JSONExportType.Table ->
                 (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+            | anythingElse -> $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
         return parsedJsonStr
     }
     parseAnnotationTablesToISAJson = fun (exportType,worksheetBuildingBlocks) -> async {
         let factors, protocol, assay =  JSONExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr =
             match exportType with
-            | ProcessSeq ->
+            | JSONExportType.ProcessSeq ->
                 ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
-            | Assay ->
+            | JSONExportType.Assay ->
                 ISADotNet.Json.Assay.toString assay
-            | Table ->
+            | JSONExportType.Table ->
                 (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+            | anythingElse -> $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
         return parsedJsonStr
     }
     //getTemplateMetadataJsonSchema = fun () -> async {
@@ -91,7 +93,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             let processJSon = assay |> fun (_,_,_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
             return processJSon
         }
-        toSimplifiedRowMajorJSON = fun byteArray -> async {
+        toTableJSON = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
             let processJSon = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) 
             return processJSon

@@ -118,6 +118,7 @@ module Validation =
         | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlock []
 
 module Protocol =
+
     type Msg =
         // ------ Process from file ------
         //| ParseJsonToProcessRequest         of string
@@ -140,11 +141,6 @@ module Protocol =
         | RemoveSelectedProtocol
         | UpdateLoading                     of bool
 
-type XLSXConverterMsg =
-    | StoreXLSXByteArray                of byte []
-    | GetAssayJsonRequest               of byte []
-    | GetAssayJsonResponse              of string
-
 type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockTermsRequest      of TermSearchable []
     | GetSelectedBuildingBlockTermsResponse     of TermSearchable []
@@ -154,27 +150,8 @@ type BuildingBlockDetailsMsg =
 module SettingsXml =
     type Msg =
     //    // // Client // //
-    //    // Validation Xml
-    //    | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    //    | UpdateNextAnnotationTableForActiveValidation  of AnnotationTable option
-    //    | UpdateValidationXmls                          of OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
-    //    // Protocol Group Xml
-    //    | UpdateProtocolGroupXmls                       of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
-    //    | UpdateActiveProtocolGroup                     of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    //    | UpdateNextAnnotationTableForActiveProtGroup   of AnnotationTable option
-    //    // Protocol Xml
-    //    | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
-    //    | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
-    //    //
-        | UpdateRawCustomXml                            of string option
-        | UpdateNextRawCustomXml                        of string option
-    //    // Excel Interop
-    //    | GetAllValidationXmlParsedRequest
-    //    | GetAllValidationXmlParsedResponse             of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
-    //    | GetAllProtocolGroupXmlParsedRequest
-    //    | GetAllProtocolGroupXmlParsedResponse          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
-    //    | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
-    //    | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypesUpdateSwateCustomXml
+    | UpdateRawCustomXml                            of string option
+    | UpdateNextRawCustomXml                        of string option
 
 type SettingsDataStewardMsg =
     // Client
@@ -237,9 +214,6 @@ type Model = {
     SettingsDataStewardState    : SettingsDataStewardState
 
     WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
-
-    XLSXByteArray               : byte []
-    XLSXJSONResult              : string
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
@@ -248,33 +222,32 @@ type Model = {
     member this.updateByTemplateMetadataModel (m:TemplateMetadata.Model) =
         { this with TemplateMetadataModel = m}
 
-and Msg =
-    | Bounce                of (System.TimeSpan*string*Msg)
-    | DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
-    | Api                   of ApiMsg
-    | Dev                   of DevMsg
-    | TermSearchMsg         of TermSearch.Msg
-    | AdvancedSearchMsg     of AdvancedSearch.Msg
-    | OfficeInteropMsg      of OfficeInterop.Msg
-    | StyleChange           of StyleChangeMsg
-    | PersistentStorage     of PersistentStorageMsg
-    | FilePickerMsg         of FilePicker.Msg
-    | BuildingBlockMsg      of BuildingBlock.Msg
-    | ValidationMsg         of Validation.Msg
-    | ProtocolMsg           of Protocol.Msg
-    | XLSXConverterMsg      of XLSXConverterMsg
-    | JSONExporterMsg       of JSONExporter.Msg
-    | TemplateMetadataMsg   of TemplateMetadata.Msg
-    | BuildingBlockDetails  of BuildingBlockDetailsMsg
-    | SettingsXmlMsg        of SettingsXml.Msg
-    | SettingDataStewardMsg of SettingsDataStewardMsg
-    //| SettingsProtocolMsg   of SettingsProtocolMsg
-    | TopLevelMsg           of TopLevelMsg
-    | UpdatePageState       of Routing.Route option
-    | Batch                 of seq<Msg>
-    /// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
-    | UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
-    | DoNothing
+type Msg =
+| Bounce                of (System.TimeSpan*string*Msg)
+| DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
+| Api                   of ApiMsg
+| DevMsg                of DevMsg
+| TermSearchMsg         of TermSearch.Msg
+| AdvancedSearchMsg     of AdvancedSearch.Msg
+| OfficeInteropMsg      of OfficeInterop.Msg
+| StyleChange           of StyleChangeMsg
+| PersistentStorage     of PersistentStorageMsg
+| FilePickerMsg         of FilePicker.Msg
+| BuildingBlockMsg      of BuildingBlock.Msg
+| ValidationMsg         of Validation.Msg
+| ProtocolMsg           of Protocol.Msg
+| JSONExporterMsg       of JSONExporter.Msg
+| TemplateMetadataMsg   of TemplateMetadata.Msg
+| BuildingBlockDetails  of BuildingBlockDetailsMsg
+| SettingsXmlMsg        of SettingsXml.Msg
+| SettingDataStewardMsg of SettingsDataStewardMsg
+//| SettingsProtocolMsg   of SettingsProtocolMsg
+| TopLevelMsg           of TopLevelMsg
+| UpdatePageState       of Routing.Route option
+| Batch                 of seq<Messages.Msg>
+/// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
+| UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
+| DoNothing
 
 let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
     let isDarkMode =
@@ -312,6 +285,4 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         JSONExporterModel           = JSONExporter.Model        .init ()
         TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         WarningModal                = None
-        XLSXByteArray               = [||]
-        XLSXJSONResult              = ""
     }

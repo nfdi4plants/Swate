@@ -25,8 +25,8 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
             Cmd.OfPromise.either
                 OfficeInterop.TemplateMetadataFunctions.createTemplateMetadataWorksheet
                 (metadataFieldsOpt)
-                (curry GenericLog Cmd.none >> Dev)
-                (curry GenericError Cmd.none >> Dev)
+                (curry GenericLog Cmd.none >> DevMsg)
+                (curry GenericError Cmd.none >> DevMsg)
         currentModel, cmd
 
 open Messages

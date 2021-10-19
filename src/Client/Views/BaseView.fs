@@ -61,7 +61,6 @@ let tabs (model:Model) dispatch =
             createNavigationTab Routing.Route.JSONExporter          model dispatch
             createNavigationTab Routing.Route.TemplateMetadata      model dispatch
             createNavigationTab Routing.Route.Validation            model dispatch
-            createNavigationTab Routing.Route.XLSXConverter         model dispatch
             createNavigationTab Routing.Route.Info                  model dispatch
     ]
 

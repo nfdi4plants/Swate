@@ -10,7 +10,7 @@ open Routing
 open Model
 open Messages
 
-let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
+let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.Msg> =
     match route with
     | Some page ->
         let nextPageState = {
@@ -25,7 +25,6 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
         }
         nextModel,Cmd.none
     | None ->
-        //Browser.console.error("Error parsing url")
         let nextPageState = {
             currentModel.PageState with
                 CurrentPage = Route.NotFound
@@ -37,49 +36,51 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
         }
         nextModel,Cmd.none
 
-let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> =
-    match devMsg with
-    | GenericLog (nextCmd,(level,logText)) ->
-        let nextState = {
-            currentState with
-                Log = (LogItem.ofStringNow level logText)::currentState.Log
-        }
-        nextState, nextCmd
+module Dev = 
 
-    | GenericInteropLogs (nextCmd,logs) ->
-        let parsedLogs = logs |> List.map LogItem.ofInteropLogginMsg
-        let nextState = {
-            currentState with
-                Log = parsedLogs@currentState.Log
-        }
-        nextState, nextCmd
-
-    | GenericError (nextCmd, e) ->
-        OfficeInterop.consoleLog (sprintf "GenericError occured: %s" e.Message)
-        let nextState = {
-            currentState with
-                Log = LogItem.Error(System.DateTime.Now,e.Message)::currentState.Log
-                LastFullError = Some e
+    let update (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Messages.Msg> =
+        match devMsg with
+        | GenericLog (nextCmd,(level,logText)) ->
+            let nextState = {
+                currentState with
+                    Log = (LogItem.ofStringNow level logText)::currentState.Log
             }
-        nextState, nextCmd
+            nextState, nextCmd
 
-    | UpdateLastFullError (eOpt) ->
-        let nextState = {
-            currentState with
-                LastFullError = eOpt
-        }
-        nextState, Cmd.none
+        | GenericInteropLogs (nextCmd,logs) ->
+            let parsedLogs = logs |> List.map LogItem.ofInteropLogginMsg
+            let nextState = {
+                currentState with
+                    Log = parsedLogs@currentState.Log
+            }
+            nextState, nextCmd
 
-    | LogTableMetadata ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getTableMetaData
-                ()
-                (curry GenericLog Cmd.none >> Dev)
-                (curry GenericError Cmd.none >> Dev)
-        currentState, cmd
+        | GenericError (nextCmd, e) ->
+            OfficeInterop.consoleLog (sprintf "GenericError occured: %s" e.Message)
+            let nextState = {
+                currentState with
+                    Log = LogItem.Error(System.DateTime.Now,e.Message)::currentState.Log
+                    LastFullError = Some e
+                }
+            nextState, nextCmd
 
-let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Msg> =
+        | UpdateLastFullError (eOpt) ->
+            let nextState = {
+                currentState with
+                    LastFullError = eOpt
+            }
+            nextState, Cmd.none
+
+        | LogTableMetadata ->
+            let cmd =
+                Cmd.OfPromise.either
+                    OfficeInterop.getTableMetaData
+                    ()
+                    (curry GenericLog Cmd.none >> DevMsg)
+                    (curry GenericError Cmd.none >> DevMsg)
+            currentState, cmd
+
+let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
 
     let handleTermSuggestionRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString =
         let currentCall = {
@@ -158,22 +159,6 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             (fun x -> ("Debug",sprintf "Successfully created %A" x) |> ApiSuccess |> Api)
             (ApiError >> Api)
 
-        //let currentCall = {
-        //        FunctionName = "getTermSuggestions"
-        //        Status = Pending
-        //}
-
-        //let nextState = {
-        //    currentState with
-        //        currentCall = currentCall
-        //}
-
-        //nextState,
-        //Cmd.OfAsync.either
-        //    Api.api.getTermSuggestions
-        //    (5,queryString)
-        //    (TermSuggestionResponse >> Response >> Api)
-        //    (ApiError >> Api)
     | GetNewTermSuggestions queryString ->
         handleTermSuggestionRequest
             "getTermSuggestions"
@@ -280,7 +265,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         nextState, cmd
         
 
-let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : ApiState * Cmd<Msg> =
+let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
 
     let handleTermSuggestionResponse (responseHandler: DbDomain.Term [] -> Msg) (suggestions: DbDomain.Term[]) =
         let finishedCall = {
@@ -415,7 +400,10 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Msg> =
+open Dev
+open Messages
+
+let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messages.Msg> =
     match apiMsg with
     | ApiError e ->
         let failedCall = {
@@ -429,10 +417,10 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Msg> =
                 callHistory = failedCall::currentState.callHistory
         }
 
-        nextState, curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName e.Message) |> Dev |> Cmd.ofMsg
+        nextState, curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName e.Message) |> DevMsg |> Cmd.ofMsg
 
     | ApiSuccess (level,logMsg) ->
-        currentState, curry GenericLog Cmd.none (level,logMsg) |> Dev |> Cmd.ofMsg
+        currentState, curry GenericLog Cmd.none (level,logMsg) |> DevMsg |> Cmd.ofMsg
 
     | Request req ->
         handleApiRequestMsg req currentState
@@ -512,7 +500,7 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
                 (GetSelectedBuildingBlockTermsResponse >> BuildingBlockDetails)
                 (fun x ->
                     Msg.Batch [
-                        curry GenericError Cmd.none x |> Dev
+                        curry GenericError Cmd.none x |> DevMsg
                         UpdateCurrentRequestState Inactive |> BuildingBlockDetails
                     ]
                 )
@@ -535,99 +523,6 @@ let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentSt
                 PointerJson = nextPointerJson
         }
         nextState, Cmd.none
-
-open Browser
-open Fable.Core.JS
-open Fable.Core.JsInterop
-
-let handleXLSXConverterMsg (msg:XLSXConverterMsg) (currentModel: Model) : Model * Cmd<Msg> =
-    let download(filename, text) =
-      let element = document.createElement("a");
-      element.setAttribute("href", "data:text/plain;charset=utf-8," +  encodeURIComponent(text));
-      element.setAttribute("download", filename);
-    
-      element?style?display <- "None";
-      let _ = document.body.appendChild(element);
-    
-      element.click();
-    
-      document.body.removeChild(element);
-    match msg with
-    // Client
-    | StoreXLSXByteArray byteArr ->
-        let nextModel = {
-            currentModel with
-                XLSXByteArray = byteArr
-        }
-        nextModel, Cmd.none
-    | GetAssayJsonRequest byteArr ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.isaDotNetCommonApi.toParsedSwateTemplate
-                byteArr
-                (fun x -> x.ToString() |> (GetAssayJsonResponse >> XLSXConverterMsg))
-                (ApiError >> Api)
-        currentModel, cmd
-    | GetAssayJsonResponse jsonStr ->
-        let _ = download("test.json",jsonStr)
-        let nextModel = {
-            currentModel with
-                XLSXJSONResult = jsonStr
-        }
-        nextModel, Cmd.none
-
-//let handleSettingsProtocolMsg (topLevelMsg:SettingsProtocolMsg) (currentState: SettingsProtocolState) : SettingsProtocolState * Cmd<Msg> =
-//    match topLevelMsg with
-//    // Client
-//    | UpdateProtocolsFromDB nextProtFromDB ->
-//        let nextState = {
-//            currentState with
-//                ProtocolsFromDB = nextProtFromDB
-//        }
-//        nextState, Cmd.none
-//    | UpdateProtocolsFromExcel nextProtFromExcel ->
-//        let nextState = {
-//            currentState with
-//                ProtocolsFromExcel = nextProtFromExcel
-//        }
-//        nextState, Cmd.none
-//    // Excel
-//    | GetActiveProtocolGroupXmlParsed ->
-//        let cmd =
-//            Cmd.OfPromise.either
-//                OfficeInterop.getActiveProtocolGroupXmlParsed
-//                ()
-//                (fun x ->
-//                    Msg.Batch [
-//                        UpdateProtocolsFromExcel x |> SettingsProtocolMsg
-//                        GetProtocolsFromDBRequest x |> SettingsProtocolMsg
-//                    ]
-//                )
-//                (GenericError >> Dev)
-//        currentState, cmd
-//    | UpdateProtocolByNewVersion (prot, protTemplate) ->
-//        failwith """Function "UpdateProtocolByNewVersion" is currently not supported."""
-//        //let cmd =
-//        //    Cmd.OfPromise.either
-//        //        OfficeInterop.updateProtocolByNewVersion
-//        //        (prot,protTemplate)
-//        //        (AddAnnotationBlocks >> ExcelInterop)
-//        //        (GenericError >> Dev)
-//        currentState, Cmd.none
-//    // Server
-//    | GetProtocolsFromDBRequest activeProtGroupOpt ->
-//        let cmd =
-//            match activeProtGroupOpt with
-//            | Some protGroup ->
-//                let protNames = protGroup.Protocols |> List.map (fun x -> x.Id) |> Array.ofList
-//                Cmd.OfAsync.either
-//                    Api.api.getProtocolsByName
-//                    protNames
-//                    (UpdateProtocolsFromDB >> SettingsProtocolMsg)
-//                    (GenericError >> Dev)
-//            | None ->
-//                GenericLog ("Info", "No protocols found for active table") |> Dev |> Cmd.ofMsg
-//        currentState, cmd
             
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
@@ -740,10 +635,8 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 AdvancedSearchState = nextAdvancedSearchState
         }
         nextModel,nextCmd
-    | Dev devMsg ->
-        let nextDevState,nextCmd =
-            currentModel.DevState
-            |> handleDevMsg devMsg
+    | DevMsg msg ->
+        let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
         
         let nextModel = {
             currentModel with
@@ -752,9 +645,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         nextModel,nextCmd
 
     | Api apiMsg ->
-        let nextApiState,nextCmd =
-            currentModel.ApiState
-            |> handleApiMsg apiMsg
+        let nextApiState,nextCmd = currentModel.ApiState |> handleApiMsg apiMsg
 
         let nextModel = {
             currentModel with
@@ -830,10 +721,6 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 ProtocolState = nextFileUploadJsonState
             }
         nextModel, nextCmd
-
-    | XLSXConverterMsg msg ->
-        let nextModel, nextMsg = handleXLSXConverterMsg msg currentModel
-        nextModel, nextMsg
 
     | BuildingBlockDetails buildingBlockDetailsMsg ->
         let nextState, nextCmd =
