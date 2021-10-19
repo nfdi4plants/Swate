@@ -238,7 +238,8 @@ let dependencies = [
 
     "run-db"
 
-    "release"
+    "createvfs"
+        ==> "release"
 
     "testfake"
     "Ignore"
