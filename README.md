@@ -52,6 +52,8 @@ There are many more small and incremental features. Check the [latest release no
 You can test swate by following the steps below. If you decide to do so, please take the time to set up a Github account to report your issues and suggestions [here](https://github.com/nfdi4plants/Swate/issues).
 You can also search existing issues for solutions for your questions and/or discussions about your suggestions.
 
+___N O T E___ : Swate runs **only** on MS Excel 365, and MS Excel Online. We test on and develop for explicitly these versions. (It is possible though that some older versions like MS Excel 2019 work.)
+
 ### Excel desktop
 
 
