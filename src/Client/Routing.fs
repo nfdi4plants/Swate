@@ -65,7 +65,7 @@ type Route =
 
     member this.toSwateEntry =
         match this with
-        | Route.Validation | Route.SettingsDataStewards | Route.TemplateMetadata -> SwateEntry.Expert
+        | Route.Validation | Route.SettingsDataStewards | Route.TemplateMetadata | Route.JSONExporter -> SwateEntry.Expert
         | _ -> SwateEntry.Core
 
     static member toIcon (p: Route)=
