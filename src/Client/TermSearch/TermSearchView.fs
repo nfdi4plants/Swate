@@ -59,6 +59,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 
         let nextState = {
             Model.init() with
+                SearchByParentOntology = currentState.SearchByParentOntology
                 SelectedTerm = Some suggestion
                 TermSearchText = suggestion.Name
         }

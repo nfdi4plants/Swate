@@ -229,15 +229,6 @@ module OfficeInterop =
                     )
                     (curry GenericError (UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails |> Cmd.ofMsg) >> DevMsg)
             currentModel, cmd
-        //
-        | CreatePointerJson ->
-            let cmd =
-                Cmd.OfPromise.either
-                    OfficeInterop.createPointerJson
-                    ()
-                    (fun x -> Some x |> UpdatePointerJson |> SettingDataStewardMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
 
         /// DEV
         | TryExcel  ->

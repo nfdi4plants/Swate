@@ -301,3 +301,21 @@ module OfficeInteropTypes =
         member this.HasUnit = this.UnitTerm.IsSome
         member this.HasExistingTerm = this.ColumnTerm.IsSome
         member this.HasCompleteTerm = this.ColumnTerm.IsSome && this.ColumnTerm.Value.Name <> "" && this.ColumnTerm.Value.TermAccession <> ""
+
+    type InsertBuildingBlockWithValues = {
+        Column      : BuildingBlockNamePrePrint
+        ColumnTerm  : TermMinimal option
+        UnitTerm    : TermMinimal option
+        Rows        : TermMinimal []
+    } with
+        static member create column columnTerm unitTerm rows = {
+            Column      = column
+            ColumnTerm  = columnTerm
+            UnitTerm    = unitTerm
+            Rows        = rows
+        }
+
+        member this.HasUnit         = this.UnitTerm.IsSome
+        member this.HasExistingTerm = this.ColumnTerm.IsSome
+        member this.HasCompleteTerm = this.ColumnTerm.IsSome && this.ColumnTerm.Value.Name <> "" && this.ColumnTerm.Value.TermAccession <> ""
+        member this.HasValues       = this.Rows <> Array.empty

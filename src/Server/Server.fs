@@ -17,37 +17,49 @@ let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
-let expertAPIv1 = {
-    parseAnnotationTableToISAJson = fun (exportType,worksheetName,buildingblocks) -> async {
+let swateJsonAPIv1 = {
+    parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
         let factors, protocol, assay = JSONExport.parseBuildingBlockToAssay worksheetName buildingblocks
-        let parsedJsonStr =
-            match exportType with
-            | JSONExportType.ProcessSeq ->
-                ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
-            | JSONExportType.Assay ->
-                ISADotNet.Json.Assay.toString assay
-            | JSONExportType.Table ->
-                (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
-            | anythingElse -> $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
+        let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
-    parseAnnotationTablesToISAJson = fun (exportType,worksheetBuildingBlocks) -> async {
+    parseAnnotationTableToProcessSeqJson = fun (worksheetName,buildingblocks) -> async {
+        let factors, protocol, assay = JSONExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
+        return parsedJsonStr
+    }
+    parseAnnotationTableToTableJson = fun (worksheetName,buildingblocks) -> async {
+        let factors, protocol, assay = JSONExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+        return parsedJsonStr
+    }
+    parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
         let factors, protocol, assay =  JSONExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-        let parsedJsonStr =
-            match exportType with
-            | JSONExportType.ProcessSeq ->
-                ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
-            | JSONExportType.Assay ->
-                ISADotNet.Json.Assay.toString assay
-            | JSONExportType.Table ->
-                (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
-            | anythingElse -> $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
+        let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
-    //getTemplateMetadataJsonSchema = fun () -> async {
-    //    let xmlStr = TemplateMetadata.getJsonSchemaAsXml
-    //    return xmlStr
-    //}
+    parseAnnotationTablesToProcessSeqJson = fun worksheetBuildingBlocks -> async {
+        let factors, protocol, assay =  JSONExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
+        return parsedJsonStr
+    }
+    parseAnnotationTablesToTableJson = fun worksheetBuildingBlocks -> async {
+        let factors, protocol, assay =  JSONExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+        return parsedJsonStr
+    }
+    parseAssayJsonToBuildingBlocks = fun jsonString -> async {
+        let table = JSONImport.assayJsonToTable jsonString
+        return [||]
+    }
+    parseTableJsonToBuildingBlocks = fun jsonString -> async {
+        let table = JSONImport.tableJsonToTable jsonString
+        return [||]
+    }
+    parseProcessSeqToBuildingBlocks = fun jsonString -> async {
+        let table = JSONImport.processSeqJsonToTable jsonString
+        return [||]
+    }
 }
 
 let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
@@ -343,7 +355,7 @@ let createISADotNetCommonAPIv1 =
 let createExpertAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue expertAPIv1
+    |> Remoting.fromValue swateJsonAPIv1
     //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(

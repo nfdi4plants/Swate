@@ -45,17 +45,13 @@ module Assay =
         assay
 
 
-let assayJsonToRowMajorDM jsonString = 
+/// Only use this function for protocol templates from db
+let rowMajorOfTemplateJson jsonString =
     let assay = Assay.fromString jsonString
     let rowMajorFormat = AssayCommonAPI.RowWiseAssay.fromAssay assay
-    rowMajorFormat
-
-/// Take only head of sheets
-let rowMajorOfTemplateJson jsonString =
-    let rowMajorAssay = assayJsonToRowMajorDM jsonString
-    if rowMajorAssay.Sheets.Length <> 1 then
+    if rowMajorFormat.Sheets.Length <> 1 then
         failwith "Swate was unable to identify the information from the requested template (<Found more than one process in template>). Please open an issue for the developers."
-    let template = rowMajorAssay.Sheets.Head
+    let template = rowMajorFormat.Sheets.Head
     template
 
 let private ColumnPositionCommentName = "ValueIndex"
@@ -120,7 +116,7 @@ type ISADotNet.ProcessParameterValue with
 /// static member to map it to the Swate InsertBuildingBlock type used as input for addBuildingBlock functions
 type AssayCommonAPI.RowWiseSheet with
     /// Map ISADotNet type to Swate OfficerInterop type. Only done for first row.
-    member this.toInsertBuildingBlockList : InsertBuildingBlock list =
+    member this.headerToInsertBuildingBlockList : InsertBuildingBlock list =
         let headerRow = this.Rows.Head
         let factors = headerRow.FactorValues |> List.map (fun fv -> fv.toInsertBuildingBlock)
         let parameters = headerRow.ParameterValues |> List.map (fun ppv -> ppv.toInsertBuildingBlock)
@@ -129,3 +125,6 @@ type AssayCommonAPI.RowWiseSheet with
         newList
         |> List.sortBy fst
         |> List.map snd
+
+    //member this.toInsertBuildingBlockList : InsertBuildingBlockWithValues list =
+    //    0

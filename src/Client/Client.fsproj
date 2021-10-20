@@ -55,7 +55,6 @@
         <Compile Include="Settings\SettingsView.fs" />
         <Compile Include="JSONExporter\JSONExporter.fs" />
         <Compile Include="TemplateMetadata\TemplateMetadata.fs" />
-        <Compile Include="Views\SettingsDataStewardView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Views\BaseView.fs" />
         <Compile Include="Update\OfficeInteropUpdate.fs" />

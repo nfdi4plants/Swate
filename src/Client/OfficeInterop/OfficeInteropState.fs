@@ -63,9 +63,6 @@ type Msg =
     //
     ///
     | InsertFileNames                       of fileNameList:string list
-    // Swate expert functions
-    ///
-    | CreatePointerJson
     // Development
     | TryExcel
     | TryExcel2

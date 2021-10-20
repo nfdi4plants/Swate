@@ -64,7 +64,7 @@ let getProtocolByName cString (queryStr:string) =
     /// Parse assay.json in database to insertbuildingblocks.
     let insertBuildingBlockList =
         let dbJson = reader.GetString(10)
-        (dbJson |> rowMajorOfTemplateJson).toInsertBuildingBlockList
+        (dbJson |> rowMajorOfTemplateJson).headerToInsertBuildingBlockList
     ProtocolTemplate.create
         (reader.GetString(1))       // name
         (reader.GetString(2))       // version

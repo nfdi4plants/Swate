@@ -115,10 +115,19 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 CurrentExportType   = Some currentModel.JSONExporterModel.TableJSONExportType
                 Loading             = true
         }
+        let api =
+            match currentModel.JSONExporterModel.TableJSONExportType with
+            | JSONExportType.ProcessSeq ->
+                Api.swateJsonAPIv1.parseAnnotationTableToProcessSeqJson
+            | JSONExportType.Assay ->
+                Api.swateJsonAPIv1.parseAnnotationTableToAssayJson
+            | JSONExportType.Table ->
+                Api.swateJsonAPIv1.parseAnnotationTableToTableJson
+            | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
         let cmd =
             Cmd.OfAsync.either
-                Api.expertAPIv1.parseAnnotationTableToISAJson
-                (currentModel.JSONExporterModel.TableJSONExportType, worksheetName, buildingBlocks)
+                api
+                (worksheetName, buildingBlocks)
                 (ParseTableServerResponse >> JSONExporterMsg)
                 (curry GenericError (UpdateLoading false |> JSONExporterMsg |> Cmd.ofMsg) >> DevMsg)
 
@@ -138,10 +147,19 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 CurrentExportType   = Some currentModel.JSONExporterModel.WorkbookJSONExportType
                 Loading             = true
         }
+        let api =
+            match currentModel.JSONExporterModel.WorkbookJSONExportType with
+            | JSONExportType.ProcessSeq ->
+                Api.swateJsonAPIv1.parseAnnotationTablesToProcessSeqJson
+            | JSONExportType.Assay ->
+                Api.swateJsonAPIv1.parseAnnotationTablesToAssayJson
+            | JSONExportType.Table ->
+                Api.swateJsonAPIv1.parseAnnotationTablesToTableJson
+            | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
         let cmd =
             Cmd.OfAsync.either
-                Api.expertAPIv1.parseAnnotationTablesToISAJson
-                (currentModel.JSONExporterModel.WorkbookJSONExportType, worksheetBuildingBlocksTuple)
+                api
+                worksheetBuildingBlocksTuple
                 (ParseTableServerResponse >> JSONExporterMsg)
                 (curry GenericError (UpdateLoading false |> JSONExporterMsg |> Cmd.ofMsg) >> DevMsg)
 

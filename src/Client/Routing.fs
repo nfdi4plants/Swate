@@ -24,7 +24,6 @@ type Route =
 | ActivityLog
 | Settings
 | SettingsXml
-| SettingsDataStewards
 | NotFound
 
     static member toRouteUrl (route:Route) =
@@ -42,7 +41,6 @@ type Route =
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
         | Route.SettingsXml         -> "/#Settings/Xml"
-        | Route.SettingsDataStewards-> "/#Settings/DataStewards"
         | Route.NotFound            -> "/#NotFound"
 
     member this.toStringRdbl =
@@ -60,12 +58,11 @@ type Route =
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
         | Route.SettingsXml         -> "Xml Settings"
-        | Route.SettingsDataStewards-> "Settings for Data Stewards"
         | Route.NotFound            -> "NotFound"
 
     member this.toSwateEntry =
         match this with
-        | Route.Validation | Route.SettingsDataStewards | Route.TemplateMetadata | Route.JSONExporter -> SwateEntry.Expert
+        | Route.Validation | Route.TemplateMetadata | Route.JSONExporter -> SwateEntry.Expert
         | _ -> SwateEntry.Core
 
     static member toIcon (p: Route)=
@@ -114,7 +111,6 @@ module Routing =
             map Route.ActivityLog           (s "ActivityLog")
             map Route.Settings              (s "Settings")
             map Route.SettingsXml           (s "Settings" </> s "Xml")
-            map Route.SettingsDataStewards  (s "Settings" </> s "DataStewards")
             map Route.NotFound              (s "NotFound")
             /// Redirect
             map Route.Validation            (s "Experts")

@@ -62,14 +62,20 @@ type IISADotNetCommonAPIv1 = {
     toInvestigationJSON         : byte [] -> Async<string>
     toProcessSeqJSON            : byte [] -> Async<string>
     toTableJSON                 : byte [] -> Async<string>
-    testPostNumber              : int -> Async<string>
-    getTestNumber               : unit -> Async<string>
+    testPostNumber              : int   -> Async<string>
+    getTestNumber               : unit  -> Async<string>
 }
 
-type IExpertAPIv1 = {
-    parseAnnotationTableToISAJson       : JSONExportType * string * OfficeInteropTypes.BuildingBlock []         -> Async<string>
-    parseAnnotationTablesToISAJson      : JSONExportType * (string * OfficeInteropTypes.BuildingBlock []) []    -> Async<string>
-    //getTemplateMetadataJsonSchema       : unit                                                                  -> Async<string>
+type ISwateJsonAPIv1 = {
+    parseAnnotationTableToAssayJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
+    parseAnnotationTableToProcessSeqJson    : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
+    parseAnnotationTableToTableJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
+    parseAnnotationTablesToAssayJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    parseAnnotationTablesToProcessSeqJson   : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    parseAnnotationTablesToTableJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    parseAssayJsonToBuildingBlocks          : string -> Async<OfficeInteropTypes.InsertBuildingBlockWithValues []>
+    parseTableJsonToBuildingBlocks          : string -> Async<OfficeInteropTypes.InsertBuildingBlockWithValues []>
+    parseProcessSeqToBuildingBlocks         : string -> Async<OfficeInteropTypes.InsertBuildingBlockWithValues []>
 }
 
 type IAnnotatorAPIv1 = {
