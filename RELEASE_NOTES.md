@@ -1,6 +1,13 @@
 ### 0.5.0+4fb63e9 (Released 2021-10-19)
 * Additions:
     * latest commit #4fb63e9
+    * Column headers slimmed, only term accession number in brackets
+    * Unit section slimmed from three columns to one
+        * Units tracked with number section in Excel
+        * Only terms from unit ontology (UO) allowed
+    * Protocol insert is now called template insert and more generalized
+    * Building blocks can only be inserted once
+        * When trying to insert duplicate activity log shows success, but that headers were already found
     * [[#e63bffc](https://github.com/nfdi4plants/Swate/commit/e63bffc767f61939e09b7f2f4f4cfac950babe21)] Make protocol preview table scrollable :lipstick:
     * [[#8d83591](https://github.com/nfdi4plants/Swate/commit/8d83591f25ad20f9497db166072e4b1bc8e37ddf)] improve template insert performance
     * [[#f6ebef3](https://github.com/nfdi4plants/Swate/commit/f6ebef39294b76a762bc15426fde657e4cb25e40)] Allow each building block only once per sheet
