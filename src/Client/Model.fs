@@ -288,48 +288,40 @@ module Validation =
             DisplayedOptionsId          = None
         }
 
-
-//open ISADotNet
-
 module Protocol =
     /// This model is used for both protocol insert and protocol search
     type Model = {
-        // Client view
-        DisplayedProtDetailsId  : int option
-
-        // Process.json file upload
-        UploadData              : string
-        //ProcessModel            : ISADotNet.Process option
-
-        // Database protocol template
+        // Client 
+        Loading                 : bool
+        // // ------ Process from file ------
+        UploadedFile            : string
+        ShowJsonTypeDropdown    : bool
+        JsonExportType          : Shared.JsonExportType
+        // ------ Protocol from Database ------
         ProtocolSelected        : ProtocolTemplate option
         ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-        // 
         ProtocolsAll            : ProtocolTemplate []
-
+        DisplayedProtDetailsId  : int option
         ProtocolNameSearchQuery : string
         ProtocolTagSearchQuery  : string
         ProtocolSearchTags      : string list
-        Loading                 : bool
 
     } with
         static member init () = {
-            // Client view
-            DisplayedProtDetailsId  = None
-
-            // ISADotNet Process.json file upload
-            UploadData              = ""
-            //ProcessModel            = None
-
-            // Database protocol templates
+            // Client
+            Loading                 = false
+            // // ------ Process from file ------
+            UploadedFile            = ""
+            ShowJsonTypeDropdown    = false
+            JsonExportType          = Shared.JsonExportType.Assay
+            // ------ Protocol from Database ------
             ProtocolSelected        = None
-            ValidationXml           = None
             ProtocolsAll            = [||]
+            DisplayedProtDetailsId  = None
+            ValidationXml           = None
             ProtocolNameSearchQuery = ""
             ProtocolTagSearchQuery  = ""
             ProtocolSearchTags      = []
-
-            Loading                 = false
         }
 
 type RequestBuildingBlockInfoStates =

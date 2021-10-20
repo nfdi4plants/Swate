@@ -120,19 +120,21 @@ module Validation =
 module Protocol =
 
     type Msg =
-        // ------ Process from file ------
-        //| ParseJsonToProcessRequest         of string
-        //| ParseJsonToProcessResult          of Result<ISADotNet.Process,exn>
+        // // ------ Process from file ------
+        | ParseUploadedFileRequest
+        | ParseUploadedFileResponse
         // Client
-        | RemoveProcessFromModel
-        // ------ Protocol from Database ------
+        /// Update JsonExportType which defines the type of json which is supposedly uploaded. Determines function which will be used for parsing.
+        | UpdateJsonExportType              of Shared.JsonExportType
+        | UpdateUploadFile                  of jsonString:string
+        | UpdateShowJsonTypeDropdown        of bool
+        // // ------ Protocol from Database ------
         | GetAllProtocolsRequest
         | GetAllProtocolsResponse           of ProtocolTemplate []
         | GetProtocolByNameRequest          of string
         | GetProtocolByNameResponse         of ProtocolTemplate
         | ProtocolIncreaseTimesUsed         of protocolName:string
         // Client
-        | UpdateUploadData                  of string
         | UpdateDisplayedProtDetailsId      of int option
         | UpdateProtocolNameSearchQuery     of string
         | UpdateProtocolTagSearchQuery      of string
@@ -206,7 +208,7 @@ type Model = {
     ///Used to manage all custom xml settings
     SettingsXmlState            : SettingsXml.Model
 
-    JSONExporterModel           : JSONExporter.Model
+    JsonExporterModel           : JsonExporter.Model
 
     TemplateMetadataModel       : TemplateMetadata.Model
 
@@ -217,8 +219,8 @@ type Model = {
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
-    member this.updateByJSONExporterModel (m:JSONExporter.Model) =
-        { this with JSONExporterModel = m}
+    member this.updateByJsonExporterModel (m:JsonExporter.Model) =
+        { this with JsonExporterModel = m}
     member this.updateByTemplateMetadataModel (m:TemplateMetadata.Model) =
         { this with TemplateMetadataModel = m}
 
@@ -236,7 +238,7 @@ type Msg =
 | BuildingBlockMsg      of BuildingBlock.Msg
 | ValidationMsg         of Validation.Msg
 | ProtocolMsg           of Protocol.Msg
-| JSONExporterMsg       of JSONExporter.Msg
+| JsonExporterMsg       of JsonExporter.Msg
 | TemplateMetadataMsg   of TemplateMetadata.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | SettingsXmlMsg        of SettingsXml.Msg
@@ -282,7 +284,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
         SettingsXmlState            = SettingsXml.Model         .init ()
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
-        JSONExporterModel           = JSONExporter.Model        .init ()
+        JsonExporterModel           = JsonExporter.Model        .init ()
         TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         WarningModal                = None
     }

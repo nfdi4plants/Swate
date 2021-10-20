@@ -81,12 +81,12 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         jsonStr
     {
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
-        toAssayJSON = fun byteArray -> async {
+        toAssayJson = fun byteArray -> async {
             let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
             return assayJsonString
         }
         /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
-        toParsedSwateTemplate = fun byteArray -> async {
+        toSwateTemplateJson = fun byteArray -> async {
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
             let ms = new MemoryStream(byteArray)
             let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
@@ -98,16 +98,16 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             return jsonExp
         }
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
-        toInvestigationJSON = fun byteArray -> async {
+        toInvestigationJson = fun byteArray -> async {
             let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
             return investigationJson
         }
-        toProcessSeqJSON = fun byteArray -> async {
+        toProcessSeqJson = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
             let processJSon = assay |> fun (_,_,_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
             return processJSon
         }
-        toTableJSON = fun byteArray -> async {
+        toTableJson = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
             let processJSon = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) 
             return processJSon

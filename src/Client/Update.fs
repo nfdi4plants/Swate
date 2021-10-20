@@ -756,8 +756,8 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         }
         nextModel, nextCmd
 
-    | JSONExporterMsg msg ->
-        let nextModel, nextCmd = currentModel |> JSONExporter.update msg
+    | JsonExporterMsg msg ->
+        let nextModel, nextCmd = currentModel |> JsonExporter.update msg
         nextModel, nextCmd
 
     | TemplateMetadataMsg msg ->

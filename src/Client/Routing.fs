@@ -19,7 +19,7 @@ type Route =
 | Info
 | Protocol
 | ProtocolSearch
-| JSONExporter
+| JsonExporter
 | TemplateMetadata
 | ActivityLog
 | Settings
@@ -35,7 +35,7 @@ type Route =
         | Route.FilePicker          -> "/#FilePicker"
         | Route.Protocol            -> "/#ProtocolInsert"
         | Route.ProtocolSearch      -> "/#Protocol/Search"
-        | Route.JSONExporter        -> "/#JSONExporter"
+        | Route.JsonExporter        -> "/#JsonExporter"
         | Route.TemplateMetadata    -> "/#TemplateMetadata"
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
@@ -52,7 +52,7 @@ type Route =
         | Route.FilePicker          -> "File Picker"
         | Route.Protocol            -> "Templates"
         | Route.ProtocolSearch      -> "Template Search"
-        | Route.JSONExporter        -> "JSON Exporter"
+        | Route.JsonExporter        -> "Json Exporter"
         | Route.TemplateMetadata    -> "Template Metadata"
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
@@ -62,7 +62,7 @@ type Route =
 
     member this.toSwateEntry =
         match this with
-        | Route.Validation | Route.TemplateMetadata | Route.JSONExporter -> SwateEntry.Expert
+        | Route.Validation | Route.TemplateMetadata | Route.JsonExporter -> SwateEntry.Expert
         | _ -> SwateEntry.Core
 
     static member toIcon (p: Route)=
@@ -80,7 +80,7 @@ type Route =
         | Route.BuildingBlock       -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
         | Route.Protocol            -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
         | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
-        | Route.JSONExporter        -> createElem [Fa.Solid.FileExport                      ]   (p.toStringRdbl)
+        | Route.JsonExporter        -> createElem [Fa.Solid.FileExport                      ]   (p.toStringRdbl)
         | Route.TemplateMetadata    -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)     
         | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
         | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
@@ -106,7 +106,7 @@ module Routing =
             map Route.Info                  (s "Info")
             map Route.Protocol              (s "ProtocolInsert")
             map Route.ProtocolSearch        (s "Protocol" </> s "Search")
-            map Route.JSONExporter          (s "JSONExporter")
+            map Route.JsonExporter          (s "JsonExporter")
             map Route.TemplateMetadata      (s "TemplateMetadata")
             map Route.ActivityLog           (s "ActivityLog")
             map Route.Settings              (s "Settings")

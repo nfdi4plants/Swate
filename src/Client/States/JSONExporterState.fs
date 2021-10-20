@@ -1,15 +1,15 @@
-namespace JSONExporter
+namespace JsonExporter
 
 open Shared
 open Shared.OfficeInteropTypes
 
 type Model = {
     /// Use this value to determine on click which export value to use
-    CurrentExportType               : JSONExportType option
+    CurrentExportType               : JsonExportType option
     //
-    TableJSONExportType             : JSONExportType
-    WorkbookJSONExportType          : JSONExportType
-    XLSXParsingExportType           : JSONExportType
+    TableJsonExportType             : JsonExportType
+    WorkbookJsonExportType          : JsonExportType
+    XLSXParsingExportType           : JsonExportType
     Loading                         : bool
     ShowTableExportTypeDropdown     : bool
     ShowWorkbookExportTypeDropdown  : bool
@@ -21,9 +21,9 @@ type Model = {
 
         CurrentExportType               = None
         //
-        TableJSONExportType             = JSONExportType.Assay
-        WorkbookJSONExportType          = JSONExportType.Assay
-        XLSXParsingExportType           = JSONExportType.Assay
+        TableJsonExportType             = JsonExportType.Assay
+        WorkbookJsonExportType          = JsonExportType.Assay
+        XLSXParsingExportType           = JsonExportType.Assay
         Loading                         = false
         ShowTableExportTypeDropdown     = false
         ShowWorkbookExportTypeDropdown  = false
@@ -40,9 +40,9 @@ type Msg =
 | UpdateShowWorkbookExportTypeDropdown  of bool
 | UpdateShowXLSXExportTypeDropdown      of bool
 | CloseAllDropdowns
-| UpdateTableJSONExportType             of JSONExportType
-| UpdateWorkbookJSONExportType          of JSONExportType
-| UpdateXLSXParsingExportType           of JSONExportType
+| UpdateTableJsonExportType             of JsonExportType
+| UpdateWorkbookJsonExportType          of JsonExportType
+| UpdateXLSXParsingExportType           of JsonExportType
 //
 | ParseTableOfficeInteropRequest
 /// parse active annotation table to building blocks

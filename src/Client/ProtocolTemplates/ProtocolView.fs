@@ -167,235 +167,278 @@ open Protocol
 open Messages
 open Elmish
 
-let fileUploadButton (model:Model) dispatch id =
-    Label.label [Label.Props [Style [FontWeight "normal";Margin "1rem 0"]]][
-        Input.input [
-            Input.Props [
-                Id id
-                Type "file"; Style [Display DisplayOptions.None]
-                OnChange (fun ev ->
-                    let files : FileList = ev.target?files
+module TemplateFromJsonFile =
 
-                    let fileNames =
-                        [ for i=0 to (files.length - 1) do yield files.item i ]
-                        |> List.map (fun f -> f.slice() )
+    let fileUploadButton (model:Model) dispatch =
+        let uploadId = "UploadFiles_ElementId"
+        Label.label [Label.Props [Style [FontWeight "normal"]]][
+            Input.input [
+                Input.Props [
+                    Id uploadId
+                    Type "file"; Style [Display DisplayOptions.None]
+                    OnChange (fun ev ->
+                        let files : FileList = ev.target?files
 
-                    let reader = Browser.Dom.FileReader.Create()
+                        let fileNames =
+                            [ for i=0 to (files.length - 1) do yield files.item i ]
+                            |> List.map (fun f -> f.slice() )
 
-                    reader.onload <- fun evt ->
-                        UpdateUploadData evt.target?result |> ProtocolMsg |> dispatch
+                        let reader = Browser.Dom.FileReader.Create()
+
+                        reader.onload <- fun evt ->
+                            UpdateUploadFile evt.target?result |> ProtocolMsg |> dispatch
                                    
-                    reader.onerror <- fun evt ->
-                        curry GenericLog Cmd.none ("Error", evt.Value) |> DevMsg |> dispatch
+                        reader.onerror <- fun evt ->
+                            curry GenericLog Cmd.none ("Error", evt.Value) |> DevMsg |> dispatch
 
-                    reader.readAsText(fileNames |> List.head)
+                        reader.readAsText(fileNames |> List.head)
 
-                    let picker = Browser.Dom.document.getElementById(id)
-                    // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
-                    picker?value <- null
-                )
+                        let picker = Browser.Dom.document.getElementById(uploadId)
+                        // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
+                        picker?value <- null
+                    )
+                ]
+            ]
+            Button.a [Button.Color Color.IsInfo; Button.IsFullWidth][
+                str "Upload protocol"
             ]
         ]
-        Button.a [Button.Color Color.IsInfo; Button.IsFullWidth][
-            str "Upload protocol"
-        ]
-    ]
 
-//let addFromFileToTableButton isValid (model:Model) dispatch =
-//    Columns.columns [Columns.IsMobile][
-//        Column.column [][
-//            Field.div [] [
-//                Control.div [] [
-//                    Button.a [
-//                        if isValid then
-//                            Button.IsActive true
-//                        else
-//                            Button.Color Color.IsDanger
-//                            Button.Props [Disabled true]
-//                        Button.IsFullWidth
-//                        Button.Color IsSuccess
-//                        Button.OnClick (fun e ->
-//                            let preProtocol =
-//                                let p = model.ProtocolInsertState.ProcessModel.Value
-//                                let id = p.ExecutesProtocol.Value.Name.Value
-//                                let version = p.ExecutesProtocol.Value.Version.Value
-//                                let swateVersion = model.PersistentStorageState.AppVersion
-//                                GroupTypes.Protocol.create id version swateVersion [] "" ""
-//                            let minBuildingBlockInfos =
-//                                OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock.ofISADotNetProcess model.ProtocolInsertState.ProcessModel.Value
-//                                |> List.rev
-//                            AddAnnotationBlocks (minBuildingBlockInfos,preProtocol, None) |> ExcelInterop |> dispatch
-//                        )
-//                    ] [
-//                        str "Insert protocol annotation blocks"
-//                    ]
-//                ]
-//            ]
-//        ]
-//        if model.ProtocolInsertState.ProcessModel.IsSome then
-//            Column.column [Column.Width(Screen.All, Column.IsNarrow)][
-//                Button.a [
-//                    Button.OnClick (fun e -> RemoveProcessFromModel |> ProtocolInsert |> dispatch)
-//                    Button.Color IsDanger
-//                ][
-//                    Fa.i [Fa.Solid.Times][]
-//                ]
-//            ]
-//    ]
-
-//let protocolInsertElement uploadId (model:Model) dispatch =
-//    let isViable, errorMsg =
-//        if model.ProtocolInsertState.ProcessModel.IsSome then
-//            isViableISADotNetProcess model.ProtocolInsertState.ProcessModel.Value
-//        else
-//            false, "" |> Some
-//    div [
-//        Style [
-//            BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-//            Padding "0.25rem 1rem"
-//            MarginBottom "1rem"
-//        ]
-//    ] [
-//        Help.help [][
-//            b [] [
-//                str "Upload a "
-//                a [Href "https://github.com/nfdi4plants/Swate/wiki/Insert-via-Process.json"; Target "_Blank"][ str "process.json" ]
-//                str " file."
-//            ]
-//            str " The building blocks in this file can be group-inserted into a Swate table."
-//            str " In the future these files will be accessible either by "
-//            a [Href "https://github.com/nfdi4plants/Spawn"; Target "_Blank"] [str "Spawn"]
-//            str " or offered as download!"
-//        ]
-
-//        fileUploadButton model dispatch uploadId
-
-//        Field.div [Field.Props [Style [
-//            Width "100%"
-//        ]]][
-//            if model.ProtocolInsertState.ProcessModel.IsSome then
-//                yield! displayProtocolInfoElement isViable errorMsg model dispatch
-
-//            addFromFileToTableButton isViable model dispatch
-//        ]
-//    ]
-
-let toProtocolSearchElement (model:Model) dispatch =
-    Button.span [
-        Button.OnClick(fun e -> UpdatePageState (Some Routing.Route.ProtocolSearch) |> dispatch)
-        Button.Color IsInfo
-        Button.IsFullWidth
-        Button.Props [Style [Margin "1rem 0"]]
-    ] [str "Browse database"]
-
-let addFromDBToTableButton (model:Messages.Model) dispatch =
-    Columns.columns [Columns.IsMobile][
-        Column.column [][
-            Field.div [] [
-                Control.div [] [
+    let fileUploadEle (model:Model) dispatch =
+        let hasData = model.ProtocolState.UploadedFile <> ""
+        Columns.columns [Columns.IsMobile][
+            Column.column [][
+                fileUploadButton model dispatch
+            ]
+            if hasData then
+                Column.column [Column.Width(Screen.All, Column.IsNarrow)][
                     Button.a [
-                        if model.ProtocolState.ProtocolSelected.IsSome //&& model.ProtocolInsertState.ValidationXml.IsSome
-                        then
-                            Button.IsActive true
-                        else
-                            Button.Color Color.IsDanger
-                            Button.Props [Disabled true]
-                        Button.IsFullWidth
-                        Button.Color IsSuccess
-                        Button.OnClick (fun e ->
-                            let p = model.ProtocolState.ProtocolSelected.Value
-                            /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
-                            //let validation =
-                            //    model.ProtocolInsertState.ValidationXml.Value |> Some
-                            ProtocolIncreaseTimesUsed p.Name |> ProtocolMsg |> dispatch
-                            AddAnnotationBlocks p.TemplateBuildingBlocks |> OfficeInteropMsg |> dispatch
-                        )
-                    ] [
-                        str "Add template"
-                    ]
-                ]
-            ]
-        ]
-        if model.ProtocolState.ProtocolSelected.IsSome then
-            Column.column [Column.Width(Screen.All, Column.IsNarrow)][
-                Button.a [
-                    Button.OnClick (fun e -> RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
-                    Button.Color IsDanger
-                ][
-                    Fa.i [Fa.Solid.Times][]
-                ]
-            ]
-    ]
-
-let showDatabaseProtocolTemplate (model:Messages.Model) dispatch =
-    mainFunctionContainer [
-        Help.help [][
-            b [] [str "Search the database for protocol templates."]
-            str " The building blocks from these templates can be inserted into the Swate table. "
-            span [Style [Color NFDIColors.Red.Base]][str "Only missing building blocks will be added."]
-        ]
-
-        toProtocolSearchElement model dispatch
-
-        addFromDBToTableButton model dispatch
-        if model.ProtocolState.ProtocolSelected.IsSome then
-            div [Style [OverflowX OverflowOptions.Auto]] [
-                    Table.table [
-                        Table.IsFullWidth;
-                        Table.IsBordered
-                        Table.Props [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
+                        Button.OnClick (fun e -> UpdateUploadFile "" |> ProtocolMsg |> dispatch)
+                        Button.Color IsDanger
                     ][
-                        thead [][
-                            tr [][
-                                th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column"]
-                                th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column TAN"]
-                                th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit"]
-                                th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit TAN"]
-                            ]
-                        ]
-                        tbody [][
-                            for insertBB in model.ProtocolState.ProtocolSelected.Value.TemplateBuildingBlocks do
-                                yield
-                                    tr [][
-                                        td [][str (insertBB.Column.toAnnotationTableHeader())]
-                                        td [][str (if insertBB.HasExistingTerm then insertBB.ColumnTerm.Value.TermAccession else "-")]
-                                        td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.Name else "-")]
-                                        td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
-                                    ]
+                        Fa.i [Fa.Solid.Times][]
+                    ]
+                ]
+        ]
+
+    let dropdownItem (exportType:JsonExportType) (model:Model) msg (isActive:bool) =
+        Dropdown.Item.a [
+            Dropdown.Item.Props [
+                TabIndex 0
+                OnClick (fun e ->
+                    e.stopPropagation()
+                    exportType |> msg
+                )
+                OnKeyDown (fun k -> if (int k.which) = 13 then exportType |> msg)
+                Style [if isActive then BackgroundColor model.SiteStyleState.ColorMode.ControlForeground]
+            ]
+    
+        ][
+            Text.span [
+                CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
+                Props [
+                    Tooltip.dataTooltip (exportType.toExplanation)
+                    Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
+                ]
+            ] [
+                Fa.i [Fa.Solid.InfoCircle] []
+            ]
+    
+            Text.span [] [str (exportType.ToString())]
+        ]
+    
+    let parseJsonToTableEle (model:Model) (dispatch:Messages.Msg -> unit) =
+        Field.div [Field.HasAddons][
+            Control.div [][
+                Dropdown.dropdown [
+                    Dropdown.IsActive model.ProtocolState.ShowJsonTypeDropdown
+                ][
+                    Dropdown.trigger [][
+                        Button.a [
+                            Button.OnClick (fun e -> e.stopPropagation(); UpdateShowJsonTypeDropdown (not model.ProtocolState.ShowJsonTypeDropdown) |> ProtocolMsg |> dispatch )
+                        ][
+                            span [Style [MarginRight "5px"]] [str (model.ProtocolState.JsonExportType.ToString())]
+                            Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
+                    Dropdown.menu [][
+                        Dropdown.content [][
+                            let msg = (UpdateJsonExportType >> ProtocolMsg >> dispatch)
+                            dropdownItem JsonExportType.Assay model msg (model.ProtocolState.JsonExportType = JsonExportType.Assay)
+                            dropdownItem JsonExportType.Table model msg (model.ProtocolState.JsonExportType = JsonExportType.Table)
+                            dropdownItem JsonExportType.ProcessSeq model msg (model.ProtocolState.JsonExportType = JsonExportType.ProcessSeq)
+                        ]
+                    ]
+                ]
             ]
-            div [Style [MarginBottom "1rem"]] []
+            Control.div [Control.IsExpanded][
+                Button.a [
+                    Button.Color IsInfo
+                    Button.IsFullWidth
+                    Button.OnClick(fun e ->
+                        ProtocolMsg ParseUploadedFileRequest |> dispatch
+                    )
+                ][
+                    str "Insert json"
+                ]
+            ]
+        ]
+
+    let protocolInsertElement (model:Model) dispatch =
+        mainFunctionContainer [
+            Field.div [][
+                Help.help [][
+                    b [] [
+                        str "Upload a "
+                        a [Href "https://github.com/nfdi4plants/Swate/wiki/Insert-via-Process.json"; Target "_Blank"][ str "process.json" ]
+                        str " file."
+                    ]
+                    str " The building blocks in this file can be group-inserted into a Swate table."
+                    str " In the future these files will be accessible either by "
+                    a [Href "https://github.com/nfdi4plants/Spawn"; Target "_Blank"] [str "Spawn"]
+                    str " or offered as download!"
+                ]
+            ]
+
+            Field.div [][
+                fileUploadEle model dispatch
+            ]
+
+            parseJsonToTableEle model dispatch
+        ]
+
+module TemplateFromDB = 
+
+    let toProtocolSearchElement (model:Model) dispatch =
+        Button.span [
+            Button.OnClick(fun e -> UpdatePageState (Some Routing.Route.ProtocolSearch) |> dispatch)
+            Button.Color IsInfo
+            Button.IsFullWidth
+            Button.Props [Style [Margin "1rem 0"]]
+        ] [str "Browse database"]
+
+    let addFromDBToTableButton (model:Messages.Model) dispatch =
+        Columns.columns [Columns.IsMobile][
+            Column.column [][
+                Field.div [] [
+                    Control.div [] [
+                        Button.a [
+                            if model.ProtocolState.ProtocolSelected.IsSome //&& model.ProtocolInsertState.ValidationXml.IsSome
+                            then
+                                Button.IsActive true
+                            else
+                                Button.Color Color.IsDanger
+                                Button.Props [Disabled true]
+                            Button.IsFullWidth
+                            Button.Color IsSuccess
+                            Button.OnClick (fun e ->
+                                let p = model.ProtocolState.ProtocolSelected.Value
+                                /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
+                                //let validation =
+                                //    model.ProtocolInsertState.ValidationXml.Value |> Some
+                                ProtocolIncreaseTimesUsed p.Name |> ProtocolMsg |> dispatch
+                                AddAnnotationBlocks p.TemplateBuildingBlocks |> OfficeInteropMsg |> dispatch
+                            )
+                        ] [
+                            str "Add template"
+                        ]
+                    ]
+                ]
+            ]
+            if model.ProtocolState.ProtocolSelected.IsSome then
+                Column.column [Column.Width(Screen.All, Column.IsNarrow)][
+                    Button.a [
+                        Button.OnClick (fun e -> RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
+                        Button.Color IsDanger
+                    ][
+                        Fa.i [Fa.Solid.Times][]
+                    ]
+                ]
+        ]
+
+    let displaySelectedProtocolEle (model:Model) dispatch =
+        [
+            div [Style [OverflowX OverflowOptions.Auto; MarginBottom "1rem"]] [
+                Table.table [
+                    Table.IsFullWidth;
+                    Table.IsBordered
+                    Table.Props [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
+                ][
+                    thead [][
+                        tr [][
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column TAN"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit TAN"]
+                        ]
+                    ]
+                    tbody [][
+                        for insertBB in model.ProtocolState.ProtocolSelected.Value.TemplateBuildingBlocks do
+                            yield
+                                tr [][
+                                    td [][str (insertBB.Column.toAnnotationTableHeader())]
+                                    td [][str (if insertBB.HasExistingTerm then insertBB.ColumnTerm.Value.TermAccession else "-")]
+                                    td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.Name else "-")]
+                                    td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
+                                ]
+                    ]
+                ]
+            ]
             addFromDBToTableButton model dispatch
-    ]
+        ]
+    
+
+    let showDatabaseProtocolTemplate (model:Messages.Model) dispatch =
+        mainFunctionContainer [
+            Field.div [][
+                Help.help [][
+                    b [] [str "Search the database for protocol templates."]
+                    str " The building blocks from these templates can be inserted into the Swate table. "
+                    span [Style [Color NFDIColors.Red.Base]][str "Only missing building blocks will be added."]
+                ]
+            ]
+            Field.div [][
+                toProtocolSearchElement model dispatch
+            ]
+
+            Field.div [][
+                addFromDBToTableButton model dispatch
+            ]
+            if model.ProtocolState.ProtocolSelected.IsSome then
+                Field.div [][
+                    yield! displaySelectedProtocolEle model dispatch
+                ]
+        ]
 
 
 let fileUploadViewComponent (model:Messages.Model) dispatch =
-    let uploadId = "UploadFiles_ElementId"
-    form [
+    Content.content [ Content.Props [
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-    ] [
+        OnClick (fun e ->
+            if model.ProtocolState.ShowJsonTypeDropdown then
+                UpdateShowJsonTypeDropdown false |> ProtocolMsg |> dispatch
+        )
+        Style [MinHeight "100vh"]
+    ]] [
         
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Templates"]
-
 
         /// Box 1
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add template from database."]
 
-        showDatabaseProtocolTemplate model dispatch
-
+        TemplateFromDB.showDatabaseProtocolTemplate model dispatch
 
         /// Box 2
-        //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks from file."]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks from file."]
 
-        //protocolInsertElement uploadId model dispatch
+        TemplateFromJsonFile.protocolInsertElement model dispatch
 
         //div [][
         //    str (
-        //        let dataStr = model.ProtocolInsertState.ProcessModel
-        //        if dataStr.IsNone then "no upload data found" else sprintf "%A" model.ProtocolInsertState.ProcessModel.Value
+        //        let dataStr = model.ProtocolState.UploadData
+        //        if dataStr = "" then "no upload data found" else sprintf "%A" model.ProtocolState.UploadData
         //    )
         //]
     ]

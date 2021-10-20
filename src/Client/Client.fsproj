@@ -25,7 +25,7 @@
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
         <Compile Include="States\TemplateMetadataState.fs" />
-        <Compile Include="States\JSONExporterState.fs" />
+        <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
         <Compile Include="CustomComponents\ActionButton.fs" />
@@ -45,15 +45,15 @@
         <Compile Include="BuildingBlock\BuildingBlockView.fs" />
         <Compile Include="TermSearch\TermSearchView.fs" />
         <Compile Include="ProtocolTemplates\ProtocolState.fs" />
-        <Compile Include="ProtocolTemplates\ProtocolView.fs" />
         <Compile Include="ProtocolTemplates\ProtocolSearchView.fs" />
+        <Compile Include="ProtocolTemplates\ProtocolView.fs" />
         <Compile Include="FilePicker\FilePickerView.fs" />
         <Compile Include="Validation\ValidationView.fs" />
         <Compile Include="Info\InfoView.fs" />
         <Compile Include="ActivityLog\ActivityLogView.fs" />
         <Compile Include="Settings\SettingsXml\SettingsXmlView.fs" />
         <Compile Include="Settings\SettingsView.fs" />
-        <Compile Include="JSONExporter\JSONExporter.fs" />
+        <Compile Include="JsonExporter\JsonExporter.fs" />
         <Compile Include="TemplateMetadata\TemplateMetadata.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Views\BaseView.fs" />

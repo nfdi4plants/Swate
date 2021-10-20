@@ -26,17 +26,17 @@ module Suggestion =
         |> set
 
 [<RequireQualifiedAccess>]
-type JSONExportType =
+type JsonExportType =
 | ProcessSeq
 | Assay
 | Table
 | ProtocolTemplate
     member this.toExplanation =
         match this with
-        | ProcessSeq        -> "Export to sequence of process.json."
-        | Assay             -> "Export to assay.json"
-        | Table             -> "Export to access layer type. table.json utilizes minor isa json types in a more accessible model."
-        | ProtocolTemplate  -> "Export to Swate protocol template schema, with template metadata and table json."
+        | ProcessSeq        -> "Sequence of ISA process.json."
+        | Assay             -> "ISA assay.json"
+        | Table             -> "Access layer type. table.json utilizes minor ISA-JSON types in a more accessible model."
+        | ProtocolTemplate  -> "Schema for Swate protocol template, with template metadata and table json."
 
 /// This type is used to define target for unit term search.
 type UnitSearchRequest =
@@ -57,11 +57,11 @@ type IServiceAPIv1 = {
 }
 
 type IISADotNetCommonAPIv1 = {
-    toAssayJSON                 : byte [] -> Async<string>
-    toParsedSwateTemplate       : byte [] -> Async<string>
-    toInvestigationJSON         : byte [] -> Async<string>
-    toProcessSeqJSON            : byte [] -> Async<string>
-    toTableJSON                 : byte [] -> Async<string>
+    toAssayJson                 : byte [] -> Async<string>
+    toSwateTemplateJson         : byte [] -> Async<string>
+    toInvestigationJson         : byte [] -> Async<string>
+    toProcessSeqJson            : byte [] -> Async<string>
+    toTableJson                 : byte [] -> Async<string>
     testPostNumber              : int   -> Async<string>
     getTestNumber               : unit  -> Async<string>
 }
