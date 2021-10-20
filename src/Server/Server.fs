@@ -53,8 +53,7 @@ let expertAPIv1 = {
 let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
     let assayFromByteArray (byteArray: byte []) =
         let ms = new MemoryStream(byteArray)
-        let jsonStr =
-            ISADotNet.XLSX.AssayFile.Assay.fromStream ms
+        let jsonStr = ISADotNet.XLSX.AssayFile.Assay.fromStream ms
         jsonStr
     let investigationFromByteArray (byteArray: byte []) =
         let ms = new MemoryStream(byteArray)
@@ -74,12 +73,15 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
             return assayJsonString
         }
-        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay with it's customXml.
+        /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
         toParsedSwateTemplate = fun byteArray -> async {
-            let assay = assayFromByteArray byteArray 
-            let tableJson = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString)
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
-            metadata.SetValue("TemplateJson",tableJson)
+            let ms = new MemoryStream(byteArray)
+            let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
+            let tableName = metadata.TryGetValue "Table"
+            let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
+            let assayJson = ISADotNet.Json.Assay.toString assay.Value
+            metadata.SetValue("TemplateJson",assayJson)
             let jsonExp = metadata.toJson()
             return jsonExp
         }

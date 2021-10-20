@@ -62,7 +62,9 @@ let getProtocolByName cString (queryStr:string) =
     reader.Read() |> ignore
     let tags = reader.GetString(7).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
     /// Parse assay.json in database to insertbuildingblocks.
-    let insertBuildingBlockList = (reader.GetString(10) |> rowMajorOfTemplateJson).toInsertBuildingBlockList
+    let insertBuildingBlockList =
+        let dbJson = reader.GetString(10)
+        (dbJson |> rowMajorOfTemplateJson).toInsertBuildingBlockList
     ProtocolTemplate.create
         (reader.GetString(1))       // name
         (reader.GetString(2))       // version
