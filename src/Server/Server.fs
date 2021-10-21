@@ -17,48 +17,61 @@ let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
+open ISADotNet
+
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
-        let factors, protocol, assay = JSONExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
     parseAnnotationTableToProcessSeqJson = fun (worksheetName,buildingblocks) -> async {
-        let factors, protocol, assay = JSONExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
         let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
         return parsedJsonStr
     }
     parseAnnotationTableToTableJson = fun (worksheetName,buildingblocks) -> async {
-        let factors, protocol, assay = JSONExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
         let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
         return parsedJsonStr
     }
     parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
-        let factors, protocol, assay =  JSONExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
     parseAnnotationTablesToProcessSeqJson = fun worksheetBuildingBlocks -> async {
-        let factors, protocol, assay =  JSONExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
         return parsedJsonStr
     }
     parseAnnotationTablesToTableJson = fun worksheetBuildingBlocks -> async {
-        let factors, protocol, assay =  JSONExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
         return parsedJsonStr
     }
     parseAssayJsonToBuildingBlocks = fun jsonString -> async {
-        let table = JSONImport.assayJsonToTable jsonString
-        return [||]
+        let table = JsonImport.assayJsonToTable jsonString
+        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        return buildingBlocks
     }
     parseTableJsonToBuildingBlocks = fun jsonString -> async {
-        let table = JSONImport.tableJsonToTable jsonString
-        return [||]
+        let table = JsonImport.tableJsonToTable jsonString
+        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        printfn "Will parse \"%A\" sheets" table.Sheets.Length
+        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        printfn "n sheets: %A" buildingBlocks.Length
+        buildingBlocks |> Array.iter (fun (sheetName,columns) ->
+            printfn "%A, n columns: %A" sheetName columns.Length
+        )
+        return buildingBlocks
     }
     parseProcessSeqToBuildingBlocks = fun jsonString -> async {
-        let table = JSONImport.processSeqJsonToTable jsonString
-        return [||]
+        let table = JsonImport.processSeqJsonToTable jsonString
+        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        return buildingBlocks
     }
 }
 
@@ -326,7 +339,7 @@ let createIAnnotatorApiv1 cString =
     |> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.annotatorApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A" x))
     ) 
     |> Remoting.buildHttpHandler
 
@@ -337,7 +350,7 @@ let createIServiceAPIv1 =
     |> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A" x))
     )
     |> Remoting.buildHttpHandler
 
@@ -348,7 +361,7 @@ let createISADotNetCommonAPIv1 =
     |> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A" x))
     )
     |> Remoting.buildHttpHandler
 
@@ -359,7 +372,7 @@ let createExpertAPIv1 =
     //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
+        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A" x))
     )
     |> Remoting.buildHttpHandler
 

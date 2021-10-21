@@ -1,4 +1,4 @@
-module JSONImport
+module JsonImport
 
 open ISADotNet
 open ISADotNet.Json

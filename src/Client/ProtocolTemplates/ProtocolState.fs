@@ -18,21 +18,20 @@ module Protocol =
             let api =
                 match currentState.JsonExportType with
                 | JsonExportType.ProcessSeq ->
-                    Api.swateJsonAPIv1.parseAnnotationTableToProcessSeqJson
+                    Api.swateJsonAPIv1.parseProcessSeqToBuildingBlocks
                 | JsonExportType.Assay ->
-                    Api.swateJsonAPIv1.parseAnnotationTableToAssayJson
+                    Api.swateJsonAPIv1.parseAssayJsonToBuildingBlocks
                 | JsonExportType.Table ->
-                    Api.swateJsonAPIv1.parseAnnotationTableToTableJson
+                    Api.swateJsonAPIv1.parseTableJsonToBuildingBlocks
                 | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
-            //let cmd =
-            //    Cmd.OfAsync.either
-            //        api
-            //        (worksheetName, buildingBlocks)
-            //        (ParseTableServerResponse >> JsonExporterMsg)
-            //        (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
-            //currentModel.updateByJsonExporterModel nextModel, cmd
-            nextModel, Cmd.none
-        | ParseUploadedFileResponse ->
+            let cmd =
+                Cmd.OfAsync.either
+                    api
+                    currentState.UploadedFile
+                    (ParseUploadedFileResponse >> ProtocolMsg)
+                    (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
+            nextModel, cmd
+        | ParseUploadedFileResponse buildingBlocksWithValue ->
             failwith "not implemented yet"
             currentState, Cmd.none
         // Client

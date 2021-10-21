@@ -73,9 +73,9 @@ type ISwateJsonAPIv1 = {
     parseAnnotationTablesToAssayJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
     parseAnnotationTablesToProcessSeqJson   : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
     parseAnnotationTablesToTableJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
-    parseAssayJsonToBuildingBlocks          : string -> Async<OfficeInteropTypes.InsertBuildingBlockWithValues []>
-    parseTableJsonToBuildingBlocks          : string -> Async<OfficeInteropTypes.InsertBuildingBlockWithValues []>
-    parseProcessSeqToBuildingBlocks         : string -> Async<OfficeInteropTypes.InsertBuildingBlockWithValues []>
+    parseAssayJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlockWithValues []) []>
+    parseTableJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlockWithValues []) []>
+    parseProcessSeqToBuildingBlocks         : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlockWithValues []) []>
 }
 
 type IAnnotatorAPIv1 = {

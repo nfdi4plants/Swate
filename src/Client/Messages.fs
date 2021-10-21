@@ -122,7 +122,7 @@ module Protocol =
     type Msg =
         // // ------ Process from file ------
         | ParseUploadedFileRequest
-        | ParseUploadedFileResponse
+        | ParseUploadedFileResponse         of (string * InsertBuildingBlockWithValues []) []
         // Client
         /// Update JsonExportType which defines the type of json which is supposedly uploaded. Determines function which will be used for parsing.
         | UpdateJsonExportType              of Shared.JsonExportType

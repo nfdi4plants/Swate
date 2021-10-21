@@ -81,7 +81,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
             //Text.p [] [str ""]
         ]
 
-    | Routing.Route.JsonExporter ->
+    | Routing.Route.JsonExport ->
         BaseView.baseViewMainElement model dispatch [
             JsonExporter.jsonExporterMainElement model dispatch
         ] [ (*Footer*) ]

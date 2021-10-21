@@ -248,6 +248,7 @@ module TemplateFromJsonFile =
         ]
     
     let parseJsonToTableEle (model:Model) (dispatch:Messages.Msg -> unit) =
+        let hasData = model.ProtocolState.UploadedFile <> ""
         Field.div [Field.HasAddons][
             Control.div [][
                 Dropdown.dropdown [
@@ -273,6 +274,11 @@ module TemplateFromJsonFile =
             ]
             Control.div [Control.IsExpanded][
                 Button.a [
+                    if hasData then
+                        Button.IsActive true
+                    else
+                        Button.Color Color.IsDanger
+                        Button.Props [Disabled true]
                     Button.Color IsInfo
                     Button.IsFullWidth
                     Button.OnClick(fun e ->
@@ -323,8 +329,7 @@ module TemplateFromDB =
                 Field.div [] [
                     Control.div [] [
                         Button.a [
-                            if model.ProtocolState.ProtocolSelected.IsSome //&& model.ProtocolInsertState.ValidationXml.IsSome
-                            then
+                            if model.ProtocolState.ProtocolSelected.IsSome (*&& model.ProtocolInsertState.ValidationXml.IsSome*) then
                                 Button.IsActive true
                             else
                                 Button.Color Color.IsDanger

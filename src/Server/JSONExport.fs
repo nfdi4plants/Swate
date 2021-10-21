@@ -1,4 +1,4 @@
-module JSONExport
+module JsonExport
 
 open System
 open ISADotNet

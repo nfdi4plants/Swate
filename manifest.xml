@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>5d6f5462-3401-48ec-9406-d12882e9ad83</Id>
   <Version>0.5.0</Version>
@@ -117,7 +117,7 @@
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
         <bt:Url id="Swate.Core.Url" DefaultValue="https://localhost:3000/#BuildingBlock"/>
-        <bt:Url id="Swate.Experts.Url" DefaultValue="https://localhost:3000/#JSONExporter"/>
+        <bt:Url id="Swate.Experts.Url" DefaultValue="https://localhost:3000/#JsonExport"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>
