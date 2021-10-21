@@ -31,11 +31,21 @@ module Protocol =
                     (ParseUploadedFileResponse >> ProtocolMsg)
                     (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
             nextModel, cmd
-        | ParseUploadedFileResponse buildingBlocksWithValue ->
+        | ParseUploadedFileResponse buildingBlockTables ->
             let nextCmd =
-                match Array.tryExactlyOne buildingBlocksWithValue with
-                | Some (_,buildingBlocksWithValue) -> Cmd.none
-                | None -> Cmd.none
+                match Array.tryExactlyOne buildingBlockTables with
+                | Some (_,buildingBlocks) ->
+                    Cmd.OfPromise.either
+                        OfficeInterop.addAnnotationBlocks
+                        (List.ofArray buildingBlocks)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                | None ->
+                    Cmd.OfPromise.either
+                        OfficeInterop.addAnnotationBlocks
+                        (List.ofArray (snd buildingBlockTables.[0]))
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
             currentState, nextCmd
         // Client
         | UpdateJsonExportType nextType ->

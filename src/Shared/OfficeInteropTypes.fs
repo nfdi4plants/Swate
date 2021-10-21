@@ -288,16 +288,16 @@ module OfficeInteropTypes =
         member this.hasCompleteTerm = this.MainColumnTerm.IsSome && this.MainColumnTerm.Value.Name <> "" && this.MainColumnTerm.Value.TermAccession <> ""
 
     type InsertBuildingBlock = {
-        Column      : BuildingBlockNamePrePrint
-        ColumnTerm  : TermMinimal option
-        UnitTerm    : TermMinimal option
-        Rows        : TermMinimal []
+        ColumnHeader    : BuildingBlockNamePrePrint
+        ColumnTerm      : TermMinimal option
+        UnitTerm        : TermMinimal option
+        Rows            : TermMinimal []
     } with
-        static member create column columnTerm unitTerm rows = {
-            Column      = column
-            ColumnTerm  = columnTerm
-            UnitTerm    = unitTerm
-            Rows        = rows
+        static member create header columnTerm unitTerm rows = {
+            ColumnHeader    = header
+            ColumnTerm      = columnTerm
+            UnitTerm        = unitTerm
+            Rows            = rows
         }
 
         member this.HasUnit         = this.UnitTerm.IsSome

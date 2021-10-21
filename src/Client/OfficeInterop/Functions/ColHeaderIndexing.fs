@@ -33,7 +33,7 @@ module Column =
     /// This time no core name is needed as this will always be TSR or TAN.
     let createHiddenColAttributes (newBB:InsertBuildingBlock) (id:int) =
         /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
-        let isSingleCol = newBB.Column.Type.isSingleColumn
+        let isSingleCol = newBB.ColumnHeader.Type.isSingleColumn
         if isSingleCol then
             failwith """The function "createHiddenColAttributes" should not get called if there is only a single column in the new building block."""
         /// Try to get existing term accession from InsertBuildingBlock. If none exists do not add any to the header
@@ -46,8 +46,8 @@ module Column =
     /// The possible addition of an id tag is needed, because column headers need to be unique in excel.
     let createMainColName (newBB:InsertBuildingBlock) (id:int) =
         match id with
-        | 1             -> newBB.Column.toAnnotationTableHeader()
-        | anyOtherId    -> $"{newBB.Column.toAnnotationTableHeader(anyOtherId)}" 
+        | 1             -> newBB.ColumnHeader.toAnnotationTableHeader()
+        | anyOtherId    -> $"{newBB.ColumnHeader.toAnnotationTableHeader(anyOtherId)}" 
 
     let createTSRColName (newBB:InsertBuildingBlock) (id:int) =
         let bracketAttributes = createHiddenColAttributes newBB id
@@ -62,7 +62,7 @@ module Column =
     let findNewIdForColumn (allColHeaders:string []) (newBB:InsertBuildingBlock) =
 
         /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
-        let isSingleCol = newBB.Column.Type.isSingleColumn
+        let isSingleCol = newBB.ColumnHeader.Type.isSingleColumn
         let rec loopingCheck int =
             let isExisting =
                 allColHeaders

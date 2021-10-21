@@ -1,5 +1,6 @@
 module OfficeInterop
 
+open System.Collections.Generic
 open Fable.Core
 open ExcelJS.Fable
 open Excel
@@ -11,6 +12,7 @@ open TermTypes
 
 open OfficeInterop
 open OfficeInterop.HelperFunctions
+open BuildingBlockFunctions
 
 /// Reoccuring Comment Defitinitions
 
@@ -539,8 +541,6 @@ let rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range)
         diff
     |> float
 
-open BuildingBlockFunctions
-
 /// Check column type and term if combination already exists
 let private checkIfBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
     let mainColumnPrints =
@@ -551,11 +551,11 @@ let private checkIfBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBu
             else
                 None
         )
-    if mainColumnPrints |> Array.contains newBB.Column then failwith $"Swate table contains already building block \"{newBB.Column.toAnnotationTableHeader()}\" in worksheet."
+    if mainColumnPrints |> Array.contains newBB.ColumnHeader then failwith $"Swate table contains already building block \"{newBB.ColumnHeader.toAnnotationTableHeader()}\" in worksheet."
 
 /// Check column type and term if combination already exists
 let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
-    if newBB.Column.isOutputColumn then
+    if newBB.ColumnHeader.isOutputColumn then
         let existingOutputOpt =
             existingBuildingBlocks
             |> Array.tryFind (fun x -> x.MainColumn.Header.isMainColumn && x.MainColumn.Header.isOutputCol)
@@ -631,7 +631,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                     mainColName
                     if newBB.UnitTerm.IsSome then
                         unitColName()
-                    if not newBB.Column.Type.isSingleColumn then
+                    if not newBB.ColumnHeader.Type.isSingleColumn then
                         tsrColName()
                         tanColName()
                 |]
@@ -683,7 +683,39 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
         } 
     )
 
-let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
+let createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
+    let createList (rowCount:int) (values:string []) =
+        ResizeArray [|
+            // tableRowCount-2 because -1 to match index-level and -1 to substract header from count
+            for i in 0 .. tableRowCount-2 do
+                yield ResizeArray [|
+                    if i <= rowCount-1 then
+                        box values.[i] |> Some
+                    else
+                        None
+                |]
+        |] 
+    match insertBB.HasValues with
+    | false -> [||]
+    | true ->
+        let rowCount = insertBB.Rows.Length
+        if insertBB.ColumnHeader.Type.isSingleColumn then
+            let values          = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
+            [|values|]
+        elif insertBB.HasUnit then
+            let unitTermRowArr  = Array.init rowCount (fun _ -> insertBB.UnitTerm.Value) 
+            let values          = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
+            let unitTermNames   = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.Name))
+            let tsrs            = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.accessionToTSR))
+            let tans            = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.accessionToTAN))
+            [|values; unitTermNames; tsrs; tans|]
+        else
+            let termNames = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
+            let tsrs      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTSR))
+            let tans      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTAN))
+            [|termNames; tsrs; tans|]
+
+let addAnnotationBlocks (buildingBlocks:InsertBuildingBlock list) =
     Excel.run(fun context ->
 
         promise {
@@ -695,18 +727,25 @@ let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
 
             let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable) 
 
-            let newBBs, alreadyExistingBBs =
-                let newSet = newBuildingBlocks |> List.map (fun x -> x.Column) |> Set.ofList
+            let newBuildingBlocks, alreadyExistingBBs =
+                let newSet = buildingBlocks |> List.map (fun x -> x.ColumnHeader) |> Set.ofList
                 let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint )|> Set.ofArray
                 let bbsToAdd = Set.difference newSet prevSet |> Set.toArray
                 // These building blocks do not exist in table and will be added
-                let newBBs = newBuildingBlocks |> List.filter (fun x -> bbsToAdd |> Array.contains x.Column) |> List.filter (fun x -> not x.Column.isOutputColumn && not x.Column.isInputColumn)
+                let newBuildingBlocks =
+                    buildingBlocks
+                    |> List.filter (fun buildingblock ->
+                        // Not existing in annotation table
+                        let isNotExisting = bbsToAdd |> Array.contains buildingblock.ColumnHeader
+                        // Not input or output column
+                        let isInputOutput = buildingblock.ColumnHeader.isOutputColumn && buildingblock.ColumnHeader.isInputColumn
+                        isNotExisting && isInputOutput |> not
+                    )
                 // These building blocks exist in table and are part of building block list. Keep them to push them as info msg.
                 let existingBBs = Set.intersect newSet prevSet |> Set.toList
-                newBBs, existingBBs
+                newBuildingBlocks, existingBBs
 
             // Ref. 2
-    
             // This is necessary to place new columns next to selected col
             let annoHeaderRange = annotationTable.getHeaderRowRange()
             let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
@@ -728,35 +767,71 @@ let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
                 let nextIndex = findIndexNextNotHiddenCol headerVals rebasedIndex
                 nextIndex, headerVals
             )
-    
-            let rowCount = tableRange.rowCount |> int
+
+            let startColumnCount = tableRange.columnCount |> int
+            let expandByNRows =
+                let maxNewRowCount =
+                    if List.isEmpty newBuildingBlocks then
+                        0
+                    else
+                        newBuildingBlocks |> List.map (fun x -> x.Rows.Length) |> List.max
+                let startRowCount = tableRange.rowCount |> int
+                // substract one from table rowCount because of header row
+                // maxNewRowCount refers to body rows
+                let nOfMissingRows = maxNewRowCount - (startRowCount-1)
+                if nOfMissingRows > 0 then
+                    Some nOfMissingRows
+                else
+                    None
+
+            // expand table by min rows
+            let! expandedTable,expandedRowCount =
+                if expandByNRows.IsSome then
+                    promise {
+                        let! expandedTable,expandedTableRange = context.sync().``then``(fun e ->
+                            let newRowsValues = createMatrixForTables startColumnCount expandByNRows.Value ""
+                            let newRows =
+                                annotationTable.rows.add(
+                                    values = U4.Case1 newRowsValues
+                                )
+                            let newTable = sheet.tables.getItem(annotationTableName)
+                            let newTableRange = newTable.getRange()
+                            let _ = newTableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+                            newTable,newTableRange
+                        )
+                        let! expandedRowCount = context.sync().``then``(fun _ -> int expandedTableRange.rowCount)
+                        return (expandedTable, expandedRowCount)
+                    }
+                else
+                    promise { return (annotationTable,tableRange.rowCount |> int) }
+
 
             //create an empty column to insert
-            let col value = createMatrixForTables 1 rowCount value
+            let col value = createMatrixForTables 1 expandedRowCount value
 
             let mutable nextIndex = startIndex
             let mutable allColumnHeaders = headerVals |> Array.choose id |> Array.map string |> List.ofArray
 
-            let addBuildingBlock (bb:InsertBuildingBlock) (currentNextIndex:float) (columnHeaders:string []) =
-            
+            let addBuildingBlock (buildingBlock:InsertBuildingBlock) (currentNextIndex:float) (columnHeaders:string []) =
+                printfn "start add"
                 /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
                 /// This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
-                let checkIdForMainCol() = OfficeInterop.Indexing.Column.findNewIdForColumn columnHeaders bb
+                let checkIdForMainCol() = OfficeInterop.Indexing.Column.findNewIdForColumn columnHeaders buildingBlock
             
                 let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit columnHeaders
             
                 let mainColId = checkIdForMainCol()
                 let unitColId = checkIdForUnitCol()
             
-                let mainColName = OfficeInterop.Indexing.Column.createMainColName bb mainColId
-                let tsrColName() = OfficeInterop.Indexing.Column.createTSRColName bb mainColId
-                let tanColName() = OfficeInterop.Indexing.Column.createTANColName bb mainColId
+                let mainColName = OfficeInterop.Indexing.Column.createMainColName buildingBlock mainColId
+                let tsrColName() = OfficeInterop.Indexing.Column.createTSRColName buildingBlock mainColId
+                let tanColName() = OfficeInterop.Indexing.Column.createTANColName buildingBlock mainColId
                 let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
 
                 let colNames = [|
                     mainColName
-                    if bb.UnitTerm.IsSome then OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
-                    if not bb.Column.Type.isSingleColumn then
+                    if buildingBlock.UnitTerm.IsSome then OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+                    if not buildingBlock.ColumnHeader.Type.isSingleColumn then
                         tsrColName()
                         tanColName()
                 |]
@@ -764,7 +839,7 @@ let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
                 /// Update storage for variables
                 nextIndex <- currentNextIndex + float colNames.Length
                 let updatedHeaderList =
-                    if bb.UnitTerm.IsSome then
+                    if buildingBlock.UnitTerm.IsSome then
                         unitColName()::mainColName::tsrColName()::tanColName()::allColumnHeaders
                     else
                         mainColName::tsrColName()::tanColName()::allColumnHeaders 
@@ -772,13 +847,14 @@ let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
             
                 let createAllCols =
                     let createCol index =
-                        annotationTable.columns.add(
+                        expandedTable.columns.add(
                             index   = index,
                             values  = U4.Case1 (col "")
                         )
                     colNames
                     |> Array.mapi (fun i colName ->
                         // create a single column
+                        printfn "Column: %A" colName
                         let col = createCol (currentNextIndex + float i)
                         // add column header name
                         col.name <- colName
@@ -786,15 +862,18 @@ let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
                         // Fit column width to content
                         columnBody.format.autofitColumns()
                         // Update mainColumn body rows with number format IF building block has unit.
-                        if bb.UnitTerm.IsSome && colName = mainColName then
+                        if buildingBlock.UnitTerm.IsSome && colName = mainColName then
                             // create numberFormat for unit columns
-                            let format = bb.UnitTerm.Value.toNumberFormat
-                            let formats = createValueMatrix 1 (rowCount-1) format
+                            let format = buildingBlock.UnitTerm.Value.toNumberFormat
+                            let formats = createValueMatrix 1 (expandedRowCount-1) format
                             columnBody.numberFormat <- formats
                         else
                             let format = $"General"
-                            let formats = createValueMatrix 1 (rowCount-1) format
+                            let formats = createValueMatrix 1 (expandedRowCount-1) format
                             columnBody.numberFormat <- formats
+                        if buildingBlock.HasValues then
+                            let values = createColumnBodyValues buildingBlock expandedRowCount
+                            columnBody.values <- values.[i]
                         // hide freshly created column if it is a reference column
                         if colName <> mainColName then
                             columnBody.columnHidden <- true
@@ -803,17 +882,17 @@ let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
             
                 colNames
 
-            let! addBuildingBlocks = 
+            let! addNewBuildingBlocks = 
                 context.sync().``then``(fun _ ->
-                    newBBs
-                    |> List.collect (fun bb ->
+                    newBuildingBlocks
+                    |> List.collect (fun (buildingBlock) ->
                         let colHeadersArr = allColumnHeaders |> Array.ofList
-                        let addedBlockName = addBuildingBlock bb nextIndex colHeadersArr
+                        let addedBlockName = addBuildingBlock buildingBlock nextIndex colHeadersArr
                         addedBlockName |> List.ofArray
                     )
                 )
 
-            let! fit = autoFitTableByTable annotationTable context
+            let! fit = autoFitTableByTable expandedTable context
 
             let createColsMsg =
                 let msg =

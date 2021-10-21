@@ -74,8 +74,22 @@ module TermTypes =
             with
                 | :? NullReferenceException -> failwith $"Unable to parse given string {formatStr} to TermMinimal.Name."
 
-        member this.accessionToTSR = this.TermAccession.Split(@":").[0] 
-        member this.accessionToTAN = URLs.TermAccessionBaseUrl + this.TermAccession.Replace(@":",@"_")
+        /// Returns empty string if no accession is found
+        member this.accessionToTSR =
+            if this.TermAccession = "" then
+                ""
+            else
+                try 
+                    this.TermAccession.Split(@":").[0]
+                with
+                    | exn -> ""
+
+        /// Returns empty string if no accession is found
+        member this.accessionToTAN =
+            if this.TermAccession = "" then
+                ""
+            else
+                URLs.TermAccessionBaseUrl + this.TermAccession.Replace(@":",@"_")
 
     type TermSearchable = {
         // Contains information about the term to search itself. If term accession is known, search result is 100% correct.

@@ -165,7 +165,7 @@ type AssayCommonAPI.RowWiseSheet with
         // group building block values by "InsertBuildingBlock" information (column information without values)
         insertBuildingBlockRowList
         |> List.groupBy (fun buildingBlock ->
-            buildingBlock.Column,buildingBlock.ColumnTerm,buildingBlock.UnitTerm
+            buildingBlock.ColumnHeader,buildingBlock.ColumnTerm,buildingBlock.UnitTerm
         )
         |> List.map (fun ((header,term,unit),buildingBlocks) ->
             let rows = buildingBlocks |> Array.ofList |> Array.collect (fun bb -> bb.Rows)

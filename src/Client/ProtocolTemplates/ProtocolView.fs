@@ -381,7 +381,7 @@ module TemplateFromDB =
                         for insertBB in model.ProtocolState.ProtocolSelected.Value.TemplateBuildingBlocks do
                             yield
                                 tr [][
-                                    td [][str (insertBB.Column.toAnnotationTableHeader())]
+                                    td [][str (insertBB.ColumnHeader.toAnnotationTableHeader())]
                                     td [][str (if insertBB.HasExistingTerm then insertBB.ColumnTerm.Value.TermAccession else "-")]
                                     td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.Name else "-")]
                                     td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
