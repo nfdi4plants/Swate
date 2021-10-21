@@ -18,6 +18,7 @@ let serviceApi = {
 }
 
 open ISADotNet
+open Microsoft.AspNetCore.Http
 
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
@@ -332,15 +333,17 @@ let annotatorApi cString = {
     }
 }
 
+let errorHandler (ex:exn) (routeInfo:RouteInfo<HttpContext>) =
+    let msg = sprintf "[SERVER SIDE ERROR]: %A @%s." ex.Message routeInfo.path
+    Propagate msg
+
 let createIAnnotatorApiv1 cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue (annotatorApi cString)
     |> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.annotatorApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A" x))
-    ) 
+    |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
 let createIServiceAPIv1 =
@@ -349,9 +352,7 @@ let createIServiceAPIv1 =
     |> Remoting.fromValue serviceApi
     |> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A" x))
-    )
+    |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
 let createISADotNetCommonAPIv1 =
@@ -360,9 +361,7 @@ let createISADotNetCommonAPIv1 =
     |> Remoting.fromValue isaDotNetCommonAPIv1
     |> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A" x))
-    )
+    |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
 let createExpertAPIv1 =
@@ -371,9 +370,7 @@ let createExpertAPIv1 =
     |> Remoting.fromValue swateJsonAPIv1
     //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A" x))
-    )
+    |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
 /// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)

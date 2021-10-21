@@ -56,11 +56,10 @@ module Dev =
             nextState, nextCmd
 
         | GenericError (nextCmd, e) ->
-            OfficeInterop.consoleLog (sprintf "GenericError occured: %s" e.Message)
             let nextState = {
                 currentState with
-                    Log = LogItem.Error(System.DateTime.Now,e.Message)::currentState.Log
-                    LastFullError = Some e
+                    Log = LogItem.Error(System.DateTime.Now,e.GetPropagatedError())::currentState.Log
+                    LastFullError = Some (e)
                 }
             nextState, nextCmd
 
@@ -408,7 +407,7 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messag
     | ApiError e ->
         let failedCall = {
             currentState.currentCall with
-                Status = Failed e.Message
+                Status = Failed (e.GetPropagatedError())
         }
 
         let nextState = {
@@ -417,7 +416,7 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messag
                 callHistory = failedCall::currentState.callHistory
         }
 
-        nextState, curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName e.Message) |> DevMsg |> Cmd.ofMsg
+        nextState, curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName (e.GetPropagatedError())) |> DevMsg |> Cmd.ofMsg
 
     | ApiSuccess (level,logMsg) ->
         currentState, curry GenericLog Cmd.none (level,logMsg) |> DevMsg |> Cmd.ofMsg

@@ -3,14 +3,25 @@ module rec Messages
 open Elmish
 open Thoth.Elmish
 open Shared
+open Fable.Remoting.Client
+open Fable.SimpleJson
+
 open TermTypes
 open ProtocolTemplateTypes
-
 open ExcelColors
 open OfficeInterop
 open OfficeInteropTypes
 open Model
 open Routing
+
+type System.Exception with
+    member this.GetPropagatedError() =
+        match this with
+        | :? ProxyRequestException as exn ->
+            let response = exn.ResponseText |> Json.parseAs<{| error:string; ignored : bool; handled : bool |}>
+            response.error
+        | ex ->
+            ex.Message
 
 let curry f a b = f (a,b)
 
