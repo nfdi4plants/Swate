@@ -37,13 +37,13 @@ module Protocol =
                 | Some (_,buildingBlocks) ->
                     Cmd.OfPromise.either
                         OfficeInterop.addAnnotationBlocks
-                        (List.ofArray buildingBlocks)
+                        buildingBlocks
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 | None ->
                     Cmd.OfPromise.either
-                        OfficeInterop.addAnnotationBlocks
-                        (List.ofArray (snd buildingBlockTables.[0]))
+                        OfficeInterop.addAnnotationBlocksInNewSheets
+                        buildingBlockTables
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
             currentState, nextCmd

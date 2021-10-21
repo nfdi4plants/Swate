@@ -109,7 +109,7 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.createAnnotationTable  
                     (isDark,tryUsePrevOutput)
-                    (curry GenericLog (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
+                    (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel,cmd
 

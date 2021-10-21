@@ -342,7 +342,7 @@ module TemplateFromDB =
                                 //let validation =
                                 //    model.ProtocolInsertState.ValidationXml.Value |> Some
                                 ProtocolIncreaseTimesUsed p.Name |> ProtocolMsg |> dispatch
-                                AddAnnotationBlocks p.TemplateBuildingBlocks |> OfficeInteropMsg |> dispatch
+                                AddAnnotationBlocks (Array.ofList p.TemplateBuildingBlocks) |> OfficeInteropMsg |> dispatch
                             )
                         ] [
                             str "Add template"

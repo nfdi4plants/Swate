@@ -39,7 +39,7 @@ type Msg =
     | AnnotationTableExists                 of TryFindAnnoTableResult
     | InsertOntologyTerm                    of TermMinimal
     | AddAnnotationBlock                    of InsertBuildingBlock
-    | AddAnnotationBlocks                   of InsertBuildingBlock list //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | AddAnnotationBlocks                   of InsertBuildingBlock [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | RemoveAnnotationBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | AutoFitTable                          of hideRefCols:bool

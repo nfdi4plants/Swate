@@ -183,125 +183,138 @@ let getPrevTableOutput (context:RequestContext) =
 /// This function is used to create a new annotation table.
 /// 'allTableNames' is a array of all currently existing annotationTables.
 /// 'isDark' refers to the current styling of excel (darkmode, or not).
+let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, range:Excel.Range, context: RequestContext) =
+    
+    /// This function is used to create the "next" annotationTable name.
+    /// 'allTableNames' is passed from a previous function and contains a list of all annotationTables.
+    /// The function then tests if the freshly created name already exists and if it does it rec executes itself againn with (ind+1)
+    /// Due to how this function is written, the tables will not always count up. E.g. annotationTable2 gets deleted then the next table will not be
+    /// annotationTable3 or higher but annotationTable2 again. This could in the future lead to problems if information is saved with the table name as identifier.
+    let rec findNewTableName allTableNames =
+        let id = HumanReadableIds.tableName()
+        let newTestName = $"annotationTable{id}"
+        let existsAlready = allTableNames |> Array.exists (fun x -> x = newTestName)
+        if existsAlready then
+            findNewTableName allTableNames
+        else
+            newTestName
+    
+    /// decide table style by input parameter
+    let style =
+        if isDark then
+            "TableStyleMedium15"
+        else
+            "TableStyleMedium7"
+    
+    // The next part loads relevant information from the excel objects and allows us to access them after 'context.sync()'
+    
+    let tableRange = range
+    let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"; "worksheet"])))
+
+    let activeSheet = tableRange.worksheet
+    let _ = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
+    let activeTables = activeSheet.tables.load(propertyNames=U2.Case1 "items")
+    
+    let r = context.runtime.load(U2.Case1 "enableEvents")
+    
+    promise {
+    
+        /// Is user input signals to try and find+reuse the output from the previous annotationTable do this, otherwise just return empty array
+        let! prevTableOutput = if tryUseLastOutput then getPrevTableOutput context else promise {return Array.empty}
+    
+        /// If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
+        let useExistingPrevOutput = tryUseLastOutput && Array.isEmpty >> not <| prevTableOutput
+    
+        let! allTableNames = getAllTableNames context
+    
+        //sync with proxy objects after loading values from excel
+        let! table,newTableLogging = context.sync().``then``( fun _ ->
+    
+            /// Filter all names of tables on the active worksheet for names starting with "annotationTable".
+            let annoTables =
+                activeTables.items
+                |> Seq.toArray
+                |> Array.map (fun x -> x.name)
+                |> Array.filter (fun x -> x.StartsWith "annotationTable")
+    
+            // Fail the function if there are not exactly 0 annotation tables in the active worksheet.
+            // This check is done, to only have one annotationTable per workSheet.
+            let _ =
+                match annoTables.Length with
+                | x when x > 0 ->
+                    failwith "The active worksheet contains more than zero annotationTables. Please move to a new worksheet."
+                | 0 ->
+                    ()
+                | _ ->
+                    failwith "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers."
+    
+            // Ref. 1
+            r.enableEvents <- false
+    
+            /// We do not want to create annotation tables of any size. The recommended workflow is to use the addBuildingBlock functionality.
+            /// Therefore we recreate the tableRange but with a columncount of 2. The 2 Basic columns in any annotation table.
+            /// "Source Name" | "Sample Name"
+            let adaptedRange =
+                let rowCount =
+                    if useExistingPrevOutput then
+                        (float prevTableOutput.Length + 1.)
+                    elif tableRange.isEntireColumn then
+                        21.
+                    elif tableRange.rowCount <= 2. then
+                        2.
+                    else
+                        tableRange.rowCount
+                activeSheet.getRangeByIndexes(tableRange.rowIndex,tableRange.columnIndex,rowCount,2.)
+    
+            /// Create table in current worksheet
+            let annotationTable = activeSheet.tables.add(U2.Case1 adaptedRange,true)
+    
+            /// Update annotationTable column headers
+            (annotationTable.columns.getItemAt 0.).name <- "Source Name"
+            (annotationTable.columns.getItemAt 1.).name <- "Sample Name"
+    
+            if useExistingPrevOutput then
+                let newColValues = prevTableOutput |> Array.map (fun cell -> ResizeArray[|Option.bind (box >> Some) cell.Value|] ) |> ResizeArray
+                let col1 = (annotationTable.columns.getItemAt 0.)
+                let body = col1.getDataBodyRange()
+                body.values <- newColValues
+    
+            /// Create new annotationTable name
+            let newName = findNewTableName allTableNames
+            /// Update annotationTable name
+            annotationTable.name <- newName
+    
+            /// Update annotationTable style
+            annotationTable.style <- style
+    
+            /// Fit widths and heights of cols and rows to value size. (In this case the new column headers).
+            activeSheet.getUsedRange().format.autofitColumns()
+            activeSheet.getUsedRange().format.autofitRows()
+    
+            //let annoTableName = allTableNames |> Array.filter (fun x -> x.StartsWith "annotationTable")
+    
+            r.enableEvents <- true
+    
+            /// Return info message
+            let logging = InteropLogging.Msg.create InteropLogging.Info (sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." tableRange.address (tableRange.rowCount - 1.))
+
+            annotationTable, logging
+        )
+    
+        return (table,newTableLogging)
+    }
+
+/// This function is used to create a new annotation table.
+/// 'allTableNames' is a array of all currently existing annotationTables.
+/// 'isDark' refers to the current styling of excel (darkmode, or not).
 let createAnnotationTable (isDark:bool, tryUseLastOutput:bool) =
-    Excel.run(fun context ->
-
-        /// This function is used to create the "next" annotationTable name.
-        /// 'allTableNames' is passed from a previous function and contains a list of all annotationTables.
-        /// The function then tests if the freshly created name already exists and if it does it rec executes itself againn with (ind+1)
-        /// Due to how this function is written, the tables will not always count up. E.g. annotationTable2 gets deleted then the next table will not be
-        /// annotationTable3 or higher but annotationTable2 again. This could in the future lead to problems if information is saved with the table name as identifier.
-        let rec findNewTableName allTableNames =
-            let id = HumanReadableIds.tableName()
-            let newTestName = $"annotationTable{id}"
-            let existsAlready = allTableNames |> Array.exists (fun x -> x = newTestName)
-            if existsAlready then
-                findNewTableName allTableNames
-            else
-                newTestName
-
-        /// decide table style by input parameter
-        let style =
-            if isDark then
-                "TableStyleMedium15"
-            else
-                "TableStyleMedium7"
-
-        // The next part loads relevant information from the excel objects and allows us to access them after 'context.sync()'
-        let activeSheet = context.workbook.worksheets.getActiveWorksheet()
-        let _ = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
-        let activeTables = activeSheet.tables.load(propertyNames=U2.Case1 "items")
-
-        let tableRange = context.workbook.getSelectedRange()
-        let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"])))
-
-        let r = context.runtime.load(U2.Case1 "enableEvents")
-
+    Excel.run (fun context ->
+        let selectedRange = context.workbook.getSelectedRange()
         promise {
+            let! newTableLogging = createAnnotationTableAtRange (isDark,tryUseLastOutput,selectedRange,context)
 
-            /// Is user input signals to try and find+reuse the output from the previous annotationTable do this, otherwise just return empty array
-            let! prevTableOutput = if tryUseLastOutput then getPrevTableOutput context else promise {return Array.empty}
-
-            /// If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
-            let useExistingPrevOutput = tryUseLastOutput && Array.isEmpty >> not <| prevTableOutput
-
-            printfn $"{useExistingPrevOutput}"
-
-            let! allTableNames = getAllTableNames context
-
-            //sync with proxy objects after loading values from excel
-            let! r = context.sync().``then``( fun _ ->
-
-                /// Filter all names of tables on the active worksheet for names starting with "annotationTable".
-                let annoTables =
-                    activeTables.items
-                    |> Seq.toArray
-                    |> Array.map (fun x -> x.name)
-                    |> Array.filter (fun x -> x.StartsWith "annotationTable")
-
-                // Fail the function if there are not exactly 0 annotation tables in the active worksheet.
-                // This check is done, to only have one annotationTable per workSheet.
-                let _ =
-                    match annoTables.Length with
-                    | x when x > 0 ->
-                        failwith "The active worksheet contains more than zero annotationTables. Please move to a new worksheet."
-                    | 0 ->
-                        ()
-                    | _ ->
-                        failwith "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers."
-
-                // Ref. 1
-                r.enableEvents <- false
-
-                /// We do not want to create annotation tables of any size. The recommended workflow is to use the addBuildingBlock functionality.
-                /// Therefore we recreate the tableRange but with a columncount of 2. The 2 Basic columns in any annotation table.
-                /// "Source Name" | "Sample Name"
-                let adaptedRange =
-                    let rowCount =
-                        if useExistingPrevOutput then
-                            (float prevTableOutput.Length + 1.)
-                        elif tableRange.isEntireColumn then
-                            21.
-                        elif tableRange.rowCount <= 2. then
-                            2.
-                        else
-                            tableRange.rowCount
-                    activeSheet.getRangeByIndexes(tableRange.rowIndex,tableRange.columnIndex,rowCount,2.)
-
-                /// Create table in current worksheet
-                let annotationTable = activeSheet.tables.add(U2.Case1 adaptedRange,true)
-
-                /// Update annotationTable column headers
-                (annotationTable.columns.getItemAt 0.).name <- "Source Name"
-                (annotationTable.columns.getItemAt 1.).name <- "Sample Name"
-
-                if useExistingPrevOutput then
-                    let newColValues = prevTableOutput |> Array.map (fun cell -> ResizeArray[|Option.bind (box >> Some) cell.Value|] ) |> ResizeArray
-                    let col1 = (annotationTable.columns.getItemAt 0.)
-                    let body = col1.getDataBodyRange()
-                    body.values <- newColValues
-
-                /// Create new annotationTable name
-                let newName = findNewTableName allTableNames
-                /// Update annotationTable name
-                annotationTable.name <- newName
-
-                /// Update annotationTable style
-                annotationTable.style <- style
-
-                /// Fit widths and heights of cols and rows to value size. (In this case the new column headers).
-                activeSheet.getUsedRange().format.autofitColumns()
-                activeSheet.getUsedRange().format.autofitRows()
-
-                //let annoTableName = allTableNames |> Array.filter (fun x -> x.StartsWith "annotationTable")
-
-                r.enableEvents <- true
-
-                /// Return info message
-                sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." tableRange.address (tableRange.rowCount - 1.)
-            )
-
-            return ("Info",r)
+            // Interop logging expects list of logs
+            return [snd newTableLogging] 
         }
     )
 
@@ -683,7 +696,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
         } 
     )
 
-let createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
+let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
     let createList (rowCount:int) (values:string []) =
         ResizeArray [|
             // tableRowCount-2 because -1 to match index-level and -1 to substract header from count
@@ -715,202 +728,237 @@ let createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
             let tans      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTAN))
             [|termNames; tsrs; tans|]
 
-let addAnnotationBlocks (buildingBlocks:InsertBuildingBlock list) =
+let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Table,context:RequestContext) =
+    promise {
+        
+        let annotationTable = table
+        let _ = annotationTable.load(U2.Case1 "name")
+
+        let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable) 
+    
+        let newBuildingBlocks, alreadyExistingBBs =
+            let newSet = buildingBlocks |> Array.map (fun x -> x.ColumnHeader) |> Set.ofArray
+            let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint )|> Set.ofArray
+            let bbsToAdd = Set.difference newSet prevSet |> Set.toArray
+            // These building blocks do not exist in table and will be added
+            let newBuildingBlocks =
+                buildingBlocks
+                |> Array.filter (fun buildingblock ->
+                    // Not existing in annotation table
+                    let isNotExisting = bbsToAdd |> Array.contains buildingblock.ColumnHeader
+                    // Not input or output column
+                    let isInputOutput = buildingblock.ColumnHeader.isOutputColumn && buildingblock.ColumnHeader.isInputColumn
+                    isNotExisting && isInputOutput |> not
+                )
+            // These building blocks exist in table and are part of building block list. Keep them to push them as info msg.
+            let existingBBs = Set.intersect newSet prevSet |> Set.toList
+            newBuildingBlocks, existingBBs
+    
+        // Ref. 2
+        // This is necessary to place new columns next to selected col
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
+        let tableRange = annotationTable.getRange()
+        let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+        let selectedRange = context.workbook.getSelectedRange()
+        let _ = selectedRange.load(U2.Case1 "columnIndex")
+        
+        let! startIndex, headerVals = context.sync().``then``(fun e ->
+            // Ref. 3
+            /// This is necessary to place new columns next to selected col.
+            let rebasedIndex = rebaseIndexToTable selectedRange annoHeaderRange
+        
+            // This is necessary to skip over hidden cols
+            /// Get an array of the headers
+            let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
+        
+            /// Here is the next col index, which is not hidden, calculated.
+            let nextIndex = findIndexNextNotHiddenCol headerVals rebasedIndex
+            nextIndex, headerVals
+        )
+    
+        let startColumnCount = tableRange.columnCount |> int
+        /// Calculate if building blocks have values and if they have more values than currently rows exist for the table
+        /// Return Some "n of missing rows" to match n of values from building blocks or None
+        let expandByNRows =
+            let maxNewRowCount =
+                if Array.isEmpty newBuildingBlocks then
+                    0
+                else
+                    newBuildingBlocks |> Array.map (fun x -> x.Rows.Length) |> Array.max
+            let startRowCount = tableRange.rowCount |> int
+            // substract one from table rowCount because of header row
+            // maxNewRowCount refers to body rows
+            let nOfMissingRows = maxNewRowCount - (startRowCount-1)
+            if nOfMissingRows > 0 then
+                Some nOfMissingRows
+            else
+                None
+    
+        // Expand table by min rows, only done if necessary
+        let! expandedTable,expandedRowCount =
+            if expandByNRows.IsSome then
+                promise {
+                    let! expandedTable,expandedTableRange = context.sync().``then``(fun e ->
+                        let newRowsValues = createMatrixForTables startColumnCount expandByNRows.Value ""
+                        let newRows =
+                            annotationTable.rows.add(
+                                values = U4.Case1 newRowsValues
+                            )
+                        let newTable = context.workbook.tables.getItem(annotationTable.name)
+                        let newTableRange = annotationTable.getRange()
+                        let _ = newTableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+                        annotationTable,newTableRange
+                    )
+                    let! expandedRowCount = context.sync().``then``(fun _ -> int expandedTableRange.rowCount)
+                    return (expandedTable, expandedRowCount)
+                }
+            else
+                promise { return (annotationTable,tableRange.rowCount |> int) }
+    
+    
+        //create an empty column to insert
+        let col value = createMatrixForTables 1 expandedRowCount value
+    
+        let mutable nextIndex = startIndex
+        let mutable allColumnHeaders = headerVals |> Array.choose id |> Array.map string |> List.ofArray
+    
+        let addBuildingBlock (buildingBlock:InsertBuildingBlock) (currentNextIndex:float) (columnHeaders:string []) =
+            /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
+            /// This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
+            let checkIdForMainCol() = OfficeInterop.Indexing.Column.findNewIdForColumn columnHeaders buildingBlock
+                
+            let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit columnHeaders
+                
+            let mainColId = checkIdForMainCol()
+            let unitColId = checkIdForUnitCol()
+                
+            let mainColName = OfficeInterop.Indexing.Column.createMainColName buildingBlock mainColId
+            let tsrColName() = OfficeInterop.Indexing.Column.createTSRColName buildingBlock mainColId
+            let tanColName() = OfficeInterop.Indexing.Column.createTANColName buildingBlock mainColId
+            let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+    
+            let colNames = [|
+                mainColName
+                if buildingBlock.UnitTerm.IsSome then OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+                if not buildingBlock.ColumnHeader.Type.isSingleColumn then
+                    tsrColName()
+                    tanColName()
+            |]
+            
+            /// Update storage for variables
+            nextIndex <- currentNextIndex + float colNames.Length
+            let updatedHeaderList =
+                if buildingBlock.UnitTerm.IsSome then
+                    unitColName()::mainColName::tsrColName()::tanColName()::allColumnHeaders
+                else
+                    mainColName::tsrColName()::tanColName()::allColumnHeaders 
+            allColumnHeaders <-  updatedHeaderList
+                
+            let createAllCols =
+                let createCol index =
+                    expandedTable.columns.add(
+                        index   = index,
+                        values  = U4.Case1 (col "")
+                    )
+                colNames
+                |> Array.mapi (fun i colName ->
+                    // create a single column
+                    let col = createCol (currentNextIndex + float i)
+                    // add column header name
+                    col.name <- colName
+                    let columnBody = col.getDataBodyRange()
+                    // Fit column width to content
+                    columnBody.format.autofitColumns()
+                    // Update mainColumn body rows with number format IF building block has unit.
+                    if buildingBlock.UnitTerm.IsSome && colName = mainColName then
+                        // create numberFormat for unit columns
+                        let format = buildingBlock.UnitTerm.Value.toNumberFormat
+                        let formats = createValueMatrix 1 (expandedRowCount-1) format
+                        columnBody.numberFormat <- formats
+                    else
+                        let format = $"General"
+                        let formats = createValueMatrix 1 (expandedRowCount-1) format
+                        columnBody.numberFormat <- formats
+                    if buildingBlock.HasValues then
+                        let values = createColumnBodyValues buildingBlock expandedRowCount
+                        columnBody.values <- values.[i]
+                    // hide freshly created column if it is a reference column
+                    if colName <> mainColName then
+                        columnBody.columnHidden <- true
+                    col
+                )
+                
+            colNames
+    
+        let! addNewBuildingBlocks = 
+            context.sync().``then``(fun _ ->
+                newBuildingBlocks
+                |> Array.collect (fun (buildingBlock) ->
+                    let colHeadersArr = allColumnHeaders |> Array.ofList
+                    let addedBlockName = addBuildingBlock buildingBlock nextIndex colHeadersArr
+                    addedBlockName
+                )
+            )
+    
+        let! fit = autoFitTableByTable expandedTable context
+    
+        let createColsMsg =
+            let msg =
+                if alreadyExistingBBs.IsEmpty
+                    then $"Added protocol building blocks successfully."
+                else
+                    let skippedBBs = alreadyExistingBBs |> List.map (fun x -> x.toAnnotationTableHeader()) |> String.concat ", "
+                    $"Insert completed successfully, but Swate found already existing building blocks in table. Building blocks must be unique. Skipped the following \"{skippedBBs}\"."
+            InteropLogging.Msg.create InteropLogging.Info msg
+    
+        let logging = [
+            yield! fit
+            createColsMsg
+        ]
+        
+        return logging
+    } 
+
+let addAnnotationBlocks (buildingBlocks:InsertBuildingBlock []) =
     Excel.run(fun context ->
 
         promise {
     
             let! annotationTableName = getActiveAnnotationTableName context
-    
+            
             let sheet = context.workbook.worksheets.getActiveWorksheet()
             let annotationTable = sheet.tables.getItem(annotationTableName)
 
-            let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable) 
+            let! addBlocksLogging = addAnnotationBlocksToTable(buildingBlocks,annotationTable,context)
 
-            let newBuildingBlocks, alreadyExistingBBs =
-                let newSet = buildingBlocks |> List.map (fun x -> x.ColumnHeader) |> Set.ofList
-                let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint )|> Set.ofArray
-                let bbsToAdd = Set.difference newSet prevSet |> Set.toArray
-                // These building blocks do not exist in table and will be added
-                let newBuildingBlocks =
-                    buildingBlocks
-                    |> List.filter (fun buildingblock ->
-                        // Not existing in annotation table
-                        let isNotExisting = bbsToAdd |> Array.contains buildingblock.ColumnHeader
-                        // Not input or output column
-                        let isInputOutput = buildingblock.ColumnHeader.isOutputColumn && buildingblock.ColumnHeader.isInputColumn
-                        isNotExisting && isInputOutput |> not
-                    )
-                // These building blocks exist in table and are part of building block list. Keep them to push them as info msg.
-                let existingBBs = Set.intersect newSet prevSet |> Set.toList
-                newBuildingBlocks, existingBBs
-
-            // Ref. 2
-            // This is necessary to place new columns next to selected col
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
-            let tableRange = annotationTable.getRange()
-            let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
-            let selectedRange = context.workbook.getSelectedRange()
-            let _ = selectedRange.load(U2.Case1 "columnIndex")
-    
-            let! startIndex, headerVals = context.sync().``then``(fun e ->
-                // Ref. 3
-                /// This is necessary to place new columns next to selected col.
-                let rebasedIndex = rebaseIndexToTable selectedRange annoHeaderRange
-    
-                // This is necessary to skip over hidden cols
-                /// Get an array of the headers
-                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-    
-                /// Here is the next col index, which is not hidden, calculated.
-                let nextIndex = findIndexNextNotHiddenCol headerVals rebasedIndex
-                nextIndex, headerVals
-            )
-
-            let startColumnCount = tableRange.columnCount |> int
-            let expandByNRows =
-                let maxNewRowCount =
-                    if List.isEmpty newBuildingBlocks then
-                        0
-                    else
-                        newBuildingBlocks |> List.map (fun x -> x.Rows.Length) |> List.max
-                let startRowCount = tableRange.rowCount |> int
-                // substract one from table rowCount because of header row
-                // maxNewRowCount refers to body rows
-                let nOfMissingRows = maxNewRowCount - (startRowCount-1)
-                if nOfMissingRows > 0 then
-                    Some nOfMissingRows
-                else
-                    None
-
-            // expand table by min rows
-            let! expandedTable,expandedRowCount =
-                if expandByNRows.IsSome then
-                    promise {
-                        let! expandedTable,expandedTableRange = context.sync().``then``(fun e ->
-                            let newRowsValues = createMatrixForTables startColumnCount expandByNRows.Value ""
-                            let newRows =
-                                annotationTable.rows.add(
-                                    values = U4.Case1 newRowsValues
-                                )
-                            let newTable = sheet.tables.getItem(annotationTableName)
-                            let newTableRange = newTable.getRange()
-                            let _ = newTableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
-                            newTable,newTableRange
-                        )
-                        let! expandedRowCount = context.sync().``then``(fun _ -> int expandedTableRange.rowCount)
-                        return (expandedTable, expandedRowCount)
-                    }
-                else
-                    promise { return (annotationTable,tableRange.rowCount |> int) }
-
-
-            //create an empty column to insert
-            let col value = createMatrixForTables 1 expandedRowCount value
-
-            let mutable nextIndex = startIndex
-            let mutable allColumnHeaders = headerVals |> Array.choose id |> Array.map string |> List.ofArray
-
-            let addBuildingBlock (buildingBlock:InsertBuildingBlock) (currentNextIndex:float) (columnHeaders:string []) =
-                printfn "start add"
-                /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
-                /// This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
-                let checkIdForMainCol() = OfficeInterop.Indexing.Column.findNewIdForColumn columnHeaders buildingBlock
-            
-                let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit columnHeaders
-            
-                let mainColId = checkIdForMainCol()
-                let unitColId = checkIdForUnitCol()
-            
-                let mainColName = OfficeInterop.Indexing.Column.createMainColName buildingBlock mainColId
-                let tsrColName() = OfficeInterop.Indexing.Column.createTSRColName buildingBlock mainColId
-                let tanColName() = OfficeInterop.Indexing.Column.createTANColName buildingBlock mainColId
-                let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
-
-                let colNames = [|
-                    mainColName
-                    if buildingBlock.UnitTerm.IsSome then OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
-                    if not buildingBlock.ColumnHeader.Type.isSingleColumn then
-                        tsrColName()
-                        tanColName()
-                |]
-        
-                /// Update storage for variables
-                nextIndex <- currentNextIndex + float colNames.Length
-                let updatedHeaderList =
-                    if buildingBlock.UnitTerm.IsSome then
-                        unitColName()::mainColName::tsrColName()::tanColName()::allColumnHeaders
-                    else
-                        mainColName::tsrColName()::tanColName()::allColumnHeaders 
-                allColumnHeaders <-  updatedHeaderList
-            
-                let createAllCols =
-                    let createCol index =
-                        expandedTable.columns.add(
-                            index   = index,
-                            values  = U4.Case1 (col "")
-                        )
-                    colNames
-                    |> Array.mapi (fun i colName ->
-                        // create a single column
-                        printfn "Column: %A" colName
-                        let col = createCol (currentNextIndex + float i)
-                        // add column header name
-                        col.name <- colName
-                        let columnBody = col.getDataBodyRange()
-                        // Fit column width to content
-                        columnBody.format.autofitColumns()
-                        // Update mainColumn body rows with number format IF building block has unit.
-                        if buildingBlock.UnitTerm.IsSome && colName = mainColName then
-                            // create numberFormat for unit columns
-                            let format = buildingBlock.UnitTerm.Value.toNumberFormat
-                            let formats = createValueMatrix 1 (expandedRowCount-1) format
-                            columnBody.numberFormat <- formats
-                        else
-                            let format = $"General"
-                            let formats = createValueMatrix 1 (expandedRowCount-1) format
-                            columnBody.numberFormat <- formats
-                        if buildingBlock.HasValues then
-                            let values = createColumnBodyValues buildingBlock expandedRowCount
-                            columnBody.values <- values.[i]
-                        // hide freshly created column if it is a reference column
-                        if colName <> mainColName then
-                            columnBody.columnHidden <- true
-                        col
-                    )
-            
-                colNames
-
-            let! addNewBuildingBlocks = 
-                context.sync().``then``(fun _ ->
-                    newBuildingBlocks
-                    |> List.collect (fun (buildingBlock) ->
-                        let colHeadersArr = allColumnHeaders |> Array.ofList
-                        let addedBlockName = addBuildingBlock buildingBlock nextIndex colHeadersArr
-                        addedBlockName |> List.ofArray
-                    )
-                )
-
-            let! fit = autoFitTableByTable expandedTable context
-
-            let createColsMsg =
-                let msg =
-                    if alreadyExistingBBs.IsEmpty
-                        then $"Added protocol building blocks successfully."
-                    else
-                        let skippedBBs = alreadyExistingBBs |> List.map (fun x -> x.toAnnotationTableHeader()) |> String.concat ", "
-                        $"Insert completed successfully, but Swate found already existing building blocks in table. Building blocks must be unique. Skipped the following \"{skippedBBs}\"."
-                InteropLogging.Msg.create InteropLogging.Info msg
-
-            let logging = [
-                yield! fit
-                createColsMsg
-            ]
-    
-            return logging
+            return addBlocksLogging
         } 
     )
+
+let addAnnotationBlocksInNewSheet (worksheetName:string,buildingBlocks:InsertBuildingBlock []) =
+    Excel.run(fun context ->
+        promise {
+
+            let newWorksheet = context.workbook.worksheets.add(name=worksheetName)
+
+            let worksheetRange = newWorksheet.getUsedRange()
+
+            let! newTable,newTableLogging = createAnnotationTableAtRange (false,false,worksheetRange,context)
+
+            let! addNewBuildingBlocksLogging = addAnnotationBlocksToTable(buildingBlocks, newTable, context)
+
+            let newSheetLogging = InteropLogging.Msg.create InteropLogging.Info $"Create new worksheet: {worksheetName}"
+
+            return newSheetLogging::newTableLogging::addNewBuildingBlocksLogging
+        }
+    )
+
+let addAnnotationBlocksInNewSheets (annotationTablesToAdd: (string*InsertBuildingBlock []) []) =
+    annotationTablesToAdd
+    |> Array.map addAnnotationBlocksInNewSheet
+    |> Promise.all
+    |> Promise.map List.concat
 
 /// This function is used to add unit reference columns to an existing building block without unit reference columns
 let updateUnitForCells (unitTerm:TermMinimal) =
