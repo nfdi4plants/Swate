@@ -699,17 +699,11 @@ let addAnnotationBlocks (newBuildingBlocks:InsertBuildingBlock list) =
                 let newSet = newBuildingBlocks |> List.map (fun x -> x.Column) |> Set.ofList
                 let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint )|> Set.ofArray
                 let bbsToAdd = Set.difference newSet prevSet |> Set.toArray
-                //printfn $"{newBuildingBlocks}"
-                //printfn $"prevSet {prevSet.ToString()}"
-                //printfn $"newSet {newSet.ToString()}"
                 // These building blocks do not exist in table and will be added
                 let newBBs = newBuildingBlocks |> List.filter (fun x -> bbsToAdd |> Array.contains x.Column) |> List.filter (fun x -> not x.Column.isOutputColumn && not x.Column.isInputColumn)
                 // These building blocks exist in table and are part of building block list. Keep them to push them as info msg.
                 let existingBBs = Set.intersect newSet prevSet |> Set.toList
-                //printfn $"prevSet {newBBs.Length}"
-                //printfn $"newSet {existingBBs.Length}"
                 newBBs, existingBBs
-
 
             // Ref. 2
     

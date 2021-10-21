@@ -32,8 +32,11 @@ module Protocol =
                     (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
             nextModel, cmd
         | ParseUploadedFileResponse buildingBlocksWithValue ->
-            failwith "not implemented yet"
-            currentState, Cmd.none
+            let nextCmd =
+                match Array.tryExactlyOne buildingBlocksWithValue with
+                | Some (_,buildingBlocksWithValue) -> Cmd.none
+                | None -> Cmd.none
+            currentState, nextCmd
         // Client
         | UpdateJsonExportType nextType ->
             let nextModel = {
