@@ -11,8 +11,14 @@ type Column with
         |> Array.map (fun cell ->
             (cell.Index, header), Option.defaultValue "" cell.Value
         )
+    member this.toMatrixElement(rebaseIndex:int) =
+        let header = this.Header.SwateColumnHeader
+        this.Cells
+        |> Array.map (fun cell ->
+            (cell.Index-rebaseIndex, header), Option.defaultValue "" cell.Value
+        )
 
-let parseBuildingBlockToMatrix (protocolName:string) (buildingBlocks:BuildingBlock []) =
+let parseBuildingBlockToMatrix (buildingBlocks:BuildingBlock []) =
     let matrixHeaders =
         buildingBlocks
         |> Array.collect (fun bb -> [|
@@ -23,28 +29,39 @@ let parseBuildingBlockToMatrix (protocolName:string) (buildingBlocks:BuildingBlo
                 bb.TSR.Value.Header.SwateColumnHeader
                 bb.TAN.Value.Header.SwateColumnHeader
         |])
+    let rebaseindex =
+        let getCellIndices (cellArr:Cell []) = cellArr |> Array.map (fun c -> c.Index)
+        buildingBlocks
+        |> Array.collect (fun bb -> [|
+            yield! bb.MainColumn.Cells |> getCellIndices
+            if bb.hasUnit then
+                yield! bb.Unit.Value.Cells |> getCellIndices
+            if bb.hasCompleteTSRTAN then
+                yield! bb.TSR.Value.Cells |> getCellIndices
+                yield! bb.TAN.Value.Cells |> getCellIndices
+        |]) |> Array.min
     let matrixArr =
         buildingBlocks
         |> Array.collect (fun bb -> [|
-            yield! bb.MainColumn.toMatrixElement()
+            yield! bb.MainColumn.toMatrixElement(rebaseindex)
             if bb.hasUnit then
-                yield! bb.Unit.Value.toMatrixElement()
+                yield! bb.Unit.Value.toMatrixElement(rebaseindex)
             if bb.hasCompleteTSRTAN then
-                yield! bb.TSR.Value.toMatrixElement()
-                yield! bb.TAN.Value.toMatrixElement()
+                yield! bb.TSR.Value.toMatrixElement(rebaseindex)
+                yield! bb.TAN.Value.toMatrixElement(rebaseindex)
         |])
     let matrix = Collections.Generic.Dictionary<(int*string),string>(Map.ofArray matrixArr)
     matrixHeaders, matrix
 
-let parseBuildingBlockToAssay (protocolName:string) (buildingBlocks:BuildingBlock []) =
-    let matrixHeaders, matrix = parseBuildingBlockToMatrix protocolName buildingBlocks
-    ISADotNet.XLSX.AssayFile.Assay.fromSparseMatrix protocolName matrixHeaders matrix
+let parseBuildingBlockToAssay (templateName:string) (buildingBlocks:BuildingBlock []) =
+    let matrixHeaders, matrix = parseBuildingBlockToMatrix buildingBlocks
+    ISADotNet.XLSX.AssayFile.Assay.fromSparseMatrix templateName matrixHeaders matrix
 
 let parseBuildingBlockSeqsToAssay (worksheetNameBuildingBlocks: (string*BuildingBlock []) []) =
     let matrices =
         worksheetNameBuildingBlocks
-        |> Array.map (fun (protocolName, buildingBlocks) ->
-            let matrixHeaders, matrix = parseBuildingBlockToMatrix protocolName buildingBlocks
-            protocolName, Seq.ofArray matrixHeaders, matrix
+        |> Array.map (fun (templateName, buildingBlocks) ->
+            let matrixHeaders, matrix = parseBuildingBlockToMatrix buildingBlocks
+            templateName, Seq.ofArray matrixHeaders, matrix
         )
     ISADotNet.XLSX.AssayFile.Assay.fromSparseMatrices matrices
