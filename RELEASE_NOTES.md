@@ -1,54 +1,41 @@
-### 0.5.0+ac96487 (Released 2021-10-22)
+### 0.5.0+70632951 (Released 2021-10-22)
 * Additions:
-    * latest commit #ac96487
-    * [[#ac96487](https://github.com/nfdi4plants/Swate/commit/ac964873bb7bb4e6ce1c79b5d62a990ad9d484c0)] Update production swate url in manifest.
-    * [[#2f7db37](https://github.com/nfdi4plants/Swate/commit/2f7db3705777bec830240a82fbe263861cf260f5)] Update dag visuals
-    * [[#6c62234](https://github.com/nfdi4plants/Swate/commit/6c62234aeda2d232a6054b278fff4785d8902aba)] Finalize dag :sparkles:
-    * [[#48c5c36](https://github.com/nfdi4plants/Swate/commit/48c5c3653e0615ba84546ccec466d46308056d7d)] Update ISADotNet :arrow_up:, Add ISADotNet.Viz :heavy_plus_sign:
-    * [[#5cd3a36](https://github.com/nfdi4plants/Swate/commit/5cd3a364686fbba74f084398d600ed6ff8a22e94)] Add twitter link for news to burga menu
-    * [[#f3ecb8d](https://github.com/nfdi4plants/Swate/commit/f3ecb8d83408bcc3d3d73b2085e9ba4df0ffda3a)] Split server apis :boom:
-    * [[#cf6df06](https://github.com/nfdi4plants/Swate/commit/cf6df0687fcf085c3d978250ef60a658acd76e14)] Set up dag state
-    * [[#954437d](https://github.com/nfdi4plants/Swate/commit/954437d191db43d5ed21b189aaf619ce6a044f21)] Init dag page :tada:
-    * [[#612332c](https://github.com/nfdi4plants/Swate/commit/612332c9a58da4a625e9ddfca89f1b4145bab202)] Add sort to conserve template column order
-    * [[#8205eeb](https://github.com/nfdi4plants/Swate/commit/8205eeb82ce6bbcd3ccd4c972e9438616b9badbe)] Redesign json-swate table parsing and init json import :tada:
-    * [[#074cf1a](https://github.com/nfdi4plants/Swate/commit/074cf1a77d2d9eb4d920ce7588c619462b243ca6)] Rename JSON to Json :art:
-    * [[#d080748](https://github.com/nfdi4plants/Swate/commit/d080748dd90510f676aefc43aec6905bd3539830)] Add parsing from json to annotation tables :sparkles:
-    * [[#16ec188](https://github.com/nfdi4plants/Swate/commit/16ec1880b99d1d0b102d965f413c29ef47fe1669)] Improve server side error feedback.
-    * [[#19a20c5](https://github.com/nfdi4plants/Swate/commit/19a20c520e8c63062edb401a604d899d97d5c3a5)] Merge InsertBuildingBlock and values to one type.
-    * [[#7b293ce](https://github.com/nfdi4plants/Swate/commit/7b293ce6dcbfc3e8a658222d326db31d13ca541b)] Implement isa json value import with row extension.
-    * [[#19a93b2](https://github.com/nfdi4plants/Swate/commit/19a93b2a444fa2d0376f387ab58beeab75fb139e)] Add multi-table support for json import.
+    * latest commit #70632951
     * Column headers slimmed, only term accession number in brackets
-    * Unit section slimmed from three columns to one
-    * Units tracked with number section in Excel
-    * Only terms from unit ontology (UO) allowed
+        * Unit section slimmed from three columns to one
+        * Units tracked with number section in Excel
+        * Only terms from unit ontology (UO) allowed
     * Protocol insert is now called template insert and more generalized
-    * Building blocks can only be inserted once
-    * When trying to insert duplicate activity log shows success, but that headers were already found
+        * Building blocks can only be inserted once
+        * When trying to insert duplicate template no error is thrown, but no building block duplicates are inserted.
+    * [[#6c62234](https://github.com/nfdi4plants/Swate/commit/6c62234aeda2d232a6054b278fff4785d8902aba)] Add visualization for source-protocol-sample chains :sparkles:
+    * [[#d080748](https://github.com/nfdi4plants/Swate/commit/d080748dd90510f676aefc43aec6905bd3539830)] Add import from json to **multiple** annotation tables :sparkles:
+    * [[#16ec188](https://github.com/nfdi4plants/Swate/commit/16ec1880b99d1d0b102d965f413c29ef47fe1669)] Improve server side error feedback.
     * [[#e63bffc](https://github.com/nfdi4plants/Swate/commit/e63bffc767f61939e09b7f2f4f4cfac950babe21)] Make protocol preview table scrollable :lipstick:
-    * [[#8d83591](https://github.com/nfdi4plants/Swate/commit/8d83591f25ad20f9497db166072e4b1bc8e37ddf)] improve template insert performance
-    * [[#f6ebef3](https://github.com/nfdi4plants/Swate/commit/f6ebef39294b76a762bc15426fde657e4cb25e40)] Allow each building block only once per sheet
+    * [[#8d83591](https://github.com/nfdi4plants/Swate/commit/8d83591f25ad20f9497db166072e4b1bc8e37ddf)] Improve template insert performance.
+    * [[#f6ebef3](https://github.com/nfdi4plants/Swate/commit/f6ebef39294b76a762bc15426fde657e4cb25e40)] Allow each building block only once per sheet.
     * [[#2cbbaef](https://github.com/nfdi4plants/Swate/commit/2cbbaef34888a8d7db6bde06ef30eaa4ff8705bd)] Allow only one output column type per table.
-    * [[#1e0a3f4](https://github.com/nfdi4plants/Swate/commit/1e0a3f41103082408ebec21e2782437fcd46d0ba)] Update table name generator
+    * [[#1e0a3f4](https://github.com/nfdi4plants/Swate/commit/1e0a3f41103082408ebec21e2782437fcd46d0ba)] Update table name generator.
     * [[#6138c65](https://github.com/nfdi4plants/Swate/commit/6138c654002b16f40225747929be39108dcab011)] Update visuals :sparkles: (Issue #162).
     * [[#cc81c47](https://github.com/nfdi4plants/Swate/commit/cc81c476c1d9e722d189f1392433a5b60b688097)] Update name for protocol templates (Issue #153).
-    * [[#4187c99](https://github.com/nfdi4plants/Swate/commit/4187c993f08f461c7df8210886c2f55d96e8b586)] Buildup for better building block info modal (Issue #160).
+    * [[#4187c99](https://github.com/nfdi4plants/Swate/commit/4187c993f08f461c7df8210886c2f55d96e8b586)] Improve building block info (Issue #160).
     * [[#25e0253](https://github.com/nfdi4plants/Swate/commit/25e02539f944ba93ab094b6f1c488b19b811e13a)] Refactor Settings :hammer:
     * [[#ff96e2a](https://github.com/nfdi4plants/Swate/commit/ff96e2a58e0ec8f9252f07acb284e7a23d3474f3)] Improve client logging.
     * [[#c885c0c](https://github.com/nfdi4plants/Swate/commit/c885c0c14d85bfc7424d4f800cb490300af816e5)] Track template metadata with worksheet and provide ease-of-access function.
-    * [[#8df5246](https://github.com/nfdi4plants/Swate/commit/8df52468cd903273fcc81c676431122764a77857)] Add hide-reference-columns option to autofit table :tada:.
+    * [[#8df5246](https://github.com/nfdi4plants/Swate/commit/8df52468cd903273fcc81c676431122764a77857)] Add hide-reference-columns option to autofit table :sparkles:.
     * [[#db9b9e1](https://github.com/nfdi4plants/Swate/commit/db9b9e12787e672bd3ec88553118aa2ca6acb30f)] Add annotationTable create with prev output auto-insert (Issue #168).
     * [[#b07aca5](https://github.com/nfdi4plants/Swate/commit/b07aca5783dde95009853a9aaad00d4c679f9763)] Add option to export Swate tables as json files.
-    * [[#c020fea](https://github.com/nfdi4plants/Swate/commit/c020fea3722d08bde5a2aeea2fe52277fd3fd2ee)] Add json export from external xlsx files :tada:
+    * [[#c020fea](https://github.com/nfdi4plants/Swate/commit/c020fea3722d08bde5a2aeea2fe52277fd3fd2ee)] Add json export from external xlsx files :sparkles:
     * [[#b7f9920](https://github.com/nfdi4plants/Swate/commit/b7f9920dfe7653a482ee5af44687288eb7c9287d)] Add Common API to backend.
     * [[#e14c648](https://github.com/nfdi4plants/Swate/commit/e14c6482488c3755254f038015c6b2aba2b55d05)] Update Protocol search and filter functionality.
     * [[#7194b96](https://github.com/nfdi4plants/Swate/commit/7194b96c386b665c7fd3ef254258b48d5a96d8f7)] Start updating unit to ISA conformity :fire:
-    * [[#6ba34f2](https://github.com/nfdi4plants/Swate/commit/6ba34f2268267e4c7686f547dce707e8b4b93700)] Update to SAFE stack v3.
+    * [[#6ba34f2](https://github.com/nfdi4plants/Swate/commit/6ba34f2268267e4c7686f547dce707e8b4b93700)] Improve performance with update to SAFE stack v3.
 * Deletions:
-    * [[#8302630](https://github.com/nfdi4plants/Swate/commit/830263002d8429ec5016fefc91ec100228e9c496)] Remove definition field from ontologies
+    * [[#8302630](https://github.com/nfdi4plants/Swate/commit/830263002d8429ec5016fefc91ec100228e9c496)] Remove definition field from ontologies.
 * Bugfixes:
     * [[#8f33b3b](https://github.com/nfdi4plants/Swate/commit/8f33b3b6e1a62f7d94e023cc791bd7e332369f1a)] Fix index error in json exporting rows :bug:
-    * [[#0fb73e2](https://github.com/nfdi4plants/Swate/commit/0fb73e2b2786e2b9dfbf12ed17d983809b7cbabf)] Update navbar to stay fixed
-    * [[#6afcd91](https://github.com/nfdi4plants/Swate/commit/6afcd9102bd3e858c46621dda3e6fc804abc6afe)] Fix context update issues in interop functions
+    * [[#0fb73e2](https://github.com/nfdi4plants/Swate/commit/0fb73e2b2786e2b9dfbf12ed17d983809b7cbabf)] Update navbar to stay fixed.
+    * [[#6afcd91](https://github.com/nfdi4plants/Swate/commit/6afcd9102bd3e858c46621dda3e6fc804abc6afe)] Fix context update issues in interop functions.
     * [[#4fb63e9](https://github.com/nfdi4plants/Swate/commit/4fb63e9767da0fe82479c42cbd13b9f0c89b0209)] Fix warning modal when just entering validation subpage :bug:
 
 ### 0.4.8+7960150 (Released 2021-9-8)
