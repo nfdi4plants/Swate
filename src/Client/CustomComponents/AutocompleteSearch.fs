@@ -1,18 +1,17 @@
 module CustomComponents.AutocompleteSearch
+
 open Fable.React
 open Fable.React.Props
 open Fulma
 open Fulma.Extensions.Wikiki
 open Fable.FontAwesome
-open Thoth.Json
-open Thoth.Elmish
 open ExcelColors
 open Api
 open Model
 open Messages
-open Update
 open Shared
-open Fable.Core
+open Shared.TermTypes
+
 
 type AutocompleteSuggestion<'SearchResult> = {
     Name            : string
@@ -35,7 +34,7 @@ with
     static member ofOntology (ont:DbDomain.Ontology) : AutocompleteSuggestion<DbDomain.Ontology> = {
         Name            = ont.Name
         ID              = ont.CurrentVersion
-        TooltipText     = ont.Definition
+        TooltipText     = ""
         Status          = ""
         StatusIsWarning = false
         Data            = ont
@@ -61,7 +60,7 @@ type AutocompleteParameters<'SearchResult> = {
     OnAdvancedSearch        : ('SearchResult -> Msg)
 }
 with
-    static member ofTermSearchState (state:TermSearchState) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofTermSearchState (state:TermSearch.Model) : AutocompleteParameters<DbDomain.Term> = {
         ModalId                 = "TermSearch_ID"
         InputId                 = "TermSearchInput_ID"
 
@@ -71,15 +70,15 @@ with
         DropDownIsVisible       = state.ShowSuggestions
         DropDownIsLoading       = state.HasSuggestionsLoading
 
-        OnInputChangeMsg        = (SearchTermTextChange >> TermSearch )
-        OnSuggestionSelect      = ( fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch)
+        OnInputChangeMsg        = (TermSearch.SearchTermTextChange >> TermSearchMsg )
+        OnSuggestionSelect      = ( fun (term:DbDomain.Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term |> TermSuggestionUsed |> TermSearch )
+        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg )
     }
 
-    static member ofAddBuildingBlockUnitState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockUnitState (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
         ModalId                 = "UnitSearch_ID"
         InputId                 = "UnitSearchInput_ID"
 
@@ -90,14 +89,14 @@ with
         DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str, Unit1) |> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnInputChangeMsg        = (fun str -> BuildingBlock.Msg.SearchUnitTermTextChange (str, Unit1) |> BuildingBlockMsg)
+        OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockUnit2State (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockUnit2State (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
         ModalId                 = "Unit2Search_ID"
         InputId                 = "Unit2SearchInput_ID"
 
@@ -108,14 +107,14 @@ with
         DropDownIsLoading       = state.HasUnit2TermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (fun str -> SearchUnitTermTextChange (str,Unit2) |> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> (sugg, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnInputChangeMsg        = (fun str -> BuildingBlock.Msg.SearchUnitTermTextChange (str,Unit2) |> BuildingBlockMsg)
+        OnSuggestionSelect      = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> UnitTermSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockState (state:AddBuildingBlockState) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockState (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
         ModalId                 = "BlockNameSearch_ID"
         InputId                 = "BlockNameSearchInput_ID"
 
@@ -125,12 +124,12 @@ with
         DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
         DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
 
-        OnInputChangeMsg        = (BuildingBlockNameChange >> AddBuildingBlock)
-        OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
+        OnInputChangeMsg        = (BuildingBlock.Msg.BuildingBlockNameChange >> BuildingBlockMsg)
+        OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlockNameSuggestionUsed |> AddBuildingBlock)
+        OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
     }
 
 
@@ -156,7 +155,10 @@ let createAutocompleteSuggestions
                     colorControl colorMode
                     Class "suggestion"
                 ] [
-                    td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.TooltipText] [
+                    td [
+                        Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline); Tooltip.dataTooltip (if sugg.TooltipText.Trim() <> "" then sugg.TooltipText else "No definition found")
+                        Style [FontSize "1.1rem"; Padding "0 0 0 .4rem"; TextAlign TextAlignOptions.Center; VerticalAlign "middle"; Color NFDIColors.Yellow.Darker20]
+                    ] [
                         Fa.i [Fa.Solid.InfoCircle] []
                     ]
                     td [] [
@@ -189,7 +191,7 @@ let createAutocompleteSuggestions
         ][
             td [ColSpan 4] [
                 str (sprintf "%s " autocompleteParams.AdvancedSearchLinkText)
-                a [OnClick (fun _ -> ToggleModal autocompleteParams.ModalId |> AdvancedSearch |> dispatch)] [
+                a [OnClick (fun _ -> AdvancedSearch.ToggleModal autocompleteParams.ModalId |> AdvancedSearchMsg |> dispatch)] [
                     str "Use Advanced Search"
                 ] 
             ]
@@ -261,7 +263,9 @@ let autocompleteTermSearchComponent
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
-            Input.Props [Style [BorderColor ExcelColors.Colorfull.gray40]]
+            Input.Props [Style [
+                if isDisabled then BorderColor ExcelColors.Colorfull.gray40
+            ]]
             Input.Disabled isDisabled
             Input.Placeholder inputPlaceholderText
             Input.ValueOrDefault autocompleteParams.StateBinding
@@ -299,6 +303,7 @@ let autocompleteTermSearchComponentOfParentOntology
     let parentOntologyNotificationElement show =
         Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]][
             Button.button [
+                Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]
                 Button.IsStatic true
                 match inputSize with
                 | Some size -> Button.Size size
@@ -323,21 +328,26 @@ let autocompleteTermSearchComponentOfParentOntology
                     Input.Props [
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
-                            GetParentTerm |> ExcelInterop |> dispatch
+                            OfficeInterop.GetParentTerm |> OfficeInteropMsg |> dispatch
                             let el = Browser.Dom.document.getElementById autocompleteParams.InputId
                             el.focus()
                         )
                         OnDoubleClick (fun e ->
                             if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.TermSearchText = "" then
                                 let parentOnt = model.TermSearchState.ParentOntology.Value
-                                let (parentOntInfo:OntologyInfo) = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
-                                GetAllTermsByParentTermRequest parentOntInfo |> TermSearch |> dispatch
+                                let (parentOntInfo:TermMinimal) = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
+                                TermSearch.GetAllTermsByParentTermRequest parentOntInfo |> TermSearchMsg |> dispatch
                             else
                                 let v = Browser.Dom.document.getElementById autocompleteParams.InputId
                                 v?value |> autocompleteParams.OnInputChangeMsg |> dispatch
                         )
                     ]           
-                    Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
+                    Input.OnChange (fun e ->
+                        if e.Value = "nice_rgb" then
+                            let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
+                            UpdateColorMode c |> Messages.StyleChange |> dispatch
+                        e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
+                    )
                 ]
             ]
         ]

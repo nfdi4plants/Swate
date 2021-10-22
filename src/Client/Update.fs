@@ -1,31 +1,16 @@
 module Update
 
 open Elmish
-open Elmish.Navigation
 open Thoth.Elmish
-open System.Text.RegularExpressions
 
 open Shared
+open TermTypes
+open OfficeInteropTypes
 open Routing
 open Model
 open Messages
 
-open OfficeInterop.Types
-
-/// This function matches a OfficeInterop.TryFindAnnoTableResult to either Success or Error
-/// If Success it will pipe the tableName on to the msg input paramter.
-/// If Error it will pipe the error message to GenericLog ("Error",errorMsg).
-let matchActiveTableResToMsg activeTableNameRes (msg:string -> Cmd<Msg>) =
-    match activeTableNameRes with
-    | Success tableName ->
-        msg tableName
-    | Error eMsg ->
-        Msg.Batch [
-            UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-            GenericLog ("Error",eMsg) |> Dev
-        ] |> Cmd.ofMsg
-
-let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
+let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.Msg> =
     match route with
     | Some page ->
         let nextPageState = {
@@ -40,653 +25,62 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Msg> =
         }
         nextModel,Cmd.none
     | None ->
-        //Browser.console.error("Error parsing url")
         let nextPageState = {
             currentModel.PageState with
-                CurrentPage = Route.NotFound
+                CurrentPage = Route.TermSearch
         }
 
         let nextModel = {
             currentModel with
+                PersistentStorageState = { currentModel.PersistentStorageState with PageEntry = SwateEntry.Core }
                 PageState = nextPageState
         }
         nextModel,Cmd.none
 
-let handleExcelInteropMsg (excelInteropMsg: ExcelInteropMsg) (currentModel:Model) : Model * Cmd<Msg> =
+module Dev = 
 
-    match excelInteropMsg with
+    let update (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Messages.Msg> =
+        match devMsg with
+        | GenericLog (nextCmd,(level,logText)) ->
+            let nextState = {
+                currentState with
+                    Log = (LogItem.ofStringNow level logText)::currentState.Log
+            }
+            nextState, nextCmd
 
-    | AutoFitTable ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.autoFitTable
-                ()
-                (GenericLog >> Dev)
-                (GenericError >> Dev)
-        currentModel, cmd
+        | GenericInteropLogs (nextCmd,logs) ->
+            let parsedLogs = logs |> List.map LogItem.ofInteropLogginMsg
+            let nextState = {
+                currentState with
+                    Log = parsedLogs@currentState.Log
+            }
+            nextState, nextCmd
 
-    | UpdateProtocolGroupHeader ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.updateProtocolGroupHeader
-                ()
-                (GenericLog >> Dev)
-                (GenericError >> Dev)
-        currentModel, cmd
+        | GenericError (nextCmd, e) ->
+            let nextState = {
+                currentState with
+                    Log = LogItem.Error(System.DateTime.Now,e.GetPropagatedError())::currentState.Log
+                    LastFullError = Some (e)
+                }
+            nextState, nextCmd
 
-    | Initialized (h,p) ->
-        let welcomeMsg = sprintf "Ready to go in %s running on %s" h p
+        | UpdateLastFullError (eOpt) ->
+            let nextState = {
+                currentState with
+                    LastFullError = eOpt
+            }
+            nextState, Cmd.none
 
-        let nextModel = {
-            currentModel.ExcelState with
-                Host        = h
-                Platform    = p
-        } 
-
-        let cmd =
-            Cmd.batch [
-                Cmd.ofMsg (GetAppVersion |> Request |> Api)
-                Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
+        | LogTableMetadata ->
+            let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.tryFindActiveAnnotationTable
+                    OfficeInterop.getTableMetaData
                     ()
-                    (AnnotationTableExists >> ExcelInterop)
-                    (GenericError >> Dev)
-                Cmd.ofMsg (("Info",welcomeMsg) |> (GenericLog >> Dev))
-            ]
-
-        currentModel.updateByExcelState nextModel, cmd
-
-    | AnnotationTableExists annoTableOpt ->
-        let exists =
-            match annoTableOpt with
-            | Success name -> true
-            | _ -> false
-        let nextState = {
-            currentModel.ExcelState with
-                HasAnnotationTable = exists
-        }
-
-        currentModel.updateByExcelState nextState,Cmd.none
-
-    | FillSelection (fillValue,fillTerm) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.fillValue  
-                (fillValue,fillTerm)
-                (GenericLog >> Dev)
-                (GenericError >> Dev)
-        currentModel, cmd
-
-    | AddAnnotationBlock (minBuildingBlockInfo) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.addAnnotationBlock  
-                (minBuildingBlockInfo)
-                (fun (newColName,format,msg) ->
-                    Msg.Batch [
-                        GenericLog ("Info",msg) |> Dev
-                        FormatColumn (newColName,format) |> ExcelInterop
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-
-    | AddAnnotationBlocks (minBuildingBlockInfos, protocol, validationOpt) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.addAnnotationBlocksAsProtocol
-                (minBuildingBlockInfos,protocol)
-                (fun (resList,protocolInfo) ->
-                    let newColNames = resList |> List.map (fun (names,_,_) -> names)
-                    let changeColFormatInfos,msg = resList |> List.map (fun (names,format,msg) -> (names,format), msg ) |> List.unzip
-                    Msg.Batch [
-                        FormatColumns (changeColFormatInfos) |> ExcelInterop
-                        GenericLog ("Info", msg |> String.concat "; ") |> Dev
-                        /// This is currently used for protocol template insert from database
-                        if validationOpt.IsSome then
-                            /// tableValidation is retrived from database and does not contain correct tablename and worksheetname.
-                            /// But it is updated during 'addAnnotationBlocksAsProtocol' with the active annotationtable
-                            /// The next step can be redesigned, as the protocol is also passed to 'AddTableValidationtoExisting'
-                            let updatedValidation = {validationOpt.Value with AnnotationTable = Shared.AnnotationTable.create protocolInfo.AnnotationTable.Name protocolInfo.AnnotationTable.Worksheet}
-                            AddTableValidationtoExisting (updatedValidation, newColNames, protocolInfo) |> ExcelInterop
-                        else
-                            WriteProtocolToXml protocolInfo |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-
-    | RemoveAnnotationBlock ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.removeSelectedAnnotationBlock
-                ()
-                (fun msg ->
-                    Msg.Batch [
-                        GenericLog ("Info",msg) |> Dev
-                        AutoFitTable |> ExcelInterop
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-
-    | AddUnitToAnnotationBlock (format, unitTermOpt) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.addUnitToExistingBuildingBlock
-                (format,unitTermOpt)
-                (fun (newColName,format) ->
-                    Msg.Batch [
-                        FormatColumn (newColName, format) |> ExcelInterop
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-
-    | FormatColumn (colName,format) ->
-        let cmd =
-            Cmd.OfPromise.either
-                (OfficeInterop.changeTableColumnFormat colName)
-                format
-                (fun x ->
-                    Msg.Batch [
-                        AutoFitTable |> ExcelInterop
-                        GenericLog x |> Dev
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel,cmd
-
-    | FormatColumns (resList) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.changeTableColumnsFormat
-                resList
-                (fun x ->
-                    Msg.Batch [
-                        AutoFitTable |> ExcelInterop
-                        GenericLog x |> Dev
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel,cmd
-
-    | CreateAnnotationTable (isDark) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.createAnnotationTable  
-                (isDark)
-                (fun (res,msg) ->
-                    AnnotationtableCreated (msg) |> ExcelInterop
-                )
-                (GenericError >> Dev)
-        currentModel,cmd
-
-    | AnnotationtableCreated (range) ->
-        let nextState = {
-            currentModel.ExcelState with
-                HasAnnotationTable = true
-        }
-        let msg =
-            Msg.Batch [
-                AutoFitTable |> ExcelInterop
-                UpdateProtocolGroupHeader |> ExcelInterop
-                GenericLog ("info", range) |> Dev
-            ]
-        currentModel.updateByExcelState nextState, Cmd.ofMsg msg
-
-
-    | GetParentTerm ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getParentTerm
-                ()
-                (StoreParentOntologyFromOfficeInterop >> TermSearch)
-                (GenericError >> Dev)
-        currentModel, cmd
-    //
-    | GetTableValidationXml ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getTableRepresentation
-                ()
-                (fun (currentTableValidation, buildingBlocks,msg) ->
-                    StoreTableRepresentationFromOfficeInterop (currentTableValidation, buildingBlocks, msg) |> Validation)
-                (GenericError >> Dev)
-        currentModel, cmd
-    | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.writeTableValidationToXml
-                (newTableValidation, currentSwateVersion)
-                (fun x ->
-                    Msg.Batch [
-                        GenericLog x |> Dev
-                        GetTableValidationXml |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-
-        currentModel, cmd
-
-    | AddTableValidationtoExisting (newTableValidation, newColNames, protocolInfo) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.addTableValidationToExisting
-                (newTableValidation, newColNames)
-                (fun x ->
-                    Msg.Batch [
-                        GenericLog x |> Dev
-                        WriteProtocolToXml protocolInfo |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-
-    | WriteProtocolToXml protocolInfo ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.writeProtocolToXml
-                (protocolInfo)
-                (fun res ->
-                    Msg.Batch [
-                        GenericLog res |> Dev
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                        if currentModel.PageState.CurrentPage = Route.SettingsProtocol then GetActiveProtocolGroupXmlParsed |> SettingsProtocolMsg 
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-    | DeleteAllCustomXml ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.deleteAllCustomXml
-                ()
-                (fun res ->
-                    Msg.Batch [
-                        GenericLog res |> Dev
-                        UpdateProtocolGroupHeader |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-    | GetSwateCustomXml ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getSwateCustomXml
-                ()
-                (fun xml ->
-                    Msg.Batch [
-                        GenericLog xml |> Dev
-                        UpdateRawCustomXml (snd xml) |> SettingsXmlMsg
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-    | UpdateSwateCustomXml newCustomXml ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.updateSwateCustomXml
-                newCustomXml
-                (fun x ->
-                    Msg.Batch [
-                        x |> (GenericLog >> Dev)
-                        GetSwateCustomXml |> ExcelInterop
-                    ]
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-    //
-    | FillHiddenColsRequest ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.createSearchTermsIFromTable 
-                ()
-                (SearchForInsertTermsRequest >> Request >> Api)
-                (fun e ->
-                    Msg.Batch [
-                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-                        GenericError e |> Dev
-                    ] )
-        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> ExcelInterop |> Cmd.ofMsg
-        let cmds = Cmd.batch [cmd; cmd2]
-        currentModel, cmds
-
-    | FillHiddenColumns (tableName,insertTerms) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.UpdateTableBySearchTermsI
-                (tableName,insertTerms)
-                (fun msg ->
-                    Msg.Batch [
-                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-                        GenericLog ("info",msg) |> Dev
-                    ]
-                )
-                (fun e ->
-                    Msg.Batch [
-                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
-                        GenericError e |> Dev
-                    ] )
-        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ExcelWriteFoundTerms |> ExcelInterop |> Cmd.ofMsg
-        let cmds = Cmd.batch [cmd; cmd2]
-        currentModel, cmds
-
-
-    | UpdateFillHiddenColsState newState ->
-        let nextState = {
-            currentModel.ExcelState with
-                FillHiddenColsStateStore = newState
-        }
-        currentModel.updateByExcelState nextState, Cmd.none
-    //
-    | InsertFileNames (fileNameList) ->
-        let cmd = 
-            Cmd.OfPromise.either
-                OfficeInterop.insertFileNamesFromFilePicker 
-                (fileNameList)
-                ((fun x -> 
-                    ("Debug",x) |> GenericLog) >> Dev
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-
-    //
-    | GetSelectedBuildingBlockSearchTerms ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getAnnotationBlockDetails
-                ()
-                (GetSelectedBuildingBlockSearchTermsRequest >> BuildingBlockDetails)
-                (fun x ->
-                    Msg.Batch [
-                        GenericError x |> Dev
-                        UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails
-                    ]
-                )
-        let cmd2 = Cmd.ofMsg (UpdateCurrentRequestState RequestBuildingBlockInfoStates.RequestExcelInformation |> BuildingBlockDetails) 
-        currentModel, Cmd.batch [cmd;cmd2]
-    //
-    | CreatePointerJson ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.createPointerJson
-                ()
-                (fun x -> Some x |> UpdatePointerJson |> SettingDataStewardMsg)
-                (GenericError >> Dev)
-        currentModel, cmd
-
-    /// DEV
-    | TryExcel  ->
-        let cmd = 
-            Cmd.OfPromise.either
-                OfficeInterop.exampleExcelFunction1
-                ()
-                ((fun x -> 
-                    ("Debug",x) |> GenericLog) >> Dev
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-    | TryExcel2 ->
-        let cmd = 
-            Cmd.OfPromise.either
-                OfficeInterop.exampleExcelFunction2 
-                ()
-                ((fun x -> 
-                    ("Debug",x) |> GenericLog) >> Dev
-                )
-                (GenericError >> Dev)
-        currentModel, cmd
-    //| _ ->
-    //    printfn "Hit currently non existing message"
-    //    currentState, Cmd.none
-        
-let handleTermSearchMsg (termSearchMsg: TermSearchMsg) (currentState:TermSearchState) : TermSearchState * Cmd<Msg> =
-    match termSearchMsg with
-    /// Toggle the search by parent ontology option on/off by clicking on a checkbox
-    | ToggleSearchByParentOntology ->
-
-        let nextState = {
-            currentState with
-                SearchByParentOntology = currentState.SearchByParentOntology |> not
-        }
-
-        nextState, Cmd.none
-
-    | SearchTermTextChange newTerm ->
-
-        let triggerNewSearch =
-            newTerm.Length > 2
-           
-        let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
-            "GetNewTermSuggestions",
-            (
-                if triggerNewSearch then
-                    match currentState.ParentOntology, currentState.SearchByParentOntology with
-                    | Some parentOntology, true ->
-                        (newTerm,parentOntology) |> (GetNewTermSuggestionsByParentTerm >> Request >> Api)
-                    | None,_ | _, false ->
-                        newTerm  |> (GetNewTermSuggestions >> Request >> Api)
-                else
-                    DoNothing
-            )
-
-        let nextState = {
-            currentState with
-                TermSearchText = newTerm
-                SelectedTerm = None
-                ShowSuggestions = triggerNewSearch
-                HasSuggestionsLoading = true
-        }
-
-        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
-
-    | TermSuggestionUsed suggestion ->
-
-        let nextState = {
-            TermSearchState.init() with
-                SelectedTerm = Some suggestion
-                TermSearchText = suggestion.Name
-        }
-        nextState, Cmd.none
-
-    | NewSuggestions suggestions ->
-
-        let nextState = {
-            currentState with
-                TermSuggestions         = suggestions
-                ShowSuggestions         = true
-                HasSuggestionsLoading   = false
-        }
-
-        nextState,Cmd.none
-
-    | StoreParentOntologyFromOfficeInterop parentTerm ->
-        let pOnt =
-            // if none, no parentOntology was found by office.js.
-            // this happens e.g. if a field outside the table is selected
-            if parentTerm.IsNone
-            then None
-            else
-                let s = (string parentTerm.Value)
-                let res =
-                    OfficeInterop.Regex.parseColHeader s
-                res.Ontology
-
-        let nextState = {
-            currentState with
-                ParentOntology = pOnt
-        }
-        nextState, Cmd.none
-
-    // Server
-
-    | GetAllTermsByParentTermRequest ontInfo ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.api.getAllTermsByParentTerm
-                ontInfo
-                (GetAllTermsByParentTermResponse >> TermSearch)
-                (GenericError >> Dev)
-
-        let nextState = {
-            currentState with
-                HasSuggestionsLoading = true
-        }
-
-        nextState, cmd
-
-    | GetAllTermsByParentTermResponse terms ->
-        let nextState = {
-            currentState with
-                TermSuggestions = terms
-                HasSuggestionsLoading = false
-                ShowSuggestions = true
-                
-        }
-        nextState, Cmd.none
-
-let handleAdvancedTermSearchMsg (advancedTermSearchMsg: AdvancedSearchMsg) (currentState:AdvancedSearchState) : AdvancedSearchState * Cmd<Msg> =
-    match advancedTermSearchMsg with
-    | ResetAdvancedSearchOptions ->
-        let nextState = {
-            currentState with
-                AdvancedSearchOptions = AdvancedTermSearchOptions.init()
-                AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.InputFormSubpage
-        }
-
-        nextState,Cmd.none
-    | UpdateAdvancedTermSearchSubpage subpage ->
-        let tOpt =
-            match subpage with
-            |SelectedResultSubpage t   -> Some t
-            | _                 -> None
-        let nextState = {
-            currentState with
-                SelectedResult = tOpt
-                AdvancedTermSearchSubpage = subpage
-        }
-        nextState, Cmd.none
-
-    | ToggleModal modalId ->
-        let nextState = {
-            currentState with
-                ModalId = modalId
-                HasModalVisible = (not currentState.HasModalVisible)
-        }
-
-        nextState,Cmd.none
-
-    | ToggleOntologyDropdown ->
-        let nextState = {
-            currentState with
-                HasOntologyDropdownVisible = (not currentState.HasOntologyDropdownVisible)
-        }
-
-        nextState,Cmd.none
-
-    | OntologySuggestionUsed suggestion ->
-
-        let nextAdvancedSearchOptions = {
-            currentState.AdvancedSearchOptions with
-                Ontology = suggestion
-        }
-
-        let nextState = {
-            currentState with
-                AdvancedSearchOptions   = nextAdvancedSearchOptions
-            }
-        nextState, Cmd.ofMsg (AdvancedSearch ToggleOntologyDropdown)
-
-    | UpdateAdvancedTermSearchOptions opts ->
-
-        let nextState = {
-            currentState with
-                AdvancedSearchOptions = opts
-        }
-
-        nextState,Cmd.none
-
-    | StartAdvancedSearch ->
-
-        let nextState = {
-            currentState with
-                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.ResultsSubpage
-                HasAdvancedSearchResultsLoading = true
-            
-        }
-
-        let nextCmd =
-            currentState.AdvancedSearchOptions
-            |> GetNewAdvancedTermSearchResults
-            |> Request
-            |> Api
-            |> Cmd.ofMsg
-
-        nextState,nextCmd
-
-    | ResetAdvancedSearchState ->
-        let nextState = AdvancedSearchState.init()
-
-        nextState,Cmd.none
-
-    | NewAdvancedSearchResults results ->
-        let nextState = {
-            currentState with
-                AdvancedSearchTermResults       = results
-                AdvancedTermSearchSubpage       = AdvancedTermSearchSubpages.ResultsSubpage
-                HasAdvancedSearchResultsLoading = false
-        }
-
-        nextState,Cmd.none
-
-    | ChangePageinationIndex index ->
-        let nextState = {
-            currentState with
-                AdvancedSearchResultPageinationIndex = index
-        }
-
-        nextState,Cmd.none
-
-let handleDevMsg (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Msg> =
-    match devMsg with
-    | GenericLog (level,logText) ->
-        let nextState = {
-            currentState with
-                Log = (LogItem.ofStringNow level logText)::currentState.Log
-            }
-        nextState, Cmd.none
-
-    | GenericError (e) ->
-        OfficeInterop.consoleLog (sprintf "GenericError occured: %s" e.Message)
-        let nextState = {
-            currentState with
-                Log = LogItem.Error(System.DateTime.Now,e.Message)::currentState.Log
-            }
-        nextState, Cmd.ofMsg (UpdateLastFullError (Some e) |> Dev)
-
-    | UpdateLastFullError (eOpt) ->
-        let nextState = {
-            currentState with
-                LastFullError = eOpt
-        }
-        nextState, Cmd.none
-
-    | LogTableMetadata ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getTableMetaData
-                ()
-                (GenericLog >> Dev)
-                (GenericError >> Dev)
-        currentState, cmd
-
-let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Msg> =
+                    (curry GenericLog Cmd.none >> DevMsg)
+                    (curry GenericError Cmd.none >> DevMsg)
+            currentState, cmd
+
+let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
 
     let handleTermSuggestionRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString =
         let currentCall = {
@@ -726,7 +120,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString (parentOntology:OntologyInfo) =
+    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString (termMin:TermMinimal) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -739,14 +133,14 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getTermSuggestionsByParentTerm
-                (5,queryString,parentOntology)
+                (5,queryString,termMin)
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
         nextState,nextCmd
 
     match reqMsg with
-    | TestOntologyInsert (a,b,c,d,e) ->
+    | TestOntologyInsert (a,b,d,e) ->
 
         let currentCall = {
             FunctionName = "testOntologyInsert"
@@ -761,27 +155,10 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         nextState,
         Cmd.OfAsync.either
             Api.api.testOntologyInsert
-            (a,b,c,d,e)
+            (a,b,d,e)
             (fun x -> ("Debug",sprintf "Successfully created %A" x) |> ApiSuccess |> Api)
             (ApiError >> Api)
 
-        
-        //let currentCall = {
-        //        FunctionName = "getTermSuggestions"
-        //        Status = Pending
-        //}
-
-        //let nextState = {
-        //    currentState with
-        //        currentCall = currentCall
-        //}
-
-        //nextState,
-        //Cmd.OfAsync.either
-        //    Api.api.getTermSuggestions
-        //    (5,queryString)
-        //    (TermSuggestionResponse >> Response >> Api)
-        //    (ApiError >> Api)
     | GetNewTermSuggestions queryString ->
         handleTermSuggestionRequest
             "getTermSuggestions"
@@ -844,7 +221,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             (FetchAllOntologiesResponse >> Response >> Api)
             (ApiError >> Api)
 
-    | SearchForInsertTermsRequest (tableName,insertTerms) ->
+    | SearchForInsertTermsRequest (tableTerms) ->
         let currentCall = {
             FunctionName = "getTermsByNames"
             Status = Pending
@@ -856,16 +233,15 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let cmd =
             Cmd.OfAsync.either
                 Api.api.getTermsByNames
-                insertTerms
-                ((fun newTerms -> SearchForInsertTermsResponse (tableName,newTerms) ) >> Response >> Api)
+                tableTerms
+                (SearchForInsertTermsResponse >> Response >> Api)
                 (fun e ->
                     Msg.Batch [
-                        UpdateFillHiddenColsState FillHiddenColsState.Inactive |> ExcelInterop
+                        OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg
                         ApiError e |> Api
                     ] )
-        let cmd2 = UpdateFillHiddenColsState FillHiddenColsState.ServerSearchDatabase |> ExcelInterop |> Cmd.ofMsg
-        //let cmd3 = GenericLog ("Debug", sprintf "%A" insertTerms) |> Dev |> Cmd.ofMsg
-        let cmds = Cmd.batch [cmd; cmd2; (*cmd3*)]
+        let stateCmd = OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.ServerSearchDatabase |> OfficeInteropMsg |> Cmd.ofMsg
+        let cmds = Cmd.batch [cmd; stateCmd]
         nextState, cmds
     //
     | GetAppVersion ->
@@ -889,7 +265,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         nextState, cmd
         
 
-let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : ApiState * Cmd<Msg> =
+let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
 
     let handleTermSuggestionResponse (responseHandler: DbDomain.Term [] -> Msg) (suggestions: DbDomain.Term[]) =
         let finishedCall = {
@@ -933,13 +309,13 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
     | TermSuggestionResponse suggestions ->
 
         handleTermSuggestionResponse
-            (NewSuggestions >> TermSearch)
+            (TermSearch.NewSuggestions >> TermSearchMsg)
             suggestions
 
     | UnitTermSuggestionResponse (suggestions,relUnit) ->
 
         handleUnitTermSuggestionResponse
-            (NewUnitTermSuggestions >> AddBuildingBlock)
+            (BuildingBlock.Msg.NewUnitTermSuggestions >> BuildingBlockMsg)
             suggestions
             relUnit
             
@@ -947,7 +323,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
     | BuildingBlockNameSuggestionsResponse suggestions ->
 
         handleTermSuggestionResponse
-            (NewBuildingBlockNameSuggestions >> AddBuildingBlock)
+            (BuildingBlock.Msg.NewBuildingBlockNameSuggestions >> BuildingBlockMsg)
             suggestions
 
     | AdvancedTermSearchResultsResponse results ->
@@ -964,7 +340,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         let cmds = Cmd.batch [
             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            results |> NewAdvancedSearchResults |> AdvancedSearch |> Cmd.ofMsg
+            results |> AdvancedSearch.NewAdvancedSearchResults |> AdvancedSearchMsg |> Cmd.ofMsg
         ]
 
         nextState, cmds
@@ -988,7 +364,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-    | SearchForInsertTermsResponse (tableName,insertTerms) ->
+    | SearchForInsertTermsResponse (termsWithSearchResult) ->
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -999,12 +375,10 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
                 callHistory = finishedCall::currentState.callHistory
         }
         let cmd =
-            FillHiddenColumns (tableName,insertTerms) |> ExcelInterop |> Cmd.ofMsg
-        let cmd2 =
+            OfficeInterop.FillHiddenColumns (termsWithSearchResult) |> OfficeInteropMsg |> Cmd.ofMsg
+        let loggingCmd =
              ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-        let cmds =
-            Cmd.batch [cmd; cmd2]
-        nextState, cmds
+        nextState, Cmd.batch [cmd; loggingCmd]
 
     //
     | GetAppVersionResponse appVersion ->
@@ -1026,12 +400,15 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Msg> =
+open Dev
+open Messages
+
+let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messages.Msg> =
     match apiMsg with
     | ApiError e ->
         let failedCall = {
             currentState.currentCall with
-                Status = Failed e.Message
+                Status = Failed (e.GetPropagatedError())
         }
 
         let nextState = {
@@ -1040,12 +417,10 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Msg> =
                 callHistory = failedCall::currentState.callHistory
         }
 
-        nextState,
-        ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName e.Message)|> GenericLog |> Dev |> Cmd.ofMsg
+        nextState, curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName (e.GetPropagatedError())) |> DevMsg |> Cmd.ofMsg
 
     | ApiSuccess (level,logMsg) ->
-        currentState,
-        (level,logMsg) |> GenericLog |> Dev |> Cmd.ofMsg
+        currentState, curry GenericLog Cmd.none (level,logMsg) |> DevMsg |> Cmd.ofMsg
 
     | Request req ->
         handleApiRequestMsg req currentState
@@ -1086,377 +461,13 @@ let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyle
         }
         nextState, Cmd.none
 
-    | ToggleColorMode       -> 
-        let opposite = not currentState.IsDarkMode
+    | UpdateColorMode nextColors -> 
         let nextState = {
             currentState with
-                IsDarkMode = opposite;
-                ColorMode = if opposite then ExcelColors.darkMode else ExcelColors.colorfullMode
+                IsDarkMode = nextColors.Name.StartsWith ExcelColors.darkMode.Name;
+                ColorMode = nextColors
         }
         nextState,Cmd.none
-
-let handleFilePickerMsg (filePickerMsg:FilePickerMsg) (currentState: FilePickerState) : FilePickerState * Cmd<Msg> =
-    match filePickerMsg with
-    | LoadNewFiles fileNames ->
-        let nextState = {
-            FilePickerState.init() with
-                FileNames = fileNames |> List.mapi (fun i x -> i+1,x)
-        }
-        let nextCmd = UpdatePageState (Some Routing.Route.FilePicker) |> Cmd.ofMsg
-        nextState, nextCmd
-    | UpdateFileNames newFileNames ->
-        let nextState = {
-            currentState with
-                FileNames = newFileNames
-        }
-        nextState, Cmd.none
-    | UpdateDNDDropped isDropped ->
-        let nextState = {
-            currentState with
-                DNDDropped = isDropped
-        }
-        nextState, Cmd.none
-
-let handleAddBuildingBlockMsg (addBuildingBlockMsg:AddBuildingBlockMsg) (currentState: AddBuildingBlockState) : AddBuildingBlockState * Cmd<Msg> =
-    match addBuildingBlockMsg with
-    | NewBuildingBlockSelected nextBB ->
-        let nextState = {
-            AddBuildingBlockState.init() with
-                CurrentBuildingBlock        = nextBB
-        }
-
-        nextState,Cmd.none
-
-    | ToggleSelectionDropdown ->
-        let nextState = {
-            currentState with
-                ShowBuildingBlockSelection = not currentState.ShowBuildingBlockSelection
-        }
-
-        nextState,Cmd.none
-
-    | SearchUnitTermTextChange (newTerm,relUnit) ->
-
-        let triggerNewSearch =
-            newTerm.Length > 2
-       
-        let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
-            "GetNewUnitTermSuggestions",
-            (
-                if triggerNewSearch then
-                    (newTerm,relUnit) |> (GetNewUnitTermSuggestions >> Request >> Api)
-                else
-                    DoNothing
-            )
-
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { currentState with
-                    UnitTermSearchText                  = newTerm
-                    UnitSelectedTerm                    = None
-                    ShowUnitTermSuggestions             = triggerNewSearch
-                    HasUnitTermSuggestionsLoading       = true
-                }
-            | Unit2 ->
-                { currentState with
-                    Unit2TermSearchText                  = newTerm
-                    Unit2SelectedTerm                    = None
-                    ShowUnit2TermSuggestions             = triggerNewSearch
-                    HasUnit2TermSuggestionsLoading       = true
-                }
-
-        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
-
-    | NewUnitTermSuggestions (suggestions,relUnit) ->
-
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { currentState with
-                        UnitTermSuggestions             = suggestions
-                        ShowUnitTermSuggestions         = true
-                        HasUnitTermSuggestionsLoading   = false
-                }
-            | Unit2 ->
-                { currentState with
-                    Unit2TermSuggestions             = suggestions
-                    ShowUnit2TermSuggestions         = true
-                    HasUnit2TermSuggestionsLoading   = false
-                }
-
-        nextState,Cmd.none
-
-    | UnitTermSuggestionUsed (suggestion, relUnit) ->
-
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { currentState with
-                    UnitTermSearchText              = suggestion.Name
-                    UnitSelectedTerm                = Some suggestion
-                    ShowUnitTermSuggestions         = false
-                    HasUnitTermSuggestionsLoading   = false
-                }
-            | Unit2 ->
-                { currentState with
-                    Unit2TermSearchText             = suggestion.Name
-                    Unit2SelectedTerm               = Some suggestion
-                    ShowUnit2TermSuggestions        = false
-                    HasUnit2TermSuggestionsLoading  = false
-                }
-        nextState, Cmd.none
-
-    | BuildingBlockNameChange newName ->
-
-        let triggerNewSearch =
-            newName.Length > 2
-   
-        let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
-            "GetNewBuildingBlockNameTermSuggestions",
-            (
-                if triggerNewSearch then
-                    newName  |> (GetNewBuildingBlockNameSuggestions >> Request >> Api)
-                else
-                    DoNothing
-            )
-
-        let nextBB = {
-            currentState.CurrentBuildingBlock with
-                Name = newName
-        }
-
-        let nextState = {
-            currentState with
-                CurrentBuildingBlock                    = nextBB
-                BuildingBlockSelectedTerm               = None
-                ShowBuildingBlockTermSuggestions        = triggerNewSearch
-                HasBuildingBlockTermSuggestionsLoading  = true
-        }
-
-        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
-
-    | NewBuildingBlockNameSuggestions suggestions ->
-
-        let nextState = {
-            currentState with
-                BuildingBlockNameSuggestions            = suggestions
-                ShowBuildingBlockTermSuggestions        = true
-                HasBuildingBlockTermSuggestionsLoading  = false
-        }
-
-        nextState,Cmd.none
-
-    | BuildingBlockNameSuggestionUsed suggestion ->
-        
-        let nextBB = {
-            currentState.CurrentBuildingBlock with
-                Name = suggestion.Name
-        }
-
-        let nextState = {
-            currentState with
-                CurrentBuildingBlock                    = nextBB
-
-                BuildingBlockSelectedTerm               = Some suggestion
-                ShowBuildingBlockTermSuggestions        = false
-                HasBuildingBlockTermSuggestionsLoading  = false
-        }
-        nextState, Cmd.none
-
-    | ToggleBuildingBlockHasUnit ->
-
-        let hasUnit = not currentState.BuildingBlockHasUnit
-
-        let nextState =
-            if hasUnit then
-                {
-                    currentState with
-                        BuildingBlockHasUnit = hasUnit
-                }
-            else
-                {
-                currentState with
-                    BuildingBlockHasUnit = hasUnit
-                    //UnitTerm = None
-                    UnitTermSearchText = ""
-                    UnitTermSuggestions = [||]
-                    ShowUnitTermSuggestions = false
-                    HasUnitTermSuggestionsLoading = false
-                }
-        nextState, Cmd.none
-
-open OfficeInterop.Types.Xml.ValidationTypes
-
-let handleValidationMsg (validationMsg:ValidationMsg) (currentState: ValidationState) : ValidationState * Cmd<Msg> =
-    match validationMsg with
-    /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
-    /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
-    | StoreTableRepresentationFromOfficeInterop (tableValidation:TableValidation, buildingBlocks:BuildingBlockTypes.BuildingBlock [], msg) ->
-
-        let nextCmd =
-            GenericLog ("Info", msg) |> Dev |> Cmd.ofMsg
-
-        let nextState = {
-            currentState with
-                ActiveTableBuildingBlocks = buildingBlocks
-                TableValidationScheme = tableValidation
-        }
-        nextState, nextCmd
-
-    | UpdateDisplayedOptionsId intOpt ->
-        let nextState = {
-            currentState with
-                DisplayedOptionsId = intOpt
-        }
-        nextState, Cmd.none
-    | UpdateTableValidationScheme tableValidation ->
-        let nextState = {
-            currentState with
-                TableValidationScheme   = tableValidation
-        }
-        nextState, Cmd.none
-
-let handleFileUploadJsonMsg (fujMsg:ProtocolInsertMsg) (currentState: ProtocolInsertState) : ProtocolInsertState * Cmd<Msg> =
-
-    let parseDBProtocol (prot:Shared.ProtocolTemplate) =
-        let tableName,minBBInfos = prot.TableXml |> OfficeInterop.Regex.MinimalBuildingBlock.ofExcelTableXml
-        let validationType =  prot.CustomXml |> TableValidation.ofXml
-        if tableName <> validationType.AnnotationTable.Name then failwith "CustomXml and TableXml relate to different tables."
-        prot, validationType, minBBInfos
-
-    match fujMsg with
-    | ParseJsonToProcessRequest parsableString ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.isaDotNetApi.parseJsonToProcess
-                parsableString
-                (Ok >> ParseJsonToProcessResult)
-                (Result.Error >> ParseJsonToProcessResult)
-        currentState, Cmd.map ProtocolInsert cmd 
-    | ParseJsonToProcessResult (Ok isaProcess) ->
-        let nextState = {
-            currentState with
-                ProcessModel = Some isaProcess
-        }
-        nextState, Cmd.none
-    | ParseJsonToProcessResult (Result.Error e) ->
-        let cmd =
-            GenericError e |> Dev |> Cmd.ofMsg 
-        currentState, cmd
-    | RemoveProcessFromModel ->
-        let nextState = {
-            currentState with
-                ProcessModel = None
-                UploadData = ""
-        }
-        nextState, Cmd.none
-    | GetAllProtocolsRequest ->
-        let nextState = {currentState with Loading = true}
-        let cmd =
-            Cmd.OfAsync.either
-                Api.api.getAllProtocolsWithoutXml
-                ()
-                (GetAllProtocolsResponse >> ProtocolInsert)
-                (GenericError >> Dev)
-        nextState, cmd
-    | GetAllProtocolsResponse protocols ->
-        let nextState = {
-            currentState with
-                ProtocolsAll = protocols
-                Loading = false
-        }
-        nextState, Cmd.none
-    | GetProtocolXmlByProtocolRequest prot ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.api.getProtocolXmlForProtocol
-                prot
-                (ParseProtocolXmlByProtocolRequest >> ProtocolInsert)
-                (GenericError >> Dev)
-        currentState, cmd
-    | ParseProtocolXmlByProtocolRequest prot ->
-        let cmd =
-            Cmd.OfFunc.either
-                parseDBProtocol
-                (prot)
-                (GetProtocolXmlByProtocolResponse >> ProtocolInsert)
-                (fun e ->
-                    Msg.Batch [
-                        GenericError e |> Dev
-                        UpdateLoading false |> ProtocolInsert 
-                    ]
-                )
-        currentState, cmd
-    | GetProtocolXmlByProtocolResponse (prot,validation,minBBInfoList) -> 
-        let nextState = {
-            currentState with
-                ProtocolSelected = Some prot
-                BuildingBlockMinInfoList = minBBInfoList
-                ValidationXml = Some validation
-
-                DisplayedProtDetailsId = None
-        }
-        nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.ProtocolInsert)
-    | ProtocolIncreaseTimesUsed protocolTemplateName ->
-        let cmd =
-            Cmd.OfAsync.attempt
-                Api.api.increaseTimesUsed
-                protocolTemplateName
-                (GenericError >> Dev)
-        currentState, cmd
-                
-    // Client
-    | UpdateLoading nextLoadingState ->
-        let nextState = {
-            currentState with Loading = nextLoadingState
-        }
-        nextState, Cmd.none
-    | UpdateUploadData newDataString ->
-        let nextState = {
-            currentState with
-                UploadData = newDataString
-        }
-        nextState, Cmd.ofMsg (ParseJsonToProcessRequest newDataString |> ProtocolInsert)
-    | UpdateDisplayedProtDetailsId idOpt ->
-        let nextState = {
-            currentState with
-                DisplayedProtDetailsId = idOpt
-        }
-        nextState, Cmd.none
-    | UpdateProtocolNameSearchQuery strVal ->
-        let nextState = {
-            currentState with ProtocolNameSearchQuery = strVal
-        }
-        nextState, Cmd.none
-    | UpdateProtocolTagSearchQuery strVal ->
-        let nextState = {
-            currentState with ProtocolTagSearchQuery = strVal
-        }
-        nextState, Cmd.none
-    | AddProtocolTag tagStr ->
-        let nextState = {
-            currentState with
-                ProtocolSearchTags      = tagStr::currentState.ProtocolSearchTags
-                ProtocolTagSearchQuery  = ""
-        }
-        nextState, Cmd.none
-    | RemoveProtocolTag tagStr ->
-        let nextState = {
-            currentState with
-                ProtocolSearchTags      = currentState.ProtocolSearchTags |> List.filter (fun x -> x <> tagStr)
-        }
-        nextState, Cmd.none
-    | RemoveSelectedProtocol ->
-        let nextState = {
-            currentState with
-                ProtocolSelected = None
-                ValidationXml = None
-                BuildingBlockMinInfoList = []
-        }
-        nextState, Cmd.none
 
 let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
     match topLevelMsg with
@@ -1476,7 +487,7 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
         }
         nextState, Cmd.none
     // Server
-    | GetSelectedBuildingBlockSearchTermsRequest searchTerms ->
+    | GetSelectedBuildingBlockTermsRequest searchTerms ->
         let nextState = {
             currentState with
                 CurrentRequestState = RequestBuildingBlockInfoStates.RequestDataBaseInformation
@@ -1485,15 +496,15 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
             Cmd.OfAsync.either
                 Api.api.getTermsByNames
                 searchTerms
-                (GetSelectedBuildingBlockSearchTermsResponse >> BuildingBlockDetails)
+                (GetSelectedBuildingBlockTermsResponse >> BuildingBlockDetails)
                 (fun x ->
                     Msg.Batch [
-                        GenericError x |> Dev
+                        curry GenericError Cmd.none x |> DevMsg
                         UpdateCurrentRequestState Inactive |> BuildingBlockDetails
                     ]
                 )
         nextState, cmd
-    | GetSelectedBuildingBlockSearchTermsResponse searchTermResults ->
+    | GetSelectedBuildingBlockTermsResponse searchTermResults ->
         let nextState = {
             currentState with
                 ShowDetails         = true
@@ -1501,163 +512,6 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
                 CurrentRequestState = Inactive
         }
         nextState, Cmd.none
-
-let handleSettingsXmlMsg (msg:SettingsXmlMsg) (currentState: SettingsXmlState) : SettingsXmlState * Cmd<Msg> =
-
-    let matchXmlTypeToUpdateMsg msg (xmlType:OfficeInterop.Types.Xml.XmlTypes) =
-        match xmlType with
-        | OfficeInterop.Types.Xml.XmlTypes.ValidationType v ->
-            Msg.Batch [
-                GenericLog ("Info", msg) |> Dev
-                GetAllValidationXmlParsedRequest |> SettingsXmlMsg
-            ]
-        | OfficeInterop.Types.Xml.XmlTypes.GroupType _ | OfficeInterop.Types.Xml.XmlTypes.ProtocolType _ ->
-            Msg.Batch [
-                GenericLog ("Info", msg) |> Dev
-                GetAllProtocolGroupXmlParsedRequest |> SettingsXmlMsg
-                UpdateProtocolGroupHeader |> ExcelInterop
-            ]
-        
-    match msg with
-    // // Client // //
-    // Validation Xml
-    | UpdateActiveSwateValidation nextActiveTableValid ->
-        let nextState = {
-            currentState with
-                ActiveSwateValidation                   = nextActiveTableValid
-                NextAnnotationTableForActiveValidation  = None
-        }
-        nextState, Cmd.none
-    | UpdateNextAnnotationTableForActiveValidation nextAnnoTable ->
-        let nextState = {
-            currentState with
-                NextAnnotationTableForActiveValidation = nextAnnoTable
-        }
-        nextState, Cmd.none
-    | UpdateValidationXmls newValXmls ->
-        let nextState = {
-            currentState with
-                ActiveSwateValidation                   = None
-                NextAnnotationTableForActiveValidation  = None
-                ValidationXmls                          = newValXmls
-        }
-        nextState, Cmd.none
-    // Protocol group xml
-    | UpdateProtocolGroupXmls newProtXmls ->
-        let nextState = {
-            currentState with
-                ActiveProtocolGroup                     = None
-                NextAnnotationTableForActiveProtGroup   = None
-                ActiveProtocol                          = None
-                NextAnnotationTableForActiveProtocol    = None
-                ProtocolGroupXmls                       = newProtXmls
-        }
-        nextState, Cmd.none
-    | UpdateActiveProtocolGroup nextActiveProtGroup ->
-        let nextState= {
-            currentState with
-                ActiveProtocolGroup                     = nextActiveProtGroup
-                NextAnnotationTableForActiveProtGroup   = None
-        }
-        nextState, Cmd.none
-    | UpdateNextAnnotationTableForActiveProtGroup nextAnnoTable ->
-        let nextState = {
-            currentState with
-                NextAnnotationTableForActiveProtGroup = nextAnnoTable
-        }
-        nextState, Cmd.none
-    // Protocol xml
-    | UpdateActiveProtocol protocol ->
-        let nextState = {
-            currentState with
-                ActiveProtocol                          = protocol
-                NextAnnotationTableForActiveProtocol    = None
-        }
-        nextState, Cmd.none
-    | UpdateNextAnnotationTableForActiveProtocol nextAnnoTable ->
-        let nextState = {
-            currentState with
-                NextAnnotationTableForActiveProtocol = nextAnnoTable
-        }
-        nextState, Cmd.none
-    //
-    | UpdateRawCustomXml rawXmlStr ->
-        let nextState = {
-            currentState with
-                RawXml      = rawXmlStr
-                NextRawXml  = ""
-        }
-        nextState, Cmd.none
-    | UpdateNextRawCustomXml nextRawCustomXml ->
-        let nextState = {
-            currentState with
-                NextRawXml = nextRawCustomXml
-        }
-        nextState, Cmd.none
-    // OfficeInterop
-    | GetAllValidationXmlParsedRequest ->
-        let nextState = {
-            currentState with
-                ActiveSwateValidation                   = None
-                NextAnnotationTableForActiveValidation  = None
-        }
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getAllValidationXmlParsed
-                ()
-                (GetAllValidationXmlParsedResponse >> SettingsXmlMsg)
-                (GenericError >> Dev)
-        nextState, cmd
-    | GetAllValidationXmlParsedResponse (tableValidations, annoTables) ->
-        let nextState = {
-            currentState with
-                FoundTables = annoTables
-                ValidationXmls = tableValidations |> Array.ofList
-        }
-        let infoMsg = "Info", sprintf "Found %i checklist XML(s)." tableValidations.Length
-        let infoCmd = GenericLog infoMsg |> Dev |> Cmd.ofMsg
-        nextState, infoCmd
-    | GetAllProtocolGroupXmlParsedRequest ->
-        let nextState = {
-            currentState with
-                ActiveProtocolGroup                     = None
-                NextAnnotationTableForActiveProtGroup   = None
-                ActiveProtocol                          = None
-                NextAnnotationTableForActiveProtocol    = None
-        }
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getAllProtocolGroupXmlParsed
-                ()
-                (GetAllProtocolGroupXmlParsedResponse >> SettingsXmlMsg)
-                (GenericError >> Dev)
-        nextState, cmd
-    | GetAllProtocolGroupXmlParsedResponse (protocolGroupXmls, annoTables) ->
-        let nextState = {
-            currentState with
-                FoundTables = annoTables
-                ProtocolGroupXmls = protocolGroupXmls |> Array.ofList
-        }
-        let infoMsg = "Info", sprintf "Found %i protocol group XML(s)." protocolGroupXmls.Length
-        let infoCmd = GenericLog infoMsg |> Dev |> Cmd.ofMsg
-        nextState, infoCmd
-    | RemoveCustomXmlRequest xmlType ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.removeXmlType
-                xmlType
-                (fun msg ->  matchXmlTypeToUpdateMsg msg xmlType)
-                (GenericError >> Dev)
-        currentState, cmd
-    | ReassignCustomXmlRequest (prevXml,newXml) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.updateAnnotationTableByXmlType
-                (prevXml,newXml)
-                // can use prevXml or newXml. Both are checked during 'updateAnnotationTableByXmlType' to be of the same kind
-                (fun msg -> matchXmlTypeToUpdateMsg msg prevXml)
-                (GenericError >> Dev)
-        currentState, cmd
 
 let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
     match topLevelMsg with
@@ -1668,58 +522,6 @@ let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentSt
                 PointerJson = nextPointerJson
         }
         nextState, Cmd.none
-
-let handleSettingsProtocolMsg (topLevelMsg:SettingsProtocolMsg) (currentState: SettingsProtocolState) : SettingsProtocolState * Cmd<Msg> =
-    match topLevelMsg with
-    // Client
-    | UpdateProtocolsFromDB nextProtFromDB ->
-        let nextState = {
-            currentState with
-                ProtocolsFromDB = nextProtFromDB
-        }
-        nextState, Cmd.none
-    | UpdateProtocolsFromExcel nextProtFromExcel ->
-        let nextState = {
-            currentState with
-                ProtocolsFromExcel = nextProtFromExcel
-        }
-        nextState, Cmd.none
-    // Excel
-    | GetActiveProtocolGroupXmlParsed ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.getActiveProtocolGroupXmlParsed
-                ()
-                (fun x ->
-                    Msg.Batch [
-                        UpdateProtocolsFromExcel x |> SettingsProtocolMsg
-                        GetProtocolsFromDBRequest x |> SettingsProtocolMsg
-                    ]
-                )
-                (GenericError >> Dev)
-        currentState, cmd
-    | UpdateProtocolByNewVersion (prot, protTemplate) ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.updateProtocolByNewVersion
-                (prot,protTemplate)
-                (AddAnnotationBlocks >> ExcelInterop)
-                (GenericError >> Dev)
-        currentState, cmd
-    // Server
-    | GetProtocolsFromDBRequest activeProtGroupOpt ->
-        let cmd =
-            match activeProtGroupOpt with
-            | Some protGroup ->
-                let protNames = protGroup.Protocols |> List.map (fun x -> x.Id) |> Array.ofList
-                Cmd.OfAsync.either
-                    Api.api.getProtocolsByName
-                    protNames
-                    (UpdateProtocolsFromDB >> SettingsProtocolMsg)
-                    (GenericError >> Dev)
-            | None ->
-                GenericLog ("Info", "No protocols found for active table") |> Dev |> Cmd.ofMsg
-        currentState, cmd
             
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
@@ -1760,9 +562,12 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextCmd =
             match pageOpt with
             | Some Routing.Route.Validation ->
-                GetTableValidationXml |> ExcelInterop |> Cmd.ofMsg
+                Cmd.OfPromise.perform
+                    OfficeInterop.getTableRepresentation
+                    ()
+                    (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
             | Some Routing.Route.ProtocolSearch ->
-                GetAllProtocolsRequest |> ProtocolInsert |> Cmd.ofMsg
+                Protocol.GetAllProtocolsRequest |> ProtocolMsg |> Cmd.ofMsg
             | _ ->
                 Cmd.none
         let nextPageState =
@@ -1807,16 +612,14 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         }
         nextModel, debouncerCmd
 
-    | ExcelInterop excelMsg ->
-        let nextModel,nextCmd =
-            currentModel
-            |> handleExcelInteropMsg excelMsg
+    | OfficeInteropMsg excelMsg ->
+        let nextModel,nextCmd = currentModel |> Update.OfficeInterop.update excelMsg
         nextModel,nextCmd
 
-    | TermSearch termSearchMsg ->
+    | TermSearchMsg termSearchMsg ->
         let nextTermSearchState,nextCmd =
             currentModel.TermSearchState
-            |> handleTermSearchMsg termSearchMsg
+            |> TermSearch.update termSearchMsg
 
         let nextModel = {
             currentModel with
@@ -1824,20 +627,18 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         }
         nextModel,nextCmd
 
-    | AdvancedSearch advancedSearchMsg ->
+    | AdvancedSearchMsg advancedSearchMsg ->
         let nextAdvancedSearchState,nextCmd =
             currentModel.AdvancedSearchState
-            |> handleAdvancedTermSearchMsg advancedSearchMsg
+            |> AdvancedSearch.update advancedSearchMsg
 
         let nextModel = {
             currentModel with
                 AdvancedSearchState = nextAdvancedSearchState
         }
         nextModel,nextCmd
-    | Dev devMsg ->
-        let nextDevState,nextCmd =
-            currentModel.DevState
-            |> handleDevMsg devMsg
+    | DevMsg msg ->
+        let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
         
         let nextModel = {
             currentModel with
@@ -1846,9 +647,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         nextModel,nextCmd
 
     | Api apiMsg ->
-        let nextApiState,nextCmd =
-            currentModel.ApiState
-            |> handleApiMsg apiMsg
+        let nextApiState,nextCmd = currentModel.ApiState |> handleApiMsg apiMsg
 
         let nextModel = {
             currentModel with
@@ -1880,10 +679,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
 
         nextModel,nextCmd
 
-    | FilePicker filePickerMsg ->
+    | FilePickerMsg filePickerMsg ->
         let nextFilePickerState,nextCmd =
             currentModel.FilePickerState
-            |> handleFilePickerMsg filePickerMsg
+            |> FilePicker.update filePickerMsg
 
         let nextModel = {
             currentModel with
@@ -1892,10 +691,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
 
         nextModel,nextCmd
 
-    | AddBuildingBlock addBuildingBlockMsg ->
+    | BuildingBlockMsg addBuildingBlockMsg ->
         let nextAddBuildingBlockState,nextCmd = 
             currentModel.AddBuildingBlockState
-            |> handleAddBuildingBlockMsg addBuildingBlockMsg
+            |> BuildingBlock.update addBuildingBlockMsg
 
         let nextModel = {
             currentModel with
@@ -1903,10 +702,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             }
         nextModel, nextCmd
 
-    | Validation validationMsg ->
+    | ValidationMsg validationMsg ->
         let nextValidationState, nextCmd =
             currentModel.ValidationState
-            |> handleValidationMsg validationMsg
+            |> Validation.update validationMsg
 
         let nextModel = {
             currentModel with
@@ -1914,14 +713,14 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             }
         nextModel, nextCmd
 
-    | ProtocolInsert fileUploadJsonMsg ->
+    | ProtocolMsg fileUploadJsonMsg ->
         let nextFileUploadJsonState, nextCmd =
-            currentModel.ProtocolInsertState
-            |> handleFileUploadJsonMsg fileUploadJsonMsg
+            currentModel.ProtocolState
+            |> Protocol.update fileUploadJsonMsg
 
         let nextModel = {
             currentModel with
-                ProtocolInsertState = nextFileUploadJsonState
+                ProtocolState = nextFileUploadJsonState
             }
         nextModel, nextCmd
 
@@ -1939,7 +738,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | SettingsXmlMsg msg ->
         let nextState, nextCmd =
             currentModel.SettingsXmlState
-            |> handleSettingsXmlMsg msg
+            |> SettingsXml.update msg
         let nextModel = {
             currentModel with
                 SettingsXmlState = nextState
@@ -1956,14 +755,16 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         }
         nextModel, nextCmd
 
-    | SettingsProtocolMsg msg ->
-        let nextState, nextCmd =
-            currentModel.SettingsProtocolState
-            |> handleSettingsProtocolMsg msg
-        let nextModel = {
-            currentModel with
-                SettingsProtocolState = nextState
-        }
+    | JsonExporterMsg msg ->
+        let nextModel, nextCmd = currentModel |> JsonExporter.update msg
+        nextModel, nextCmd
+
+    | TemplateMetadataMsg msg ->
+        let nextModel, nextCmd = currentModel |> TemplateMetadata.update msg
+        nextModel, nextCmd
+
+    | DagMsg msg ->
+        let nextModel, nextCmd = currentModel |> Dag.update msg
         nextModel, nextCmd
 
     | TopLevelMsg topLevelMsg ->

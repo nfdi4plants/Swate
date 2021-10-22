@@ -4,6 +4,7 @@ version: '3.9'
 services:
 
   db:
+    # newer version fail with .net
     image: mariadb:10.4
     # command: --default-authentication-plugin=mysql_native_password
     restart: always
@@ -12,10 +13,10 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: {PASSWORD}
     ports:
-      - 42333:3306
+        - 42333:3306
 
   adminer:
     image: adminer
     restart: always
     ports:
-      - 8085:8080
+        - 8085:8080

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.18.0/cytoscape.min.js"></script>
+</head>
+<body> <style>#eddf67bb498 { width: 800px; height: 400px; display: block } </style>
+<div id="eddf67bb498"></div>
+<script type="text/javascript">
+
+            var renderCyjs_541ebbba4d9a4988881c0bd061a6ab2e = function() {
+            var fsharpCyjsRequire = requirejs.config({context:'fsharp-cyjs',paths:{cyjs:'https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.18.0/cytoscape.min'}}) || require;
+            fsharpCyjsRequire(['cyjs'], function(Cyjs) {
+
+            var graphdata = {"container":document.getElementById('eddf67bb498'),"elements":[{"data":{"id":"Source1","label":"Source1"}},{"data":{"id":"Sample1","label":"Sample1"}},{"data":{"id":"Source2","label":"Source2"}},{"data":{"id":"Sample2","label":"Sample2"}},{"data":{"id":"Source3","label":"Source3"}},{"data":{"id":"Sample3","label":"Sample3"}},{"data":{"id":"Source4","label":"Source4"}},{"data":{"id":"Sample4","label":"Sample4"}},{"data":{"id":"Result1","label":"Result1"}},{"data":{"id":"Result2","label":"Result2"}},{"data":{"id":"Result3","label":"Result3"}},{"data":{"id":"Result4","label":"Result4"}},{"data":{"id":"0","source":"Source1","target":"Sample1","label":"FirstStep_0"}},{"data":{"id":"1","source":"Source2","target":"Sample2","label":"FirstStep_0"}},{"data":{"id":"2","source":"Source3","target":"Sample3","label":"FirstStep_1"}},{"data":{"id":"3","source":"Source4","target":"Sample4","label":"FirstStep_1"}},{"data":{"id":"4","source":"Sample1","target":"Result1","label":"StepNumeroDos_0"}},{"data":{"id":"5","source":"Sample2","target":"Result2","label":"StepNumeroDos_0"}},{"data":{"id":"6","source":"Sample3","target":"Result3","label":"StepNumeroDos_0"}},{"data":{"id":"7","source":"Sample4","target":"Result4","label":"StepNumeroDos_0"}}],"style":[{"selector":"node","style":{"content":"data(label)","color":"#A00975"}},{"selector":"edge","style":{"content":"data(label)","color":"#FF0000"}}],"layout":{"name":"breadthfirst"}}
+            var cy = cytoscape( graphdata );
+            cy.userZoomingEnabled( false );
+            
+});
+            };
+            if ((typeof(requirejs) !==  typeof(Function)) || (typeof(requirejs.config) !== typeof(Function))) {
+                var script = document.createElement("script");
+                script.setAttribute("src", "https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js");
+                script.onload = function(){
+                    renderCyjs_541ebbba4d9a4988881c0bd061a6ab2e();
+                };
+                document.getElementsByTagName("head")[0].appendChild(script);
+            }
+            else {
+                renderCyjs_541ebbba4d9a4988881c0bd061a6ab2e();
+            }
+</script>
+ </body>
+</html>

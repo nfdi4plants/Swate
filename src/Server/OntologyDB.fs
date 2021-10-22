@@ -1,6 +1,8 @@
 module OntologyDB
 
-open MySql.Data
+open Shared
+open TermTypes
+open OfficeInteropTypes
 open MySql.Data.MySqlClient
 open System.Data
 open System
@@ -18,19 +20,17 @@ let insertOntology cString (name:string) (currentVersion:string) (definition:str
 
     insertOntologyCmd
         .CommandText <-"""
-INSERT INTO Ontology (Name,CurrentVersion,Definition,DateCreated,UserID)
+INSERT INTO Ontology (Name,CurrentVersion,DateCreated,UserID)
 VALUES (@name,@cv,@def,@dc,@uid);
 SELECT max(ID) FROM Ontology"""
 
     let nameParam           = insertOntologyCmd.Parameters.Add("name",MySqlDbType.VarChar)
     let currentVersionParam = insertOntologyCmd.Parameters.Add("cv",MySqlDbType.VarChar)
-    let definitionParam     = insertOntologyCmd.Parameters.Add("def",MySqlDbType.VarChar)
     let dateCreatedParam    = insertOntologyCmd.Parameters.Add("dc",MySqlDbType.DateTime)
     let userIDParam         = insertOntologyCmd.Parameters.Add("uid",MySqlDbType.VarChar)
 
     nameParam           .Value <- name
     currentVersionParam .Value <- currentVersion
-    definitionParam     .Value <- definition
     dateCreatedParam    .Value <- System.DateTimeOffset.UtcNow
     userIDParam         .Value <- userID
 
@@ -40,7 +40,6 @@ SELECT max(ID) FROM Ontology"""
         DbDomain.createOntology 
             name
             currentVersion
-            definition
             dateCreated
             userID
     | false -> failwith "Inserting ontology failed."
@@ -59,7 +58,7 @@ VALUES (@acc,@ontId,@name,@def,@xrv,@iO);
 SELECT max(ID) FROM Term"""
 
     let accessionParam      = insertTermCmd.Parameters.Add("acc",MySqlDbType.VarChar)
-    let ontologyNameParam     = insertTermCmd.Parameters.Add("ontId",MySqlDbType.VarChar)
+    let ontologyNameParam   = insertTermCmd.Parameters.Add("ontId",MySqlDbType.VarChar)
     let nameParam           = insertTermCmd.Parameters.Add("name",MySqlDbType.VarChar)
     let definitionParam     = insertTermCmd.Parameters.Add("def",MySqlDbType.VarChar)
     let xRefValueTypeParam  = insertTermCmd.Parameters.Add("xrv",MySqlDbType.VarChar)
@@ -183,7 +182,7 @@ let getTermSuggestionsByChildTerm cString (query:string, childTerm:string) =
                     (reader.GetBoolean(5))
     |]
 
-let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyInfo) =
+let getTermByParentTermOntologyInfo cString (query:string, parentTerm:TermMinimal) =
 
     let hasAccession = parentTerm.TermAccession <> ""
 
@@ -223,7 +222,7 @@ let getTermByParentTermOntologyInfo cString (query:string, parentTerm:OntologyIn
                     (reader.GetBoolean(5))
     |]
 
-let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
+let getAllTermsByParentTermOntologyInfo cString (parentTerm:TermMinimal) =
 
     let hasAccession = parentTerm.TermAccession <> ""
 
@@ -261,7 +260,7 @@ let getAllTermsByParentTermOntologyInfo cString (parentTerm:OntologyInfo) =
                     (reader.GetBoolean(5))
     |]
 
-let getAllTermsByChildTermOntologyInfo cString (childTerm:OntologyInfo) =
+let getAllTermsByChildTermOntologyInfo cString (childTerm:TermMinimal) =
 
     let hasAccession = childTerm.TermAccession <> ""
 
@@ -419,6 +418,38 @@ let getTermByName cString (queryStr:string) =
                (reader.GetBoolean(5))
     |]
 
+let getTermByNameAndOntology cString (queryStr:string, ontologyShortName:string) =
+    
+    use connection = establishConnection cString
+    connection.Open()
+
+    use getTermByNameAndOntologyCmd = connection.CreateCommand()
+    getTermByNameAndOntologyCmd
+        .CommandText <- """
+            SELECT * FROM Term WHERE Term.Name = @name && Term.FK_OntologyName = @ontologyShortName
+        """
+
+    let ontologyShortNameParam = getTermByNameAndOntologyCmd.Parameters.Add("ontologyShortName", MySqlDbType.VarChar)
+    let queryParam = getTermByNameAndOntologyCmd.Parameters.Add("name",MySqlDbType.VarChar)
+
+    queryParam.Value                <- queryStr
+    ontologyShortNameParam.Value    <- ontologyShortName
+
+    use reader = getTermByNameAndOntologyCmd.ExecuteReader()
+    [|
+        while reader.Read() do
+            DbDomain.createTerm
+               (reader.GetString(0))
+               (reader.GetString(1))
+               (reader.GetString(2))
+               (reader.GetString(3))
+               (if (reader.IsDBNull(4)) then
+                   None
+               else
+                   Some (reader.GetString(4)))
+               (reader.GetBoolean(5))
+    |]
+
 let getTermByNameAndAccession cString (queryStr:string,accessionString:string) =
     
     use connection = establishConnection cString
@@ -498,9 +529,8 @@ let getAllOntologies cString () =
                 DbDomain.createOntology
                     (reader.GetString(0))
                     (reader.GetString(1))
-                    (reader.GetString(2))
-                    (reader.GetDateTime(3)) // TODO:
-                    (reader.GetString(4))
+                    (reader.GetDateTime(2))
+                    (reader.GetString(3))
     |]
 
 let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (searchName : string) (mustContainName:string) (searchDef:string) (mustContainDef:string) (keepObsolete:bool) =

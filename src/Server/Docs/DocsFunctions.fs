@@ -2,7 +2,7 @@ module DocsFunctions
 
 open System
 
-open Shared
+open Shared.TermTypes
 
 type ParameterType =
 | ParamInteger
@@ -128,23 +128,23 @@ module PredefinedParams =
 
     module Examples =
 
-        let ontologyInfoExmp:OntologyInfo = OntologyInfo.create "Instrument Model" "MS:1000031"
-        let ontologyInfoExmp2:OntologyInfo = OntologyInfo.create "Q TRAP" "MS:1000187"
+        let ontologyInfoExmp:TermMinimal = TermMinimal.create "Instrument Model" "MS:1000031"
+        let ontologyInfoExmp2:TermMinimal = TermMinimal.create "Q TRAP" "MS:1000187"
         
         let unitOntologyExmp:DbDomain.Ontology = {
             Name = "uo"
             CurrentVersion = "releases/2020-03-10"
-            Definition = "Unit Ontology"
             DateCreated = System.DateTime(2014,9,4) //"2014-09-04 00:00:00.000000"
             UserID = "gkoutos"
         }
 
-        let searchTermExmp:SearchTermI = {
-            ColIndices = [|2; 3|]
-            SearchQuery = Shared.OntologyInfo.create "Bruker Daltonics HCT Series" ""
-            IsA = Some ontologyInfoExmp
+        let termSearchableExmp:TermSearchable = {
+            Term = TermMinimal.create "Bruker Daltonics HCT Series" ""
+            ParentTerm = Some ontologyInfoExmp
+            IsUnit = false
+            ColIndex = 2
             RowIndices = [|0 .. 10|]
-            TermOpt = None
+            SearchResultTerm = None
         }
 
         let test = System.DateTime(2020,11,17)

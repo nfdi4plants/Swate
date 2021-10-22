@@ -1,19 +1,17 @@
 source https://api.nuget.org/v3/index.json
-framework: netcoreapp3.1
+framework: net5.0
 storage: none
 
+nuget DynamicObj 0.2.1
+nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
-nuget Fable.SimpleJson 3.11.0
-nuget Fable.SimpleXml
-nuget FSharp.Data
-nuget Fulma.Extensions.Wikiki.Checkradio
-nuget Fulma.Extensions.Wikiki.Slider
+nuget ISADotNet.XLSX 0.4.0-preview.1
+nuget ISADotNet.Viz 0.4.0-preview.1
 nuget Saturn
 nuget Expecto
-nuget MySql.Data 8.0.21
+nuget FSharp.Data
 nuget Microsoft.Extensions.Configuration.UserSecrets
-nuget ISADotNet.Fable
-
+nuget MySql.Data 8.0.21
 
 nuget Fable.Core
 nuget Fable.Elmish
@@ -31,3 +29,8 @@ nuget Fulma.Extensions.Wikiki.Tooltip
 nuget Fulma.Extensions.Wikiki.Switch
 nuget System.Text.Encodings.Web
 nuget Thoth.Elmish.Debouncer
+
+nuget Fable.SimpleJson
+nuget Fable.SimpleXml
+nuget Fulma.Extensions.Wikiki.Checkradio
+nuget Fulma.Extensions.Wikiki.Slider

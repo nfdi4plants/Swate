@@ -28,12 +28,6 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
             OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
         ] [
             Text.span [] [
-                /// does not work for me in excel, and in excel online i have a fixed width that always shows the icon
-                //let mediaQuery = window.matchMedia("(min-width:575px)")
-                //if mediaQuery.matches then
-                //    str (pageLink |> Routing.Route.toString)
-                //else
-                //    pageLink |> Routing.Route.toIcon
                 span [Class "hideUnder775px"][str pageLink.toStringRdbl]
                 span [Class "hideOver775px"][pageLink |> Routing.Route.toIcon]
             ]
@@ -48,26 +42,32 @@ let tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
             Style [
                 BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
                 CSSProp.Custom ("overflow","visible")
+                PaddingTop "1rem"
             ]
         ]
     ] [
         yield! tabs
     ]
 
-let firstRowTabs (model:Model) dispatch =
+let tabs (model:Model) dispatch =
     tabRow model dispatch [
-        createNavigationTab Routing.Route.AddBuildingBlock      model dispatch
-        createNavigationTab Routing.Route.TermSearch            model dispatch
-        createNavigationTab Routing.Route.Validation            model dispatch
-        createNavigationTab Routing.Route.FilePicker            model dispatch
-        createNavigationTab Routing.Route.ProtocolInsert        model dispatch
-        createNavigationTab Routing.Route.Info                  model dispatch
+        if model.PersistentStorageState.PageEntry = Routing.SwateEntry.Core then
+            createNavigationTab Routing.Route.BuildingBlock         model dispatch
+            createNavigationTab Routing.Route.TermSearch            model dispatch
+            createNavigationTab Routing.Route.Protocol              model dispatch
+            createNavigationTab Routing.Route.FilePicker            model dispatch
+            createNavigationTab Routing.Route.Dag                   model dispatch
+            createNavigationTab Routing.Route.Info                  model dispatch
+        else
+            createNavigationTab Routing.Route.JsonExport            model dispatch
+            createNavigationTab Routing.Route.TemplateMetadata      model dispatch
+            createNavigationTab Routing.Route.Validation            model dispatch
+            createNavigationTab Routing.Route.Info                  model dispatch
     ]
 
-let sndRowTabs (model:Model) dispatch =
-    tabRow model dispatch [
-        
-    ]
+
+//let sndRowTabs (model:Model) dispatch =
+//    tabRow model dispatch [ ]
 
 let footerContentStatic (model:Model) dispatch =
     div [][
@@ -78,8 +78,7 @@ let footerContentStatic (model:Model) dispatch =
 open Fable.Core.JsInterop
 open Fable.FontAwesome
 
-/// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
-let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
+let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement list) =
     div [
         OnClick (fun e ->
             if model.TermSearchState.ShowSuggestions
@@ -88,16 +87,23 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                 || model.AddBuildingBlockState.ShowBuildingBlockTermSuggestions
             then
                 TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
+            if model.AddBuildingBlockState.ShowBuildingBlockSelection then
+                BuildingBlockMsg BuildingBlock.ToggleSelectionDropdown |> dispatch
         )
-        Style [MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;
-    ]
-    ] [
+        Style [
+            MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"
+        ]
+    ] children
+
+/// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
+let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
+    viewContainer model dispatch [
         Navbar.navbarComponent model dispatch
+        //Navbar.quickAccessScalableNavbar model dispatch
         Container.container [
             Container.IsFluid
         ] [
-            br []
-            firstRowTabs model dispatch
+            tabs model dispatch
             //sndRowTabs model dispatch
 
             if (not model.ExcelState.HasAnnotationTable) then
@@ -115,8 +121,6 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
 
             yield! bodyChildren
 
-            br []
-
             if footerChildren.IsEmpty |> not then
                 Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
                     Content.content [
@@ -128,7 +132,7 @@ let baseViewComponent (model: Model) (dispatch: Msg -> unit) (bodyChildren: Reac
                 ]
         ]
 
-        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"]][
+        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]][
             footerContentStatic model dispatch
         ]
     ]

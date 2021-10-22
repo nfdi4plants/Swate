@@ -1,17 +1,13 @@
 module DocsISADotNetAPIvs1
 
 open Shared
-open Giraffe
-open Saturn
-open Shared
-open Shared.DbDomain
 
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 
 open DocsFunctions
 
-let isaDotNetDocsv1 = Docs.createFor<IISADotNetAPIv1>()
+let docs = Docs.createFor<IISADotNetCommonAPIv1>()
 
 module IsaDotNetExamples =
 
@@ -27,24 +23,31 @@ module IsaDotNetExamples =
             Parameter.create "Name" ParamString ""
         |]
 
-let isaDotNetApiDocsv1 =
+let isaDotNetCommonApiDocsv1 =
     Remoting.documentation (sprintf "Service API v1") [
 
         ///////////////////////////////////////////////////////////// Development /////////////////////////////////////////////////////////////
         ////////
-        isaDotNetDocsv1.route <@ fun api -> api.parseJsonToProcess @>
-        |> isaDotNetDocsv1.alias "Parse Json to ISADotNet Process Model (<code>parseJsonToProcess</code>)"
-        |> isaDotNetDocsv1.description
-            (
-                createDocumentationDescription
-                    "This function is used to parse a json string value to the ISA process type defined by ISADotNet."
-                    "<code>parseJsonToProcess</code> is executed when uploading a ISA process json file."
-                    (Some [|
-                        Parameter.create "JsonString" (ParamString) "This is a string of a isa process json format."
-                    |])
-                    "Returns the parsed complex process type. More information can be found <a href=\"https://github.com/nfdi4plants/ISADotNet\">here</a>"
-                    (Parameter.create "Placeholder" ParamString "Json Process Type")
-            )
-        |> isaDotNetDocsv1.example <@ fun api -> api.parseJsonToProcess IsaDotNetExamples.jsonstring @>
+        docs.route <@ fun api -> api.testPostNumber @>
+        |> docs.description "
+            This route can be used to test post requests to the Server.
+        "
+        |> docs.alias "POST Test with integer"
+        |> docs.example <@ fun api -> api.testPostNumber (5) @>
+        docs.route <@ fun api -> api.toAssayJson @>
+        |> docs.alias "Parse ISA-XLSX file to ISA-JSON's assay.json"
+        //|> docs.description
+        //    (
+        //        createDocumentationDescription
+        //            "This function is used to parse a json string value to the ISA process type defined by ISADotNet."
+        //            "<code>parseJsonToProcess</code> is executed when uploading a ISA process json file."
+        //            (Some [|
+        //                Parameter.create "JsonString" (ParamString) "This is a string of a isa process json format."
+        //            |])
+        //            "Returns the parsed complex process type. More information can be found <a href=\"https://github.com/nfdi4plants/ISADotNet\">here</a>"
+        //            (Parameter.create "Placeholder" ParamString "Json Process Type")
+        //    )
+        //|> docs.example <@ fun api -> api.parseJsonToProcess IsaDotNetExamples.jsonstring @>
+
 
 ]

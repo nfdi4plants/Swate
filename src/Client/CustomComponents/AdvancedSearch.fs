@@ -5,11 +5,120 @@ open Fable.React.Props
 open Fulma
 open Fulma.Extensions.Wikiki
 open Fable.FontAwesome
+open Elmish
+
+open Shared
+open TermTypes
 open ExcelColors
 open Model
 open Messages
-open Shared
 open CustomComponents
+
+open AdvancedSearch
+
+let update (advancedTermSearchMsg: AdvancedSearch.Msg) (currentState:AdvancedSearch.Model) : AdvancedSearch.Model * Cmd<Messages.Msg> =
+    match advancedTermSearchMsg with
+    | ResetAdvancedSearchOptions ->
+        let nextState = {
+            currentState with
+                AdvancedSearchOptions = AdvancedSearchOptions.init()
+                AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage
+        }
+
+        nextState,Cmd.none
+    | UpdateAdvancedTermSearchSubpage subpage ->
+        let tOpt =
+            match subpage with
+            |SelectedResultSubpage t   -> Some t
+            | _                 -> None
+        let nextState = {
+            currentState with
+                SelectedResult = tOpt
+                AdvancedTermSearchSubpage = subpage
+        }
+        nextState, Cmd.none
+
+    | ToggleModal modalId ->
+        let nextState = {
+            currentState with
+                ModalId = modalId
+                HasModalVisible = (not currentState.HasModalVisible)
+        }
+
+        nextState,Cmd.none
+
+    | ToggleOntologyDropdown ->
+        let nextState = {
+            currentState with
+                HasOntologyDropdownVisible = (not currentState.HasOntologyDropdownVisible)
+        }
+
+        nextState,Cmd.none
+
+    | OntologySuggestionUsed suggestion ->
+
+        let nextAdvancedSearchOptions = {
+            currentState.AdvancedSearchOptions with
+                Ontology = suggestion
+        }
+
+        let nextState = {
+            currentState with
+                AdvancedSearchOptions   = nextAdvancedSearchOptions
+            }
+        nextState, Cmd.ofMsg (AdvancedSearchMsg ToggleOntologyDropdown)
+
+    | UpdateAdvancedTermSearchOptions opts ->
+
+        let nextState = {
+            currentState with
+                AdvancedSearchOptions = opts
+        }
+
+        nextState,Cmd.none
+
+    | StartAdvancedSearch ->
+
+        let nextState = {
+            currentState with
+                AdvancedTermSearchSubpage       = AdvancedSearchSubpages.ResultsSubpage
+                HasAdvancedSearchResultsLoading = true
+            
+        }
+
+        let nextCmd =
+            currentState.AdvancedSearchOptions
+            |> GetNewAdvancedTermSearchResults
+            |> Request
+            |> Api
+            |> Cmd.ofMsg
+
+        nextState,nextCmd
+
+    | ResetAdvancedSearchState ->
+        let nextState = AdvancedSearch.Model.init()
+
+        nextState,Cmd.none
+
+    | NewAdvancedSearchResults results ->
+        let nextState = {
+            currentState with
+                AdvancedSearchTermResults       = results
+                AdvancedTermSearchSubpage       = AdvancedSearchSubpages.ResultsSubpage
+                HasAdvancedSearchResultsLoading = false
+        }
+
+        nextState,Cmd.none
+
+    | ChangePageinationIndex index ->
+        let nextState = {
+            currentState with
+                AdvancedSearchResultPageinationIndex = index
+        }
+
+        nextState,Cmd.none
+
+open Messages
 
 let createLinkOfAccession (accession:string) =
     a [
@@ -20,7 +129,7 @@ let createLinkOfAccession (accession:string) =
         str accession
     ]
 
-let isValidAdancedSearchOptions (opt:AdvancedTermSearchOptions) =
+let isValidAdancedSearchOptions (opt:AdvancedSearchOptions) =
     ((
         opt.SearchTermName.Length
         + opt.SearchTermDefinition.Length
@@ -33,20 +142,10 @@ let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: DbD
     Dropdown.Item.a [
         Dropdown.Item.Props [
             TabIndex 0
-            OnClick (fun _ -> ontOpt |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
-            OnKeyDown (fun k -> if k.key = "Enter" then ontOpt |> OntologySuggestionUsed |> AdvancedSearch |> dispatch)
+            OnClick (fun _ -> ontOpt |> OntologySuggestionUsed |> AdvancedSearchMsg |> dispatch)
+            OnKeyDown (fun k -> if k.key = "Enter" then ontOpt |> OntologySuggestionUsed |> AdvancedSearchMsg |> dispatch)
         ]
     ][
-        Text.span [
-            CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
-            Props [
-                if ontOpt.IsSome then Tooltip.dataTooltip (ontOpt.Value.Definition)
-                Style [PaddingRight "10px"]
-            ]
-        ] [
-            Fa.i [Fa.Solid.InfoCircle] []
-        ]
-        
         Text.span [] [
             if ontOpt.IsSome then
                 ontOpt.Value.Name |> str
@@ -101,7 +200,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                 ] [
                     Dropdown.trigger [] [
                         Button.button [
-                            Button.OnClick (fun _ -> ToggleOntologyDropdown |> AdvancedSearch |> dispatch);
+                            Button.OnClick (fun _ -> ToggleOntologyDropdown |> AdvancedSearchMsg |> dispatch);
                             Button.Size Size.IsSmall;
                             Button.Props [Style [MarginTop "0.5rem"]]
                         ] [
@@ -145,7 +244,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                                 with SearchTermName = e.Value
                             }
                             |> UpdateAdvancedTermSearchOptions
-                            |> AdvancedSearch
+                            |> AdvancedSearchMsg
                             |> dispatch)
                         Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.SearchTermName
                     ] 
@@ -166,7 +265,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                                 with MustContainName = e.Value
                             }
                             |> UpdateAdvancedTermSearchOptions
-                            |> AdvancedSearch
+                            |> AdvancedSearchMsg
                             |> dispatch)
                         Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.MustContainName
                     ] 
@@ -187,7 +286,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                                 with SearchTermDefinition = e.Value
                             }
                             |> UpdateAdvancedTermSearchOptions
-                            |> AdvancedSearch
+                            |> AdvancedSearchMsg
                             |> dispatch)
                         Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.SearchTermDefinition
                     ] 
@@ -209,7 +308,7 @@ let advancedTermSearchComponent (model:Model) (dispatch: Msg -> unit) =
                                     with MustContainDefinition = e.Value
                                 }
                                 |> UpdateAdvancedTermSearchOptions
-                                |> AdvancedSearch
+                                |> AdvancedSearchMsg
                                 |> dispatch)
                             Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.MustContainDefinition
                         ] 
@@ -224,10 +323,10 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
         div [
             Style [Margin "1rem"]
         ][
-            Button.buttonComponent model.SiteStyleState.ColorMode true "Change search options" (fun _ -> UpdateAdvancedTermSearchSubpage AdvancedTermSearchSubpages.InputFormSubpage |> AdvancedSearch |> dispatch)
+            Button.buttonComponent model.SiteStyleState.ColorMode true "Change search options" (fun _ -> UpdateAdvancedTermSearchSubpage AdvancedSearchSubpages.InputFormSubpage |> AdvancedSearchMsg |> dispatch)
         ]
         Label.label [Label.Props [colorControl model.SiteStyleState.ColorMode]] [str "Results:"]
-        if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedTermSearchSubpages.ResultsSubpage then
+        if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.ResultsSubpage then
             if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
                 div [
                     Style [Width "100%"; Display DisplayOptions.Flex; JustifyContent "center"]
@@ -243,7 +342,7 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
                         dispatch
                         /// The following line defines which message is executed onClick on one of the terms in the result table.
                         ((fun t ->
-                            UpdateAdvancedTermSearchSubpage <| AdvancedTermSearchSubpages.SelectedResultSubpage t) >> AdvancedSearch
+                            UpdateAdvancedTermSearchSubpage <| AdvancedSearchSubpages.SelectedResultSubpage t) >> AdvancedSearchMsg
                         )
                     )
     ]
@@ -283,18 +382,18 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
         Modal.background [] []
         Modal.Card.card [] [
             Modal.Card.head [Props [colorControl model.SiteStyleState.ColorMode]] [
-                Modal.close [Modal.Close.Size IsLarge; Modal.Close.OnClick (fun _ -> ToggleModal modalId |> AdvancedSearch |> dispatch)] []
+                Modal.close [Modal.Close.Size IsLarge; Modal.Close.OnClick (fun _ -> ToggleModal modalId |> AdvancedSearchMsg |> dispatch)] []
                 Heading.h4 [Heading.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
                     str "Advanced Search"
                 ]
             ]
             Modal.Card.body [Props [colorControl model.SiteStyleState.ColorMode]] [
                 match model.AdvancedSearchState.AdvancedTermSearchSubpage with
-                | AdvancedTermSearchSubpages.InputFormSubpage ->
+                | AdvancedSearchSubpages.InputFormSubpage ->
                     advancedTermSearchComponent model dispatch
-                | AdvancedTermSearchSubpages.ResultsSubpage ->
+                | AdvancedSearchSubpages.ResultsSubpage ->
                     advancedSearchResultTable model dispatch
-                | AdvancedTermSearchSubpages.SelectedResultSubpage r ->
+                | AdvancedSearchSubpages.SelectedResultSubpage r ->
                     advancedSearchSelectedResultDisplay model r
                 //else
                 //    match model.AdvancedSearchState.SelectedResult with
@@ -314,7 +413,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                     Button.button   [   
                                         Button.CustomClass "is-danger"
                                         Button.IsFullWidth
-                                        Button.OnClick (fun _ -> ResetAdvancedSearchOptions |> AdvancedSearch |> dispatch)
+                                        Button.OnClick (fun _ -> ResetAdvancedSearchOptions |> AdvancedSearchMsg |> dispatch)
                                     ] [
                                         str "Reset"
                                     ]
@@ -323,7 +422,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                     Button.button [   
                                         Button.CustomClass "is-danger"
                                         Button.IsFullWidth
-                                        Button.OnClick (fun _ -> ResetAdvancedSearchState |> AdvancedSearch |> dispatch)
+                                        Button.OnClick (fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)
 
                                     ] [
                                         str "Cancel"
@@ -333,7 +432,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                         ]
                         Level.item [][
                             match model.AdvancedSearchState.AdvancedTermSearchSubpage with
-                            | AdvancedTermSearchSubpages.SelectedResultSubpage sth ->
+                            | AdvancedSearchSubpages.SelectedResultSubpage sth ->
                                 Button.button   [
                                     let hasText = model.AdvancedSearchState.SelectedResult.IsSome
                                     if hasText then
@@ -348,7 +447,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                         sth |> resultHandler |> dispatch
 
                                         e?value <- sth.Name
-                                        ResetAdvancedSearchState |> AdvancedSearch |> dispatch)
+                                        ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)
                                 ] [
                                     str "Confirm"
                             
@@ -363,7 +462,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                         Button.CustomClass "is-danger"
                                         Button.Props [Disabled (not isValid)]
                                     Button.IsFullWidth
-                                    Button.OnClick (fun _ -> StartAdvancedSearch |> AdvancedSearch |> dispatch)
+                                    Button.OnClick (fun _ -> StartAdvancedSearch |> AdvancedSearchMsg |> dispatch)
                                 ] [ str "Start advanced search"]
                         ]
                     ]

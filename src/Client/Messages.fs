@@ -1,99 +1,76 @@
-module Messages
+module rec Messages
 
 open Elmish
 open Thoth.Elmish
 open Shared
+open Fable.Remoting.Client
+open Fable.SimpleJson
 
+open TermTypes
+open ProtocolTemplateTypes
 open ExcelColors
 open OfficeInterop
-open OfficeInterop.Types
+open OfficeInteropTypes
 open Model
+open Routing
 
-//open ISADotNet
+type System.Exception with
+    member this.GetPropagatedError() =
+        match this with
+        | :? ProxyRequestException as exn ->
+            let response = exn.ResponseText |> Json.parseAs<{| error:string; ignored : bool; handled : bool |}>
+            response.error
+        | ex ->
+            ex.Message
 
-type ExcelInteropMsg =
-    | Initialized                           of (string*string)
-    | FillSelection                         of string * (DbDomain.Term option)
-    | AddAnnotationBlock                    of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock
-    | AddAnnotationBlocks                   of OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list * Xml.GroupTypes.Protocol * OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | RemoveAnnotationBlock
-    | AddUnitToAnnotationBlock              of unitTermName:string option * unitTermAccession:string option
-    | FormatColumn                          of colname:string * formatString:string
-    | FormatColumns                         of (string * string) list
-    /// This message does not need the active annotation table as `PipeCreateAnnotationTableInfo` checks if any annotationtables exist in the active worksheet, and if so, errors.
-    | CreateAnnotationTable                 of isDark:bool
-    | AnnotationtableCreated                of string
-    | AnnotationTableExists                 of TryFindAnnoTableResult
-    | GetParentTerm
-    | AutoFitTable
-    | UpdateProtocolGroupHeader
-    //
-    | GetTableValidationXml
-    | WriteTableValidationToXml             of newTableValidation:Xml.ValidationTypes.TableValidation * currentSwateVersion:string
-    /// needs to set newColNames separately as these validations come from templates for protocol group insert
-    | AddTableValidationtoExisting          of addedTableValidation:Xml.ValidationTypes.TableValidation * newColNames:string list * protocol:OfficeInterop.Types.Xml.GroupTypes.Protocol
-    | WriteProtocolToXml                    of newProtocol:Xml.GroupTypes.Protocol
-    | DeleteAllCustomXml
-    | GetSwateCustomXml
-    | UpdateSwateCustomXml                  of string
-    //
-    | FillHiddenColsRequest
-    | FillHiddenColumns                     of tableName:string*SearchTermI []
-    | UpdateFillHiddenColsState             of FillHiddenColsState
-    //
-    | InsertFileNames                       of fileNameList:string list
-    // Show Details to selected BuildingBlock
-    | GetSelectedBuildingBlockSearchTerms
-    //
-    | CreatePointerJson
-    //
-    // Development
-    | TryExcel
-    | TryExcel2
-    //| ExcelSubscriptionMsg          of OfficeInterop.Types.Subscription.Msg
+let curry f a b = f (a,b)
 
-type TermSearchMsg =
-    | ToggleSearchByParentOntology
-    | SearchTermTextChange                  of string
-    | TermSuggestionUsed                    of DbDomain.Term
-    | NewSuggestions                        of DbDomain.Term []
-    | StoreParentOntologyFromOfficeInterop  of obj option
-    // Server
-    | GetAllTermsByParentTermRequest        of OntologyInfo 
-    | GetAllTermsByParentTermResponse       of DbDomain.Term []
+module TermSearch =
 
-type AdvancedSearchMsg =
-    // Client
-    | ResetAdvancedSearchState
-    | ResetAdvancedSearchOptions
-    | UpdateAdvancedTermSearchSubpage   of AdvancedTermSearchSubpages
-    | ToggleModal                       of string
-    | ToggleOntologyDropdown
-    | UpdateAdvancedTermSearchOptions   of AdvancedTermSearchOptions
-    | OntologySuggestionUsed            of DbDomain.Ontology option
-    | ChangePageinationIndex            of int
-    // Server
-    /// Main function. Forward request to Request Api -> Server.
-    | StartAdvancedSearch
-    | NewAdvancedSearchResults          of DbDomain.Term []
+    type Msg =
+        | ToggleSearchByParentOntology
+        | SearchTermTextChange                  of string
+        | TermSuggestionUsed                    of DbDomain.Term
+        | NewSuggestions                        of DbDomain.Term []
+        | StoreParentOntologyFromOfficeInterop  of TermMinimal option
+        // Server
+        | GetAllTermsByParentTermRequest        of TermMinimal 
+        | GetAllTermsByParentTermResponse       of DbDomain.Term []
+
+module AdvancedSearch =
+
+    type Msg =
+        // Client
+        | ResetAdvancedSearchState
+        | ResetAdvancedSearchOptions
+        | UpdateAdvancedTermSearchSubpage   of AdvancedSearch.AdvancedSearchSubpages
+        | ToggleModal                       of string
+        | ToggleOntologyDropdown
+        | UpdateAdvancedTermSearchOptions   of AdvancedSearch.AdvancedSearchOptions
+        | OntologySuggestionUsed            of DbDomain.Ontology option
+        | ChangePageinationIndex            of int
+        // Server
+        /// Main function. Forward request to Request Api -> Server.
+        | StartAdvancedSearch
+        | NewAdvancedSearchResults          of DbDomain.Term []
 
 type DevMsg =
     | LogTableMetadata
-    | GenericLog            of (string*string)
-    | GenericError          of exn
+    | GenericLog            of Cmd<Messages.Msg> * (string*string)
+    | GenericInteropLogs    of Cmd<Messages.Msg> * InteropLogging.Msg list
+    | GenericError          of Cmd<Messages.Msg> * exn
     | UpdateLastFullError   of exn option
     
 type ApiRequestMsg =
-    | TestOntologyInsert                        of (string*string*string*System.DateTime*string)
+    | TestOntologyInsert                        of (string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
-    | GetNewTermSuggestionsByParentTerm         of string*OntologyInfo
+    | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
     | GetNewBuildingBlockNameSuggestions        of string
     | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
-    | GetNewAdvancedTermSearchResults           of AdvancedTermSearchOptions
+    | GetNewAdvancedTermSearchResults           of AdvancedSearch.AdvancedSearchOptions
     | FetchAllOntologies
-    /// This function is used to search for all values found in the table main columns.
-    /// InsertTerm [] is created by officeInterop and passed to server for db search.
-    | SearchForInsertTermsRequest              of tableName:string*SearchTermI []
+    /// TermSearchable [] is created by officeInterop and passed to server for db search.
+    | SearchForInsertTermsRequest              of TermSearchable []
     //
     | GetAppVersion
 
@@ -103,7 +80,7 @@ type ApiResponseMsg =
     | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
     | UnitTermSuggestionResponse                of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | FetchAllOntologiesResponse                of DbDomain.Ontology []
-    | SearchForInsertTermsResponse              of tableName:string*SearchTermI []  
+    | SearchForInsertTermsResponse              of TermSearchable []  
     //
     | GetAppVersionResponse                     of string
 
@@ -116,20 +93,21 @@ type ApiMsg =
 type StyleChangeMsg =
     | ToggleBurger
     | ToggleQuickAcessIconsShown
-    | ToggleColorMode
+    | UpdateColorMode of ColorMode
 
 type PersistentStorageMsg =
     | NewSearchableOntologies of DbDomain.Ontology []
     | UpdateAppVersion of string
 
-type FilePickerMsg =
-    | LoadNewFiles              of string list
-    | UpdateFileNames           of newFileNames:(int*string) list
-    ///
-    | UpdateDNDDropped          of isDropped:bool
+module FilePicker =
+    type Msg =
+        | LoadNewFiles              of string list
+        | UpdateFileNames           of newFileNames:(int*string) list
 
-type AddBuildingBlockMsg =
-    | NewBuildingBlockSelected  of AnnotationBuildingBlock
+module BuildingBlock =
+
+    type Msg =
+    | NewBuildingBlockSelected  of BuildingBlockNamePrePrint
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown
 
@@ -141,81 +119,57 @@ type AddBuildingBlockMsg =
     | NewUnitTermSuggestions    of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
     | ToggleBuildingBlockHasUnit
 
-type ValidationMsg =
-    // Client
-    | UpdateDisplayedOptionsId of int option
-    | UpdateTableValidationScheme of Xml.ValidationTypes.TableValidation
-    // OfficeInterop
-    | StoreTableRepresentationFromOfficeInterop of OfficeInterop.Types.Xml.ValidationTypes.TableValidation * buildingBlocks:OfficeInterop.Types.BuildingBlockTypes.BuildingBlock [] * msg:string
+module Validation =
 
-type ProtocolInsertMsg =
-    // ------ Process from file ------
-    | ParseJsonToProcessRequest         of string
-    | ParseJsonToProcessResult          of Result<ISADotNet.Process,exn>
-    // Client
-    | RemoveProcessFromModel
-    // ------ Protocol from Database ------
-    | GetAllProtocolsRequest
-    | GetAllProtocolsResponse           of ProtocolTemplate []
-    // Access xml from db and parse it
-    /// Get Protocol Xml from db
-    | GetProtocolXmlByProtocolRequest   of ProtocolTemplate
-    /// On return parse Protocol Xml
-    | ParseProtocolXmlByProtocolRequest of ProtocolTemplate
-    /// Store Result from ParseProtocolXmlByProtocolRequest in model
-    | GetProtocolXmlByProtocolResponse  of ProtocolTemplate * OfficeInterop.Types.Xml.ValidationTypes.TableValidation * OfficeInterop.Types.BuildingBlockTypes.MinimalBuildingBlock list
-    | ProtocolIncreaseTimesUsed         of protocolName:string
-    // Client
-    | UpdateUploadData                  of string
-    | UpdateDisplayedProtDetailsId      of int option
-    | UpdateProtocolNameSearchQuery     of string
-    | UpdateProtocolTagSearchQuery      of string
-    | AddProtocolTag                    of string
-    | RemoveProtocolTag                 of string
-    | RemoveSelectedProtocol
-    | UpdateLoading                     of bool
+    type Msg =
+        // Client
+        | UpdateDisplayedOptionsId of int option
+        | UpdateTableValidationScheme of CustomXmlTypes.Validation.TableValidation
+        // OfficeInterop
+        | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlock []
+
+module Protocol =
+
+    type Msg =
+        // // ------ Process from file ------
+        | ParseUploadedFileRequest
+        | ParseUploadedFileResponse         of (string * InsertBuildingBlock []) []
+        // Client
+        /// Update JsonExportType which defines the type of json which is supposedly uploaded. Determines function which will be used for parsing.
+        | UpdateJsonExportType              of Shared.JsonExportType
+        | UpdateUploadFile                  of jsonString:string
+        | UpdateShowJsonTypeDropdown        of bool
+        // // ------ Protocol from Database ------
+        | GetAllProtocolsRequest
+        | GetAllProtocolsResponse           of ProtocolTemplate []
+        | GetProtocolByNameRequest          of string
+        | GetProtocolByNameResponse         of ProtocolTemplate
+        | ProtocolIncreaseTimesUsed         of protocolName:string
+        // Client
+        | UpdateDisplayedProtDetailsId      of int option
+        | UpdateProtocolNameSearchQuery     of string
+        | UpdateProtocolTagSearchQuery      of string
+        | AddProtocolTag                    of string
+        | RemoveProtocolTag                 of string
+        | RemoveSelectedProtocol
+        | UpdateLoading                     of bool
 
 type BuildingBlockDetailsMsg =
-    | GetSelectedBuildingBlockSearchTermsRequest    of Shared.SearchTermI []
-    | GetSelectedBuildingBlockSearchTermsResponse   of Shared.SearchTermI []
+    | GetSelectedBuildingBlockTermsRequest      of TermSearchable []
+    | GetSelectedBuildingBlockTermsResponse     of TermSearchable []
     | ToggleShowDetails
-    | UpdateCurrentRequestState                     of RequestBuildingBlockInfoStates
+    | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
 
-type SettingsXmlMsg =
-    // // Client // //
-    // Validation Xml
-    | UpdateActiveSwateValidation                   of OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | UpdateNextAnnotationTableForActiveValidation  of AnnotationTable option
-    | UpdateValidationXmls                          of OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
-    // Protocol Group Xml
-    | UpdateProtocolGroupXmls                       of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup []
-    | UpdateActiveProtocolGroup                     of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    | UpdateNextAnnotationTableForActiveProtGroup   of AnnotationTable option
-    // Protocol Xml
-    | UpdateActiveProtocol                          of OfficeInterop.Types.Xml.GroupTypes.Protocol option
-    | UpdateNextAnnotationTableForActiveProtocol    of AnnotationTable option
-    //
-    | UpdateRawCustomXml                            of string
-    | UpdateNextRawCustomXml                        of string
-    // Excel Interop
-    | GetAllValidationXmlParsedRequest
-    | GetAllValidationXmlParsedResponse             of OfficeInterop.Types.Xml.ValidationTypes.TableValidation list * AnnotationTable []
-    | GetAllProtocolGroupXmlParsedRequest
-    | GetAllProtocolGroupXmlParsedResponse          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup list * AnnotationTable []
-    | ReassignCustomXmlRequest                      of prevXml:OfficeInterop.Types.Xml.XmlTypes * newXml:OfficeInterop.Types.Xml.XmlTypes
-    | RemoveCustomXmlRequest                        of xml: OfficeInterop.Types.Xml.XmlTypes
+module SettingsXml =
+    type Msg =
+    //    // // Client // //
+    | UpdateRawCustomXml                            of string option
+    | UpdateNextRawCustomXml                        of string option
 
 type SettingsDataStewardMsg =
     // Client
     | UpdatePointerJson of string option
 
-type SettingsProtocolMsg =
-    | UpdateProtocolsFromExcel          of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    | UpdateProtocolsFromDB             of Shared.ProtocolTemplate []
-    // ExcelInterop
-    | GetActiveProtocolGroupXmlParsed
-    | GetProtocolsFromDBRequest         of OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-    | UpdateProtocolByNewVersion        of OfficeInterop.Types.Xml.GroupTypes.Protocol * Shared.ProtocolTemplate
 
 type TopLevelMsg =
     | CloseSuggestions
@@ -238,72 +192,82 @@ type Model = {
     SiteStyleState          : SiteStyleState
 
     ///States regarding term search
-    TermSearchState         : TermSearchState
+    TermSearchState         : TermSearch.Model
 
-    AdvancedSearchState     : AdvancedSearchState
+    AdvancedSearchState     : AdvancedSearch.Model
 
     ///Use this in the future to model excel stuff like table data
-    ExcelState              : ExcelState
+    ExcelState              : OfficeInterop.Model
 
     ///Use this to log Api calls and maybe handle them better
     ApiState                : ApiState
 
     ///States regarding File picker functionality
-    FilePickerState         : FilePickerState
+    FilePickerState         : FilePicker.Model
 
-    ProtocolInsertState     : ProtocolInsertState
+    ProtocolState           : Protocol.Model
 
     ///Insert annotation columns
-    AddBuildingBlockState   : AddBuildingBlockState
+    AddBuildingBlockState   : BuildingBlock.Model
 
     ///Create Validation scheme for Table
-    ValidationState         : ValidationState
+    ValidationState         : Validation.Model
 
     ///Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
 
     ///Used to manage all custom xml settings
-    SettingsXmlState            : SettingsXmlState
+    SettingsXmlState            : SettingsXml.Model
+
+    JsonExporterModel           : JsonExporter.Model
+
+    TemplateMetadataModel       : TemplateMetadata.Model
+
+    DagModel                    : Dag.Model
 
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
 
-    ///Used to manage protocols
-    SettingsProtocolState       : SettingsProtocolState
-
     WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
 } with
-    member this.updateByExcelState (s:ExcelState) =
+    member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
+    member this.updateByJsonExporterModel (m:JsonExporter.Model) =
+        { this with JsonExporterModel = m}
+    member this.updateByTemplateMetadataModel (m:TemplateMetadata.Model) =
+        { this with TemplateMetadataModel = m}
+    member this.updateByDagModel (m:Dag.Model) =
+        { this with DagModel = m}
 
-and Msg =
-    | Bounce                of (System.TimeSpan*string*Msg)
-    | DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
-    | Api                   of ApiMsg
-    | Dev                   of DevMsg
-    | TermSearch            of TermSearchMsg
-    | AdvancedSearch        of AdvancedSearchMsg
-    | ExcelInterop          of ExcelInteropMsg
-    | StyleChange           of StyleChangeMsg
-    | PersistentStorage     of PersistentStorageMsg
-    | FilePicker            of FilePickerMsg
-    | AddBuildingBlock      of AddBuildingBlockMsg
-    | Validation            of ValidationMsg
-    | ProtocolInsert        of ProtocolInsertMsg
-    | BuildingBlockDetails  of BuildingBlockDetailsMsg
-    | SettingsXmlMsg        of SettingsXmlMsg
-    | SettingDataStewardMsg of SettingsDataStewardMsg
-    | SettingsProtocolMsg   of SettingsProtocolMsg
-    | TopLevelMsg           of TopLevelMsg
-    | UpdatePageState       of Routing.Route option
-    | Batch                 of seq<Msg>
-    /// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
-    | UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
-    | DoNothing
+type Msg =
+| Bounce                of (System.TimeSpan*string*Msg)
+| DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
+| Api                   of ApiMsg
+| DevMsg                of DevMsg
+| TermSearchMsg         of TermSearch.Msg
+| AdvancedSearchMsg     of AdvancedSearch.Msg
+| OfficeInteropMsg      of OfficeInterop.Msg
+| StyleChange           of StyleChangeMsg
+| PersistentStorage     of PersistentStorageMsg
+| FilePickerMsg         of FilePicker.Msg
+| BuildingBlockMsg      of BuildingBlock.Msg
+| ValidationMsg         of Validation.Msg
+| ProtocolMsg           of Protocol.Msg
+| JsonExporterMsg       of JsonExporter.Msg
+| TemplateMetadataMsg   of TemplateMetadata.Msg
+| BuildingBlockDetails  of BuildingBlockDetailsMsg
+| SettingsXmlMsg        of SettingsXml.Msg
+| SettingDataStewardMsg of SettingsDataStewardMsg
+| DagMsg                of Dag.Msg
+//| SettingsProtocolMsg   of SettingsProtocolMsg
+| TopLevelMsg           of TopLevelMsg
+| UpdatePageState       of Routing.Route option
+| Batch                 of seq<Messages.Msg>
+/// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
+| UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
+| DoNothing
 
-open Routing
-
-let initializeModel (pageOpt: Route option) =
+let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
     let isDarkMode =
         let cookies = Browser.Dom.document.cookie
         let cookiesSplit = cookies.Split([|";"|], System.StringSplitOptions.RemoveEmptyEntries)
@@ -322,20 +286,22 @@ let initializeModel (pageOpt: Route option) =
     {
         DebouncerState              = Debouncer                 .create ()
         PageState                   = PageState                 .init pageOpt
-        PersistentStorageState      = PersistentStorageState    .init ()
+        PersistentStorageState      = PersistentStorageState    .init (pageEntry=pageEntry)
         DevState                    = DevState                  .init ()
         SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
-        TermSearchState             = TermSearchState           .init ()
-        AdvancedSearchState         = AdvancedSearchState       .init ()
-        ExcelState                  = ExcelState                .init ()
+        TermSearchState             = TermSearch.Model          .init ()
+        AdvancedSearchState         = AdvancedSearch.Model      .init ()
+        ExcelState                  = OfficeInterop.Model       .init ()
         ApiState                    = ApiState                  .init ()
-        FilePickerState             = FilePickerState           .init ()
-        AddBuildingBlockState       = AddBuildingBlockState     .init ()
-        ValidationState             = ValidationState           .init ()
-        ProtocolInsertState         = ProtocolInsertState       .init ()
+        FilePickerState             = FilePicker.Model          .init ()
+        AddBuildingBlockState       = BuildingBlock.Model       .init ()
+        ValidationState             = Validation.Model          .init ()
+        ProtocolState               = Protocol.Model            .init ()
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
-        SettingsXmlState            = SettingsXmlState          .init ()
+        SettingsXmlState            = SettingsXml.Model         .init ()
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
-        SettingsProtocolState       = SettingsProtocolState     .init ()
+        JsonExporterModel           = JsonExporter.Model        .init ()
+        TemplateMetadataModel       = TemplateMetadata.Model    .init ()
+        DagModel                    = Dag.Model                 .init ()
         WarningModal                = None
     }

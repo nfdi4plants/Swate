@@ -2,4 +2,7 @@ Saturn
 Fable.Remoting.Giraffe
 MySql.Data
 Microsoft.Extensions.Configuration.UserSecrets
-ISADotNet.Fable
+ISADotNet.XLSX
+ISADotNet.Viz
+ISADotNet
+DynamicObj

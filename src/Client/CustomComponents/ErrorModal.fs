@@ -12,7 +12,7 @@ open Shared
 open CustomComponents
 
 let errorModal (model:Model) dispatch =
-    let closeMsg = (fun e -> UpdateLastFullError None |> Dev |> dispatch) 
+    let closeMsg = (fun e -> UpdateLastFullError None |> DevMsg |> dispatch) 
     Modal.modal [ Modal.IsActive true ] [
         Modal.background [
             Props [ OnClick closeMsg ]
@@ -22,6 +22,6 @@ let errorModal (model:Model) dispatch =
             Notification.Props [Style [MaxWidth "80%"; MaxHeight "80%"; OverflowX OverflowOptions.Auto (*CSSProp.Custom ("overflow", "scroll")*)]]
         ] [
             Notification.delete [Props [OnClick closeMsg]][]
-            str model.DevState.LastFullError.Value.Message
+            str (model.DevState.LastFullError.Value.GetPropagatedError())
         ]
     ]

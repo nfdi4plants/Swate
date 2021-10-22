@@ -1,65 +1,14 @@
 namespace Shared
 
 open System
-//open ISADotNet
-
-module URLs =
-
-    [<LiteralAttribute>]
-    let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
-
-    /// accession string needs to have format: PO:0007131
-    let termAccessionUrlOfAccessionStr (accessionStr:string) =
-        let replaced = accessionStr.Replace(":","_")
-        TermAccessionBaseUrl + replaced
-
-    [<LiteralAttribute>]
-    let Nfdi4psoOntologyUrl = @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"
-
-    [<LiteralAttribute>]
-    let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
-
-    [<LiteralAttribute>]
-    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate/wiki"
-
-    [<LiteralAttribute>]
-    let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
-
-    /// This will only be needed as long there is no documentation on where to find all api docs.
-    /// As soon as that link exists it will replace DocsApiUrl and DocsApiUrl2
-    [<LiteralAttribute>]
-    let DocsApiUrl2 = @"/api/IServiceAPIv1/docs"
-
-    [<LiteralAttribute>]
-    let CSBTwitterUrl = @"https://twitter.com/cs_biology"
-
-    [<LiteralAttribute>]
-    let NFDITwitterUrl = @"https://twitter.com/nfdi4plants"
-
-    [<LiteralAttribute>]
-    let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
-
-module HelperFunctions =
-
-    open System.Text.RegularExpressions
-
-    /// (|Regex|_|) pattern input
-    let (|Regex|_|) pattern input =
-        let m = Regex.Match(input, pattern)
-        if m.Success then Some(m.Value)
-        else None
-
-    let isAccessionPattern = "^[a-zA-Z]+:[0-9]+$"
+open Shared
+open TermTypes
+open ProtocolTemplateTypes
 
 module Route =
-    /// Defines how routes are generated on server and mapped from client
-    //let builder typeName methodName =
-    //    sprintf "/api/%s/%s" typeName methodName
 
     let builder typeName methodName =
-
         sprintf "/api/%s/%s" typeName methodName
-
 
 module Suggestion =
     
@@ -76,118 +25,18 @@ module Suggestion =
         |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
         |> set
 
-module DbDomain =
-    
-    type Ontology = {
-        Name            : string
-        CurrentVersion  : string
-        Definition      : string
-        DateCreated     : System.DateTime
-        UserID          : string
-    }
-
-    let createOntology name currentVersion definition dateCreated userID = {     
-        Name            = name          
-        CurrentVersion  = currentVersion
-        Definition      = definition    
-        DateCreated     = dateCreated   
-        UserID          = userID        
-    }
-
-    type Term = {
-        OntologyName    : string
-        Accession       : string
-        Name            : string
-        Definition      : string
-        XRefValueType   : string option
-        IsObsolete      : bool
-    }
-
-    let createTerm accession ontologyName name definition xrefvaluetype isObsolete = {          
-        OntologyName  = ontologyName
-        Accession     = accession    
-        Name          = name         
-        Definition    = definition   
-        XRefValueType = xrefvaluetype
-        IsObsolete    = isObsolete   
-    }
-
-    type TermRelationship = {
-        TermID              : int64
-        RelationshipType    : string
-        RelatedTermID       : int64
-    }
-
-type OntologyInfo = {
-    /// This is the Ontology Name
-    Name            : string
-    /// This is the Ontology Term Accession 'XX:aaaaaa'
-    TermAccession   : string
-} with
-    static member create name termAccession = {
-        Name            = name
-        TermAccession   = termAccession
-    }
-
-type AnnotationTable = {
-    Name            : string
-    Worksheet       : string
-} with
-    static member create name worksheet = {
-        Name        = name
-        Worksheet   = worksheet
-    }
-
-/// Used in OfficeInterop to effectively find possible Term names and search for them in db
-type SearchTermI = {
-    ColIndices      : int []
-    SearchQuery     : OntologyInfo
-    ///// This is the Ontology Name
-    //SearchString    : string
-    ///// This is the Ontology Term Accession 'XX:aaaaaa'
-    //TermAccession   : string
-    IsA             : OntologyInfo option
-    RowIndices      : int []
-    TermOpt         : DbDomain.Term option
-} with
-    static member create colIndices searchString termAccession ontologyInfoOpt rowIndices = {
-        ColIndices      = colIndices
-        SearchQuery     = OntologyInfo.create searchString termAccession
-        //SearchString    = searchString
-        //TermAccession   = termAccession
-        IsA             = ontologyInfoOpt
-        RowIndices      = rowIndices
-        TermOpt         = None
-    }
-
-type ProtocolTemplate = {
-    Name            : string
-    Version         : string
-    Created         : DateTime
-    Author          : string
-    Description     : string
-    DocsLink        : string
-    CustomXml       : string
-    TableXml        : string
-    Tags            : string []
-    // WIP
-    Used            : int
-    Rating          : int  
-} with
-    static member create name version created author desc docs tags customXml tableXml used rating = {
-        Name            = name
-        Version         = version
-        Created         = created 
-        Author          = author
-        Description     = desc
-        DocsLink        = docs
-        Tags            = tags
-        CustomXml       = customXml
-        TableXml        = tableXml
-        // WIP          
-        Used            = used
-        Rating          = rating
-    }
+[<RequireQualifiedAccess>]
+type JsonExportType =
+| ProcessSeq
+| Assay
+| Table
+| ProtocolTemplate
+    member this.toExplanation =
+        match this with
+        | ProcessSeq        -> "Sequence of ISA process.json."
+        | Assay             -> "ISA assay.json"
+        | Table             -> "Access layer type. table.json utilizes minor ISA-JSON types in a more accessible model."
+        | ProtocolTemplate  -> "Schema for Swate protocol template, with template metadata and table json."
 
 /// This type is used to define target for unit term search.
 type UnitSearchRequest =
@@ -199,45 +48,68 @@ type ITestAPI = {
     getTestNumber           : unit      -> Async<int>
 }
 
-type IISADotNetAPIv1 = {
-    parseJsonToProcess      : string    -> Async<ISADotNet.Process> //Async<ISADotNet.Process>
-}
+//type IISADotNetAPIv1 = {
+//    parseJsonToProcess      : string    -> Async<ISADotNet.Process> //Async<ISADotNet.Process>
+//}
 
 type IServiceAPIv1 = {
     getAppVersion           : unit      -> Async<string>
 }
 
+type IDagAPIv1 = {
+    parseAnnotationTablesToDagHtml          : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+}
 
-type IAnnotatorAPIv1 = {
+type IISADotNetCommonAPIv1 = {
+    toAssayJson                 : byte [] -> Async<string>
+    toSwateTemplateJson         : byte [] -> Async<string>
+    toInvestigationJson         : byte [] -> Async<string>
+    toProcessSeqJson            : byte [] -> Async<string>
+    toTableJson                 : byte [] -> Async<string>
+    testPostNumber              : int   -> Async<string>
+    getTestNumber               : unit  -> Async<string>
+}
+
+type ISwateJsonAPIv1 = {
+    parseAnnotationTableToAssayJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
+    parseAnnotationTableToProcessSeqJson    : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
+    parseAnnotationTableToTableJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
+    parseAnnotationTablesToAssayJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    parseAnnotationTablesToProcessSeqJson   : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    parseAnnotationTablesToTableJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    parseAssayJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+    parseTableJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+    parseProcessSeqToBuildingBlocks         : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+}
+
+type IOntologyAPIv1 = {
     // Development
-    getTestNumber               : unit                                                  -> Async<int>
-    getTestString               : string                                                -> Async<string option>
+    getTestNumber               : unit                                          -> Async<int>
+
     // Ontology related requests
     /// (name,version,definition,created,user)
-    testOntologyInsert          : (string*string*string*System.DateTime*string)         -> Async<DbDomain.Ontology>
-    getAllOntologies            : unit                                                  -> Async<DbDomain.Ontology []>
+    testOntologyInsert          : (string*string*System.DateTime*string)        -> Async<DbDomain.Ontology>
+    getAllOntologies            : unit                                          -> Async<DbDomain.Ontology []>
 
     // Term related requests
+    ///
     getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : (int*string*OntologyInfo)                                     -> Async<DbDomain.Term []>
-    ///
-    getAllTermsByParentTerm             : OntologyInfo                                                  -> Async<DbDomain.Term []>
+    getTermSuggestionsByParentTerm      : (int*string*TermMinimal)                                      -> Async<DbDomain.Term []>
+    getAllTermsByParentTerm             : TermMinimal                                                   -> Async<DbDomain.Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : (int*string*OntologyInfo)                                     -> Async<DbDomain.Term []>
-    ///
-    getAllTermsByChildTerm              : OntologyInfo                                                  -> Async<DbDomain.Term []>
+    getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                      -> Async<DbDomain.Term []>
+    getAllTermsByChildTerm              : TermMinimal                                                   -> Async<DbDomain.Term []>
     /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
     getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
-
     getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<DbDomain.Term [] * UnitSearchRequest>
+    getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
+}
 
-    getTermsByNames                     : SearchTermI []                                                -> Async<SearchTermI []>
-
-    // Protocol apis
+type IProtocolAPIv1 = {
     getAllProtocolsWithoutXml       : unit                      -> Async<ProtocolTemplate []>
+    getProtocolByName               : string                    -> Async<ProtocolTemplate>
     getProtocolsByName              : string []                 -> Async<ProtocolTemplate []>
-    getProtocolXmlForProtocol       : ProtocolTemplate          -> Async<ProtocolTemplate>
     increaseTimesUsed               : string                    -> Async<unit>
 }
 

@@ -1,31 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <TargetFramework>net5.0</TargetFramework>
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="NFDIColors.fs" />
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
-        <Compile Include="Version.fs" />
-        <Compile Include="ISADotNetHelpers.fs" />
-        <Compile Include="Routing.fs" />
-        <Compile Include="ExcelColors.fs" />
-        <Compile Include="OfficeJS.fs" />
-        <Compile Include="OfficeInterop\Types.fs" />
-        <Compile Include="OfficeInterop\Regex.fs" />
-        <Compile Include="OfficeInterop\HelperFunctions.fs" />
-        <Compile Include="OfficeInterop\EventHandlers.fs" />
-        <Compile Include="OfficeInterop\OfficeInterop.fs" />
+        <Compile Include="PageTemplate.md" />
+        <Compile Include="HumanReadableIds.fs" />
+        <Compile Include="Colors\NFDIColors.fs" />
+        <Compile Include="Colors\ExcelColors.fs" />
         <Compile Include="Api.fs" />
+        <Compile Include="Routing.fs" />
+        <Compile Include="OfficeInterop\InteropLogging.fs" />
+        <Compile Include="OfficeInterop\CustomXmlTypes.fs" />
+        <Compile Include="OfficeInterop\Functions\TemplateMetadataFunctions.fs" />
+        <Compile Include="OfficeInterop\Functions\TermCollectionFunctions.fs" />
+        <Compile Include="OfficeInterop\Functions\ColHeaderIndexing.fs" />
+        <Compile Include="OfficeInterop\Functions\BuildingBlockFunctions.fs" />
+        <Compile Include="OfficeInterop\Functions\CustomXmlFunctions.fs" />
+        <Compile Include="OfficeInterop\HelperFunctions.fs" />
+        <Compile Include="OfficeInterop\OfficeInterop.fs" />
+        <Compile Include="OfficeInterop\OfficeInteropState.fs" />
+        <Compile Include="States\DagState.fs" />
+        <Compile Include="States\TemplateMetadataState.fs" />
+        <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
-        <Compile Include="Update.fs" />
+        <Compile Include="CustomComponents\ActionButton.fs" />
+        <Compile Include="CustomComponents\FunctionContainer.fs" />
         <Compile Include="CustomComponents\ResponsiveFA.fs" />
         <Compile Include="CustomComponents\DwnButton.fs" />
-        <Compile Include="CustomComponents\Footer.fs" />
         <Compile Include="CustomComponents\Button.fs" />
         <Compile Include="CustomComponents\AnnotationTableMissingWarning.fs" />
         <Compile Include="CustomComponents\Navbar.fs" />
@@ -36,26 +43,25 @@
         <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
-        <Compile Include="Views\BaseView.fs" />
-        <Compile Include="Views\LandingPageView.fs" />
-        <Compile Include="Views\AdvancedSearchView.fs" />
-        <Compile Include="Views\AddBuildingBlockView.fs" />
-        <Compile Include="Views\TermSearchView.fs" />
-        <Compile Include="Views\ValidationView.fs" />
-        <Compile Include="Views\FilePickerView.fs" />
-        <Compile Include="Views\ProtocolInsertView.fs" />
-        <Compile Include="Views\ProtocolSearchView.fs" />
-        <Compile Include="Views\InfoView.fs" />
-        <Compile Include="Views\ActivityLogView.fs" />
-        <Compile Include="Views\SettingsView.fs" />
-        <Compile Include="Views\SettingsXmlView.fs" />
-        <Compile Include="Views\SettingsProtocolView.fs" />
-        <Compile Include="Views\SettingsDataStewardView.fs" />
+        <Compile Include="BuildingBlock\BuildingBlockView.fs" />
+        <Compile Include="TermSearch\TermSearchView.fs" />
+        <Compile Include="ProtocolTemplates\ProtocolState.fs" />
+        <Compile Include="ProtocolTemplates\ProtocolSearchView.fs" />
+        <Compile Include="ProtocolTemplates\ProtocolView.fs" />
+        <Compile Include="FilePicker\FilePickerView.fs" />
+        <Compile Include="Validation\ValidationView.fs" />
+        <Compile Include="Info\InfoView.fs" />
+        <Compile Include="ActivityLog\ActivityLogView.fs" />
+        <Compile Include="Settings\SettingsXml\SettingsXmlView.fs" />
+        <Compile Include="Settings\SettingsView.fs" />
+        <Compile Include="JsonExporter\JsonExporter.fs" />
+        <Compile Include="TemplateMetadata\TemplateMetadata.fs" />
+        <Compile Include="Dag\Dag.fs" />
         <Compile Include="Views\NotFoundView.fs" />
+        <Compile Include="Views\BaseView.fs" />
+        <Compile Include="Update\OfficeInteropUpdate.fs" />
+        <Compile Include="Update.fs" />
         <Compile Include="Client.fs" />
-    </ItemGroup>
-    <ItemGroup>
-      <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="3.1.0" />
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\Shared\Shared.fsproj" />

@@ -3,44 +3,148 @@ open System.Threading.Tasks
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
-open FSharp.Control.Tasks.V2
 open Giraffe
 open Saturn
 open Shared
+open Shared.TermTypes
 
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Configuration
-open Microsoft.Extensions.Configuration.Json
-open Microsoft.Extensions.Configuration.UserSecrets
-open Microsoft.AspNetCore.Hosting
-
-/// Was transferred into dev.json
-//[<Literal>]
-//let DevLocalConnectionString = "server=127.0.0.1;user id=root;password=example; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
 
 let serviceApi = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
 }
 
 open ISADotNet
+open Microsoft.AspNetCore.Http
 
-let isaDotNetApi = {
-    parseJsonToProcess = fun jsonString -> async {
-        let parsedJson = ISADotNet.Json.Process.fromString jsonString
-        return parsedJson
+let dagApiv1 = {
+    parseAnnotationTablesToDagHtml = fun worksheetBuildingBlocks -> async {
+        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let processSequence = Option.defaultValue [] assay.ProcessSequence
+        let dag = Viz.DAG.fromProcessSequence (processSequence,Viz.Schema.NFDIBlue) |> CyjsAdaption.MyHTML.toEmbeddedHTML
+        return dag
     }
 }
 
-let annotatorApi cString = {
+let swateJsonAPIv1 = {
+    parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
+        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let parsedJsonStr = ISADotNet.Json.Assay.toString assay
+        return parsedJsonStr
+    }
+    parseAnnotationTableToProcessSeqJson = fun (worksheetName,buildingblocks) -> async {
+        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
+        return parsedJsonStr
+    }
+    parseAnnotationTableToTableJson = fun (worksheetName,buildingblocks) -> async {
+        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+        return parsedJsonStr
+    }
+    parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
+        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let parsedJsonStr = ISADotNet.Json.Assay.toString assay
+        return parsedJsonStr
+    }
+    parseAnnotationTablesToProcessSeqJson = fun worksheetBuildingBlocks -> async {
+        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
+        return parsedJsonStr
+    }
+    parseAnnotationTablesToTableJson = fun worksheetBuildingBlocks -> async {
+        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+        return parsedJsonStr
+    }
+    parseAssayJsonToBuildingBlocks = fun jsonString -> async {
+        let table = JsonImport.assayJsonToTable jsonString
+        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        return buildingBlocks
+    }
+    parseTableJsonToBuildingBlocks = fun jsonString -> async {
+        let table = JsonImport.tableJsonToTable jsonString
+        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        return buildingBlocks
+    }
+    parseProcessSeqToBuildingBlocks = fun jsonString -> async {
+        let table = JsonImport.processSeqJsonToTable jsonString
+        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        return buildingBlocks
+    }
+}
 
+let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
+    let assayFromByteArray (byteArray: byte []) =
+        let ms = new MemoryStream(byteArray)
+        let jsonStr = ISADotNet.XLSX.AssayFile.Assay.fromStream ms
+        jsonStr
+    let investigationFromByteArray (byteArray: byte []) =
+        let ms = new MemoryStream(byteArray)
+        let jsonStr =
+            ISADotNet.XLSX.Investigation.fromStream ms
+        jsonStr
+    let customXmlFromByteArray (byteArray: byte []) =
+        let ms = new MemoryStream(byteArray)
+        let jsonStr =
+            ISADotNet.XLSX.AssayFile.SwateTable.SwateTable.readSwateTablesFromStream ms
+            |> Array.ofSeq
+            |> Array.map (fun x -> ISADotNet.JsonExtensions.toString x)
+        jsonStr
+    {
+        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
+        toAssayJson = fun byteArray -> async {
+            let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
+            return assayJsonString
+        }
+        /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
+        toSwateTemplateJson = fun byteArray -> async {
+            let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
+            let ms = new MemoryStream(byteArray)
+            let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
+            let tableName = metadata.TryGetValue "Table"
+            let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
+            let assayJson = ISADotNet.Json.Assay.toString assay.Value
+            metadata.SetValue("TemplateJson",assayJson)
+            let jsonExp = metadata.toJson()
+            return jsonExp
+        }
+        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
+        toInvestigationJson = fun byteArray -> async {
+            let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
+            return investigationJson
+        }
+        toProcessSeqJson = fun byteArray -> async {
+            let assay = assayFromByteArray byteArray 
+            let processJSon = assay |> fun (_,_,_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
+            return processJSon
+        }
+        toTableJson = fun byteArray -> async {
+            let assay = assayFromByteArray byteArray 
+            let processJSon = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) 
+            return processJSon
+        }
+        testPostNumber = fun num -> async {
+            let res = $"Hey you just sent us a number. Is this your number {num}?"
+            return res
+        }
+        getTestNumber = fun () -> async {
+            return "42"
+        }
+    }
+
+let ontologyApi cString = {
     //Development
     getTestNumber = fun () -> async { return 42 }
-    getTestString = fun strOpt -> async { return None }
 
     //Ontology related requests
-    testOntologyInsert = fun (name,version,definition,created,user) ->
+    testOntologyInsert = fun (name,version,created,user) ->
         async {
             /// Don't allow users to access this part!! At least for now
             //let createdEntry = OntologyDB.insertOntology cString name version definition created user
@@ -48,7 +152,6 @@ let annotatorApi cString = {
                 DbDomain.createOntology 
                     name
                     version
-                    definition
                     created
                     user
             printfn "created pseudo ontology entry: \t%A. No actual db insert has happened." onto
@@ -66,7 +169,7 @@ let annotatorApi cString = {
         async {
             let searchRes =
                 match typedSoFar with
-                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like = OntologyDB.getTermSuggestions cString (typedSoFar)
@@ -75,17 +178,16 @@ let annotatorApi cString = {
                     |> Array.sortByDescending (fun sugg ->
                             Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
                     )
-                
                     |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
             return searchRes
         }
 
-    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:OntologyInfo) ->
+    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:TermMinimal) ->
         async {
 
             let searchRes =
                 match typedSoFar with
-                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like =
@@ -101,11 +203,10 @@ let annotatorApi cString = {
                     )
                     
                     |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
-
             return searchRes
         }
 
-    getAllTermsByParentTerm = fun (parentTerm:OntologyInfo) ->
+    getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
         async {
             let searchRes =
                 OntologyDB.getAllTermsByParentTermOntologyInfo cString parentTerm
@@ -113,12 +214,12 @@ let annotatorApi cString = {
             return searchRes  
         }
 
-    getTermSuggestionsByChildTerm = fun (max:int,typedSoFar:string,childTerm:OntologyInfo) ->
+    getTermSuggestionsByChildTerm = fun (max:int,typedSoFar:string,childTerm:TermMinimal) ->
         async {
 
             let searchRes =
                 match typedSoFar with
-                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like =
@@ -138,7 +239,7 @@ let annotatorApi cString = {
             return searchRes
         }
 
-    getAllTermsByChildTerm = fun (childTerm:OntologyInfo) ->
+    getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
         async {
             let searchRes =
                 OntologyDB.getAllTermsByChildTermOntologyInfo cString childTerm
@@ -161,7 +262,7 @@ let annotatorApi cString = {
         async {
             let searchRes =
                 match typedSoFar with
-                | HelperFunctions.Regex HelperFunctions.isAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like = OntologyDB.getUnitTermSuggestions cString (typedSoFar)
@@ -181,42 +282,55 @@ let annotatorApi cString = {
             let result =
                 queryArr |> Array.map (fun searchTerm ->
                     {searchTerm with
-                        TermOpt =
+                        SearchResultTerm =
                             // check if search string is empty. This case should delete TAN- and TSR- values in table
-                            if searchTerm.SearchQuery.Name = "" then None
+                            if searchTerm.Term.Name = "" then None
                             // check if term accession was found. If so search also by this as it is unique
-                            elif searchTerm.SearchQuery.TermAccession <> "" then
-                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.SearchQuery.Name,searchTerm.SearchQuery.TermAccession)
+                            elif searchTerm.Term.TermAccession <> "" then
+                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.Term.Name,searchTerm.Term.TermAccession)
                                 if Array.isEmpty searchRes then
                                     None
                                 else
                                     searchRes |> Array.head |> Some
-                            elif searchTerm.IsA.IsSome then
-                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.SearchQuery.Name,searchTerm.IsA.Value)
+                            // check if parent term was found and try find term via parent term
+                            elif searchTerm.ParentTerm.IsSome then
+                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.Term.Name,searchTerm.ParentTerm.Value)
                                 if Array.isEmpty searchRes then
-                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.SearchQuery.Name
+                                    // if no term can be found by is_a directed search do standard search by name
+                                    // no need to search for name and accession, as accession is the clearly defines a term and is checked in the if branch above.
+                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.Term.Name
                                     if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
                                 else
                                     searchRes |> Array.head |> Some
+                            // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
+                            elif searchTerm.IsUnit then
+                                let searchRes = OntologyDB.getTermByNameAndOntology cString (searchTerm.Term.Name,"uo")
+                                if Array.isEmpty searchRes then
+                                    None
+                                else
+                                    searchRes |> Array.head |> Some
+                            // if none of the above apply we do a standard term search
                             else
-                                let searchRes = OntologyDB.getTermByName cString searchTerm.SearchQuery.Name
+                                let searchRes = OntologyDB.getTermByName cString searchTerm.Term.Name
                                 if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
                     }
                 )
             return result
         }
+}
 
+let protocolApi cString = {
     getAllProtocolsWithoutXml = fun () -> async {
         let protocols = ProtocolDB.getAllProtocols cString
         return protocols
     }
 
-    getProtocolXmlForProtocol = fun prot -> async { return ProtocolDB.getXmlByProtocol cString prot }
+    getProtocolByName = fun prot -> async { return ProtocolDB.getProtocolByName cString prot }
 
     getProtocolsByName = fun (names) -> async {
-        let protsWithoutXml = names |> Array.map (fun x -> ProtocolDB.getProtocolByName cString x)
-        let protsWithXml = protsWithoutXml |> Array.map (ProtocolDB.getXmlByProtocol cString)
-        return protsWithXml
+        let prot = names |> Array.map (fun x -> ProtocolDB.getProtocolByName cString x)
+        //let protsWithXml = protsWithoutXml |> Array.map (ProtocolDB.getXmlByProtocol cString)
+        return prot
     }
 
     increaseTimesUsed = fun templateName -> async {
@@ -225,56 +339,80 @@ let annotatorApi cString = {
     }
 }
 
+let errorHandler (ex:exn) (routeInfo:RouteInfo<HttpContext>) =
+    let msg = sprintf "[SERVER SIDE ERROR]: %A @%s." ex.Message routeInfo.path
+    Propagate msg
+
+let createIProtocolApiv1 cString =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue (protocolApi cString)
+    //|> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler errorHandler
+    |> Remoting.buildHttpHandler
+
+let createIOntologyApiv1 cString =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue (ontologyApi cString)
+    |> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler errorHandler
+    |> Remoting.buildHttpHandler
+
 let createIServiceAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue serviceApi
-    |> Remoting.withDocs "/api/IServiceAPIv1/docs" DocsServiceAPIvs1.serviceApiDocsv1
+    |> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
-    )
+    |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
-let createISADotNetAPIv1 =
+let createISADotNetCommonAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue isaDotNetApi
-    |> Remoting.withDocs "/api/IISADotNetAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetApiDocsv1
+    |> Remoting.fromValue isaDotNetCommonAPIv1
+    //|> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
-    )
+    |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
-let createIAnnotatorApiv1 cString =
+let createExpertAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (annotatorApi cString)
-    |> Remoting.withDocs "/api/IAnnotatorAPIv1/docs" DocsAnnotationAPIvs1.annotatorApiDocsv1
+    |> Remoting.fromValue swateJsonAPIv1
+    //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler(
-        (fun x y -> Propagate (sprintf "[SERVER SIDE ERROR]: %A @ %A" x y))
-    )
+    |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
+let createDagApiv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue dagApiv1
+    //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler errorHandler
+    |> Remoting.buildHttpHandler
 
-/// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
-let mainApiController = router {
+///// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
+//let mainApiController = router {
 
-    //
-    forward @"/IAnnotatorAPIv1" (fun next ctx ->
-        let cString = 
-            let settings = ctx.GetService<IConfiguration>()
-            settings.["Swate:ConnectionString"]
-        createIAnnotatorApiv1 cString next ctx
-    )
+//    //
+//    forward @"/IOntologyAPIv1" (fun next ctx ->
+//        let cString = 
+//            let settings = ctx.GetService<IConfiguration>()
+//            settings.["Swate:ConnectionString"]
+//        createIOntologyApiv1 cString next ctx
+//    )
 
-    //
-    forward @"/IServiceAPIv1" (fun next ctx ->
-        createIServiceAPIv1 next ctx
-    )
-}
+//    //
+//    forward @"/IServiceAPIv1" (fun next ctx ->
+//        createIServiceAPIv1 next ctx
+//    )
+//}
 
 let topLevelRouter = router {
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
@@ -283,7 +421,14 @@ let topLevelRouter = router {
         let cString = 
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
-        createIAnnotatorApiv1 cString next ctx
+        createIOntologyApiv1 cString next ctx
+    )
+
+    forward @"" (fun next ctx ->
+        let cString = 
+            let settings = ctx.GetService<IConfiguration>()
+            settings.["Swate:ConnectionString"]
+        createIProtocolApiv1 cString next ctx
     )
 
     //
@@ -291,20 +436,28 @@ let topLevelRouter = router {
         createIServiceAPIv1 next ctx
     )
 
-    //
+    
     forward @"" (fun next ctx ->
-        createISADotNetAPIv1 next ctx
+        createISADotNetCommonAPIv1 next ctx
+    )
+
+    forward @"" (fun next ctx ->
+        createExpertAPIv1 next ctx
+    )
+
+    forward @""(fun next ctx ->
+        createDagApiv1 next ctx
     )
 }
 
 let app = application {
     url "http://localhost:5000/"
-    //force_ssl
     use_router topLevelRouter
     memory_cache
+    //logging 
     use_static "public"
     use_gzip
-    logging (fun (builder: ILoggingBuilder) -> builder.SetMinimumLevel(LogLevel.Warning) |> ignore)
+    logging (fun (builder: ILoggingBuilder) -> builder.SetMinimumLevel(LogLevel.Debug) |> ignore)
 }
 
 app
