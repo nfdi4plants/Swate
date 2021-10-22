@@ -223,11 +223,15 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
         ]
         Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu"); ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
             Navbar.Dropdown.div [ ] [
+                Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.NFDITwitterUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                    str "News "
+                    Fa.i [Fa.Brand.Twitter; Fa.Size Fa.FaLarge; Fa.Props [Style [Color "#1DA1F2"]]][]
+                ]
                 Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.DocsFeatureUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                     str "How to use"
                 ]
                 Navbar.Item.a [Navbar.Item.Props [Href @"https://github.com/nfdi4plants/Swate/issues/new/choose"; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                    str "Contact"
+                    str "Contact Developers"
                 ]
                 Navbar.Item.a [Navbar.Item.Props [
                     OnClick (fun e ->
