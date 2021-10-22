@@ -56,6 +56,10 @@ type IServiceAPIv1 = {
     getAppVersion           : unit      -> Async<string>
 }
 
+type IDagAPIv1 = {
+    parseAnnotationTablesToDagHtml          : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+}
+
 type IISADotNetCommonAPIv1 = {
     toAssayJson                 : byte [] -> Async<string>
     toSwateTemplateJson         : byte [] -> Async<string>
@@ -78,7 +82,7 @@ type ISwateJsonAPIv1 = {
     parseProcessSeqToBuildingBlocks         : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
 }
 
-type IAnnotatorAPIv1 = {
+type IOntologyAPIv1 = {
     // Development
     getTestNumber               : unit                                          -> Async<int>
 
@@ -100,8 +104,9 @@ type IAnnotatorAPIv1 = {
     getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
     getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<DbDomain.Term [] * UnitSearchRequest>
     getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
+}
 
-    // Protocol apis
+type IProtocolAPIv1 = {
     getAllProtocolsWithoutXml       : unit                      -> Async<ProtocolTemplate []>
     getProtocolByName               : string                    -> Async<ProtocolTemplate>
     getProtocolsByName              : string []                 -> Async<ProtocolTemplate []>

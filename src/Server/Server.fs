@@ -20,6 +20,14 @@ let serviceApi = {
 open ISADotNet
 open Microsoft.AspNetCore.Http
 
+let dagApiv1 = {
+    parseAnnotationTablesToDagHtml = fun worksheetBuildingBlocks -> async {
+        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let processSequence = Option.defaultValue [] assay.ProcessSequence
+        return ""
+    }
+}
+
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
         let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
@@ -60,12 +68,7 @@ let swateJsonAPIv1 = {
     parseTableJsonToBuildingBlocks = fun jsonString -> async {
         let table = JsonImport.tableJsonToTable jsonString
         if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-        printfn "Will parse \"%A\" sheets" table.Sheets.Length
         let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
-        printfn "n sheets: %A" buildingBlocks.Length
-        buildingBlocks |> Array.iter (fun (sheetName,columns) ->
-            printfn "%A, n columns: %A" sheetName columns.Length
-        )
         return buildingBlocks
     }
     parseProcessSeqToBuildingBlocks = fun jsonString -> async {
@@ -135,7 +138,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         }
     }
 
-let annotatorApi cString = {
+let ontologyApi cString = {
     //Development
     getTestNumber = fun () -> async { return 42 }
 
@@ -313,7 +316,9 @@ let annotatorApi cString = {
                 )
             return result
         }
+}
 
+let protocolApi cString = {
     getAllProtocolsWithoutXml = fun () -> async {
         let protocols = ProtocolDB.getAllProtocols cString
         return protocols
@@ -337,11 +342,20 @@ let errorHandler (ex:exn) (routeInfo:RouteInfo<HttpContext>) =
     let msg = sprintf "[SERVER SIDE ERROR]: %A @%s." ex.Message routeInfo.path
     Propagate msg
 
-let createIAnnotatorApiv1 cString =
+let createIProtocolApiv1 cString =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (annotatorApi cString)
-    |> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.annotatorApiDocsv1
+    |> Remoting.fromValue (protocolApi cString)
+    //|> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler errorHandler
+    |> Remoting.buildHttpHandler
+
+let createIOntologyApiv1 cString =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue (ontologyApi cString)
+    |> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
@@ -359,7 +373,7 @@ let createISADotNetCommonAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue isaDotNetCommonAPIv1
-    |> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
+    //|> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
@@ -373,22 +387,31 @@ let createExpertAPIv1 =
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
-/// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
-let mainApiController = router {
+let createDagApiv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue dagApiv1
+    //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler errorHandler
+    |> Remoting.buildHttpHandler
 
-    //
-    forward @"/IAnnotatorAPIv1" (fun next ctx ->
-        let cString = 
-            let settings = ctx.GetService<IConfiguration>()
-            settings.["Swate:ConnectionString"]
-        createIAnnotatorApiv1 cString next ctx
-    )
+///// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
+//let mainApiController = router {
 
-    //
-    forward @"/IServiceAPIv1" (fun next ctx ->
-        createIServiceAPIv1 next ctx
-    )
-}
+//    //
+//    forward @"/IOntologyAPIv1" (fun next ctx ->
+//        let cString = 
+//            let settings = ctx.GetService<IConfiguration>()
+//            settings.["Swate:ConnectionString"]
+//        createIOntologyApiv1 cString next ctx
+//    )
+
+//    //
+//    forward @"/IServiceAPIv1" (fun next ctx ->
+//        createIServiceAPIv1 next ctx
+//    )
+//}
 
 let topLevelRouter = router {
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
@@ -397,7 +420,14 @@ let topLevelRouter = router {
         let cString = 
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
-        createIAnnotatorApiv1 cString next ctx
+        createIOntologyApiv1 cString next ctx
+    )
+
+    forward @"" (fun next ctx ->
+        let cString = 
+            let settings = ctx.GetService<IConfiguration>()
+            settings.["Swate:ConnectionString"]
+        createIProtocolApiv1 cString next ctx
     )
 
     //
@@ -412,6 +442,10 @@ let topLevelRouter = router {
 
     forward @"" (fun next ctx ->
         createExpertAPIv1 next ctx
+    )
+
+    forward @""(fun next ctx ->
+        createDagApiv1 next ctx
     )
 }
 

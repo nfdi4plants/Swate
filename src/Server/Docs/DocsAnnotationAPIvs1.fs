@@ -7,16 +7,16 @@ open Fable.Remoting.Giraffe
 
 open DocsFunctions
 
-let annotatorDocsv1 = Docs.createFor<IAnnotatorAPIv1>()
+let ontologyDocsv1 = Docs.createFor<IOntologyAPIv1>()
 
-let annotatorApiDocsv1 =
+let ontologyApiDocsv1 =
     Remoting.documentation (sprintf "Annotation API v1") [
 
         ///////////////////////////////////////////////////////////// Development /////////////////////////////////////////////////////////////
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getTestNumber @>
-        |> annotatorDocsv1.alias "Get Test Number (<code>getTestNumber</code>)"
-        |> annotatorDocsv1.description
+        ontologyDocsv1.route <@ fun api -> api.getTestNumber @>
+        |> ontologyDocsv1.alias "Get Test Number (<code>getTestNumber</code>)"
+        |> ontologyDocsv1.description
             (
                 createDocumentationDescription
                     "This is used during development to check connection between client and server."
@@ -28,9 +28,9 @@ let annotatorApiDocsv1 =
 
         ///////////////////////////////////////////////////////////// Ontology related requests /////////////////////////////////////////////////////////////
         ////////
-        annotatorDocsv1.route <@ fun api -> api.testOntologyInsert @>
-        |> annotatorDocsv1.alias "Test Insertion of Ontology into Database (<code>testOntologyInsert</code>)"
-        |> annotatorDocsv1.description
+        ontologyDocsv1.route <@ fun api -> api.testOntologyInsert @>
+        |> ontologyDocsv1.alias "Test Insertion of Ontology into Database (<code>testOntologyInsert</code>)"
+        |> ontologyDocsv1.description
             (
                 createDocumentationDescription
                     "This is a preview function for a future feature. Right now it only returns an <code>DbDomain.Ontology</code> that <b>would</b> be created."
@@ -45,12 +45,12 @@ let annotatorApiDocsv1 =
                     "Creates a <code>DbDomain.Ontology</code> from the given params and returns it."
                     (Parameter.create "Ontology" PredefinedParams.OntologyType "A database Ontology entry. This one is not from the database and is currently <b>not</b> created. <code>ID</code> is a set value for this version.")
             )
-        |> annotatorDocsv1.example <@ fun api -> api.testOntologyInsert ("TO","releases/testdate",PredefinedParams.Examples.test,"UserTestId") @>
+        |> ontologyDocsv1.example <@ fun api -> api.testOntologyInsert ("TO","releases/testdate",PredefinedParams.Examples.test,"UserTestId") @>
 
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getAllOntologies @>
-        |> annotatorDocsv1.alias "Get All Ontologies (<code>getAllOntologies</code>)"
-        |> annotatorDocsv1.description (
+        ontologyDocsv1.route <@ fun api -> api.getAllOntologies @>
+        |> ontologyDocsv1.alias "Get All Ontologies (<code>getAllOntologies</code>)"
+        |> ontologyDocsv1.description (
             let dbDomainOntologyArr =
                 PredefinedParams.OntologyType
                 |> ParamArray
@@ -61,13 +61,13 @@ let annotatorApiDocsv1 =
                 "This function returns an array of all Database.Ontology entries in the form of <code>DbDomain.Ontology []</code>."
                 (Parameter.create "Ontology []" dbDomainOntologyArr "Array of database Ontology entries.")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getAllOntologies () @>
+        |> ontologyDocsv1.example <@ fun api -> api.getAllOntologies () @>
 
         ///////////////////////////////////////////////////////////// Term related requests /////////////////////////////////////////////////////////////
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getTermSuggestions @>
-        |> annotatorDocsv1.alias "Get Terms (<code>getTermSuggestions</code>)"
-        |> annotatorDocsv1.description
+        ontologyDocsv1.route <@ fun api -> api.getTermSuggestions @>
+        |> ontologyDocsv1.alias "Get Terms (<code>getTermSuggestions</code>)"
+        |> ontologyDocsv1.description
             (
                 let dbDomainTermArr =
                     PredefinedParams.TermType
@@ -84,12 +84,12 @@ let annotatorApiDocsv1 =
                     "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
                     (Parameter.create "Term []" dbDomainTermArr "Array of database Term entries.")
             )
-        |> annotatorDocsv1.example <@ fun api -> api.getTermSuggestions (5,"micrOTOF-Q") @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermSuggestions (5,"micrOTOF-Q") @>
 
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getTermSuggestionsByParentTerm @>
-        |> annotatorDocsv1.alias "Get Terms By Parent Ontology Term (<code>getTermSuggestionsByParentTerm</code>)"
-        |> annotatorDocsv1.description (
+        ontologyDocsv1.route <@ fun api -> api.getTermSuggestionsByParentTerm @>
+        |> ontologyDocsv1.alias "Get Terms By Parent Ontology Term (<code>getTermSuggestionsByParentTerm</code>)"
+        |> ontologyDocsv1.description (
             createDocumentationDescription
                 "This is a <code>getTermSuggestions</code> variant, used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the parent ontology (written at the top of the column)."
                 "If a column with a parent ontology is selected, the app will add this to the 'TermSearch' field in a static button. This can be toggled but a small slider below. If this alternative term search is active then <code>getTermSuggestionsByParentTerm</code> is executed."
@@ -101,12 +101,12 @@ let annotatorApiDocsv1 =
                 "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
                 (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q",PredefinedParams.Examples.ontologyInfoExmp) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermSuggestionsByParentTerm (5,"micrOTOF-Q",PredefinedParams.Examples.ontologyInfoExmp) @>
 
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getAllTermsByParentTerm @>
-        |> annotatorDocsv1.alias "Get All Terms By Parent Ontology Term (<code>getAllTermsByParentTerm</code>)"
-        |> annotatorDocsv1.description (
+        ontologyDocsv1.route <@ fun api -> api.getAllTermsByParentTerm @>
+        |> ontologyDocsv1.alias "Get All Terms By Parent Ontology Term (<code>getAllTermsByParentTerm</code>)"
+        |> ontologyDocsv1.description (
             createDocumentationDescription
                 "This is a <code>getTermSuggestions</code> variant, used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the parent ontology (written at the top of the column)."
                 "If a column with a parent ontology is selected, the app will add this to the 'TermSearch' field in a static button. This can be toggled but a small slider below. If this alternative term search is active then <code>getAllTermsByParentTerm</code> and the input field is still empty, a double click will trigger this search."
@@ -116,12 +116,12 @@ let annotatorApiDocsv1 =
                 "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
                 (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getAllTermsByParentTerm PredefinedParams.Examples.ontologyInfoExmp @>
+        |> ontologyDocsv1.example <@ fun api -> api.getAllTermsByParentTerm PredefinedParams.Examples.ontologyInfoExmp @>
 
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getTermSuggestionsByChildTerm @>
-        |> annotatorDocsv1.alias "Get Terms By Child Ontology Term (<code>getTermSuggestionsByChildTerm</code>)"
-        |> annotatorDocsv1.description (
+        ontologyDocsv1.route <@ fun api -> api.getTermSuggestionsByChildTerm @>
+        |> ontologyDocsv1.alias "Get Terms By Child Ontology Term (<code>getTermSuggestionsByChildTerm</code>)"
+        |> ontologyDocsv1.description (
             createDocumentationDescription
                 "This function does something similiar to <code>getTermSuggestionsByParentTerm</code>. But instead of searching children in a is_a directed search, it searches all parents in a is_a directed search."
                 "It is used purely as API endpoint for Spawn, but might be implemented for Swate in the future."
@@ -133,12 +133,12 @@ let annotatorApiDocsv1 =
                 "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
                 (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getTermSuggestionsByChildTerm (5,"inst",PredefinedParams.Examples.ontologyInfoExmp2) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermSuggestionsByChildTerm (5,"inst",PredefinedParams.Examples.ontologyInfoExmp2) @>
 
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getAllTermsByChildTerm @>
-        |> annotatorDocsv1.alias "Get All Terms By Child Ontology Term (<code>getAllTermsByChildTerm</code>)"
-        |> annotatorDocsv1.description (
+        ontologyDocsv1.route <@ fun api -> api.getAllTermsByChildTerm @>
+        |> ontologyDocsv1.alias "Get All Terms By Child Ontology Term (<code>getAllTermsByChildTerm</code>)"
+        |> ontologyDocsv1.description (
             createDocumentationDescription
                 "This is a <code>getTermSuggestions</code> variant, used to reduce the number of possible hits searching only data that is in a \"is_a\" relation to the child ontology term."
                 "It is used purely as API endpoint for Spawn, but might be implemented for Swate in the future."
@@ -148,12 +148,12 @@ let annotatorApiDocsv1 =
                 "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
                 (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getAllTermsByParentTerm (PredefinedParams.Examples.ontologyInfoExmp2) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getAllTermsByParentTerm (PredefinedParams.Examples.ontologyInfoExmp2) @>
 
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getTermsForAdvancedSearch @>
-        |> annotatorDocsv1.alias "Get Terms Advanced Search (<code>getTermsForAdvancedSearch</code>)"
-        |> annotatorDocsv1.description
+        ontologyDocsv1.route <@ fun api -> api.getTermsForAdvancedSearch @>
+        |> ontologyDocsv1.alias "Get Terms Advanced Search (<code>getTermsForAdvancedSearch</code>)"
+        |> ontologyDocsv1.description
             (
                 createDocumentationDescription
                     "<code>getTermsForAdvancedSearch</code>) can be used to search for specific Terms that might not show up in the top 5 results of the normal term search."
@@ -169,16 +169,16 @@ let annotatorApiDocsv1 =
                     "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>."
                     (Parameter.create "Term []" (PredefinedParams.TermType |> ParamArray) "Array of database Term entries.")
             )
-        |> annotatorDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (None                                 , "unit volume", ""        ,""                 ,""     ,true) @>
-        |> annotatorDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (PredefinedParams.Examples.unitOntologyExmp |> Some, "unit volume", ""        ,""                 ,""     ,true) @>
-        |> annotatorDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (PredefinedParams.Examples.unitOntologyExmp |> Some, "unit volume", "volume"  ,""                 ,""     ,true) @>
-        |> annotatorDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (PredefinedParams.Examples.unitOntologyExmp |> Some, "unit volume", "volume"  ,"mass per volume"  ,""     ,true) @>
-        |> annotatorDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (PredefinedParams.Examples.unitOntologyExmp |> Some, "unit volume", "volume"  ,"mass per volume"  ,"mass" ,true) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (None                                 , "unit volume", ""        ,""                 ,""     ,true) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (PredefinedParams.Examples.unitOntologyExmp |> Some, "unit volume", ""        ,""                 ,""     ,true) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (PredefinedParams.Examples.unitOntologyExmp |> Some, "unit volume", "volume"  ,""                 ,""     ,true) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (PredefinedParams.Examples.unitOntologyExmp |> Some, "unit volume", "volume"  ,"mass per volume"  ,""     ,true) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermsForAdvancedSearch (PredefinedParams.Examples.unitOntologyExmp |> Some, "unit volume", "volume"  ,"mass per volume"  ,"mass" ,true) @>
 
         ////////
-        annotatorDocsv1.route <@ fun api -> api.getUnitTermSuggestions @>
-        |> annotatorDocsv1.alias "Get Unit Terms (<code>getUnitTermSuggestions</code>)"
-        |> annotatorDocsv1.description (
+        ontologyDocsv1.route <@ fun api -> api.getUnitTermSuggestions @>
+        |> ontologyDocsv1.alias "Get Unit Terms (<code>getUnitTermSuggestions</code>)"
+        |> ontologyDocsv1.description (
             let dbDomainTermArr =
                 PredefinedParams.TermType
                 |> ParamArray
@@ -194,12 +194,12 @@ let annotatorApiDocsv1 =
                 "This function returns an array of matching Database.Term entries in the form of <code>DbDomain.Term []</code>. The matching results are restricted to Term.FK_OntologyID = 1 (Unit Ontology)."
                 (Parameter.create "Term []" dbDomainTermArr "Array of database Term entries.")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getUnitTermSuggestions (5,"light", Unit1) @>
-        |> annotatorDocsv1.example <@ fun api -> api.getUnitTermSuggestions (5,"temp", Unit1) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getUnitTermSuggestions (5,"light", Unit1) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getUnitTermSuggestions (5,"temp", Unit1) @>
 
-        annotatorDocsv1.route <@ fun api -> api.getTermsByNames @>
-        |> annotatorDocsv1.alias "Get Unit Terms (<code>getTermsByNames</code>)"
-        |> annotatorDocsv1.description (
+        ontologyDocsv1.route <@ fun api -> api.getTermsByNames @>
+        |> ontologyDocsv1.alias "Get Unit Terms (<code>getTermsByNames</code>)"
+        |> ontologyDocsv1.description (
             createDocumentationDescription
                 "This function uses the given <code>SearchTermI []</code> to try and find one search result for each member of <code>SearchTermI []</code> for the
                 <code>SearchTermI.SearchString</code> on Term.Name in the database.
@@ -212,6 +212,6 @@ let annotatorApiDocsv1 =
                 "Returns the parameter array posted to it with the search result in <code>SearchTerm.TermOpt</code>."
                 (Parameter.create "SearchTermI []" (PredefinedParams.SearchTermType |> ParameterType.ParamArray) "")
         )
-        |> annotatorDocsv1.example <@ fun api -> api.getTermsByNames ([|PredefinedParams.Examples.termSearchableExmp|]) @>
+        |> ontologyDocsv1.example <@ fun api -> api.getTermsByNames ([|PredefinedParams.Examples.termSearchableExmp|]) @>
     ]
 

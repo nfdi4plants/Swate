@@ -20,7 +20,7 @@ module URLs =
     let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate/wiki"
 
     [<LiteralAttribute>]
-    let DocsApiUrl = @"/api/IAnnotatorAPIv1/docs"
+    let DocsApiUrl = @"/api/IOntologyAPIv1/docs"
 
     /// This will only be needed as long there is no documentation on where to find all api docs.
     /// As soon as that link exists it will replace DocsApiUrl and DocsApiUrl2
