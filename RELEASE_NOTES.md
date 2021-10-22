@@ -1,13 +1,21 @@
-### 0.5.0+4fb63e9 (Released 2021-10-19)
+### 0.5.0+19a93b2 (Released 2021-10-21)
 * Additions:
-    * latest commit #4fb63e9
+    * latest commit #19a93b2
+    * [[#612332c](https://github.com/nfdi4plants/Swate/commit/612332c9a58da4a625e9ddfca89f1b4145bab202)] Add sort to conserve template column order
+    * [[#8205eeb](https://github.com/nfdi4plants/Swate/commit/8205eeb82ce6bbcd3ccd4c972e9438616b9badbe)] Redesign json-swate table parsing and init json import :tada:
+    * [[#074cf1a](https://github.com/nfdi4plants/Swate/commit/074cf1a77d2d9eb4d920ce7588c619462b243ca6)] Rename JSON to Json :art:
+    * [[#d080748](https://github.com/nfdi4plants/Swate/commit/d080748dd90510f676aefc43aec6905bd3539830)] Add parsing from json to annotation tables :sparkles:
+    * [[#16ec188](https://github.com/nfdi4plants/Swate/commit/16ec1880b99d1d0b102d965f413c29ef47fe1669)] Improve server side error feedback.
+    * [[#19a20c5](https://github.com/nfdi4plants/Swate/commit/19a20c520e8c63062edb401a604d899d97d5c3a5)] Merge InsertBuildingBlock and values to one type.
+    * [[#7b293ce](https://github.com/nfdi4plants/Swate/commit/7b293ce6dcbfc3e8a658222d326db31d13ca541b)] Implement isa json value import with row extension.
+    * [[#19a93b2](https://github.com/nfdi4plants/Swate/commit/19a93b2a444fa2d0376f387ab58beeab75fb139e)] Add multi-table support for json import.
     * Column headers slimmed, only term accession number in brackets
     * Unit section slimmed from three columns to one
-        * Units tracked with number section in Excel
-        * Only terms from unit ontology (UO) allowed
+    * Units tracked with number section in Excel
+    * Only terms from unit ontology (UO) allowed
     * Protocol insert is now called template insert and more generalized
     * Building blocks can only be inserted once
-        * When trying to insert duplicate activity log shows success, but that headers were already found
+    * When trying to insert duplicate activity log shows success, but that headers were already found
     * [[#e63bffc](https://github.com/nfdi4plants/Swate/commit/e63bffc767f61939e09b7f2f4f4cfac950babe21)] Make protocol preview table scrollable :lipstick:
     * [[#8d83591](https://github.com/nfdi4plants/Swate/commit/8d83591f25ad20f9497db166072e4b1bc8e37ddf)] improve template insert performance
     * [[#f6ebef3](https://github.com/nfdi4plants/Swate/commit/f6ebef39294b76a762bc15426fde657e4cb25e40)] Allow each building block only once per sheet
@@ -30,6 +38,7 @@
 * Deletions:
     * [[#8302630](https://github.com/nfdi4plants/Swate/commit/830263002d8429ec5016fefc91ec100228e9c496)] Remove definition field from ontologies
 * Bugfixes:
+    * [[#8f33b3b](https://github.com/nfdi4plants/Swate/commit/8f33b3b6e1a62f7d94e023cc791bd7e332369f1a)] Fix index error in json exporting rows :bug:
     * [[#0fb73e2](https://github.com/nfdi4plants/Swate/commit/0fb73e2b2786e2b9dfbf12ed17d983809b7cbabf)] Update navbar to stay fixed
     * [[#6afcd91](https://github.com/nfdi4plants/Swate/commit/6afcd9102bd3e858c46621dda3e6fc804abc6afe)] Fix context update issues in interop functions
     * [[#4fb63e9](https://github.com/nfdi4plants/Swate/commit/4fb63e9767da0fe82479c42cbd13b9f0c89b0209)] Fix warning modal when just entering validation subpage :bug:
