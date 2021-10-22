@@ -27,11 +27,12 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.
     | None ->
         let nextPageState = {
             currentModel.PageState with
-                CurrentPage = Route.NotFound
+                CurrentPage = Route.TermSearch
         }
 
         let nextModel = {
             currentModel with
+                PersistentStorageState = { currentModel.PersistentStorageState with PageEntry = SwateEntry.Core }
                 PageState = nextPageState
         }
         nextModel,Cmd.none
@@ -460,12 +461,11 @@ let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyle
         }
         nextState, Cmd.none
 
-    | ToggleColorMode       -> 
-        let opposite = not currentState.IsDarkMode
+    | UpdateColorMode nextColors -> 
         let nextState = {
             currentState with
-                IsDarkMode = opposite;
-                ColorMode = if opposite then ExcelColors.darkMode else ExcelColors.colorfullMode
+                IsDarkMode = nextColors.Name.StartsWith ExcelColors.darkMode.Name;
+                ColorMode = nextColors
         }
         nextState,Cmd.none
 

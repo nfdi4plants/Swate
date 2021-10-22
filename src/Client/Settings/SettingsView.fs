@@ -25,12 +25,41 @@ let toggleDarkModeElement (model:Model) dispatch =
                 Switch.IsOutlined
                 Switch.Color IsPrimary
                 Switch.OnChange (fun _ ->
+                    let isCurrentlyDarkMode = model.SiteStyleState.IsDarkMode
                     Browser.Dom.document.cookie <-
-                        let isDarkMode b =
-                            let expire = System.DateTime.Now.AddYears 100
-                            $"{Cookies.IsDarkMode.toCookieString}={b.ToString()}; expires={expire.ToUniversalTime()}; path=/"
-                        not model.SiteStyleState.IsDarkMode |> isDarkMode
-                    ToggleColorMode |> StyleChange |> dispatch
+                        let expire = System.DateTime.Now.AddYears 100
+                        $"{Cookies.IsDarkMode.toCookieString}={(not isCurrentlyDarkMode).ToString()}; expires={expire.ToUniversalTime()}; path=/"
+                    let nextColor = if isCurrentlyDarkMode then ExcelColors.colorfullMode else ExcelColors.darkMode
+                    UpdateColorMode nextColor |> StyleChange |> dispatch
+                )
+            ] []
+        ]
+    ]
+
+let toggleRgbModeElement (model:Model) dispatch =
+    Level.level [Level.Level.IsMobile][
+        Level.left [][
+            str "RGB"
+        ]
+        Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
+            Switch.switch [
+                let isActive = model.SiteStyleState.ColorMode = ExcelColors.transparentMode
+                Switch.Id "RgbModeSwitch"
+                Switch.Checked isActive
+                Switch.IsOutlined
+                Switch.Color IsPrimary
+                Switch.OnChange (fun _ ->
+                    if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
+                        let nextColor =
+                            if isActive then
+                                let b = Browser.Dom.document.body
+                                b.classList.remove("niceBkgrnd")
+                                ExcelColors.darkMode
+                            else
+                                let b = Browser.Dom.document.body
+                                b.classList.add("niceBkgrnd")
+                                ExcelColors.transparentMode
+                        UpdateColorMode nextColor |> StyleChange |> dispatch
                 )
             ] []
         ]
@@ -60,6 +89,9 @@ let settingsViewComponent (model:Model) dispatch =
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Customize Swate"]
         toggleDarkModeElement model dispatch
+
+        if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
+            toggleRgbModeElement model dispatch
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Advanced Settings"]
         customXmlSettings model dispatch

@@ -93,7 +93,7 @@ type ApiMsg =
 type StyleChangeMsg =
     | ToggleBurger
     | ToggleQuickAcessIconsShown
-    | ToggleColorMode
+    | UpdateColorMode of ColorMode
 
 type PersistentStorageMsg =
     | NewSearchableOntologies of DbDomain.Ontology []

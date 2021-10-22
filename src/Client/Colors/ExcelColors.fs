@@ -87,6 +87,19 @@ let colorfullMode = {
     Fade                    = Excel.Tint30
 }
 
+let transparentMode = {
+    Name                    = "Dark_rgb"
+    BodyBackground          = "transparent"
+    BodyForeground          = Black.gray160
+    ControlBackground       = Black.gray140
+    ControlForeground       = Black.gray100
+    ElementBackground       = Black.Primary
+    ElementForeground       = Black.gray140
+    Text                    = NFDIColors.white
+    Accent                  = NFDIColors.white
+    Fade                    = Black.gray70
+}
+
 let colorElement (mode:ColorMode) =
     Style [
         BackgroundColor mode.ElementBackground

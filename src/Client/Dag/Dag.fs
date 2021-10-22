@@ -58,17 +58,31 @@ open Messages
 
 let defaultMessageEle (model:Model) dispatch =
     mainFunctionContainer [
-        Button.a [
-            Button.IsFullWidth
-            Button.Color Color.IsInfo
-            Button.OnClick(fun e -> ParseTablesOfficeInteropRequest |> DagMsg |> dispatch)
-        ][
-            str "Display dag"
+        Field.div [][
+            Help.help [][
+                str "A "
+                b [][str "D"]
+                str "irected "
+                b [][str "A"]
+                str "cyclic "
+                b [][str "G"]
+                str "raph represents the chain of applied protocols to samples. Within are all intermediate products as well as protocols displayed."
+            ]
+        ]
+        
+        Field.div [][
+            Button.a [
+                Button.IsFullWidth
+                Button.Color Color.IsInfo
+                Button.OnClick(fun e -> ParseTablesOfficeInteropRequest |> DagMsg |> dispatch)
+            ][
+                str "Display dag"
+            ]
         ]
 
         if model.DagModel.DagHtml.IsSome then
             Field.div [][
-                iframe [SrcDoc model.DagModel.DagHtml.Value; Style [Width "800px"; Height "400px"] ][]
+                iframe [SrcDoc model.DagModel.DagHtml.Value; Style [Width "100%"; Height "400px"] ][]
             ]
     ]
 
@@ -80,7 +94,7 @@ let mainElement (model:Messages.Model) dispatch =
 
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "DAG"]
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display acyclic graph"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display directed acyclic graph"]
 
         defaultMessageEle model dispatch
     ]

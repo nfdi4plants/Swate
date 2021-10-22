@@ -342,7 +342,12 @@ let autocompleteTermSearchComponentOfParentOntology
                                 v?value |> autocompleteParams.OnInputChangeMsg |> dispatch
                         )
                     ]           
-                    Input.OnChange (fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch)
+                    Input.OnChange (fun e ->
+                        if e.Value = "nice_rgb" then
+                            let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
+                            UpdateColorMode c |> Messages.StyleChange |> dispatch
+                        e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
+                    )
                 ]
             ]
         ]
