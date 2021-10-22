@@ -8,6 +8,7 @@
     <ItemGroup>
         <None Include="paket.references" />
         <Compile Include="Version.fs" />
+        <Compile Include="CyjsAdaption.fs" />
         <Compile Include="TemplateMetadata.fs" />
         <Compile Include="ISADotNet.fs" />
         <Compile Include="JsonExport.fs" />

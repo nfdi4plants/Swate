@@ -44,7 +44,6 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 worksheetBuildingBlocksTuple
                 (ParseTablesDagServerResponse >> DagMsg)
                 (curry GenericError (Dag.UpdateLoading false |> DagMsg |> Cmd.ofMsg) >> DevMsg)
-
         currentModel, cmd
     //
     | ParseTablesDagServerResponse dagHtml ->
@@ -60,10 +59,17 @@ open Messages
 let defaultMessageEle (model:Model) dispatch =
     mainFunctionContainer [
         Button.a [
-            Button.OnClick(fun e -> ())
+            Button.IsFullWidth
+            Button.Color Color.IsInfo
+            Button.OnClick(fun e -> ParseTablesOfficeInteropRequest |> DagMsg |> dispatch)
         ][
-            str "Click me!"
+            str "Display dag"
         ]
+
+        if model.DagModel.DagHtml.IsSome then
+            Field.div [][
+                iframe [SrcDoc model.DagModel.DagHtml.Value; Style [Width "800px"; Height "400px"] ][]
+            ]
     ]
 
 let mainElement (model:Messages.Model) dispatch =

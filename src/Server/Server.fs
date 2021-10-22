@@ -24,7 +24,8 @@ let dagApiv1 = {
     parseAnnotationTablesToDagHtml = fun worksheetBuildingBlocks -> async {
         let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let processSequence = Option.defaultValue [] assay.ProcessSequence
-        return ""
+        let dag = Viz.DAG.fromProcessSequence (processSequence,Viz.Schema.NFDIBlue) |> CyjsAdaption.MyHTML.toEmbeddedHTML
+        return dag
     }
 }
 
