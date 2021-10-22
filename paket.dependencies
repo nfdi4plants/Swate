@@ -5,7 +5,8 @@ storage: none
 nuget DynamicObj 0.2.1
 nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
-nuget ISADotNet.XLSX 0.3.3-preview.5
+nuget ISADotNet.XLSX 0.4.0-preview.1
+nuget ISADotNet.Viz 0.4.0-preview.1
 nuget Saturn
 nuget Expecto
 nuget FSharp.Data
