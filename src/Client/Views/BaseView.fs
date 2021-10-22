@@ -56,6 +56,7 @@ let tabs (model:Model) dispatch =
             createNavigationTab Routing.Route.TermSearch            model dispatch
             createNavigationTab Routing.Route.Protocol              model dispatch
             createNavigationTab Routing.Route.FilePicker            model dispatch
+            createNavigationTab Routing.Route.Dag                   model dispatch
             createNavigationTab Routing.Route.Info                  model dispatch
         else
             createNavigationTab Routing.Route.JsonExport            model dispatch

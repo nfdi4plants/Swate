@@ -119,6 +119,11 @@ let view (model : Model) (dispatch : Msg -> unit) =
             //Text.p [] [str ""]
         ]
 
+    | Routing.Route.Dag ->
+        BaseView.baseViewMainElement model dispatch [
+            Dag.mainElement model dispatch
+        ] [ (*Footer*) ]
+
     | Routing.Route.Info ->
         BaseView.baseViewMainElement model dispatch [
             InfoView.infoComponent model dispatch

@@ -223,6 +223,8 @@ type Model = {
 
     TemplateMetadataModel       : TemplateMetadata.Model
 
+    DagModel                    : Dag.Model
+
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
 
@@ -254,6 +256,7 @@ type Msg =
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | SettingsXmlMsg        of SettingsXml.Msg
 | SettingDataStewardMsg of SettingsDataStewardMsg
+| DagMsg                of Dag.Msg
 //| SettingsProtocolMsg   of SettingsProtocolMsg
 | TopLevelMsg           of TopLevelMsg
 | UpdatePageState       of Routing.Route option
@@ -297,5 +300,6 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
         JsonExporterModel           = JsonExporter.Model        .init ()
         TemplateMetadataModel       = TemplateMetadata.Model    .init ()
+        DagModel                    = Dag.Model                 .init ()
         WarningModal                = None
     }

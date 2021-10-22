@@ -61,32 +61,6 @@ let exampleExcelFunction1 () =
 
         OfficeInterop.TermCollectionFunctions.addUpdateSelectedCellToQueryParamHandler context
 
-        //promise {
-            
-            //let! termNamerange = OfficeInterop.TermCollectionFunctions.getSwateTermCollectionNameCol context
-
-            //let! addValidation = context.sync().``then``(fun _ ->
-
-            //    // https://fable.io/docs/communicate/js-from-fable.html
-            //    let t1 = createEmpty<ListDataValidation>
-            //    t1.inCellDropDown <- true
-            //    t1.source <- U2.Case1 "=SwateTermCollection!$D$2#"
-
-            //    let t2 = createEmpty<DataValidationRule>
-            //    t2.list <- Some t1
-
-            //    //https://stackoverflow.com/questions/37881457/how-to-implement-data-validation-in-excel-using-office-js-api
-            //    //https://docs.microsoft.com/de-de/javascript/api/excel/excel.datavalidation?view=excel-js-preview#rule
-            //    selectedRangeValidation.rule <- t2
-
-            //    $"{selectedRangeValidation.rule.list.Value.inCellDropDown},{selectedRangeValidation.rule.list.Value.source}"
-            //)
-
-            //let! mySync = context.sync().``then``(fun _ -> ())
-
-            //return addValidation
-        //}
-
     )
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
@@ -936,7 +910,7 @@ let addAnnotationBlocks (buildingBlocks:InsertBuildingBlock []) =
         } 
     )
 
-let addAnnotationBlocksInNewSheet (worksheetName:string,buildingBlocks:InsertBuildingBlock []) =
+let addAnnotationBlocksInNewSheet activateWorksheet (worksheetName:string,buildingBlocks:InsertBuildingBlock []) =
     Excel.run(fun context ->
         promise {
 
@@ -948,6 +922,8 @@ let addAnnotationBlocksInNewSheet (worksheetName:string,buildingBlocks:InsertBui
 
             let! addNewBuildingBlocksLogging = addAnnotationBlocksToTable(buildingBlocks, newTable, context)
 
+            if activateWorksheet then newWorksheet.activate()
+
             let newSheetLogging = InteropLogging.Msg.create InteropLogging.Info $"Create new worksheet: {worksheetName}"
 
             return newSheetLogging::newTableLogging::addNewBuildingBlocksLogging
@@ -955,8 +931,14 @@ let addAnnotationBlocksInNewSheet (worksheetName:string,buildingBlocks:InsertBui
     )
 
 let addAnnotationBlocksInNewSheets (annotationTablesToAdd: (string*InsertBuildingBlock []) []) =
+    // Use different context instances for individual worksheet creation.
+    // Does not work with Excel.run at the beginning and passing the related context to subfunctions.
     annotationTablesToAdd
-    |> Array.map addAnnotationBlocksInNewSheet
+    |> Array.mapi (fun i x ->
+        let acitvate = i = annotationTablesToAdd.Length-1
+        addAnnotationBlocksInNewSheet acitvate x
+            
+    )
     |> Promise.all
     |> Promise.map List.concat
 

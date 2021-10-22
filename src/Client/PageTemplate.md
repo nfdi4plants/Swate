@@ -52,11 +52,11 @@ open ExcelColors
 open Model
 open Messages
 
-open NewName //!
+open (*NewName*) 
 
 let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
-    | NewName.DefaultMsg ->
+    | DefaultMsg ->
         Fable.Core.JS.console.log "Default Msg"
         currentModel, Cmd.none
 
@@ -65,13 +65,13 @@ open Messages
 let defaultMessageEle (model:Model) dispatch =
     mainFunctionContainer [
         Button.a [
-            Button.OnClick(fun e -> DefaultMsg |> NewNameMsg |> dispatch)
+            Button.OnClick(fun e -> DefaultMsg |> (*NewName*)Msg |> dispatch)
         ][
             str "Click me!"
         ]
     ]
 
-let newNameMainElement (model:Messages.Model) dispatch =
+let mainElement (model:Messages.Model) dispatch =
     form [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
@@ -88,7 +88,7 @@ let newNameMainElement (model:Messages.Model) dispatch =
 6. Add update subrouting to the update function in ``Update.fs``.
 
 ```fsharp
-    | NewNameMsg msg ->
+    | (*NewName.*)Msg msg ->
         let nextModel, nextCmd = currentModel |> (*NewName.*)update msg
         nextModel, nextCmd
 ```
@@ -98,8 +98,8 @@ let newNameMainElement (model:Messages.Model) dispatch =
 ```fsharp
     | Routing.Route.NewName ->
         BaseView.baseViewMainElement model dispatch [
-            JSONExporter.newNameMainElement model dispatch
-        ] [ (*Footer*) ]
+            (*NewName.*).mainElement model dispatch
+        ] [ ]
 ```
 
 8. Add navigation tab (optional). Just follow existing scheme in ``View.BaseView.fs``.

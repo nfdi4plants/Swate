@@ -197,32 +197,6 @@ let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
     | BuildingBlockType.Sample | BuildingBlockType.Data | BuildingBlockType.Source ->
         true
 
-//let createUnitTermSuggestions (model:Model) (dispatch: Msg -> unit) =
-//    if model.AddBuildingBlockState.UnitTermSuggestions.Length > 0 then
-//        model.AddBuildingBlockState.UnitTermSuggestions
-//        |> fun s -> s |> Array.take (if s.Length < 5 then s.Length else 5)
-//        |> Array.map (fun sugg ->
-//            tr [OnClick (fun _ -> sugg |> UnitTermSuggestionUsed |> AddBuildingBlock |> dispatch)
-//                colorControl model.SiteStyleState.ColorMode
-//                Class "suggestion"
-//            ] [
-//                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
-//                    Fa.i [Fa.Solid.InfoCircle] []
-//                ]
-//                td [] [
-//                    b [] [str sugg.Name]
-//                ]
-//                td [Style [Color ""]] [if sugg.IsObsolete then str "obsolete"]
-//                td [Style [FontWeight "light"]] [small [] [str sugg.Accession]]
-//            ])
-//        |> List.ofArray
-//    else
-//        [
-//            tr [] [
-//                td [] [str "No terms found matching your input."]
-//            ]
-//        ]
-
 
 let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit) (block: BuildingBlockType )  =
     Dropdown.Item.a [
@@ -400,7 +374,8 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
     mainFunctionContainer [
         Field.div [][
             Help.help [][
-                str "Adds a unit to a the complete building block. If the building block already has a unit assigned, the new unit is only applied to selected rows of the selected column."
+                b [][str "Adds a unit to a complete building block." ]
+                str " If the building block already has a unit assigned, the new unit is only applied to selected rows of the selected column."
             ]
         ]
         Field.div [Field.HasAddons] [

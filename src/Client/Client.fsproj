@@ -24,6 +24,7 @@
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
+        <Compile Include="States\DagState.fs" />
         <Compile Include="States\TemplateMetadataState.fs" />
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
@@ -55,6 +56,7 @@
         <Compile Include="Settings\SettingsView.fs" />
         <Compile Include="JsonExporter\JsonExporter.fs" />
         <Compile Include="TemplateMetadata\TemplateMetadata.fs" />
+        <Compile Include="Dag\Dag.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Views\BaseView.fs" />
         <Compile Include="Update\OfficeInteropUpdate.fs" />

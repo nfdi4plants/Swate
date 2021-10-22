@@ -763,6 +763,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel, nextCmd = currentModel |> TemplateMetadata.update msg
         nextModel, nextCmd
 
+    | DagMsg msg ->
+        let nextModel, nextCmd = currentModel |> Dag.update msg
+        nextModel, nextCmd
+
     | TopLevelMsg topLevelMsg ->
         let nextModel, nextCmd =
             handleTopLevelMsg topLevelMsg currentModel

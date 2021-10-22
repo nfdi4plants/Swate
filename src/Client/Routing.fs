@@ -19,6 +19,7 @@ type Route =
 | Info
 | Protocol
 | ProtocolSearch
+| Dag /// Directed Acylclic Graph
 | JsonExport
 | TemplateMetadata
 | ActivityLog
@@ -31,12 +32,13 @@ type Route =
         | Route.Home                -> "/"
         | Route.BuildingBlock       -> "/#BuildingBlock"
         | Route.TermSearch          -> "/#TermSearch"
-        | Route.Validation          -> "/#Validation"   
         | Route.FilePicker          -> "/#FilePicker"
         | Route.Protocol            -> "/#ProtocolInsert"
         | Route.ProtocolSearch      -> "/#Protocol/Search"
-        | Route.JsonExport          -> "/#JsonExport"
-        | Route.TemplateMetadata    -> "/#TemplateMetadata"
+        | Route.Dag                 -> "/#Dag"
+        | Route.Validation          -> "/#Experts/Validation"   
+        | Route.JsonExport          -> "/#Experts/JsonExport"
+        | Route.TemplateMetadata    -> "/#Experts/TemplateMetadata"
         | Route.Info                -> "/#Info"
         | Route.ActivityLog         -> "/#ActivityLog"
         | Route.Settings            -> "/#Settings"
@@ -48,10 +50,11 @@ type Route =
         | Route.Home                -> ""
         | Route.BuildingBlock       -> "Building Blocks"
         | Route.TermSearch          -> "Terms"
-        | Route.Validation          -> "Checklist Editor"
         | Route.FilePicker          -> "File Picker"
         | Route.Protocol            -> "Templates"
         | Route.ProtocolSearch      -> "Template Search"
+        | Route.Dag                 -> "Directed Acylclic Graph"
+        | Route.Validation          -> "Checklist Editor"
         | Route.JsonExport          -> "Json Export"
         | Route.TemplateMetadata    -> "Template Metadata"
         | Route.Info                -> "Info"
@@ -76,12 +79,13 @@ type Route =
         match p with
         | Route.Home                -> createElem [Fa.Solid.Home                            ]   (p.toStringRdbl)
         | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
-        | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
         | Route.BuildingBlock       -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
-        | Route.Protocol            -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)
+        | Route.Protocol            -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Table      ]   (p.toStringRdbl)
         | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
+        | Route.Dag                 -> createElem [Fa.Solid.ProjectDiagram                  ]   (p.toStringRdbl)
+        | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
         | Route.JsonExport          -> createElem [Fa.Solid.FileExport                      ]   (p.toStringRdbl)
-        | Route.TemplateMetadata    -> createElem [Fa.Solid.Table; Fa.Solid.PlusCircle      ]   (p.toStringRdbl)     
+        | Route.TemplateMetadata    -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Table;     ]   (p.toStringRdbl)     
         | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
         | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
         | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  
@@ -101,13 +105,14 @@ module Routing =
             map Route.Home                  (s "")
             map Route.TermSearch            (s "TermSearch")
             map Route.BuildingBlock         (s "BuildingBlock")
-            map Route.Validation            (s "Validation")
             map Route.FilePicker            (s "FilePicker")
             map Route.Info                  (s "Info")
             map Route.Protocol              (s "ProtocolInsert")
             map Route.ProtocolSearch        (s "Protocol" </> s "Search")
-            map Route.JsonExport            (s "JsonExport")
-            map Route.TemplateMetadata      (s "TemplateMetadata")
+            map Route.Dag                   (s "Dag")
+            map Route.Validation            (s "Experts" </> s "Validation")
+            map Route.JsonExport            (s "Experts" </> s "JsonExport")
+            map Route.TemplateMetadata      (s "Experts" </> s "TemplateMetadata")
             map Route.ActivityLog           (s "ActivityLog")
             map Route.Settings              (s "Settings")
             map Route.SettingsXml           (s "Settings" </> s "Xml")
