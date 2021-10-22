@@ -254,7 +254,7 @@ module TemplateFromDB =
         mainFunctionContainer [
             Field.div [][
                 Help.help [][
-                    b [] [str "Search the database for protocol templates."]
+                    b [] [str "Search the database for templates."]
                     str " The building blocks from these templates can be inserted into the Swate table. "
                     span [Style [Color NFDIColors.Red.Base]][str "Only missing building blocks will be added."]
                 ]
@@ -293,7 +293,7 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
         TemplateFromDB.showDatabaseProtocolTemplate model dispatch
 
         /// Box 2
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks from file."]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add template(s) from file."]
 
         TemplateFromJsonFile.protocolInsertElement model dispatch
 

@@ -1,6 +1,14 @@
-### 0.5.0+19a93b2 (Released 2021-10-21)
+### 0.5.0+ac96487 (Released 2021-10-22)
 * Additions:
-    * latest commit #19a93b2
+    * latest commit #ac96487
+    * [[#ac96487](https://github.com/nfdi4plants/Swate/commit/ac964873bb7bb4e6ce1c79b5d62a990ad9d484c0)] Update production swate url in manifest.
+    * [[#2f7db37](https://github.com/nfdi4plants/Swate/commit/2f7db3705777bec830240a82fbe263861cf260f5)] Update dag visuals
+    * [[#6c62234](https://github.com/nfdi4plants/Swate/commit/6c62234aeda2d232a6054b278fff4785d8902aba)] Finalize dag :sparkles:
+    * [[#48c5c36](https://github.com/nfdi4plants/Swate/commit/48c5c3653e0615ba84546ccec466d46308056d7d)] Update ISADotNet :arrow_up:, Add ISADotNet.Viz :heavy_plus_sign:
+    * [[#5cd3a36](https://github.com/nfdi4plants/Swate/commit/5cd3a364686fbba74f084398d600ed6ff8a22e94)] Add twitter link for news to burga menu
+    * [[#f3ecb8d](https://github.com/nfdi4plants/Swate/commit/f3ecb8d83408bcc3d3d73b2085e9ba4df0ffda3a)] Split server apis :boom:
+    * [[#cf6df06](https://github.com/nfdi4plants/Swate/commit/cf6df0687fcf085c3d978250ef60a658acd76e14)] Set up dag state
+    * [[#954437d](https://github.com/nfdi4plants/Swate/commit/954437d191db43d5ed21b189aaf619ce6a044f21)] Init dag page :tada:
     * [[#612332c](https://github.com/nfdi4plants/Swate/commit/612332c9a58da4a625e9ddfca89f1b4145bab202)] Add sort to conserve template column order
     * [[#8205eeb](https://github.com/nfdi4plants/Swate/commit/8205eeb82ce6bbcd3ccd4c972e9438616b9badbe)] Redesign json-swate table parsing and init json import :tada:
     * [[#074cf1a](https://github.com/nfdi4plants/Swate/commit/074cf1a77d2d9eb4d920ce7588c619462b243ca6)] Rename JSON to Json :art:
