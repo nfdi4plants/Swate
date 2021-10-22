@@ -72,7 +72,7 @@ module Protocol =
             let nextState = {currentState with Loading = true}
             let cmd =
                 Cmd.OfAsync.either
-                    Api.api.getAllProtocolsWithoutXml
+                    Api.protocolApi.getAllProtocolsWithoutXml
                     ()
                     (GetAllProtocolsResponse >> ProtocolMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -87,7 +87,7 @@ module Protocol =
         | GetProtocolByNameRequest protocolName ->
             let cmd =
                 Cmd.OfAsync.either
-                    Api.api.getProtocolByName
+                    Api.protocolApi.getProtocolByName
                     protocolName
                     (GetProtocolByNameResponse >> ProtocolMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -103,7 +103,7 @@ module Protocol =
         | ProtocolIncreaseTimesUsed protocolTemplateName ->
             let cmd =
                 Cmd.OfAsync.attempt
-                    Api.api.increaseTimesUsed
+                    Api.protocolApi.increaseTimesUsed
                     protocolTemplateName
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd

@@ -236,6 +236,8 @@ type Model = {
         { this with JsonExporterModel = m}
     member this.updateByTemplateMetadataModel (m:TemplateMetadata.Model) =
         { this with TemplateMetadataModel = m}
+    member this.updateByDagModel (m:Dag.Model) =
+        { this with DagModel = m}
 
 type Msg =
 | Bounce                of (System.TimeSpan*string*Msg)

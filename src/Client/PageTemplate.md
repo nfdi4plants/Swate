@@ -72,10 +72,10 @@ let defaultMessageEle (model:Model) dispatch =
     ]
 
 let mainElement (model:Messages.Model) dispatch =
-    form [
+    Content.content [ Content.Props [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
-    ] [
+    ]] [
 
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "JSON Exporter"]
 

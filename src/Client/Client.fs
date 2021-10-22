@@ -13,17 +13,6 @@ open Update
 open Shared
 open ExcelJS.Fable.GlobalBindings
 
-module Server =
-
-    open Shared
-    open Fable.Remoting.Client
-
-    /// A proxy you can use to talk to server directly
-    let api : IAnnotatorAPIv1 =
-      Remoting.createApi()
-      |> Remoting.withRouteBuilder Route.builder
-      |> Remoting.buildProxy<IAnnotatorAPIv1>
-
 let initializeAddIn () = Office.onReady()
 
 // defines the initial state and initial command (= side-effect) of the application

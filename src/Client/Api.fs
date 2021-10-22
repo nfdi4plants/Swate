@@ -4,10 +4,20 @@ open Shared
 open Fable.Remoting.Client
 
 /// A proxy you can use to talk to server directly
-let api : IAnnotatorAPIv1 =
+let api : IOntologyAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<IAnnotatorAPIv1>
+    |> Remoting.buildProxy<IOntologyAPIv1>
+
+let protocolApi : IProtocolAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<IProtocolAPIv1>
+
+let dagApi: IDagAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<IDagAPIv1>
 
 let serviceApi : IServiceAPIv1 =
     Remoting.createApi()

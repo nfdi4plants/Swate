@@ -15,30 +15,62 @@ open ExcelColors
 open Model
 open Messages
 
-open Dag //!
+open Dag
 
 let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
-    | DefaultMsg ->
-        Fable.Core.JS.console.log "Default Msg"
-        currentModel, Cmd.none
+    | UpdateLoading loading ->
+        let nextModel = {
+            currentModel.DagModel with
+                Loading = loading
+        }
+        currentModel.updateByDagModel nextModel, Cmd.none
+    | ParseTablesOfficeInteropRequest ->
+        let nextModel = {
+            currentModel.DagModel with
+                Loading = true
+        }
+        let cmd =
+            Cmd.OfPromise.either
+                OfficeInterop.getBuildingBlocksAndSheets
+                ()
+                (ParseTablesDagServerRequest >> DagMsg)
+                (curry GenericError (Dag.UpdateLoading false |> DagMsg |> Cmd.ofMsg) >> DevMsg)
+        currentModel.updateByDagModel nextModel, cmd
+    | ParseTablesDagServerRequest (worksheetBuildingBlocksTuple) ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.dagApi.parseAnnotationTablesToDagHtml
+                worksheetBuildingBlocksTuple
+                (ParseTablesDagServerResponse >> DagMsg)
+                (curry GenericError (Dag.UpdateLoading false |> DagMsg |> Cmd.ofMsg) >> DevMsg)
+
+        currentModel, cmd
+    //
+    | ParseTablesDagServerResponse dagHtml ->
+        let nextModel = {
+            currentModel.DagModel with
+                Loading = false
+                DagHtml = Some dagHtml
+        }
+        currentModel.updateByDagModel nextModel, Cmd.none
 
 open Messages
 
 let defaultMessageEle (model:Model) dispatch =
     mainFunctionContainer [
         Button.a [
-            Button.OnClick(fun e -> DefaultMsg |> DagMsg |> dispatch)
+            Button.OnClick(fun e -> ())
         ][
             str "Click me!"
         ]
     ]
 
 let mainElement (model:Messages.Model) dispatch =
-    form [
+    Content.content [ Content.Props [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
-    ] [
+    ]] [
 
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "DAG"]
 

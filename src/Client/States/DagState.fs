@@ -1,11 +1,22 @@
 namespace Dag
 
+open Shared.OfficeInteropTypes
+
+type HtmlString = string
+
 type Model = {
-    Default: obj
+    Loading : bool
+    DagHtml : HtmlString option
 } with
     static member init() = {
-        Default = ""
+        Loading = false
+        DagHtml = None
     }
 
 type Msg =
-| DefaultMsg
+//Client
+| UpdateLoading of bool
+//
+| ParseTablesOfficeInteropRequest
+| ParseTablesDagServerRequest of (string * BuildingBlock []) []
+| ParseTablesDagServerResponse of dagHtml:string
