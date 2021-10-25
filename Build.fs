@@ -165,6 +165,12 @@ Target.create "Bundle" (fun _ ->
     |> runParallel
 )
 
+Target.create "Bundle-Linux" (fun _ ->
+    [ "server", dotnet $"publish -c Release -r linux-x64 -o \"{deployPath}\"" serverPath
+      "client", dotnet "fable --run webpack -p" clientPath ]
+    |> runParallel
+)
+
 Target.create "Run" (fun _ ->
     run dotnet "build" sharedPath
     [ "server", dotnet "watch run" serverPath
