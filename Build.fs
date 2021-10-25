@@ -66,13 +66,45 @@ module ReleaseNoteTasks =
 
     let githubDraft = Target.create "GithubDraft" (fun config ->
 
-        let body = "We are ready to go for the first release!"
+        let assetPath = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets\assets")
+        let assetDir = Fake.IO.DirectoryInfo.ofPath assetPath
+
+        let files =
+            let assetsPaths = Fake.IO.DirectoryInfo.getFiles assetDir
+            assetsPaths |> Array.map (fun x -> x.FullName)
+
+        Zip.zip assetDir.FullName ".assets\swate.zip" files
+
+        let bodyText =
+            [
+                ""
+                "You can check our [release notes](https://github.com/nfdi4plants/Swate/blob/developer/RELEASE_NOTES.md) to see a list of all new features."
+                "If you decide to test Swate in the current state, please take the time to set up a Github account to report your issues and suggestions here."
+                ""
+                "You can also search existing issues for solutions for your questions and/or discussions about your suggestions."
+                ""
+                "Here are the necessary steps to use SWATE:"
+                ""
+                "#### If you use the excel desktop application locally:"
+                "    - Install node.js LTS (needed for office add-in related tooling)"
+                "    - Download the release archive (.zip file) below and extract it"
+                "    - Execute the swate.cmd (windows) or swate.sh (macOS, you will need to make it executable via chmod a+x) script."
+                ""
+                "#### If you use Excel in the browser:"
+                "    - Download the release archive (.zip file) below and extract it"
+                "    - Launch Excel online, open a (blank) workbook"
+                "    - Under the Insert tab, select Add-Ins"
+                "    - Go to Manage my Add-Ins and select Upload my Add-In"
+                "    - select and upload the manifest.xml file contained in the archive."
+                ""
+                ""
+            ] |> String.concat "\n"
 
         Github.draft(
             ProjectInfo.gitOwner,
             ProjectInfo.gitName,
-            (Some body),
-            None,
+            (Some bodyText),
+            (Some <| Path.combine __SOURCE_DIRECTORY__ @".assets\assets\swate.zip"),
             config
         )
     )
