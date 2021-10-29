@@ -27,7 +27,7 @@ type Model = {
         Loading                         = false
         ShowTableExportTypeDropdown     = false
         ShowWorkbookExportTypeDropdown  = false
-        ShowXLSXExportTypeDropdown     = false
+        ShowXLSXExportTypeDropdown      = false
 
         // XLSX upload with json parsing
         XLSXByteArray                   = Array.empty

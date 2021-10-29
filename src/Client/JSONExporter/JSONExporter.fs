@@ -188,15 +188,15 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
         }
         let apif =
             match currentModel.JsonExporterModel.XLSXParsingExportType with
-            | JsonExportType.ProcessSeq        -> Api.isaDotNetCommonApi.toProcessSeqJson
-            | JsonExportType.Assay             -> Api.isaDotNetCommonApi.toAssayJson
-            | JsonExportType.Table             -> Api.isaDotNetCommonApi.toTableJson
-            | JsonExportType.ProtocolTemplate  -> Api.isaDotNetCommonApi.toSwateTemplateJson
+            | JsonExportType.ProcessSeq        -> Api.isaDotNetCommonApi.toProcessSeqJsonStr
+            | JsonExportType.Assay             -> Api.isaDotNetCommonApi.toAssayJsonStr
+            | JsonExportType.Table             -> Api.isaDotNetCommonApi.toTableJsonStr
+            | JsonExportType.ProtocolTemplate  -> Api.isaDotNetCommonApi.toSwateTemplateJsonStr
         let cmd =
             Cmd.OfAsync.either
                 apif
                 byteArr
-                (fun x -> x.ToString() |> (ParseXLSXToJsonResponse >> JsonExporterMsg))
+                (ParseXLSXToJsonResponse >> JsonExporterMsg)
                 (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
         currentModel.updateByJsonExporterModel nextModel, cmd
     | ParseXLSXToJsonResponse jsonStr ->
@@ -207,6 +207,7 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
             currentModel.JsonExporterModel with
                 Loading = false
         }
+
         currentModel.updateByJsonExporterModel nextModel, Cmd.none
 
 open Messages

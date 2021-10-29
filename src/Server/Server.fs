@@ -90,21 +90,52 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         let jsonStr =
             ISADotNet.XLSX.Investigation.fromStream ms
         jsonStr
-    let customXmlFromByteArray (byteArray: byte []) =
-        let ms = new MemoryStream(byteArray)
-        let jsonStr =
-            ISADotNet.XLSX.AssayFile.SwateTable.SwateTable.readSwateTablesFromStream ms
-            |> Array.ofSeq
-            |> Array.map (fun x -> ISADotNet.JsonExtensions.toString x)
-        jsonStr
+    //let customXmlFromByteArray (byteArray: byte []) =
+    //    let ms = new MemoryStream(byteArray)
+    //    let jsonStr =
+    //        ISADotNet.XLSX.AssayFile.SwateTable.SwateTable.readSwateTablesFromStream ms
+    //        |> Array.ofSeq
+    //        |> Array.map (fun x -> ISADotNet.JsonExtensions.toString x)
+    //    jsonStr
     {
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJson = fun byteArray -> async {
+            let assay = assayFromByteArray byteArray |> fun (_,_,_,assay) -> assay
+            return box assay
+        }
+        /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
+        toSwateTemplateJson = fun byteArray -> async {
+            let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
+            let ms = new MemoryStream(byteArray)
+            let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
+            let tableName = metadata.TryGetValue "Table"
+            let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
+            let assayJson = ISADotNet.Json.Assay.toString assay.Value
+            metadata.SetValue("TemplateJson",assayJson)
+            return box metadata
+        }
+        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
+        toInvestigationJson = fun byteArray -> async {
+            let investigation = investigationFromByteArray byteArray
+            return box investigation
+        }
+        toProcessSeqJson = fun byteArray -> async {
+            let assay = assayFromByteArray byteArray 
+            let processList = assay |> fun (_,_,_,assay) -> Option.defaultValue [] assay.ProcessSequence
+            return box processList
+        }
+        toTableJson = fun byteArray -> async {
+            let assay = assayFromByteArray byteArray 
+            let table = assay |> fun (_,_,_,assay) -> assay |> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay
+            return box table
+        }
+        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
+        toAssayJsonStr = fun byteArray -> async {
             let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
             return assayJsonString
         }
         /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
-        toSwateTemplateJson = fun byteArray -> async {
+        toSwateTemplateJsonStr = fun byteArray -> async {
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
             let ms = new MemoryStream(byteArray)
             let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
@@ -116,16 +147,16 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             return jsonExp
         }
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
-        toInvestigationJson = fun byteArray -> async {
+        toInvestigationJsonStr = fun byteArray -> async {
             let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
             return investigationJson
         }
-        toProcessSeqJson = fun byteArray -> async {
+        toProcessSeqJsonStr = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
             let processJSon = assay |> fun (_,_,_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
             return processJSon
         }
-        toTableJson = fun byteArray -> async {
+        toTableJsonStr = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
             let processJSon = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) 
             return processJSon
