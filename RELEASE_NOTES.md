@@ -1,3 +1,11 @@
+### 0.5.1+7b0884f (Released 2021-11-2)
+* Additions:
+    * latest commit #7b0884f
+    * [[#6d470af](https://github.com/nfdi4plants/Swate/commit/6d470af4445ed45c5554cdbf7f7e6942ad79e804)] Update asset manifest.xml
+    * [[#b9e4210](https://github.com/nfdi4plants/Swate/commit/b9e42104db68fda63ab68190263306b79054cf79)] Start testing for excel version compatibility.
+    * [[#2b65032](https://github.com/nfdi4plants/Swate/commit/2b650326b2aa72bcfa7b78a3cf142cc3fca9fc44)] Init docker support for Swate :tada:
+    * [[#7b0884f](https://github.com/nfdi4plants/Swate/commit/7b0884f9d2c76bae5d59148acecd7b4165739587)] add pure json return for common api
+
 ### 0.5.0+70632951 (Released 2021-10-22)
 * Additions:
     * latest commit #70632951
