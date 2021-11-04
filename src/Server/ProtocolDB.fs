@@ -25,7 +25,7 @@ let getAllProtocols cString =
     use reader = cmd.ExecuteReader()
     [|
         while reader.Read() do
-            let tags = reader.GetString(7).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
+            let tags = reader.GetString(7).Split([|","|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
             yield
                 ProtocolTemplate.create
                     (reader.GetString(1))       // name
@@ -60,7 +60,7 @@ let getProtocolByName cString (queryStr:string) =
 
     use reader = cmd.ExecuteReader()
     reader.Read() |> ignore
-    let tags = reader.GetString(7).Split([|";"|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
+    let tags = reader.GetString(7).Split([|","|], StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim())
     /// Parse assay.json in database to insertbuildingblocks.
     let insertBuildingBlockList =
         let dbJson = reader.GetString(10)
