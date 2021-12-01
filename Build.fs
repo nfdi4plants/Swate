@@ -16,6 +16,8 @@ let clientTestsPath = Path.getFullName "tests/Client"
 
 let dockerComposePath = Path.getFullName ".db\docker-compose.yml"
 
+let developmentUrl = "https://localhost:3000"
+
 module ProjectInfo =
     
     let gitOwner = "nfdi4plants"
@@ -206,14 +208,15 @@ Target.create "Bundle-Linux" (fun _ ->
 Target.create "Run" (fun _ ->
     run dotnet "build" sharedPath
     [ "server", dotnet "watch run" serverPath
-      "client", dotnet "fable watch --run webpack-dev-server" clientPath ]
+      "client", dotnet "fable watch src/Client -s --run webpack-dev-server" "" ]
     |> runParallel
 )
 
 Target.create "officedebug" (fun _ ->
     run dotnet "build" sharedPath
+    openBrowser developmentUrl
     [ "server", dotnet "watch run" serverPath
-      "client", dotnet "fable watch --run webpack-dev-server" clientPath
+      "client", dotnet "fable watch src/Client -s --run webpack-dev-server" ""
       /// start up mysql db from docker-compose
       "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
       /// sideload webapp in excel

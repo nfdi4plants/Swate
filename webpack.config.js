@@ -42,8 +42,20 @@ var CONFIG = {
             secure: false,
             changeOrigin: true,
             ignorePath: false
-           }
-       }
+        }
+    },
+    babel: {
+        presets: [
+            ['@babel/preset-env', {
+                modules: false,
+                // This adds polyfills when needed. Requires core-js dependency.
+                // See https://babeljs.io/docs/en/babel-preset-env#usebuiltins
+                // Note that you still need to add custom polyfills if necessary (e.g. whatwg-fetch)
+                useBuiltIns: 'usage',
+                corejs: 3
+            }]
+        ],
+    }
 }
 
 // If we're running the webpack-dev-server, assume we're in development mode
@@ -76,7 +88,7 @@ module.exports = {
     // to prevent browser caching if code changes
     output: {
         path: resolve(CONFIG.outputDir),
-        filename: isProduction ? '[name].[hash].js' : '[name].js'
+        filename: isProduction ? '[name].[fullhash].js' : '[name].js'
     },
     mode: isProduction ? 'production' : 'development',
     devtool: isProduction ? 'source-map' : 'eval-source-map',
@@ -85,6 +97,7 @@ module.exports = {
             chunks: 'all'
         },
     },
+    target: ["web", "es5"],
     // Besides the HtmlPlugin, we use the following plugins:
     // PRODUCTION
     //      - MiniCssExtractPlugin: Extracts CSS from bundle to a different file
@@ -94,11 +107,11 @@ module.exports = {
     //      - HotModuleReplacementPlugin: Enables hot reloading when code changes without refreshing
     plugins: isProduction ?
         commonPlugins.concat([
-            new MiniCssExtractPlugin({ filename: 'style.[name].[hash].css' }),
+            new MiniCssExtractPlugin({ filename: 'style.[name].[fullhash].css' }),
             new CopyWebpackPlugin({ patterns: [{ from: resolve(CONFIG.assetsDir) }] }),
         ])
         : commonPlugins.concat([
-            new webpack.HotModuleReplacementPlugin(),
+            //new webpack.HotModuleReplacementPlugin(),
         ]),
     externals: {
         officejs: 'Office.js',
@@ -109,23 +122,43 @@ module.exports = {
     },
     // Configuration for webpack-dev-server
     devServer: {
-        publicPath: '/',
-        contentBase: resolve(CONFIG.assetsDir),
+        // Necessary when using non-hash client-side routing
+        // This assumes the index.html is accessible from server root
+        // For more info, see https://webpack.js.org/configuration/dev-server/#devserverhistoryapifallback
+        historyApiFallback: {
+            index: '/'
+        },
         host: '0.0.0.0',
         port: CONFIG.devServerPort,
-        https: {
-            key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
-            cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
-            ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
+        server: {
+            type: 'https',
+            options: {
+                key: "C:/Users/User/.office-addin-dev-certs/localhost.key",
+                cert: "C:/Users/User/.office-addin-dev-certs/localhost.crt",
+                ca: "C:/Users/User/.office-addin-dev-certs/ca.crt"
+            },
         },
         proxy: CONFIG.devServerProxy,
         hot: true,
-        inline: true
+        devMiddleware: {
+            publicPath: CONFIG.publicPath
+        },
+        static: {
+            directory: resolve(CONFIG.assetsDir)
+        }
     },
     // - sass-loaders: transforms SASS/SCSS into JS
     // - file-loader: Moves files referenced in the code (fonts, images) into output folder
     module: {
         rules: [
+            {
+                test: /\.m?js$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'babel-loader',
+                    options: CONFIG.babel
+                },
+            },
             {
                 test: /\.(sass|scss|css)$/,
                 use: [
@@ -142,6 +175,11 @@ module.exports = {
             {
                 test: /\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)(\?.*)?$/,
                 use: ['file-loader']
+            },
+            {
+                test: /\.js$/,
+                enforce: "pre",
+                use: ['source-map-loader'],
             }
         ]
     }

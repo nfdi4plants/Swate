@@ -1,6 +1,7 @@
 module Helpers
 
 open Fake.Core
+open System.Runtime.InteropServices
 
 let initializeContext () =
     let execContext = Context.FakeExecutionContext.Create false "build.fsx" [ ]
@@ -101,6 +102,17 @@ let node =
 
     
 let dockerCompose = createProcess "docker-compose"
+
+///Choose process to open plots with depending on OS. Thanks to @zyzhu for hinting at a solution (https://github.com/plotly/Plotly.NET/issues/31)
+let openBrowser url =
+    if RuntimeInformation.IsOSPlatform(OSPlatform.Windows) then
+        CreateProcess.fromRawCommand "cmd.exe" [ "/C"; $"start {url}" ] |> Proc.run |> ignore
+    elif RuntimeInformation.IsOSPlatform(OSPlatform.Linux) then
+        CreateProcess.fromRawCommand "xdg-open" [ url ] |> Proc.run |> ignore
+    elif RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
+        CreateProcess.fromRawCommand "open" [ url ] |> Proc.run |> ignore
+    else
+        failwith "Cannot open Browser. OS not supported."
 
 let run proc arg dir =
     proc arg dir
