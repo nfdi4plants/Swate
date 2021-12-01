@@ -82,7 +82,7 @@ let navbarShortCutIconList model dispatch =
     ]
 
 let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
-    Navbar.Item.a [
+    Navbar.Item.div [
         Navbar.Item.Props [
             OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)
             Style [
@@ -164,7 +164,7 @@ let quickAccessScalableNavbar (model:Messages.Model) dispatch =
                         Display DisplayOptions.None
                     else Display DisplayOptions.Flex
                     yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode
-                    BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
+                    //BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
                 ]
             ]
         ][
@@ -191,7 +191,10 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                 ]
             ] [
                 let path = if model.PersistentStorageState.PageEntry = Routing.Expert then "_e" else ""
-                Image.image [] [img [Props.Src @$"assets\Swate_logo_for_excel{path}.svg"]]
+                Image.image [] [ img [
+                    Style [MaxHeight "100%"]
+                    Props.Src @$"assets\Swate_logo_for_excel{path}.svg"
+                ] ]
             ]
 
             quickAccessListElement model dispatch
@@ -213,7 +216,7 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
         ]
         div [Class "hideOver575px "][
             Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [
-                BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
+                //BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
                 if model.SiteStyleState.QuickAcessIconsShown |> not then
                     Display DisplayOptions.None
                 else Display DisplayOptions.Flex
