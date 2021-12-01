@@ -107,7 +107,7 @@ a:hover {
 
 .wrapFlexBox {
     flex-wrap: wrap;
-    flex-shrink: unset;
+    flex-shrink: 1;
 }
 
 .button {
@@ -312,11 +312,11 @@ input::-ms-clear {
 }
 
 .hideUnder575px {
-    display: unset
+    display: flex
 }
 
 .hideUnder775px {
-    display: unset
+    display: flex
 }
 
 .flexToCentered {
@@ -385,7 +385,7 @@ input::-ms-clear {
     }
 
     .hideOver775px {
-        display: unset
+        display: flex
     }
 
     .flexToCentered {
@@ -400,7 +400,7 @@ input::-ms-clear {
 
 @media only screen and (max-width: 575px) {
     .hideOver575px {
-        display: unset !important
+        display: flex !important
     }
 
     .hideUnder575px {
