@@ -69,7 +69,11 @@ module TermTypes =
         /// The format is created as $"0.00 \"{MinimalTerm.Name}\"", this function is meant to reverse this, altough term accession is lost.
         static member ofNumberFormat (formatStr:string) =
             let unitNameOpt = Regex.parseDoubleQuotes formatStr
-            let unitName = unitNameOpt |> Option.defaultWith (failwith $"Unable to parse given string {formatStr} to TermMinimal.Name.")
+            let unitName =
+                if unitNameOpt.IsNone then
+                    failwith $"Unable to parse given string {formatStr} to TermMinimal.Name."
+                else
+                    unitNameOpt.Value
             TermMinimal.create unitName ""
 
         /// Returns empty string if no accession is found
