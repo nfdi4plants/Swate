@@ -557,7 +557,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
 
             checkIfBuildingBlockExisting newBB existingBuildingBlocks
-            //checkHasExistingOutput newBB existingBuildingBlocks
+            checkHasExistingOutput newBB existingBuildingBlocks
 
 
             // Ref. 2
