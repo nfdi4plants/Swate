@@ -198,7 +198,7 @@ let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRan
             { bb with MainColumnTerm = termOpt }
 
         /// Sort all columns into building blocks.
-        let buildingBlocks =
+        let buildingBlocks = 
             sortColsIntoBuildingBlocks 0 None []
             |> List.rev
             |> Array.ofList

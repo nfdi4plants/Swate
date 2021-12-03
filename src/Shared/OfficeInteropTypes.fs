@@ -227,7 +227,7 @@ module OfficeInteropTypes =
         /// Use this function to extract ontology term name from inside square brackets in the main column header
         member this.tryGetOntologyTerm = parseSquaredTermNameBrackets this.SwateColumnHeader
         /// Get term Accession in TSR or TAN from column header
-        member this.tryGetTermAccession = parseTermAccession this.SwateColumnHeader
+        member this.tryGetTermAccession = parseTermAccessionSimplified this.SwateColumnHeader
         /// Get column header hash id from main column. E.g. Parameter [Instrument Model#2]
         member this.tryGetHeaderId =
             let brackets = parseSquaredTermNameBrackets this.SwateColumnHeader

@@ -536,6 +536,7 @@ let private checkIfBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBu
         )
     if mainColumnPrints |> Array.contains newBB.ColumnHeader then failwith $"Swate table contains already building block \"{newBB.ColumnHeader.toAnnotationTableHeader()}\" in worksheet."
 
+
 /// Check column type and term if combination already exists
 let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
     if newBB.ColumnHeader.isOutputColumn then
@@ -548,7 +549,6 @@ let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuilding
 /// This function is used to add a new building block to the active annotationTable.
 let addAnnotationBlock (newBB:InsertBuildingBlock) =
     Excel.run(fun context ->
-
         promise {
 
             let! annotationTableName = getActiveAnnotationTableName context
@@ -557,7 +557,8 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
 
             checkIfBuildingBlockExisting newBB existingBuildingBlocks
-            checkHasExistingOutput newBB existingBuildingBlocks
+            //checkHasExistingOutput newBB existingBuildingBlocks
+
 
             // Ref. 2
             // This is necessary to place new columns next to selected col

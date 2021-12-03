@@ -200,7 +200,7 @@ let ontologyApi cString = {
         async {
             let searchRes =
                 match typedSoFar with
-                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like = OntologyDB.getTermSuggestions cString (typedSoFar)
@@ -218,7 +218,7 @@ let ontologyApi cString = {
 
             let searchRes =
                 match typedSoFar with
-                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like =
@@ -250,7 +250,7 @@ let ontologyApi cString = {
 
             let searchRes =
                 match typedSoFar with
-                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like =
@@ -293,7 +293,7 @@ let ontologyApi cString = {
         async {
             let searchRes =
                 match typedSoFar with
-                | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
                     OntologyDB.getTermByAccession cString foundAccession
                 | _ ->
                     let like = OntologyDB.getUnitTermSuggestions cString (typedSoFar)
