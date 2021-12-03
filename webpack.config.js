@@ -96,6 +96,7 @@ module.exports = {
         splitChunks: {
             chunks: 'all'
         },
+        runtimeChunk: "single"
     },
     target: ["web", "es5"],
     // Besides the HtmlPlugin, we use the following plugins:
@@ -148,6 +149,7 @@ module.exports = {
         }
     },
     // - sass-loaders: transforms SASS/SCSS into JS
+    // - babel-loader: transforms JS to old syntax (compatible with old browsers)
     // - file-loader: Moves files referenced in the code (fonts, images) into output folder
     module: {
         rules: [
