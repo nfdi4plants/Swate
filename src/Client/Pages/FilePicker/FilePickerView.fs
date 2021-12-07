@@ -405,43 +405,78 @@ let fileElementContainer (model:Messages.Model) dispatch =
     ]
 
 let uploadButton (model:Messages.Model) dispatch inputId =
-    File.file [
-        File.Color IsInfo
-        File.IsCentered
-        File.Props [Style [Margin "1rem 0"]]
-    ] [
-        File.label [ Props [Style [Width "100%"]] ] [
-            File.input [
-                Props [
-                    Id inputId
-                    Multiple true
-                    OnChange (fun ev ->
+    //File.file [
+    //    File.Color IsInfo
+    //    File.IsCentered
+    //    File.Props [Style [Margin "1rem 0"]]
+    //] [
+    //    File.label [ Props [Style [Width "100%"]] ] [
+    //        File.input [
+    //            Props [
+    //                Id inputId
+    //                Multiple true
+    //                OnChange (fun ev ->
+    //                    printfn "hit"
+    //                    let files : FileList = ev.target?files
+    //                    printfn "Lenght: %i" files.length
+    //                    printfn "HERE>>"
+    //                    Browser.Dom.console.log ev
+    //                    printfn "<<HERE"
 
-                        let files : FileList = ev.target?files
-                    
-                        let fileNames =
-                            [ for i=0 to (files.length - 1) do yield files.item i ]
-                            |> List.map (fun f -> f.name)
+    //                    let fileNames =
+    //                        [ for i=0 to (files.length - 1) do yield files.item i ]
+    //                        |> List.map (fun f -> f.name)
 
-                        fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
+    //                    fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
 
-                        let picker = Browser.Dom.document.getElementById(inputId)
-                        // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
-                        picker?value <- null
-                    )
-                ]
-            ]
-            File.cta [
-                Props [Style [Width "100%"; JustifyContent "center" ]]
-            ] [
-                File.icon [] [ Fa.i [ Fa.Solid.Upload ] [] ]
-                File.label [ Props [
-                    OnClick (fun e ->
-                        let getUploadElement = Browser.Dom.document.getElementById inputId
-                        getUploadElement.click()
-                    )
-                ] ] [ str "Pick file names" ]
-            ]
+    //                    let picker = Browser.Dom.document.getElementById(inputId)
+    //                    // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
+    //                    picker?value <- null
+    //                )
+    //            ]
+    //        ]
+    //        File.cta [
+    //            Props [Style [Width "100%"; JustifyContent "center" ]]
+    //        ] [
+    //            File.icon [] [ Fa.i [ Fa.Solid.Upload ] [] ]
+    //            File.label [ Props [
+    //                //OnClick (fun e ->
+    //                //    let getUploadElement = Browser.Dom.document.getElementById inputId
+    //                //    getUploadElement.click()
+    //                //)
+    //            ] ] [ str "Pick file names" ]
+    //        ]
+    //    ]
+    //]
+    Field.div [][
+        input [
+            Style [Display DisplayOptions.None]
+            Id inputId
+            Multiple true
+            Type "file"
+            OnChange (fun ev ->
+                let files :FileList = ev.target?files
+
+                let fileNames =
+                    [ for i=0 to (files.length - 1) do yield files.item i ]
+                    |> List.map (fun f -> f.name)
+
+                fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
+
+                let picker = Browser.Dom.document.getElementById(inputId)
+                // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
+                picker?value <- null
+            )
+        ]
+        Button.button [
+            Button.Color IsInfo
+            Button.IsFullWidth
+            Button.OnClick(fun e ->
+                let getUploadElement = Browser.Dom.document.getElementById inputId
+                getUploadElement.click()
+            )
+        ][
+            str "Pick file names"
         ]
     ]
 
