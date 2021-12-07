@@ -457,15 +457,19 @@ let uploadButton (model:Messages.Model) dispatch inputId =
             OnChange (fun ev ->
                 let files :FileList = ev.target?files
 
+                Browser.Dom.console.log files.length
+
                 let fileNames =
                     [ for i=0 to (files.length - 1) do yield files.item i ]
                     |> List.map (fun f -> f.name)
 
+                Browser.Dom.console.log fileNames
+
                 fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
 
-                let picker = Browser.Dom.document.getElementById(inputId)
-                // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
-                picker?value <- null
+                //let picker = Browser.Dom.document.getElementById(inputId)
+                //// https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
+                //picker?value <- null
             )
         ]
         Button.button [
