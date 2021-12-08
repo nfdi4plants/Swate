@@ -11,6 +11,7 @@ open Browser.MediaQueryList
 open Browser.MediaQueryListExtensions
 
 open CustomComponents
+open Fable.Core.JsInterop
 
 let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
     let isActive = model.PageState.CurrentPage = pageLink
@@ -50,13 +51,16 @@ let tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
     ]
 
 let tabs (model:Model) dispatch =
+    let isIEBrowser : bool = Browser.Dom.window.document?documentMode 
     tabRow model dispatch [
         if model.PersistentStorageState.PageEntry = Routing.SwateEntry.Core then
             createNavigationTab Routing.Route.BuildingBlock         model dispatch
             createNavigationTab Routing.Route.TermSearch            model dispatch
             createNavigationTab Routing.Route.Protocol              model dispatch
             createNavigationTab Routing.Route.FilePicker            model dispatch
-            createNavigationTab Routing.Route.Dag                   model dispatch
+            if not isIEBrowser then
+                /// docsrc attribute not supported in iframe in IE
+                createNavigationTab Routing.Route.Dag                   model dispatch
             createNavigationTab Routing.Route.Info                  model dispatch
         else
             createNavigationTab Routing.Route.JsonExport            model dispatch
@@ -74,9 +78,6 @@ let footerContentStatic (model:Model) dispatch =
         str "Swate Release Version "
         a [Href "https://github.com/nfdi4plants/Swate/releases"][str model.PersistentStorageState.AppVersion]
     ]
-
-open Fable.Core.JsInterop
-open Fable.FontAwesome
 
 let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement list) =
     div [
