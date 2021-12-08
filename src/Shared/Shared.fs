@@ -61,11 +61,16 @@ type IDagAPIv1 = {
 }
 
 type IISADotNetCommonAPIv1 = {
-    toAssayJson                 : byte [] -> Async<string>
-    toSwateTemplateJson         : byte [] -> Async<string>
-    toInvestigationJson         : byte [] -> Async<string>
-    toProcessSeqJson            : byte [] -> Async<string>
-    toTableJson                 : byte [] -> Async<string>
+    toAssayJson                 : byte [] -> Async<obj>
+    toSwateTemplateJson         : byte [] -> Async<obj>
+    toInvestigationJson         : byte [] -> Async<obj>
+    toProcessSeqJson            : byte [] -> Async<obj>
+    toTableJson                 : byte [] -> Async<obj>
+    toAssayJsonStr              : byte [] -> Async<string>
+    toSwateTemplateJsonStr      : byte [] -> Async<string>
+    toInvestigationJsonStr      : byte [] -> Async<string>
+    toProcessSeqJsonStr         : byte [] -> Async<string>
+    toTableJsonStr              : byte [] -> Async<string>
     testPostNumber              : int   -> Async<string>
     getTestNumber               : unit  -> Async<string>
 }

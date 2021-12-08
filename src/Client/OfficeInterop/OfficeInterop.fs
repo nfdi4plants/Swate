@@ -368,6 +368,7 @@ let autoFitTable (hideRefCols:bool) (context:RequestContext) =
 let autoFitTableHide (context:RequestContext) =
     autoFitTable true context
 
+/// ExcelApi 1.2
 let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
 
     let allCols = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
@@ -375,12 +376,8 @@ let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
     let annoHeaderRange = annotationTable.getHeaderRowRange()
     let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
 
-    let r = context.runtime.load(U2.Case1 "enableEvents")
-
     context.sync().``then``(fun _ ->
 
-        // Ref. 1
-        r.enableEvents <- false
         // Auto fit on all columns to fit cols and rows to their values.
         let updateColumns =
             allCols.items
@@ -393,8 +390,6 @@ let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
                     r.format.autofitColumns()
                     r.format.autofitRows()  
             )
-
-        r.enableEvents <- true
 
         // return message
         [InteropLogging.Msg.create InteropLogging.Info "Autoformat Table"]
@@ -515,7 +510,8 @@ let getBuildingBlocksAndSheets() =
         }
     )
 
-/// selected ranged returns indices always from a worksheet perspective but we need the related table index. This is calculated here.
+/// ExcelApi 1.1
+/// Selected ranged returns indices always from a worksheet perspective but we need the related table index. This is calculated here.
 let rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) =
     let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex |> int
     let vals = annoHeaderRange.columnCount |> int
@@ -540,6 +536,7 @@ let private checkIfBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBu
         )
     if mainColumnPrints |> Array.contains newBB.ColumnHeader then failwith $"Swate table contains already building block \"{newBB.ColumnHeader.toAnnotationTableHeader()}\" in worksheet."
 
+
 /// Check column type and term if combination already exists
 let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
     if newBB.ColumnHeader.isOutputColumn then
@@ -548,10 +545,10 @@ let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuilding
             |> Array.tryFind (fun x -> x.MainColumn.Header.isMainColumn && x.MainColumn.Header.isOutputCol)
         if existingOutputOpt.IsSome then failwith $"Swate table contains already one output column \"{existingOutputOpt.Value.MainColumn.Header.SwateColumnHeader}\". Each Swate table can only contain exactly one output column type."
 
+/// ExcelApi 1.4
 /// This function is used to add a new building block to the active annotationTable.
 let addAnnotationBlock (newBB:InsertBuildingBlock) =
     Excel.run(fun context ->
-
         promise {
 
             let! annotationTableName = getActiveAnnotationTableName context
@@ -562,7 +559,6 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             checkIfBuildingBlockExisting newBB existingBuildingBlocks
             checkHasExistingOutput newBB existingBuildingBlocks
 
-            let t = existingBuildingBlocks 
 
             // Ref. 2
             // This is necessary to place new columns next to selected col

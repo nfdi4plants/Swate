@@ -16,7 +16,7 @@ let private viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
     |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
     |> Seq.toArray
 
-// ExcelApi 1.1
+/// ExcelApi 1.1
 /// This function is part 1 to get a 'BuildingBlock []' representation of a Swate table.
 /// It should be used as follows: 'let annoHeaderRange, annoBodyRange = BuildingBlockTypes.getBuildingBlocksPreSync context annotationTable'
 /// This function will load all necessery excel properties.
@@ -29,6 +29,7 @@ let private getBuildingBlocksPreSync (context:RequestContext) annotationTable =
     let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
     annoHeaderRange, annoBodyRange
 
+/// ExcelApi 1.1
 let private getBuildingBlocksPreSyncFromTable (annotationTable:Table) =
     let annoHeaderRange = annotationTable.getHeaderRowRange()
     let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
@@ -36,7 +37,7 @@ let private getBuildingBlocksPreSyncFromTable (annotationTable:Table) =
     let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
     annoHeaderRange, annoBodyRange
 
-// ExcelApi 1.1
+/// ExcelApi 1.1
 /// This function is part 2 to get a 'BuildingBlock []' representation of a Swate table.
 /// It's parameters are the output of 'getBuildingBlocksPreSync' and it will return a full 'BuildingBlock []'.
 /// It MUST be used either in or after 'context.sync().``then``(fun e -> ..)' after 'getBuildingBlocksPreSync'.
@@ -197,7 +198,7 @@ let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRan
             { bb with MainColumnTerm = termOpt }
 
         /// Sort all columns into building blocks.
-        let buildingBlocks =
+        let buildingBlocks = 
             sortColsIntoBuildingBlocks 0 None []
             |> List.rev
             |> Array.ofList
@@ -207,14 +208,17 @@ let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRan
     )
 
 type BuildingBlock with
+    ///  ExcelApi 1.1
     static member getFromContext(context:RequestContext,annotationTableName:string) =
         let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
         getBuildingBlocksPostSync annoHeaderRange annoBodyRange context
 
+    ///  ExcelApi 1.1
     static member getFromContext(context:RequestContext,annotationTable:Table) =
         let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSyncFromTable annotationTable
         getBuildingBlocksPostSync annoHeaderRange annoBodyRange context
 
+///  ExcelApi 1.1
 let getBuildingBlocks (context:RequestContext) (annotationTableName:string) =
     let annoHeaderRange, annoBodyRange = getBuildingBlocksPreSync context annotationTableName
     getBuildingBlocksPostSync annoHeaderRange annoBodyRange context

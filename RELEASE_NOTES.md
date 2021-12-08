@@ -1,3 +1,14 @@
+### 0.5.1+0c90a83 (Released 2021-12-8)
+* Additions:
+    * latest commit #0c90a83
+    * Add support for Excel 2019 :tada:
+    * [[#48d8d61](https://github.com/nfdi4plants/Swate/commit/48d8d61409d1404b9bd254241e54742ced36b357)] Replace drag and drop for filepicker with simplified table sorting element
+    * [[#e16c861](https://github.com/nfdi4plants/Swate/commit/e16c8613acde31738ecf0af09bee503feea7246a)] Add whitespace between authors.
+    * [[#7b0884f](https://github.com/nfdi4plants/Swate/commit/7b0884f9d2c76bae5d59148acecd7b4165739587)] add pure json return for common api
+* Bugfixes:
+    * [[#2a09a55](https://github.com/nfdi4plants/Swate/commit/2a09a55120261db8527b1c80e63a50cb0ecfe4e3)] Split template tags by "," instead of ";"
+    * [[#c82dd4f](https://github.com/nfdi4plants/Swate/commit/c82dd4f3ef72a21af8f0896ea0cb103811f2c198)] Fix server port error for production.
+
 ### 0.5.0+70632951 (Released 2021-10-22)
 * Additions:
     * latest commit #70632951

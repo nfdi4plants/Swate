@@ -22,11 +22,11 @@ module Regex =
         //"http://purl.obolibrary.org/obo/NFDI4PSO_0000064"
 
         [<LiteralAttribute>]
-        let IdPattern = @"(?<=#)\d+(?=[\)\]])"//"#\d+"
+        let IdPattern = "#\d+" //  @"(?<=#)\d+(?=[\)\]])" <- Cannot be used in IE11
 
         [<LiteralAttribute>]
         /// This pattern captures characters between squared brackets, without id: Parameter [biological replicate#2] -> biological replicate
-        let SquaredBracketsTermNamePattern = @"(?<= \[)[^#\]]*(?=[\]#])"//"\[.*\]"
+        let SquaredBracketsTermNamePattern = "\[.*\]" //  @"(?<= \[)[^#\]]*(?=[\]#])" <- Cannot be used in IE11
 
         [<LiteralAttribute>]
         /// Used to get unit name from Excel numberFormat: 0.00 "degree Celsius"
@@ -36,9 +36,9 @@ module Regex =
         /// This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
         let CoreNamePattern = "^[^[(]*"
 
-        // Hits term accession, without id, NEEDS brackets before and after: ENVO:01001831
-        [<LiteralAttribute>]
-        let TermAccessionPattern = @"(?<=\()\S+[:_][^;)#]*(?=[\)\#])" //"[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
+        //// Hits term accession, without id, NEEDS brackets before and after: ENVO:01001831
+        //[<LiteralAttribute>]
+        //let TermAccessionPattern = @"(?<=\()\S+[:_][^;)#]*(?=[\)\#])" //"[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
 
         // Hits term accession, without id: ENVO:01001831
         [<LiteralAttribute>]
@@ -61,7 +61,12 @@ module Regex =
 
     let parseSquaredTermNameBrackets (headerStr:string) =
         match headerStr with
-        | Regex SquaredBracketsTermNamePattern value -> value.Trim() |> Some 
+        | Regex SquaredBracketsTermNamePattern value ->
+            // trim whitespace AND remove brackets
+            value.Trim().[1..value.Length-2]
+            // remove #id pattern
+            |> fun str -> Regex.Replace(str, IdPattern, "")
+            |> Some 
         | _ ->
             None
 
@@ -73,13 +78,14 @@ module Regex =
         | _ ->
             None
 
-    let parseTermAccession (headerStr:string) =
-        match headerStr with
-        | Regex TermAccessionPattern value ->
-            value.Trim().Replace('_',':')
-            |> Some
-        | _ ->
-            None
+    //let parseTermAccession (headerStr:string) =
+    //    printfn "parse.."
+    //    match headerStr with
+    //    | Regex TermAccessionPattern value ->
+    //        value.Trim().Replace('_',':')
+    //        |> Some
+    //    | _ ->
+    //        None
 
     let parseTermAccessionSimplified (headerStr:string) =
         match headerStr with
@@ -100,6 +106,6 @@ module Regex =
 
     let getId (headerStr:string) =
         match headerStr with
-        | Regex IdPattern value -> value.Trim() |> Some
+        | Regex IdPattern value -> value.Trim().[1..] |> Some
         | _ ->
             None

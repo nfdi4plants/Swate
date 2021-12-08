@@ -11,9 +11,8 @@ open System.Text.RegularExpressions
 open Shared.OfficeInteropTypes
 open Shared
 
-// ExcelApi 1.1
+/// ExcelApi 1.1
 let getActiveAnnotationTableName (context:RequestContext) =
-    // Ref. 2
 
     let sheet = context.workbook.worksheets.getActiveWorksheet()
     let t = sheet.load(U2.Case2 (ResizeArray[|"tables"|]))

@@ -199,7 +199,7 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
                                 div [][
                                     Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
                                         b [] [str "Author: "]
-                                        str prot.Author
+                                        str (prot.Author.Replace(",",", "))
                                     ]
                                     Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
                                         b [][str "Created: "]
