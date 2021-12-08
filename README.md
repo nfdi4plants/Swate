@@ -127,11 +127,14 @@ Before you contribute to the project remember to return all placeholders to your
 
 -   webpack.config.js    
     ```
-    https: {
-        key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
-        cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
-        ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
-    },
+    server: {
+            type: 'https',
+            options: {
+                key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
+                cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
+                ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
+            },
+        },
     ```
 -   .db/docker-compose.yml
     ```
