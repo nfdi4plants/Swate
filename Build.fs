@@ -77,11 +77,13 @@ module ReleaseNoteTasks =
 
         Zip.zip assetDir.FullName ".assets\swate.zip" files
 
+        Trace.trace "Assets zipped!"
+
         let bodyText =
             [
                 ""
                 "You can check our [release notes](https://github.com/nfdi4plants/Swate/blob/developer/RELEASE_NOTES.md) to see a list of all new features."
-                "If you decide to test Swate in the current state, please take the time to set up a Github account to report your issues and suggestions here."
+                "If you decide to test Swate in the current state, please take the time to set up a Github account to report your issues and suggestions [here](https://github.com/nfdi4plants/Swate/issues/new/choose)."
                 ""
                 "You can also search existing issues for solutions for your questions and/or discussions about your suggestions."
                 ""
@@ -106,7 +108,7 @@ module ReleaseNoteTasks =
             ProjectInfo.gitOwner,
             ProjectInfo.gitName,
             (Some bodyText),
-            (Some <| Path.combine __SOURCE_DIRECTORY__ @".assets\assets\swate.zip"),
+            None, //(Some <| Path.combine __SOURCE_DIRECTORY__ @".assets\swate.zip"),
             config
         )
     )
