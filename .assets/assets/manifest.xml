@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>5d6f5462-3401-48ec-9406-d12882e9ad83</Id>
   <Version>0.5.1</Version>
@@ -8,7 +8,7 @@
   <Description DefaultValue="Utility functions to annotate data in a fast and safe way."/>
   <IconUrl DefaultValue="https://swate.nfdi4plants.de/assets/swate_32x32.png"/>
   <HighResolutionIconUrl DefaultValue="https://swate.nfdi4plants.de/assets/swate_80x80.png"/>
-  <SupportUrl DefaultValue="https://csb.bio.uni-kl.de/"/>
+  <SupportUrl DefaultValue="https://github.com/nfdi4plants/Swate/issues"/>
   <AppDomains>
     <AppDomain>bio.uni-kl.de</AppDomain>
   </AppDomains>
