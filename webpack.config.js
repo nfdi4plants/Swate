@@ -134,9 +134,9 @@ module.exports = {
         server: {
             type: 'https',
             options: {
-                key: "C:/Users/User/.office-addin-dev-certs/localhost.key",
-                cert: "C:/Users/User/.office-addin-dev-certs/localhost.crt",
-                ca: "C:/Users/User/.office-addin-dev-certs/ca.crt"
+                key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
+                cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
+                ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
             },
         },
         proxy: CONFIG.devServerProxy,
