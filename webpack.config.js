@@ -88,15 +88,19 @@ module.exports = {
     // to prevent browser caching if code changes
     output: {
         path: resolve(CONFIG.outputDir),
+        publicPath: '/',
         filename: isProduction ? '[name].[fullhash].js' : '[name].js'
     },
     mode: isProduction ? 'production' : 'development',
     devtool: isProduction ? 'source-map' : 'eval-source-map',
     optimization: {
+        runtimeChunk: "single",
+        moduleIds: 'deterministic',
+        // Split the code coming from npm packages into a different file.
+        // 3rd party dependencies change less often, let the browser cache them.
         splitChunks: {
             chunks: 'all'
         },
-        runtimeChunk: "single"
     },
     target: ["web", "es5"],
     // Besides the HtmlPlugin, we use the following plugins:
@@ -111,9 +115,7 @@ module.exports = {
             new MiniCssExtractPlugin({ filename: 'style.[name].[fullhash].css' }),
             new CopyWebpackPlugin({ patterns: [{ from: resolve(CONFIG.assetsDir) }] }),
         ])
-        : commonPlugins.concat([
-            //new webpack.HotModuleReplacementPlugin(),
-        ]),
+        : commonPlugins,
     externals: {
         officejs: 'Office.js',
     },
@@ -126,9 +128,7 @@ module.exports = {
         // Necessary when using non-hash client-side routing
         // This assumes the index.html is accessible from server root
         // For more info, see https://webpack.js.org/configuration/dev-server/#devserverhistoryapifallback
-        historyApiFallback: {
-            index: '/'
-        },
+        historyApiFallback: true,
         host: '0.0.0.0',
         port: CONFIG.devServerPort,
         server: {
@@ -145,7 +145,8 @@ module.exports = {
             publicPath: CONFIG.publicPath
         },
         static: {
-            directory: resolve(CONFIG.assetsDir)
+            directory: resolve(CONFIG.assetsDir),
+            publicPath: '/'
         }
     },
     // - sass-loaders: transforms SASS/SCSS into JS
