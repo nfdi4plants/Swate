@@ -14,8 +14,8 @@ open Model
 open Shared
 open Browser.Types
 open Elmish
+open Messages.FilePicker
 open Messages
-open FilePicker
 
 let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : FilePicker.Model * Cmd<Messages.Msg> =
     match filePickerMsg with
@@ -405,49 +405,6 @@ let fileElementContainer (model:Messages.Model) dispatch =
     ]
 
 let uploadButton (model:Messages.Model) dispatch inputId =
-    //File.file [
-    //    File.Color IsInfo
-    //    File.IsCentered
-    //    File.Props [Style [Margin "1rem 0"]]
-    //] [
-    //    File.label [ Props [Style [Width "100%"]] ] [
-    //        File.input [
-    //            Props [
-    //                Id inputId
-    //                Multiple true
-    //                OnChange (fun ev ->
-    //                    printfn "hit"
-    //                    let files : FileList = ev.target?files
-    //                    printfn "Lenght: %i" files.length
-    //                    printfn "HERE>>"
-    //                    Browser.Dom.console.log ev
-    //                    printfn "<<HERE"
-
-    //                    let fileNames =
-    //                        [ for i=0 to (files.length - 1) do yield files.item i ]
-    //                        |> List.map (fun f -> f.name)
-
-    //                    fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
-
-    //                    let picker = Browser.Dom.document.getElementById(inputId)
-    //                    // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
-    //                    picker?value <- null
-    //                )
-    //            ]
-    //        ]
-    //        File.cta [
-    //            Props [Style [Width "100%"; JustifyContent "center" ]]
-    //        ] [
-    //            File.icon [] [ Fa.i [ Fa.Solid.Upload ] [] ]
-    //            File.label [ Props [
-    //                //OnClick (fun e ->
-    //                //    let getUploadElement = Browser.Dom.document.getElementById inputId
-    //                //    getUploadElement.click()
-    //                //)
-    //            ] ] [ str "Pick file names" ]
-    //        ]
-    //    ]
-    //]
     Field.div [][
         input [
             Style [Display DisplayOptions.None]
@@ -456,8 +413,6 @@ let uploadButton (model:Messages.Model) dispatch inputId =
             Type "file"
             OnChange (fun ev ->
                 let files :FileList = ev.target?files
-
-                Browser.Dom.console.log files.length
 
                 let fileNames =
                     [ for i=0 to (files.length - 1) do yield files.item i ]
@@ -554,21 +509,108 @@ let fileSortElements (model:Messages.Model) dispatch =
             Button.List.Props [Style [MarginLeft "auto"]]
         ][
             sortButton Fa.Solid.SortAlphaDown (fun e ->
-                let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i,snd x)
+                let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
             sortButton Fa.Solid.SortAlphaDownAlt (fun e ->
-                let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i,snd x)
+                let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i+1,snd x)
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
         ]
     ]
 
+module FileNameTable =
+
+    let deleteFromTable (id,fileName) (model:Model) dispatch =
+        Delete.delete [
+            Delete.OnClick (fun _ ->
+                let newList =
+                    model.FilePickerState.FileNames
+                    |> List.except [id,fileName]
+                    |> List.mapi (fun i (_,name) -> i+1, name)
+                newList |> UpdateFileNames |> FilePickerMsg |> dispatch
+            )
+            Delete.Props [ Style [
+                MarginRight "2rem"
+            ]]
+        ][]
+
+    let moveUpButton (id,fileName) (model:Model) dispatch =
+        Button.a [
+            Button.OnClick (fun _ ->
+                let sortedList =
+                    model.FilePickerState.FileNames
+                    |> List.map (fun (iterInd,iterFileName) ->
+                        let isNameToMove = (id,fileName) = (iterInd,iterFileName)
+                        if isNameToMove then
+                            /// if the iterated element is the one we want to move, substract 1.5 from it
+                            /// let sortBy handle all stuff then assign new indices with mapi
+                            (float iterInd-1.5,iterFileName)
+                        else
+                            (float iterInd,iterFileName)
+                    )
+                    |> List.sortBy fst
+                    |> List.mapi (fun i v -> i+1, snd v)
+                UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+            )
+            Button.Size IsSmall
+        ][
+            Fa.i [Fa.Solid.ArrowUp][]
+        ]
+
+    let moveDownButton (id,fileName) (model:Model) dispatch =
+        Button.a [
+            Button.Size IsSmall
+            Button.OnClick (fun _ ->
+                let sortedList =
+                    model.FilePickerState.FileNames
+                    |> List.map (fun (iterInd,iterFileName) ->
+                        let isNameToMove = (id,fileName) = (iterInd,iterFileName)
+                        if isNameToMove then
+                            /// if the iterated element is the one we want to move, add 1.5 from it
+                            /// let sortBy handle all stuff then assign new indices with mapi
+                            (float iterInd+1.5,iterFileName)
+                        else
+                            (float iterInd,iterFileName)
+                    )
+                    |> List.sortBy fst
+                    |> List.mapi (fun i v -> i+1, snd v)
+                UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+            )
+        ][
+            Fa.i [Fa.Solid.ArrowDown][]
+        ]
+
+    let moveButtonList (id,fileName) (model:Model) dispatch =
+        Button.list [][
+            moveUpButton (id,fileName) model dispatch
+            moveDownButton (id,fileName) model dispatch
+        ]
+        
+
+    let table (model:Messages.Model) dispatch =
+        Table.table [
+            Table.IsHoverable
+            Table.IsStriped
+        ][
+            tbody [][
+                for index,fileName in model.FilePickerState.FileNames do
+                    tr [][
+                        td [][b [][str $"{index}"]]
+                        td [][str fileName]
+                        td [][moveButtonList (index,fileName) model dispatch]
+                        td [Style [TextAlign TextAlignOptions.Right]][deleteFromTable (index,fileName) model dispatch]
+                    ]
+            ]
+        ]
+        
+
 let fileContainer (model:Messages.Model) dispatch inputId=
     mainFunctionContainer [
         fileSortElements model dispatch
 
-        fileNameElements model dispatch
+        FileNameTable.table model dispatch
+        //fileNameElements model dispatch
     ]
 
 let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
