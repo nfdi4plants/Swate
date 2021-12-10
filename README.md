@@ -16,8 +16,7 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
     - [Swate Features sorted by Excel Versions](#swate-features-sorted-by-excel-versions)
   - [Install/Use](#installuse)
     - [Excel desktop](#excel-desktop)
-      - [Using the Swate installer](#using-the-swate-installer)
-      - [Using a shared folder](#using-a-shared-folder)
+    - [Using a shared folder as system admin](#using-a-shared-folder-as-system-admin)
     - [Excel online](#excel-online)
   - [Discuss/Get help](#discussget-help)
     - [Documentation](#documentation)
@@ -71,9 +70,18 @@ You can also search existing issues for solutions for your questions and/or disc
 
 ### Excel desktop
 
+- Download the [Windows Installer](https://github.com/nfdi4plants/Swate/blob/developer/.assets/swate-win.zip?raw=true).
+- Close all Office instances (Excel, Powerpoint, Word..)
+- Unzip (`Right click` ➞ `Extract All..`)
+- Double click the `install.cmd`. You will be asked to give administrative permissions and in the end to allow changes to the registry. Allow both and you are good to go!
+- Open Excel, go to `Insert` ➞ `My Add-ins` ➞ `Shared Folder`. There you should see both `Swate` and `Swate.Experts`.
 
-#### Using the Swate installer
-Use the new [Swate installer](https://github.com/omaus/Swate_Install#swate-installer).
+<details>
+    <summary>Alternative | Using the previous Swate installer</summary>
+    
+    [Swate installer](https://github.com/omaus/Swate_Install#swate-installer)
+  
+</details>
 
 <details>
     <summary>Alternative | Using the release archive</summary>
@@ -87,7 +95,7 @@ Use the new [Swate installer](https://github.com/omaus/Swate_Install#swate-insta
   
 </details>
 
-#### Using a shared folder 
+### Using a shared folder as system admin
 
 If you have administrative access in your organization, you can create a network share folder and follow [this guide](https://github.com/OfficeDev/office-js-docs-pr/blob/master/docs/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins.md#:~:text=Sideload%20your%20add%2Din,-Put%20the%20manifest&text=Be%20sure%20to%20specify%20the,element%20of%20the%20manifest%20file.&text=In%20Excel%2C%20Word%2C%20or%20PowerPoint,Office%20Add%2Dins%20dialog%20box.) to make the addin available without any further downloads from your users
 
