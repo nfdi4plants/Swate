@@ -10,6 +10,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.config\dotnet-tools.json = .config\dotnet-tools.json
 		global.json = global.json
 		install.cmd = install.cmd
+		.assets\assets\install.cmd = .assets\assets\install.cmd
 		manifest.xml = manifest.xml
 		package.json = package.json
 		paket.dependencies = paket.dependencies
@@ -18,11 +19,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		RELEASE_NOTES.md = RELEASE_NOTES.md
 		webpack.config.js = webpack.config.js
 		yarn.lock = yarn.lock
-	EndProjectSection
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "assets", "assets", "{A21844B3-2816-4F6F-B275-308DA4EC2B3E}"
-	ProjectSection(SolutionItems) = preProject
-		src\Client\public\favicon.png = src\Client\public\favicon.png
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E0FF3176-0B77-4662-A2A8-7233E5E59981}"

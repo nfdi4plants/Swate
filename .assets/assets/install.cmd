@@ -34,6 +34,7 @@ if '%errorlevel%' NEQ '0' (
 SET swateFolderName=nfdi_manifests
 SET swateFolder=%LOCALAPPDATA%\%swateFolderName%
 
+@REM create folder in user folder
 IF EXIST %swateFolder% (
     ECHO Found existing folder for Swate manifests!
 ) ELSE (
@@ -44,15 +45,18 @@ ECHO Created folder for Swate manifest @%swateFolder%.
 
 ECHO Download Swate manifest to folder..
 
-curl.exe --output %swateFolder%/manifest.xml --url https://raw.githubusercontent.com/nfdi4plants/Swate/developer/.assets/assets/manifest.xml
+@REM Download Swate manifests into new folder
+curl.exe --output %swateFolder%/swateCore_manifest.xml --url https://raw.githubusercontent.com/nfdi4plants/Swate/developer/.assets/assets/core_manifest.xml
+curl.exe --output %swateFolder%/swateExperts_manifest.xml --url https://raw.githubusercontent.com/nfdi4plants/Swate/developer/.assets/assets/experts_manifest.xml
 
 ECHO Share folder with Excel network..
 
+@REM Share folder with user
 net share swate_manifests=%swateFolder% /grant:%USERNAME%,FULL
 
 ECHO Create registry file for Excel..
 
-@REM Network path always contains computer name as first parameter
+@REM Network path always contains computer name as first parameter. Create registry file according to Excel/Office docs.
 (
     ECHO Windows Registry Editor Version 5.00
     ECHO ""
