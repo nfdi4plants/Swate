@@ -70,6 +70,8 @@ You can also search existing issues for solutions for your questions and/or disc
 
 ### Excel desktop
 
+**If you have an older Swate version installed already, it <u>might</u> be necessary to [clear the cache](https://docs.microsoft.com/de-de/office/dev/add-ins/testing/clear-cache#manually-clear-the-cache-in-excel-word-and-powerpoint) to apply the changes to Swate.**
+
 - Download the [Windows Installer](https://github.com/nfdi4plants/Swate/blob/developer/.assets/swate-win.zip?raw=true).
 - Close all Office instances (Excel, Powerpoint, Word..)
 - Unzip (`Right click` ➞ `Extract All..`)
