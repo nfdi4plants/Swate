@@ -60,6 +60,8 @@ module ReleaseNoteTasks =
                 System.Text.Encoding.UTF8
                 [
                     (Path.combine __SOURCE_DIRECTORY__ @".assets\assets\manifest.xml")
+                    (Path.combine __SOURCE_DIRECTORY__ @".assets\assets\core_manifest.xml")
+                    (Path.combine __SOURCE_DIRECTORY__ @".assets\assets\experts_manifest.xml")
                     (Path.combine __SOURCE_DIRECTORY__ "manifest.xml")
                 ]
         
