@@ -77,7 +77,7 @@ module ReleaseNoteTasks =
             let assetsPaths = Fake.IO.DirectoryInfo.getFiles assetDir
             assetsPaths |> Array.map (fun x -> x.FullName)
 
-        Zip.zip assetDir.FullName ".assets\swate.zip" files
+        Zip.zip assetDir.FullName ".assets\swate-win.zip" files
 
         Trace.trace "Assets zipped!"
 
@@ -89,20 +89,7 @@ module ReleaseNoteTasks =
                 ""
                 "You can also search existing issues for solutions for your questions and/or discussions about your suggestions."
                 ""
-                "Here are the necessary steps to use SWATE:"
-                ""
-                "#### If you use the excel desktop application locally:"
-                "    - Install node.js LTS (needed for office add-in related tooling)"
-                "    - Download the release archive (.zip file) below and extract it"
-                "    - Execute the swate.cmd (windows) or swate.sh (macOS, you will need to make it executable via chmod a+x) script."
-                ""
-                "#### If you use Excel in the browser:"
-                "    - Download the release archive (.zip file) below and extract it"
-                "    - Launch Excel online, open a (blank) workbook"
-                "    - Under the Insert tab, select Add-Ins"
-                "    - Go to Manage my Add-Ins and select Upload my Add-In"
-                "    - select and upload the manifest.xml file contained in the archive."
-                ""
+                "If you want to start using Swate follow these easy instructions: [Swate installation](https://github.com/nfdi4plants/Swate#installuse)"
                 ""
             ] |> String.concat "\n"
 
@@ -110,7 +97,7 @@ module ReleaseNoteTasks =
             ProjectInfo.gitOwner,
             ProjectInfo.gitName,
             (Some bodyText),
-            None, //(Some <| Path.combine __SOURCE_DIRECTORY__ @".assets\swate.zip"),
+            None, //(Some <| @".assets\swate-win.zip"),
             config
         )
     )
