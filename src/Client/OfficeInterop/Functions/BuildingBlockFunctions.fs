@@ -68,7 +68,11 @@ let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRan
                                 let cellUnit =
                                     let unit = numberFormats.[ind].[i]
                                     if unit.IsSome && string unit.Value <> "General" then
-                                        TermMinimal.ofNumberFormat (string unit.Value) |> Some
+                                    // This case was added, as a numberFormat of "Text" resulted in an error.
+                                        try
+                                            TermMinimal.ofNumberFormat (string unit.Value) |> Some
+                                        with
+                                            | _ -> None
                                     else
                                         None
                                 // start cell row index by 1, as 0 will later be used for the header
