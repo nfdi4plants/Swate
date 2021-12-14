@@ -69,7 +69,6 @@ module OfficeInterop =
             currentModel, cmd
 
         | AddAnnotationBlock (minBuildingBlockInfo) ->
-            printfn "Hit interop function"
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.addAnnotationBlock  

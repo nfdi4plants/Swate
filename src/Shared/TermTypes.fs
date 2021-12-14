@@ -71,7 +71,7 @@ module TermTypes =
             let unitNameOpt = Regex.parseDoubleQuotes formatStr
             let unitName =
                 if unitNameOpt.IsNone then
-                    failwith $"Unable to parse given string {formatStr} to TermMinimal.Name."
+                    failwith $"Unable to parse given string {formatStr} to TermMinimal.Name in numberFormat."
                 else
                     unitNameOpt.Value
             TermMinimal.create unitName ""
