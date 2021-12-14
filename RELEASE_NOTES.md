@@ -1,3 +1,11 @@
+### 0.5.2+abcc754 (Released 2021-12-14)
+* Additions:
+    * latest commit #abcc754
+    * [[#681d9c9](https://github.com/nfdi4plants/Swate/commit/681d9c9ef7ac4afb12f912ad99f1b5f0f288c26f)] Add new installer using shared folders! This allows Swate installation without the microsoft store and any dependencies.
+    * [[#9154dd5](https://github.com/nfdi4plants/Swate/commit/9154dd5eacc20cc5e6be78b554f1226abc298996)] Split Swate.Core and Experts into different add-ins :tada:
+* Bugfixes:
+    * [[#abcc754](https://github.com/nfdi4plants/Swate/commit/abcc754fddc57b9f9785670569ef352fb5548e56)] **Try** parse number format (fix Issue #180).
+
 ### 0.5.1+0c90a83 (Released 2021-12-8)
 * Additions:
     * latest commit #0c90a83
