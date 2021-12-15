@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>5d6f5462-3401-48ec-9406-d12882e9ad84</Id>
   <Version>0.5.2</Version>
@@ -95,7 +95,7 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <!-- <bt:Image id="Icon.16x16" DefaultValue="https://swate.nfdi4plants.de/assets/swate_16x16.png"/>
+         <bt:Image id="Icon.16x16" DefaultValue="https://swate.nfdi4plants.de/assets/swate_16x16.png"/>
         <bt:Image id="Icon.20x20" DefaultValue="https://swate.nfdi4plants.de/assets/swate_20x20.png"/>
         <bt:Image id="Icon.24x24" DefaultValue="https://swate.nfdi4plants.de/assets/swate_24x24.png"/>
         <bt:Image id="Icon.32x32" DefaultValue="https://swate.nfdi4plants.de/assets/swate_32x32.png"/>
@@ -103,7 +103,7 @@
         <bt:Image id="Icon.48x48" DefaultValue="https://swate.nfdi4plants.de/assets/swate_48x48.png"/>
         <bt:Image id="Icon.64x64" DefaultValue="https://swate.nfdi4plants.de/assets/swate_64x64.png"/>
         <bt:Image id="Icon.80x80" DefaultValue="https://swate.nfdi4plants.de/assets/swate_80x80.png"/>
-        <bt:Image id="Icon.96x96" DefaultValue="https://swate.nfdi4plants.de/assets/swate_96x96.png"/> -->
+        <bt:Image id="Icon.96x96" DefaultValue="https://swate.nfdi4plants.de/assets/swate_96x96.png"/> 
         <bt:Image id="IconE.16x16" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_16x16.png"/>
         <bt:Image id="IconE.20x20" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_20x20.png"/>
         <bt:Image id="IconE.24x24" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_24x24.png"/>
