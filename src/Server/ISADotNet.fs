@@ -111,7 +111,7 @@ type ISADotNet.FactorValue with
         let columnPosition = getColumnPosition this.Category.Value.FactorType.Value
         let unitTerm =
             if this.Unit.IsSome then this.Unit.Value.toTermMinimal else None
-        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.Characteristics colHeaderTerm.Value.Name
+        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.Factor colHeaderTerm.Value.Name
         let value =
             match this.Value with
             | Some v    -> Array.singleton v.toTermMinimal
@@ -131,7 +131,7 @@ type ISADotNet.ProcessParameterValue with
         let columnPosition = getColumnPosition this.Category.Value.ParameterName.Value
         let unitTerm =
             if this.Unit.IsSome then this.Unit.Value.toTermMinimal else None
-        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.Characteristics colHeaderTerm.Value.Name
+        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.Parameter colHeaderTerm.Value.Name
         let value =
             match this.Value with
             | Some v    -> Array.singleton v.toTermMinimal
