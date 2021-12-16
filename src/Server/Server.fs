@@ -495,8 +495,8 @@ app
     .ConfigureAppConfiguration(
         System.Action<Microsoft.Extensions.Hosting.HostBuilderContext,IConfigurationBuilder> ( fun ctx config ->
             config.AddUserSecrets("6de80bdf-2a05-4cf7-a1a8-d08581dfa887") |> ignore
-            config.AddJsonFile("production.json",true,true)  |> ignore
-            config.AddJsonFile("dev.json",true,true)  |> ignore
+            config.AddJsonFile("dev.json",true,true)            |> ignore
+            config.AddJsonFile("production.json",true,true)     |> ignore
         )
 )
 |> run

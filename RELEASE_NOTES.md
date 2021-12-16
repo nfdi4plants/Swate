@@ -1,3 +1,11 @@
+### 0.5.3+0eaa644 (Released 2021-12-16)
+* Additions:
+    * latest commit #0eaa644
+* Bugfixes:
+    * [[#85c47e0](https://github.com/nfdi4plants/Swate/commit/85c47e0cefe40e038fbcd93ec360f92e5ec6efb2)] Update installer (Issue #181).
+    * [[#0eaa644](https://github.com/nfdi4plants/Swate/commit/0eaa6446e70d858720a1ea3428083cd3b379360a)] Fix accidental value insert from template db.
+    * [[#2039287](https://github.com/nfdi4plants/Swate/commit/20392878a667a6c563a389078629f3526766c4a3)] Fix templates only inserting as characteristic.
+
 ### 0.5.2+abcc754 (Released 2021-12-14)
 * Additions:
     * latest commit #abcc754
