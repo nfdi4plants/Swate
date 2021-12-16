@@ -20,17 +20,17 @@ let breadcrumbEle (model:Model) dispatch =
     Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
         Breadcrumb.item [][
             a [
-                OnClick (fun e -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
+                OnClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
             ][
                 str (Routing.Route.Protocol.toStringRdbl)
             ]
-        ]
+        ];
         Breadcrumb.item [
             Breadcrumb.Item.IsActive true
         ][
             a [
                 Style [Color model.SiteStyleState.ColorMode.Text]
-                OnClick (fun e -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
+                OnClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
             ][
                 str Routing.Route.ProtocolSearch.toStringRdbl
             ]
@@ -131,7 +131,7 @@ let fileSortElements (model:Model) dispatch =
                                 Tag.CustomClass "clickableTagDelete"
                                 //Tag.Color IsWarning;
                                 Tag.Props [
-                                    OnClick (fun e -> RemoveProtocolTag selectedTag |> ProtocolMsg |> dispatch)
+                                    OnClick (fun _ -> RemoveProtocolTag selectedTag |> ProtocolMsg |> dispatch)
                                 ]
                             ] []
                         ]

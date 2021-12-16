@@ -65,6 +65,8 @@ let getProtocolByName cString (queryStr:string) =
     let insertBuildingBlockList =
         let dbJson = reader.GetString(10)
         (dbJson |> rowMajorOfTemplateJson).headerToInsertBuildingBlockList
+        /// Remove values from template, not wanted for this function
+        |> List.map (fun ibb -> {ibb with Rows = [||]})
     ProtocolTemplate.create
         (reader.GetString(1))       // name
         (reader.GetString(2))       // version
