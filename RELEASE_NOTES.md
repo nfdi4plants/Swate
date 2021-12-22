@@ -1,3 +1,8 @@
+### 0.5.4+84984db (Released 2021-12-22)
+* Additions:
+    * latest commit #84984db
+    * [[#84984db](https://github.com/nfdi4plants/Swate/commit/84984db59d2ebcbc01f43103f1994b35463d1958)] Update Swate install zip
+
 ### 0.5.3+0eaa644 (Released 2021-12-16)
 * Additions:
     * latest commit #0eaa644
