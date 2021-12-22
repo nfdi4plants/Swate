@@ -132,7 +132,7 @@ let getTermSuggestionsByParentTerm cString (query:string, parentTerm:string) =
     getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
 
     let queryParam              = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
-    let parentOntologyParam     = getTermSuggestionsCmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+    let parentOntologyParam     = getTermSuggestionsCmd.Parameters.Add("parentTermName",MySqlDbType.VarChar)
 
     queryParam              .Value <- query
     parentOntologyParam     .Value <- parentTerm
@@ -197,7 +197,7 @@ let getTermByParentTermOntologyInfo cString (query:string, parentTerm:TermMinima
     cmd.CommandType <- CommandType.StoredProcedure
 
     let queryParam              = cmd.Parameters.Add("query",MySqlDbType.VarChar)
-    let parentOntologyParam     = cmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+    let parentOntologyParam     = cmd.Parameters.Add("parentTermName",MySqlDbType.VarChar)
 
     queryParam              .Value <- query
     parentOntologyParam     .Value <- parentTerm.Name
@@ -236,7 +236,7 @@ let getAllTermsByParentTermOntologyInfo cString (parentTerm:TermMinimal) =
 
     cmd.CommandType <- CommandType.StoredProcedure
 
-    let parentOntologyParam     = cmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+    let parentOntologyParam     = cmd.Parameters.Add("parentTermName",MySqlDbType.VarChar)
 
     parentOntologyParam     .Value <- parentTerm.Name
 
@@ -306,7 +306,7 @@ let getTermSuggestionsByParentTermAndAccession cString (query:string, parentTerm
     getTermSuggestionsCmd.CommandType <- CommandType.StoredProcedure
 
     let queryParam                  = getTermSuggestionsCmd.Parameters.Add("query",MySqlDbType.VarChar)
-    let parentOntologyParam         = getTermSuggestionsCmd.Parameters.Add("parentOntology",MySqlDbType.VarChar)
+    let parentOntologyParam         = getTermSuggestionsCmd.Parameters.Add("parentTermName",MySqlDbType.VarChar)
     let parentTermAccessionParam    = getTermSuggestionsCmd.Parameters.Add("parentTermAccession",MySqlDbType.VarChar)
 
     queryParam              .Value <- query
