@@ -106,8 +106,23 @@ let fileSortElements (model:Model) dispatch =
                         //Border "0.5px solid"
                         if hitTagList |> Array.isEmpty then Display DisplayOptions.None
                     ]]] [
+                        let erTags = hitTagList |> Array.filter (fun x -> x.StartsWith "er:")
+                        let standardTags = hitTagList |> Array.except erTags |> fun x -> if Array.isEmpty x then [|"GEO Test"; "GEO tagging"|] else x
+                        Label.label [][str "Endpoint Repositories"]
                         Tag.list [][
-                            for tagSuggestion in hitTagList do
+                            for tagSuggestion in erTags do
+                                yield
+                                    Tag.tag [
+                                        Tag.CustomClass "clickableTag"
+                                        Tag.Color IsLink
+                                        Tag.Props [ OnClick (fun e -> AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch) ]
+                                    ][
+                                        str (tagSuggestion.Replace("er:",""))
+                                    ]
+                        ]
+                        Label.label [][str "Tags"]
+                        Tag.list [][
+                            for tagSuggestion in standardTags do
                                 yield
                                     Tag.tag [
                                         Tag.CustomClass "clickableTag"
@@ -170,7 +185,13 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
 
         ] [
             td [ ] [ str prot.Name ]
-            td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt][]] ]
+            td [ ] [
+                if prot.Name.StartsWith "MAdLand" then
+                    Tag.tag [Tag.Color IsWarning ][str "community"]
+                else
+                    Tag.tag [Tag.Color IsSuccess ][str "curated"]
+            ]
+            //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt][]] ]
             td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str prot.Version ]
             td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string prot.Used) ]
             td [][
@@ -281,7 +302,8 @@ let protocolElementContainer (model:Model) dispatch =
             thead [][
                 tr [][
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Protocol Name"      ]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Documentation"      ]
+                    //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Documentation"      ]
+                    th [][]
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Protocol Version"   ]
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Uses"               ]
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][]
