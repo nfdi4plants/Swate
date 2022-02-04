@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<installer-script minSpecVersion="1.000000">
+    <title>Swate</title>
+
+    <!-- <background
+        file="bg.png"
+        mime-type="image/png"
+        scaling="proportional"
+        alignment="bottomleft"
+    /> -->
+
+    <welcome file="welcome.html" mime-type="text/html" />
+    <conclusion file="conclusion.html" mime-type="text/html" />
+
+    <!-- <license file="LICENSE"/> -->
+
+    <options customize="never" allow-external-scripts="no" />
+
+    <domains enable_currentUserHome="true" />
+
+    <choices-outline>
+        <line choice="swate"/>
+    </choices-outline>
+
+    <choice id="swate" title="SWATE">
+        <pkg-ref id="swate"/>
+    </choice>
+
+    <pkg-ref id="swate" version="0.5.3">swate-pkg.pkg</pkg-ref>
+    <pkg-ref id="swate">
+        <must-close>
+            <app id="com.microsoft.Excel"/>
+       </must-close>
+   </pkg-ref>
+
+</installer-script>

@@ -1,0 +1,11 @@
+#! /bin/sh
+
+echo "args: " $@
+
+ROOT="$2"
+
+cp -v \
+    "${ROOT}"/wef/*_manifest.xml \
+    "${HOME}"/Library/Containers/com.microsoft.Excel/Data/Documents/wef
+
+rm -r "${ROOT}"
