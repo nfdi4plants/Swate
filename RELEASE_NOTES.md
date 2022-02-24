@@ -1,6 +1,7 @@
-### 0.5.4+ac1bc58 (Released 2021-12-22)
+### 0.5.4+bd8e3fb (Released 2022-2-3)
 * Additions:
-    * latest commit #ac1bc58
+    * latest commit #bd8e3fb
+    * [[#bd8e3fb](https://github.com/nfdi4plants/Swate/commit/bd8e3fb946cbe956a730de58508b3a94ae2c27d4)] Prototype ER tags and curated templates (#187, #186).
     * [[#ac1bc58](https://github.com/nfdi4plants/Swate/commit/ac1bc58e2fb447025dd8cd7812d98d8ed5a7b588)] Update input var name for stored procedures.
     * [[#84984db](https://github.com/nfdi4plants/Swate/commit/84984db59d2ebcbc01f43103f1994b35463d1958)] Update Swate install zip
 
