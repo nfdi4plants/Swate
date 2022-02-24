@@ -545,6 +545,14 @@ let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * 
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
+    | TestMyAPI ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.testAPIv1.test
+                    ()
+                    (curry GenericLog Cmd.none)
+                    (curry GenericError Cmd.none)
+        currentModel, Cmd.map DevMsg cmd
     | Batch msgSeq ->
         let cmd =
             Cmd.batch [

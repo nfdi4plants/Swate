@@ -203,15 +203,16 @@ Target.create "Run" (fun _ ->
     |> runParallel
 )
 
-Target.create "officedebug" (fun _ ->
+Target.create "officedebug" (fun config ->
+    let args = config.Context.Arguments
     run dotnet "build" sharedPath
-    openBrowser developmentUrl
+    if args |> List.contains "--open" then openBrowser developmentUrl
     [ "server", dotnet "watch run" serverPath
       "client", dotnet "fable watch src/Client -s --run webpack-dev-server" ""
       /// start up mysql db from docker-compose
       "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
       /// sideload webapp in excel
-      "officedebug", npx "office-addin-debugging start manifest.xml desktop --debug-method web" __SOURCE_DIRECTORY__
+      if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start manifest.xml desktop --debug-method web" __SOURCE_DIRECTORY__
       ]
     |> runParallel
 )

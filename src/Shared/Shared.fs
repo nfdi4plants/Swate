@@ -45,7 +45,7 @@ type UnitSearchRequest =
 
 type ITestAPI = {
     // Development
-    getTestNumber           : unit      -> Async<int>
+    test : unit      -> Async<string*string>
 }
 
 //type IISADotNetAPIv1 = {

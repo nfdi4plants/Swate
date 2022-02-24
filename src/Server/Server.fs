@@ -370,6 +370,22 @@ let protocolApi cString = {
     }
 }
 
+let testApi (ctx: HttpContext): ITestAPI = {
+    test = fun () -> async {
+        let c =
+            let settings = ctx.GetService<IConfiguration>()
+            let credentials : OntologyDBneo4j.Neo4JCredentials= {
+                User        = settings.["neo4j-username"]
+                Pw          = settings.["neo4j-pw"]
+                BoltUrl     = settings.["neo4j-uri"]
+                DatabaseName= settings.["neo4j-db"]
+            }
+            credentials
+        let exmp = OntologyDBneo4j.Queries.Term.matchChildrenByParentAccession c ("SCIE","MS:1000031")
+        return "Info", sprintf "RES: %A" exmp
+    }
+}
+
 let errorHandler (ex:exn) (routeInfo:RouteInfo<HttpContext>) =
     let msg = sprintf "[SERVER SIDE ERROR]: %A @%s." ex.Message routeInfo.path
     Propagate msg
@@ -428,6 +444,15 @@ let createDagApiv1 =
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
+let createTestApi =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromContext testApi
+    //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler errorHandler
+    |> Remoting.buildHttpHandler
+
 ///// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
 //let mainApiController = router {
 
@@ -478,6 +503,10 @@ let topLevelRouter = router {
 
     forward @""(fun next ctx ->
         createDagApiv1 next ctx
+    )
+
+    forward @""(fun next ctx ->
+        createTestApi next ctx
     )
 }
 

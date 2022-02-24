@@ -101,6 +101,11 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
     viewContainer model dispatch [
         Navbar.navbarComponent model dispatch
         //Navbar.quickAccessScalableNavbar model dispatch
+        Box.box' [][
+            Button.button [
+                Button.OnClick(fun e -> TestMyAPI |> dispatch)
+            ] [str "Test api"]
+        ]
         Container.container [
             Container.IsFluid
         ] [

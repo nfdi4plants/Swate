@@ -33,3 +33,9 @@ let swateJsonAPIv1 : ISwateJsonAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<ISwateJsonAPIv1>
+
+
+let testAPIv1 : ITestAPI =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<ITestAPI>

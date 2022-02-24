@@ -265,6 +265,8 @@ type Msg =
 | Batch                 of seq<Messages.Msg>
 /// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
 | UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
+/// Top level msg to test specific  api interactions, only for dev.
+| TestMyAPI
 | DoNothing
 
 let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
