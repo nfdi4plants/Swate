@@ -62,7 +62,6 @@ type DevMsg =
     | UpdateLastFullError   of exn option
     
 type ApiRequestMsg =
-    | TestOntologyInsert                        of (string*string*System.DateTime*string)
     | GetNewTermSuggestions                     of string
     | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
     | GetNewBuildingBlockNameSuggestions        of string

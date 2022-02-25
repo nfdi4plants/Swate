@@ -27,25 +27,6 @@ let ontologyApiDocsv1 =
             )
 
         ///////////////////////////////////////////////////////////// Ontology related requests /////////////////////////////////////////////////////////////
-        ////////
-        ontologyDocsv1.route <@ fun api -> api.testOntologyInsert @>
-        |> ontologyDocsv1.alias "Test Insertion of Ontology into Database (<code>testOntologyInsert</code>)"
-        |> ontologyDocsv1.description
-            (
-                createDocumentationDescription
-                    "This is a preview function for a future feature. Right now it only returns an <code>DbDomain.Ontology</code> that <b>would</b> be created."
-                    "This is currently not used"
-                    (Some [|
-                        Parameter.create "OntologyName" ParamString ""
-                        Parameter.create "OntologyVersion" ParamString ""
-                        Parameter.create "OntologyDefinition" ParamString ""
-                        Parameter.create "Created" ParamString "DateTime at which the ontology was created."
-                        Parameter.create "User" ParamString "Id of user who posted the ontology."
-                    |])
-                    "Creates a <code>DbDomain.Ontology</code> from the given params and returns it."
-                    (Parameter.create "Ontology" PredefinedParams.OntologyType "A database Ontology entry. This one is not from the database and is currently <b>not</b> created. <code>ID</code> is a set value for this version.")
-            )
-        |> ontologyDocsv1.example <@ fun api -> api.testOntologyInsert ("TO","releases/testdate",PredefinedParams.Examples.test,"UserTestId") @>
 
         ////////
         ontologyDocsv1.route <@ fun api -> api.getAllOntologies @>

@@ -6,20 +6,19 @@ module TermTypes =
     open System
 
     module DbDomain =
-    
-        type Ontology = {
-            Name            : string
-            CurrentVersion  : string
-            DateCreated     : System.DateTime
-            UserID          : string
-        }
 
-        let createOntology name currentVersion dateCreated userID = {     
-            Name            = name          
-            CurrentVersion  = currentVersion
-            DateCreated     = dateCreated   
-            UserID          = userID        
-        }
+        type Ontology = {
+            Name        : string
+            Version     : string
+            LastUpdated : DateTime
+            Author      : string
+        } with
+            static member create name version lastUpdated authors = {     
+                Name         = name          
+                Version      = version
+                LastUpdated  = lastUpdated   
+                Author       = authors        
+            }
 
         type Term = {
             OntologyName    : string

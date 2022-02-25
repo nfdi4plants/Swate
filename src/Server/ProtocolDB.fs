@@ -7,7 +7,7 @@ open System
 
 open Shared.TermTypes
 open Shared.ProtocolTemplateTypes
-open OntologyDB
+open OntologyDB_old
 
 
 /// Returns Protocols with empty protocol blocks

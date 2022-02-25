@@ -140,24 +140,6 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         nextState,nextCmd
 
     match reqMsg with
-    | TestOntologyInsert (a,b,d,e) ->
-
-        let currentCall = {
-            FunctionName = "testOntologyInsert"
-            Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-
-        nextState,
-        Cmd.OfAsync.either
-            Api.api.testOntologyInsert
-            (a,b,d,e)
-            (fun x -> ("Debug",sprintf "Successfully created %A" x) |> ApiSuccess |> Api)
-            (ApiError >> Api)
 
     | GetNewTermSuggestions queryString ->
         handleTermSuggestionRequest

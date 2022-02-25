@@ -92,8 +92,6 @@ type IOntologyAPIv1 = {
     getTestNumber               : unit                                          -> Async<int>
 
     // Ontology related requests
-    /// (name,version,definition,created,user)
-    testOntologyInsert          : (string*string*System.DateTime*string)        -> Async<DbDomain.Ontology>
     getAllOntologies            : unit                                          -> Async<DbDomain.Ontology []>
 
     // Term related requests

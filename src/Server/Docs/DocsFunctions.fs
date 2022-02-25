@@ -133,9 +133,9 @@ module PredefinedParams =
         
         let unitOntologyExmp:DbDomain.Ontology = {
             Name = "uo"
-            CurrentVersion = "releases/2020-03-10"
-            DateCreated = System.DateTime(2014,9,4) //"2014-09-04 00:00:00.000000"
-            UserID = "gkoutos"
+            Version = "releases/2020-03-10"
+            LastUpdated = System.DateTime(2014,9,4) //"2014-09-04 00:00:00.000000"
+            Author = "gkoutos"
         }
 
         let termSearchableExmp:TermSearchable = {

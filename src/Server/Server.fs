@@ -170,28 +170,15 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         }
     }
 
-let ontologyApi cString = {
+let ontologyApi cString credentials = {
     //Development
     getTestNumber = fun () -> async { return 42 }
 
     //Ontology related requests
-    testOntologyInsert = fun (name,version,created,user) ->
-        async {
-            /// Don't allow users to access this part!! At least for now
-            //let createdEntry = OntologyDB.insertOntology cString name version definition created user
-            let onto =
-                DbDomain.createOntology 
-                    name
-                    version
-                    created
-                    user
-            printfn "created pseudo ontology entry: \t%A. No actual db insert has happened." onto
-            return onto
-        }
 
     getAllOntologies = fun () ->
-        async {
-            let results = OntologyDB.getAllOntologies cString ()
+        async { 
+            let results = OntologyDB.Queries.Ontology(credentials).getAll() |> Array.ofSeq
             return results
         }
 
@@ -201,9 +188,9 @@ let ontologyApi cString = {
             let searchRes =
                 match typedSoFar with
                 | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                    OntologyDB.getTermByAccession cString foundAccession
+                    OntologyDB_old.getTermByAccession cString foundAccession
                 | _ ->
-                    let like = OntologyDB.getTermSuggestions cString (typedSoFar)
+                    let like = OntologyDB_old.getTermSuggestions cString (typedSoFar)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -219,14 +206,14 @@ let ontologyApi cString = {
             let searchRes =
                 match typedSoFar with
                 | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                    OntologyDB.getTermByAccession cString foundAccession
+                    OntologyDB_old.getTermByAccession cString foundAccession
                 | _ ->
                     let like =
                         if parentTerm.TermAccession = ""
                         then
-                            OntologyDB.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm.Name)
+                            OntologyDB_old.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm.Name)
                         else
-                            OntologyDB.getTermSuggestionsByParentTermAndAccession cString (typedSoFar,parentTerm.Name,parentTerm.TermAccession)
+                            OntologyDB_old.getTermSuggestionsByParentTermAndAccession cString (typedSoFar,parentTerm.Name,parentTerm.TermAccession)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -240,7 +227,7 @@ let ontologyApi cString = {
     getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
         async {
             let searchRes =
-                OntologyDB.getAllTermsByParentTermOntologyInfo cString parentTerm
+                OntologyDB_old.getAllTermsByParentTermOntologyInfo cString parentTerm
 
             return searchRes  
         }
@@ -251,14 +238,14 @@ let ontologyApi cString = {
             let searchRes =
                 match typedSoFar with
                 | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                    OntologyDB.getTermByAccession cString foundAccession
+                    OntologyDB_old.getTermByAccession cString foundAccession
                 | _ ->
                     let like =
                         if childTerm.TermAccession = ""
                         then
-                            OntologyDB.getTermSuggestionsByChildTerm cString (typedSoFar,childTerm.Name)
+                            OntologyDB_old.getTermSuggestionsByChildTerm cString (typedSoFar,childTerm.Name)
                         else
-                            OntologyDB.getTermSuggestionsByChildTermAndAccession cString (typedSoFar,childTerm.Name,childTerm.TermAccession)
+                            OntologyDB_old.getTermSuggestionsByChildTermAndAccession cString (typedSoFar,childTerm.Name,childTerm.TermAccession)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -273,7 +260,7 @@ let ontologyApi cString = {
     getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
         async {
             let searchRes =
-                OntologyDB.getAllTermsByChildTermOntologyInfo cString childTerm
+                OntologyDB_old.getAllTermsByChildTermOntologyInfo cString childTerm
 
             return searchRes  
         }
@@ -282,7 +269,7 @@ let ontologyApi cString = {
         async {
             let result =
                 let searchSet = searchName + mustContainName + searchDefinition + mustContainDefinition|> Suggestion.createBigrams
-                OntologyDB.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
+                OntologyDB_old.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
                 |> Array.sortByDescending (fun sugg ->
                     Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
                     )
@@ -294,9 +281,9 @@ let ontologyApi cString = {
             let searchRes =
                 match typedSoFar with
                 | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                    OntologyDB.getTermByAccession cString foundAccession
+                    OntologyDB_old.getTermByAccession cString foundAccession
                 | _ ->
-                    let like = OntologyDB.getUnitTermSuggestions cString (typedSoFar)
+                    let like = OntologyDB_old.getUnitTermSuggestions cString (typedSoFar)
                     let searchSet = typedSoFar |> Suggestion.createBigrams
                     like
                     |> Array.sortByDescending (fun sugg ->
@@ -318,31 +305,31 @@ let ontologyApi cString = {
                             if searchTerm.Term.Name = "" then None
                             // check if term accession was found. If so search also by this as it is unique
                             elif searchTerm.Term.TermAccession <> "" then
-                                let searchRes = OntologyDB.getTermByNameAndAccession cString (searchTerm.Term.Name,searchTerm.Term.TermAccession)
+                                let searchRes = OntologyDB_old.getTermByNameAndAccession cString (searchTerm.Term.Name,searchTerm.Term.TermAccession)
                                 if Array.isEmpty searchRes then
                                     None
                                 else
                                     searchRes |> Array.head |> Some
                             // check if parent term was found and try find term via parent term
                             elif searchTerm.ParentTerm.IsSome then
-                                let searchRes = OntologyDB.getTermByParentTermOntologyInfo cString (searchTerm.Term.Name,searchTerm.ParentTerm.Value)
+                                let searchRes = OntologyDB_old.getTermByParentTermOntologyInfo cString (searchTerm.Term.Name,searchTerm.ParentTerm.Value)
                                 if Array.isEmpty searchRes then
                                     // if no term can be found by is_a directed search do standard search by name
                                     // no need to search for name and accession, as accession is the clearly defines a term and is checked in the if branch above.
-                                    let searchRes' = OntologyDB.getTermByName cString searchTerm.Term.Name
+                                    let searchRes' = OntologyDB_old.getTermByName cString searchTerm.Term.Name
                                     if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
                                 else
                                     searchRes |> Array.head |> Some
                             // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
                             elif searchTerm.IsUnit then
-                                let searchRes = OntologyDB.getTermByNameAndOntology cString (searchTerm.Term.Name,"uo")
+                                let searchRes = OntologyDB_old.getTermByNameAndOntology cString (searchTerm.Term.Name,"uo")
                                 if Array.isEmpty searchRes then
                                     None
                                 else
                                     searchRes |> Array.head |> Some
                             // if none of the above apply we do a standard term search
                             else
-                                let searchRes = OntologyDB.getTermByName cString searchTerm.Term.Name
+                                let searchRes = OntologyDB_old.getTermByName cString searchTerm.Term.Name
                                 if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
                     }
                 )
@@ -374,15 +361,15 @@ let testApi (ctx: HttpContext): ITestAPI = {
     test = fun () -> async {
         let c =
             let settings = ctx.GetService<IConfiguration>()
-            let credentials : OntologyDBneo4j.Neo4JCredentials= {
+            let credentials : OntologyDB.Neo4JCredentials= {
                 User        = settings.["neo4j-username"]
                 Pw          = settings.["neo4j-pw"]
                 BoltUrl     = settings.["neo4j-uri"]
                 DatabaseName= settings.["neo4j-db"]
             }
             credentials
-        let exmp = OntologyDBneo4j.Queries.Term.matchChildrenByParentAccession c ("SCIE","MS:1000031")
-        return "Info", sprintf "RES: %A" exmp
+        let exmp = OntologyDB.Queries.Term(c).getByName("instrument mode",sourceOntologyName="ms")
+        return "Info", sprintf "%A" (exmp |> Seq.length)
     }
 }
 
@@ -399,10 +386,10 @@ let createIProtocolApiv1 cString =
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
 
-let createIOntologyApiv1 cString =
+let createIOntologyApiv1 (cString,credentials) =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (ontologyApi cString)
+    |> Remoting.fromValue (ontologyApi cString credentials)
     |> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler errorHandler
@@ -477,7 +464,16 @@ let topLevelRouter = router {
         let cString = 
             let settings = ctx.GetService<IConfiguration>()
             settings.["Swate:ConnectionString"]
-        createIOntologyApiv1 cString next ctx
+        let credentials =
+            let settings = ctx.GetService<IConfiguration>()
+            let credentials : OntologyDB.Neo4JCredentials= {
+                User        = settings.["neo4j-username"]
+                Pw          = settings.["neo4j-pw"]
+                BoltUrl     = settings.["neo4j-uri"]
+                DatabaseName= settings.["neo4j-db"]
+            }
+            credentials
+        createIOntologyApiv1 (cString,credentials) next ctx
     )
 
     forward @"" (fun next ctx ->

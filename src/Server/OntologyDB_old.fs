@@ -1,4 +1,4 @@
-module OntologyDB
+module OntologyDB_old
 
 open Shared
 open TermTypes
@@ -12,39 +12,7 @@ open Shared
 let establishConnection cString = 
     new MySqlConnection(cString)
 
-let insertOntology cString (name:string) (currentVersion:string) (definition:string) (dateCreated:System.DateTime) (userID:string)=
-
-    use connection = establishConnection cString
-    connection.Open()
-    use insertOntologyCmd = connection.CreateCommand()
-
-    insertOntologyCmd
-        .CommandText <-"""
-INSERT INTO Ontology (Name,CurrentVersion,DateCreated,UserID)
-VALUES (@name,@cv,@def,@dc,@uid);
-SELECT max(ID) FROM Ontology"""
-
-    let nameParam           = insertOntologyCmd.Parameters.Add("name",MySqlDbType.VarChar)
-    let currentVersionParam = insertOntologyCmd.Parameters.Add("cv",MySqlDbType.VarChar)
-    let dateCreatedParam    = insertOntologyCmd.Parameters.Add("dc",MySqlDbType.DateTime)
-    let userIDParam         = insertOntologyCmd.Parameters.Add("uid",MySqlDbType.VarChar)
-
-    nameParam           .Value <- name
-    currentVersionParam .Value <- currentVersion
-    dateCreatedParam    .Value <- System.DateTimeOffset.UtcNow
-    userIDParam         .Value <- userID
-
-    use reader = insertOntologyCmd.ExecuteReader()
-    match reader.Read() with
-    | true -> 
-        DbDomain.createOntology 
-            name
-            currentVersion
-            dateCreated
-            userID
-    | false -> failwith "Inserting ontology failed."
-
-
+/// never used
 let insertTerm cString (accession:string) (ontologyName:string) (name:string) (definition:string) (xrefvaluetype: string option) (isObsolete:bool) =
     
     use connection = establishConnection cString
@@ -515,23 +483,23 @@ let getTermByAccession cString (queryStr:string) =
                     (reader.GetBoolean(5))
     |]
 
-let getAllOntologies cString () =
+//let getAllOntologies cString () =
     
-    use connection = establishConnection cString
-    connection.Open()
-    use getAllOntologiesCmd = new MySqlCommand("getAllOntologies",connection)
-    getAllOntologiesCmd.CommandType <- CommandType.StoredProcedure
+//    use connection = establishConnection cString
+//    connection.Open()
+//    use getAllOntologiesCmd = new MySqlCommand("getAllOntologies",connection)
+//    getAllOntologiesCmd.CommandType <- CommandType.StoredProcedure
 
-    use reader = getAllOntologiesCmd.ExecuteReader()
-    [|
-        while reader.Read() do
-            yield
-                DbDomain.createOntology
-                    (reader.GetString(0))
-                    (reader.GetString(1))
-                    (reader.GetDateTime(2))
-                    (reader.GetString(3))
-    |]
+//    use reader = getAllOntologiesCmd.ExecuteReader()
+//    [|
+//        while reader.Read() do
+//            yield
+//                DbDomain.createOntology
+//                    (reader.GetString(0))
+//                    (reader.GetString(1))
+//                    (reader.GetDateTime(2))
+//                    (reader.GetString(3))
+//    |]
 
 let getAdvancedTermSearchResults cString (ont : DbDomain.Ontology option) (searchName : string) (mustContainName:string) (searchDef:string) (mustContainDef:string) (keepObsolete:bool) =
     
