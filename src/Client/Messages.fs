@@ -18,10 +18,15 @@ type System.Exception with
     member this.GetPropagatedError() =
         match this with
         | :? ProxyRequestException as exn ->
-            let response = exn.ResponseText |> Json.parseAs<{| error:string; ignored : bool; handled : bool |}>
-            response.error
+            try
+                let response = exn.ResponseText |> Json.parseAs<{| error:string; ignored : bool; handled : bool |}>
+                response.error
+            with
+                | ex -> ex.Message
         | ex ->
             ex.Message
+
+    
 
 let curry f a b = f (a,b)
 
@@ -30,12 +35,12 @@ module TermSearch =
     type Msg =
         | ToggleSearchByParentOntology
         | SearchTermTextChange                  of string
-        | TermSuggestionUsed                    of DbDomain.Term
-        | NewSuggestions                        of DbDomain.Term []
+        | TermSuggestionUsed                    of Term
+        | NewSuggestions                        of Term []
         | StoreParentOntologyFromOfficeInterop  of TermMinimal option
         // Server
         | GetAllTermsByParentTermRequest        of TermMinimal 
-        | GetAllTermsByParentTermResponse       of DbDomain.Term []
+        | GetAllTermsByParentTermResponse       of Term []
 
 module AdvancedSearch =
 
@@ -47,12 +52,12 @@ module AdvancedSearch =
         | ToggleModal                       of string
         | ToggleOntologyDropdown
         | UpdateAdvancedTermSearchOptions   of AdvancedSearch.AdvancedSearchOptions
-        | OntologySuggestionUsed            of DbDomain.Ontology option
+        | OntologySuggestionUsed            of Ontology option
         | ChangePageinationIndex            of int
         // Server
         /// Main function. Forward request to Request Api -> Server.
         | StartAdvancedSearch
-        | NewAdvancedSearchResults          of DbDomain.Term []
+        | NewAdvancedSearchResults          of Term []
 
 type DevMsg =
     | LogTableMetadata
@@ -74,11 +79,11 @@ type ApiRequestMsg =
     | GetAppVersion
 
 type ApiResponseMsg =
-    | TermSuggestionResponse                    of DbDomain.Term []
-    | AdvancedTermSearchResultsResponse         of DbDomain.Term []
-    | BuildingBlockNameSuggestionsResponse      of DbDomain.Term []
-    | UnitTermSuggestionResponse                of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
-    | FetchAllOntologiesResponse                of DbDomain.Ontology []
+    | TermSuggestionResponse                    of Term []
+    | AdvancedTermSearchResultsResponse         of Term []
+    | BuildingBlockNameSuggestionsResponse      of Term []
+    | UnitTermSuggestionResponse                of Term [] * relatedUnitSearch:UnitSearchRequest
+    | FetchAllOntologiesResponse                of Ontology []
     | SearchForInsertTermsResponse              of TermSearchable []  
     //
     | GetAppVersionResponse                     of string
@@ -95,7 +100,7 @@ type StyleChangeMsg =
     | UpdateColorMode of ColorMode
 
 type PersistentStorageMsg =
-    | NewSearchableOntologies of DbDomain.Ontology []
+    | NewSearchableOntologies of Ontology []
     | UpdateAppVersion of string
 
 module FilePicker =
@@ -110,12 +115,12 @@ module BuildingBlock =
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown
 
-    | BuildingBlockNameSuggestionUsed   of DbDomain.Term
-    | NewBuildingBlockNameSuggestions   of DbDomain.Term []
+    | BuildingBlockNameSuggestionUsed   of Term
+    | NewBuildingBlockNameSuggestions   of Term []
 
     | SearchUnitTermTextChange  of searchString:string * relatedUnitSearch:UnitSearchRequest
-    | UnitTermSuggestionUsed    of unitTerm:DbDomain.Term* relatedUnitSearch:UnitSearchRequest
-    | NewUnitTermSuggestions    of DbDomain.Term [] * relatedUnitSearch:UnitSearchRequest
+    | UnitTermSuggestionUsed    of unitTerm:Term* relatedUnitSearch:UnitSearchRequest
+    | NewUnitTermSuggestions    of Term [] * relatedUnitSearch:UnitSearchRequest
     | ToggleBuildingBlockHasUnit
 
 module Validation =
@@ -266,6 +271,7 @@ type Msg =
 | UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
 /// Top level msg to test specific  api interactions, only for dev.
 | TestMyAPI
+| TestMyPostAPI
 | DoNothing
 
 let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =

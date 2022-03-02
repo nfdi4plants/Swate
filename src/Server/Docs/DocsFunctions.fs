@@ -131,7 +131,7 @@ module PredefinedParams =
         let ontologyInfoExmp:TermMinimal = TermMinimal.create "Instrument Model" "MS:1000031"
         let ontologyInfoExmp2:TermMinimal = TermMinimal.create "Q TRAP" "MS:1000187"
         
-        let unitOntologyExmp:DbDomain.Ontology = {
+        let unitOntologyExmp:Ontology = {
             Name = "uo"
             Version = "releases/2020-03-10"
             LastUpdated = System.DateTime(2014,9,4) //"2014-09-04 00:00:00.000000"

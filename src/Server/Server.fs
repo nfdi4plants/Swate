@@ -170,192 +170,176 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         }
     }
 
-let ontologyApi cString credentials = {
-    //Development
-    getTestNumber = fun () -> async { return 42 }
+let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
+    /// Neo4j prefix query does not provide any measurement on distance between query and result.
+    /// Thats why we apply sorensen dice after the database search.
+    let sorensenDiceSortTerms (searchStr:string) (terms: Term []) =
+        terms |> SorensenDice.sortBySimilarity searchStr (fun term -> term.Name)
+    
+    {
+        //Development
+        getTestNumber = fun () -> async { return 42 }
 
-    //Ontology related requests
+        //Ontology related requests
 
-    getAllOntologies = fun () ->
-        async { 
-            let results = OntologyDB.Queries.Ontology(credentials).getAll() |> Array.ofSeq
-            return results
-        }
+        getAllOntologies = fun () ->
+            async {
+                printfn "get ontologies"
+                let results = OntologyDB.Queries.Ontology(credentials).getAll() |> Array.ofSeq
+                return results
+            }
 
-    // Term related requests
-    getTermSuggestions = fun (max:int,typedSoFar:string) ->
-        async {
-            let searchRes =
-                match typedSoFar with
-                | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                    OntologyDB_old.getTermByAccession cString foundAccession
-                | _ ->
-                    let like = OntologyDB_old.getTermSuggestions cString (typedSoFar)
-                    let searchSet = typedSoFar |> Suggestion.createBigrams
-                    like
-                    |> Array.sortByDescending (fun sugg ->
-                            Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                    )
-                    |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
-            return searchRes
-        }
+        // Term related requests
+        getTermSuggestions = fun (max:int,typedSoFar:string) ->
+            async {
+                let dbSearchRes =
+                    match typedSoFar with
+                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
+                        OntologyDB.Queries.Term(credentials).getByAccession foundAccession
+                    /// This suggests we search for a term name
+                    | notAnAccession ->
+                        OntologyDB.Queries.Term(credentials).getByName notAnAccession
+                    |> Array.ofSeq
+                    |> sorensenDiceSortTerms typedSoFar
+                let arr = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
+                return arr
+            }
 
-    getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:TermMinimal) ->
-        async {
-
-            let searchRes =
-                match typedSoFar with
-                | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                    OntologyDB_old.getTermByAccession cString foundAccession
-                | _ ->
-                    let like =
+        getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:TermMinimal) ->
+            async {
+                let dbSearchRes =
+                    match typedSoFar with
+                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
+                        OntologyDB.Queries.Term(credentials).getByAccession foundAccession
+                    | _ ->
                         if parentTerm.TermAccession = ""
                         then
-                            OntologyDB_old.getTermSuggestionsByParentTerm cString (typedSoFar,parentTerm.Name)
+                            OntologyDB.Queries.Term(credentials).getByNameAndParent_Name(typedSoFar,parentTerm.Name)
                         else
-                            OntologyDB_old.getTermSuggestionsByParentTermAndAccession cString (typedSoFar,parentTerm.Name,parentTerm.TermAccession)
-                    let searchSet = typedSoFar |> Suggestion.createBigrams
-                    like
-                    |> Array.sortByDescending (fun sugg ->
-                            Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                    )
-                    
-                    |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
-            return searchRes
-        }
+                            OntologyDB.Queries.Term(credentials).getByNameAndParent(typedSoFar,parentTerm)
+                    |> Array.ofSeq
+                    |> sorensenDiceSortTerms typedSoFar
+                let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
+                return res
+            }
 
-    getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
-        async {
-            let searchRes =
-                OntologyDB_old.getAllTermsByParentTermOntologyInfo cString parentTerm
+        getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
+            async {
+                let searchRes = OntologyDB.Queries.Term(credentials).getAllByParent parentTerm |> Array.ofSeq
+                return searchRes  
+            }
 
-            return searchRes  
-        }
+        getTermSuggestionsByChildTerm = fun (max:int,typedSoFar:string,childTerm:TermMinimal) ->
+            async {
 
-    getTermSuggestionsByChildTerm = fun (max:int,typedSoFar:string,childTerm:TermMinimal) ->
-        async {
-
-            let searchRes =
-                match typedSoFar with
-                | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                    OntologyDB_old.getTermByAccession cString foundAccession
-                | _ ->
-                    let like =
+                let dbSearchRes =
+                    match typedSoFar with
+                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
+                        OntologyDB.Queries.Term(credentials).getByAccession foundAccession
+                    | _ ->
                         if childTerm.TermAccession = ""
                         then
-                            OntologyDB_old.getTermSuggestionsByChildTerm cString (typedSoFar,childTerm.Name)
+                            OntologyDB.Queries.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name)
                         else
-                            OntologyDB_old.getTermSuggestionsByChildTermAndAccession cString (typedSoFar,childTerm.Name,childTerm.TermAccession)
-                    let searchSet = typedSoFar |> Suggestion.createBigrams
-                    like
-                    |> Array.sortByDescending (fun sugg ->
-                            Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                    )
-                    
-                    |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
+                            OntologyDB.Queries.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession)
+                    |> Array.ofSeq
+                    |> sorensenDiceSortTerms typedSoFar
+                let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
+                return res
+            }
 
-            return searchRes
-        }
+        getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
+            async {
+                let searchRes = OntologyDB.Queries.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
+                return searchRes  
+            }
 
-    getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
-        async {
-            let searchRes =
-                OntologyDB_old.getAllTermsByChildTermOntologyInfo cString childTerm
+        getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
+            async {
+                //let result =
+                //    let searchSet = searchName + mustContainName + searchDefinition + mustContainDefinition|> Suggestion.createBigrams
+                //    OntologyDB_old.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
+                //    |> Array.sortByDescending (fun sugg ->
+                //        Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
+                //        )
+                return [||]
+            }
 
-            return searchRes  
-        }
+        getUnitTermSuggestions = fun (max:int,typedSoFar:string, unit:UnitSearchRequest) ->
+            async {
+                let dbSearchRes =
+                    match typedSoFar with
+                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
+                        OntologyDB.Queries.Term(credentials).getByAccession foundAccession
+                    | notAnAccession ->
+                        OntologyDB.Queries.Term(credentials).getByName(notAnAccession,sourceOntologyName="uo")
+                    |> Array.ofSeq
+                    |> sorensenDiceSortTerms typedSoFar
+                let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
+                return (res, unit)
+            }
 
-    getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
-        async {
-            let result =
-                let searchSet = searchName + mustContainName + searchDefinition + mustContainDefinition|> Suggestion.createBigrams
-                OntologyDB_old.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
-                |> Array.sortByDescending (fun sugg ->
-                    Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                    )
-            return result
-        }
-
-    getUnitTermSuggestions = fun (max:int,typedSoFar:string, unit:UnitSearchRequest) ->
-        async {
-            let searchRes =
-                match typedSoFar with
-                | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                    OntologyDB_old.getTermByAccession cString foundAccession
-                | _ ->
-                    let like = OntologyDB_old.getUnitTermSuggestions cString (typedSoFar)
-                    let searchSet = typedSoFar |> Suggestion.createBigrams
-                    like
-                    |> Array.sortByDescending (fun sugg ->
-                            Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                    )
-                
-                    |> fun x -> x |> Array.take (if x.Length > max then max else x.Length)
-
-            return (searchRes, unit)
-        }
-
-    getTermsByNames = fun (queryArr) ->
-        async {
-            let result =
-                queryArr |> Array.map (fun searchTerm ->
-                    {searchTerm with
-                        SearchResultTerm =
-                            // check if search string is empty. This case should delete TAN- and TSR- values in table
-                            if searchTerm.Term.Name = "" then None
-                            // check if term accession was found. If so search also by this as it is unique
-                            elif searchTerm.Term.TermAccession <> "" then
-                                let searchRes = OntologyDB_old.getTermByNameAndAccession cString (searchTerm.Term.Name,searchTerm.Term.TermAccession)
-                                if Array.isEmpty searchRes then
-                                    None
+        getTermsByNames = fun (queryArr) ->
+            async {
+                let result =
+                    queryArr |> Array.map (fun searchTerm ->
+                        {searchTerm with
+                            SearchResultTerm =
+                                // check if search string is empty. This case should delete TAN- and TSR- values in table
+                                if searchTerm.Term.Name = "" then None
+                                // check if term accession was found. If so search also by this as it is unique
+                                elif searchTerm.Term.TermAccession <> "" then
+                                    let searchRes = OntologyDB.Queries.Term(credentials).getByAccession searchTerm.Term.TermAccession
+                                    if Seq.isEmpty searchRes then
+                                        None
+                                    else
+                                        searchRes |> Seq.head |> Some
+                                // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
+                                elif searchTerm.IsUnit then
+                                    let searchRes = OntologyDB.Queries.Term(credentials).getByName(searchTerm.Term.Name,sourceOntologyName="uo") |> Array.ofSeq |> sorensenDiceSortTerms searchTerm.Term.Name
+                                    if Seq.isEmpty searchRes then
+                                        None
+                                    else
+                                        searchRes |> Array.head |> Some
+                                // check if parent term was found and try find term via parent term
+                                elif searchTerm.ParentTerm.IsSome then
+                                    let searchRes = OntologyDB.Queries.Term(credentials).getByNameAndParent(searchTerm.Term.Name,searchTerm.ParentTerm.Value)
+                                    if Seq.isEmpty searchRes then
+                                        // if no term can be found by is_a directed search do standard search by name
+                                        // no need to search for name and accession, as accession clearly defines a term and is checked in the if branch above.
+                                        let searchRes' = OntologyDB.Queries.Term(credentials).getByName(searchTerm.Term.Name) |> Array.ofSeq |> sorensenDiceSortTerms searchTerm.Term.Name
+                                        if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
+                                    else
+                                        searchRes |> Seq.head |> Some
+                                // if none of the above apply we do a standard term search
                                 else
-                                    searchRes |> Array.head |> Some
-                            // check if parent term was found and try find term via parent term
-                            elif searchTerm.ParentTerm.IsSome then
-                                let searchRes = OntologyDB_old.getTermByParentTermOntologyInfo cString (searchTerm.Term.Name,searchTerm.ParentTerm.Value)
-                                if Array.isEmpty searchRes then
-                                    // if no term can be found by is_a directed search do standard search by name
-                                    // no need to search for name and accession, as accession is the clearly defines a term and is checked in the if branch above.
-                                    let searchRes' = OntologyDB_old.getTermByName cString searchTerm.Term.Name
-                                    if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
-                                else
-                                    searchRes |> Array.head |> Some
-                            // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
-                            elif searchTerm.IsUnit then
-                                let searchRes = OntologyDB_old.getTermByNameAndOntology cString (searchTerm.Term.Name,"uo")
-                                if Array.isEmpty searchRes then
-                                    None
-                                else
-                                    searchRes |> Array.head |> Some
-                            // if none of the above apply we do a standard term search
-                            else
-                                let searchRes = OntologyDB_old.getTermByName cString searchTerm.Term.Name
-                                if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
-                    }
-                )
-            return result
-        }
-}
-
-let protocolApi cString = {
-    getAllProtocolsWithoutXml = fun () -> async {
-        let protocols = ProtocolDB.getAllProtocols cString
-        return protocols
+                                    let searchRes = OntologyDB.Queries.Term(credentials).getByName(searchTerm.Term.Name) |> Array.ofSeq |> sorensenDiceSortTerms searchTerm.Term.Name
+                                    if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
+                        }
+                    )
+                return result
+            }
     }
 
-    getProtocolByName = fun prot -> async { return ProtocolDB.getProtocolByName cString prot }
+//let protocolApi cString = {
+//    getAllProtocolsWithoutXml = fun () -> async {
+//        let protocols = ProtocolDB.getAllProtocols cString
+//        return protocols
+//    }
 
-    getProtocolsByName = fun (names) -> async {
-        let prot = names |> Array.map (fun x -> ProtocolDB.getProtocolByName cString x)
-        //let protsWithXml = protsWithoutXml |> Array.map (ProtocolDB.getXmlByProtocol cString)
-        return prot
-    }
+//    getProtocolByName = fun prot -> async { return ProtocolDB.getProtocolByName cString prot }
 
-    increaseTimesUsed = fun templateName -> async {
-        ProtocolDB.increaseTimesUsed cString templateName
-        return ()
-    }
-}
+//    getProtocolsByName = fun (names) -> async {
+//        let prot = names |> Array.map (fun x -> ProtocolDB.getProtocolByName cString x)
+//        let protsWithXml = protsWithoutXml |> Array.map (ProtocolDB.getXmlByProtocol cString)
+//        return prot
+//    }
+
+//    increaseTimesUsed = fun templateName -> async {
+//        ProtocolDB.increaseTimesUsed cString templateName
+//        return ()
+//    }
+//}
 
 let testApi (ctx: HttpContext): ITestAPI = {
     test = fun () -> async {
@@ -371,26 +355,39 @@ let testApi (ctx: HttpContext): ITestAPI = {
         let exmp = OntologyDB.Queries.Term(c).getByName("instrument mode",sourceOntologyName="ms")
         return "Info", sprintf "%A" (exmp |> Seq.length)
     }
+    postTest = fun (termName) -> async {
+        let c =
+            let settings = ctx.GetService<IConfiguration>()
+            let credentials : OntologyDB.Neo4JCredentials= {
+                User        = settings.["neo4j-username"]
+                Pw          = settings.["neo4j-pw"]
+                BoltUrl     = settings.["neo4j-uri"]
+                DatabaseName= settings.["neo4j-db"]
+            }
+            credentials
+        let exmp = OntologyDB.Queries.Term(c).getByName(termName,sourceOntologyName="ms")
+        return "Info", sprintf "%A" (exmp |> Seq.length)
+    }
 }
 
 let errorHandler (ex:exn) (routeInfo:RouteInfo<HttpContext>) =
-    let msg = sprintf "[SERVER SIDE ERROR]: %A @%s." ex.Message routeInfo.path
+    let msg = sprintf "%A %s @%s." ex.Message System.Environment.NewLine routeInfo.path
     Propagate msg
 
-let createIProtocolApiv1 cString =
-    Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (protocolApi cString)
-    //|> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
-    |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler errorHandler
-    |> Remoting.buildHttpHandler
+//let createIProtocolApiv1 cString =
+//    Remoting.createApi()
+//    |> Remoting.withRouteBuilder Route.builder
+//    |> Remoting.fromValue (protocolApi cString)
+//    //|> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
+//    |> Remoting.withDiagnosticsLogger(printfn "%A")
+//    |> Remoting.withErrorHandler errorHandler
+//    |> Remoting.buildHttpHandler
 
-let createIOntologyApiv1 (cString,credentials) =
+let createIOntologyApiv1 credentials =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (ontologyApi cString credentials)
-    |> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
+    |> Remoting.fromValue (ontologyApi credentials)
+    //|> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
@@ -443,13 +440,13 @@ let createTestApi =
 ///// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
 //let mainApiController = router {
 
-//    //
-//    forward @"/IOntologyAPIv1" (fun next ctx ->
-//        let cString = 
-//            let settings = ctx.GetService<IConfiguration>()
-//            settings.["Swate:ConnectionString"]
-//        createIOntologyApiv1 cString next ctx
-//    )
+    ////
+    //forward @"/IOntologyAPIv1" (fun next ctx ->
+    //    let cString = 
+    //        let settings = ctx.GetService<IConfiguration>()
+    //        settings.["Swate:ConnectionString"]
+    //    createIOntologyApiv1 cString next ctx
+    //)
 
 //    //
 //    forward @"/IServiceAPIv1" (fun next ctx ->
@@ -459,29 +456,26 @@ let createTestApi =
 
 let topLevelRouter = router {
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
-    //forward "/api" mainApiController
+
     forward @"" (fun next ctx ->
-        let cString = 
-            let settings = ctx.GetService<IConfiguration>()
-            settings.["Swate:ConnectionString"]
         let credentials =
             let settings = ctx.GetService<IConfiguration>()
-            let credentials : OntologyDB.Neo4JCredentials= {
+            let (credentials : OntologyDB.Neo4JCredentials) = {
                 User        = settings.["neo4j-username"]
                 Pw          = settings.["neo4j-pw"]
                 BoltUrl     = settings.["neo4j-uri"]
                 DatabaseName= settings.["neo4j-db"]
             }
             credentials
-        createIOntologyApiv1 (cString,credentials) next ctx
+        createIOntologyApiv1 credentials next ctx
     )
 
-    forward @"" (fun next ctx ->
-        let cString = 
-            let settings = ctx.GetService<IConfiguration>()
-            settings.["Swate:ConnectionString"]
-        createIProtocolApiv1 cString next ctx
-    )
+    //forward @"" (fun next ctx ->
+    //    let cString = 
+    //        let settings = ctx.GetService<IConfiguration>()
+    //        settings.["Swate:ConnectionString"]
+    //    createIProtocolApiv1 cString next ctx
+    //)
 
     //
     forward @"" (fun next ctx ->

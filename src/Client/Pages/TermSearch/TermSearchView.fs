@@ -123,7 +123,7 @@ let simpleSearchComponent model dispatch =
                 model
                 "Start typing to search for terms"
                 (Some Size.IsLarge)
-                (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
+                (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState)
         ]
 
         div [][
@@ -134,17 +134,17 @@ let simpleSearchComponent model dispatch =
                 Switch.OnChange (fun e ->
                     TermSearch.ToggleSearchByParentOntology |> TermSearchMsg |> dispatch
                     let _ =
-                        let inpId = (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).InputId
+                        let inpId = (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).InputId
                         let e = Browser.Dom.document.getElementById inpId
                         e.focus()
                     ()
                     // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
-                    //((AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
+                    //((AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
                 )
             ] [ str "Use related term directed search." ]
 
             Help.help [ Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]] ] [
-                a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearchMsg |> dispatch)] [
+                a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearchMsg |> dispatch)] [
                     str "Use advanced search"
                 ] 
             ]

@@ -78,7 +78,7 @@ let searchResultTermToTableHeaderElement (term:TermSearchable option) =
     | Some hasResult when hasResult.SearchResultTerm.IsSome ->
         tr [ ] [
             th [][str hasResult.SearchResultTerm.Value.Name]
-            th [ Style [TextAlign TextAlignOptions.Center] ][infoIcon hasResult.SearchResultTerm.Value.Definition]
+            th [ Style [TextAlign TextAlignOptions.Center] ][infoIcon hasResult.SearchResultTerm.Value.Description]
             th [][str hasResult.SearchResultTerm.Value.Accession]
             th [][str (rowIndicesToReadable hasResult.RowIndices)]
         ]
@@ -112,7 +112,7 @@ let searchResultTermToTableElement (term:TermSearchable) =
     | hasResult when term.SearchResultTerm.IsSome ->
         tr [ ] [
             td [][str hasResult.SearchResultTerm.Value.Name]
-            td [ Style [TextAlign TextAlignOptions.Center] ][infoIcon hasResult.SearchResultTerm.Value.Definition]
+            td [ Style [TextAlign TextAlignOptions.Center] ][infoIcon hasResult.SearchResultTerm.Value.Description]
             td [][str hasResult.SearchResultTerm.Value.Accession]
             td [][str (rowIndicesToReadable hasResult.RowIndices)]
         ]

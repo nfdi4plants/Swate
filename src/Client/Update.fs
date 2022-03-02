@@ -82,7 +82,7 @@ module Dev =
 
 let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
 
-    let handleTermSuggestionRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString =
+    let handleTermSuggestionRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -101,7 +101,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (DbDomain.Term [] * UnitSearchRequest) -> ApiMsg) queryString (relUnit:UnitSearchRequest) =
+    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (Term [] * UnitSearchRequest) -> ApiMsg) queryString (relUnit:UnitSearchRequest) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -120,7 +120,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString (termMin:TermMinimal) =
+    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString (termMin:TermMinimal) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -249,7 +249,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
 let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
 
-    let handleTermSuggestionResponse (responseHandler: DbDomain.Term [] -> Msg) (suggestions: DbDomain.Term[]) =
+    let handleTermSuggestionResponse (responseHandler: Term [] -> Msg) (suggestions: Term[]) =
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -268,7 +268,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-    let handleUnitTermSuggestionResponse (responseHandler: DbDomain.Term [] * UnitSearchRequest -> Msg) (suggestions: DbDomain.Term[]) (relatedUnitSearch:UnitSearchRequest) =
+    let handleUnitTermSuggestionResponse (responseHandler: Term [] * UnitSearchRequest -> Msg) (suggestions: Term[]) (relatedUnitSearch:UnitSearchRequest) =
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -414,7 +414,7 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorageMsg) (curr
     | NewSearchableOntologies onts ->
         let nextState = {
             currentState with
-                SearchableOntologies    = onts |> Array.map (fun ont -> ont.Name |> Suggestion.createBigrams, ont)
+                SearchableOntologies    = onts |> Array.map (fun ont -> ont.Name |> SorensenDice.createBigrams, ont)
                 HasOntologiesLoaded     = true
         }
 
@@ -532,6 +532,14 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             Cmd.OfAsync.either
                 Api.testAPIv1.test
                     ()
+                    (curry GenericLog Cmd.none)
+                    (curry GenericError Cmd.none)
+        currentModel, Cmd.map DevMsg cmd
+    | TestMyPostAPI ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.testAPIv1.postTest
+                    ("instrument Mod")
                     (curry GenericLog Cmd.none)
                     (curry GenericError Cmd.none)
         currentModel, Cmd.map DevMsg cmd

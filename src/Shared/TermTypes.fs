@@ -5,44 +5,40 @@ module TermTypes =
     open Shared.Regex
     open System
 
-    module DbDomain =
-
-        type Ontology = {
-            Name        : string
-            Version     : string
-            LastUpdated : DateTime
-            Author      : string
-        } with
-            static member create name version lastUpdated authors = {     
-                Name         = name          
-                Version      = version
-                LastUpdated  = lastUpdated   
-                Author       = authors        
-            }
-
-        type Term = {
-            OntologyName    : string
-            Accession       : string
-            Name            : string
-            Definition      : string
-            XRefValueType   : string option
-            IsObsolete      : bool
+    type Ontology = {
+        Name        : string
+        Version     : string
+        LastUpdated : DateTime
+        Author      : string
+    } with
+        static member create name version lastUpdated authors = {     
+            Name         = name          
+            Version      = version
+            LastUpdated  = lastUpdated   
+            Author       = authors        
         }
 
-        let createTerm accession ontologyName name definition xrefvaluetype isObsolete = {          
-            OntologyName  = ontologyName
-            Accession     = accession    
-            Name          = name         
-            Definition    = definition   
-            XRefValueType = xrefvaluetype
-            IsObsolete    = isObsolete   
-        }
+    type Term = {
+        Accession       : string
+        Name            : string
+        Description     : string
+        IsObsolete      : bool
+        FK_Ontology     : string
+    }
 
-        type TermRelationship = {
-            TermID              : int64
-            RelationshipType    : string
-            RelatedTermID       : int64
-        }
+    let createTerm accession name description isObsolete ontologyName= {          
+        Accession   = accession    
+        Name        = name         
+        Description = description   
+        IsObsolete  = isObsolete   
+        FK_Ontology = ontologyName
+    }
+
+    type TermRelationship = {
+        TermID          : int64
+        Relationship    : string
+        RelatedTermID   : int64
+    }
 
     type TermMinimal = {
         /// This is the Ontology Term Name
@@ -55,7 +51,7 @@ module TermTypes =
             TermAccession   = termAccession
         }
 
-        static member ofTerm (term:DbDomain.Term) = {
+        static member ofTerm (term:Term) = {
             Name            = term.Name
             TermAccession   = term.Accession
         }
@@ -104,7 +100,7 @@ module TermTypes =
         // RowIndex in table
         RowIndices          : int []
         // Search result
-        SearchResultTerm    : DbDomain.Term option
+        SearchResultTerm    : Term option
     } with
         static member create term parentTerm isUnit colInd rowIndices= {
             Term                = term

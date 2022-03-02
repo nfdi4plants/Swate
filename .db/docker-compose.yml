@@ -3,21 +3,21 @@ version: '3.9'
 
 services:
 
-  db:
-    # newer version fail with .net
-    image: mariadb:10.4
-    # command: --default-authentication-plugin=mysql_native_password
-    volumes:
-      - ./mysql-dump:/docker-entrypoint-initdb.d
-    environment:
-      MYSQL_ROOT_PASSWORD: example
-    ports:
-        - 42333:3306
+  #db:
+  #  # newer version fail with .net
+  #  image: mariadb:10.4
+  #  # command: --default-authentication-plugin=mysql_native_password
+  #  volumes:
+  #    - ./mysql-dump:/docker-entrypoint-initdb.d
+  #  environment:
+  #    MYSQL_ROOT_PASSWORD: example
+  #  ports:
+  #      - 42333:3306
 
-  adminer:
-    image: adminer
-    ports:
-        - 8085:8080
+  #adminer:
+  #  image: adminer
+  #  ports:
+  #      - 8085:8080
 
 
   neo4j:

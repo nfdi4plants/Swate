@@ -69,8 +69,8 @@ module TermSearch =
 
         TermSearchText          : string
 
-        SelectedTerm            : DbDomain.Term option
-        TermSuggestions         : DbDomain.Term []
+        SelectedTerm            : Term option
+        TermSuggestions         : Term []
 
         ParentOntology          : TermMinimal option
         SearchByParentOntology  : bool
@@ -92,7 +92,7 @@ module TermSearch =
 module AdvancedSearch =
 
     type AdvancedSearchOptions = {
-        Ontology                : DbDomain.Ontology option
+        Ontology                : Ontology option
         SearchTermName          : string
         MustContainName         : string 
         SearchTermDefinition    : string
@@ -111,14 +111,14 @@ module AdvancedSearch =
     type AdvancedSearchSubpages =
     | InputFormSubpage
     | ResultsSubpage
-    | SelectedResultSubpage of DbDomain.Term
+    | SelectedResultSubpage of Term
 
     type Model = {
         ModalId                             : string
         ///
         AdvancedSearchOptions               : AdvancedSearchOptions
-        AdvancedSearchTermResults           : DbDomain.Term []
-        SelectedResult                      : DbDomain.Term option
+        AdvancedSearchTermResults           : Term []
+        SelectedResult                      : Term option
         // Client visual design
         AdvancedTermSearchSubpage           : AdvancedSearchSubpages
         HasModalVisible                     : bool
@@ -161,7 +161,7 @@ type DevState = {
     }
 
 type PersistentStorageState = {
-    SearchableOntologies    : (Set<string>*DbDomain.Ontology) []
+    SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
     HasOntologiesLoaded     : bool
     PageEntry               : SwateEntry
@@ -227,8 +227,8 @@ module BuildingBlock =
     type Model = {
         CurrentBuildingBlock                    : BuildingBlockNamePrePrint
 
-        BuildingBlockSelectedTerm               : DbDomain.Term option
-        BuildingBlockNameSuggestions            : DbDomain.Term []
+        BuildingBlockSelectedTerm               : Term option
+        BuildingBlockNameSuggestions            : Term []
         ShowBuildingBlockSelection              : bool
         BuildingBlockHasUnit                    : bool
         ShowBuildingBlockTermSuggestions        : bool
@@ -236,15 +236,15 @@ module BuildingBlock =
 
         /// This section is used to add a unit directly to a freshly created building block.
         UnitTermSearchText                      : string
-        UnitSelectedTerm                        : DbDomain.Term option
-        UnitTermSuggestions                     : DbDomain.Term []
+        UnitSelectedTerm                        : Term option
+        UnitTermSuggestions                     : Term []
         HasUnitTermSuggestionsLoading           : bool
         ShowUnitTermSuggestions                 : bool
 
         /// This section is used to add a unit directly to an already existing building block
         Unit2TermSearchText                     : string
-        Unit2SelectedTerm                       : DbDomain.Term option
-        Unit2TermSuggestions                    : DbDomain.Term []
+        Unit2SelectedTerm                       : Term option
+        Unit2TermSuggestions                    : Term []
         HasUnit2TermSuggestionsLoading          : bool
         ShowUnit2TermSuggestions                : bool
 

@@ -138,7 +138,7 @@ let isValidAdancedSearchOptions (opt:AdvancedSearchOptions) =
             ) > 0)
             || opt.Ontology.IsSome
 
-let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: DbDomain.Ontology option)  =
+let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: Ontology option)  =
     Dropdown.Item.a [
         Dropdown.Item.Props [
             TabIndex 0
@@ -154,7 +154,7 @@ let createOntologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: DbD
         ]
     ]
 
-let createAdvancedTermSearchResultRows (model:Model) (dispatch: Msg -> unit) (suggestionUsedHandler: DbDomain.Term -> Msg) =
+let createAdvancedTermSearchResultRows (model:Model) (dispatch: Msg -> unit) (suggestionUsedHandler: Term -> Msg) =
     if model.AdvancedSearchState.AdvancedSearchTermResults |> Array.isEmpty |> not then
         model.AdvancedSearchState.AdvancedSearchTermResults
         |> Array.map (fun sugg ->
@@ -163,7 +163,7 @@ let createAdvancedTermSearchResultRows (model:Model) (dispatch: Msg -> unit) (su
                 Class "suggestion"
                 colorControl model.SiteStyleState.ColorMode
             ] [
-                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Definition] [
+                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Description] [
                     Fa.i [Fa.Solid.InfoCircle] []
                 ]
                 td [] [
@@ -347,7 +347,7 @@ let advancedSearchResultTable (model:Model) (dispatch: Msg -> unit) =
                     )
     ]
 
-let advancedSearchSelectedResultDisplay (model:Model) (result:DbDomain.Term) =
+let advancedSearchSelectedResultDisplay (model:Model) (result:Term) =
     Container.container [] [
         Heading.h4 [Heading.Props [colorControl model.SiteStyleState.ColorMode]] [str "Selected Result:"]
         Table.table [Table.IsFullWidth] [
@@ -368,7 +368,7 @@ let advancedSearchSelectedResultDisplay (model:Model) (result:DbDomain.Term) =
 
 open Fable.Core.JsInterop
 
-let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) (dispatch: Msg -> unit) (resultHandler: DbDomain.Term -> Msg) =
+let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) (dispatch: Msg -> unit) (resultHandler: Term -> Msg) =
     Modal.modal [
         Modal.IsActive (
             model.AdvancedSearchState.HasModalVisible
