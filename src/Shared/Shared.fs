@@ -10,9 +10,9 @@ module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
-module Suggestion =
+module SorensenDice =
     
-    let inline sorensenDice (x : Set<'T>) (y : Set<'T>) =
+    let inline calculateDistance (x : Set<'T>) (y : Set<'T>) =
         match  (x.Count, y.Count) with
         | (0,0) -> 1.
         | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
@@ -24,6 +24,14 @@ module Suggestion =
         |> Array.windowed 2
         |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
         |> set
+
+    let sortBySimilarity (searchStr:string) (f: 'a -> string) (arrayToSort:'a []) =
+        let searchSet = searchStr |> createBigrams
+        arrayToSort
+        |> Array.sortByDescending (fun result ->
+            let resultSet = f result |> createBigrams
+            calculateDistance resultSet searchSet
+        )
 
 [<RequireQualifiedAccess>]
 type JsonExportType =
@@ -43,9 +51,10 @@ type UnitSearchRequest =
 | Unit1
 | Unit2
 
+/// Development api
 type ITestAPI = {
-    // Development
     test : unit      -> Async<string*string>
+    postTest: string -> Async<string*string>
 }
 
 //type IISADotNetAPIv1 = {
@@ -92,20 +101,20 @@ type IOntologyAPIv1 = {
     getTestNumber               : unit                                          -> Async<int>
 
     // Ontology related requests
-    getAllOntologies            : unit                                          -> Async<DbDomain.Ontology []>
+    getAllOntologies            : unit                                          -> Async<Ontology []>
 
     // Term related requests
     ///
-    getTermSuggestions                  : (int*string)                                                  -> Async<DbDomain.Term []>
+    getTermSuggestions                  : (int*string)                                                  -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : (int*string*TermMinimal)                                      -> Async<DbDomain.Term []>
-    getAllTermsByParentTerm             : TermMinimal                                                   -> Async<DbDomain.Term []>
+    getTermSuggestionsByParentTerm      : (int*string*TermMinimal)                                      -> Async<Term []>
+    getAllTermsByParentTerm             : TermMinimal                                                   -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                      -> Async<DbDomain.Term []>
-    getAllTermsByChildTerm              : TermMinimal                                                   -> Async<DbDomain.Term []>
+    getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                      -> Async<Term []>
+    getAllTermsByChildTerm              : TermMinimal                                                   -> Async<Term []>
     /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
-    getTermsForAdvancedSearch           : (DbDomain.Ontology option*string*string*string*string*bool)   -> Async<DbDomain.Term []>
-    getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<DbDomain.Term [] * UnitSearchRequest>
+    getTermsForAdvancedSearch           : (Ontology option*string*string*string*string*bool)   -> Async<Term []>
+    getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<Term [] * UnitSearchRequest>
     getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
 }
 

@@ -280,7 +280,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                         model
                         "Start typing to search"
                         None
-                        (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockState model.AddBuildingBlockState)
+                        (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState)
                         false
                 | _ -> ()
             ]
@@ -294,7 +294,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                             if model.AddBuildingBlockState.BuildingBlockHasUnit then Color NFDIColors.Mint.Base else Color NFDIColors.Red.Base
                         ]]
                         Button.OnClick (fun _ ->
-                            let inputId = (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).InputId
+                            let inputId = (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).InputId
                             if model.AddBuildingBlockState.BuildingBlockHasUnit = true then
                                 let e = Browser.Dom.document.getElementById inputId
                                 e?value <- null
@@ -322,21 +322,21 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                     model
                     "Start typing to search"
                     None
-                    (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState)
+                    (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState)
                     // if BuildingBlockHasUnit = false then disabled = true
                     (model.AddBuildingBlockState.BuildingBlockHasUnit |> not)
             ]
 
             div [][
                 Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
-                    a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
+                    a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
                         str "Use advanced search building block"
                     ]
                 ]
                 match model.AddBuildingBlockState.CurrentBuildingBlock.Type with
                 | BuildingBlockType.Parameter | BuildingBlockType.Characteristics | BuildingBlockType.Factor ->
                     Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
-                        a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
+                        a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
                             str "Use advanced search unit"
                         ]
                     ]
@@ -390,12 +390,12 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
                 model
                 "Start typing to search"
                 None
-                (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState)
+                (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState)
                 // if BuildingBlockHasUnit = false then disabled = true
                 false
         ]
         Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
-            a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
+            a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
                 str "Use advanced search"
             ]
         ]

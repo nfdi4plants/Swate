@@ -51,13 +51,13 @@ let fileSortElements (model:Model) dispatch =
     let hitTagList =
         if model.ProtocolState.ProtocolTagSearchQuery <> ""
         then
-            let queryBigram = model.ProtocolState.ProtocolTagSearchQuery |> Shared.Suggestion.createBigrams 
+            let queryBigram = model.ProtocolState.ProtocolTagSearchQuery |> Shared.SorensenDice.createBigrams 
             let bigrams =
                 allTags
                 |> Array.map (fun x ->
                     x
-                    |> Shared.Suggestion.createBigrams
-                    |> Shared.Suggestion.sorensenDice queryBigram
+                    |> Shared.SorensenDice.createBigrams
+                    |> Shared.SorensenDice.calculateDistance queryBigram
                     , x
                 )
                 |> Array.filter (fun x -> fst x >= 0.3)
@@ -251,14 +251,14 @@ let protocolElementContainer (model:Model) dispatch =
     let sortTableBySearchQuery (protocol:ProtocolTemplate []) =
         if model.ProtocolState.ProtocolNameSearchQuery <> ""
         then
-            let queryBigram = model.ProtocolState.ProtocolNameSearchQuery |> Shared.Suggestion.createBigrams 
+            let queryBigram = model.ProtocolState.ProtocolNameSearchQuery |> Shared.SorensenDice.createBigrams 
             let bigrams =
                 protocol
                 |> Array.map (fun prot ->
                     let score =
                         prot.Name
-                        |> Shared.Suggestion.createBigrams
-                        |> Shared.Suggestion.sorensenDice queryBigram
+                        |> Shared.SorensenDice.createBigrams
+                        |> Shared.SorensenDice.calculateDistance queryBigram
                     score,prot
                 )
                 |> Array.filter (fun (score,prot) -> score > 0.1)

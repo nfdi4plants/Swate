@@ -4,23 +4,6 @@ open System
 open System.IO
 open Neo4j
 
-module Types =
-
-    type Term = {
-        TermAccession: string
-        FK_Ontology: string
-        Name: string
-        Description: string
-        IsObsolete: bool
-    }
-
-    type TermRelationship = {
-        ChildTerm: string
-        Relationship: string
-        ParentTerm: string
-    }
-
-open Types
 open Neo4j.Driver
 open System.Threading.Tasks
 open Shared.TermTypes
@@ -51,9 +34,9 @@ let establishConnection(c: Neo4JCredentials) =
 /// <param name="query">The cypher query string</param>
 /// <param name="parameters">Map of key value pairs. Only use this if you used parameters, for example '$Name' in your query. In which case you need to provide `Map ["Name", value]`.</param>
 /// <param name="resultAs">How to return query results. In the format of `(fun (record:IRecord) -> parsingFunction record)`.</param>
-/// <param name="prdocutionCredentials">Username, password, bolt-url and database name to create session with database.</param>
-let runNeo4JQuery (query:string) (parameters:Map<string,'a> option) (resultAs:IRecord -> 'T) prdocutionCredentials=
-    use session = establishConnection(prdocutionCredentials)
+/// <param name="credentials">Username, password, bolt-url and database name to create session with database.</param>
+let runNeo4JQuery (query:string) (parameters:Map<string,'a> option) (resultAs:IRecord -> 'T) credentials=
+    use session = establishConnection(credentials)
     async {
         let! executeReadQuery =
             if parameters.IsSome then
@@ -81,9 +64,9 @@ module Queries =
 
     type Ontology(credentials:Neo4JCredentials) =
 
-        static member private asOntology : IRecord -> DbDomain.Ontology =
+        static member private asOntology : IRecord -> Shared.TermTypes.Ontology =
             fun (record:IRecord) ->
-                {
+                let (ontology:Shared.TermTypes.Ontology) = {
                     Name        = record.["o.name"].As<string>()
                     Version     = 
                         let r = record.["o.version"].As<string>()
@@ -93,6 +76,7 @@ module Queries =
                         let r = record.["o.author"].As<string>()
                         if isNull r then "" else r
                 }
+                ontology
 
         member this.getAll() = 
             let query = 
@@ -125,8 +109,8 @@ module Queries =
         /// "termParamName": the query function tries to map properties of the "termParamName" to this function so depending on how the node was called in the query this needs to adapt.
         static member private asTerm(termParamName) = fun (record:IRecord) ->
             let accession = record.[$"{termParamName}.accession"].As<string>()
-            {
-                TermAccession = accession
+            let (term:Shared.TermTypes.Term) = {
+                Accession = accession
                 FK_Ontology = Term.parseAccessionToOntologyName accession
                 Name = 
                     let r = record.[$"{termParamName}.name"].As<string>()
@@ -136,6 +120,7 @@ module Queries =
                     if isNull r then "" else r
                 IsObsolete = record.[$"{termParamName}.isObsolete"].As<bool>()
             }
+            term
 
         /// Searchtype defaults to "get term suggestions with auto complete".
         member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:string) =
@@ -177,8 +162,7 @@ module Queries =
                 (Term.asTerm("term"))
                 credentials
 
-        /// getAllTermsByParentTermOntologyInfo
-        member this.getAllByParentAccession(parentAccession:string) =
+        member this.getAllByParent(parentAccession:string) =
             let query = 
                 """MATCH (child)-[*1..]->(:Term {accession: $Accession})
                 RETURN child.accession, child.name, child.description, child.isObsolete
@@ -191,7 +175,8 @@ module Queries =
                 (Term.asTerm("child"))
                 credentials
 
-        member this.getAllByParentAccession(parentAccession:TermMinimal) =
+        /// This function uses only the parent term accession
+        member this.getAllByParent(parentAccession:TermMinimal) =
             let query = 
                 """MATCH (child)-[*1..]->(:Term {accession: $Accession})
                 RETURN child.accession, child.name, child.description, child.isObsolete
@@ -205,7 +190,7 @@ module Queries =
                 credentials
 
         /// Searchtype defaults to "get child term suggestions with auto complete"
-        member this.getByNameAndParentAccession(termName:string,parentAccession:string,?searchType:FullTextSearch) =
+        member this.getByNameAndParent(termName:string,parentAccession:string,?searchType:FullTextSearch) =
             let fulltextSearchStr =
                 if searchType.IsSome then
                     searchType.Value.ofQueryString termName
@@ -229,12 +214,36 @@ module Queries =
                 credentials
 
         /// Searchtype defaults to "get child term suggestions with auto complete"
-        member this.getByNameAndParentAccession(termName:TermMinimal,parentAccession:TermMinimal,?searchType:FullTextSearch) =
+        member this.getByNameAndParent(term:TermMinimal,parent:TermMinimal,?searchType:FullTextSearch) =
             let fulltextSearchStr =
                 if searchType.IsSome then
-                    searchType.Value.ofQueryString termName.Name
+                    searchType.Value.ofQueryString term.Name
                 else
-                    FullTextSearch.Complete.ofQueryString termName.Name
+                    FullTextSearch.Complete.ofQueryString term.Name
+            let query =
+                """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+                YIELD node
+                WITH node
+                MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {accession: $Accession}) 
+                RETURN child.accession, child.name, child.description, child.isObsolete"""
+            let param =
+                Map [
+                    "Accession", parent.TermAccession; 
+                    "Search", fulltextSearchStr
+                ]
+            runNeo4JQuery
+                query
+                (Some param)
+                (Term.asTerm("child"))
+                credentials
+
+        // Searchtype defaults to "get child term suggestions with auto complete"
+        member this.getByNameAndParent(termName:string,parentAccession:TermMinimal,?searchType:FullTextSearch) =
+            let fulltextSearchStr =
+                if searchType.IsSome then
+                    searchType.Value.ofQueryString termName
+                else
+                    FullTextSearch.Complete.ofQueryString termName
             let query =
                 """CALL db.index.fulltext.queryNodes("TermName", $Search) 
                 YIELD node
@@ -252,3 +261,87 @@ module Queries =
                 (Term.asTerm("child"))
                 credentials
 
+        member this.getByNameAndParent_Name(termName:string,parentName:string,?searchType:FullTextSearch) =
+            let fulltextSearchStr =
+                if searchType.IsSome then
+                    searchType.Value.ofQueryString termName
+                else
+                    FullTextSearch.Complete.ofQueryString termName
+            let query =
+                """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+                YIELD node
+                WITH node
+                MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {name: $Name}) 
+                RETURN child.accession, child.name, child.description, child.isObsolete"""
+            let param =
+                Map [
+                    "Name", parentName; 
+                    "Search", fulltextSearchStr
+                ]
+            runNeo4JQuery
+                query
+                (Some param)
+                (Term.asTerm("child"))
+                credentials
+
+        /// This function uses only the parent term accession
+        member this.getAllByChild(childAccession:TermMinimal) =
+            let query = 
+                """MATCH (:Term {accession: $Accession})-[*1..]->(parent:Term)
+                RETURN parent.accession, parent.name, parent.description, parent.isObsolete
+                """
+            let param =
+                Map ["Accession",childAccession.TermAccession]
+            runNeo4JQuery
+                query
+                (Some param)
+                (Term.asTerm("parent"))
+                credentials
+
+        /// Searchtype defaults to "get child term suggestions with auto complete"
+        member this.getByNameAndChild(termName:string,childAccession:string,?searchType:FullTextSearch) =
+            let fulltextSearchStr =
+                if searchType.IsSome then
+                    searchType.Value.ofQueryString termName
+                else
+                    FullTextSearch.Complete.ofQueryString termName
+            let query =
+                """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+                YIELD node
+                WITH node
+                MATCH (:Term {accession: $Accession})-[*1..]->(parent:Term {accession: node.accession})
+                RETURN parent.accession, parent.name, parent.description, parent.isObsolete"""
+            let param =
+                Map [
+                    "Accession", childAccession; 
+                    "Search", fulltextSearchStr
+                ]
+            runNeo4JQuery
+                query
+                (Some param)
+                (Term.asTerm("parent"))
+                credentials
+
+        /// Searchtype defaults to "get child term suggestions with auto complete"
+        member this.getByNameAndChild_Name(termName:string,childName:string,?searchType:FullTextSearch) =
+            let fulltextSearchStr =
+                if searchType.IsSome then
+                    searchType.Value.ofQueryString termName
+                else
+                    FullTextSearch.Complete.ofQueryString termName
+            let query =
+                """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+                YIELD node
+                WITH node
+                MATCH (:Term {name: $Name})-[*1..]->(parent:Term {accession: node.accession})
+                RETURN parent.accession, parent.name, parent.description, parent.isObsolete"""
+            let param =
+                Map [
+                    "Name", childName; 
+                    "Search", fulltextSearchStr
+                ]
+            runNeo4JQuery
+                query
+                (Some param)
+                (Term.asTerm("parent"))
+                credentials

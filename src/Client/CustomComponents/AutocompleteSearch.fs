@@ -22,16 +22,16 @@ type AutocompleteSuggestion<'SearchResult> = {
     Data            : 'SearchResult 
 }
 with
-    static member ofTerm (term:DbDomain.Term) : AutocompleteSuggestion<DbDomain.Term> = {
+    static member ofTerm (term:Term) : AutocompleteSuggestion<Term> = {
         Name            = term.Name
         ID              = term.Accession
-        TooltipText     = term.Definition
+        TooltipText     = term.Description
         Status          = if term.IsObsolete then "obsolete" else ""
         StatusIsWarning = term.IsObsolete
         Data            = term
     }
 
-    static member ofOntology (ont:DbDomain.Ontology) : AutocompleteSuggestion<DbDomain.Ontology> = {
+    static member ofOntology (ont:Ontology) : AutocompleteSuggestion<Ontology> = {
         Name            = ont.Name
         ID              = ont.Version
         TooltipText     = ""
@@ -60,30 +60,30 @@ type AutocompleteParameters<'SearchResult> = {
     OnAdvancedSearch        : ('SearchResult -> Msg)
 }
 with
-    static member ofTermSearchState (state:TermSearch.Model) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofTermSearchState (state:TermSearch.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "TermSearch_ID"
         InputId                 = "TermSearchInput_ID"
 
         StateBinding            = state.TermSearchText
-        Suggestions             = state.TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        Suggestions             = state.TermSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowSuggestions
         DropDownIsLoading       = state.HasSuggestionsLoading
 
         OnInputChangeMsg        = (TermSearch.SearchTermTextChange >> TermSearchMsg )
-        OnSuggestionSelect      = ( fun (term:DbDomain.Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg)
+        OnSuggestionSelect      = ( fun (term:Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg )
+        OnAdvancedSearch        = (fun (term:Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg )
     }
 
-    static member ofAddBuildingBlockUnitState (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockUnitState (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "UnitSearch_ID"
         InputId                 = "UnitSearchInput_ID"
 
         StateBinding            = state.UnitTermSearchText
-        Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowUnitTermSuggestions
         DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
@@ -96,12 +96,12 @@ with
         OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockUnit2State (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockUnit2State (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "Unit2Search_ID"
         InputId                 = "Unit2SearchInput_ID"
 
         StateBinding            = state.Unit2TermSearchText
-        Suggestions             = state.Unit2TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        Suggestions             = state.Unit2TermSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowUnit2TermSuggestions
         DropDownIsLoading       = state.HasUnit2TermSuggestionsLoading
@@ -114,12 +114,12 @@ with
         OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockState (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockState (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "BlockNameSearch_ID"
         InputId                 = "BlockNameSearchInput_ID"
 
         StateBinding            = state.CurrentBuildingBlock.Name
-        Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
         DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
@@ -257,7 +257,7 @@ let autocompleteTermSearchComponent
     (model:Model)
     (inputPlaceholderText   : string)
     (inputSize              : ISize option)
-    (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
+    (autocompleteParams     : AutocompleteParameters<Term>)
     (isDisabled:bool)
     = 
     Control.div [Control.IsExpanded] [
@@ -297,7 +297,7 @@ let autocompleteTermSearchComponentOfParentOntology
     (model:Model)
     (inputPlaceholderText   : string)
     (inputSize              : ISize option)
-    (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
+    (autocompleteParams     : AutocompleteParameters<Term>)
 
     =
     let parentOntologyNotificationElement show =
