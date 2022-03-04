@@ -106,6 +106,8 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
         toSwateTemplateJson = fun byteArray -> async {
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
+            printfn "LOOK @ME"
+            printfn "%A" (metadata.toJson())
             let ms = new MemoryStream(byteArray)
             let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
             let tableName = metadata.TryGetValue "Table"
@@ -405,7 +407,7 @@ let createISADotNetCommonAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue isaDotNetCommonAPIv1
-    //|> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
+    |> Remoting.withDocs "/api/IISADotNetCommonAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler

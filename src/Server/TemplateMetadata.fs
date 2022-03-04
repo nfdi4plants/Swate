@@ -91,14 +91,17 @@ let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.She
         /// hit leaves without children
         | isOutput when metadata.Children = [] ->
             let isList = listIndex.IsSome
-            let rowValues = rowValues |> findRowValuesByKey metadata.ExtendedNameKey |> Array.choose id
+            let rowValues = rowValues |> findRowValuesByKey metadata.ExtendedNameKey |> Array.map (fun x -> if x.IsSome then x.Value else "") //|> Array.choose id
+            printfn "%A" rowValues
             if isList then
                 let v =
                     let tryFromArr = Array.tryItem (listIndex.Value) rowValues
                     Option.defaultValue "" tryFromArr
+                //if v <> "" then
                 output.setProp(metadata.Key, Some v)
             else
                 let v = if Array.isEmpty >> not <| rowValues then rowValues.[0] else ""
+                //if v <> "" then
                 output.setProp(metadata.Key, Some v)
             output
         /// Treat nested lists as object, as nested lists cannot be represented in excel
@@ -109,9 +112,11 @@ let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.She
         /// children are represented by columns
         | isObjectList when metadata.Children <> [] && metadata.List && metadata.Key <> "" ->
             let childRows = getAllRelatedRowsValues metadata rowValues
+            printfn "CHILDROWS: %A" childRows
             /// Only calculate max columns if cell still contains a value. Filter out None and ""
             let notEmptyChildRows = childRows |> Array.map (Array.choose id) |> Array.map (Array.filter (fun x -> x <> ""))
             let maxColumn = notEmptyChildRows |> Array.map Array.length |> Array.max
+            printfn "MAXCOLUMN: %A" maxColumn
             let childObjects =
                 [| for i = 0 to maxColumn-1 do
                     let childOutput = TemplateMetadataJsonExport.init()
