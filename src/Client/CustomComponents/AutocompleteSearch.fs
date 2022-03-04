@@ -216,7 +216,7 @@ let createAutocompleteSuggestions
 
 
 let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (isVisible: bool) (isLoading:bool) (suggestions: ReactElement list)  =
-    Container.container[ ] [
+    Container.container [ ] [
         Dropdown.content [Props [
             Style [
                 if isVisible then Display DisplayOptions.Block else Display DisplayOptions.None
@@ -252,16 +252,15 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
 open Fable.Core.JsInterop
 
 let autocompleteTermSearchComponent
-    (dispatch: Msg -> unit)
-    (colorMode:ColorMode)
-    (model:Model)
+    (dispatch               : Msg -> unit)
+    (colorMode              : ColorMode)
+    (model                  : Model)
     (inputPlaceholderText   : string)
     (inputSize              : ISize option)
     (autocompleteParams     : AutocompleteParameters<Term>)
-    (isDisabled:bool)
+    (isDisabled             : bool)
     = 
     Control.div [Control.IsExpanded] [
-        AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Input.input [
             Input.Props [Style [
                 if isDisabled then BorderColor ExcelColors.Colorfull.gray40

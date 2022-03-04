@@ -8,6 +8,7 @@
     <None Include="paket.references" />
     <Compile Include="Regex.fs" />
     <Compile Include="TermTypes.fs" />
+    <Compile Include="AdvancedSearchTypes.fs" />
     <Compile Include="OfficeInteropTypes.fs" />
     <Compile Include="ProtocolTemplateTypes.fs" />
     <Compile Include="Shared.fs" />

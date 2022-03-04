@@ -45,15 +45,14 @@ module TermSearch =
 module AdvancedSearch =
 
     type Msg =
-        // Client
-        | ResetAdvancedSearchState
-        | ResetAdvancedSearchOptions
-        | UpdateAdvancedTermSearchSubpage   of AdvancedSearch.AdvancedSearchSubpages
+        // Client - UI
         | ToggleModal                       of string
         | ToggleOntologyDropdown
-        | UpdateAdvancedTermSearchOptions   of AdvancedSearch.AdvancedSearchOptions
-        | OntologySuggestionUsed            of Ontology option
         | ChangePageinationIndex            of int
+        | UpdateAdvancedTermSearchSubpage   of AdvancedSearch.AdvancedSearchSubpages
+        // Client
+        | ResetAdvancedSearchState
+        | UpdateAdvancedTermSearchOptions   of AdvancedSearchTypes.AdvancedSearchOptions
         // Server
         /// Main function. Forward request to Request Api -> Server.
         | StartAdvancedSearch
@@ -71,7 +70,7 @@ type ApiRequestMsg =
     | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
     | GetNewBuildingBlockNameSuggestions        of string
     | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
-    | GetNewAdvancedTermSearchResults           of AdvancedSearch.AdvancedSearchOptions
+    | GetNewAdvancedTermSearchResults           of AdvancedSearchTypes.AdvancedSearchOptions
     | FetchAllOntologies
     /// TermSearchable [] is created by officeInterop and passed to server for db search.
     | SearchForInsertTermsRequest              of TermSearchable []
@@ -181,57 +180,38 @@ type TopLevelMsg =
 type Model = {
 
     ///PageState
-    PageState               : PageState
-
+    PageState                   : PageState
     ///Data that needs to be persistent once loaded
-    PersistentStorageState  : PersistentStorageState
- 
+    PersistentStorageState      : PersistentStorageState
     ///Debouncing
-    DebouncerState          : Debouncer.State
-
+    DebouncerState              : Debouncer.State
     ///Error handling, Logging, etc.
-    DevState                : DevState
-
+    DevState                    : DevState
     ///Site Meta Options (Styling etc)
-    SiteStyleState          : SiteStyleState
-
+    SiteStyleState              : SiteStyleState
     ///States regarding term search
-    TermSearchState         : TermSearch.Model
-
-    AdvancedSearchState     : AdvancedSearch.Model
-
+    TermSearchState             : TermSearch.Model
+    AdvancedSearchState         : AdvancedSearch.Model
     ///Use this in the future to model excel stuff like table data
-    ExcelState              : OfficeInterop.Model
-
+    ExcelState                  : OfficeInterop.Model
     ///Use this to log Api calls and maybe handle them better
-    ApiState                : ApiState
-
+    ApiState                    : ApiState
     ///States regarding File picker functionality
-    FilePickerState         : FilePicker.Model
-
-    ProtocolState           : Protocol.Model
-
+    FilePickerState             : FilePicker.Model
+    ProtocolState               : Protocol.Model
     ///Insert annotation columns
-    AddBuildingBlockState   : BuildingBlock.Model
-
+    AddBuildingBlockState       : BuildingBlock.Model
     ///Create Validation scheme for Table
-    ValidationState         : Validation.Model
-
+    ValidationState             : Validation.Model
     ///Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
-
     ///Used to manage all custom xml settings
     SettingsXmlState            : SettingsXml.Model
-
     JsonExporterModel           : JsonExporter.Model
-
     TemplateMetadataModel       : TemplateMetadata.Model
-
     DagModel                    : Dag.Model
-
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
-
     WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =

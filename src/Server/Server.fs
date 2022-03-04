@@ -254,15 +254,15 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 return searchRes  
             }
 
-        getTermsForAdvancedSearch = fun (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete) ->
+        getTermsForAdvancedSearch = fun advancedSearchOption ->
             async {
-                //let result =
-                //    let searchSet = searchName + mustContainName + searchDefinition + mustContainDefinition|> Suggestion.createBigrams
-                //    OntologyDB_old.getAdvancedTermSearchResults cString ontOpt searchName mustContainName searchDefinition mustContainDefinition keepObsolete
-                //    |> Array.sortByDescending (fun sugg ->
-                //        Suggestion.sorensenDice (Suggestion.createBigrams sugg.Name) searchSet
-                //        )
-                return [||]
+                let result = OntologyDB.Queries.Term(credentials).getByAdvancedTermSearch(advancedSearchOption) |> Array.ofSeq
+                let filteredResult =
+                    if advancedSearchOption.KeepObsolete then
+                        result
+                    else
+                        result |> Array.filter (fun x -> x.IsObsolete |> not)
+                return filteredResult
             }
 
         getUnitTermSuggestions = fun (max:int,typedSoFar:string, unit:UnitSearchRequest) ->
@@ -352,8 +352,8 @@ let testApi (ctx: HttpContext): ITestAPI = {
                 DatabaseName= settings.["neo4j-db"]
             }
             credentials
-        let exmp = OntologyDB.Queries.Term(c).getByName("instrument mode",sourceOntologyName="ms")
-        return "Info", sprintf "%A" (exmp |> Seq.length)
+        //let exmp = OntologyDB.Queries.Term(c).getByAdvancedTermSearch(termName="insturment~ -Shimadzu")
+        return "Info", "nothing active here"
     }
     postTest = fun (termName) -> async {
         let c =

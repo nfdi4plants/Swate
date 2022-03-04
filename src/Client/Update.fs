@@ -181,7 +181,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         nextState,
         Cmd.OfAsync.either
             Api.api.getTermsForAdvancedSearch
-            (options.Ontology,options.SearchTermName,options.MustContainName,options.SearchTermDefinition,options.MustContainDefinition,options.KeepObsolete)
+            options
             (AdvancedTermSearchResultsResponse >> Response >> Api)
             (ApiError >> Api)
 

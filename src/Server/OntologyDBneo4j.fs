@@ -149,6 +149,42 @@ module Queries =
                 (Term.asTerm("node"))
                 credentials
 
+        /// This function will allow for raw apache lucene input. It is possible to search either term name or description or both.
+        /// The function will error if both term name and term description are None.
+        member this.getByAdvancedTermSearch(advancedSearchOptions:Shared.AdvancedSearchTypes.AdvancedSearchOptions) =
+            let termName = if advancedSearchOptions.TermName = "" then None else Some advancedSearchOptions.TermName
+            let termDescription = if advancedSearchOptions.TermDescription = "" then None else Some advancedSearchOptions.TermDescription
+            let indexName, queryInsert =
+                match termName,termDescription with
+                | None, None -> failwith "Cannot execute term search without any term name or term description."
+                | Some _, None -> "TermName", termName.Value
+                | Some name, Some desc -> "TermNameAndDescription", sprintf """name: "%s", description: "%s" """ name desc
+                | None, Some _ -> "TermDescription", termDescription.Value
+            let query =
+                if advancedSearchOptions.OntologyName.IsSome then
+                    sprintf
+                        """CALL db.index.fulltext.queryNodes("%s", $Query) 
+                        YIELD node
+                        WHERE EXISTS((:Term {accession: node.accession})-[:CONTAINED_IN]->(:Ontology {name: $OntologyName}))
+                        RETURN node.accession, node.name, node.description, node.isObsolete"""
+                        indexName
+                else
+                    sprintf
+                        """CALL db.index.fulltext.queryNodes("%s", $Query) YIELD node
+                        RETURN node.accession, node.name, node.description, node.isObsolete"""
+                        indexName
+            let param =
+                Map [
+                    if advancedSearchOptions.OntologyName.IsSome then "OntologyName", advancedSearchOptions.OntologyName.Value
+                    "Query", queryInsert
+                ]
+            runNeo4JQuery
+                query
+                (Some param)
+                (Term.asTerm("node"))
+                credentials
+
+
         /// Exact match for unique identifier term accession.
         member this.getByAccession(termAccession:string) =
             let query = 

@@ -53,8 +53,8 @@ type UnitSearchRequest =
 
 /// Development api
 type ITestAPI = {
-    test : unit      -> Async<string*string>
-    postTest: string -> Async<string*string>
+    test    : unit      -> Async<string*string>
+    postTest: string    -> Async<string*string>
 }
 
 //type IISADotNetAPIv1 = {
@@ -112,8 +112,7 @@ type IOntologyAPIv1 = {
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
     getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                      -> Async<Term []>
     getAllTermsByChildTerm              : TermMinimal                                                   -> Async<Term []>
-    /// (ontOpt,searchName,mustContainName,searchDefinition,mustContainDefinition,keepObsolete)
-    getTermsForAdvancedSearch           : (Ontology option*string*string*string*string*bool)   -> Async<Term []>
+    getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions)                   -> Async<Term []>
     getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<Term [] * UnitSearchRequest>
     getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
 }

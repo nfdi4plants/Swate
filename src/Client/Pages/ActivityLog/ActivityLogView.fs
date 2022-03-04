@@ -15,14 +15,20 @@ open Browser.Types
 
 let debugBox model dispatch =
     Box.box' [][
+        //Button.button [
+        //    Button.Color Color.IsInfo
+        //    Button.IsFullWidth
+        //    Button.OnClick (fun e -> OfficeInterop.TryExcel |> OfficeInteropMsg |> dispatch )
+        //    Button.Props [Style [MarginBottom "1rem"]]
+        //] [
+        //    str "Try Excel"
+        //]
         Button.button [
-            Button.Color Color.IsInfo
-            Button.IsFullWidth
-            Button.OnClick (fun e -> OfficeInterop.TryExcel |> OfficeInteropMsg |> dispatch )
-            Button.Props [Style [MarginBottom "1rem"]]
-        ] [
-            str "Try Excel"
-        ]
+            Button.OnClick(fun e -> TestMyAPI |> dispatch)
+        ] [str "Test api"]
+        Button.button [
+            Button.OnClick(fun e -> TestMyPostAPI |> dispatch)
+        ] [str "Test post api"]
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth

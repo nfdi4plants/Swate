@@ -91,34 +91,15 @@ module TermSearch =
 
 module AdvancedSearch =
 
-    type AdvancedSearchOptions = {
-        Ontology                : Ontology option
-        SearchTermName          : string
-        MustContainName         : string 
-        SearchTermDefinition    : string
-        MustContainDefinition   : string
-        KeepObsolete            : bool
-        } with
-            static member init() = {
-                Ontology                = None
-                SearchTermName          = ""
-                MustContainName         = "" 
-                SearchTermDefinition    = ""
-                MustContainDefinition   = ""
-                KeepObsolete            = true
-            }
-
     type AdvancedSearchSubpages =
     | InputFormSubpage
     | ResultsSubpage
-    | SelectedResultSubpage of Term
 
     type Model = {
         ModalId                             : string
         ///
-        AdvancedSearchOptions               : AdvancedSearchOptions
+        AdvancedSearchOptions               : AdvancedSearchTypes.AdvancedSearchOptions
         AdvancedSearchTermResults           : Term []
-        SelectedResult                      : Term option
         // Client visual design
         AdvancedTermSearchSubpage           : AdvancedSearchSubpages
         HasModalVisible                     : bool
@@ -130,12 +111,11 @@ module AdvancedSearch =
             ModalId                             = ""
             HasModalVisible                     = false
             HasOntologyDropdownVisible          = false
-            AdvancedSearchOptions               = AdvancedSearchOptions.init ()
+            AdvancedSearchOptions               = AdvancedSearchTypes.AdvancedSearchOptions.init ()
             AdvancedSearchTermResults           = [||]
             HasAdvancedSearchResultsLoading     = false
             AdvancedTermSearchSubpage           = InputFormSubpage
             AdvancedSearchResultPageinationIndex= 0
-            SelectedResult                      = None
         }
 
 type SiteStyleState = {

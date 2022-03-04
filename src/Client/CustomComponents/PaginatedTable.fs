@@ -39,12 +39,12 @@ let pageinateDynamic (dispatch:Msg->unit) (currentPageinationIndex: int) (pageCo
     ) 
 
 
-let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elements:ReactElement []) =
+let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elementsPerPage:int) (elements:ReactElement []) =
 
     if elements.Length > 0 then 
 
         let currentPageinationIndex = model.AdvancedSearchState.AdvancedSearchResultPageinationIndex
-        let chunked = elements |> Array.chunkBySize 5
+        let chunked = elements |> Array.chunkBySize elementsPerPage
         let len = chunked.Length 
     
         Container.container [] [

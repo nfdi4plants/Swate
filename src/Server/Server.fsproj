@@ -6,15 +6,14 @@
         <UserSecretsId>6de80bdf-2a05-4cf7-a1a8-d08581dfa887</UserSecretsId>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="OntologyDBneo4j.fs" />
         <None Include="paket.references" />
         <Compile Include="Version.fs" />
+        <Compile Include="OntologyDBneo4j.fs" />
         <Compile Include="CyjsAdaption.fs" />
         <Compile Include="TemplateMetadata.fs" />
         <Compile Include="ISADotNet.fs" />
         <Compile Include="JsonExport.fs" />
         <Compile Include="JsonImport.fs" />
-        <Compile Include="OntologyDB_old.fs" />
         <Compile Include="ProtocolDB.fs" />
         <Compile Include="Docs\DocsFunctions.fs" />
         <Compile Include="Docs\DocsServiceAPIvs1.fs" />
