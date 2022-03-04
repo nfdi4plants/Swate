@@ -342,7 +342,8 @@ let autocompleteTermSearchComponentOfParentOntology
                         )
                     ]           
                     Input.OnChange (fun e ->
-                        if e.Value = "nice_rgb" then
+                        let x = "01101110 01101001 01100011 01100101 01011111 01110010 01100111 01100010".Split(" ") |> Array.map (fun x -> System.Convert.ToInt32(x, 2) |> char |> string) |> String.concat ""
+                        if e.Value = x then
                             let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
                             UpdateColorMode c |> Messages.StyleChange |> dispatch
                         e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch

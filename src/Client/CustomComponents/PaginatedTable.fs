@@ -48,7 +48,10 @@ let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elementsPerPa
         let len = chunked.Length 
     
         Container.container [] [
-            Table.table [Table.IsFullWidth] [
+            Table.table [
+                Table.IsFullWidth
+                Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text]]
+            ] [
                 thead [] []
                 tbody [] (
                     chunked.[currentPageinationIndex] |> Array.toList
@@ -57,6 +60,7 @@ let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elementsPerPa
             Pagination.pagination [Pagination.IsCentered] [
                 Pagination.previous [
                     Props [
+                        Style [Cursor "pointer"]
                         OnClick (fun _ -> (max (currentPageinationIndex - 1) 0) |> AdvancedSearch.ChangePageinationIndex |> AdvancedSearchMsg |> dispatch )
                         Disabled (currentPageinationIndex = 0)
                     ]
@@ -72,6 +76,7 @@ let paginatedTableComponent (model:Model) (dispatch: Msg -> unit) (elementsPerPa
                 ]
                 Pagination.next [
                     Props [
+                        Style [Cursor "pointer"]
                         OnClick (fun _ -> (min (currentPageinationIndex + 1) (len - 1)) |> AdvancedSearch.ChangePageinationIndex |> AdvancedSearchMsg |> dispatch )
                         Disabled (currentPageinationIndex = len - 1)
                     ]

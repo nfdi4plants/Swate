@@ -142,8 +142,8 @@ let private createAdvancedTermSearchResultRows relatedInputId resultHandler  (mo
                     ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch
 
                 )
-                Class "suggestion"
-                colorControl model.SiteStyleState.ColorMode
+                Class "suggestion hoverTableEle"
+                //colorControl model.SiteStyleState.ColorMode
             ] [
                 td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Description] [
                     Fa.i [Fa.Solid.InfoCircle] []
@@ -174,7 +174,7 @@ let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:b
         Checkradio.Name checkradioName;
         Checkradio.Id (sprintf "%s_%A_%A"checkradioName keepObsolete modalId);
         Checkradio.Checked (model.AdvancedSearchState.AdvancedSearchOptions.KeepObsolete = keepObsolete)
-        Checkradio.Color IsBlack
+        Checkradio.Color (if model.SiteStyleState.IsDarkMode then IsWhite else IsBlack)
         Checkradio.OnChange (fun _ ->
             {model.AdvancedSearchState.AdvancedSearchOptions
                 with KeepObsolete = keepObsolete
@@ -268,7 +268,7 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
 
 let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Msg -> unit) =
     Field.div [Field.Props [] ] [
-        Label.label [Label.Props [colorControl model.SiteStyleState.ColorMode]] [str "Results:"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Results:"]
         if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.ResultsSubpage then
             if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
                 div [
@@ -284,24 +284,6 @@ let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Ms
                     (createAdvancedTermSearchResultRows relatedInputId resultHandler model dispatch)
     ]
 
-let advancedSearchSelectedResultDisplay (model:Model) (result:Term) =
-    Container.container [] [
-        Heading.h4 [Heading.Props [colorControl model.SiteStyleState.ColorMode]] [str "Selected Result:"]
-        Table.table [Table.IsFullWidth] [
-            tbody [colorControl model.SiteStyleState.ColorMode] [
-                tr [
-                    Class "suggestion"
-                ] [
-                    td [] [
-                        b [] [str result.Name]
-                    ]
-                    td [Style [Color "red"]] [if result.IsObsolete then str "obsolete"]
-                    td [Style [FontWeight "light"]] [small [] [str result.Accession]]
-                ]
-            ]
-        ]
-    ]
-
 let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) (dispatch: Msg -> unit) (resultHandler: Term -> Msg) =
     Modal.modal [
         Modal.IsActive (
@@ -313,14 +295,14 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
         // Close modal on click on background
         Modal.background [Props [OnClick (fun e -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)]] []
         Modal.Card.card [] [
-            Modal.Card.head [Props [colorControl model.SiteStyleState.ColorMode]] [
+            Modal.Card.head [Props [colorBackground model.SiteStyleState.ColorMode]] [
                 // Close modal on click on x-button
                 Modal.close [Modal.Close.Size IsLarge; Modal.Close.OnClick (fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)] []
                 Heading.h4 [Heading.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
                     str "Advanced Search"
                 ]
             ]
-            Modal.Card.body [Props [colorControl model.SiteStyleState.ColorMode]] [
+            Modal.Card.body [Props [colorBackground model.SiteStyleState.ColorMode]] [
                 match model.AdvancedSearchState.AdvancedTermSearchSubpage with
                 | AdvancedSearchSubpages.InputFormSubpage ->
                     /// we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
@@ -328,7 +310,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                 | AdvancedSearchSubpages.ResultsSubpage ->
                     resultsPage relatedInputId resultHandler model dispatch
             ]
-            Modal.Card.foot [Props [colorControl model.SiteStyleState.ColorMode]] [
+            Modal.Card.foot [Props [colorBackground model.SiteStyleState.ColorMode]] [
                 form [
                     OnSubmit    (fun e -> e.preventDefault())
                     OnKeyDown   (fun k -> if k.key = "Enter" then k.preventDefault())
