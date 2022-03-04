@@ -297,12 +297,15 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
         Modal.Card.card [] [
             Modal.Card.head [Props [colorBackground model.SiteStyleState.ColorMode]] [
                 // Close modal on click on x-button
-                Modal.close [Modal.Close.Size IsLarge; Modal.Close.OnClick (fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)] []
-                Heading.h4 [Heading.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
+                Modal.Card.title [Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
                     str "Advanced Search"
                 ]
+                Fulma.Delete.delete [Delete.OnClick(fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)][]
             ]
             Modal.Card.body [Props [colorBackground model.SiteStyleState.ColorMode]] [
+                Field.div [][
+                    Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All, TextAlignment.Justified)]][str "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."]
+                ]
                 match model.AdvancedSearchState.AdvancedTermSearchSubpage with
                 | AdvancedSearchSubpages.InputFormSubpage ->
                     /// we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
