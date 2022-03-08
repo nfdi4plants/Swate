@@ -184,7 +184,6 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllOntologies = fun () ->
             async {
-                printfn "get ontologies"
                 let results = OntologyDB.Queries.Ontology(credentials).getAll() |> Array.ofSeq
                 return results
             }
@@ -214,9 +213,9 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                     | _ ->
                         if parentTerm.TermAccession = ""
                         then
-                            OntologyDB.Queries.Term(credentials).getByNameAndParent_Name(typedSoFar,parentTerm.Name)
+                            OntologyDB.Queries.Term(credentials).getByNameAndParent_Name(typedSoFar,parentTerm.Name,OntologyDB.FullTextSearch.PerformanceComplete)
                         else
-                            OntologyDB.Queries.Term(credentials).getByNameAndParent(typedSoFar,parentTerm)
+                            OntologyDB.Queries.Term(credentials).getByNameAndParent(typedSoFar,parentTerm,OntologyDB.FullTextSearch.PerformanceComplete)
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -225,7 +224,7 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
             async {
-                let searchRes = OntologyDB.Queries.Term(credentials).getAllByParent parentTerm |> Array.ofSeq
+                let searchRes = OntologyDB.Queries.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
                 return searchRes  
             }
 
@@ -239,9 +238,9 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                     | _ ->
                         if childTerm.TermAccession = ""
                         then
-                            OntologyDB.Queries.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name)
+                            OntologyDB.Queries.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name,OntologyDB.FullTextSearch.PerformanceComplete)
                         else
-                            OntologyDB.Queries.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession)
+                            OntologyDB.Queries.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession,OntologyDB.FullTextSearch.PerformanceComplete)
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -303,7 +302,7 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                                         searchRes |> Array.head |> Some
                                 // check if parent term was found and try find term via parent term
                                 elif searchTerm.ParentTerm.IsSome then
-                                    let searchRes = OntologyDB.Queries.Term(credentials).getByNameAndParent(searchTerm.Term.Name,searchTerm.ParentTerm.Value)
+                                    let searchRes = OntologyDB.Queries.Term(credentials).getByNameAndParent(searchTerm.Term.Name,searchTerm.ParentTerm.Value,OntologyDB.FullTextSearch.PerformanceComplete)
                                     if Seq.isEmpty searchRes then
                                         // if no term can be found by is_a directed search do standard search by name
                                         // no need to search for name and accession, as accession clearly defines a term and is checked in the if branch above.

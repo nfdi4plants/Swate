@@ -11,12 +11,19 @@ open Shared.TermTypes
 type FullTextSearch =
 | Exact
 | Complete
+| PerformanceComplete
 | Fuzzy
 with
     member this.ofQueryString(queryString:string) =
         match this with
         | Exact         -> queryString
         | Complete      -> queryString + "*"
+        | PerformanceComplete ->
+            let s = queryString.Split(" ", StringSplitOptions.RemoveEmptyEntries)
+            s
+            /// add "+" to every word so the fulltext search must include the previous word, this highly improves search performance
+            |> Array.mapi (fun i str -> if i <> s.Length-1 then "+" + str else str + "*")
+            |> String.concat " "
         | Fuzzy         -> queryString.Replace(" ","~ ") + "~"
             
 type Neo4JCredentials = {
@@ -198,30 +205,42 @@ module Queries =
                 (Term.asTerm("term"))
                 credentials
 
-        member this.getAllByParent(parentAccession:string) =
-            let query = 
-                """MATCH (child)-[*1..]->(:Term {accession: $Accession})
-                RETURN child.accession, child.name, child.description, child.isObsolete
-                """
+        member this.getAllByParent(parentAccession:string, ?limit:int) =
+            let query =
+                sprintf
+                    """MATCH (child)-[*1..]->(:Term {accession: $Accession})
+                    RETURN child.accession, child.name, child.description, child.isObsolete
+                    %s"""
+                    (if limit.IsSome then "LIMIT $Limit" else "")
             let param =
-                Map ["Accession",parentAccession]
+                Map [
+                    /// need to box values, because limit.Value will error if parsed as string
+                    "Accession", box parentAccession
+                    if limit.IsSome then "Limit", box limit.Value
+                ] |> Some
             runNeo4JQuery
                 query
-                (Some param)
+                param
                 (Term.asTerm("child"))
                 credentials
 
         /// This function uses only the parent term accession
-        member this.getAllByParent(parentAccession:TermMinimal) =
-            let query = 
-                """MATCH (child)-[*1..]->(:Term {accession: $Accession})
-                RETURN child.accession, child.name, child.description, child.isObsolete
-                """
+        member this.getAllByParent(parentAccession:TermMinimal, ?limit:int) =
+            let query =
+                sprintf
+                    """MATCH (child)-[*1..]->(:Term {accession: $Accession})
+                    RETURN child.accession, child.name, child.description, child.isObsolete
+                    %s"""
+                    (if limit.IsSome then "LIMIT $Limit" else "")
             let param =
-                Map ["Accession",parentAccession.TermAccession]
+                Map [
+                    /// need to box values, because limit.Value will error if parsed as string
+                    "Accession", box parentAccession.TermAccession
+                    if limit.IsSome then "Limit", box limit.Value
+                ] |> Some
             runNeo4JQuery
                 query
-                (Some param)
+                param
                 (Term.asTerm("child"))
                 credentials
 
