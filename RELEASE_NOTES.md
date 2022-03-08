@@ -1,9 +1,17 @@
-### 0.5.4+bd8e3fb (Released 2022-2-3)
+### 0.6.0+50646f8 (Released 2022-3-8)
 * Additions:
-    * latest commit #bd8e3fb
-    * [[#bd8e3fb](https://github.com/nfdi4plants/Swate/commit/bd8e3fb946cbe956a730de58508b3a94ae2c27d4)] Prototype ER tags and curated templates (#187, #186).
-    * [[#ac1bc58](https://github.com/nfdi4plants/Swate/commit/ac1bc58e2fb447025dd8cd7812d98d8ed5a7b588)] Update input var name for stored procedures.
-    * [[#84984db](https://github.com/nfdi4plants/Swate/commit/84984db59d2ebcbc01f43103f1994b35463d1958)] Update Swate install zip
+    * latest commit #50646f8
+    * [[#822d375](https://github.com/nfdi4plants/Swate/commit/822d375be01fea946faf3601d8f90dfa9ead169e)] Switch to neo4j database :sparkles:.
+    * [[#432c14b](https://github.com/nfdi4plants/Swate/commit/432c14b33dee96bfa1074d0078e5dda04b4b6b9b)] Improve parent-child search performance (Issue #117,#193) :racehorse:.
+    * [[#7b360e8](https://github.com/nfdi4plants/Swate/commit/7b360e862b19e42eddca47f4ca8245577296c24d)] Update Advanced term search for cleaner input.
+    * [[#bfec630](https://github.com/nfdi4plants/Swate/commit/bfec63094cbc78cb28644d53df8d654cde087eb4)] Persist active tabs over subpages (Issue #191) :lipstick:.
+    * [[#92d973c](https://github.com/nfdi4plants/Swate/commit/92d973cd6a33144c2eafe52eb84b7b52c1fbea15)] Update navbar burger menu to always be visible (Issue #194).
+    * [[#bd8e3fb](https://github.com/nfdi4plants/Swate/commit/bd8e3fb946cbe956a730de58508b3a94ae2c27d4)] Separate ER tags from other tags and add curated vs community templates badge (#187, #186).
+* Deletions:
+    * [[#ab1456e](https://github.com/nfdi4plants/Swate/commit/ab1456e3fc9ace365294987f7f1cb74279a6f7e0)] Remove mysql dependency :heavy_minus_sign:
+* Bugfixes:
+    * [[#d63e668](https://github.com/nfdi4plants/Swate/commit/d63e668056d3612c5e40f1c93ab9b65238aad342)] Fix bug in template.xlsx to template.json parsing
+    * [[#de99630](https://github.com/nfdi4plants/Swate/commit/de99630332c1b12925fdc4c534a105652de27c4d)] Fix bug not incrementing timesUsed for templates :bug:
 
 ### 0.5.3+0eaa644 (Released 2021-12-16)
 * Additions:
