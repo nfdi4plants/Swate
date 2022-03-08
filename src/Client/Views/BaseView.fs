@@ -14,7 +14,7 @@ open CustomComponents
 open Fable.Core.JsInterop
 
 let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
-    let isActive = model.PageState.CurrentPage = pageLink
+    let isActive = pageLink.isActive(model.PageState.CurrentPage)
     Tabs.tab [Tabs.Tab.IsActive isActive] [
         a [ //Href (Routing.Route.toRouteUrl pageLink)
             Style [
