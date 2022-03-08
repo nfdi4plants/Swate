@@ -208,6 +208,7 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Role "button"
                     AriaLabel "menu"
                     Props.AriaExpanded false
+                    Style [Display DisplayOptions.Block]
             ]] [
                 span [AriaHidden true] [ ]
                 span [AriaHidden true] [ ]
@@ -224,8 +225,12 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                 yield! navbarShortCutIconList model dispatch
             ]
         ]
-        Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu"); ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
-            Navbar.Dropdown.div [ ] [
+        Navbar.menu [Navbar.Menu.Props [
+            Style [yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode; if model.SiteStyleState.BurgerVisible then Display DisplayOptions.Block];
+            Id "navbarMenu";
+            Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu");
+        ]] [
+            Navbar.Dropdown.div [ Navbar.Dropdown.Props [Style [if model.SiteStyleState.BurgerVisible then Display DisplayOptions.Block]] ] [
                 Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.NFDITwitterUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                     str "News "
                     Fa.i [Fa.Brand.Twitter; Fa.Size Fa.FaLarge; Fa.Props [Style [Color "#1DA1F2"]]][]
