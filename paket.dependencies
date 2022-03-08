@@ -12,7 +12,6 @@ nuget Saturn
 nuget Expecto
 nuget FSharp.Data
 nuget Microsoft.Extensions.Configuration.UserSecrets
-nuget MySql.Data 8.0.21
 
 nuget Fable.Core
 nuget Fable.Elmish
