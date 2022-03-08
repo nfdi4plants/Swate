@@ -204,7 +204,7 @@ module TemplateFromDB =
                                 /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
                                 //let validation =
                                 //    model.ProtocolInsertState.ValidationXml.Value |> Some
-                                ProtocolIncreaseTimesUsed p.Name |> ProtocolMsg |> dispatch
+                                ProtocolIncreaseTimesUsed p.Id |> ProtocolMsg |> dispatch
                                 AddAnnotationBlocks (Array.ofList p.TemplateBuildingBlocks) |> OfficeInteropMsg |> dispatch
                             )
                         ] [
