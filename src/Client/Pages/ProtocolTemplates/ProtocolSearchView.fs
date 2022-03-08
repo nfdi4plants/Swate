@@ -182,6 +182,17 @@ let fileSortElements (model:Model) dispatch =
         ]
     ]
 
+let private curatedTag = Tag.tag [Tag.Color IsSuccess][str "curated"]
+let private communitytag = Tag.tag [Tag.Color IsWarning][str "community"]
+let private curatedCommunityTag =
+    Tag.tag [
+        Tag.Props [Style [Background "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)"]]
+        Tag.Color IsSuccess
+    ][
+        span [Style [MarginRight "0.75em"]][str "cur"]
+        span [Style [MarginLeft "0.75em"; Color "rgba(0, 0, 0, 0.7)"]][str "com"]  
+    ]
+
 let protocolElement i (sortedTable:Template []) (model:Model) dispatch =
     let isActive =
         match model.ProtocolState.DisplayedProtDetailsId with
@@ -215,9 +226,9 @@ let protocolElement i (sortedTable:Template []) (model:Model) dispatch =
             td [ ] [ str prot.Name ]
             td [ ] [
                 if curatedOrganisationNames |> List.contains (prot.Organisation.ToLower()) then
-                    Tag.tag [Tag.Color IsSuccess ][str "curated"]
+                    curatedTag
                 else
-                    Tag.tag [Tag.Color IsWarning ][str "community"]
+                    communitytag
             ]
             //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt][]] ]
             td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str prot.Version ]
@@ -281,6 +292,37 @@ let protocolElement i (sortedTable:Template []) (model:Model) dispatch =
         ]
     ]
 
+
+let private curatedCommunityFilterDropdownItem (filter:Protocol.CuratedCommunityFilter) child (model:Model) dispatch =
+    Dropdown.Item.a [
+        Dropdown.Item.Props [
+            OnClick(fun e ->
+                e.preventDefault();
+                printfn "click"
+                UpdateCuratedCommunityFilter filter |> ProtocolMsg |> dispatch
+            )
+        ]
+    ] [ child ]
+
+let private curatedCommunityFilterElement (model:Model) dispatch =
+    Dropdown.dropdown [ Dropdown.IsHoverable ] [
+        Dropdown.trigger [ ] [
+            Button.button [ Button.Size IsSmall; Button.IsOutlined; Button.Color IsWhite; Button.Props [Style [Padding "0px"]] ] [
+                match model.ProtocolState.CuratedCommunityFilter with
+                | Protocol.CuratedCommunityFilter.Both -> curatedCommunityTag
+                | Protocol.CuratedCommunityFilter.OnlyCommunity -> communitytag
+                | Protocol.CuratedCommunityFilter.OnlyCurated -> curatedTag
+            ]
+        ]
+        Dropdown.menu [ Props [Style [MinWidth "unset"; CSSProp.FontWeight "normal"]] ] [
+            Dropdown.content [ ] [
+                curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.Both curatedCommunityTag model dispatch
+                curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.OnlyCurated curatedTag model dispatch
+                curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.OnlyCommunity communitytag model dispatch
+            ]
+        ]
+    ]
+
 let protocolElementContainer (model:Model) dispatch =
     
     let sortTableBySearchQuery (protocol:Template []) =
@@ -322,11 +364,18 @@ let protocolElementContainer (model:Model) dispatch =
         else
             protocol
 
+    let filterTableByCuratedCommunityFilter (protocol:Template []) =
+        match model.ProtocolState.CuratedCommunityFilter with
+        | Protocol.CuratedCommunityFilter.Both          -> protocol
+        | Protocol.CuratedCommunityFilter.OnlyCurated   -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToLower()) curatedOrganisationNames)
+        | Protocol.CuratedCommunityFilter.OnlyCommunity -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToLower()) curatedOrganisationNames |> not)
+
     let sortedTable =
         model.ProtocolState.ProtocolsAll
         |> filterTableByTags
-        |> sortTableBySearchQuery
         |> filterTableByErTags
+        |> filterTableByCuratedCommunityFilter
+        |> sortTableBySearchQuery
 
     mainFunctionContainer [
         Field.div [][
@@ -349,7 +398,7 @@ let protocolElementContainer (model:Model) dispatch =
                 tr [][
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Protocol Name"      ]
                     //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Documentation"      ]
-                    th [][]
+                    th [][curatedCommunityFilterElement model dispatch]
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Protocol Version"   ]
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Uses"               ]
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][]

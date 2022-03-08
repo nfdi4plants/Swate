@@ -268,7 +268,15 @@ module Validation =
             DisplayedOptionsId          = None
         }
 
+
 module Protocol =
+
+    [<RequireQualifiedAccess>]
+    type CuratedCommunityFilter =
+    | Both
+    | OnlyCurated
+    | OnlyCommunity
+
     /// This model is used for both protocol insert and protocol search
     type Model = {
         // Client 
@@ -286,23 +294,25 @@ module Protocol =
         ProtocolTagSearchQuery  : string
         ProtocolFilterTags      : string list
         ProtocolFilterErTags    : string list
+        CuratedCommunityFilter  : CuratedCommunityFilter
     } with
         static member init () = {
             // Client
             Loading                 = false
+            ProtocolNameSearchQuery = ""
+            ProtocolTagSearchQuery  = ""
+            ProtocolFilterTags      = []
+            ProtocolFilterErTags    = []
+            CuratedCommunityFilter  = CuratedCommunityFilter.Both
+            DisplayedProtDetailsId  = None
+            ProtocolSelected        = None
             // // ------ Process from file ------
             UploadedFile            = ""
             ShowJsonTypeDropdown    = false
             JsonExportType          = Shared.JsonExportType.Assay
             // ------ Protocol from Database ------
-            ProtocolSelected        = None
             ProtocolsAll            = [||]
-            DisplayedProtDetailsId  = None
             ValidationXml           = None
-            ProtocolNameSearchQuery = ""
-            ProtocolTagSearchQuery  = ""
-            ProtocolFilterTags      = []
-            ProtocolFilterErTags    = []
         }
 
 type RequestBuildingBlockInfoStates =

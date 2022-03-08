@@ -156,6 +156,12 @@ module Protocol =
                     ProtocolFilterErTags = currentState.ProtocolFilterErTags |> List.filter (fun x -> x <> tagStr)
             }
             nextState, Cmd.none
+        | UpdateCuratedCommunityFilter nextFilter ->
+            let nextState = {
+                currentState with
+                    CuratedCommunityFilter = nextFilter
+            }
+            nextState, Cmd.none
         | RemoveSelectedProtocol ->
             let nextState = {
                 currentState with
