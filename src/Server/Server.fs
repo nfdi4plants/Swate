@@ -106,8 +106,6 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
         toSwateTemplateJson = fun byteArray -> async {
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
-            printfn "LOOK @ME"
-            printfn "%A" (metadata.toJson())
             let ms = new MemoryStream(byteArray)
             let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
             let tableName = metadata.TryGetValue "Table"
@@ -323,25 +321,19 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
             }
     }
 
-//let protocolApi cString = {
-//    getAllProtocolsWithoutXml = fun () -> async {
-//        let protocols = ProtocolDB.getAllProtocols cString
-//        return protocols
-//    }
+let protocolApi credentials = {
+    getAllProtocolsWithoutXml = fun () -> async {
+        let protocols = TemplateDB.Queries.Template(credentials).getAll() |> Array.ofSeq
+        return protocols
+    }
 
-//    getProtocolByName = fun prot -> async { return ProtocolDB.getProtocolByName cString prot }
+    getProtocolById = fun templateId -> async { return TemplateDB.Queries.Template(credentials).getById(templateId) }
 
-//    getProtocolsByName = fun (names) -> async {
-//        let prot = names |> Array.map (fun x -> ProtocolDB.getProtocolByName cString x)
-//        let protsWithXml = protsWithoutXml |> Array.map (ProtocolDB.getXmlByProtocol cString)
-//        return prot
-//    }
-
-//    increaseTimesUsed = fun templateName -> async {
-//        ProtocolDB.increaseTimesUsed cString templateName
-//        return ()
-//    }
-//}
+    increaseTimesUsedById = fun templateId -> async {
+        let _ = TemplateDB.Queries.Template(credentials).increaseTimesUsed(templateId)
+        return ()
+    }
+}
 
 let testApi (ctx: HttpContext): ITestAPI = {
     test = fun () -> async {
@@ -376,14 +368,14 @@ let errorHandler (ex:exn) (routeInfo:RouteInfo<HttpContext>) =
     let msg = sprintf "%A %s @%s." ex.Message System.Environment.NewLine routeInfo.path
     Propagate msg
 
-//let createIProtocolApiv1 cString =
-//    Remoting.createApi()
-//    |> Remoting.withRouteBuilder Route.builder
-//    |> Remoting.fromValue (protocolApi cString)
-//    //|> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
-//    |> Remoting.withDiagnosticsLogger(printfn "%A")
-//    |> Remoting.withErrorHandler errorHandler
-//    |> Remoting.buildHttpHandler
+let createIProtocolApiv1 credentials =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.fromValue (protocolApi credentials)
+    //|> Remoting.withDocs Shared.URLs.DocsApiUrl DocsAnnotationAPIvs1.ontologyApiDocsv1
+    |> Remoting.withDiagnosticsLogger(printfn "%A")
+    |> Remoting.withErrorHandler errorHandler
+    |> Remoting.buildHttpHandler
 
 let createIOntologyApiv1 credentials =
     Remoting.createApi()
@@ -472,12 +464,18 @@ let topLevelRouter = router {
         createIOntologyApiv1 credentials next ctx
     )
 
-    //forward @"" (fun next ctx ->
-    //    let cString = 
-    //        let settings = ctx.GetService<IConfiguration>()
-    //        settings.["Swate:ConnectionString"]
-    //    createIProtocolApiv1 cString next ctx
-    //)
+    forward @"" (fun next ctx ->
+        let credentials =
+            let settings = ctx.GetService<IConfiguration>()
+            let (credentials : OntologyDB.Neo4JCredentials) = {
+                User        = settings.["neo4j-username"]
+                Pw          = settings.["neo4j-pw"]
+                BoltUrl     = settings.["neo4j-uri"]
+                DatabaseName= settings.["neo4j-db"]
+            }
+            credentials
+        createIProtocolApiv1 credentials next ctx
+    )
 
     //
     forward @"" (fun next ctx ->

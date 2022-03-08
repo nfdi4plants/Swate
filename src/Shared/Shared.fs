@@ -3,7 +3,7 @@ namespace Shared
 open System
 open Shared
 open TermTypes
-open ProtocolTemplateTypes
+open TemplateTypes
 
 module Route =
 
@@ -118,10 +118,9 @@ type IOntologyAPIv1 = {
 }
 
 type IProtocolAPIv1 = {
-    getAllProtocolsWithoutXml       : unit                      -> Async<ProtocolTemplate []>
-    getProtocolByName               : string                    -> Async<ProtocolTemplate>
-    getProtocolsByName              : string []                 -> Async<ProtocolTemplate []>
-    increaseTimesUsed               : string                    -> Async<unit>
+    getAllProtocolsWithoutXml       : unit                      -> Async<Template []>
+    getProtocolById                 : string                    -> Async<Template>
+    increaseTimesUsedById           : string                    -> Async<unit>
 }
 
         

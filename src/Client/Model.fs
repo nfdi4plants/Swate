@@ -5,7 +5,7 @@ open Fable.React.Props
 open Fulma
 open Shared
 open TermTypes
-open ProtocolTemplateTypes
+open TemplateTypes
 open Thoth.Elmish
 open Routing
 
@@ -278,14 +278,14 @@ module Protocol =
         ShowJsonTypeDropdown    : bool
         JsonExportType          : Shared.JsonExportType
         // ------ Protocol from Database ------
-        ProtocolSelected        : ProtocolTemplate option
+        ProtocolSelected        : Template option
         ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-        ProtocolsAll            : ProtocolTemplate []
+        ProtocolsAll            : Template []
         DisplayedProtDetailsId  : int option
         ProtocolNameSearchQuery : string
         ProtocolTagSearchQuery  : string
-        ProtocolSearchTags      : string list
-
+        ProtocolFilterTags      : string list
+        ProtocolFilterErTags    : string list
     } with
         static member init () = {
             // Client
@@ -301,7 +301,8 @@ module Protocol =
             ValidationXml           = None
             ProtocolNameSearchQuery = ""
             ProtocolTagSearchQuery  = ""
-            ProtocolSearchTags      = []
+            ProtocolFilterTags      = []
+            ProtocolFilterErTags    = []
         }
 
 type RequestBuildingBlockInfoStates =

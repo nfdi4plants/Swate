@@ -20,7 +20,7 @@ open System.IO
 open FSharpSpreadsheetML
 
 open Shared
-open ProtocolTemplateTypes
+open TemplateTypes
 open DynamicObj
 open Newtonsoft.Json
 
@@ -58,8 +58,8 @@ let private findRowValuesByKey (key:string) (rowValues: string option [][])=
     |> Array.tail
 
 /// Also gets rows from children
-let private getAllRelatedRowsValues (metadata:TemplateMetadata.MetadataField) (rows: string option [][]) =
-    let rec collectRows (crMetadata:TemplateMetadata.MetadataField) =
+let private getAllRelatedRowsValues (metadata:Metadata.MetadataField) (rows: string option [][]) =
+    let rec collectRows (crMetadata:Metadata.MetadataField) =
         if crMetadata.Children.IsEmpty then
             let row = rows |> findRowValuesByKey crMetadata.ExtendedNameKey
             [|row|]
@@ -68,7 +68,7 @@ let private getAllRelatedRowsValues (metadata:TemplateMetadata.MetadataField) (r
             childRows
     collectRows metadata
 
-let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.SheetData) sst (metadata:TemplateMetadata.MetadataField) =
+let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.SheetData) sst (metadata:Metadata.MetadataField) =
     let rows = SheetData.getRows sheetData |> Array.ofSeq
     let rowValues =
         rows
@@ -81,7 +81,7 @@ let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.She
                         Row.tryGetValueAt sst i row
             |]
         )
-    let rec convertDynamic (listIndex: int option) (forwardOutput:TemplateMetadataJsonExport option) (metadata:TemplateMetadata.MetadataField) =
+    let rec convertDynamic (listIndex: int option) (forwardOutput:TemplateMetadataJsonExport option) (metadata:Metadata.MetadataField) =
         let output =
             if forwardOutput.IsSome then
                 forwardOutput.Value
@@ -92,7 +92,6 @@ let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.She
         | isOutput when metadata.Children = [] ->
             let isList = listIndex.IsSome
             let rowValues = rowValues |> findRowValuesByKey metadata.ExtendedNameKey |> Array.map (fun x -> if x.IsSome then x.Value else "") //|> Array.choose id
-            printfn "%A" rowValues
             if isList then
                 let v =
                     let tryFromArr = Array.tryItem (listIndex.Value) rowValues
@@ -112,11 +111,9 @@ let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.She
         /// children are represented by columns
         | isObjectList when metadata.Children <> [] && metadata.List && metadata.Key <> "" ->
             let childRows = getAllRelatedRowsValues metadata rowValues
-            printfn "CHILDROWS: %A" childRows
             /// Only calculate max columns if cell still contains a value. Filter out None and ""
             let notEmptyChildRows = childRows |> Array.map (Array.choose id) |> Array.map (Array.filter (fun x -> x <> ""))
             let maxColumn = notEmptyChildRows |> Array.map Array.length |> Array.max
-            printfn "MAXCOLUMN: %A" maxColumn
             let childObjects =
                 [| for i = 0 to maxColumn-1 do
                     let childOutput = TemplateMetadataJsonExport.init()
@@ -147,7 +144,7 @@ let parseDynMetadataFromByteArr (byteArray:byte []) =
     let ms = new MemoryStream(byteArray)
     let spreadsheet = Spreadsheet.fromStream ms false
     let sst = Spreadsheet.tryGetSharedStringTable spreadsheet
-    let sheetOpt = Spreadsheet.tryGetSheetBySheetName ProtocolTemplateTypes.TemplateMetadata.TemplateMetadataWorksheetName spreadsheet
-    if sheetOpt.IsNone then failwith $"Could not find template metadata worksheet: {ProtocolTemplateTypes.TemplateMetadata.TemplateMetadataWorksheetName}"
+    let sheetOpt = Spreadsheet.tryGetSheetBySheetName TemplateTypes.Metadata.TemplateMetadataWorksheetName spreadsheet
+    if sheetOpt.IsNone then failwith $"Could not find template metadata worksheet: {TemplateTypes.Metadata.TemplateMetadataWorksheetName}"
 
-    convertToDynObject sheetOpt.Value sst TemplateMetadata.root
+    convertToDynObject sheetOpt.Value sst Metadata.root

@@ -9,12 +9,16 @@ open Fable.React.Props
 open Fable.FontAwesome
 
 open Shared
-open ProtocolTemplateTypes
+open TemplateTypes
 
 open Model
 open Messages.Protocol
 open Messages
 
+let curatedOrganisationNames = [
+    "dataplant"
+    "nfdi4plants"
+]
 
 let breadcrumbEle (model:Model) dispatch =
     Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
@@ -47,12 +51,13 @@ let sortButton icon msg =
     ]
 
 let fileSortElements (model:Model) dispatch =
-    let allTags = model.ProtocolState.ProtocolsAll |> Array.collect (fun x -> x.Tags) |> Array.distinct |> Array.filter (fun x -> model.ProtocolState.ProtocolSearchTags |> List.contains x |> not )
-    let hitTagList =
+    let allTags = model.ProtocolState.ProtocolsAll |> Array.collect (fun x -> x.Tags) |> Array.distinct |> Array.filter (fun x -> model.ProtocolState.ProtocolFilterTags |> List.contains x |> not )
+    let allErTags = model.ProtocolState.ProtocolsAll |> Array.collect (fun x -> x.Er_Tags) |> Array.distinct |> Array.filter (fun x -> model.ProtocolState.ProtocolFilterErTags |> List.contains x |> not )
+    let hitTagList, hitErTagList =
         if model.ProtocolState.ProtocolTagSearchQuery <> ""
         then
             let queryBigram = model.ProtocolState.ProtocolTagSearchQuery |> Shared.SorensenDice.createBigrams 
-            let bigrams =
+            let sortedTags =
                 allTags
                 |> Array.map (fun x ->
                     x
@@ -63,9 +68,20 @@ let fileSortElements (model:Model) dispatch =
                 |> Array.filter (fun x -> fst x >= 0.3)
                 |> Array.sortByDescending fst
                 |> Array.map snd
-            bigrams
+            let sortedErTags =
+                allErTags
+                |> Array.map (fun x ->
+                    x
+                    |> Shared.SorensenDice.createBigrams
+                    |> Shared.SorensenDice.calculateDistance queryBigram
+                    , x
+                )
+                |> Array.filter (fun x -> fst x >= 0.3)
+                |> Array.sortByDescending fst
+                |> Array.map snd
+            sortedTags, sortedErTags
         else
-            [||]
+            [||], [||]
     div [ Style [MarginBottom "0.75rem"] ][
         Columns.columns [Columns.IsMobile; Columns.Props [Style [MarginBottom "0";]]] [
             Column.column [ ] [
@@ -106,23 +122,21 @@ let fileSortElements (model:Model) dispatch =
                         //Border "0.5px solid"
                         if hitTagList |> Array.isEmpty then Display DisplayOptions.None
                     ]]] [
-                        let erTags = hitTagList |> Array.filter (fun x -> x.StartsWith "er:")
-                        let standardTags = hitTagList |> Array.except erTags |> fun x -> if Array.isEmpty x then [|"GEO Test"; "GEO tagging"|] else x
                         Label.label [][str "Endpoint Repositories"]
                         Tag.list [][
-                            for tagSuggestion in erTags do
+                            for tagSuggestion in hitErTagList do
                                 yield
                                     Tag.tag [
                                         Tag.CustomClass "clickableTag"
                                         Tag.Color IsLink
-                                        Tag.Props [ OnClick (fun e -> AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch) ]
+                                        Tag.Props [ OnClick (fun e -> AddProtocolErTag tagSuggestion |> ProtocolMsg |> dispatch) ]
                                     ][
-                                        str (tagSuggestion.Replace("er:",""))
+                                        str tagSuggestion
                                     ]
                         ]
                         Label.label [][str "Tags"]
                         Tag.list [][
-                            for tagSuggestion in standardTags do
+                            for tagSuggestion in hitTagList do
                                 yield
                                     Tag.tag [
                                         Tag.CustomClass "clickableTag"
@@ -137,7 +151,21 @@ let fileSortElements (model:Model) dispatch =
             ]
         ]
         Field.div [Field.IsGroupedMultiline][
-            for selectedTag in model.ProtocolState.ProtocolSearchTags do
+            for selectedTag in model.ProtocolState.ProtocolFilterErTags do
+                yield
+                    Control.div [ ] [
+                        Tag.list [Tag.List.HasAddons][
+                            Tag.tag [Tag.Color IsLink; Tag.Props [Style [Border "0px"]]] [str selectedTag]
+                            Tag.delete [
+                                Tag.CustomClass "clickableTagDelete"
+                                //Tag.Color IsWarning;
+                                Tag.Props [
+                                    OnClick (fun _ -> RemoveProtocolErTag selectedTag |> ProtocolMsg |> dispatch)
+                                ]
+                            ] []
+                        ]
+                    ]
+            for selectedTag in model.ProtocolState.ProtocolFilterTags do
                 yield
                     Control.div [ ] [
                         Tag.list [Tag.List.HasAddons][
@@ -154,7 +182,7 @@ let fileSortElements (model:Model) dispatch =
         ]
     ]
 
-let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
+let protocolElement i (sortedTable:Template []) (model:Model) dispatch =
     let isActive =
         match model.ProtocolState.DisplayedProtDetailsId with
         | Some id when id = i ->
@@ -186,10 +214,10 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
         ] [
             td [ ] [ str prot.Name ]
             td [ ] [
-                if prot.Name.StartsWith "MAdLand" then
-                    Tag.tag [Tag.Color IsWarning ][str "community"]
-                else
+                if curatedOrganisationNames |> List.contains (prot.Organisation.ToLower()) then
                     Tag.tag [Tag.Color IsSuccess ][str "curated"]
+                else
+                    Tag.tag [Tag.Color IsWarning ][str "community"]
             ]
             //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt][]] ]
             td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str prot.Version ]
@@ -220,15 +248,22 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
                                 div [][
                                     Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
                                         b [] [str "Author: "]
-                                        str (prot.Author.Replace(",",", "))
+                                        str (prot.Authors.Replace(",",", "))
                                     ]
                                     Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
                                         b [][str "Created: "]
-                                        str (sprintf "%s %s" (prot.Created.ToShortDateString()) (prot.Created.ToShortTimeString()))
+                                        str (prot.LastUpdated.ToString("yyyy/MM/dd"))
                                     ]
                                 ]
                             ]
                         ]
+                    ]
+                    Tag.list [][
+                        for tag in prot.Er_Tags do
+                            yield
+                                Tag.tag [Tag.Color IsLink][
+                                    str tag
+                                ]
                     ]
                     Tag.list [][
                         for tag in prot.Tags do
@@ -238,7 +273,7 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
                                 ]
                     ]
                     Button.a [
-                        Button.OnClick (fun e -> GetProtocolByNameRequest prot.Name |> ProtocolMsg |> dispatch)
+                        Button.OnClick (fun _ -> GetProtocolByIdRequest prot.Id |> ProtocolMsg |> dispatch)
                         Button.IsFullWidth; Button.Color IsSuccess
                     ] [str "select"]
                 ]
@@ -248,7 +283,7 @@ let protocolElement i (sortedTable:ProtocolTemplate []) (model:Model) dispatch =
 
 let protocolElementContainer (model:Model) dispatch =
     
-    let sortTableBySearchQuery (protocol:ProtocolTemplate []) =
+    let sortTableBySearchQuery (protocol:Template []) =
         if model.ProtocolState.ProtocolNameSearchQuery <> ""
         then
             let queryBigram = model.ProtocolState.ProtocolNameSearchQuery |> Shared.SorensenDice.createBigrams 
@@ -267,11 +302,21 @@ let protocolElementContainer (model:Model) dispatch =
             bigrams
         else
             protocol
-    let filterTableByTags (protocol:ProtocolTemplate []) =
-        if model.ProtocolState.ProtocolSearchTags |> List.isEmpty |> not then
+    let filterTableByTags (protocol:Template []) =
+        if model.ProtocolState.ProtocolFilterTags |> List.isEmpty |> not then
             protocol |> Array.filter (fun x ->
                 let protTagSet = x.Tags |> Set.ofArray
-                let filterTags = model.ProtocolState.ProtocolSearchTags |> Set.ofList
+                let filterTags = model.ProtocolState.ProtocolFilterTags |> Set.ofList
+                Set.intersect protTagSet filterTags |> fun intersectSet -> intersectSet.Count = filterTags.Count
+            )
+        else
+            protocol
+
+    let filterTableByErTags (protocol:Template []) =
+        if model.ProtocolState.ProtocolFilterErTags |> List.isEmpty |> not then
+            protocol |> Array.filter (fun x ->
+                let protTagSet = x.Er_Tags |> Set.ofArray
+                let filterTags = model.ProtocolState.ProtocolFilterErTags |> Set.ofList
                 Set.intersect protTagSet filterTags |> fun intersectSet -> intersectSet.Count = filterTags.Count
             )
         else
@@ -280,7 +325,8 @@ let protocolElementContainer (model:Model) dispatch =
     let sortedTable =
         model.ProtocolState.ProtocolsAll
         |> filterTableByTags
-        |> sortTableBySearchQuery 
+        |> sortTableBySearchQuery
+        |> filterTableByErTags
 
     mainFunctionContainer [
         Field.div [][

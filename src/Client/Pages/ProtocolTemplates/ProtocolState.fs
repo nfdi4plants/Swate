@@ -84,15 +84,15 @@ module Protocol =
                     Loading = false
             }
             nextState, Cmd.none
-        | GetProtocolByNameRequest protocolName ->
+        | GetProtocolByIdRequest templateId ->
             let cmd =
                 Cmd.OfAsync.either
-                    Api.protocolApi.getProtocolByName
-                    protocolName
-                    (GetProtocolByNameResponse >> ProtocolMsg)
+                    Api.protocolApi.getProtocolById
+                    templateId
+                    (GetProtocolByIdResponse >> ProtocolMsg)
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd
-        | GetProtocolByNameResponse prot -> 
+        | GetProtocolByIdResponse prot -> 
             let nextState = {
                 currentState with
                     ProtocolSelected = Some prot
@@ -100,11 +100,11 @@ module Protocol =
                     DisplayedProtDetailsId = None
             }
             nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.Protocol)
-        | ProtocolIncreaseTimesUsed protocolTemplateName ->
+        | ProtocolIncreaseTimesUsed templateId ->
             let cmd =
                 Cmd.OfAsync.attempt
-                    Api.protocolApi.increaseTimesUsed
-                    protocolTemplateName
+                    Api.protocolApi.increaseTimesUsedById
+                    templateId
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd
                 
@@ -133,14 +133,27 @@ module Protocol =
         | AddProtocolTag tagStr ->
             let nextState = {
                 currentState with
-                    ProtocolSearchTags      = tagStr::currentState.ProtocolSearchTags
+                    ProtocolFilterTags      = tagStr::currentState.ProtocolFilterTags
                     ProtocolTagSearchQuery  = ""
             }
             nextState, Cmd.none
         | RemoveProtocolTag tagStr ->
             let nextState = {
                 currentState with
-                    ProtocolSearchTags = currentState.ProtocolSearchTags |> List.filter (fun x -> x <> tagStr)
+                    ProtocolFilterTags = currentState.ProtocolFilterTags |> List.filter (fun x -> x <> tagStr)
+            }
+            nextState, Cmd.none
+        | AddProtocolErTag tagStr ->
+            let nextState = {
+                currentState with
+                    ProtocolFilterErTags      = tagStr::currentState.ProtocolFilterErTags
+                    ProtocolTagSearchQuery  = ""
+            }
+            nextState, Cmd.none
+        | RemoveProtocolErTag tagStr ->
+            let nextState = {
+                currentState with
+                    ProtocolFilterErTags = currentState.ProtocolFilterErTags |> List.filter (fun x -> x <> tagStr)
             }
             nextState, Cmd.none
         | RemoveSelectedProtocol ->

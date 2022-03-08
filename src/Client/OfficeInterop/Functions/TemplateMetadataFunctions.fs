@@ -8,7 +8,7 @@ open Excel
 open GlobalBindings
 
 open Shared.OfficeInteropTypes
-open Shared.ProtocolTemplateTypes.TemplateMetadata
+open Shared.TemplateTypes.Metadata
 
 let private colorOuterBordersWhite (borderSeq:seq<RangeBorder>) =
     borderSeq

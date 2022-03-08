@@ -1,11 +1,11 @@
 namespace Shared
 
-module ProtocolTemplateTypes =
+module TemplateTypes =
 
     open System
 
 
-    module TemplateMetadata =
+    module Metadata =
 
         [<Literal>]
         let TemplateMetadataWorksheetName = "SwateTemplateMetadata" 
@@ -92,28 +92,33 @@ module ProtocolTemplateTypes =
         // entry
         let root = MetadataField.createWithExtendedKeys("",children=[id;name;version;description;(*docslink;*)organisation;table;er;tags;authors]) 
 
-    type ProtocolTemplate = {
+    type Template = {
+        Id                      : string
         Name                    : string
-        Version                 : string
-        Created                 : System.DateTime
-        Author                  : string
         Description             : string
-        DocsLink                : string
+        Organisation            : string
+        Version                 : string
+        Authors                 : string
+        /// endpoint repository tags
+        Er_Tags                 : string []
         Tags                    : string []
         TemplateBuildingBlocks  : OfficeInteropTypes.InsertBuildingBlock list
+        LastUpdated             : System.DateTime
         Used                    : int
         // WIP
         Rating                  : int  
     } with
-        static member create name version created author desc docs tags templateBuildingBlocks used rating  = {
+        static member create id name describtion organisation version lastUpdated author ertags tags templateBuildingBlocks used rating  = {
+            Id                      = id
             Name                    = name
+            Description             = describtion
+            Organisation            = organisation
             Version                 = version
-            Created                 = created 
-            Author                  = author
-            Description             = desc
-            DocsLink                = docs
+            Authors                 = author
+            Er_Tags                 = ertags
             Tags                    = tags
             TemplateBuildingBlocks  = templateBuildingBlocks
+            LastUpdated             = lastUpdated 
             Used                    = used
             // WIP                  
             Rating                  = rating

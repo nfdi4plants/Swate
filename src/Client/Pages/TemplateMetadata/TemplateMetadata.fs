@@ -16,7 +16,7 @@ open Messages
 
 open TemplateMetadata
 
-open ProtocolTemplateTypes
+open TemplateTypes
 
 let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
@@ -41,7 +41,7 @@ let defaultMessageEle (model:Model) dispatch =
         ]
         Field.div [][
             Button.a [
-                Button.OnClick(fun e -> CreateTemplateMetadataWorksheet TemplateMetadata.root |> TemplateMetadataMsg |> dispatch)
+                Button.OnClick(fun e -> CreateTemplateMetadataWorksheet Metadata.root |> TemplateMetadataMsg |> dispatch)
                 Button.IsFullWidth
                 Button.Color IsInfo
             ][

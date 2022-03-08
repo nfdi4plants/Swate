@@ -7,7 +7,7 @@ open Fable.Remoting.Client
 open Fable.SimpleJson
 
 open TermTypes
-open ProtocolTemplateTypes
+open TemplateTypes
 open ExcelColors
 open OfficeInterop
 open OfficeInteropTypes
@@ -144,9 +144,9 @@ module Protocol =
         | UpdateShowJsonTypeDropdown        of bool
         // // ------ Protocol from Database ------
         | GetAllProtocolsRequest
-        | GetAllProtocolsResponse           of ProtocolTemplate []
-        | GetProtocolByNameRequest          of string
-        | GetProtocolByNameResponse         of ProtocolTemplate
+        | GetAllProtocolsResponse           of Template []
+        | GetProtocolByIdRequest            of string
+        | GetProtocolByIdResponse           of Template
         | ProtocolIncreaseTimesUsed         of protocolName:string
         // Client
         | UpdateDisplayedProtDetailsId      of int option
@@ -154,6 +154,8 @@ module Protocol =
         | UpdateProtocolTagSearchQuery      of string
         | AddProtocolTag                    of string
         | RemoveProtocolTag                 of string
+        | AddProtocolErTag                  of string
+        | RemoveProtocolErTag               of string
         | RemoveSelectedProtocol
         | UpdateLoading                     of bool
 
