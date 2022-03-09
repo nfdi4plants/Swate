@@ -157,6 +157,7 @@ module Protocol =
         | AddProtocolErTag                  of string
         | RemoveProtocolErTag               of string
         | UpdateCuratedCommunityFilter      of Protocol.CuratedCommunityFilter
+        | UpdateTagFilterIsAnd              of bool
         | RemoveSelectedProtocol
         | UpdateLoading                     of bool
 

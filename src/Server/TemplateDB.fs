@@ -16,8 +16,8 @@ module Queries =
         /// This function tries not to parse templateJson to building blocks, but instead ignores the templateJson
         static member private asTemplateMinimal: IRecord -> Shared.TemplateTypes.Template =
             fun (record:IRecord) ->
-                let erTags = record.["t.erTags"].As<string>() |> fun x -> x.Split(", ")
-                let tags = record.["t.tags"].As<string>() |> fun x -> x.Split(", ")
+                let erTags = record.["t.erTags"].As<string>() |> fun x -> x.Split(", ", StringSplitOptions.RemoveEmptyEntries)
+                let tags = record.["t.tags"].As<string>() |> fun x -> x.Split(", ", StringSplitOptions.RemoveEmptyEntries)
                 let (template:Shared.TemplateTypes.Template) = {
                     Id                      = record.["t.id"].As<string>()
                     Name                    = record.["t.name"].As<string>()

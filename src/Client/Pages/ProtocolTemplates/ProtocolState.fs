@@ -162,6 +162,12 @@ module Protocol =
                     CuratedCommunityFilter = nextFilter
             }
             nextState, Cmd.none
+        | UpdateTagFilterIsAnd isAnd ->
+            let nextState = {
+                currentState with
+                    TagFilterIsAnd = isAnd
+            }
+            nextState, Cmd.none
         | RemoveSelectedProtocol ->
             let nextState = {
                 currentState with

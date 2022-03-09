@@ -14,6 +14,7 @@ open TemplateTypes
 open Model
 open Messages.Protocol
 open Messages
+open Fulma.Extensions.Wikiki
 
 let curatedOrganisationNames = [
     "dataplant"
@@ -71,10 +72,11 @@ let fileSortElements (model:Model) dispatch =
             let sortedErTags =
                 allErTags
                 |> Array.map (fun x ->
-                    x
-                    |> Shared.SorensenDice.createBigrams
-                    |> Shared.SorensenDice.calculateDistance queryBigram
-                    , x
+                    let dist = 
+                        x
+                        |> Shared.SorensenDice.createBigrams
+                        |> Shared.SorensenDice.calculateDistance queryBigram
+                    dist , x
                 )
                 |> Array.filter (fun x -> fst x >= 0.3)
                 |> Array.sortByDescending fst
@@ -85,7 +87,7 @@ let fileSortElements (model:Model) dispatch =
     div [ Style [MarginBottom "0.75rem"] ][
         Columns.columns [Columns.IsMobile; Columns.Props [Style [MarginBottom "0";]]] [
             Column.column [ ] [
-                Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]] [str "Search by protocol name"]
+                Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text; MinWidth "91px"; WhiteSpace WhiteSpaceOptions.Nowrap]]] [str "Search by protocol name"]
                 Control.div [
                     Control.HasIconRight
                 ] [
@@ -101,7 +103,7 @@ let fileSortElements (model:Model) dispatch =
             ]
 
             Column.column [ ] [
-                Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]] [str "Search for tags"]
+                Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text; MinWidth "91px"; WhiteSpace WhiteSpaceOptions.Nowrap]]] [str "Search for tags"]
                 Control.div [
                     Control.HasIconRight
                 ] [
@@ -119,67 +121,94 @@ let fileSortElements (model:Model) dispatch =
                         yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode
                         Position PositionOptions.Absolute
                         Width "100%"
-                        //Border "0.5px solid"
-                        if hitTagList |> Array.isEmpty then Display DisplayOptions.None
+                        ZIndex 10
+                        if hitTagList |> Array.isEmpty && hitErTagList |> Array.isEmpty then Display DisplayOptions.None
                     ]]] [
-                        Label.label [][str "Endpoint Repositories"]
-                        Tag.list [][
-                            for tagSuggestion in hitErTagList do
-                                yield
-                                    Tag.tag [
-                                        Tag.CustomClass "clickableTag"
-                                        Tag.Color IsLink
-                                        Tag.Props [ OnClick (fun e -> AddProtocolErTag tagSuggestion |> ProtocolMsg |> dispatch) ]
-                                    ][
-                                        str tagSuggestion
-                                    ]
-                        ]
-                        Label.label [][str "Tags"]
-                        Tag.list [][
-                            for tagSuggestion in hitTagList do
-                                yield
-                                    Tag.tag [
-                                        Tag.CustomClass "clickableTag"
-                                        Tag.Color IsInfo
-                                        Tag.Props [ OnClick (fun e -> AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch) ]
-                                    ][
-                                        str tagSuggestion
-                                    ]
-                        ]
+                        if hitErTagList <> [||] then
+                            Label.label [][str "Endpoint Repositories"]
+                            Tag.list [][
+                                for tagSuggestion in hitErTagList do
+                                    yield
+                                        Tag.tag [
+                                            Tag.CustomClass "clickableTag"
+                                            Tag.Color IsLink
+                                            Tag.Props [ OnClick (fun _ -> AddProtocolErTag tagSuggestion |> ProtocolMsg |> dispatch) ]
+                                        ][
+                                            str tagSuggestion
+                                        ]
+                            ]
+                        if hitTagList <> [||] then
+                            Label.label [][str "Tags"]
+                            Tag.list [][
+                                for tagSuggestion in hitTagList do
+                                    yield
+                                        Tag.tag [
+                                            Tag.CustomClass "clickableTag"
+                                            Tag.Color IsInfo
+                                            Tag.Props [ OnClick (fun _ -> AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch) ]
+                                        ][
+                                            str tagSuggestion
+                                        ]
+                            ]
                     ]
                 ]
             ]
         ]
-        Field.div [Field.IsGroupedMultiline][
-            for selectedTag in model.ProtocolState.ProtocolFilterErTags do
-                yield
-                    Control.div [ ] [
-                        Tag.list [Tag.List.HasAddons][
-                            Tag.tag [Tag.Color IsLink; Tag.Props [Style [Border "0px"]]] [str selectedTag]
-                            Tag.delete [
-                                Tag.CustomClass "clickableTagDelete"
-                                //Tag.Color IsWarning;
-                                Tag.Props [
-                                    OnClick (fun _ -> RemoveProtocolErTag selectedTag |> ProtocolMsg |> dispatch)
+        /// Only show the tag list and tag filter (AND or OR) if any tag exists
+        if model.ProtocolState.ProtocolFilterErTags <> [] || model.ProtocolState.ProtocolFilterTags <> [] then
+            Columns.columns [Columns.IsMobile][
+                Column.column [][
+                    Field.div [Field.IsGroupedMultiline][
+                        for selectedTag in model.ProtocolState.ProtocolFilterErTags do
+                            yield
+                                Control.div [ ] [
+                                    Tag.list [Tag.List.HasAddons][
+                                        Tag.tag [Tag.Color IsLink; Tag.Props [Style [Border "0px"]]] [str selectedTag]
+                                        Tag.delete [
+                                            Tag.CustomClass "clickableTagDelete"
+                                            //Tag.Color IsWarning;
+                                            Tag.Props [
+                                                OnClick (fun _ -> RemoveProtocolErTag selectedTag |> ProtocolMsg |> dispatch)
+                                            ]
+                                        ] []
+                                    ]
                                 ]
-                            ] []
-                        ]
-                    ]
-            for selectedTag in model.ProtocolState.ProtocolFilterTags do
-                yield
-                    Control.div [ ] [
-                        Tag.list [Tag.List.HasAddons][
-                            Tag.tag [Tag.Color IsInfo; Tag.Props [Style [Border "0px"]]] [str selectedTag]
-                            Tag.delete [
-                                Tag.CustomClass "clickableTagDelete"
-                                //Tag.Color IsWarning;
-                                Tag.Props [
-                                    OnClick (fun _ -> RemoveProtocolTag selectedTag |> ProtocolMsg |> dispatch)
+                        for selectedTag in model.ProtocolState.ProtocolFilterTags do
+                            yield
+                                Control.div [ ] [
+                                    Tag.list [Tag.List.HasAddons][
+                                        Tag.tag [Tag.Color IsInfo; Tag.Props [Style [Border "0px"]]] [str selectedTag]
+                                        Tag.delete [
+                                            Tag.CustomClass "clickableTagDelete"
+                                            //Tag.Color IsWarning;
+                                            Tag.Props [
+                                                OnClick (fun _ -> RemoveProtocolTag selectedTag |> ProtocolMsg |> dispatch)
+                                            ]
+                                        ] []
+                                    ]
                                 ]
-                            ] []
                         ]
+                ]
+                /// tag filter (AND or OR) 
+                Column.column [
+                    Column.Width (Screen.All, Column.IsNarrow)
+                    Column.Props [Title (if model.ProtocolState.TagFilterIsAnd then "Templates contain all tags." else "Templates contain at least one tag.")]
+                ][
+                    Switch.switchInline [
+                        Switch.Color Color.IsDark
+                        Switch.LabelProps [Style [UserSelect UserSelectOptions.None]]
+                        Switch.IsOutlined
+                        Switch.Size IsSmall
+                        Switch.Id "switch-2"
+                        Switch.Checked model.ProtocolState.TagFilterIsAnd
+                        Switch.OnChange (fun _ ->
+                            UpdateTagFilterIsAnd (not model.ProtocolState.TagFilterIsAnd) |> ProtocolMsg |> dispatch
+                        )
+                    ] [
+                        if model.ProtocolState.TagFilterIsAnd then b [] [str "And"] else b [] [str "Or"]
                     ]
-        ]
+                ]
+            ]
     ]
 
 let private curatedTag = Tag.tag [Tag.Color IsSuccess][str "curated"]
@@ -298,7 +327,6 @@ let private curatedCommunityFilterDropdownItem (filter:Protocol.CuratedCommunity
         Dropdown.Item.Props [
             OnClick(fun e ->
                 e.preventDefault();
-                printfn "click"
                 UpdateCuratedCommunityFilter filter |> ProtocolMsg |> dispatch
             )
         ]
@@ -345,21 +373,18 @@ let protocolElementContainer (model:Model) dispatch =
         else
             protocol
     let filterTableByTags (protocol:Template []) =
-        if model.ProtocolState.ProtocolFilterTags |> List.isEmpty |> not then
+        if model.ProtocolState.ProtocolFilterTags <> [] || model.ProtocolState.ProtocolFilterErTags <> [] then
             protocol |> Array.filter (fun x ->
-                let protTagSet = x.Tags |> Set.ofArray
-                let filterTags = model.ProtocolState.ProtocolFilterTags |> Set.ofList
-                Set.intersect protTagSet filterTags |> fun intersectSet -> intersectSet.Count = filterTags.Count
-            )
-        else
-            protocol
-
-    let filterTableByErTags (protocol:Template []) =
-        if model.ProtocolState.ProtocolFilterErTags |> List.isEmpty |> not then
-            protocol |> Array.filter (fun x ->
-                let protTagSet = x.Er_Tags |> Set.ofArray
-                let filterTags = model.ProtocolState.ProtocolFilterErTags |> Set.ofList
-                Set.intersect protTagSet filterTags |> fun intersectSet -> intersectSet.Count = filterTags.Count
+                let tagSet = Set.union (x.Tags |> Set.ofArray) (x.Er_Tags |> Set.ofArray)
+                let filterTags = Set.union (model.ProtocolState.ProtocolFilterTags |> Set.ofList) (model.ProtocolState.ProtocolFilterErTags |> Set.ofList)
+                Set.intersect tagSet filterTags
+                    |> fun intersectSet ->
+                        /// if we want to filter by tag with AND, all tags must match
+                        if model.ProtocolState.TagFilterIsAnd then
+                            intersectSet.Count = filterTags.Count
+                        /// if we want to filter by tag with OR, at least one tag must match
+                        else
+                            intersectSet.Count >= 1
             )
         else
             protocol
@@ -373,7 +398,6 @@ let protocolElementContainer (model:Model) dispatch =
     let sortedTable =
         model.ProtocolState.ProtocolsAll
         |> filterTableByTags
-        |> filterTableByErTags
         |> filterTableByCuratedCommunityFilter
         |> sortTableBySearchQuery
 

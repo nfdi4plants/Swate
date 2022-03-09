@@ -295,6 +295,7 @@ module Protocol =
         ProtocolFilterTags      : string list
         ProtocolFilterErTags    : string list
         CuratedCommunityFilter  : CuratedCommunityFilter
+        TagFilterIsAnd          : bool
     } with
         static member init () = {
             // Client
@@ -304,6 +305,7 @@ module Protocol =
             ProtocolFilterTags      = []
             ProtocolFilterErTags    = []
             CuratedCommunityFilter  = CuratedCommunityFilter.Both
+            TagFilterIsAnd          = true
             DisplayedProtDetailsId  = None
             ProtocolSelected        = None
             // // ------ Process from file ------
