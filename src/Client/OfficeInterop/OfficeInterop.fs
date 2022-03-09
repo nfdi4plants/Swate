@@ -644,6 +644,9 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                             let formats = createValueMatrix 1 (rowCount-1) format
                             formatChangedMsg <- (InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}")::formatChangedMsg
                             columnBody.numberFormat <- formats
+                        else
+                            let format = createValueMatrix 1 (rowCount-1) "General"
+                            columnBody.numberFormat <- format
                         // hide freshly created column if it is a reference column
                         if colName <> mainColName then
                             columnBody.columnHidden <- true
