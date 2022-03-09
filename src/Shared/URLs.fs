@@ -10,22 +10,24 @@ module URLs =
         let replaced = accessionStr.Replace(":","_")
         TermAccessionBaseUrl + replaced
 
-    [<LiteralAttribute>]
-    let Nfdi4psoOntologyUrl = @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"
+    type Helpdesk =
+        static member Url = @"https://support.nfdi4plants.org"
+
+        static member UrlSwateTopic = Helpdesk.Url + "/?topic=Tools_Swate"
+
+        static member UrlOntologyTopic = Helpdesk.Url + "/?topic=Metadata_OntologyUpdate"
+
+        static member UrlTemplateTopic = Helpdesk.Url + "/?topic=Metadata_SwateTemplate"
+
 
     [<LiteralAttribute>]
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
-    let DocsFeatureUrl = @"https://github.com/nfdi4plants/Swate/wiki"
+    let SwateWiki = @"https://github.com/nfdi4plants/Swate/wiki"
 
     [<LiteralAttribute>]
-    let DocsApiUrl = @"/api/IOntologyAPIv1/docs"
-
-    /// This will only be needed as long there is no documentation on where to find all api docs.
-    /// As soon as that link exists it will replace DocsApiUrl and DocsApiUrl2
-    [<LiteralAttribute>]
-    let DocsApiUrl2 = @"/api/IServiceAPIv1/docs"
+    let SwateRepo = @"https://github.com/nfdi4plants/Swate"
 
     [<LiteralAttribute>]
     let CSBTwitterUrl = @"https://twitter.com/cs_biology"
@@ -35,3 +37,5 @@ module URLs =
 
     [<LiteralAttribute>]
     let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
+
+    let NfdiWebsite = @"https://nfdi4plants.org"

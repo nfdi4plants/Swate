@@ -609,25 +609,27 @@ module FileNameTable =
 
 let fileContainer (model:Messages.Model) dispatch inputId=
     mainFunctionContainer [
-        fileSortElements model dispatch
 
-        FileNameTable.table model dispatch
-        //fileNameElements model dispatch
+        Help.help [][
+            str "Choose one or multiple files, rearrange them and add their names to the Excel sheet."
+            //str " You can use "
+            //u [][str "drag'n'drop"]
+            //str " to change the file order or remove files selected by accident."
+        ]
+
+        uploadButton model dispatch inputId
+
+        if model.FilePickerState.FileNames <> [] then
+            fileSortElements model dispatch
+
+            FileNameTable.table model dispatch
+            //fileNameElements model dispatch
     ]
 
 let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
     let inputId = "filePicker_OnFilePickerMainFunc"
     Content.content [ ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "File Picker"]
-
-        Help.help [][
-            b [] [ str "Choose one or multiple files, rearrange them and add their names to the Excel sheet."]
-            str " You can use "
-            u [][str "drag'n'drop"]
-            str " to change the file order or remove files selected by accident."
-        ]
-
-        uploadButton model dispatch inputId
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
             str "Select files from your computer and insert their names into Excel."

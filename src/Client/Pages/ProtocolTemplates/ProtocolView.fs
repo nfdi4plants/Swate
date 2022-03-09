@@ -59,9 +59,11 @@ module TemplateFromJsonFile =
             ]
             Button.a [
                 Button.Color Color.IsInfo; Button.IsFullWidth
-                Button.OnClick(fun _ ->
+                Button.OnClick(fun e ->
+                    e.preventDefault()
                     let getUploadElement = Browser.Dom.document.getElementById uploadId
                     getUploadElement.click()
+                    ()
                 )
             ][
                 str "Upload protocol"

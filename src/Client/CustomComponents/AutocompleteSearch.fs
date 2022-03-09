@@ -191,9 +191,11 @@ let createAutocompleteSuggestions
         ][
             td [ColSpan 4] [
                 str (sprintf "%s " autocompleteParams.AdvancedSearchLinkText)
+                str "Try "
                 a [OnClick (fun _ -> AdvancedSearch.ToggleModal autocompleteParams.ModalId |> AdvancedSearchMsg |> dispatch)] [
-                    str "Use Advanced Search"
-                ] 
+                    str "Advanced Search"
+                ]
+                str "!"
             ]
         ]
 
@@ -203,11 +205,11 @@ let createAutocompleteSuggestions
             Class "suggestion"
         ][
             td [ColSpan 4] [
-                str ("You can also request a term by opening an ")
-                a [Href Shared.URLs.Nfdi4psoOntologyUrl; Target "_Blank"] [
-                    str "Issue"
+                str "Still can't find what you need? Get in "
+                a [Href Shared.URLs.Helpdesk.UrlOntologyTopic; Target "_Blank"] [
+                    str "contact"
                 ]
-                str "."
+                str " with us!"
             ]
         ]
 

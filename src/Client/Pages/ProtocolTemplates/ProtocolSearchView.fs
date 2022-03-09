@@ -406,9 +406,9 @@ let protocolElementContainer (model:Model) dispatch =
             Help.help [][
                 b [][str "Search for protocol templates."]
                 str " For more information you can look "
-                a [ Href @"https://github.com/nfdi4plants/SWATE_templates/wiki"; Target "_Blank" ][str "here"]
-                str ". If you find any problems with a protocol or have other suggestions you can contact us "
-                a [ Href @"https://github.com/nfdi4plants/SWATE_templates/issues/new/choose"; Target "_Blank" ] [str "here"]
+                a [ Href Shared.URLs.SwateWiki; Target "_Blank" ][str "here"]
+                str ". If you find any problems with a template or have other suggestions you can contact us "
+                a [ Href URLs.Helpdesk.UrlTemplateTopic; Target "_Blank" ] [str "here"]
                 str "."
             ]
         ]
