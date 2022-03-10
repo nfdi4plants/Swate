@@ -155,7 +155,6 @@ let getPrevTableOutput (context:RequestContext) =
     }
 
 /// This function is used to create a new annotation table.
-/// 'allTableNames' is a array of all currently existing annotationTables.
 /// 'isDark' refers to the current styling of excel (darkmode, or not).
 let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, range:Excel.Range, context: RequestContext) =
     
@@ -279,7 +278,6 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
     }
 
 /// This function is used to create a new annotation table.
-/// 'allTableNames' is a array of all currently existing annotationTables.
 /// 'isDark' refers to the current styling of excel (darkmode, or not).
 let createAnnotationTable (isDark:bool, tryUseLastOutput:bool) =
     Excel.run (fun context ->
@@ -897,15 +895,31 @@ let addAnnotationBlocks (buildingBlocks:InsertBuildingBlock []) =
     Excel.run(fun context ->
 
         promise {
-    
-            let! annotationTableName = getActiveAnnotationTableName context
-            
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
 
+            let! tryTable = tryFindActiveAnnotationTable()
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+
+            let! annotationTable, logging =
+                match tryTable with
+                | Success table ->
+                    (
+                        sheet.tables.getItem(table),
+                        InteropLogging.Msg.create InteropLogging.Info "Found annotation table for template insert!"
+                    )
+                    |> JS.Constructors.Promise.resolve
+                | Error e ->
+                    let range =
+                        /// not sure if this try...with is necessary as on creating a new worksheet it will autoselect the A1 cell.
+                        try
+                            context.workbook.getSelectedRange()
+                        with
+                            | e -> sheet.getUsedRange()
+                    createAnnotationTableAtRange(false,false,range,context)
+
+            
             let! addBlocksLogging = addAnnotationBlocksToTable(buildingBlocks,annotationTable,context)
 
-            return addBlocksLogging
+            return logging::addBlocksLogging
         } 
     )
 
