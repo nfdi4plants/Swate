@@ -1,6 +1,10 @@
-### 0.6.0+50646f8 (Released 2022-3-8)
+### 0.6.0+4dc45b7 (Released 2022-3-10)
 * Additions:
-    * latest commit #50646f8
+    * latest commit #4dc45b7
+    * [[#2b2413f](https://github.com/nfdi4plants/Swate/commit/2b2413f3f051b096dde8d8322bbafaed6d4ac616)] Implement and/or slider for template tag filter (Issue #195) :sparkles:.
+    * [[#bcf077c](https://github.com/nfdi4plants/Swate/commit/bcf077c6b910d9c8c2bdd8402e8953f2f34af657)] Update info page :lipstick: and contact links (Issue #196).
+    * [[#f776367](https://github.com/nfdi4plants/Swate/commit/f7763677a81e3913468d2a8c9304cc7da604d5d9)] Update project for docker build automation :whale:
+    * [[#4dc45b7](https://github.com/nfdi4plants/Swate/commit/4dc45b7c882b0fe1ccf6f5391bb3a7fcc6b5f0cc)] Auto insert table for database templates (Issue #146).
     * [[#822d375](https://github.com/nfdi4plants/Swate/commit/822d375be01fea946faf3601d8f90dfa9ead169e)] Switch to neo4j database :sparkles:.
     * [[#432c14b](https://github.com/nfdi4plants/Swate/commit/432c14b33dee96bfa1074d0078e5dda04b4b6b9b)] Improve parent-child search performance (Issue #117,#193) :racehorse:.
     * [[#7b360e8](https://github.com/nfdi4plants/Swate/commit/7b360e862b19e42eddca47f4ca8245577296c24d)] Update Advanced term search for cleaner input.
@@ -10,7 +14,8 @@
 * Deletions:
     * [[#ab1456e](https://github.com/nfdi4plants/Swate/commit/ab1456e3fc9ace365294987f7f1cb74279a6f7e0)] Remove mysql dependency :heavy_minus_sign:
 * Bugfixes:
-    * [[#d63e668](https://github.com/nfdi4plants/Swate/commit/d63e668056d3612c5e40f1c93ab9b65238aad342)] Fix bug in template.xlsx to template.json parsing
+    * [[#5e45ac8](https://github.com/nfdi4plants/Swate/commit/5e45ac8cbb8a6a031bafeaf49c407b7fd8ee3ba7)] Fix propagation of unit to new building blocks (Issue #183) :bug:.
+    * [[#d63e668](https://github.com/nfdi4plants/Swate/commit/d63e668056d3612c5e40f1c93ab9b65238aad342)] Fix bug in template.xlsx to template.json parsing :bug:
     * [[#de99630](https://github.com/nfdi4plants/Swate/commit/de99630332c1b12925fdc4c534a105652de27c4d)] Fix bug not incrementing timesUsed for templates :bug:
 
 ### 0.5.3+0eaa644 (Released 2021-12-16)
