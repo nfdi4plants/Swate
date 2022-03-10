@@ -16,7 +16,6 @@
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
-        <Compile Include="PageTemplate.md" />
         <Compile Include="Colors\NFDIColors.fs" />
         <Compile Include="Colors\ExcelColors.fs" />
         <Compile Include="JsBindings\HumanReadableIds.fs" />

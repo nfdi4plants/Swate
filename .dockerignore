@@ -1,5 +1,6 @@
 .fable/
 *.fs.js
+*.fs.js.map
 .fake/
 .farmer/
 .idea/
@@ -16,4 +17,7 @@ release.sh
 *.orig
 *.DotSettings.user
 .assets/swate.zip
+/.db/data
+/.db/plugins
+/.db/import
 .git

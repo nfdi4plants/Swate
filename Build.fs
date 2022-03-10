@@ -102,6 +102,60 @@ module ReleaseNoteTasks =
         )
     )
 
+module Docker =
+    
+    open Fake.Extensions.Release
+
+    let dockerImageName = "freymaurer/swate"
+    let dockerContainerName = "swate"
+
+    Target.create "docker-publish" (fun _ ->
+        let releaseNotesPath = "RELEASE_NOTES.md"
+        let port = "5000"
+
+        Release.exists()
+        let newRelease = ReleaseNotes.load releaseNotesPath
+        let check = Fake.Core.UserInput.getUserInput($"Is version {newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch} correct? (y/n/true/false)" )
+
+        let dockerCreateImage() = run docker $"build -t {dockerContainerName} ." ""
+        let dockerTestImage() = run docker $"run -it -p {port}:{port} {dockerContainerName}" ""
+        let dockerTagImage() =
+            run docker $"tag {dockerContainerName}:latest {dockerImageName}:{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}" ""
+            run docker $"tag {dockerContainerName}:latest {dockerImageName}:latest" ""
+        let dockerPushImage() =
+            run docker $"push {dockerImageName}:{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}" ""
+            run docker $"push {dockerImageName}:latest" ""
+        let dockerPublish() =
+            Trace.trace $"Tagging image with :latest and :{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}"
+            dockerTagImage()
+            Trace.trace $"Pushing image to dockerhub with :latest and :{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}"
+            dockerPushImage()
+        /// Check if next SemVer is correct
+        match check with
+        | "y"|"true"|"Y" ->
+            Trace.trace "Perfect! Starting with docker publish"
+            Trace.trace "Creating image"
+            dockerCreateImage()
+            /// Check if user wants to test image
+            let testImage = Fake.Core.UserInput.getUserInput($"Want to test the image? (y/n/true/false)" )
+            match testImage with
+            | "y"|"true"|"Y" ->
+                Trace.trace $"Your app on port {port} will open on localhost:{port}."
+                dockerTestImage()
+                /// Check if user wants the image published
+                let imageWorkingCorrectly = Fake.Core.UserInput.getUserInput($"Is the image working as intended? (y/n/true/false)" )
+                match imageWorkingCorrectly with
+                | "y"|"true"|"Y"    -> dockerPublish()
+                | "n"|"false"|"N"   -> Trace.traceErrorfn "Cancel docker-publish"
+                | anythingElse      -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
+            | "n"|"false"|"N"   -> dockerPublish()
+            | anythingElse      -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
+        | "n"|"false"|"N" ->
+            Trace.traceErrorfn "Please update your SemVer Version in %s" releaseNotesPath
+        | anythingElse -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
+
+    )
+
 Target.create "InstallOfficeAddinTooling" (fun _ ->
 
     printfn "Installing office addin tooling"
@@ -273,6 +327,8 @@ let dependencies = [
 
     "createvfs"
         ==> "release"
+
+    "docker-publish"
 
     "testfake"
     "Ignore"

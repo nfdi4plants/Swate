@@ -389,7 +389,7 @@ let createIServiceAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue serviceApi
-    |> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
+    //|> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
@@ -500,7 +500,7 @@ let topLevelRouter = router {
 }
 
 let app = application {
-    url "http://localhost:5000/"//"http://0.0.0.0:5000/"
+    url "http://0.0.0.0:5000" //"http://localhost:5000/"
     use_router topLevelRouter
     memory_cache
     //logging 

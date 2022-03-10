@@ -73,6 +73,9 @@ let createProcess exe arg dir =
     |> CreateProcess.ensureExitCode
 
 let dotnet = createProcess "dotnet"
+
+let docker = createProcess "docker"
+
 let npm =
     let npmPath =
         match ProcessUtils.tryFindFileOnPath "npm" with
