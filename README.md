@@ -10,43 +10,24 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
 
 
 <!-- TOC -->
+## Table of contents
 
-- [Swate](#swate)
-  - [Features](#features)
-    - [Swate Features sorted by Excel Versions](#swate-features-sorted-by-excel-versions)
-  - [Install/Use](#installuse)
-    - [Excel desktop](#excel-desktop)
-    - [Using a shared folder as system admin](#using-a-shared-folder-as-system-admin)
-    - [Excel online](#excel-online)
-  - [Discuss/Get help](#discussget-help)
-    - [Documentation](#documentation)
-      - [Feature documentation](#feature-documentation)
-      - [Guides](#guides)
-    - [Report problems and request features](#report-problems-and-request-features)
-    - [(Beta) Discuss in the GitHub Discussion forum](#beta-discuss-in-the-github-discussion-forum)
-  - [Develop](#develop)
-    - [Contribute](#contribute)
-    - [Prerequisites](#prerequisites)
-    - [Use install.cmd](#use-installcmd)
-    - [Set up Sql Dump](#set-up-sql-dump)
-    - [Project Decription](#project-decription)
+- [Features](#features)
+- [Install/Use](#installuse)
+- [Contact](#contact)
+- [Develop](#develop)
+  - [Contribute](#contribute)
+  - [Prerequisites](#prerequisites)
+  - [Use install.cmd](#use-installcmd)
+  - [Set up Sql Dump](#set-up-sql-dump)
+  - [Project Decription](#project-decription)
 
 <!-- /TOC -->
 
+
 ## Features
 
-The base features of Swate are:
-
-- **Gradual workflow annotation table building** via the [basic annotation building blocks](https://nfdi4plants.github.io/AnnotationPrinciples/)
-- No-fuss **ontology term search**:
-    - search for ontology terms quickly via autocomplete
-    - use is-a **relational term search** (e.g. search all terms that are also a 'plant organ') to constrain your annotation column to a subset of ontologies
-    - use **Advanced term search** with multiple query parameters if quick search does not do it for you
-
-There are many more small and incremental features. Check the [latest release notes](https://github.com/nfdi4plants/Swate/releases) for the newest additions.
-
-
-### Swate Features sorted by Excel Versions
+For a full in-depth view of all Swate features check the [documentation](https://github.com/nfdi4plants/Swate/wiki).
 
 Feature | Excel 365/ Office online  	| Excel 2019  	|
 |---            |:---:	        |:---:	        |
@@ -65,69 +46,15 @@ Feature | Excel 365/ Office online  	| Excel 2019  	|
 
 ## Install/Use
 
-You can test swate by following the steps below. If you decide to do so, please take the time to set up a Github account to report your issues and suggestions [here](https://github.com/nfdi4plants/Swate/issues).
-You can also search existing issues for solutions for your questions and/or discussions about your suggestions.
+[Swate installation](https://github.com/nfdi4plants/Swate/wiki/docs01-installing-Swate)
 
-### Excel desktop
 
-**If you have an older Swate version installed already, it <u>might</u> be necessary to [clear the cache](https://docs.microsoft.com/de-de/office/dev/add-ins/testing/clear-cache#manually-clear-the-cache-in-excel-word-and-powerpoint) to apply the changes to Swate.**
+## Contact
 
-- Download the [Windows Installer](https://github.com/nfdi4plants/Swate/blob/developer/.assets/swate-win.zip?raw=true).
-- Close all Office instances (Excel, Powerpoint, Word..)
-- Unzip (`Right click` ➞ `Extract All..`)
-- Double click the `install.cmd`. You will be asked to give administrative permissions and in the end to allow changes to the registry. Allow both and you are good to go!
-- Open Excel, go to `Insert` ➞ `My Add-ins` ➞ `Shared Folder`. There you should see both `Swate` and `Swate.Experts`.
+If you have any issues using Swate, missing features or found a nasty bug :bug: you can always contact us via:
 
-<details>
-    <summary>Alternative | Using the previous Swate installer</summary>
-    
-    [Swate installer](https://github.com/omaus/Swate_Install#swate-installer)
-  
-</details>
-
-<details>
-    <summary>Alternative | Using the release archive</summary>
-    
-    #### Using the release archive
-    
-    - Install [node.js LTS](https://nodejs.org/en/) (needed for office addin related tooling)
-    - Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
-    - Execute the test.cmd (windows, as administrator) or test.sh (macOS, you will need to make it executable via chmod 
-    a+x) script.
-  
-</details>
-
-### Using a shared folder as system admin
-
-If you have administrative access in your organization, you can create a network share folder and follow [this guide](https://github.com/OfficeDev/office-js-docs-pr/blob/master/docs/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins.md#:~:text=Sideload%20your%20add%2Din,-Put%20the%20manifest&text=Be%20sure%20to%20specify%20the,element%20of%20the%20manifest%20file.&text=In%20Excel%2C%20Word%2C%20or%20PowerPoint,Office%20Add%2Dins%20dialog%20box.) to make the addin available without any further downloads from your users
-
-### Excel online
-
-- Download the [latest test release archive](https://github.com/nfdi4plants/Swate/releases) and extract it
-- Launch [Excel Online](https://office.live.com/start/Excel.aspx) (this requires a Microsoft account), open a (blank) workbook 
-- Under the `Insert` tab, select `Add-Ins`
-- Go to `Manage my Add-Ins` and select `Upload my Add-In`
-- select and upload the `manifest.xml` file contained in the test release archive.
-
-## Discuss/Get help
-
-### Documentation
-
-#### Feature documentation
-
-Documentation of the features is now a top priority as we completed the POC stage :rocket:. You can discuss needed docs and the available ones [here](https://github.com/nfdi4plants/Swate/issues/47)
-
-#### Guides
-
-Guides will be coming in the near future.
-
-### Report problems and request features
-
-Please use [Github issues](https://github.com/nfdi4plants/Swate/issues/new/choose) to track problems, feature requests, questions, and discussions. Additionally, you can get in touch with us on [Twitter](https://twitter.com/nfdi4plants)
-
-### (Beta) Discuss in the GitHub Discussion forum
-
-GitHub recently added forum-like features to repositories, which makes it possible to discuss and share things you do with swate without creating issues. You are very welcome to post content [in the `Discussions` tab](), but please use issues for bug reports/feature requests (or, if some of those result from a discussion, create a new issue referencing the discussion)
+- [GitHub Issues](https://github.com/nfdi4plants/Swate/issues)
+- [DataPLANT Helpdesk](https://support.nfdi4plants.org/?topic=Tools_Swate)
 
 ## Develop
 
