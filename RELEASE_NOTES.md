@@ -1,6 +1,7 @@
-### 0.6.0+4dc45b7 (Released 2022-3-10)
+### 0.6.0+18641cd (Released 2022-3-11)
 * Additions:
-    * latest commit #4dc45b7
+    * latest commit #18641cd
+    * [[#18641cd](https://github.com/nfdi4plants/Swate/commit/18641cd50a5d7854aaf2a39976479d4cda2d12e7)] Update fill reference column logic, to provide consistent results.
     * [[#2b2413f](https://github.com/nfdi4plants/Swate/commit/2b2413f3f051b096dde8d8322bbafaed6d4ac616)] Implement and/or slider for template tag filter (Issue #195) :sparkles:.
     * [[#bcf077c](https://github.com/nfdi4plants/Swate/commit/bcf077c6b910d9c8c2bdd8402e8953f2f34af657)] Update info page :lipstick: and contact links (Issue #196).
     * [[#f776367](https://github.com/nfdi4plants/Swate/commit/f7763677a81e3913468d2a8c9304cc7da604d5d9)] Update project for docker build automation :whale:
