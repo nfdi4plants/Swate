@@ -177,30 +177,6 @@ Target.create "WebpackConfigSetup" (fun _ ->
         ]
 )
 
-// https://fake.build/core-targets.html#Targets-with-arguments
-Target.create "LocalConnectionStringSetup" (fun conf ->
-
-    let pwOpt =
-        conf.Context.Arguments
-        |> List.tryFind (fun x -> x.StartsWith "pw:")
-
-    let msg =
-        if pwOpt.IsNone then "Default MySql password set" else "Custom MySql password set."
-
-    let pw =
-        if pwOpt.IsNone then "example" else pwOpt.Value.Replace("pw:","").Trim()
-
-    Shell.replaceInFiles
-        [
-            "{PASSWORD}",pw
-        ]
-        [
-            (Path.combine __SOURCE_DIRECTORY__ ".db/docker-compose.yml")
-            (Path.combine __SOURCE_DIRECTORY__ "src/Server/dev.json")
-        ]
-    Trace.trace msg
-)
-
 Target.create "SetLoopbackExempt" (fun _ ->
     Command.RawCommand("CheckNetIsolation.exe",Arguments.ofList [
         "LoopbackExempt"
@@ -318,7 +294,6 @@ let dependencies = [
 
     "InstallOfficeAddinTooling"
         ==> "WebpackConfigSetup"
-        ==> "LocalConnectionStringSetup"
         ==> "CreateDevCerts"
         ==> "SetLoopbackExempt"
         ==> "Setup"
