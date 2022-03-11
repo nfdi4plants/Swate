@@ -1104,7 +1104,6 @@ let getAnnotationBlockDetails() =
 
 let getAllAnnotationBlockDetails() =
     Excel.run(fun context ->
-
         promise {
 
             let! annotationTableName = getActiveAnnotationTableName context

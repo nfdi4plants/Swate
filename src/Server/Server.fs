@@ -90,13 +90,6 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         let jsonStr =
             ISADotNet.XLSX.Investigation.fromStream ms
         jsonStr
-    //let customXmlFromByteArray (byteArray: byte []) =
-    //    let ms = new MemoryStream(byteArray)
-    //    let jsonStr =
-    //        ISADotNet.XLSX.AssayFile.SwateTable.SwateTable.readSwateTablesFromStream ms
-    //        |> Array.ofSeq
-    //        |> Array.map (fun x -> ISADotNet.JsonExtensions.toString x)
-    //    jsonStr
     {
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJson = fun byteArray -> async {
@@ -184,7 +177,7 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllOntologies = fun () ->
             async {
-                let results = OntologyDB.Queries.Ontology(credentials).getAll() |> Array.ofSeq
+                let results = OntologyDB.Ontology(credentials).getAll() |> Array.ofSeq
                 return results
             }
 
@@ -194,10 +187,10 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 let dbSearchRes =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                        OntologyDB.Queries.Term(credentials).getByAccession foundAccession
+                        OntologyDB.Term(credentials).getByAccession foundAccession
                     /// This suggests we search for a term name
                     | notAnAccession ->
-                        OntologyDB.Queries.Term(credentials).getByName notAnAccession
+                        OntologyDB.Term(credentials).getByName notAnAccession
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let arr = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -209,13 +202,13 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 let dbSearchRes =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                        OntologyDB.Queries.Term(credentials).getByAccession foundAccession
+                        OntologyDB.Term(credentials).getByAccession foundAccession
                     | _ ->
                         if parentTerm.TermAccession = ""
                         then
-                            OntologyDB.Queries.Term(credentials).getByNameAndParent_Name(typedSoFar,parentTerm.Name,OntologyDB.FullTextSearch.PerformanceComplete)
+                            OntologyDB.Term(credentials).getByNameAndParent_Name(typedSoFar,parentTerm.Name,OntologyDB.FullTextSearch.PerformanceComplete)
                         else
-                            OntologyDB.Queries.Term(credentials).getByNameAndParent(typedSoFar,parentTerm,OntologyDB.FullTextSearch.PerformanceComplete)
+                            OntologyDB.Term(credentials).getByNameAndParent(typedSoFar,parentTerm,OntologyDB.FullTextSearch.PerformanceComplete)
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -224,7 +217,7 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
             async {
-                let searchRes = OntologyDB.Queries.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
+                let searchRes = OntologyDB.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
                 return searchRes  
             }
 
@@ -234,13 +227,13 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 let dbSearchRes =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                        OntologyDB.Queries.Term(credentials).getByAccession foundAccession
+                        OntologyDB.Term(credentials).getByAccession foundAccession
                     | _ ->
                         if childTerm.TermAccession = ""
                         then
-                            OntologyDB.Queries.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name,OntologyDB.FullTextSearch.PerformanceComplete)
+                            OntologyDB.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name,OntologyDB.FullTextSearch.PerformanceComplete)
                         else
-                            OntologyDB.Queries.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession,OntologyDB.FullTextSearch.PerformanceComplete)
+                            OntologyDB.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession,OntologyDB.FullTextSearch.PerformanceComplete)
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -249,13 +242,13 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
             async {
-                let searchRes = OntologyDB.Queries.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
+                let searchRes = OntologyDB.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
                 return searchRes  
             }
 
         getTermsForAdvancedSearch = fun advancedSearchOption ->
             async {
-                let result = OntologyDB.Queries.Term(credentials).getByAdvancedTermSearch(advancedSearchOption) |> Array.ofSeq
+                let result = OntologyDB.Term(credentials).getByAdvancedTermSearch(advancedSearchOption) |> Array.ofSeq
                 let filteredResult =
                     if advancedSearchOption.KeepObsolete then
                         result
@@ -269,9 +262,9 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 let dbSearchRes =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                        OntologyDB.Queries.Term(credentials).getByAccession foundAccession
+                        OntologyDB.Term(credentials).getByAccession foundAccession
                     | notAnAccession ->
-                        OntologyDB.Queries.Term(credentials).getByName(notAnAccession,sourceOntologyName="uo")
+                        OntologyDB.Term(credentials).getByName(notAnAccession,sourceOntologyName="uo")
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -280,42 +273,43 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getTermsByNames = fun (queryArr) ->
             async {
-                let result =
-                    queryArr |> Array.map (fun searchTerm ->
-                        {searchTerm with
-                            SearchResultTerm =
-                                // check if search string is empty. This case should delete TAN- and TSR- values in table
-                                if searchTerm.Term.Name = "" then None
-                                // check if term accession was found. If so search also by this as it is unique
-                                elif searchTerm.Term.TermAccession <> "" then
-                                    let searchRes = OntologyDB.Queries.Term(credentials).getByAccession searchTerm.Term.TermAccession
-                                    if Seq.isEmpty searchRes then
-                                        None
-                                    else
-                                        searchRes |> Seq.head |> Some
-                                // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
-                                elif searchTerm.IsUnit then
-                                    let searchRes = OntologyDB.Queries.Term(credentials).getByName(searchTerm.Term.Name,sourceOntologyName="uo") |> Array.ofSeq |> sorensenDiceSortTerms searchTerm.Term.Name
-                                    if Seq.isEmpty searchRes then
-                                        None
-                                    else
-                                        searchRes |> Array.head |> Some
-                                // check if parent term was found and try find term via parent term
-                                elif searchTerm.ParentTerm.IsSome then
-                                    let searchRes = OntologyDB.Queries.Term(credentials).getByNameAndParent(searchTerm.Term.Name,searchTerm.ParentTerm.Value,OntologyDB.FullTextSearch.PerformanceComplete)
-                                    if Seq.isEmpty searchRes then
-                                        // if no term can be found by is_a directed search do standard search by name
-                                        // no need to search for name and accession, as accession clearly defines a term and is checked in the if branch above.
-                                        let searchRes' = OntologyDB.Queries.Term(credentials).getByName(searchTerm.Term.Name) |> Array.ofSeq |> sorensenDiceSortTerms searchTerm.Term.Name
-                                        if Array.isEmpty searchRes' then None else searchRes' |> Array.head |> Some
-                                    else
-                                        searchRes |> Seq.head |> Some
-                                // if none of the above apply we do a standard term search
-                                else
-                                    let searchRes = OntologyDB.Queries.Term(credentials).getByName(searchTerm.Term.Name) |> Array.ofSeq |> sorensenDiceSortTerms searchTerm.Term.Name
-                                    if Array.isEmpty searchRes then None else searchRes |> Array.head |> Some
-                        }
+                // check if search string is empty. This case should delete TAN- and TSR- values in table
+                let filteredQueries = queryArr |> Array.filter (fun x -> x.Term.Name <> "" || x.Term.TermAccession <> "")
+                let queries =
+                    filteredQueries |> Array.map (fun searchTerm ->
+                        // check if term accession was found. If so search also by this as it is unique
+                        if searchTerm.Term.TermAccession <> "" then
+                            OntologyDB.TermQuery.getByAccession searchTerm.Term.TermAccession
+                        // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
+                        elif searchTerm.IsUnit then
+                            OntologyDB.TermQuery.getByName(searchTerm.Term.Name, searchType=OntologyDB.FullTextSearch.Exact, sourceOntologyName="uo")
+                        // if none of the above apply we do a standard term search
+                        else
+                            OntologyDB.TermQuery.getByName(searchTerm.Term.Name, searchType=OntologyDB.FullTextSearch.Exact)
                     )
+                let result =
+                    OntologyDB.Neo4j.runQueries(queries,credentials)
+                    |> Array.map2 (fun termSearchable dbResults ->
+                        // replicate if..elif..else conditions from 'queries'
+                        if termSearchable.Term.TermAccession <> "" then
+                            let result =
+                                if Array.isEmpty dbResults then
+                                    None
+                                else
+                                    // search by accession must be unique, and has unique restriction in database, so there can only be 0 or 1 result
+                                    let r = dbResults |> Array.exactlyOne
+                                    if r.Name <> termSearchable.Term.Name then
+                                        failwith $"Found mismatch between Term Accession and Term Name. Table name ({termSearchable.Term.Name}) and table accession ({termSearchable.Term.TermAccession}),
+                                        but accession belongs to name {r.Name} (ontology: {r.FK_Ontology})"
+                                    Some r
+                            { termSearchable with SearchResultTerm = result }
+                        // search is done by name and only in the unit ontology. Therefore unit term must be unique.
+                        // This might need future work, as we might want to support types of unit outside of the unit ontology
+                        elif termSearchable.IsUnit then
+                            { termSearchable with SearchResultTerm = if dbResults |> Array.isEmpty then None else Some dbResults.[0] }
+                        else
+                            { termSearchable with SearchResultTerm = if dbResults |> Array.isEmpty then None else Some dbResults.[0] }
+                    ) filteredQueries
                 return result
             }
     }
@@ -358,7 +352,7 @@ let testApi (ctx: HttpContext): ITestAPI = {
                 DatabaseName= settings.["neo4j-db"]
             }
             credentials
-        let exmp = OntologyDB.Queries.Term(c).getByName(termName,sourceOntologyName="ms")
+        let exmp = OntologyDB.Term(c).getByName(termName,sourceOntologyName="ms")
         return "Info", sprintf "%A" (exmp |> Seq.length)
     }
 }

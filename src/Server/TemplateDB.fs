@@ -53,11 +53,12 @@ module Queries =
             let query =
                 """MATCH (t:Template)
                 RETURN t.id, t.name, t.description, t.organisation, t.version, t.authors, t.erTags, t.tags, t.lastUpdated, t.timesUsed"""
-            OntologyDB.runNeo4JQuery
-                query
-                None
-                Template.asTemplateMinimal
+            OntologyDB.Neo4j.runQuery(
+                query,
+                None,
+                Template.asTemplateMinimal,
                 credentials
+            )
 
         member this.getById(id:string) =
             let query =
@@ -65,11 +66,12 @@ module Queries =
                 RETURN t.id, t.name, t.description, t.organisation, t.version, t.authors, t.erTags, t.tags, t.lastUpdated, t.timesUsed, t.templateJson"""
             let param = Map [ "Id", id ] |> Some
             let dbResults =
-                OntologyDB.runNeo4JQuery
-                    query
-                    param
-                    Template.asTemplate
+                OntologyDB.Neo4j.runQuery(
+                    query,
+                    param,
+                    Template.asTemplate,
                     credentials
+                )
             if Seq.length dbResults = 0 then failwith "Error. Could not find requested template in database, please try again or open a bug report."
             /// Id is unique and should always only result in one found template
             Seq.head dbResults
@@ -80,8 +82,9 @@ module Queries =
                 SET t.timesUsed = COALESCE(t.timesUsed,0) + 1
                 RETURN t.id, t.name, t.description, t.organisation, t.version, t.authors, t.erTags, t.tags, t.lastUpdated, t.timesUsed"""
             let param = Map [ "Id", id ] |> Some
-            OntologyDB.runNeo4JQuery
-                query
-                param
-                Template.asTemplate
+            OntologyDB.Neo4j.runQuery(
+                query,
+                param,
+                Template.asTemplate,
                 credentials
+            )

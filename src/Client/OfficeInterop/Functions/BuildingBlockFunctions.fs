@@ -302,15 +302,31 @@ let toTermSearchable (buildingBlock:BuildingBlock) =
     let allTermValues =
         if buildingBlock.hasCompleteTSRTAN && not buildingBlock.hasUnit then
             buildingBlock.MainColumn.Cells
-            // get all units from cells
+            // get all terms from cells
             |> Array.map (fun cell -> cell.Value, cell.Index)
-            // filter units to unique
+            // get only values where value.isSome
             |> Array.choose (fun (valueName,rowInd) -> if valueName.IsSome then Some (valueName.Value,rowInd) else None)
             |> Array.groupBy fst
-            // get only values where value.isSome
+            // filter terms to unique
             |> Array.map (fun (valueName,cellInfoArr) ->
                 let cellRowIndices = cellInfoArr |> Array.map snd |> Array.distinct
-                let term = TermMinimal.create valueName ""
+                let tryFindAccession =
+                    buildingBlock.TAN.Value.Cells
+                    // filter for only row indices related to main column term name
+                    |> Array.filter (fun x -> Array.contains x.Index cellRowIndices)
+                    |> Array.sortBy (fun x -> x.Index)
+                    |> Array.distinctBy (fun x -> x.Value)
+                /// Return error if one term name in row relates to different accessions
+                if tryFindAccession.Length > 1 then
+                    let rowIndices = tryFindAccession|> Array.map (fun x -> string x.Index) |> String.concat ", "
+                    failwith $"Swate found different accessions for the same Term! Please check column '{buildingBlock.MainColumn.Header.SwateColumnHeader}', different accession for rows: {rowIndices}."
+                let accession =
+                    tryFindAccession
+                    |> Array.tryExactlyOne
+                    |> Option.bind (fun x -> x.Value)
+                    |> Option.bind (fun x -> Shared.Regex.parseTermAccessionSimplified x)
+                    |> Option.defaultWith (fun _ -> "")
+                let term = TermMinimal.create valueName accession
                 TermSearchable.create term parentTerm false colIndex cellRowIndices
             )
         else
