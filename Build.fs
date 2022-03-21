@@ -70,6 +70,16 @@ module ReleaseNoteTasks =
 
     let githubDraft = Target.create "GithubDraft" (fun config ->
 
+        let zipFolderPath = @".assets"
+
+        let cleanFolder =
+            Trace.trace $"Clean existing .zip files from '{Path.getFullName(zipFolderPath)}'!"
+            Fake.IO.DirectoryInfo.ofPath zipFolderPath
+            |> Fake.IO.DirectoryInfo.getFiles
+            |> Array.filter (fun x -> x.Name.EndsWith ".zip")
+            |> Array.map (fun x -> x.FullName)
+            |> File.deleteAll
+
         let assetPath = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets\assets")
         let assetDir = Fake.IO.DirectoryInfo.ofPath assetPath
 
@@ -100,7 +110,7 @@ module ReleaseNoteTasks =
             ProjectInfo.gitOwner,
             ProjectInfo.gitName,
             (Some bodyText),
-            (Some <| @".assets"),
+            (Some <| zipFolderPath),
             config
         )
     )
