@@ -73,11 +73,14 @@ module ReleaseNoteTasks =
         let assetPath = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets\assets")
         let assetDir = Fake.IO.DirectoryInfo.ofPath assetPath
 
-        let files =
+        let allFiles, quickstartFiles =
             let assetsPaths = Fake.IO.DirectoryInfo.getFiles assetDir
-            assetsPaths |> Array.map (fun x -> x.FullName)
+            assetsPaths |> Array.map (fun x -> x.FullName),
+            assetsPaths |> Array.filter (fun x -> x.Name = "core_manifest.xml") |> Array.map (fun x -> x.FullName)
 
-        Zip.zip assetDir.FullName ".assets\swate-win.zip" files
+        Zip.zip assetDir.FullName ".assets\swate-win.zip" allFiles
+
+        Zip.zip assetDir.FullName ".assets\swate-b-quickstart.zip" (quickstartFiles)
 
         Trace.trace "Assets zipped!"
 
@@ -97,7 +100,7 @@ module ReleaseNoteTasks =
             ProjectInfo.gitOwner,
             ProjectInfo.gitName,
             (Some bodyText),
-            None, //(Some <| @".assets\swate-win.zip"),
+            (Some <| @".assets"),
             config
         )
     )

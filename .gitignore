@@ -20,3 +20,5 @@ release.sh
 /.db/data
 /.db/plugins
 /.db/import
+/.assets/swate-b-quickstart.zip
+/.assets/swate-win.zip
