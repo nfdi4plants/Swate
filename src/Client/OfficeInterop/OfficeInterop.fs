@@ -95,7 +95,7 @@ let exampleExcelFunction2 () =
     )
 
 let swateSync (context:RequestContext) =
-    context.sync().``then``(fun _ -> ()) |> Promise.start
+    context.sync().``then``(fun _ -> ())
 
 /// Will return Some tableName if any annotationTable exists in a worksheet before the active one.
 let getPrevAnnotationTable (context:RequestContext) =
@@ -1203,10 +1203,9 @@ let getParentTerm () =
 /// Should the user write a real term with this function 'termBackground'.isSome and can be used to fill TSR and TAN.
 let insertOntologyTerm (term:TermMinimal) =
     Excel.run(fun context ->
-
         // Ref. 2
         let range = context.workbook.getSelectedRange()
-        let _ = range.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+        let _ = range.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "rowIndex"; "columnCount"; "rowCount"])))
         /// This is for TSR and TAN
         let nextColsRange = range.getColumnsAfter 2.
         let _ = nextColsRange.load(U2.Case2 (ResizeArray(["values";"columnIndex";"columnCount"])))
@@ -1215,6 +1214,59 @@ let insertOntologyTerm (term:TermMinimal) =
         let r = context.runtime.load(U2.Case1 "enableEvents")
 
         promise {
+
+            let! tryTable = tryFindActiveAnnotationTable()
+
+            /// This function checks multiple scenarios destroying Swate table formatting through the insert ontology term function
+            let! checkCorrectInsertInSwateTable =
+                match tryTable with
+                | Success table ->
+                    promise {
+                        ///Input column also affects the next 2 columns so [range.columnIndex; range.columnIndex+1.; range.columnIndex+2.]
+                        let sheet = context.workbook.worksheets.getActiveWorksheet()
+                        let table = sheet.tables.getItem(table)
+                        let tableRange = table.getRange()
+                        let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "rowCount"; "columnIndex"; "columnCount"])))
+                        /// sync load to receive values
+                        let! inputRow, lastInputRow, inputColumn, lastInputColumn = context.sync().``then``(fun _ -> range.rowIndex, range.rowIndex+range.rowCount, range.columnIndex, range.columnIndex + 2.)
+                        //printfn $"inputRow: {inputRow}, lastInputRow: {lastInputRow}"
+                        //printfn $"inputColumn: {inputColumn}, lastInputColumn: {lastInputColumn}"
+                        let lastColumnIndex = tableRange.columnIndex + tableRange.columnCount
+                        let lastRowIndex = tableRange.rowIndex + tableRange.rowCount
+                        //printfn "rowIndex: %A, lastRowIndex: %A" tableRange.rowIndex lastRowIndex
+                        //printfn "columnIndex: %A, lastColumnIndex: %A" tableRange.columnIndex lastColumnIndex
+                        let isInBodyRows = (inputRow >= tableRange.rowIndex || lastInputRow >= tableRange.rowIndex) && (inputRow <= lastRowIndex || lastInputRow <= lastRowIndex)
+                        let isInBodyColumns = (inputColumn >= tableRange.columnIndex || lastInputColumn >= tableRange.columnIndex) && (inputColumn <= lastColumnIndex || lastInputColumn <= lastColumnIndex)
+                        //printfn "isInBodyRows: %A; isInBodyColumns: %A" isInBodyRows isInBodyColumns
+                        /// Never add ontology terms inside annotation table header (this will also prevent adding terms right next to the table,
+                        /// which is good, as excel would extend the table around the inserted term, destroying the annotation table format
+                        if [inputRow .. lastInputRow] |> List.contains tableRange.rowIndex then
+                            if isInBodyColumns then
+                                failwith "Cannot insert ontology term into annotation table header row. If you want to create new building blocks, please use the Add Building Block function."
+                        /// Never add ontology terms right next to the table as excel would extend the table around the inserted term, destroying the annotation table format.
+                        /// Check row below table
+                        if inputRow = lastRowIndex then
+                            if isInBodyColumns then failwith "Cannot insert ontology term directly underneath an annotation table!"
+                        /// Check column to the right side of the table AND check the two columns left of the table (function fills 3 columns)
+                        if inputColumn = lastColumnIndex || inputColumn = tableRange.columnIndex - 2. || inputColumn = tableRange.columnIndex - 1. then
+                            if isInBodyRows then failwith "Cannot insert ontology term directly next to an annotation table!"
+                        let! buildingblocks = BuildingBlock.getFromContext(context,table)
+                        /// Never add ontology terms to input/output columns and Only to main columns
+                        let mainColumnIndices =
+                            buildingblocks
+                            // cannot be added to input/output columns
+                            |> Array.filter(fun x -> not x.MainColumn.Header.isOutputCol && not x.MainColumn.Header.isInputCol )
+                            |> Array.map(fun x -> x.MainColumn.Index)
+                        // check if 'inputColumn' = any of the maincolumn indices
+                        let isInsideTable = isInBodyRows && isInBodyColumns
+                        if isInsideTable then
+                            printfn "mainColumnIndices: %A" mainColumnIndices
+                            /// indices start at table begin, so we need to rebase our inputcolumn index to table start
+                            let rebasedIndex = inputColumn - tableRange.columnIndex |> int
+                            if mainColumnIndices |> Array.contains rebasedIndex = false then failwith "Cannot insert ontology term to input/output/reference columns of an annotation table!"
+                        return ()
+                    }
+                | Error e       -> JS.Constructors.Promise.resolve(())
 
             //sync with proxy objects after loading values from excel
             let! res = context.sync().``then``( fun _ ->
@@ -1265,8 +1317,6 @@ let insertOntologyTerm (term:TermMinimal) =
                 // return print msg
                 "Info",sprintf "Insert %A %Ax" term nextColsRange.values.Count
             )
-
-            let! tryTable = tryFindActiveAnnotationTable()
 
             let! fit =
                 match tryTable with
