@@ -1,6 +1,7 @@
-### 0.6.0+82b896c (Released 2022-3-11)
+### 0.6.0+8dfa9e2 (Released 2022-3-22)
 * Additions:
-    * latest commit #82b896c
+    * latest commit #8dfa9e2
+    * [[#8dfa9e2](https://github.com/nfdi4plants/Swate/commit/8dfa9e2f0dfa9e5a42e8030adac041581d549913)] Heavily improve term insert feedback in annotation table (Issue #149, #161)
     * [[#82b896c](https://github.com/nfdi4plants/Swate/commit/82b896c152eee2b411ef8ab506b7932694144f92)] Clean up readme :shower:
     * [[#18641cd](https://github.com/nfdi4plants/Swate/commit/18641cd50a5d7854aaf2a39976479d4cda2d12e7)] Update fill reference column logic, to provide consistent results.
     * [[#2b2413f](https://github.com/nfdi4plants/Swate/commit/2b2413f3f051b096dde8d8322bbafaed6d4ac616)] Implement and/or slider for template tag filter (Issue #195) :sparkles:.
@@ -13,8 +14,6 @@
     * [[#bfec630](https://github.com/nfdi4plants/Swate/commit/bfec63094cbc78cb28644d53df8d654cde087eb4)] Persist active tabs over subpages (Issue #191) :lipstick:.
     * [[#92d973c](https://github.com/nfdi4plants/Swate/commit/92d973cd6a33144c2eafe52eb84b7b52c1fbea15)] Update navbar burger menu to always be visible (Issue #194).
     * [[#bd8e3fb](https://github.com/nfdi4plants/Swate/commit/bd8e3fb946cbe956a730de58508b3a94ae2c27d4)] Separate ER tags from other tags and add curated vs community templates badge (#187, #186).
-* Deletions:
-    * [[#ab1456e](https://github.com/nfdi4plants/Swate/commit/ab1456e3fc9ace365294987f7f1cb74279a6f7e0)] Remove mysql dependency :heavy_minus_sign:
 * Bugfixes:
     * [[#5e45ac8](https://github.com/nfdi4plants/Swate/commit/5e45ac8cbb8a6a031bafeaf49c407b7fd8ee3ba7)] Fix propagation of unit to new building blocks (Issue #183) :bug:.
     * [[#d63e668](https://github.com/nfdi4plants/Swate/commit/d63e668056d3612c5e40f1c93ab9b65238aad342)] Fix bug in template.xlsx to template.json parsing :bug:
