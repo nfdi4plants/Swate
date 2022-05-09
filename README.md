@@ -79,13 +79,6 @@ You can also search existing issues for solutions for your questions and/or disc
 - Open Excel, go to `Insert` ➞ `My Add-ins` ➞ `Shared Folder`. There you should see both `Swate` and `Swate.Experts`.
 
 <details>
-    <summary>Alternative | Using the previous Swate installer</summary>
-    
-    [Swate installer](https://github.com/omaus/Swate_Install#swate-installer)
-  
-</details>
-
-<details>
     <summary>Alternative | Using the release archive</summary>
     
     #### Using the release archive
