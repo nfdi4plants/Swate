@@ -36,6 +36,7 @@
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="CustomComponents\InteropLoggingModal.fs" />
         <Compile Include="CustomComponents\ActionButton.fs" />
         <Compile Include="CustomComponents\FunctionContainer.fs" />
         <Compile Include="CustomComponents\ResponsiveFA.fs" />

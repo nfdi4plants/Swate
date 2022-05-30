@@ -25,30 +25,38 @@ type LogItem =
     | Debug of (System.DateTime*string)
     | Info  of (System.DateTime*string)
     | Error of (System.DateTime*string)
+    | Warning of (System.DateTime*string)
 
     static member ofInteropLogginMsg (msg:InteropLogging.Msg) =
         match msg.LogIdentifier with
         | InteropLogging.Info   -> Info (System.DateTime.UtcNow,msg.MessageTxt)
         | InteropLogging.Debug  -> Debug(System.DateTime.UtcNow,msg.MessageTxt)
         | InteropLogging.Error  -> Error(System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Warning -> Warning(System.DateTime.UtcNow,msg.MessageTxt)
 
     static member toTableRow = function
         | Debug (t,m) ->
             tr [] [
                 td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "lightblue"; FontWeight "bold"]] [str "Debug"]
+                td [Style [Color NFDIColors.LightBlue.Base; FontWeight "bold"]] [str "Debug"]
                 td [] [str m]
             ]
         | Info  (t,m) ->
             tr [] [
                 td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "green"; FontWeight "bold"]] [str "Info"]
+                td [Style [Color NFDIColors.Mint.Base; FontWeight "bold"]] [str "Info"]
                 td [] [str m]
             ]
         | Error (t,m) ->
             tr [] [
                 td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "red"; FontWeight "bold"]] [str "ERROR"]
+                td [Style [Color NFDIColors.Red.Base; FontWeight "bold"]] [str "ERROR"]
+                td [] [str m]
+            ]
+        | Warning (t,m) ->
+            tr [] [
+                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
+                td [Style [Color NFDIColors.Yellow.Base; FontWeight "bold"]] [str "Warning"]
                 td [] [str m]
             ]
 
@@ -57,6 +65,7 @@ type LogItem =
         | "Debug"| "debug"  -> Debug(System.DateTime.UtcNow,message)
         | "Info" | "info"   -> Info (System.DateTime.UtcNow,message)
         | "Error" | "error" -> Error(System.DateTime.UtcNow,message)
+        | "Warning" | "warning" -> Warning(System.DateTime.UtcNow,message)
         | others -> Error(System.DateTime.UtcNow,sprintf "Swate found an unexpected log identifier: %s" others)
 
 type TermSearchMode =
@@ -134,9 +143,11 @@ type SiteStyleState = {
 type DevState = {
     LastFullError                       : System.Exception option
     Log                                 : LogItem list
+    DisplayLogList                      : LogItem list
 } with
     static member init () = {
         LastFullError   = None
+        DisplayLogList  = []
         Log             = []
     }
 

@@ -63,6 +63,7 @@ type DevMsg =
     | GenericLog            of Cmd<Messages.Msg> * (string*string)
     | GenericInteropLogs    of Cmd<Messages.Msg> * InteropLogging.Msg list
     | GenericError          of Cmd<Messages.Msg> * exn
+    | UpdateDisplayLogList of LogItem list
     | UpdateLastFullError   of exn option
     
 type ApiRequestMsg =

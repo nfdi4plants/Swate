@@ -555,12 +555,6 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             let! annotationTableName = getActiveAnnotationTableName context
             let sheet = context.workbook.worksheets.getActiveWorksheet()
             let annotationTable = sheet.tables.getItem(annotationTableName)
-            let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
-
-            checkIfBuildingBlockExisting newBB existingBuildingBlocks
-
-            // if newBB is output column and output column already exists in table this returns (Some outputcolumn-building-block), else None.
-            let outputColOpt = checkHasExistingOutput newBB existingBuildingBlocks
 
             // Ref. 2
             // This is necessary to place new columns next to selected col
@@ -570,7 +564,6 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
             let selectedRange = context.workbook.getSelectedRange()
             let _ = selectedRange.load(U2.Case1 "columnIndex")
-
 
             let! nextIndex, headerVals = context.sync().``then``(fun e ->
                 // Ref. 3
@@ -659,12 +652,68 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
             let createColsMsg = InteropLogging.Msg.create InteropLogging.Info $"{mainColName} was added." 
 
-            let logging = [
+            let loggingList = [
                 if not formatChangedMsg.IsEmpty then yield! formatChangedMsg
                 createColsMsg
             ]
 
-            return logging
+            return loggingList
+        } 
+    )
+
+let replaceOutputColumn (annotationTableName:string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
+    Excel.run(fun context ->
+        promise {
+            // Ref. 2
+            // This is necessary to place new columns next to selected col
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let annotationTable = sheet.tables.getItem(annotationTableName)
+            let annoHeaderRange = annotationTable.getHeaderRowRange()
+            let existingOutputColCell = annoHeaderRange.getCell(0., float existingOutputColumn.MainColumn.Index)
+            let _ = existingOutputColCell.load(U2.Case2 (ResizeArray[|"values"|]))
+
+            printfn "%A" existingOutputColumn.MainColumn.Index
+
+            let newHeaderValues = ResizeArray[|ResizeArray [|newOutputcolumn.ColumnHeader.toAnnotationTableHeader() |> box |> Some|]|]
+            let! change = context.sync().``then``(fun e ->
+                existingOutputColCell.values <- newHeaderValues
+                ()
+            )
+
+            let! fit = autoFitTableByTable annotationTable context
+            let warningMsg = $"Found existing output column \"{existingOutputColumn.MainColumn.Header.SwateColumnHeader}\". Changed output column to \"{newOutputcolumn.ColumnHeader.toAnnotationTableHeader()}\"."
+
+            let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+
+            let loggingList = [
+                msg
+            ]
+
+            return loggingList
+        }
+    )
+
+/// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
+let addAnnotationBlockHandler (newBB:InsertBuildingBlock) =
+    Excel.run(fun context ->
+        promise {
+
+            let! annotationTableName = getActiveAnnotationTableName context
+            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            let annotationTable = sheet.tables.getItem(annotationTableName)
+            let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
+
+            checkIfBuildingBlockExisting newBB existingBuildingBlocks
+
+            // if newBB is output column and output column already exists in table this returns (Some outputcolumn-building-block), else None.
+            let outputColOpt = checkHasExistingOutput newBB existingBuildingBlocks
+
+            let! res = 
+                match outputColOpt with
+                | Some existingOutputColumn -> replaceOutputColumn annotationTableName existingOutputColumn newBB 
+                | None -> addAnnotationBlock newBB
+
+            return res
         } 
     )
 

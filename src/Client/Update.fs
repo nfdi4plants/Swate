@@ -50,9 +50,11 @@ module Dev =
 
         | GenericInteropLogs (nextCmd,logs) ->
             let parsedLogs = logs |> List.map LogItem.ofInteropLogginMsg
+            let parsedDisplayLogs = parsedLogs |> List.filter (fun x -> match x with | Error _ | Warning _ -> true; | _ -> false)
             let nextState = {
                 currentState with
                     Log = parsedLogs@currentState.Log
+                    DisplayLogList = parsedDisplayLogs@currentState.DisplayLogList
             }
             nextState, nextCmd
 
@@ -63,6 +65,13 @@ module Dev =
                     LastFullError = Some (e)
                 }
             nextState, nextCmd
+
+        | UpdateDisplayLogList newList ->
+            let nextState = {
+                currentState with
+                    DisplayLogList = newList
+            }
+            nextState, Cmd.none
 
         | UpdateLastFullError (eOpt) ->
             let nextState = {

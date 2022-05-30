@@ -6,6 +6,7 @@ open System
 type LogIdentifier =
     | Debug
     | Info 
+    | Warning
     | Error
 
     static member ofString str =
@@ -13,6 +14,7 @@ type LogIdentifier =
         | "Debug"       -> Debug
         | "Info"        -> Info 
         | "Error"       -> Error
+        | "Warning"     -> Warning
         | anythingElse  -> failwith $"Unable to parse {anythingElse} to LogIdentifier."
 
 [<RequireQualifiedAccess>]

@@ -120,6 +120,9 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
             if model.BuildingBlockDetailsState.ShowDetails then
                 CustomComponents.BuildingBlockDetailsModal.buildingBlockDetailModal model dispatch
 
+            if not model.DevState.DisplayLogList.IsEmpty then
+                CustomComponents.InteropLoggingModal.interopLoggingModal model dispatch
+
             yield! bodyChildren
 
             if footerChildren.IsEmpty |> not then

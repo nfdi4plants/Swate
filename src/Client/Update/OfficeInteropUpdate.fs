@@ -71,7 +71,7 @@ module OfficeInterop =
         | AddAnnotationBlock (minBuildingBlockInfo) ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.addAnnotationBlock  
+                    OfficeInterop.addAnnotationBlockHandler  
                     (minBuildingBlockInfo)
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
