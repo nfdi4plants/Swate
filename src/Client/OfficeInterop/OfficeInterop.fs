@@ -19,8 +19,7 @@ open BuildingBlockFunctions
 /// 'annotationTables'      -> For a workbook (NOT! worksheet) all tables must have unique names. Therefore not all our tables can be called 'annotationTable'.
 ///                             Instead we add human readable ids to keep them unique. 'annotationTables' references all of those tables.
 
-/// 'active annotationTable' -> The annotationTable present on the active worksheet. This is not trivial to access an is most of the time passed to a function by
-///                             running 'tryFindActiveAnnotationTable()' in another message before.
+/// 'active annotationTable' -> The annotationTable present on the active worksheet. 
 
 /// 'TSR'/'TAN'             -> Term Source Ref - column / Term Accession Number - column
 
@@ -495,7 +494,7 @@ let getBuildingBlocksAndSheets() =
                 |> Array.map (fun (worksheetName,tableName) ->
                     // This function will not work without explicit calling Excel.run.
                     // My guess is, loading multiple values parallel on the same context will overwrite or cancel each other.
-                    // By creating multiplete instances of context this problem is circumvented.
+                    // By creating multiple instances of context this problem is circumvented.
                     // ONLY use multiple context instances when reading
                     Excel.run (fun context ->
                         let buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context tableName
@@ -536,12 +535,16 @@ let private checkIfBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBu
 
 
 /// Check column type and term if combination already exists
+/// Issue #203: Don't Error, instead change output column
 let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
     if newBB.ColumnHeader.isOutputColumn then
         let existingOutputOpt =
             existingBuildingBlocks
             |> Array.tryFind (fun x -> x.MainColumn.Header.isMainColumn && x.MainColumn.Header.isOutputCol)
-        if existingOutputOpt.IsSome then failwith $"Swate table contains already one output column \"{existingOutputOpt.Value.MainColumn.Header.SwateColumnHeader}\". Each Swate table can only contain exactly one output column type."
+        existingOutputOpt
+    else
+        None
+        //if existingOutputOpt.IsSome then failwith $"Swate table contains already one output column \"{existingOutputOpt.Value.MainColumn.Header.SwateColumnHeader}\". Each Swate table can only contain exactly one output column type."
 
 /// ExcelApi 1.4
 /// This function is used to add a new building block to the active annotationTable.
@@ -555,8 +558,9 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
 
             checkIfBuildingBlockExisting newBB existingBuildingBlocks
-            checkHasExistingOutput newBB existingBuildingBlocks
 
+            // if newBB is output column and output column already exists in table this returns (Some outputcolumn-building-block), else None.
+            let outputColOpt = checkHasExistingOutput newBB existingBuildingBlocks
 
             // Ref. 2
             // This is necessary to place new columns next to selected col
@@ -596,17 +600,14 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
                 /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
                 /// This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
-                let checkIdForMainCol() = OfficeInterop.Indexing.Column.findNewIdForColumn allColHeaders newBB
-
+                let checkIdForMainCol() = OfficeInterop.Indexing.MainColumn.findNewIdForColumn allColHeaders newBB
+                let checkIdForRefCols() = OfficeInterop.Indexing.RefColumns.findNewIdForReferenceColumns allColHeaders newBB
                 let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit allColHeaders
 
-                let mainColId = checkIdForMainCol()
-                let unitColId = checkIdForUnitCol()
-
-                let mainColName = OfficeInterop.Indexing.Column.createMainColName newBB mainColId
-                let tsrColName() = OfficeInterop.Indexing.Column.createTSRColName newBB mainColId
-                let tanColName() = OfficeInterop.Indexing.Column.createTANColName newBB mainColId
-                let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+                let mainColName = OfficeInterop.Indexing.MainColumn.createMainColName newBB (checkIdForMainCol())
+                let tsrColName() = OfficeInterop.Indexing.RefColumns.createTSRColName newBB (checkIdForRefCols())
+                let tanColName() = OfficeInterop.Indexing.RefColumns.createTANColName newBB (checkIdForRefCols())
+                let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader (checkIdForUnitCol())
 
                 let colNames = [|
                     mainColName
@@ -797,21 +798,19 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
         let addBuildingBlock (buildingBlock:InsertBuildingBlock) (currentNextIndex:float) (columnHeaders:string []) =
             /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
             /// This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
-            let checkIdForMainCol() = OfficeInterop.Indexing.Column.findNewIdForColumn columnHeaders buildingBlock
-                
+            let checkIdForMainCol() = OfficeInterop.Indexing.MainColumn.findNewIdForColumn columnHeaders buildingBlock
+            let checkIdForRefCols() = OfficeInterop.Indexing.RefColumns.findNewIdForReferenceColumns columnHeaders buildingBlock
             let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit columnHeaders
                 
-            let mainColId = checkIdForMainCol()
-            let unitColId = checkIdForUnitCol()
-                
-            let mainColName = OfficeInterop.Indexing.Column.createMainColName buildingBlock mainColId
-            let tsrColName() = OfficeInterop.Indexing.Column.createTSRColName buildingBlock mainColId
-            let tanColName() = OfficeInterop.Indexing.Column.createTANColName buildingBlock mainColId
-            let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+            let mainColName = OfficeInterop.Indexing.MainColumn.createMainColName buildingBlock (checkIdForMainCol())
+            let tsrColName() = OfficeInterop.Indexing.RefColumns.createTSRColName buildingBlock (checkIdForRefCols())
+            let tanColName() = OfficeInterop.Indexing.RefColumns.createTANColName buildingBlock (checkIdForRefCols())
+            let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader (checkIdForUnitCol())
     
             let colNames = [|
                 mainColName
-                if buildingBlock.UnitTerm.IsSome then OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+                if buildingBlock.UnitTerm.IsSome then
+                    unitColName()
                 if not buildingBlock.ColumnHeader.Type.isSingleColumn then
                     tsrColName()
                     tanColName()
