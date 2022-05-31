@@ -255,7 +255,7 @@ Target.create "officedebug" (fun config ->
       /// start up mysql db from docker-compose
       "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
       /// sideload webapp in excel
-      if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start manifest.xml desktop --debug-method web" __SOURCE_DIRECTORY__
+      if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start build/manifest.xml desktop --debug-method web" ""
       ]
     |> runParallel
 )
