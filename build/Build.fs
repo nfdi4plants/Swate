@@ -130,7 +130,7 @@ module Docker =
         let newRelease = ReleaseNotes.load releaseNotesPath
         let check = Fake.Core.UserInput.getUserInput($"Is version {newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch} correct? (y/n/true/false)" )
 
-        let dockerCreateImage() = run docker $"build -t {dockerContainerName} ." ""
+        let dockerCreateImage() = run docker $"build -t {dockerContainerName} -f build/Dockerfile.publish . " ""
         let dockerTestImage() = run docker $"run -it -p {port}:{port} {dockerContainerName}" ""
         let dockerTagImage() =
             run docker $"tag {dockerContainerName}:latest {dockerImageName}:{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}" ""
