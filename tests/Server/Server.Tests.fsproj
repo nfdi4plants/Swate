@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Server.Tests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Server\Server.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+      <PackageReference Include="FSharp.Core" Version="5.0.2" />
+    <PackageReference Include="Expecto" Version="9.0.4" />
+  </ItemGroup>
+
+</Project>

@@ -441,8 +441,11 @@ let createTestApi =
 //    )
 //}
 
+let getMessage() = "Hello from SAFE!"
+
 let topLevelRouter = router {
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
+    get "/test/hello" (getMessage() |> json)
 
     forward @"" (fun next ctx ->
         let credentials =
