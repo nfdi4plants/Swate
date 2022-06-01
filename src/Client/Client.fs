@@ -13,6 +13,8 @@ open Update
 open Shared
 open ExcelJS.Fable.GlobalBindings
 
+let sayHello name = $"Hello {name}"
+
 let initializeAddIn () = Office.onReady()
 
 // defines the initial state and initial command (= side-effect) of the application

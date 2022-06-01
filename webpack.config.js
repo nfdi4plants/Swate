@@ -140,7 +140,6 @@ module.exports = {
             },
         },
         proxy: CONFIG.devServerProxy,
-        hot: true,
         devMiddleware: {
             publicPath: CONFIG.publicPath
         },

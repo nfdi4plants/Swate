@@ -261,9 +261,10 @@ Target.create "officedebug" (fun config ->
 )
 
 Target.create "RunTests" (fun _ ->
-    run dotnet "build" sharedTestsPath
-    [ "server", dotnet "watch run" serverTestsPath
-      "client", dotnet "fable watch --run webpack-dev-server --config ../../webpack.tests.config.js" clientTestsPath ]
+    //run dotnet "build" sharedTestsPath
+    [
+        //"server", dotnet "watch run" serverTestsPath
+      "client", dotnet "fable watch tests/Client -s --run webpack-dev-server --config webpack.tests.config" "" ]
     |> runParallel
 )
 

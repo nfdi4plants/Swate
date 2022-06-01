@@ -5,6 +5,7 @@ VisualStudioVersion = 17.1.32228.430
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{08CCFCF6-2248-43ED-A6EF-E972A2DA0E6A}"
 	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
 		build.cmd = build.cmd
 		.db\docker-compose.yml = .db\docker-compose.yml
 		build\Dockerfile.publish = build\Dockerfile.publish
@@ -17,7 +18,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		paket.lock = paket.lock
 		README.md = README.md
 		RELEASE_NOTES.md = RELEASE_NOTES.md
+		tests\Server\Server.Tests.fsproj = tests\Server\Server.Tests.fsproj
 		webpack.config.js = webpack.config.js
+		webpack.tests.config.js = webpack.tests.config.js
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E0FF3176-0B77-4662-A2A8-7233E5E59981}"
@@ -36,6 +39,10 @@ EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Shared", "src\Shared\Shared.fsproj", "{01C323A6-F047-45F4-B6BB-D7709335D2B5}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Build", "build\Build.fsproj", "{C9453B5A-0A1A-4A27-8F88-5E4804FBF773}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{F5C1D7C6-F9B9-4DDC-9F67-F5729F46B1BB}"
+EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Client.Tests", "tests\Client\Client.Tests.fsproj", "{C95ADFEC-4D46-4AD4-BD20-3F5EA99C26CA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -59,6 +66,10 @@ Global
 		{C9453B5A-0A1A-4A27-8F88-5E4804FBF773}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C9453B5A-0A1A-4A27-8F88-5E4804FBF773}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C9453B5A-0A1A-4A27-8F88-5E4804FBF773}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C95ADFEC-4D46-4AD4-BD20-3F5EA99C26CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C95ADFEC-4D46-4AD4-BD20-3F5EA99C26CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C95ADFEC-4D46-4AD4-BD20-3F5EA99C26CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C95ADFEC-4D46-4AD4-BD20-3F5EA99C26CA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -68,6 +79,7 @@ Global
 		{E02F8351-E49E-457D-A320-6FCF06D7772C} = {E0FF3176-0B77-4662-A2A8-7233E5E59981}
 		{80E327F3-FF3C-4634-954D-57504F7E139C} = {E0FF3176-0B77-4662-A2A8-7233E5E59981}
 		{01C323A6-F047-45F4-B6BB-D7709335D2B5} = {E0FF3176-0B77-4662-A2A8-7233E5E59981}
+		{C95ADFEC-4D46-4AD4-BD20-3F5EA99C26CA} = {F5C1D7C6-F9B9-4DDC-9F67-F5729F46B1BB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7A0AA30E-4CD9-4359-9513-BA68E2E85245}
