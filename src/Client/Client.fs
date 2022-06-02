@@ -118,7 +118,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
     | Routing.Route.Info ->
         BaseView.baseViewMainElement model dispatch [
             InfoView.infoComponent model dispatch
-        ][
+        ] [
             //Text.p [] [str ""]
         ]
 

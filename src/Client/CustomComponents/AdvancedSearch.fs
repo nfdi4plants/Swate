@@ -188,7 +188,7 @@ let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:b
     ]
 
 let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
-    div [][
+    div [] [
         Field.div [] [
             Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Term name keywords:"]
             Field.div [] [
@@ -244,7 +244,7 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
                             }
                             nextSearchOptions |> UpdateAdvancedTermSearchOptions |> AdvancedSearchMsg |> dispatch
                         )
-                    ][
+                    ] [
                         yield ontologyDropdownItem model dispatch None
                         yield! (
                             model.PersistentStorageState.SearchableOntologies
@@ -257,9 +257,9 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
                 ]
             ]
         ]
-        Field.div [][
+        Field.div [] [
             Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Keep obsolete terms" ]
-            div [][
+            div [] [
                 keepObsoleteCheckradioElement model dispatch true modalId
                 keepObsoleteCheckradioElement model dispatch false modalId
             ]
@@ -273,7 +273,7 @@ let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Ms
             if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
                 div [
                     Style [Width "100%"; Display DisplayOptions.Flex; JustifyContent "center"]
-                ][
+                ] [
                     Loading.loadingComponent
                 ]
             else
@@ -303,7 +303,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                 Fulma.Delete.delete [Delete.OnClick(fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)][]
             ]
             Modal.Card.body [Props [colorBackground model.SiteStyleState.ColorMode]] [
-                Field.div [][
+                Field.div [] [
                     Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All, TextAlignment.Justified)]][str "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."]
                 ]
                 match model.AdvancedSearchState.AdvancedTermSearchSubpage with
@@ -319,11 +319,11 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                     OnKeyDown   (fun k -> if k.key = "Enter" then k.preventDefault())
                     Style [Width "100%"]
                 ] [
-                    Level.level [][
-                        Level.left [][
+                    Level.level [] [
+                        Level.left [] [
                             /// Show "Back" button NOT on first subpage
                             if model.AdvancedSearchState.AdvancedTermSearchSubpage <> AdvancedSearchSubpages.InputFormSubpage then
-                                Level.item [][
+                                Level.item [] [
                                     Button.button   [   
                                         Button.CustomClass "is-danger"
                                         Button.IsFullWidth
@@ -333,10 +333,10 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                     ]
                                 ]
                         ]
-                        Level.right [][
+                        Level.right [] [
                             /// Show "Start advanced search" button ONLY on first subpage
                             if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage then
-                                Level.item [][
+                                Level.item [] [
                                     Button.button   [
                                         let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
                                         if isValid then

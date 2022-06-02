@@ -302,7 +302,7 @@ let autocompleteTermSearchComponentOfParentOntology
 
     =
     let parentOntologyNotificationElement show =
-        Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]][
+        Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]] [
             Button.button [
                 Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]
                 Button.IsStatic true

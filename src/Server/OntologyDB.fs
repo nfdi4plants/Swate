@@ -44,6 +44,7 @@ type Neo4j =
     /// <param name="parameters">Map of key value pairs. Only use this if you used parameters, for example '$Name' in your query. In which case you need to provide `Map ["Name", value]`.</param>
     /// <param name="resultAs">How to return query results. In the format of `(fun (record:IRecord) -> parsingFunction record)`.</param>
     /// <param name="credentials">Username, password, bolt-url and database name to create session with database.</param>
+    /// <param name="session">Optional parameter to insert query into running session.</param>
     static member runQuery(query:string,parameters:Map<string,'a> option,resultAs:IRecord -> 'T, ?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         if credentials.IsNone && session.IsNone then failwith "Cannot execute query without credentials or session parameter!"
         let currentSession = if session.IsSome then session.Value else Neo4j.establishConnection(credentials.Value)

@@ -1,7 +1,9 @@
-module Tests
+module Server.Tests
 
-open System
 open Expecto
+
+open Shared
+open Server
 
 let server = testList "Server" [
     testCase "Message returned correctly" <| fun _ ->
@@ -10,5 +12,10 @@ let server = testList "Server" [
         Expect.equal result expectedResult "Result should be ok"
 ]
 
+let all = testList "All" [
+    Shared.Tests.shared
+    server
+]
+
 [<EntryPoint>]
-let main _ = runTests defaultConfig server
+let main _ = runTestsWithCLIArgs [] [||] all

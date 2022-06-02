@@ -69,32 +69,32 @@ let userSpecificTermMsg = "This Term was not found in the database."
 let searchResultTermToTableHeaderElement (term:TermSearchable option) =
     match term with
     | Some isEmpty when isEmpty.Term.Name = "" && isEmpty.Term.TermAccession = "" ->
-        tr [][
-            th [][str "-"]
-            th [][str "-"]
-            th [ Style [TextAlign TextAlignOptions.Center] ][str "-"]
-            th [][str (rowIndicesToReadable isEmpty.RowIndices)]
+        tr [] [
+            th [] [str "-"]
+            th [] [str "-"]
+            th [Style [TextAlign TextAlignOptions.Center]] [str "-"]
+            th [] [str (rowIndicesToReadable isEmpty.RowIndices)]
         ]
     | Some hasResult when hasResult.SearchResultTerm.IsSome ->
         tr [ ] [
-            th [][str hasResult.SearchResultTerm.Value.Name]
-            th [ Style [TextAlign TextAlignOptions.Center] ][infoIcon hasResult.SearchResultTerm.Value.Description]
-            th [][str hasResult.SearchResultTerm.Value.Accession]
-            th [][str (rowIndicesToReadable hasResult.RowIndices)]
+            th [] [str hasResult.SearchResultTerm.Value.Name]
+            th [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon hasResult.SearchResultTerm.Value.Description]
+            th [] [str hasResult.SearchResultTerm.Value.Accession]
+            th [] [str (rowIndicesToReadable hasResult.RowIndices)]
         ]
     | Some hasNoResult when hasNoResult.SearchResultTerm.IsNone ->
         tr [ ] [
             th [ Style [Color NFDIColors.Red.Lighter20] ] [str hasNoResult.Term.Name]
-            th [ Style [TextAlign TextAlignOptions.Center] ][infoIcon userSpecificTermMsg]
-            th [][str hasNoResult.Term.TermAccession]
-            th [][str (rowIndicesToReadable hasNoResult.RowIndices)]
+            th [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon userSpecificTermMsg]
+            th [] [str hasNoResult.Term.TermAccession]
+            th [] [str (rowIndicesToReadable hasNoResult.RowIndices)]
         ]
     | None ->
         tr [ ] [
-            th [][str "-"]
-            th [][str "-"]
-            th [][str "-"]
-            th [][str "Header"]
+            th [] [str "-"]
+            th [] [str "-"]
+            th [] [str "-"]
+            th [] [str "Header"]
         ]
     | anythingElse -> failwith $"""Swate encountered an error when trying to parse {anythingElse} to search results."""
 
@@ -103,25 +103,25 @@ let searchResultTermToTableHeaderElement (term:TermSearchable option) =
 let searchResultTermToTableElement (term:TermSearchable) =
     match term with
     | isEmpty when term.Term.Name = "" && term.Term.TermAccession = "" ->
-        tr [][
-            td [][str "-"]
-            td [ Style [TextAlign TextAlignOptions.Center] ][str "-"]
-            td [][str "-"]
-            td [][str (rowIndicesToReadable isEmpty.RowIndices)]
+        tr [] [
+            td [] [str "-"]
+            td [ Style [TextAlign TextAlignOptions.Center] ] [str "-"]
+            td [] [str "-"]
+            td [] [str (rowIndicesToReadable isEmpty.RowIndices)]
         ]
     | hasResult when term.SearchResultTerm.IsSome ->
         tr [ ] [
-            td [][str hasResult.SearchResultTerm.Value.Name]
-            td [ Style [TextAlign TextAlignOptions.Center] ][infoIcon hasResult.SearchResultTerm.Value.Description]
-            td [][str hasResult.SearchResultTerm.Value.Accession]
-            td [][str (rowIndicesToReadable hasResult.RowIndices)]
+            td [] [str hasResult.SearchResultTerm.Value.Name]
+            td [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon hasResult.SearchResultTerm.Value.Description]
+            td [] [str hasResult.SearchResultTerm.Value.Accession]
+            td [] [str (rowIndicesToReadable hasResult.RowIndices)]
         ]
     | hasNoResult when term.SearchResultTerm.IsNone ->
         tr [ ] [
             td [ Style [Color NFDIColors.Red.Lighter20] ] [str hasNoResult.Term.Name]
-            td [ Style [TextAlign TextAlignOptions.Center] ][infoIcon userSpecificTermMsg]
-            td [][str hasNoResult.Term.TermAccession]
-            td [][str (rowIndicesToReadable hasNoResult.RowIndices)]
+            td [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon userSpecificTermMsg]
+            td [] [str hasNoResult.Term.TermAccession]
+            td [] [str (rowIndicesToReadable hasNoResult.RowIndices)]
         ]
     | anythingElse -> failwith $"""Swate encountered an error when trying to parse {anythingElse} to search results."""
 
@@ -132,19 +132,19 @@ let tableElement (terms:TermSearchable []) =
     Table.table [
         Table.IsFullWidth
         Table.IsStriped
-    ][
-        thead [][
-            tr [][
-                th [Class "toExcelColor"][str "Name"]
-                th [Class "toExcelColor"; Style [TextAlign TextAlignOptions.Center] ][str "Desc."]
-                th [Class "toExcelColor"][str "TAN"]
-                th [Class "toExcelColor"][str "Row"]
+    ] [
+        thead [] [
+            tr [] [
+                th [Class "toExcelColor"] [str "Name"]
+                th [Class "toExcelColor"; Style [TextAlign TextAlignOptions.Center] ] [str "Desc."]
+                th [Class "toExcelColor"] [str "TAN"]
+                th [Class "toExcelColor"] [str "Row"]
             ]
         ]
-        thead [][
+        thead [] [
             searchResultTermToTableHeaderElement rowHeader
         ]
-        tbody [][
+        tbody [] [
             for term in bodyRows do 
                 yield
                     searchResultTermToTableElement term
@@ -163,7 +163,7 @@ let buildingBlockDetailModal (model:Model) dispatch =
         Notification.notification [
             Notification.Props [Style [Width "90%"; MaxHeight "80%"; OverflowX OverflowOptions.Auto ]]
         ] [
-            Notification.delete [Props [OnClick closeMsg]][]
+            Notification.delete [Props [OnClick closeMsg]] []
             tableElement baseArr
         ]
     ]

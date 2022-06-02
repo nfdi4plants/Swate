@@ -1,21 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
+    <None Include="paket.references" />
     <Compile Include="Server.Tests.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\src\Server\Server.fsproj" />
+    <ProjectReference Include="..\Shared\Shared.Tests.fsproj" />
   </ItemGroup>
-
-  <ItemGroup>
-      <PackageReference Include="FSharp.Core" Version="5.0.2" />
-    <PackageReference Include="Expecto" Version="9.0.4" />
-  </ItemGroup>
-
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

@@ -251,7 +251,7 @@ Target.create "officedebug" (fun config ->
     run dotnet "build" sharedPath
     if args |> List.contains "--open" then openBrowser developmentUrl
     [ "server", dotnet "watch run" serverPath
-      "client", dotnet "fable watch src/Client -s --run webpack-dev-server" ""
+      "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" ""
       /// start up mysql db from docker-compose
       "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
       /// sideload webapp in excel
@@ -261,10 +261,10 @@ Target.create "officedebug" (fun config ->
 )
 
 Target.create "RunTests" (fun _ ->
-    //run dotnet "build" sharedTestsPath
+    run dotnet "build" sharedTestsPath
     [
         "server", dotnet "watch run -p tests/Server" ""
-        "client", dotnet "fable watch tests/Client -s --run webpack-dev-server --config webpack.tests.config" "" ]
+        "client", dotnet "fable watch tests/Client -o tests/Client/output -e .fs.js -s --run webpack-dev-server --config webpack.tests.config" "" ]
     |> runParallel
 )
 

@@ -27,12 +27,12 @@ let private buttonCol (text:string) (disabled:bool) (onClickMsg:Browser.Types.Mo
     ]
 
 let private removeButton (removeMsg:Browser.Types.MouseEvent -> unit) = 
-    Column.column [Column.Width(Screen.All, Column.IsNarrow)][
+    Column.column [Column.Width(Screen.All, Column.IsNarrow)] [
         Button.a [
             Button.OnClick removeMsg
             Button.Color IsDanger
-        ][
-            Fa.i [Fa.Solid.Times][]
+        ] [
+            Fa.i [Fa.Solid.Times] []
         ]
     ]
 
