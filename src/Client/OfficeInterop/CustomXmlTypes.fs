@@ -106,7 +106,7 @@ module Validation =
                     attr.value( "TableName", this.AnnotationTable)
                     attr.value( "DateTime", this.DateTime.ToString("yyyy-MM-dd HH:mm") )
                     attr.value( "Userlist", this.Userlist |> String.concat "; " )
-            ][
+            ] [
                 for column in this.ColumnValidations do
                     yield
                         leaf "ColumnValidation" [

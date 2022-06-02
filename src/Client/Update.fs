@@ -83,7 +83,7 @@ module Dev =
         | LogTableMetadata ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.getTableMetaData
+                    OfficeInterop.Core.getTableMetaData
                     ()
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -570,7 +570,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             match pageOpt with
             | Some Routing.Route.Validation ->
                 Cmd.OfPromise.perform
-                    OfficeInterop.getTableRepresentation
+                    OfficeInterop.Core.getTableRepresentation
                     ()
                     (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
             | Some Routing.Route.ProtocolSearch ->

@@ -22,8 +22,8 @@ let interopLoggingModal (model:Model) dispatch =
         ] [
             Notification.delete [
                 Props [OnClick closeMsg]
-            ][]
-            Field.div [][
+            ] []
+            Field.div [] [
                 Table.table [
                 Table.IsFullWidth
                 Table.Props [ExcelColors.colorBackground model.SiteStyleState.ColorMode]
@@ -34,12 +34,12 @@ let interopLoggingModal (model:Model) dispatch =
                 )
             ]
             ]
-            Field.div [][
+            Field.div [] [
                 Button.a [
                     Button.Color IsWarning
                     Button.Props [Style [Float FloatOptions.Right]]
                     Button.OnClick closeMsg
-                ][
+                ] [
                     str "Continue"
                 ]
             ]

@@ -119,7 +119,7 @@ let private ontologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: O
     option [
         TabIndex 0
         Value str
-    ][
+    ] [
         str
     ]
 
@@ -300,11 +300,11 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                 Modal.Card.title [Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
                     str "Advanced Search"
                 ]
-                Fulma.Delete.delete [Delete.OnClick(fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)][]
+                Fulma.Delete.delete [Delete.OnClick(fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)] []
             ]
             Modal.Card.body [Props [colorBackground model.SiteStyleState.ColorMode]] [
                 Field.div [] [
-                    Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All, TextAlignment.Justified)]][str "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."]
+                    Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All, TextAlignment.Justified)]] [str "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."]
                 ]
                 match model.AdvancedSearchState.AdvancedTermSearchSubpage with
                 | AdvancedSearchSubpages.InputFormSubpage ->

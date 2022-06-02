@@ -126,7 +126,7 @@ let simpleSearchComponent model dispatch =
                 (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState)
         ]
 
-        div [][
+        div [] [
             Switch.switchInline [
                 Switch.Color IsPrimary
                 Switch.Id "switch-1"
@@ -155,7 +155,7 @@ let simpleSearchComponent model dispatch =
         Columns.columns [
             Columns.IsMobile;
             Columns.Props [Style [Width "100%"; MarginRight "0px"; MarginLeft "0px"]]
-        ][
+        ] [
             Column.column [Column.Props [Style [PaddingLeft "0"; if model.TermSearchState.SelectedTerm.IsNone then PaddingRight "0"]]] [
             // Fill selection confirmation
                 Field.div [] [
@@ -212,7 +212,7 @@ let simpleSearchComponent model dispatch =
                             Browser.Dom.document.body.removeChild(textArea) |> ignore
                             ()
                         )
-                    ][
+                    ] [
                         CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_termsearch" Fa.Regular.Clipboard Fa.Solid.Check
                     ]
                 ]
@@ -225,7 +225,7 @@ let termSearchComponent (model:Messages.Model) dispatch =
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [
 
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Ontology term search"]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search for an ontology term to fill into the selected field(s)"]
 
@@ -240,7 +240,7 @@ let termSearchComponent (model:Messages.Model) dispatch =
         //    Button.OnClick (fun e ->
         //        GetParentOntology |> ExcelInterop |> dispatch
         //    )
-        //][
+        //] [
         //    str "GetParentOntology"
         //]
 

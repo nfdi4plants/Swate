@@ -148,12 +148,12 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
 //                        child()?style?opacity <- "1"
 //        )
 //        OnDragOver(fun e -> e.preventDefault())
-//    ][
+//    ] [
 //        Delete.delete [
 //            Delete.Props [ Style [
 //                MarginRight "2rem"
 //            ]]
-//        ][]
+//        ] []
 //        let fileName = model.FilePickerState.FileNames |> List.find (fun (ind,name) -> id = name) |> snd
 //        str (sprintf "%s" fileName)
 //    ]
@@ -293,7 +293,7 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
 //                clone?style?top <- sprintf "%.0fpx" y
 //            ()
 //        )
-//    ][
+//    ] [
 //        Delete.delete [
 //            Delete.OnClick (fun _ ->
 //                let newList =
@@ -308,10 +308,10 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
 //                if dropped = false then PointerEvents "none"
 //                MarginRight "2rem"
 //            ]]
-//        ][]
+//        ] []
 //        str (sprintf "%s" id)
-//        Icon.icon [Icon.Props [Style [Float FloatOptions.Right; Color "darkgrey"]]][
-//            Fa.i [ Fa.Solid.ArrowsAlt][]
+//        Icon.icon [Icon.Props [Style [Float FloatOptions.Right; Color "darkgrey"]]] [
+//            Fa.i [ Fa.Solid.ArrowsAlt] []
 //        ]
 //    ]
     
@@ -329,7 +329,7 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
 //            Order 0
 //        ]
 //        OnDragOver(fun e -> e.preventDefault())
-//    ][
+//    ] [
 //        dragAndDropElement model dispatch id
 //    ]
 
@@ -388,13 +388,13 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
 //            Order "-1"
 //            BorderBottom "2px solid white"
 //        ]
-//    ][]
+//    ] []
     
 //let fileElementContainer (model:Messages.Model) dispatch =
 //    div [
 //        Style [Display DisplayOptions.Flex; FlexDirection "column"]
 //        Id fileElementContainerId
-//    ][
+//    ] [
 //        yield
 //            placeOnTopElement model dispatch
 //        for ind,ele in model.FilePickerState.FileNames do
@@ -405,7 +405,7 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
 //    ]
 
 let uploadButton (model:Messages.Model) dispatch inputId =
-    Field.div [][
+    Field.div [] [
         input [
             Style [Display DisplayOptions.None]
             Id inputId
@@ -434,14 +434,14 @@ let uploadButton (model:Messages.Model) dispatch inputId =
                 let getUploadElement = Browser.Dom.document.getElementById inputId
                 getUploadElement.click()
             )
-        ][
+        ] [
             str "Pick file names"
         ]
     ]
 
 
 //let fileNameElements (model:Messages.Model) dispatch =
-//    div [ ][
+//    div [ ] [
 //        if model.FilePickerState.FileNames <> [] then
 //            fileElementContainer model dispatch
 
@@ -459,11 +459,11 @@ let uploadButton (model:Messages.Model) dispatch inputId =
 //                    OfficeInterop.InsertFileNames (model.FilePickerState.FileNames |> List.map snd) |> OfficeInteropMsg |> dispatch 
 //                )
 
-//            ][
+//            ] [
 //                str "Insert File Names"
 //            ]
 //        else
-//            div [][
+//            div [] [
 //                str "All names from your selected files will be displayed here."
 //            ]
 //    ]
@@ -472,13 +472,13 @@ let sortButton icon msg =
     Button.a [
         Button.Color IsInfo
         Button.OnClick msg
-    ][
+    ] [
         Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
     ]
 
 let fileSortElements (model:Messages.Model) dispatch =
-    Field.div [][
-        Button.list [][
+    Field.div [] [
+        Button.list [] [
             Button.a [
                 Button.Props [Title "Copy to Clipboard"]
                 Button.Color IsInfo
@@ -501,14 +501,14 @@ let fileSortElements (model:Messages.Model) dispatch =
                     Browser.Dom.document.body.removeChild(textArea) |> ignore
                     ()
                 )
-            ][
+            ] [
                 CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" Fa.Regular.Clipboard Fa.Solid.Check
             ]
 
             Button.list [
                 Button.List.HasAddons
                 Button.List.Props [Style [MarginLeft "auto"]]
-            ][
+            ] [
                 sortButton Fa.Solid.SortAlphaDown (fun e ->
                     let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
                     UpdateFileNames sortedList |> FilePickerMsg |> dispatch
@@ -535,7 +535,7 @@ module FileNameTable =
             Delete.Props [ Style [
                 MarginRight "2rem"
             ]]
-        ][]
+        ] []
 
     let moveUpButton (id,fileName) (model:Model) dispatch =
         Button.a [
@@ -556,8 +556,8 @@ module FileNameTable =
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
             Button.Size IsSmall
-        ][
-            Fa.i [Fa.Solid.ArrowUp][]
+        ] [
+            Fa.i [Fa.Solid.ArrowUp] []
         ]
 
     let moveDownButton (id,fileName) (model:Model) dispatch =
@@ -579,12 +579,12 @@ module FileNameTable =
                     |> List.mapi (fun i v -> i+1, snd v)
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
-        ][
-            Fa.i [Fa.Solid.ArrowDown][]
+        ] [
+            Fa.i [Fa.Solid.ArrowDown] []
         ]
 
     let moveButtonList (id,fileName) (model:Model) dispatch =
-        Button.list [][
+        Button.list [] [
             moveUpButton (id,fileName) model dispatch
             moveDownButton (id,fileName) model dispatch
         ]
@@ -594,14 +594,14 @@ module FileNameTable =
         Table.table [
             Table.IsHoverable
             Table.IsStriped
-        ][
-            tbody [][
+        ] [
+            tbody [] [
                 for index,fileName in model.FilePickerState.FileNames do
-                    tr [][
-                        td [][b [][str $"{index}"]]
-                        td [][str fileName]
-                        td [][moveButtonList (index,fileName) model dispatch]
-                        td [Style [TextAlign TextAlignOptions.Right]][deleteFromTable (index,fileName) model dispatch]
+                    tr [] [
+                        td [] [b [] [str $"{index}"]]
+                        td [] [str fileName]
+                        td [] [moveButtonList (index,fileName) model dispatch]
+                        td [Style [TextAlign TextAlignOptions.Right]] [deleteFromTable (index,fileName) model dispatch]
                     ]
             ]
         ]
@@ -610,10 +610,10 @@ module FileNameTable =
 let fileContainer (model:Messages.Model) dispatch inputId=
     mainFunctionContainer [
 
-        Help.help [][
+        Help.help [] [
             str "Choose one or multiple files, rearrange them and add their names to the Excel sheet."
             //str " You can use "
-            //u [][str "drag'n'drop"]
+            //u [] [str "drag'n'drop"]
             //str " to change the file order or remove files selected by accident."
         ]
 
@@ -629,7 +629,7 @@ let fileContainer (model:Messages.Model) dispatch inputId=
 let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
     let inputId = "filePicker_OnFilePickerMainFunc"
     Content.content [ ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "File Picker"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "File Picker"]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
             str "Select files from your computer and insert their names into Excel."

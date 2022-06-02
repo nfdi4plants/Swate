@@ -14,6 +14,6 @@ let buttonComponent (colorMode: ExcelColors.ColorMode) (isDarkMode:bool) txt onC
             Button.Props [Style [BackgroundColor colorMode.BodyForeground; Color colorMode.Text]]
         Button.IsFullWidth
         Button.OnClick onClick
-        ][
+        ] [
         str txt
     ]

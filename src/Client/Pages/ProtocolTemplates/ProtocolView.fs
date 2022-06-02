@@ -29,7 +29,7 @@ module TemplateFromJsonFile =
 
     let fileUploadButton (model:Model) dispatch =
         let uploadId = "UploadFiles_ElementId"
-        Label.label [Label.Props [Style [FontWeight "normal"]]][
+        Label.label [Label.Props [Style [FontWeight "normal"]]] [
             Input.input [
                 Input.Props [
                     Id uploadId
@@ -65,24 +65,24 @@ module TemplateFromJsonFile =
                     getUploadElement.click()
                     ()
                 )
-            ][
+            ] [
                 str "Upload protocol"
             ]
         ]
 
     let fileUploadEle (model:Model) dispatch =
         let hasData = model.ProtocolState.UploadedFile <> ""
-        Columns.columns [Columns.IsMobile][
-            Column.column [][
+        Columns.columns [Columns.IsMobile] [
+            Column.column [] [
                 fileUploadButton model dispatch
             ]
             if hasData then
-                Column.column [Column.Width(Screen.All, Column.IsNarrow)][
+                Column.column [Column.Width(Screen.All, Column.IsNarrow)] [
                     Button.a [
                         Button.OnClick (fun e -> UpdateUploadFile "" |> ProtocolMsg |> dispatch)
                         Button.Color IsDanger
-                    ][
-                        Fa.i [Fa.Solid.Times][]
+                    ] [
+                        Fa.i [Fa.Solid.Times] []
                     ]
                 ]
         ]
@@ -99,7 +99,7 @@ module TemplateFromJsonFile =
                 Style [if isActive then BackgroundColor model.SiteStyleState.ColorMode.ControlForeground]
             ]
     
-        ][
+        ] [
             Text.span [
                 CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
                 Props [
@@ -115,21 +115,21 @@ module TemplateFromJsonFile =
     
     let parseJsonToTableEle (model:Model) (dispatch:Messages.Msg -> unit) =
         let hasData = model.ProtocolState.UploadedFile <> ""
-        Field.div [Field.HasAddons][
-            Control.div [][
+        Field.div [Field.HasAddons] [
+            Control.div [] [
                 Dropdown.dropdown [
                     Dropdown.IsActive model.ProtocolState.ShowJsonTypeDropdown
-                ][
-                    Dropdown.trigger [][
+                ] [
+                    Dropdown.trigger [] [
                         Button.a [
                             Button.OnClick (fun e -> e.stopPropagation(); UpdateShowJsonTypeDropdown (not model.ProtocolState.ShowJsonTypeDropdown) |> ProtocolMsg |> dispatch )
-                        ][
+                        ] [
                             span [Style [MarginRight "5px"]] [str (model.ProtocolState.JsonExportType.ToString())]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
-                    Dropdown.menu [][
-                        Dropdown.content [][
+                    Dropdown.menu [] [
+                        Dropdown.content [] [
                             let msg = (UpdateJsonExportType >> ProtocolMsg >> dispatch)
                             dropdownItem JsonExportType.Assay model msg (model.ProtocolState.JsonExportType = JsonExportType.Assay)
                             dropdownItem JsonExportType.Table model msg (model.ProtocolState.JsonExportType = JsonExportType.Table)
@@ -138,7 +138,7 @@ module TemplateFromJsonFile =
                     ]
                 ]
             ]
-            Control.div [Control.IsExpanded][
+            Control.div [Control.IsExpanded] [
                 Button.a [
                     if hasData then
                         Button.IsActive true
@@ -150,7 +150,7 @@ module TemplateFromJsonFile =
                     Button.OnClick(fun e ->
                         ProtocolMsg ParseUploadedFileRequest |> dispatch
                     )
-                ][
+                ] [
                     str "Insert json"
                 ]
             ]
@@ -158,20 +158,20 @@ module TemplateFromJsonFile =
 
     let protocolInsertElement (model:Model) dispatch =
         mainFunctionContainer [
-            Field.div [][
-                Help.help [][
+            Field.div [] [
+                Help.help [] [
                     //b [] [
                     //    str "Upload a "
-                    //    a [Href "https://github.com/nfdi4plants/Swate/wiki/Insert-via-Process.json"; Target "_Blank"][ str "process.json" ]
+                    //    a [Href "https://github.com/nfdi4plants/Swate/wiki/Insert-via-Process.json"; Target "_Blank"] [ str "process.json" ]
                     //    str " file."
                     //]
-                    b [][str "Insert tables via ISA-JSON files."]
+                    b [] [str "Insert tables via ISA-JSON files."]
                     str " You can use Swate.Experts to create these files from existing Swate tables. "
-                    span [Style [Color NFDIColors.Red.Base]][str "Only missing building blocks will be added."]
+                    span [Style [Color NFDIColors.Red.Base]] [str "Only missing building blocks will be added."]
                 ]
             ]
 
-            Field.div [][
+            Field.div [] [
                 fileUploadEle model dispatch
             ]
 
@@ -189,8 +189,8 @@ module TemplateFromDB =
         ] [str "Browse database"]
 
     let addFromDBToTableButton (model:Messages.Model) dispatch =
-        Columns.columns [Columns.IsMobile][
-            Column.column [][
+        Columns.columns [Columns.IsMobile] [
+            Column.column [] [
                 Field.div [] [
                     Control.div [] [
                         Button.a [
@@ -216,12 +216,12 @@ module TemplateFromDB =
                 ]
             ]
             if model.ProtocolState.ProtocolSelected.IsSome then
-                Column.column [Column.Width(Screen.All, Column.IsNarrow)][
+                Column.column [Column.Width(Screen.All, Column.IsNarrow)] [
                     Button.a [
                         Button.OnClick (fun e -> RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
                         Button.Color IsDanger
-                    ][
-                        Fa.i [Fa.Solid.Times][]
+                    ] [
+                        Fa.i [Fa.Solid.Times] []
                     ]
                 ]
         ]
@@ -233,23 +233,23 @@ module TemplateFromDB =
                     Table.IsFullWidth;
                     Table.IsBordered
                     Table.Props [Style [Color model.SiteStyleState.ColorMode.Text; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
-                ][
-                    thead [][
-                        tr [][
-                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column"]
-                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Column TAN"]
-                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit"]
-                            th [Style [Color model.SiteStyleState.ColorMode.Text]][str "Unit TAN"]
+                ] [
+                    thead [] [
+                        tr [] [
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]] [str "Column"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]] [str "Column TAN"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]] [str "Unit"]
+                            th [Style [Color model.SiteStyleState.ColorMode.Text]] [str "Unit TAN"]
                         ]
                     ]
-                    tbody [][
+                    tbody [] [
                         for insertBB in model.ProtocolState.ProtocolSelected.Value.TemplateBuildingBlocks do
                             yield
-                                tr [][
-                                    td [][str (insertBB.ColumnHeader.toAnnotationTableHeader())]
-                                    td [][str (if insertBB.HasExistingTerm then insertBB.ColumnTerm.Value.TermAccession else "-")]
-                                    td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.Name else "-")]
-                                    td [][str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
+                                tr [] [
+                                    td [] [str (insertBB.ColumnHeader.toAnnotationTableHeader())]
+                                    td [] [str (if insertBB.HasExistingTerm then insertBB.ColumnTerm.Value.TermAccession else "-")]
+                                    td [] [str (if insertBB.HasUnit then insertBB.UnitTerm.Value.Name else "-")]
+                                    td [] [str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
                                 ]
                     ]
                 ]
@@ -260,22 +260,22 @@ module TemplateFromDB =
 
     let showDatabaseProtocolTemplate (model:Messages.Model) dispatch =
         mainFunctionContainer [
-            Field.div [][
-                Help.help [][
+            Field.div [] [
+                Help.help [] [
                     b [] [str "Search the database for templates."]
                     str " The building blocks from these templates can be inserted into the Swate table. "
-                    span [Style [Color NFDIColors.Red.Base]][str "Only missing building blocks will be added."]
+                    span [Style [Color NFDIColors.Red.Base]] [str "Only missing building blocks will be added."]
                 ]
             ]
-            Field.div [][
+            Field.div [] [
                 toProtocolSearchElement model dispatch
             ]
 
-            Field.div [][
+            Field.div [] [
                 addFromDBToTableButton model dispatch
             ]
             if model.ProtocolState.ProtocolSelected.IsSome then
-                Field.div [][
+                Field.div [] [
                     yield! displaySelectedProtocolEle model dispatch
                 ]
         ]
@@ -293,7 +293,7 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
         Style [MinHeight "100vh"]
     ]] [
         
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Templates"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Templates"]
 
         /// Box 1
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add template from database."]
@@ -305,7 +305,7 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
 
         TemplateFromJsonFile.protocolInsertElement model dispatch
 
-        //div [][
+        //div [] [
         //    str (
         //        let dataStr = model.ProtocolState.UploadData
         //        if dataStr = "" then "no upload data found" else sprintf "%A" model.ProtocolState.UploadData

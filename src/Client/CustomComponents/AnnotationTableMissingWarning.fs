@@ -29,7 +29,7 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
         Field.div [] [
             str "Your worksheet seems to contain no annotation table. You can create one by pressing the button below."
         ]
-        Field.div [][
+        Field.div [] [
             Button.buttonComponent
                 model.SiteStyleState.ColorMode
                 model.SiteStyleState.IsDarkMode

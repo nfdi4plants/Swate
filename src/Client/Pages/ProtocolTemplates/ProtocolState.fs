@@ -36,13 +36,13 @@ module Protocol =
                 match Array.tryExactlyOne buildingBlockTables with
                 | Some (_,buildingBlocks) ->
                     Cmd.OfPromise.either
-                        OfficeInterop.addAnnotationBlocks
+                        OfficeInterop.Core.addAnnotationBlocks
                         buildingBlocks
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 | None ->
                     Cmd.OfPromise.either
-                        OfficeInterop.addAnnotationBlocksInNewSheets
+                        OfficeInterop.Core.addAnnotationBlocksInNewSheets
                         buildingBlockTables
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)

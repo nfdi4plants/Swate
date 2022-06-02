@@ -56,10 +56,10 @@ let infoIcon (txt:string) =
         Style [Color NFDIColors.Yellow.Base; OverflowY OverflowOptions.Visible]
         Class (Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
         Tooltip.dataTooltip txt
-    ][
+    ] [
         Fa.i [
             Fa.Solid.InfoCircle
-        ][]
+        ] []
     ]
 
 [<Literal>]

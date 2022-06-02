@@ -77,23 +77,23 @@ let columnListElement ind (columnValidation:ColumnValidation) (model:Model) disp
             else
                 UpdateDisplayedOptionsId (Some ind) |> ValidationMsg |> dispatch
         )
-    ][
-        td [][str columnValidation.ColumnHeader.SwateColumnHeader]
-        td [][
+    ] [
+        td [] [str columnValidation.ColumnHeader.SwateColumnHeader]
+        td [] [
             if columnValidation.Importance.IsSome then
                 str (string columnValidation.Importance)
             else
                 str "-"
         ]
-        td [][
+        td [] [
             if columnValidation.ValidationFormat.IsSome then
                 str columnValidation.ValidationFormat.Value.toReadableString
             else
                 str "-"
         ]
-        td [][
-            Icon.icon [][
-                Fa.i [Fa.Solid.ChevronDown][]
+        td [] [
+            Icon.icon [] [
+                Fa.i [Fa.Solid.ChevronDown] []
             ]
         ]
     ]
@@ -133,11 +133,11 @@ let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValida
         label [
             Class "checkbox-label"
             HtmlFor (sprintf "checkradio%i%s" id contentType)
-        ][str contentType]
+        ] [str contentType]
         label [
             Class "checkbox-checkmark";
             HtmlFor (sprintf "checkradio%i%s" id contentType)
-        ][]
+        ] []
     ]
 
 
@@ -167,11 +167,11 @@ let checkradioList (ind:int) colVal model dispatch =
 
 
 let sliderElements id columnValidation model dispatch =
-    div [][
-        Field.div [Field.HasAddons][
+    div [] [
+        Field.div [Field.HasAddons] [
             for i in 1 .. 5 do
                 yield
-                    Control.div [][
+                    Control.div [] [
                         Button.a [
                             Button.Color IsWarning
                             Button.IsOutlined
@@ -185,7 +185,7 @@ let sliderElements id columnValidation model dispatch =
                                     updateTableValidationByColValidation model nextColumnValidation
                                 UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
                                 )
-                        ][
+                        ] [
                             Fa.span [
                                 Fa.Size Fa.FaLarge
                                 if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
@@ -193,7 +193,7 @@ let sliderElements id columnValidation model dispatch =
                                 else
                                     Fa.Regular.Star
                                 //Fa.Props [Style [Color NFDIColors.Yellow.Base]]
-                            ][]
+                            ] []
                         ]
                     ]
             yield
@@ -210,11 +210,11 @@ let sliderElements id columnValidation model dispatch =
                             updateTableValidationByColValidation model nextColumnValidation
                         UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
                         )
-                ][
+                ] [
                     Fa.span [
                         Fa.Size Fa.FaLarge
                         Fa.Solid.Backspace
-                    ][]
+                    ] []
                 ]
         ]
     ]
@@ -226,14 +226,14 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
             true
         | _ ->
             false
-    tr [][
+    tr [] [
         td [
             ColSpan 4
             Style [
                 Padding "0";
                 if isVisible then BorderBottom (sprintf "2px solid %s" NFDIColors.Mint.Base)
             ]
-        ][
+        ] [
             Box.box' [
                 Props [
                     Style [
@@ -244,20 +244,20 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
                         Color model.SiteStyleState.ColorMode.Text
                     ]
                 ]
-            ][
-                Columns.columns [][
-                    Column.column [][
-                        b [][str "Content Type"]
+            ] [
+                Columns.columns [] [
+                    Column.column [] [
+                        b [] [str "Content Type"]
 
-                        Help.help [Help.Props [Style [MarginBottom "1rem"]]][str "Select the specific type of content for the selected column."]
+                        Help.help [Help.Props [Style [MarginBottom "1rem"]]] [str "Select the specific type of content for the selected column."]
                     
                         yield! checkradioList ind columnValidation model dispatch
 
                     ]
-                    Column.column [][
-                        b [][str "Importance"]
+                    Column.column [] [
+                        b [] [str "Importance"]
 
-                        Help.help [][str "Define how important it is to fill in the column correctly."]
+                        Help.help [] [str "Define how important it is to fill in the column correctly."]
 
                         sliderElements ind columnValidation model dispatch
                     ]
@@ -274,7 +274,7 @@ let validationElements (model:Model) dispatch =
             Padding "0.25rem 1rem"
             MarginBottom "1rem"
         ]
-    ][
+    ] [
         Field.div [Field.Props [Style [
             Width "100%"
         ]]] [
@@ -286,7 +286,7 @@ let validationElements (model:Model) dispatch =
                     header?style?opacity <- 1
                     header?style?transition <- "unset"
                 )
-            ][
+            ] [
                 str model.ValidationState.TableValidationScheme.AnnotationTable
                 str " - "
                 str ( model.ValidationState.TableValidationScheme.DateTime.ToString("yyyy-MM-dd HH:mm") )
@@ -324,7 +324,7 @@ let validationElements (model:Model) dispatch =
 
             /// Show warning if no validation format was found
             if model.ValidationState.TableValidationScheme.SwateVersion = "" then
-                Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color NFDIColors.Red.Lighter10]]][
+                Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color NFDIColors.Red.Lighter10]]] [
                     str """No checklist for this table found! Hit "Add checklist to workbook" to add a checklist for the active annotation table."""
                 ]
 
@@ -354,7 +354,7 @@ let validationComponent model dispatch =
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Checklist Editor"]
 
-        Help.help [][
+        Help.help [] [
             str "Display a table representation and add information to later validate values in the table according to their respective column."
         ]
 
@@ -374,8 +374,8 @@ let validationComponent model dispatch =
                 Class (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
                 Tooltip.dataTooltip """When hitting "Add checklist to workbook" this information will be saved as part of the workbook."""
                 Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"]
-            ][
-                Fa.i [ Fa.Solid.InfoCircle ][]
+            ] [
+                Fa.i [ Fa.Solid.InfoCircle ] []
             ]
         ]
 

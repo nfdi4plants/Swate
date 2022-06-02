@@ -22,21 +22,21 @@ let curatedOrganisationNames = [
 ]
 
 let breadcrumbEle (model:Model) dispatch =
-    Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
-        Breadcrumb.item [][
+    Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator] [
+        Breadcrumb.item [] [
             a [
                 OnClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
-            ][
+            ] [
                 str (Routing.Route.Protocol.toStringRdbl)
             ]
         ];
         Breadcrumb.item [
             Breadcrumb.Item.IsActive true
-        ][
+        ] [
             a [
                 Style [Color model.SiteStyleState.ColorMode.Text]
                 OnClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
-            ][
+            ] [
                 str Routing.Route.ProtocolSearch.toStringRdbl
             ]
         ]
@@ -47,7 +47,7 @@ let sortButton icon msg =
         Button.IsOutlined
         Button.Color IsPrimary
         Button.OnClick msg
-    ][
+    ] [
         Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
     ]
 
@@ -84,7 +84,7 @@ let fileSortElements (model:Model) dispatch =
             sortedTags, sortedErTags
         else
             [||], [||]
-    div [ Style [MarginBottom "0.75rem"] ][
+    div [ Style [MarginBottom "0.75rem"] ] [
         Columns.columns [Columns.IsMobile; Columns.Props [Style [MarginBottom "0";]]] [
             Column.column [ ] [
                 Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text; MinWidth "91px"; WhiteSpace WhiteSpaceOptions.Nowrap]]] [str "Search by protocol name"]
@@ -125,28 +125,28 @@ let fileSortElements (model:Model) dispatch =
                         if hitTagList |> Array.isEmpty && hitErTagList |> Array.isEmpty then Display DisplayOptions.None
                     ]]] [
                         if hitErTagList <> [||] then
-                            Label.label [][str "Endpoint Repositories"]
-                            Tag.list [][
+                            Label.label [] [str "Endpoint Repositories"]
+                            Tag.list [] [
                                 for tagSuggestion in hitErTagList do
                                     yield
                                         Tag.tag [
                                             Tag.CustomClass "clickableTag"
                                             Tag.Color IsLink
                                             Tag.Props [ OnClick (fun _ -> AddProtocolErTag tagSuggestion |> ProtocolMsg |> dispatch) ]
-                                        ][
+                                        ] [
                                             str tagSuggestion
                                         ]
                             ]
                         if hitTagList <> [||] then
-                            Label.label [][str "Tags"]
-                            Tag.list [][
+                            Label.label [] [str "Tags"]
+                            Tag.list [] [
                                 for tagSuggestion in hitTagList do
                                     yield
                                         Tag.tag [
                                             Tag.CustomClass "clickableTag"
                                             Tag.Color IsInfo
                                             Tag.Props [ OnClick (fun _ -> AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch) ]
-                                        ][
+                                        ] [
                                             str tagSuggestion
                                         ]
                             ]
@@ -156,13 +156,13 @@ let fileSortElements (model:Model) dispatch =
         ]
         /// Only show the tag list and tag filter (AND or OR) if any tag exists
         if model.ProtocolState.ProtocolFilterErTags <> [] || model.ProtocolState.ProtocolFilterTags <> [] then
-            Columns.columns [Columns.IsMobile][
-                Column.column [][
-                    Field.div [Field.IsGroupedMultiline][
+            Columns.columns [Columns.IsMobile] [
+                Column.column [] [
+                    Field.div [Field.IsGroupedMultiline] [
                         for selectedTag in model.ProtocolState.ProtocolFilterErTags do
                             yield
                                 Control.div [ ] [
-                                    Tag.list [Tag.List.HasAddons][
+                                    Tag.list [Tag.List.HasAddons] [
                                         Tag.tag [Tag.Color IsLink; Tag.Props [Style [Border "0px"]]] [str selectedTag]
                                         Tag.delete [
                                             Tag.CustomClass "clickableTagDelete"
@@ -176,7 +176,7 @@ let fileSortElements (model:Model) dispatch =
                         for selectedTag in model.ProtocolState.ProtocolFilterTags do
                             yield
                                 Control.div [ ] [
-                                    Tag.list [Tag.List.HasAddons][
+                                    Tag.list [Tag.List.HasAddons] [
                                         Tag.tag [Tag.Color IsInfo; Tag.Props [Style [Border "0px"]]] [str selectedTag]
                                         Tag.delete [
                                             Tag.CustomClass "clickableTagDelete"
@@ -193,7 +193,7 @@ let fileSortElements (model:Model) dispatch =
                 Column.column [
                     Column.Width (Screen.All, Column.IsNarrow)
                     Column.Props [Title (if model.ProtocolState.TagFilterIsAnd then "Templates contain all tags." else "Templates contain at least one tag.")]
-                ][
+                ] [
                     Switch.switchInline [
                         Switch.Color Color.IsDark
                         Switch.LabelProps [Style [UserSelect UserSelectOptions.None]]
@@ -211,15 +211,15 @@ let fileSortElements (model:Model) dispatch =
             ]
     ]
 
-let private curatedTag = Tag.tag [Tag.Color IsSuccess][str "curated"]
-let private communitytag = Tag.tag [Tag.Color IsWarning][str "community"]
+let private curatedTag = Tag.tag [Tag.Color IsSuccess] [str "curated"]
+let private communitytag = Tag.tag [Tag.Color IsWarning] [str "community"]
 let private curatedCommunityTag =
     Tag.tag [
         Tag.Props [Style [Background "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)"]]
         Tag.Color IsSuccess
-    ][
-        span [Style [MarginRight "0.75em"]][str "cur"]
-        span [Style [MarginLeft "0.75em"; Color "rgba(0, 0, 0, 0.7)"]][str "com"]  
+    ] [
+        span [Style [MarginRight "0.75em"]] [str "cur"]
+        span [Style [MarginLeft "0.75em"; Color "rgba(0, 0, 0, 0.7)"]] [str "com"]  
     ]
 
 let protocolElement i (sortedTable:Template []) (model:Model) dispatch =
@@ -259,12 +259,12 @@ let protocolElement i (sortedTable:Template []) (model:Model) dispatch =
                 else
                     communitytag
             ]
-            //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt][]] ]
+            //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt] []] ]
             td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str prot.Version ]
             td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string prot.Used) ]
-            td [][
-                Icon.icon [][
-                    Fa.i [Fa.Solid.ChevronDown][]
+            td [] [
+                Icon.icon [] [
+                    Fa.i [Fa.Solid.ChevronDown] []
                 ]
             ]
 
@@ -280,35 +280,35 @@ let protocolElement i (sortedTable:Template []) (model:Model) dispatch =
                 ]
                 ColSpan 5
             ] [
-                Box.box' [Props [Style [BorderRadius "0px"; yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode]]][
-                    Columns.columns [][
-                        Column.column [][
-                            Text.div [][
+                Box.box' [Props [Style [BorderRadius "0px"; yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode]]] [
+                    Columns.columns [] [
+                        Column.column [] [
+                            Text.div [] [
                                 str prot.Description
-                                div [][
+                                div [] [
                                     Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
                                         b [] [str "Author: "]
                                         str (prot.Authors.Replace(",",", "))
                                     ]
                                     Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
-                                        b [][str "Created: "]
+                                        b [] [str "Created: "]
                                         str (prot.LastUpdated.ToString("yyyy/MM/dd"))
                                     ]
                                 ]
                             ]
                         ]
                     ]
-                    Tag.list [][
+                    Tag.list [] [
                         for tag in prot.Er_Tags do
                             yield
-                                Tag.tag [Tag.Color IsLink][
+                                Tag.tag [Tag.Color IsLink] [
                                     str tag
                                 ]
                     ]
-                    Tag.list [][
+                    Tag.list [] [
                         for tag in prot.Tags do
                             yield
-                                Tag.tag [Tag.Color IsInfo][
+                                Tag.tag [Tag.Color IsInfo] [
                                     str tag
                                 ]
                     ]
@@ -402,11 +402,11 @@ let protocolElementContainer (model:Model) dispatch =
         |> sortTableBySearchQuery
 
     mainFunctionContainer [
-        Field.div [][
-            Help.help [][
-                b [][str "Search for protocol templates."]
+        Field.div [] [
+            Help.help [] [
+                b [] [str "Search for protocol templates."]
                 str " For more information you can look "
-                a [ Href Shared.URLs.SwateWiki; Target "_Blank" ][str "here"]
+                a [ Href Shared.URLs.SwateWiki; Target "_Blank" ] [str "here"]
                 str ". If you find any problems with a template or have other suggestions you can contact us "
                 a [ Href URLs.Helpdesk.UrlTemplateTopic; Target "_Blank" ] [str "here"]
                 str "."
@@ -418,17 +418,17 @@ let protocolElementContainer (model:Model) dispatch =
             Table.IsStriped
             Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text]]
         ] [
-            thead [][
-                tr [][
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][ str "Protocol Name"      ]
-                    //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Documentation"      ]
-                    th [][curatedCommunityFilterElement model dispatch]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Protocol Version"   ]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ][ str "Uses"               ]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ][]
+            thead [] [
+                tr [] [
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ] [ str "Protocol Name"      ]
+                    //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Documentation"      ]
+                    th [] [curatedCommunityFilterElement model dispatch]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Protocol Version"   ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Uses"               ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ] []
                 ]
             ]
-            tbody [][
+            tbody [] [
                 for i in 0 .. sortedTable.Length-1 do
                     yield!
                         protocolElement i sortedTable model dispatch
@@ -447,7 +447,7 @@ let protocolSearchViewComponent (model:Model) dispatch =
         breadcrumbEle model dispatch
 
         if isEmpty && not isLoading then
-            Help.help [Help.Color IsDanger][str "No Protocols were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
+            Help.help [Help.Color IsDanger] [str "No Protocols were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
 
         if isLoading then
             CustomComponents.Loading.loadingModal

@@ -130,8 +130,8 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ]
 
     | Routing.Route.Home ->
-        Container.container [][
-            div [][ str "This is the Swate web host. For a preview click on the following link." ]
+        Container.container [] [
+            div [] [ str "This is the Swate web host. For a preview click on the following link." ]
             a [ Href (Routing.Route.toRouteUrl Routing.Route.TermSearch) ] [ str "Termsearch" ]
         ]
 

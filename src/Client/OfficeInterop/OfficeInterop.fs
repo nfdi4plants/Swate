@@ -1,4 +1,4 @@
-module OfficeInterop
+module OfficeInterop.Core
 
 open System.Collections.Generic
 open Fable.Core

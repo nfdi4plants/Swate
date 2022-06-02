@@ -34,17 +34,17 @@ open Messages
 let defaultMessageEle (model:Model) dispatch =
     
     mainFunctionContainer [
-        Field.div [][
-            Help.help [][
+        Field.div [] [
+            Help.help [] [
                 str "Use this function to create a prewritten template metadata worksheet."
             ]
         ]
-        Field.div [][
+        Field.div [] [
             Button.a [
                 Button.OnClick(fun e -> CreateTemplateMetadataWorksheet Metadata.root |> TemplateMetadataMsg |> dispatch)
                 Button.IsFullWidth
                 Button.Color IsInfo
-            ][
+            ] [
                 str "Create metadata"
             ]
         ]
@@ -53,7 +53,7 @@ let defaultMessageEle (model:Model) dispatch =
 let newNameMainElement (model:Messages.Model) dispatch =
     Content.content [] [
 
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Template Metadata"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Template Metadata"]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Create template metadata worksheet"]
 

@@ -14,8 +14,8 @@ open Browser.Types
 open Fulma.Extensions.Wikiki
 
 let toggleDarkModeElement (model:Model) dispatch =
-    Level.level [Level.Level.IsMobile][
-        Level.left [][
+    Level.level [Level.Level.IsMobile] [
+        Level.left [] [
             str "Darkmode"
         ]
         Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
@@ -37,8 +37,8 @@ let toggleDarkModeElement (model:Model) dispatch =
     ]
 
 let toggleRgbModeElement (model:Model) dispatch =
-    Level.level [Level.Level.IsMobile][
-        Level.left [][
+    Level.level [Level.Level.IsMobile] [
+        Level.left [] [
             str "RGB"
         ]
         Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
@@ -66,8 +66,8 @@ let toggleRgbModeElement (model:Model) dispatch =
     ]
 
 let customXmlSettings (model:Model) dispatch =
-    Level.level [Level.Level.IsMobile][
-        Level.left [][
+    Level.level [Level.Level.IsMobile] [
+        Level.left [] [
             str "Custom Xml"
         ]
         Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
@@ -75,7 +75,7 @@ let customXmlSettings (model:Model) dispatch =
                 Button.Color IsInfo
                 Button.IsOutlined
                 Button.OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch ) 
-            ][
+            ] [
                 str "Advanced Settings"
             ]
         ]
@@ -84,15 +84,15 @@ let customXmlSettings (model:Model) dispatch =
 let settingsViewComponent (model:Model) dispatch =
     div [
         //Style [MaxWidth "500px"]
-    ][
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Swate Settings"]
+    ] [
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Swate Settings"]
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Customize Swate"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Customize Swate"]
         toggleDarkModeElement model dispatch
 
         if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
             toggleRgbModeElement model dispatch
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][str "Advanced Settings"]
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Advanced Settings"]
         customXmlSettings model dispatch
     ]

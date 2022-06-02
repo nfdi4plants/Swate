@@ -16,7 +16,7 @@ let loadingComponent =
 let loadingModal =
     Modal.modal [ Modal.IsActive true ] [
         Modal.background [] []
-        Modal.content [Props [Style [Width "auto"]]][
+        Modal.content [Props [Style [Width "auto"]]] [
             Box.box' [ ] [
                 loadingComponent
             ]

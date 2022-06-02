@@ -15,7 +15,7 @@ module OfficeInterop =
         match excelInteropMsg with
 
         | AutoFitTable hidecols ->
-            let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run (OfficeInterop.autoFitTable hidecols)
+            let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run (OfficeInterop.Core.autoFitTable hidecols)
             let cmd =
                 Cmd.OfPromise.either
                     p
@@ -38,7 +38,7 @@ module OfficeInterop =
                     Cmd.ofMsg (GetAppVersion |> Request |> Api)
                     Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
                     Cmd.OfPromise.either
-                        OfficeInterop.tryFindActiveAnnotationTable
+                        OfficeInterop.Core.tryFindActiveAnnotationTable
                         ()
                         (AnnotationTableExists >> OfficeInteropMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -62,7 +62,7 @@ module OfficeInterop =
         | InsertOntologyTerm (term) ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.insertOntologyTerm  
+                    OfficeInterop.Core.insertOntologyTerm  
                     term
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -71,7 +71,7 @@ module OfficeInterop =
         | AddAnnotationBlock (minBuildingBlockInfo) ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.addAnnotationBlockHandler  
+                    OfficeInterop.Core.addAnnotationBlockHandler  
                     (minBuildingBlockInfo)
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -80,7 +80,7 @@ module OfficeInterop =
         | AddAnnotationBlocks minBuildingBlockInfos ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.addAnnotationBlocks
+                    OfficeInterop.Core.addAnnotationBlocks
                     minBuildingBlockInfos
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -89,7 +89,7 @@ module OfficeInterop =
         | RemoveAnnotationBlock ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.removeSelectedAnnotationBlock
+                    OfficeInterop.Core.removeSelectedAnnotationBlock
                     ()
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -98,7 +98,7 @@ module OfficeInterop =
         | UpdateUnitForCells (unitTerm) ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.updateUnitForCells
+                    OfficeInterop.Core.updateUnitForCells
                     unitTerm
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -107,7 +107,7 @@ module OfficeInterop =
         | CreateAnnotationTable (isDark, tryUsePrevOutput) ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.createAnnotationTable  
+                    OfficeInterop.Core.createAnnotationTable  
                     (isDark,tryUsePrevOutput)
                     (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -124,7 +124,7 @@ module OfficeInterop =
         | GetParentTerm ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.getParentTerm
+                    OfficeInterop.Core.getParentTerm
                     ()
                     (TermSearch.StoreParentOntologyFromOfficeInterop >> TermSearchMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -133,7 +133,7 @@ module OfficeInterop =
         | GetTableValidationXml ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.getTableRepresentation
+                    OfficeInterop.Core.getTableRepresentation
                     ()
                     (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -141,7 +141,7 @@ module OfficeInterop =
         | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.writeTableValidationToXml
+                    OfficeInterop.Core.writeTableValidationToXml
                     (newTableValidation, currentSwateVersion)
                     (curry GenericLog (GetTableValidationXml |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -151,7 +151,7 @@ module OfficeInterop =
         | DeleteAllCustomXml ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.deleteAllCustomXml
+                    OfficeInterop.Core.deleteAllCustomXml
                     ()
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -159,7 +159,7 @@ module OfficeInterop =
         | GetSwateCustomXml ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.getSwateCustomXml
+                    OfficeInterop.Core.getSwateCustomXml
                     ()
                     (Some >> SettingsXml.UpdateRawCustomXml >> SettingsXmlMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -167,7 +167,7 @@ module OfficeInterop =
         | UpdateSwateCustomXml newCustomXml ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.updateSwateCustomXml
+                    OfficeInterop.Core.updateSwateCustomXml
                     newCustomXml
                     (curry GenericLog (OfficeInteropMsg GetSwateCustomXml |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -176,7 +176,7 @@ module OfficeInterop =
         | FillHiddenColsRequest ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.getAllAnnotationBlockDetails 
+                    OfficeInterop.Core.getAllAnnotationBlockDetails 
                     ()
                     (SearchForInsertTermsRequest >> Request >> Api)
                     (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
@@ -191,7 +191,7 @@ module OfficeInterop =
             }
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.UpdateTableByTermsSearchable
+                    OfficeInterop.Core.UpdateTableByTermsSearchable
                     (termsWithSearchResult)
                     (curry GenericInteropLogs (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
@@ -208,7 +208,7 @@ module OfficeInterop =
         | InsertFileNames (fileNameList) ->
             let cmd = 
                 Cmd.OfPromise.either
-                    OfficeInterop.insertFileNamesFromFilePicker 
+                    OfficeInterop.Core.insertFileNamesFromFilePicker 
                     (fileNameList)
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -218,7 +218,7 @@ module OfficeInterop =
         | GetSelectedBuildingBlockTerms ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.getAnnotationBlockDetails
+                    OfficeInterop.Core.getAnnotationBlockDetails
                     ()
                     (fun x ->
                         let msg = InteropLogging.Msg.create InteropLogging.Debug $"{x}"
@@ -234,7 +234,7 @@ module OfficeInterop =
         | TryExcel  ->
             let cmd = 
                 Cmd.OfPromise.either
-                    OfficeInterop.exampleExcelFunction1
+                    OfficeInterop.Core.exampleExcelFunction1
                     ()
                     ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -242,7 +242,7 @@ module OfficeInterop =
         | TryExcel2 ->
             let cmd = 
                 Cmd.OfPromise.either
-                    OfficeInterop.exampleExcelFunction2 
+                    OfficeInterop.Core.exampleExcelFunction2 
                     ()
                     ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)

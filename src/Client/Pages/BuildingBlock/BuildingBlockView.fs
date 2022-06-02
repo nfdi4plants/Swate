@@ -210,7 +210,7 @@ let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit
             colorControl model.SiteStyleState.ColorMode
         ]
 
-    ][
+    ] [
         Text.span [
             CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
             Props [
@@ -229,11 +229,11 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ 
             str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString ))
         ]
-        Text.p [Props [Style [TextAlign TextAlignOptions.Justify]]][
+        Text.p [Props [Style [TextAlign TextAlignOptions.Justify]]] [
             span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> BuildingBlockType.toLongExplanation |> str]
             span [] [str " You can find more information on our "]
-            a [Href Shared.URLs.AnnotationPrinciplesUrl; Target "_blank"][str "website"]
-            span [][str "."]
+            a [Href Shared.URLs.AnnotationPrinciplesUrl; Target "_blank"] [str "website"]
+            span [] [str "."]
         ]
     ]
 
@@ -268,7 +268,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                             BuildingBlockType.Data              |> createBuildingBlockDropdownItem model dispatch
                             Dropdown.Item.div [
                                 Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)]
-                            ][
+                            ] [
                                 a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank" ] [ str "more" ]
                             ]
                         ] 
@@ -312,7 +312,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                                 Fa.Solid.Check
                             else
                                 Fa.Solid.Ban
-                        ][ ]
+                        ] [ ]
                     ]
                 ]
                 Control.p [] [
@@ -331,7 +331,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                     (model.AddBuildingBlockState.BuildingBlockHasUnit |> not)
             ]
 
-            div [][
+            div [] [
                 Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
                     a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
                         str "Use advanced search building block"
@@ -380,9 +380,9 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
     mainFunctionContainer [
         /// advanced unit term search 2
         AdvancedSearch.advancedSearchModal model autocompleteParamsUnit2.ModalId autocompleteParamsUnit2.InputId dispatch autocompleteParamsUnit2.OnAdvancedSearch
-        Field.div [][
-            Help.help [][
-                b [][str "Adds a unit to a complete building block." ]
+        Field.div [] [
+            Help.help [] [
+                b [] [str "Adds a unit to a complete building block." ]
                 str " If the building block already has a unit assigned, the new unit is only applied to selected rows of the selected column."
             ]
         ]
@@ -444,7 +444,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
 
     ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Annotation building block selection"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Annotation building block selection"]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks (columns) to the annotation table."]
         // Input forms, etc related to add building block.

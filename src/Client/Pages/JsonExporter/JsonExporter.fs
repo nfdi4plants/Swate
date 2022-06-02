@@ -103,7 +103,7 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
         }
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.getBuildingBlocksAndSheet
+                OfficeInterop.Core.getBuildingBlocksAndSheet
                 ()
                 (ParseTableServerRequest >> JsonExporterMsg)
                 (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
@@ -134,7 +134,7 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
     | ParseTablesOfficeInteropRequest ->
         let cmd =
             Cmd.OfPromise.either
-                OfficeInterop.getBuildingBlocksAndSheets
+                OfficeInterop.Core.getBuildingBlocksAndSheets
                 ()
                 (ParseTablesServerRequest >> JsonExporterMsg)
                 (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
@@ -224,7 +224,7 @@ let dropdownItem (exportType:JsonExportType) (model:Model) msg (isActive:bool) =
             Style [if isActive then BackgroundColor model.SiteStyleState.ColorMode.ControlForeground]
         ]
 
-    ][
+    ] [
         Text.span [
             CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
             Props [
@@ -240,21 +240,21 @@ let dropdownItem (exportType:JsonExportType) (model:Model) msg (isActive:bool) =
 
 let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
     mainFunctionContainer [
-        Field.div [Field.HasAddons][
-            Control.div [][
+        Field.div [Field.HasAddons] [
+            Control.div [] [
                 Dropdown.dropdown [
                     Dropdown.IsActive model.JsonExporterModel.ShowTableExportTypeDropdown
-                ][
-                    Dropdown.trigger [][
+                ] [
+                    Dropdown.trigger [] [
                         Button.a [
                             Button.OnClick (fun e -> e.stopPropagation(); UpdateShowTableExportTypeDropdown (not model.JsonExporterModel.ShowTableExportTypeDropdown) |> JsonExporterMsg |> dispatch )
-                        ][
+                        ] [
                             span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.TableJsonExportType.ToString())]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
-                    Dropdown.menu [][
-                        Dropdown.content [][
+                    Dropdown.menu [] [
+                        Dropdown.content [] [
                             let msg = (UpdateTableJsonExportType >> JsonExporterMsg >> dispatch)
                             dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.Assay)
                             dropdownItem JsonExportType.Table model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.Table)
@@ -263,14 +263,14 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
                     ]
                 ]
             ]
-            Control.div [Control.IsExpanded][
+            Control.div [Control.IsExpanded] [
                 Button.a [
                     Button.Color IsInfo
                     Button.IsFullWidth
                     Button.OnClick(fun e ->
                         JsonExporterMsg ParseTableOfficeInteropRequest |> dispatch
                     )
-                ][
+                ] [
                     str "Download as isa json"
                 ]
             ]
@@ -279,21 +279,21 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
 
 let parseTablesToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
     mainFunctionContainer [
-        Field.div [Field.HasAddons][
-            Control.div [][
+        Field.div [Field.HasAddons] [
+            Control.div [] [
                 Dropdown.dropdown [
                     Dropdown.IsActive model.JsonExporterModel.ShowWorkbookExportTypeDropdown
-                ][
-                    Dropdown.trigger [][
+                ] [
+                    Dropdown.trigger [] [
                         Button.a [
                             Button.OnClick (fun e -> e.stopPropagation(); UpdateShowWorkbookExportTypeDropdown (not model.JsonExporterModel.ShowWorkbookExportTypeDropdown) |> JsonExporterMsg |> dispatch )
-                        ][
+                        ] [
                             span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.WorkbookJsonExportType.ToString())]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
-                    Dropdown.menu [][
-                        Dropdown.content [][
+                    Dropdown.menu [] [
+                        Dropdown.content [] [
                             let msg = (UpdateWorkbookJsonExportType >> JsonExporterMsg >> dispatch)
                             dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.Assay)
                             dropdownItem JsonExportType.Table model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.Table)
@@ -302,14 +302,14 @@ let parseTablesToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
                     ]
                 ]
             ]
-            Control.div [Control.IsExpanded][
+            Control.div [Control.IsExpanded] [
                 Button.a [
                     Button.Color IsInfo
                     Button.IsFullWidth
                     Button.OnClick(fun e ->
                         JsonExporterMsg ParseTablesOfficeInteropRequest |> dispatch
                     )
-                ][
+                ] [
                     str "Download as isa json"
                 ]
             ]
@@ -319,7 +319,7 @@ let parseTablesToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
 // SND ELEMENT
 
 let fileUploadButton (model:Model) dispatch id =
-    Label.label [Label.Props [Style [FontWeight "normal";MarginBottom "0.5rem"]]][
+    Label.label [Label.Props [Style [FontWeight "normal";MarginBottom "0.5rem"]]] [
         Input.input [
             Input.Props [
                 Id id
@@ -353,7 +353,7 @@ let fileUploadButton (model:Model) dispatch id =
                 )
             ]
         ]
-        Button.a [Button.Color Color.IsInfo; Button.IsFullWidth][
+        Button.a [Button.Color Color.IsInfo; Button.IsFullWidth] [
             str "Upload Excel file"
         ]
     ]
@@ -365,21 +365,21 @@ let xlsxUploadAndParsingMainElement (model:Model) (dispatch: Msg -> unit) =
         /// Upload xlsx file to byte []
         fileUploadButton model dispatch inputId
         /// Request parsing
-        Field.div [Field.HasAddons][
-            Control.div [][
+        Field.div [Field.HasAddons] [
+            Control.div [] [
                 Dropdown.dropdown [
                     Dropdown.IsActive model.JsonExporterModel.ShowXLSXExportTypeDropdown
-                ][
-                    Dropdown.trigger [][
+                ] [
+                    Dropdown.trigger [] [
                         Button.a [
                             Button.OnClick (fun e -> e.stopPropagation(); UpdateShowXLSXExportTypeDropdown (not model.JsonExporterModel.ShowXLSXExportTypeDropdown) |> JsonExporterMsg |> dispatch )
-                        ][
+                        ] [
                             span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.XLSXParsingExportType.ToString())]
                             Fa.i [Fa.Solid.AngleDown] []
                         ]
                     ]
-                    Dropdown.menu [][
-                        Dropdown.content [][
+                    Dropdown.menu [] [
+                        Dropdown.content [] [
                             let msg = (UpdateXLSXParsingExportType >> JsonExporterMsg >> dispatch)
                             dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.Assay)
                             dropdownItem JsonExportType.Table model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.Table)
@@ -389,7 +389,7 @@ let xlsxUploadAndParsingMainElement (model:Model) (dispatch: Msg -> unit) =
                     ]
                 ]
             ]
-            Control.div [Control.IsExpanded][
+            Control.div [Control.IsExpanded] [
                 Button.a [
                     let hasContent = model.JsonExporterModel.XLSXByteArray <> Array.empty
                     Button.Color IsInfo
@@ -402,7 +402,7 @@ let xlsxUploadAndParsingMainElement (model:Model) (dispatch: Msg -> unit) =
                     Button.OnClick(fun e ->
                         ParseXLSXToJsonRequest model.JsonExporterModel.XLSXByteArray |> JsonExporterMsg |> dispatch
                     )
-                ][
+                ] [
                     str "Download as isa json"
                 ]
             ]
@@ -419,13 +419,13 @@ let jsonExporterMainElement (model:Messages.Model) (dispatch: Messages.Msg -> un
         Style [MinHeight "100vh"]
     ]] [
 
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Json Exporter"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Json Exporter"]
 
-        Help.help [][
+        Help.help [] [
             str "Export swate annotation tables to "
-            a [Href @"https://en.wikipedia.org/wiki/JSON"][str "JSON"]
+            a [Href @"https://en.wikipedia.org/wiki/JSON"] [str "JSON"]
             str " format. Official ISA-JSON types can be found "
-            a [Href @"https://isa-specs.readthedocs.io/en/latest/isajson.html#"][str "here"]
+            a [Href @"https://isa-specs.readthedocs.io/en/latest/isajson.html#"] [str "here"]
             str "."
         ]
 

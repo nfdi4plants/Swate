@@ -174,15 +174,15 @@ let update (msg:Msg) (currentState: SettingsXml.Model) : SettingsXml.Model * Cmd
 open Messages
 
 let dangerZone (model:Model) dispatch =
-    div [][
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]][str "Dangerzone"]
+    div [] [
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]] [str "Dangerzone"]
         Container.container [
             Container.Props [Style [
                 Padding "1rem"
                 Border (sprintf "2.5px solid %s" NFDIColors.Red.Base)
                 BorderRadius "10px"
             ]]
-        ][
+        ] [
             Button.a [
                 Button.Color Color.IsDanger
                 Button.IsFullWidth
@@ -190,37 +190,37 @@ let dangerZone (model:Model) dispatch =
                 Button.Props [Style []; Title "Be sure you know what you do. This cannot be undone!"]
             ] [
                 Icon.icon [ ] [
-                    Fa.i [Fa.Solid.ExclamationTriangle][]
+                    Fa.i [Fa.Solid.ExclamationTriangle] []
                 ]
                 span [] [str "Delete All Custom Xml!"]
                 Icon.icon [ ] [
-                    Fa.i [Fa.Solid.ExclamationTriangle][]
+                    Fa.i [Fa.Solid.ExclamationTriangle] []
                 ]
             ]
         ]
     ]
 
 let breadcrumbEle model dispatch =
-    Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator][
-        Breadcrumb.item [][
+    Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator] [
+        Breadcrumb.item [] [
             a [
                 OnClick (fun e -> UpdatePageState (Some Routing.Route.Settings) |> dispatch)
-            ][
+            ] [
                 str (Routing.Route.Settings.toStringRdbl)
             ]
         ]
-        Breadcrumb.item [ Breadcrumb.Item.IsActive true ][
+        Breadcrumb.item [ Breadcrumb.Item.IsActive true ] [
             a [
                 Style [Color model.SiteStyleState.ColorMode.Text]
                 OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch)
-            ][
+            ] [
                 str Routing.Route.SettingsXml.toStringRdbl
             ]
         ]
     ]
 
 let showRawCustomXmlButton model dispatch =
-    Field.div [][
+    Field.div [] [
         Button.a [
             Button.Color Color.IsInfo
             Button.IsFullWidth
@@ -232,9 +232,9 @@ let showRawCustomXmlButton model dispatch =
     ]
 
 let textAreaEle (model:Model) dispatch = 
-    Columns.columns [Columns.IsMobile][
-        Column.column [][
-            Control.div [][
+    Columns.columns [Columns.IsMobile] [
+        Column.column [] [
+            Control.div [] [
                 Textarea.textarea [
                     Textarea.OnChange (fun e ->
                         SettingsXml.UpdateNextRawCustomXml (Some e.Value) |> SettingsXmlMsg |> dispatch
@@ -246,8 +246,8 @@ let textAreaEle (model:Model) dispatch =
         ]
         Column.column [
             Column.Width (Screen.All,Column.IsNarrow)
-        ][
-            Field.div [][
+        ] [
+            Field.div [] [
                 Button.a [
                     Button.Props [
                         Style [Width "40.5px"]
@@ -273,11 +273,11 @@ let textAreaEle (model:Model) dispatch =
                         Browser.Dom.document.body.removeChild(textArea) |> ignore
                         ()
                     )
-                ][
+                ] [
                     CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_customxmlSettings_rawXml" Fa.Regular.Clipboard Fa.Solid.Check
                 ]
             ]
-            Field.div [][
+            Field.div [] [
                 Button.a [
                     Button.IsStatic (model.SettingsXmlState.NextRawXml = model.SettingsXmlState.RawXml)
                     Button.Props [
@@ -309,32 +309,32 @@ let textAreaEle (model:Model) dispatch =
 
 let showRawCustomXmlEle (model:Model) dispatch =
     mainFunctionContainer [
-        Field.div [][
-            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]][
+        Field.div [] [
+            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]] [
                 str "Here you can display all custom xml of your Swate table. This can help debug your Swate table and/or fix any problems occuring."
             ]
         ]
 
-        Field.div [][
-            Columns.columns [Columns.IsMobile][
-                Column.column [][
+        Field.div [] [
+            Columns.columns [Columns.IsMobile] [
+                Column.column [] [
                     showRawCustomXmlButton model dispatch
                 ]
                 if model.SettingsXmlState.RawXml.IsSome then
-                    Column.column [Column.Width (Screen.All,Column.IsNarrow)][
+                    Column.column [Column.Width (Screen.All,Column.IsNarrow)] [
                         Button.a [
                             Button.OnClick (fun e -> SettingsXml.UpdateRawCustomXml None |> SettingsXmlMsg |> dispatch)
                             Button.Color IsDanger
                             Button.Props [Title "Remove custom xml from the text area"]
-                        ][
-                            Fa.i [Fa.Solid.Times][]
+                        ] [
+                            Fa.i [Fa.Solid.Times] []
                         ]
                     ]
             ]
         ]
 
         if model.SettingsXmlState.RawXml.IsSome then
-            Field.div [][
+            Field.div [] [
                 textAreaEle model dispatch
             ]
     ]
@@ -354,7 +354,7 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //        Button.OnClick (fun e ->
 //            GetAllValidationXmlParsedRequest |> SettingsXmlMsg |> dispatch
 //        )
-//    ][
+//    ] [
 //        str "Load checklist xml"
 //    ]
 
@@ -364,8 +364,8 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //        Button.OnClick (fun e ->
 //            UpdateValidationXmls [||] |> SettingsXmlMsg |> dispatch
 //        )
-//    ][
-//        Fa.i [Fa.Solid.Times][]
+//    ] [
+//        Fa.i [Fa.Solid.Times] []
 //    ]
 
 
@@ -394,7 +394,7 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //            }
 //            ReassignCustomXmlRequest (prevXml,newXml) |> SettingsXmlMsg |> dispatch
 //        )
-//    ][
+//    ] [
 //        text [if isNextValidForWorkbook then Style [Color "white"]] [str "Apply Changes"]
 //    ]
 
@@ -408,7 +408,7 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //            UpdateWarningModal nM |> dispatch
 //        )
 //        Button.Color IsDanger
-//    ][
+//    ] [
 //        str "Remove"
 //    ]
 
@@ -437,8 +437,8 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //        Table.IsFullWidth
 //        Table.IsBordered
 //        Table.IsStriped
-//    ][
-//        thead [][
+//    ] [
+//        thead [] [
 //            tr [
 //                Style [Cursor "pointer"]
 //                Class "hoverTableEle"
@@ -446,11 +446,11 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //                    let next = if isActive then None else Some tableValidation
 //                    UpdateActiveSwateValidation next |> SettingsXmlMsg |> dispatch
 //                )
-//            ][
+//            ] [
 //                th [
 //                    Style [if not isValidForWorkBook then Color NFDIColors.Red.Base else Color NFDIColors.Mint.Base]
 //                    Title ""
-//                ][
+//                ] [
 //                    if isActive then
 //                        Input.text [
 //                            if isValidForWorkBook || isNextValidForWorkbook then Input.Color IsSuccess else Input.Color IsDanger
@@ -472,7 +472,7 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //                ]
 //                th [
 //                    Style [if not isValidForWorkBook then Color NFDIColors.Red.Base else Color NFDIColors.Mint.Base]
-//                ][
+//                ] [
 //                    if isActive then
 //                        Input.text [
 //                            if isValidForWorkBook || isNextValidForWorkbook then Input.Color IsSuccess else Input.Color IsDanger
@@ -492,8 +492,8 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //                    else
 //                        str tableValidation.AnnotationTable.Worksheet
 //                ]
-//                th [][str tableValidation.SwateVersion]
-//                th [][str ( sprintf "%s %s" (tableValidation.DateTime.ToShortDateString()) (tableValidation.DateTime.ToShortTimeString()) )]
+//                th [] [str tableValidation.SwateVersion]
+//                th [] [str ( sprintf "%s %s" (tableValidation.DateTime.ToShortDateString()) (tableValidation.DateTime.ToShortTimeString()) )]
 //            ]
 //        ]
 //        tbody [Style [
@@ -508,23 +508,23 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //                let importance = if col.Importance.IsSome then string col.Importance.Value else "-"
 //                let colAdress = if col.ColumnAdress.IsSome then string col.ColumnAdress.Value else "-"
 //                yield
-//                    tr [][
-//                        td [][str col.ColumnHeader]
-//                        td [][str valFormat]
-//                        td [][str importance]
-//                        td [][str colAdress]
+//                    tr [] [
+//                        td [] [str col.ColumnHeader]
+//                        td [] [str valFormat]
+//                        td [] [str importance]
+//                        td [] [str colAdress]
 //                    ]
 //            yield
 //                tr [] [
-//                    td [ColSpan 4][
-//                        Level.level [Level.Level.IsMobile][
-//                            Level.left [][
-//                                Level.item [][
+//                    td [ColSpan 4] [
+//                        Level.level [Level.Level.IsMobile] [
+//                            Level.left [] [
+//                                Level.item [] [
 //                                    applyChangesToTableValidationButton model dispatch tableValidation isNextValidForWorkbook
 //                                ]
 //                            ]
-//                            Level.right [][
-//                                Level.item [][
+//                            Level.right [] [
+//                                Level.item [] [
 //                                    removeTableValidationButton model dispatch tableValidation
 //                                ]
 //                            ]
@@ -545,29 +545,29 @@ let showRawCustomXmlEle (model:Model) dispatch =
 //            Padding "0.25rem 1rem"
 //            MarginBottom "1rem"
 //        ]
-//    ][
-//        Field.div [][
-//            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]][
+//    ] [
+//        Field.div [] [
+//            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]] [
 //                str "This block will display all checklist xml for this workbook. You can then remove single elements or assign
 //                them to a new table-sheet combination. Should Swate find any information not related to an existing table-sheet
 //                combination these will be marked in red."
 //            ]
 //        ]
 
-//        Field.div [][
-//            Columns.columns [Columns.IsMobile][
-//                Column.column [][
+//        Field.div [] [
+//            Columns.columns [Columns.IsMobile] [
+//                Column.column [] [
 //                    getValidationXmlButton model dispatch
 //                ]
 //                if model.SettingsXmlState.ValidationXmls |> Array.isEmpty |> not then
-//                    Column.column [Column.Width (Screen.All,Column.IsNarrow)][
+//                    Column.column [Column.Width (Screen.All,Column.IsNarrow)] [
 //                        removeValidationXmlButton model dispatch
 //                    ]
 //            ]
 //        ]
 
 //        if model.SettingsXmlState.ValidationXmls |> Array.isEmpty |> not then
-//            Field.div [][
+//            Field.div [] [
 //                for validation in model.SettingsXmlState.ValidationXmls do
 //                    yield
 //                        displaySingleTableValidationEle model dispatch validation tryFindMap
@@ -586,7 +586,7 @@ let settingsXmlViewComponent (model:Model) dispatch =
     ] [
         breadcrumbEle model dispatch
 
-        Help.help [][str "The functions on this page allow direct manipulation of the Xml used to save additional information about your Swate table. Please use them with care."]
+        Help.help [] [str "The functions on this page allow direct manipulation of the Xml used to save additional information about your Swate table. Please use them with care."]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display raw custom xml."]
         showRawCustomXmlEle model dispatch

@@ -188,7 +188,7 @@ let createAutocompleteSuggestions
         tr [
             colorControl colorMode
             Class "suggestion"
-        ][
+        ] [
             td [ColSpan 4] [
                 str (sprintf "%s " autocompleteParams.AdvancedSearchLinkText)
                 str "Try "
@@ -203,7 +203,7 @@ let createAutocompleteSuggestions
         tr [
             colorControl colorMode
             Class "suggestion"
-        ][
+        ] [
             td [ColSpan 4] [
                 str "Still can't find what you need? Get in "
                 a [Href Shared.URLs.Helpdesk.UrlOntologyTopic; Target "_Blank"] [
@@ -316,9 +316,9 @@ let autocompleteTermSearchComponentOfParentOntology
 
     Control.div [Control.IsExpanded] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
-        Field.div [Field.HasAddons][
+        Field.div [Field.HasAddons] [
             parentOntologyNotificationElement ((model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology) |> not)
-            Control.p [Control.IsExpanded][
+            Control.p [Control.IsExpanded] [
                 Input.input [
                     Input.Props [Id autocompleteParams.InputId]
                     Input.Placeholder inputPlaceholderText

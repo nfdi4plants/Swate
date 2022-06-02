@@ -29,8 +29,8 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
             OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
         ] [
             Text.span [] [
-                span [Class "hideUnder775px"][str pageLink.toStringRdbl]
-                span [Class "hideOver775px"][pageLink |> Routing.Route.toIcon]
+                span [Class "hideUnder775px"] [str pageLink.toStringRdbl]
+                span [Class "hideOver775px"] [pageLink |> Routing.Route.toIcon]
             ]
 
         ]
@@ -74,9 +74,9 @@ let tabs (model:Model) dispatch =
 //    tabRow model dispatch [ ]
 
 let footerContentStatic (model:Model) dispatch =
-    div [][
+    div [] [
         str "Swate Release Version "
-        a [Href "https://github.com/nfdi4plants/Swate/releases"][str model.PersistentStorageState.AppVersion]
+        a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
     ]
 
 let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement list) =
@@ -136,7 +136,7 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
                 ]
         ]
 
-        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]][
+        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]] [
             footerContentStatic model dispatch
         ]
     ]
