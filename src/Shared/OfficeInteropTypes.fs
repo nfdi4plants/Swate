@@ -1,5 +1,7 @@
 namespace Shared
 
+open System
+
 module OfficeInteropTypes =
 
     open Shared.TermTypes
@@ -29,26 +31,37 @@ module OfficeInteropTypes =
         | Factor            
         | Characteristics
         | Source
-        | Sample            
-        | Data
+        | Sample
+        | Data // [<ObsoleteAttribute>] 
+        | RawDataFile
+        | DerivedDataFile
 
-        static member listAll = [ Parameter; Factor; Characteristics; Source; Sample; Data ]
+        static member listAll = [
+            Parameter; Factor; Characteristics;
+            //input
+            Source;
+            //output
+            Sample; RawDataFile; DerivedDataFile;
+            Data // deprecated
+        ]
 
         member this.isInputColumn =
             match this with | Source -> true | anythingElse -> false
 
         member this.isOutputColumn =
-            match this with | Data | Sample -> true | anythingElse -> false
+            match this with | Data | Sample | RawDataFile | DerivedDataFile -> true | anythingElse -> false
 
         static member ofString str =
             match str with
-            | "Parameter"       -> Parameter
-            | "Factor"          -> Factor         
-            | "Characteristics" -> Characteristics
-            | "Sample Name"     -> Sample         
-            | "Data File Name"  -> Data           
-            | "Source Name"     -> Source
-            | anythingElse      -> failwith $"Error: Unable to parse {anythingElse} to BuildingBlockType!"
+            | "Parameter"           -> Parameter
+            | "Factor"              -> Factor         
+            | "Characteristics"     -> Characteristics
+            | "Sample Name"         -> Sample         
+            | "Data File Name"      -> Data
+            | "Raw Data File"       -> RawDataFile
+            | "Derived Data File"   -> DerivedDataFile
+            | "Source Name"         -> Source
+            | anythingElse          -> failwith $"Error: Unable to parse {anythingElse} to BuildingBlockType!"
 
         static member tryOfString str =
             match str with
@@ -56,7 +69,9 @@ module OfficeInteropTypes =
             | "Factor"          -> Some Factor         
             | "Characteristics" -> Some Characteristics
             | "Sample Name"     -> Some Sample         
-            | "Data File Name"  -> Some Data           
+            | "Data File Name"  -> Some Data
+            | "Raw Data File"       -> Some RawDataFile
+            | "Derived Data File"   -> Some DerivedDataFile
             | "Source Name"     -> Some Source
             | anythingElse      -> None
 
@@ -67,6 +82,8 @@ module OfficeInteropTypes =
             | Characteristics   -> "Characteristics"
             | Sample            -> "Sample Name"
             | Data              -> "Data File Name"
+            | RawDataFile       -> "Raw Data File"
+            | DerivedDataFile   -> "Derived Data File"
             | Source            -> "Source Name"
 
         static member toShortExplanation = function
@@ -74,7 +91,9 @@ module OfficeInteropTypes =
             | Factor            -> "Use factor columns to track the experimental conditions that govern your study. Example: temperature,light,..."
             | Characteristics   -> "Use characteristics columns to annotate interesting properties of your organism. Example: strain,phenotype,... "
             | Sample            -> "Use sample columns to mark the name of the sample that your experimental workflow produced."
-            | Data              -> "Use data columns to mark the data file name that your computational analysis produced."
+            | Data              -> "DEPRECATED: Use data columns to mark the data file name that your computational analysis produced."
+            | RawDataFile       -> "Use raw data file columns to mark the name of untransformed and unprocessed data files"
+            | DerivedDataFile   -> "Use derived data file columns to mark the name of transformed and/or processed data files"
             | Source            -> "Attention: you normally dont have to add this manually if you initialize an annotation table. The Source column defines the organism that is subject to your study. It is the first column of every study file."
 
         static member toLongExplanation = function
@@ -91,9 +110,11 @@ module OfficeInteropTypes =
                 The name used must be a unique identifier.
                 Samples can again be sources for further experimental workflows."
             | Data              ->
-                "The Data column describes data files that results from your experiments.
+                "DEPRECATED: The Data column describes data files that results from your experiments.
                 Additionally to the type of data, the annotated files must have a unique name.
                 Data files can be sources for computational workflows."
+            | RawDataFile       -> "" //TODO:
+            | DerivedDataFile   -> "" //TODO:
             | Source            ->
                 "The Source Name column defines the source of biological material used for your experiments.
                 The name used must be a unique identifier. It can be an organism, a sample, or both.
@@ -102,7 +123,7 @@ module OfficeInteropTypes =
         /// Checks if a string matches one of the single column core names exactly.
         member this.isSingleColumn =
             match this with
-            | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data -> true
+            | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile -> true
             | _ -> false
 
     type BuildingBlockNamePrePrint = {
@@ -121,21 +142,25 @@ module OfficeInteropTypes =
 
         member this.toAnnotationTableHeader() =
             match this.Type with
-            | BuildingBlockType.Parameter         -> sprintf "Parameter [%s]" this.Name
-            | BuildingBlockType.Factor            -> sprintf "Factor [%s]" this.Name
-            | BuildingBlockType.Characteristics   -> sprintf "Characteristics [%s]" this.Name
-            | BuildingBlockType.Sample            -> "Sample Name"
-            | BuildingBlockType.Data              -> "Data File Name"
-            | BuildingBlockType.Source            -> "Source Name"
+            | BuildingBlockType.Parameter           -> sprintf "Parameter [%s]" this.Name
+            | BuildingBlockType.Factor              -> sprintf "Factor [%s]" this.Name
+            | BuildingBlockType.Characteristics     -> sprintf "Characteristics [%s]" this.Name
+            | BuildingBlockType.Sample              -> BuildingBlockType.Sample.toString
+            | BuildingBlockType.Data                -> BuildingBlockType.Data.toString
+            | BuildingBlockType.RawDataFile         -> BuildingBlockType.RawDataFile.toString
+            | BuildingBlockType.DerivedDataFile     -> BuildingBlockType.DerivedDataFile.toString
+            | BuildingBlockType.Source              -> BuildingBlockType.Source.toString
 
         member this.toAnnotationTableHeader(id) =
             match this.Type with
             | BuildingBlockType.Parameter         -> $"Parameter [{this.Name}#{id}]"
             | BuildingBlockType.Factor            -> $"Factor [{this.Name}#{id}]"
             | BuildingBlockType.Characteristics   -> $"Characteristics [{this.Name}#{id}]"
-            | BuildingBlockType.Sample            -> "Sample Name"
-            | BuildingBlockType.Data              -> "Data File Name"
-            | BuildingBlockType.Source            -> "Source Name"
+            | BuildingBlockType.Sample              -> BuildingBlockType.Sample.toString
+            | BuildingBlockType.Data                -> BuildingBlockType.Data.toString
+            | BuildingBlockType.RawDataFile         -> BuildingBlockType.RawDataFile.toString
+            | BuildingBlockType.DerivedDataFile     -> BuildingBlockType.DerivedDataFile.toString
+            | BuildingBlockType.Source              -> BuildingBlockType.Source.toString
 
         /// Check if .Type is single column type
         member this.isSingleColumn = this.Type.isSingleColumn

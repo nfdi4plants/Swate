@@ -53,13 +53,9 @@ open Fable.Core.JsInterop
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
 let exampleExcelFunction1 () =
     Excel.run(fun context ->
-
-        let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray [|"dataValidation"|]))
-
-        let selectedRangeValidation = selectedRange.dataValidation.load(U2.Case2 (ResizeArray [|"rule"|]))
-
-        OfficeInterop.TermCollectionFunctions.addUpdateSelectedCellToQueryParamHandler context
-
+        promise {
+            return "Hello World!"
+        }
     )
 
 /// This is not used in production and only here for development. Its content is always changing to test functions for new features.
@@ -661,6 +657,8 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
         } 
     )
 
+// https://github.com/nfdi4plants/Swate/issues/203
+/// If an output column already exists it should be replaced by the new output column type.
 let replaceOutputColumn (annotationTableName:string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
     Excel.run(fun context ->
         promise {
@@ -671,8 +669,6 @@ let replaceOutputColumn (annotationTableName:string) (existingOutputColumn: Buil
             let annoHeaderRange = annotationTable.getHeaderRowRange()
             let existingOutputColCell = annoHeaderRange.getCell(0., float existingOutputColumn.MainColumn.Index)
             let _ = existingOutputColCell.load(U2.Case2 (ResizeArray[|"values"|]))
-
-            printfn "%A" existingOutputColumn.MainColumn.Index
 
             let newHeaderValues = ResizeArray[|ResizeArray [|newOutputcolumn.ColumnHeader.toAnnotationTableHeader() |> box |> Some|]|]
             let! change = context.sync().``then``(fun e ->
@@ -1150,17 +1146,42 @@ let getAnnotationBlockDetails() =
         }
     )
 
+let checkForDeprecation (buildingBlocks:BuildingBlock [])  =
+    let mutable msgList = []
+    // https://github.com/nfdi4plants/Swate/issues/201
+    /// Output column "Data File Name" Shared.OfficeInteropTypes.BuildingBlockType.Data was deprecated in version 0.6.0
+    let deprecated_DataFileName (buildingBlocks:BuildingBlock []) =
+        let hasDataFileNameCol = buildingBlocks |> Array.tryFind (fun x -> x.MainColumn.Header.SwateColumnHeader = Shared.OfficeInteropTypes.BuildingBlockType.Data.toString)
+        match hasDataFileNameCol with
+        | Some _ ->
+            let m =
+                $"""Found deprecated output column "{Shared.OfficeInteropTypes.BuildingBlockType.Data.toString}". Obsolete since v0.6.0.
+                It is recommend to replace "{Shared.OfficeInteropTypes.BuildingBlockType.Data.toString}" with "{Shared.OfficeInteropTypes.BuildingBlockType.RawDataFile.toString}"
+                or "{Shared.OfficeInteropTypes.BuildingBlockType.DerivedDataFile.toString}"."""
+            let message = InteropLogging.Msg.create InteropLogging.Warning m
+            msgList <- message::msgList
+            buildingBlocks
+        | None ->
+            buildingBlocks
+    // Chain all deprecation checks
+    buildingBlocks
+    |> deprecated_DataFileName
+    |> ignore
+    // Only return msg list. Messages with InteropLogging.Warning will be pushed to user.
+    msgList
+
 let getAllAnnotationBlockDetails() =
     Excel.run(fun context ->
         promise {
-
             let! annotationTableName = getActiveAnnotationTableName context
 
             let! buildingBlocks = OfficeInterop.BuildingBlockFunctions.getBuildingBlocks context annotationTableName
 
+            let deprecationMsgs = checkForDeprecation buildingBlocks
+
             let searchTerms = buildingBlocks |> Array.collect OfficeInterop.BuildingBlockFunctions.toTermSearchable 
 
-            return searchTerms
+            return (searchTerms, deprecationMsgs)
         }
     )
 

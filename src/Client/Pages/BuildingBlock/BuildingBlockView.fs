@@ -194,8 +194,9 @@ let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
     match block.Type with
     | BuildingBlockType.Parameter | BuildingBlockType.Characteristics | BuildingBlockType.Factor ->
         block.Name.Length > 0
-    | BuildingBlockType.Sample | BuildingBlockType.Data | BuildingBlockType.Source ->
+    | BuildingBlockType.Sample | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile | BuildingBlockType.Source ->
         true
+    | _ -> false
 
 
 let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit) (block: BuildingBlockType )  =
@@ -265,7 +266,8 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                             BuildingBlockType.Characteristics   |> createBuildingBlockDropdownItem model dispatch
                             Dropdown.divider []
                             BuildingBlockType.Sample            |> createBuildingBlockDropdownItem model dispatch
-                            BuildingBlockType.Data              |> createBuildingBlockDropdownItem model dispatch
+                            BuildingBlockType.RawDataFile       |> createBuildingBlockDropdownItem model dispatch
+                            BuildingBlockType.DerivedDataFile   |> createBuildingBlockDropdownItem model dispatch
                             Dropdown.Item.div [
                                 Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)]
                             ] [

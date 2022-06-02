@@ -89,13 +89,11 @@ let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRan
                 $"Swate encountered an error while processing the active annotation table.
                 Swate found a reference column ({nextCol.Header.SwateColumnHeader}) without a prior main column.."
 
-
         /// Hidden columns do only come with certain core names. The acceptable names can be found in OfficeInterop.Types.ColumnCoreNames.
         let errorMsg2 (nextCol:Column) =
             failwith 
                 $"Swate encountered an error while processing the active annotation table.
                 Swate found a reference column ({nextCol.Header.SwateColumnHeader}) with an unknown core name: {nextCol.Header.getColumnCoreName}"
-            
 
         /// If a columns core name already exists for the current building block, then the block is faulty and needs userinput to be corrected.
         let errorMsg3 (nextCol:Column) (buildingBlock:BuildingBlock) assignedCol =
@@ -156,7 +154,7 @@ let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRan
                     not nextCol.Header.isSwateColumnHeader
                 then
                     sortColsIntoBuildingBlocks (index+1) currentBlock buildingBlockList
-                // If the nextCol.Header has no tag array or its tag array does NOT contain a hidden tag then it starts a new building block
+                // If the nextCol.Header can be found in the list of all main column types then it opens a new building block
                 elif
                     nextCol.Header.isMainColumn
                 then
