@@ -13,7 +13,7 @@ let server = testList "Server" [
 ]
 
 let all = testList "All" [
-    Shared.Tests.shared
+    Tests.shared
     server
 ]
 

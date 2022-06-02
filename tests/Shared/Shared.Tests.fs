@@ -28,45 +28,39 @@ module TestCases =
     let case13 = "Unit (#3)"
     let case14 = "Term Accession Number ()" 
 
-//let regex = testList "Regex patterns" [
-//    testCase "CoreNamePattern 'Source Name'" <| fun _ ->
-//        let regExMatch = Regex.Match(TestCases.case1, Pattern.CoreNamePattern)
-//        let regexValue = regExMatch.Value
-//        Expect.equal regexValue "Source Name" ""
+let regex = testList "Regex patterns" [
+    testCase "CoreNamePattern 'Source Name'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case1, Pattern.CoreNamePattern)
+        let regexValue = regExMatch.Value
+        Expect.equal regexValue "Source Name" ""
 
-//    testCase "CoreNamePattern 'Characteristic [Sample type]'" <| fun _ ->
-//        let regExMatch = Regex.Match(TestCases.case3, Pattern.CoreNamePattern)
-//        let regexValue = regExMatch.Value.Trim()
-//        Expect.equal regexValue "Characteristics" ""
+    testCase "CoreNamePattern 'Characteristic [Sample type]'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case3, Pattern.CoreNamePattern)
+        let regexValue = regExMatch.Value.Trim()
+        Expect.equal regexValue "Characteristics" ""
 
-//    testCase "CoreNamePattern 'Term Source REF (NFDI4PSO:0000064)'" <| fun _ ->
-//        let regExMatch = Regex.Match(TestCases.case8, Pattern.CoreNamePattern)
-//        let regexValue = regExMatch.Value.Trim()
-//        Expect.equal regexValue "Term Source REF" ""
+    testCase "CoreNamePattern 'Term Source REF (NFDI4PSO:0000064)'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case8, Pattern.CoreNamePattern)
+        let regexValue = regExMatch.Value.Trim()
+        Expect.equal regexValue "Term Source REF" ""
 
-//    testCase "CoreNamePattern 'Term Accession Number (MS:1001809#2)'" <| fun _ ->
-//        let regExMatch = Regex.Match(TestCases.case11, Pattern.CoreNamePattern)
-//        let regexValue = regExMatch.Value.Trim()
-//        Expect.equal regexValue "Term Accession Number" ""
+    testCase "CoreNamePattern 'Term Accession Number (MS:1001809#2)'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case11, Pattern.CoreNamePattern)
+        let regexValue = regExMatch.Value.Trim()
+        Expect.equal regexValue "Term Accession Number" ""
 
-//    testCase "CoreNamePattern 'Unit (#3)'" <| fun _ ->
-//        let regExMatch = Regex.Match(TestCases.case13, Pattern.CoreNamePattern)
-//        let regexValue = regExMatch.Value.Trim()
-//        Expect.equal regexValue "Unit" ""
+    testCase "CoreNamePattern 'Unit (#3)'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case13, Pattern.CoreNamePattern)
+        let regexValue = regExMatch.Value.Trim()
+        Expect.equal regexValue "Unit" ""
 
-//    testCase "CoreNamePattern 'Term Accession Number ()'" <| fun _ ->
-//        let regExMatch = Regex.Match(TestCases.case14, Pattern.CoreNamePattern)
-//        let regexValue = regExMatch.Value.Trim()
-//        Expect.equal regexValue "Term Accession Number" ""
-//]
+    testCase "CoreNamePattern 'Term Accession Number ()'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case14, Pattern.CoreNamePattern)
+        let regexValue = regExMatch.Value.Trim()
+        Expect.equal regexValue "Term Accession Number" ""
+]
 
-//let shared = testList "Shared" [
-//    regex
-//]
 
 let shared = testList "Shared" [
-    testCase "Empty string is not a valid description" <| fun _ ->
-        let expected = false
-        let actual = false
-        Expect.equal actual expected "Should be false"
+    regex
 ]
