@@ -67,19 +67,19 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.Protocol ->
         BaseView.baseViewMainElement model dispatch [
-            Protocol.fileUploadViewComponent model dispatch
+            Protocol.Core.fileUploadViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.JsonExport ->
         BaseView.baseViewMainElement model dispatch [
-            JsonExporter.jsonExporterMainElement model dispatch
+            JsonExporter.Core.jsonExporterMainElement model dispatch
         ] [ (*Footer*) ]
 
     | Routing.Route.TemplateMetadata ->
         BaseView.baseViewMainElement model dispatch [
-            TemplateMetadata.newNameMainElement model dispatch
+            TemplateMetadata.Core.newNameMainElement model dispatch
         ] [ (*Footer*) ]
 
     | Routing.Route.ProtocolSearch ->
@@ -112,7 +112,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.Dag ->
         BaseView.baseViewMainElement model dispatch [
-            Dag.mainElement model dispatch
+            Dag.Core.mainElement model dispatch
         ] [ (*Footer*) ]
 
     | Routing.Route.Info ->

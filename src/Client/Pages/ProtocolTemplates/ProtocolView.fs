@@ -1,4 +1,4 @@
-module Protocol
+module Protocol.Core
 
 open System
 

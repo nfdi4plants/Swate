@@ -1,4 +1,4 @@
-module TemplateMetadata
+module TemplateMetadata.Core
 
 open Fable.React
 open Fable.React.Props

@@ -1,3 +1,4 @@
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>] //will create build error without
 module rec Messages
 
 open Elmish
@@ -25,8 +26,6 @@ type System.Exception with
                 | ex -> ex.Message
         | ex ->
             ex.Message
-
-    
 
 let curry f a b = f (a,b)
 

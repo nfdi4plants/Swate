@@ -1,4 +1,5 @@
-module JsonExporter
+[<AutoOpen>]
+module JsonExporter.Core
 
 open Fable.React
 open Fable.React.Props

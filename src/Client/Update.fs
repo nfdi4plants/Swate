@@ -1,4 +1,5 @@
-module Update
+[<AutoOpen>]
+module Update.Update
 
 open Elmish
 open Thoth.Elmish
@@ -763,15 +764,15 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         nextModel, nextCmd
 
     | JsonExporterMsg msg ->
-        let nextModel, nextCmd = currentModel |> JsonExporter.update msg
+        let nextModel, nextCmd = currentModel |> JsonExporter.Core.update msg
         nextModel, nextCmd
 
     | TemplateMetadataMsg msg ->
-        let nextModel, nextCmd = currentModel |> TemplateMetadata.update msg
+        let nextModel, nextCmd = currentModel |> TemplateMetadata.Core.update msg
         nextModel, nextCmd
 
     | DagMsg msg ->
-        let nextModel, nextCmd = currentModel |> Dag.update msg
+        let nextModel, nextCmd = currentModel |> Dag.Core.update msg
         nextModel, nextCmd
 
     | TopLevelMsg topLevelMsg ->

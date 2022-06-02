@@ -1,5 +1,5 @@
 [<RequireQualifiedAccess>]
-module Dag
+module Dag.Core
 
 open Fable.React
 open Fable.React.Props
