@@ -94,7 +94,7 @@ module OfficeInteropTypes =
             | Data              -> "DEPRECATED: Use data columns to mark the data file name that your computational analysis produced."
             | RawDataFile       -> "Use raw data file columns to mark the name of untransformed and unprocessed data files"
             | DerivedDataFile   -> "Use derived data file columns to mark the name of transformed and/or processed data files"
-            | Source            -> "Attention: you normally dont have to add this manually if you initialize an annotation table. The Source column defines the organism that is subject to your study. It is the first column of every study file."
+            | Source            -> "The Source column defines the label of the source of your study. This can be anything from a biological sample to a measurement data file."
 
         static member toLongExplanation = function
             | Parameter         ->
