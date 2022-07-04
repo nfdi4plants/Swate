@@ -336,7 +336,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         OnDoubleClick (fun e ->
                             if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.TermSearchText = "" then
                                 let parentOnt = model.TermSearchState.ParentOntology.Value
-                                let (parentOntInfo:TermMinimal) = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
+                                let parentOntInfo: TermMinimal = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
                                 TermSearch.GetAllTermsByParentTermRequest parentOntInfo |> TermSearchMsg |> dispatch
                             else
                                 let v = Browser.Dom.document.getElementById autocompleteParams.InputId

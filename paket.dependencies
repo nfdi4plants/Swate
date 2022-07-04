@@ -1,10 +1,11 @@
 source https://api.nuget.org/v3/index.json
-framework: net5.0
+framework: net6.0
 storage: none
 
 nuget DynamicObj 0.2.1
 nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
+nuget ISADotNet 0.4.0-preview.1
 nuget ISADotNet.XLSX 0.4.0-preview.1
 nuget ISADotNet.Viz 0.4.0-preview.1
 nuget Neo4j.Driver 4.4.0

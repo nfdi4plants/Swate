@@ -322,7 +322,7 @@ let toTermSearchable (buildingBlock:BuildingBlock) =
                     tryFindAccession
                     |> Array.tryExactlyOne
                     |> Option.bind (fun x -> x.Value)
-                    |> Option.bind (fun x -> Shared.Regex.parseTermAccessionSimplified x)
+                    |> Option.bind (fun x -> Shared.Regex.parseTermAccession x)
                     |> Option.defaultWith (fun _ -> "")
                 let term = TermMinimal.create valueName accession
                 TermSearchable.create term parentTerm false colIndex cellRowIndices

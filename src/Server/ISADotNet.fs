@@ -58,7 +58,7 @@ let private ColumnPositionCommentName = "ValueIndex"
 
 type OntologyAnnotation with
     member this.toTermMinimal =
-        match this.Name, Option.bind Regex.parseTermAccessionSimplified this.TermAccessionNumber with
+        match this.Name, Option.bind Regex.parseTermAccession this.TermAccessionNumber with
         | Some name, Some tan   -> TermMinimal.create (AnnotationValue.toString name) tan |> Some
         | Some name, None       -> TermMinimal.create (AnnotationValue.toString name) "" |> Some
         | _,_                   -> None
@@ -69,7 +69,7 @@ type ISADotNet.Value with
         let name = nameOpt |> Option.defaultValue ""
         let tan =
             if tanUrlOpt.IsSome then
-                Regex.parseTermAccessionSimplified tanUrlOpt.Value |> Option.map (fun tan -> tan.Replace("_",":")) |> Option.defaultValue ""
+                Regex.parseTermAccession tanUrlOpt.Value |> Option.map (fun tan -> tan.Replace("_",":")) |> Option.defaultValue ""
             else
                 ""
         TermMinimal.create name tan

@@ -13,8 +13,8 @@ open Shared
 open Shared.Regex
 
 module TestCases =
-    let case1 = "Source Name"
-    let case2 = "Sample Name"
+    let case_SourceName = "Source Name"
+    let case_SampleName = "Sample Name"
     let case3 = "Characteristics [Sample type]"
     let case4 = "Characteristics [biological replicate]"
     let case5 = "Factor [Sample type#2]"
@@ -26,11 +26,14 @@ module TestCases =
     let case11 = "Term Accession Number (MS:1001809#2)"
     let case12 = "Unit"
     let case13 = "Unit (#3)"
-    let case14 = "Term Accession Number ()" 
+    let case14 = "Term Accession Number ()"
+    let case_Underscore = "Term Source REF (KF_PH:001)"
+    let case_URI = "http://purl.obolibrary.org/obo/GO_000001"
+    let case_numberInIDSPACE = "Term Source REF (nfdi4pso:001)"
 
 let regex = testList "Regex patterns" [
     testCase "CoreNamePattern 'Source Name'" <| fun _ ->
-        let regExMatch = Regex.Match(TestCases.case1, Pattern.CoreNamePattern)
+        let regExMatch = Regex.Match(TestCases.case_SourceName, Pattern.CoreNamePattern)
         let regexValue = regExMatch.Value
         Expect.equal regexValue "Source Name" ""
 
@@ -58,6 +61,26 @@ let regex = testList "Regex patterns" [
         let regExMatch = Regex.Match(TestCases.case14, Pattern.CoreNamePattern)
         let regexValue = regExMatch.Value.Trim()
         Expect.equal regexValue "Term Accession Number" ""
+
+    testCase "parseTermAccession 'http://purl.obolibrary.org/obo/GO_000001'" <| fun _ ->
+        let regExMatch = Regex.parseTermAccession TestCases.case_URI
+        Expect.equal regExMatch (Some "GO:000001") ""
+
+    testCase "parseTermAccession 'Term Source REF (KF_PH:001)'" <| fun _ ->
+        let regExMatch = Regex.parseTermAccession TestCases.case_Underscore
+        Expect.equal regExMatch (Some "KF_PH:001") ""
+
+    testCase "TermAccessionPatternURI 'Term Source REF (KF_PH:001)'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case_Underscore, Pattern.TermAccessionPatternURI)
+        Expect.equal regExMatch.Success false ""
+
+    testCase "TermAccessionPattern 'Term Source REF (KF_PH:001)'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case_Underscore, Pattern.TermAccessionPattern)
+        Expect.equal regExMatch.Value "KF_PH:001" ""
+
+    testCase "TermAccessionPattern 'Term Source REF (nfdi4pso:001)'" <| fun _ ->
+        let regExMatch = Regex.Match(TestCases.case_numberInIDSPACE, Pattern.TermAccessionPattern)
+        Expect.equal regExMatch.Value "nfdi4pso:001" ""
 ]
 
 

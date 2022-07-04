@@ -186,8 +186,8 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
             async {
                 let dbSearchRes =
                     match typedSoFar with
-                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                        OntologyDB.Term(credentials).getByAccession foundAccession
+                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        OntologyDB.Term(credentials).getByAccession foundAccession.Value
                     /// This suggests we search for a term name
                     | notAnAccession ->
                         OntologyDB.Term(credentials).getByName notAnAccession
@@ -201,8 +201,8 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
             async {
                 let dbSearchRes =
                     match typedSoFar with
-                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                        OntologyDB.Term(credentials).getByAccession foundAccession
+                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        OntologyDB.Term(credentials).getByAccession foundAccession.Value
                     | _ ->
                         if parentTerm.TermAccession = ""
                         then
@@ -226,8 +226,8 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
                 let dbSearchRes =
                     match typedSoFar with
-                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                        OntologyDB.Term(credentials).getByAccession foundAccession
+                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        OntologyDB.Term(credentials).getByAccession foundAccession.Value
                     | _ ->
                         if childTerm.TermAccession = ""
                         then
@@ -261,8 +261,8 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
             async {
                 let dbSearchRes =
                     match typedSoFar with
-                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPatternSimplified foundAccession ->
-                        OntologyDB.Term(credentials).getByAccession foundAccession
+                    | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        OntologyDB.Term(credentials).getByAccession foundAccession.Value
                     | notAnAccession ->
                         OntologyDB.Term(credentials).getByName(notAnAccession,sourceOntologyName="uo")
                     |> Array.ofSeq
