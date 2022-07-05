@@ -37,7 +37,7 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
     ]
 
 let tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
-    Tabs.tabs[
+    Tabs.tabs [
         Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
         Tabs.Props [
             Style [

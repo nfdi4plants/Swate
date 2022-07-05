@@ -86,4 +86,5 @@ let regex = testList "Regex patterns" [
 
 let shared = testList "Shared" [
     regex
+    OfficeInteropTypes.buildingBlockTypes
 ]

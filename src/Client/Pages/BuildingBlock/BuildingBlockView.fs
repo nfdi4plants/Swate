@@ -194,7 +194,7 @@ let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
     match block.Type with
     | BuildingBlockType.Parameter | BuildingBlockType.Characteristics | BuildingBlockType.Factor ->
         block.Name.Length > 0
-    | BuildingBlockType.Sample | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile | BuildingBlockType.Source ->
+    | BuildingBlockType.Sample | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile | BuildingBlockType.Source | BuildingBlockType.ProtocolType ->
         true
     | _ -> false
 
@@ -258,7 +258,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                         ]
                     ]
                     Dropdown.menu [ ] [
-                        Dropdown.content [Props [colorControl model.SiteStyleState.ColorMode]] [
+                        Dropdown.content [Props [Style [yield! colorControlInArray model.SiteStyleState.ColorMode]] ] [
                             BuildingBlockType.Source            |> createBuildingBlockDropdownItem model dispatch
                             Dropdown.divider []
                             BuildingBlockType.Parameter         |> createBuildingBlockDropdownItem model dispatch
@@ -268,6 +268,8 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                             BuildingBlockType.Sample            |> createBuildingBlockDropdownItem model dispatch
                             BuildingBlockType.RawDataFile       |> createBuildingBlockDropdownItem model dispatch
                             BuildingBlockType.DerivedDataFile   |> createBuildingBlockDropdownItem model dispatch
+                            Dropdown.divider []
+                            BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem model dispatch
                             Dropdown.Item.div [
                                 Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)]
                             ] [
@@ -355,8 +357,8 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
             Control.div [] [
                 Button.button   [
                     let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> isValidBuildingBlock
-                    Button.Color Color.IsSuccess
                     if isValid then
+                        Button.Color Color.IsSuccess
                         Button.IsActive true
                     else
                         Button.Color Color.IsDanger
@@ -364,7 +366,13 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                     Button.IsFullWidth
                     Button.OnClick (fun e ->
                         let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
-                        let colTerm     = if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some else None
+                        let colTerm     =
+                            if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then
+                                TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some
+                            elif colName.isFeaturedColumn then
+                                TermMinimal.create colName.Type.toString colName.Type.getFeaturedColumnAccession |> Some
+                            else
+                                None
                         let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && not colName.isSingleColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
                         let newBuildingBlock = InsertBuildingBlock.create colName colTerm unitTerm Array.empty
                         OfficeInterop.AddAnnotationBlock newBuildingBlock |> OfficeInteropMsg |> dispatch

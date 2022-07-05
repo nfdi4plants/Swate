@@ -25,15 +25,15 @@ module Regex =
         let IdPattern = "#\d+" //  @"(?<=#)\d+(?=[\)\]])" <- Cannot be used in IE11
 
         [<LiteralAttribute>]
-        /// <summary> This pattern captures characters between squared brackets, without id: Parameter [biological replicate#2] -> biological replicate</summary>
+        // <summary> This pattern captures characters between squared brackets, without id: Parameter [biological replicate#2] -> biological replicate</summary>
         let SquaredBracketsTermNamePattern = "\[.*\]" //  @"(?<= \[)[^#\]]*(?=[\]#])" <- Cannot be used in IE11
 
         [<LiteralAttribute>]
-        /// Used to get unit name from Excel numberFormat: 0.00 "degree Celsius"
+        // Used to get unit name from Excel numberFormat: 0.00 "degree Celsius"
         let DoubleQuotesPattern = "\"(.*?)\""
 
         [<LiteralAttribute>]
-        /// This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
+        // This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
         let CoreNamePattern = "^[^[(]*"
 
         //// Hits term accession, without id, NEEDS brackets before and after: ENVO:01001831
@@ -45,7 +45,7 @@ module Regex =
         let TermAccessionPattern = @"[\w]+?:[\d]+"
 
         // https://obofoundry.org/id-policy.html#mapping-of-owl-ids-to-obo-format-ids
-        /// <summary>Regex pattern is designed to hit only Foundry-compliant URIs.</summary>
+        // <summary>Regex pattern is designed to hit only Foundry-compliant URIs.</summary>
         [<LiteralAttribute>]
         let TermAccessionPatternURI = @"http://purl.obolibrary.org/obo/(?<idspace>[\w]+?)_(?<localid>[\d]+)"
 

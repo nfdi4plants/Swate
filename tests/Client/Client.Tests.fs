@@ -16,6 +16,7 @@ let all =
 #if FABLE_COMPILER // This preprocessor directive makes editor happy
             Shared.Tests.shared
 #endif
+            BuildingBlockFunctions.tests_buildingBlockFunctions
             client
         ]
 

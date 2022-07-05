@@ -27,14 +27,19 @@ module OfficeInteropTypes =
 
     [<RequireQualifiedAccess>]
     type BuildingBlockType =
+        // Term columns
         | Parameter         
         | Factor            
         | Characteristics
+        // Source columns
         | Source
+        // Output columns
         | Sample
         | Data // [<ObsoleteAttribute>] 
         | RawDataFile
         | DerivedDataFile
+        // Special Columns
+        | ProtocolType
 
         static member listAll = [
             Parameter; Factor; Characteristics;
@@ -43,6 +48,8 @@ module OfficeInteropTypes =
             //output
             Sample; RawDataFile; DerivedDataFile;
             Data // deprecated
+            // special
+            ProtocolType
         ]
 
         member this.isInputColumn =
@@ -50,6 +57,35 @@ module OfficeInteropTypes =
 
         member this.isOutputColumn =
             match this with | Data | Sample | RawDataFile | DerivedDataFile -> true | anythingElse -> false
+
+        /// <summary>This function returns true if the BuildingBlockType is a featured column. A featured column can
+        /// be abstracted by Parameter/Factor/Characteristics and describes one common usecase of either.
+        /// Such a block will contain TSR and TAN and can be used for directed Term search.</summary>
+        member this.isFeaturedColumn =
+            match this with | ProtocolType -> true | anythingElse -> false
+
+        member this.getFeaturedColumnAccession =
+            if this.isFeaturedColumn then
+                match this with
+                | ProtocolType -> "NFDI4PSO:1000161"
+                | _ -> failwith "This cannot happen"
+            else
+                failwith $"'{this}' is not listed as featured column type! No referenced accession available."
+
+        member this.getFeaturedColumnTermMinimal =
+            if this.isFeaturedColumn then
+                match this with
+                | ProtocolType -> TermMinimal.create "protocol type" this.getFeaturedColumnAccession
+                | _ -> failwith "This cannot happen"
+            else
+                failwith $"'{this}' is not listed as featured column type! No referenced accession available."
+
+        /// Checks if a string matches one of the single column core names exactly.
+        member this.isSingleColumn =
+            match this with
+            /// Input & Output columns
+            | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile -> true
+            | _ -> false
 
         static member ofString str =
             match str with
@@ -61,6 +97,7 @@ module OfficeInteropTypes =
             | "Raw Data File"       -> RawDataFile
             | "Derived Data File"   -> DerivedDataFile
             | "Source Name"         -> Source
+            | "Protocol Type"       -> ProtocolType
             | anythingElse          -> failwith $"Error: Unable to parse {anythingElse} to BuildingBlockType!"
 
         static member tryOfString str =
@@ -73,6 +110,7 @@ module OfficeInteropTypes =
             | "Raw Data File"       -> Some RawDataFile
             | "Derived Data File"   -> Some DerivedDataFile
             | "Source Name"     -> Some Source
+            | "Protocol Type"   -> Some ProtocolType
             | anythingElse      -> None
 
         member this.toString =
@@ -84,6 +122,7 @@ module OfficeInteropTypes =
             | Data              -> "Data File Name"
             | RawDataFile       -> "Raw Data File"
             | DerivedDataFile   -> "Derived Data File"
+            | ProtocolType      -> "Protocol Type" 
             | Source            -> "Source Name"
 
         static member toShortExplanation = function
@@ -95,6 +134,7 @@ module OfficeInteropTypes =
             | RawDataFile       -> "Use raw data file columns to mark the name of untransformed and unprocessed data files"
             | DerivedDataFile   -> "Use derived data file columns to mark the name of transformed and/or processed data files"
             | Source            -> "The Source column defines the label of the source of your study. This can be anything from a biological sample to a measurement data file."
+            | ProtocolType      -> "Use this column type to define the protocol type according to your preferred endpoint repository." 
 
         static member toLongExplanation = function
             | Parameter         ->
@@ -119,12 +159,9 @@ module OfficeInteropTypes =
                 "The Source Name column defines the source of biological material used for your experiments.
                 The name used must be a unique identifier. It can be an organism, a sample, or both.
                 Every annotation table must start with the Source Name column."
-
-        /// Checks if a string matches one of the single column core names exactly.
-        member this.isSingleColumn =
-            match this with
-            | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile -> true
-            | _ -> false
+            | ProtocolType      ->
+                "Use this column type to define the protocol type according to your preferred endpoint repository.
+                You can use the term search, to search through all available protocol types." 
 
     type BuildingBlockNamePrePrint = {
         Type : BuildingBlockType
@@ -150,6 +187,7 @@ module OfficeInteropTypes =
             | BuildingBlockType.RawDataFile         -> BuildingBlockType.RawDataFile.toString
             | BuildingBlockType.DerivedDataFile     -> BuildingBlockType.DerivedDataFile.toString
             | BuildingBlockType.Source              -> BuildingBlockType.Source.toString
+            | BuildingBlockType.ProtocolType        -> BuildingBlockType.ProtocolType.toString
 
         member this.toAnnotationTableHeader(id) =
             match this.Type with
@@ -161,6 +199,7 @@ module OfficeInteropTypes =
             | BuildingBlockType.RawDataFile         -> BuildingBlockType.RawDataFile.toString
             | BuildingBlockType.DerivedDataFile     -> BuildingBlockType.DerivedDataFile.toString
             | BuildingBlockType.Source              -> BuildingBlockType.Source.toString
+            | BuildingBlockType.ProtocolType        -> BuildingBlockType.ProtocolType.toString
 
         /// Check if .Type is single column type
         member this.isSingleColumn = this.Type.isSingleColumn
@@ -168,6 +207,8 @@ module OfficeInteropTypes =
         member this.isInputColumn = this.Type.isInputColumn
         /// Check if .Type is output column type
         member this.isOutputColumn = this.Type.isOutputColumn
+        /// Check if .Type is featured column type
+        member this.isFeaturedColumn = this.Type.isFeaturedColumn
 
     type ColumnCoreNames =
         | TermSourceRef
@@ -198,25 +239,36 @@ module OfficeInteropTypes =
             | None      -> false
         member this.isSingleCol =
             if this.isMainColumn then
-                let bbType = parseCoreName this.SwateColumnHeader
+                let bbType = this.getColumnCoreName (*parseCoreName this.SwateColumnHeader *)
                 match bbType with
-                | Some t    -> BuildingBlockType.ofString (t.Trim()) |> fun x -> x.isSingleColumn
+                | Some (t: string)  -> BuildingBlockType.ofString t |> fun x -> x.isSingleColumn
                 | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
             else
                 false
         member this.isOutputCol = 
             if this.isMainColumn then
-                let bbType = parseCoreName this.SwateColumnHeader
+                let bbType = this.getColumnCoreName //parseCoreName this.SwateColumnHeader
                 match bbType with
-                | Some t    -> BuildingBlockType.ofString (t.Trim()) |> fun x -> x.isOutputColumn
+                | Some t    -> BuildingBlockType.ofString t |> fun x -> x.isOutputColumn
                 | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
             else
                 false
         member this.isInputCol = 
             if this.isMainColumn then
-                let bbType = parseCoreName this.SwateColumnHeader
+                let bbType = this.getColumnCoreName // parseCoreName this.SwateColumnHeader
                 match bbType with
-                | Some t    -> BuildingBlockType.ofString (t.Trim()) |> fun x -> x.isInputColumn
+                | Some t    -> BuildingBlockType.ofString t |> fun x -> x.isInputColumn
+                | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
+            else
+                false
+        /// <summary>This function returns true if the SwateColumnHeader can be parsed to a featured column. A featured column can
+        /// be abstracted by Parameter/Factor/Characteristics and describes one common usecase of either.
+        /// Such a block will contain TSR and TAN and can be used for directed Term search.</summary>
+        member this.isFeaturedCol =
+            if this.isMainColumn then
+                let bbType = this.getColumnCoreName //parseCoreName this.SwateColumnHeader
+                match bbType with
+                | Some t    -> BuildingBlockType.ofString t |> fun x -> x.isFeaturedColumn
                 | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
             else
                 false
@@ -244,21 +296,33 @@ module OfficeInteropTypes =
                     BuildingBlockNamePrePrint.create t.Value term |> Some
                 else None
             | None, _ -> None
+        /// <summary>This member returns true if the header is either a main column header ("Source Name", "Protocol Type", "Parameter [xxxx]")
+        /// or a reference column ("TSR", "TAN", "Unit").</summary>
         member this.isSwateColumnHeader =
             match this with
             | isMainCol when isMainCol.isMainColumn -> true
             | isRefCol when isRefCol.isReference    -> true
             | anythingelse                          -> false
-        /// Use this function to extract ontology term name from inside square brackets in the main column header
+        /// <summary>Use this function to extract ontology term name from inside square brackets in the main column header</summary>
         member this.tryGetOntologyTerm = parseSquaredTermNameBrackets this.SwateColumnHeader
-        /// Get term Accession in TSR or TAN from column header
+        /// <summary>Get term Accession in TSR or TAN from column header</summary>
         member this.tryGetTermAccession = parseTermAccession this.SwateColumnHeader
-        /// Get column header hash id from main column. E.g. Parameter [Instrument Model#2]
+        /// <summary>Get column header hash id from main column. E.g. Parameter [Instrument Model#2]</summary>
         member this.tryGetHeaderId =
             let brackets = parseSquaredTermNameBrackets this.SwateColumnHeader
             match brackets with
             | Some str  -> getId str |> Option.bind (fun x -> "#" + x |> Some)
             | None      -> None
+        member this.getFeaturedColAccession =
+            let bbType = this.getColumnCoreName 
+            match bbType with
+            | Some t    -> BuildingBlockType.ofString t |> fun x -> x.getFeaturedColumnAccession
+            | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
+        member this.getFeaturedColTermMinimal =
+            let bbType = this.getColumnCoreName 
+            match bbType with
+            | Some t    -> BuildingBlockType.ofString t |> fun x -> x.getFeaturedColumnTermMinimal
+            | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
 
     type Cell = {
         Index: int
