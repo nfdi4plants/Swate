@@ -21,13 +21,19 @@ open Elmish
 
 let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
     match addBuildingBlockMsg with
+    | UpdateDropdownPage newDropdownPage ->
+        let nextState = {
+            currentState with
+                DropdownPage = newDropdownPage
+        }
+        nextState, Cmd.none
     | NewBuildingBlockSelected nextBB ->
         let nextState = {
             currentState with
                 CurrentBuildingBlock = if not nextBB.isSingleColumn && currentState.BuildingBlockSelectedTerm.IsSome then {nextBB with Name = currentState.BuildingBlockSelectedTerm.Value.Name} else nextBB
                 ShowBuildingBlockSelection = false
         }
-        nextState,Cmd.none
+        nextState, Cmd.none
 
     | ToggleSelectionDropdown ->
         let nextState = {
@@ -241,6 +247,64 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit
 let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
     let autocompleteParamsTerm = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState
     let autocompleteParamsUnit = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState
+    /// Main column types subpage for dropdown
+    let dropdownContentMain (model:Model) (dispatch:Messages.Msg -> unit) =
+        [
+            BuildingBlockType.Source            |> createBuildingBlockDropdownItem model dispatch
+            Dropdown.divider []
+            BuildingBlockType.Parameter         |> createBuildingBlockDropdownItem model dispatch
+            BuildingBlockType.Factor            |> createBuildingBlockDropdownItem model dispatch
+            BuildingBlockType.Characteristics   |> createBuildingBlockDropdownItem model dispatch
+            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Centered)] ] [
+                Button.button [
+                    Button.OnClick (fun e ->
+                        e.preventDefault()
+                        e.stopPropagation()
+                        UpdateDropdownPage Model.BuildingBlock.DropdownPage.Featured |> BuildingBlockMsg |> dispatch
+                    )
+                    Button.Color IsSuccess
+                    Button.IsInverted
+                    if model.SiteStyleState.IsDarkMode then Button.IsOutlined
+                    Button.Props [Style [
+                        Width "20px"; Height "20px"; BorderRadius "4px"; Border "unset"
+                        if model.SiteStyleState.IsDarkMode then BackgroundColor "unset"
+                    ]]
+                ] [
+                    Fa.i [Fa.Regular.Star; Fa.Props [Title "Featured Columns"]] [] 
+                ]
+            ]
+            Dropdown.divider []
+            BuildingBlockType.Sample            |> createBuildingBlockDropdownItem model dispatch
+            BuildingBlockType.RawDataFile       |> createBuildingBlockDropdownItem model dispatch
+            BuildingBlockType.DerivedDataFile   |> createBuildingBlockDropdownItem model dispatch
+            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
+                a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank"] [ str "info" ]
+            ]
+        ]
+    /// Featured Columns subpage for dropdown
+    let dropdownContentFeaturedColumns (model:Model) (dispatch: Messages.Msg -> unit) =
+        [
+            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Left)] ] [
+                Button.button [
+                    Button.OnClick (fun e ->
+                        e.preventDefault()
+                        e.stopPropagation()
+                        UpdateDropdownPage Model.BuildingBlock.DropdownPage.Main |> BuildingBlockMsg |> dispatch
+                    )
+                    Button.IsInverted
+                    if model.SiteStyleState.IsDarkMode then Button.IsOutlined
+                    Button.Color IsBlack
+                    Button.Props [Style [ Width "20px"; Height "20px"; BorderRadius "4px"; Border "unset"]]
+                ] [
+                    Fa.i [Fa.Solid.ArrowLeft] [] 
+                ]
+            ]
+            BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem model dispatch
+            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
+                a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank"] [ str "info" ]
+            ]
+        ]
+
     mainFunctionContainer [
         AdvancedSearch.advancedSearchModal model autocompleteParamsTerm.ModalId autocompleteParamsTerm.InputId dispatch autocompleteParamsTerm.OnAdvancedSearch
         AdvancedSearch.advancedSearchModal model autocompleteParamsUnit.ModalId autocompleteParamsUnit.InputId dispatch autocompleteParamsUnit.OnAdvancedSearch
@@ -258,24 +322,12 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                         ]
                     ]
                     Dropdown.menu [ ] [
-                        Dropdown.content [Props [Style [yield! colorControlInArray model.SiteStyleState.ColorMode]] ] [
-                            BuildingBlockType.Source            |> createBuildingBlockDropdownItem model dispatch
-                            Dropdown.divider []
-                            BuildingBlockType.Parameter         |> createBuildingBlockDropdownItem model dispatch
-                            BuildingBlockType.Factor            |> createBuildingBlockDropdownItem model dispatch
-                            BuildingBlockType.Characteristics   |> createBuildingBlockDropdownItem model dispatch
-                            Dropdown.divider []
-                            BuildingBlockType.Sample            |> createBuildingBlockDropdownItem model dispatch
-                            BuildingBlockType.RawDataFile       |> createBuildingBlockDropdownItem model dispatch
-                            BuildingBlockType.DerivedDataFile   |> createBuildingBlockDropdownItem model dispatch
-                            Dropdown.divider []
-                            BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem model dispatch
-                            Dropdown.Item.div [
-                                Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)]
-                            ] [
-                                a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank" ] [ str "more" ]
-                            ]
-                        ] 
+                        match model.AddBuildingBlockState.DropdownPage with
+                        | Model.BuildingBlock.DropdownPage.Main ->
+                            dropdownContentMain model dispatch
+                        | Model.BuildingBlock.DropdownPage.Featured ->
+                            dropdownContentFeaturedColumns model dispatch
+                        |> fun content -> Dropdown.content [Props [Style [yield! colorControlInArray model.SiteStyleState.ColorMode]] ] content
                     ]
                 ]
             ]

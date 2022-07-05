@@ -110,6 +110,8 @@ module FilePicker =
 module BuildingBlock =
 
     type Msg =
+    | UpdateDropdownPage        of BuildingBlock.DropdownPage
+
     | NewBuildingBlockSelected  of BuildingBlockNamePrePrint
     | BuildingBlockNameChange   of string
     | ToggleSelectionDropdown

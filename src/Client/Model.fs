@@ -215,8 +215,16 @@ module FilePicker =
 open OfficeInteropTypes
 
 module BuildingBlock =
+
+    [<RequireQualifiedAccess>]
+    type DropdownPage =
+    | Main
+    | Featured
+
     type Model = {
         CurrentBuildingBlock                    : BuildingBlockNamePrePrint
+
+        DropdownPage                            : DropdownPage
 
         BuildingBlockSelectedTerm               : Term option
         BuildingBlockNameSuggestions            : Term []
@@ -242,6 +250,8 @@ module BuildingBlock =
     } with
         static member init () = {
             ShowBuildingBlockSelection              = false
+
+            DropdownPage                            = DropdownPage.Main
 
             CurrentBuildingBlock                    = BuildingBlockNamePrePrint.init BuildingBlockType.Parameter
             BuildingBlockSelectedTerm               = None
