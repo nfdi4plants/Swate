@@ -266,7 +266,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                     Button.IsInverted
                     if model.SiteStyleState.IsDarkMode then Button.IsOutlined
                     Button.Props [Style [
-                        Width "20px"; Height "20px"; BorderRadius "4px"; Border "unset"
+                        Height "20px"; BorderRadius "4px"; Border "unset"
                         if model.SiteStyleState.IsDarkMode then BackgroundColor "unset"
                     ]]
                 ] [
@@ -284,8 +284,27 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
     /// Featured Columns subpage for dropdown
     let dropdownContentFeaturedColumns (model:Model) (dispatch: Messages.Msg -> unit) =
         [
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Left)] ] [
+            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Centered)] ] [
+                //Button.button [
+                //    Button.OnClick (fun e ->
+                //        e.preventDefault()
+                //        e.stopPropagation()
+                //        UpdateDropdownPage Model.BuildingBlock.DropdownPage.Main |> BuildingBlockMsg |> dispatch
+                //    )
+                //    Button.IsInverted
+                //    if model.SiteStyleState.IsDarkMode then Button.IsOutlined
+                //    Button.Color IsBlack
+                //    Button.Props [Style [ Width "20px"; Height "20px"; BorderRadius "4px"; Border "unset"]]
+                //] [
+                //    Fa.i [Fa.Solid.ArrowLeft] [] 
+                //]
+                Heading.h6 [Heading.IsSubtitle; Heading.Modifiers [Modifier.TextWeight TextWeight.Option.Bold]] [str "Featured Columns"]
+            ]
+            Dropdown.divider []
+            BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem model dispatch
+            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
                 Button.button [
+                    Button.Modifiers [Modifier.IsPulledLeft]
                     Button.OnClick (fun e ->
                         e.preventDefault()
                         e.stopPropagation()
@@ -298,9 +317,6 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                 ] [
                     Fa.i [Fa.Solid.ArrowLeft] [] 
                 ]
-            ]
-            BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem model dispatch
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
                 a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank"] [ str "info" ]
             ]
         ]
