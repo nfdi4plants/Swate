@@ -56,6 +56,10 @@ module OfficeInteropTypes =
         member this.isOutputColumn =
             match this with | Data | Sample | RawDataFile | DerivedDataFile -> true | anythingElse -> false
 
+        ///<summary>The name "TermColumn" refers to all columns with the syntax "Parameter/Factor/etc [TERM-NAME]"</summary>
+        member this.isTermColumn =
+            match this with | Parameter | Factor | Characteristics -> true | anythingElse -> false
+
         /// <summary>This function returns true if the BuildingBlockType is a featured column. A featured column can
         /// be abstracted by Parameter/Factor/Characteristics and describes one common usecase of either.
         /// Such a block will contain TSR and TAN and can be used for directed Term search.</summary>
@@ -207,6 +211,8 @@ module OfficeInteropTypes =
         member this.isOutputColumn = this.Type.isOutputColumn
         /// Check if .Type is featured column type
         member this.isFeaturedColumn = this.Type.isFeaturedColumn
+        /// Check if .Type is term column type
+        member this.isTermColumn = this.Type.isTermColumn
 
     type ColumnCoreNames =
         | TermSourceRef
@@ -267,6 +273,15 @@ module OfficeInteropTypes =
                 let bbType = this.getColumnCoreName //parseCoreName this.SwateColumnHeader
                 match bbType with
                 | Some t    -> BuildingBlockType.ofString t |> fun x -> x.isFeaturedColumn
+                | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
+            else
+                false
+        /// <summary>The name "TermColumn" refers to all columns with the syntax "Parameter/Factor/etc [TERM-NAME]"</summary>
+        member this.isTermColumn =
+            if this.isMainColumn then
+                let bbType = this.getColumnCoreName //parseCoreName this.SwateColumnHeader
+                match bbType with
+                | Some t    -> BuildingBlockType.ofString t |> fun x -> x.isTermColumn
                 | None      -> failwith $"Cannot get ColumnCoreName from {this.SwateColumnHeader}"
             else
                 false

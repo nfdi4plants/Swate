@@ -209,8 +209,6 @@ let private getBuildingBlocksPostSync (annoHeaderRange:Excel.Range) (annoBodyRan
                     )
             |]
 
-        printfn "%A" columns
-
         /// Sort all columns into building blocks.
         let buildingBlocks = 
             Aux_GetBuildingBlocksPostSync.sortColsIntoBuildingBlocks columns

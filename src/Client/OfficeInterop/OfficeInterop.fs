@@ -27,9 +27,15 @@ open BuildingBlockFunctions
 
 // 'Main Column'           -> Non hidden column of a building block. Each building block only contains one main column
 
-// 'Id Tag'                -> Column headers in Excel must be unique. Therefore Swate adds #integer to headers.
+// 'Id Tag'                -> Column headers in Excel must be unique. Therefore, Swate adds #integer to headers.
 
-// 'Unit column'           -> This references the unit column of a building block. It is a optional addition and not every building block must contain it. 
+// 'Unit column'           -> This references the unit column of a building block. It is a optional addition and not every building block must contain it.
+
+// 'Term column'            -> The name "TermColumn" refers to all columns with the syntax "Parameter/Factor/etc [TERM-NAME]"
+
+// 'Featured column'        -> A featured column can be abstracted as a "term column" and is a pre-implemented usecase.
+//                              Such a block will contain TSR and TAN and can be used for directed Term search.
+
 
 
 [<Emit("console.log($0)")>]

@@ -373,7 +373,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                                 TermMinimal.create colName.Type.toString colName.Type.getFeaturedColumnAccession |> Some
                             else
                                 None
-                        let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && not colName.isSingleColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
+                        let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && not colName.isSingleColumn && not colName.isFeaturedColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
                         let newBuildingBlock = InsertBuildingBlock.create colName colTerm unitTerm Array.empty
                         OfficeInterop.AddAnnotationBlock newBuildingBlock |> OfficeInteropMsg |> dispatch
                     )
