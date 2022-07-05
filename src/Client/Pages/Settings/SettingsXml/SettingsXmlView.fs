@@ -266,7 +266,7 @@ let textAreaEle (model:Model) dispatch =
                         Browser.Dom.document.body.appendChild textArea |> ignore
 
                         textArea.focus()
-                        /// Can't belive this actually worked
+                        // Can't belive this actually worked
                         textArea?select()
 
                         let t = Browser.Dom.document.execCommand("copy")

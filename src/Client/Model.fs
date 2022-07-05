@@ -225,14 +225,14 @@ module BuildingBlock =
         ShowBuildingBlockTermSuggestions        : bool
         HasBuildingBlockTermSuggestionsLoading  : bool
 
-        /// This section is used to add a unit directly to a freshly created building block.
+        // This section is used to add a unit directly to a freshly created building block.
         UnitTermSearchText                      : string
         UnitSelectedTerm                        : Term option
         UnitTermSuggestions                     : Term []
         HasUnitTermSuggestionsLoading           : bool
         ShowUnitTermSuggestions                 : bool
 
-        /// This section is used to add a unit directly to an already existing building block
+        // This section is used to add a unit directly to an already existing building block
         Unit2TermSearchText                     : string
         Unit2SelectedTerm                       : Term option
         Unit2TermSuggestions                    : Term []
@@ -250,14 +250,14 @@ module BuildingBlock =
             HasBuildingBlockTermSuggestionsLoading  = false
             BuildingBlockHasUnit                    = false
 
-            /// This section is used to add a unit directly to a freshly created building block.
+            // This section is used to add a unit directly to a freshly created building block.
             UnitTermSearchText                      = ""
             UnitSelectedTerm                        = None
             UnitTermSuggestions                     = [||]
             ShowUnitTermSuggestions                 = false
             HasUnitTermSuggestionsLoading           = false
 
-            /// This section is used to add a unit directly to an already existing building block
+            // This section is used to add a unit directly to an already existing building block
             Unit2TermSearchText                     = ""
             Unit2SelectedTerm                       = None
             Unit2TermSuggestions                    = [||]
@@ -374,7 +374,7 @@ module SettingsXml =
             ActiveProtocolGroup                     = None
             NextAnnotationTableForActiveProtGroup   = None
             ActiveProtocol                          = None
-            /// Unused
+            // Unused
             NextAnnotationTableForActiveProtocol    = None
             //
             RawXml                                  = None
@@ -390,4 +390,4 @@ type SettingsDataStewardState = {
         PointerJson = None
     }
 
-/// The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'
+// The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

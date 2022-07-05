@@ -388,7 +388,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
     /// advanced unit term search 2
     let autocompleteParamsUnit2 = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState
     mainFunctionContainer [
-        /// advanced unit term search 2
+        // advanced unit term search 2
         AdvancedSearch.advancedSearchModal model autocompleteParamsUnit2.ModalId autocompleteParamsUnit2.InputId dispatch autocompleteParamsUnit2.OnAdvancedSearch
         Field.div [] [
             Help.help [] [

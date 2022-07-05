@@ -9,21 +9,19 @@ module OfficeInteropTypes =
     type TryFindAnnoTableResult =
     | Success of string
     | Error of string 
-
         with
-            static member
-                /// This function is used on an array of table names (string []). If the length of the array is <> 1 it will trough the correct error.
-                /// Only returns success if annoTables.Length = 1. Does not check if the existing table names are correct/okay.
-                exactlyOneAnnotationTable (annoTables:string [])=
-                    match annoTables.Length with
-                    | x when x < 1 ->
-                        Error "Could not find annotationTable in active worksheet. Please create one before trying to execute this function."
-                    | x when x > 1 ->
-                        Error "The active worksheet contains more than one annotationTable. Please move one of them to another worksheet."
-                    | 1 ->
-                        annoTables |> Array.exactlyOne |> Success
-                    | _ ->
-                        Error "Could not process message. Swate was not able to identify the given annotation tables with a known case."
+        ///<summary>This function is used on an array of table names (string []). If the length of the array is <> 1 it will trough the correct error.
+        /// Only returns success if annoTables.Length = 1. Does not check if the existing table names are correct/okay.</summary>
+        static member exactlyOneAnnotationTable (annoTables:string [])=
+            match annoTables.Length with
+            | x when x < 1 ->
+                Error "Could not find annotationTable in active worksheet. Please create one before trying to execute this function."
+            | x when x > 1 ->
+                Error "The active worksheet contains more than one annotationTable. Please move one of them to another worksheet."
+            | 1 ->
+                annoTables |> Array.exactlyOne |> Success
+            | _ ->
+                Error "Could not process message. Swate was not able to identify the given annotation tables with a known case."
 
     [<RequireQualifiedAccess>]
     type BuildingBlockType =
@@ -83,7 +81,7 @@ module OfficeInteropTypes =
         /// Checks if a string matches one of the single column core names exactly.
         member this.isSingleColumn =
             match this with
-            /// Input & Output columns
+            // Input & Output columns
             | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile -> true
             | _ -> false
 

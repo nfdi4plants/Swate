@@ -22,8 +22,8 @@ open Validation
 
 let update (validationMsg:Validation.Msg) (currentState: Validation.Model) : Validation.Model * Cmd<Messages.Msg> =
     match validationMsg with
-    /// This message gets its values from ExcelInteropMsg.GetTableRepresentation.
-    /// It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
+    // This message gets its values from ExcelInteropMsg.GetTableRepresentation.
+    // It is used to update ValidationState.TableRepresentation and to transform the new information to ValidationState.TableValidationScheme.
     | StoreTableRepresentationFromOfficeInterop (tableValidation:OfficeInterop.CustomXmlTypes.Validation.TableValidation, buildingBlocks:BuildingBlock []) ->
         let nextState = {
             currentState with
@@ -55,7 +55,7 @@ let columnListElement ind (columnValidation:ColumnValidation) (model:Model) disp
         | _ ->
             false
     tr [
-        /// Remove validationTableEle when active to remove on-hover color change to really light grey.
+        // Remove validationTableEle when active to remove on-hover color change to really light grey.
         if isActive then
             Class "nonSelectText"
         else
@@ -322,7 +322,7 @@ let validationElements (model:Model) dispatch =
                 ]
             ]
 
-            /// Show warning if no validation format was found
+            // Show warning if no validation format was found
             if model.ValidationState.TableValidationScheme.SwateVersion = "" then
                 Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color NFDIColors.Red.Lighter10]]] [
                     str """No checklist for this table found! Hit "Add checklist to workbook" to add a checklist for the active annotation table."""

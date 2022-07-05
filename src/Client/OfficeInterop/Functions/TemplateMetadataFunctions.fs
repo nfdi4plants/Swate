@@ -24,8 +24,6 @@ let private colorTopBottomBordersWhite (borderSeq:seq<RangeBorder>) =
             border.color <- NFDIColors.white
     )
 
-open Fable.Core.JsInterop
-
 let rec extendMetadataFields (metadatafields:MetadataField) =
     let children = metadatafields.Children |> List.collect extendMetadataFields
     if metadatafields.Key <> "" && metadatafields.Children.IsEmpty |> not && metadatafields.List then
@@ -109,8 +107,8 @@ let createTemplateMetadataWorksheet (metadatafields:MetadataField) =
                         if info.Description.IsSome && info.Description.Value <> "" then
                             let targetCellRange : U2<Range,string> = U2.Case1 fstColumnCells.[i]
                             let content : U2<CommentRichContent,string> = U2.Case2 info.Description.Value
-                            /// WARNING!
-                            /// If you use "let comment = ..." outside of this if-else case ONLY the comment with reply will be added
+                            // WARNING!
+                            // If you use "let comment = ..." outside of this if-else case ONLY the comment with reply will be added
                             if i = idValueIndex then
                                 let comment = context.workbook.comments.add(targetCellRange, content, contentType =  ContentType.Plain)
                                 let reply : U2<CommentRichContent,string> = U2.Case2 $"id={newIdent.ToString()}"

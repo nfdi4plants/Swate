@@ -17,7 +17,7 @@ open TermSearch
 
 let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : TermSearch.Model * Cmd<Messages.Msg> =
     match termSearchMsg with
-    /// Toggle the search by parent ontology option on/off by clicking on a checkbox
+    // Toggle the search by parent ontology option on/off by clicking on a checkbox
     | TermSearch.ToggleSearchByParentOntology ->
         let nextState = {
             currentState with
@@ -150,8 +150,8 @@ let simpleSearchComponent model dispatch =
             ]
         ]
 
-        /// For some reason columns seam to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
-        /// It would not be full width. This results in the need to remove padding left/right for Column.column childs.
+        // For some reason columns seem to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
+        // It would not be full width. This results in the need to remove padding left/right for Column.column childs.
         Columns.columns [
             Columns.IsMobile;
             Columns.Props [Style [Width "100%"; MarginRight "0px"; MarginLeft "0px"]]
@@ -191,7 +191,7 @@ let simpleSearchComponent model dispatch =
                         Button.Props [Title "Copy to Clipboard"]
                         Button.Color IsInfo
                         Button.OnClick (fun e ->
-                            /// trigger icon response
+                            // trigger icon response
                             CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_termsearch"
                             //
                             let t = model.TermSearchState.SelectedTerm.Value
@@ -205,7 +205,7 @@ let simpleSearchComponent model dispatch =
                             Browser.Dom.document.body.appendChild textArea |> ignore
 
                             textArea.focus()
-                            /// Can't belive this actually worked
+                            // Can't belive this actually worked
                             textArea?select()
 
                             let t = Browser.Dom.document.execCommand("copy")

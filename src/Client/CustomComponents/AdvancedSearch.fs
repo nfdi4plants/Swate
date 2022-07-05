@@ -131,14 +131,14 @@ let private createAdvancedTermSearchResultRows relatedInputId resultHandler  (mo
         |> Array.map (fun sugg ->
             tr [
                 OnClick (fun e ->
-                    /// dont close modal on click
+                    // dont close modal on click
                     e.stopPropagation()
                     let relInput = Browser.Dom.document.getElementById(relatedInputId)
-                    /// select wanted term
+                    // select wanted term
                     sugg |> resultHandler |> dispatch
-                    /// propagate wanted term name to related input on main page
+                    // propagate wanted term name to related input on main page
                     relInput?value <- sugg.Name
-                    /// reset advanced term search state
+                    // reset advanced term search state
                     ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch
 
                 )
@@ -308,7 +308,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                 ]
                 match model.AdvancedSearchState.AdvancedTermSearchSubpage with
                 | AdvancedSearchSubpages.InputFormSubpage ->
-                    /// we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
+                    // we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
                     inputFormPage modalId model dispatch
                 | AdvancedSearchSubpages.ResultsSubpage ->
                     resultsPage relatedInputId resultHandler model dispatch
@@ -321,7 +321,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                 ] [
                     Level.level [] [
                         Level.left [] [
-                            /// Show "Back" button NOT on first subpage
+                            // Show "Back" button NOT on first subpage
                             if model.AdvancedSearchState.AdvancedTermSearchSubpage <> AdvancedSearchSubpages.InputFormSubpage then
                                 Level.item [] [
                                     Button.button   [   
@@ -334,7 +334,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                 ]
                         ]
                         Level.right [] [
-                            /// Show "Start advanced search" button ONLY on first subpage
+                            // Show "Start advanced search" button ONLY on first subpage
                             if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage then
                                 Level.item [] [
                                     Button.button   [

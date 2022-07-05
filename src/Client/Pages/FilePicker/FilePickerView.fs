@@ -494,7 +494,7 @@ let fileSortElements (model:Messages.Model) dispatch =
                     Browser.Dom.document.body.appendChild textArea |> ignore
 
                     textArea.focus()
-                    /// Can't belive this actually worked
+                    // Can't belive this actually worked
                     textArea?select()
 
                     let t = Browser.Dom.document.execCommand("copy")
@@ -545,8 +545,8 @@ module FileNameTable =
                     |> List.map (fun (iterInd,iterFileName) ->
                         let isNameToMove = (id,fileName) = (iterInd,iterFileName)
                         if isNameToMove then
-                            /// if the iterated element is the one we want to move, substract 1.5 from it
-                            /// let sortBy handle all stuff then assign new indices with mapi
+                            // if the iterated element is the one we want to move, substract 1.5 from it
+                            // let sortBy handle all stuff then assign new indices with mapi
                             (float iterInd-1.5,iterFileName)
                         else
                             (float iterInd,iterFileName)
@@ -569,8 +569,8 @@ module FileNameTable =
                     |> List.map (fun (iterInd,iterFileName) ->
                         let isNameToMove = (id,fileName) = (iterInd,iterFileName)
                         if isNameToMove then
-                            /// if the iterated element is the one we want to move, add 1.5 from it
-                            /// let sortBy handle all stuff then assign new indices with mapi
+                            // if the iterated element is the one we want to move, add 1.5 from it
+                            // let sortBy handle all stuff then assign new indices with mapi
                             (float iterInd+1.5,iterFileName)
                         else
                             (float iterInd,iterFileName)
@@ -635,6 +635,6 @@ let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
             str "Select files from your computer and insert their names into Excel."
         ]
 
-        /// COlored container element for all uploaded file names and sort elements
+        // Colored container element for all uploaded file names and sort elements
         fileContainer model dispatch inputId
     ]

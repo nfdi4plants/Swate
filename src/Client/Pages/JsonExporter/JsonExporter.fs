@@ -363,9 +363,9 @@ let fileUploadButton (model:Model) dispatch id =
 let xlsxUploadAndParsingMainElement (model:Model) (dispatch: Msg -> unit) =
     let inputId = "xlsxConverter_uploadButton"
     mainFunctionContainer [
-        /// Upload xlsx file to byte []
+        // Upload xlsx file to byte []
         fileUploadButton model dispatch inputId
-        /// Request parsing
+        // Request parsing
         Field.div [Field.HasAddons] [
             Control.div [] [
                 Dropdown.dropdown [

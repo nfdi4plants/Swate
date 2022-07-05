@@ -239,7 +239,7 @@ module OfficeInterop =
                     (curry GenericError (UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails |> Cmd.ofMsg) >> DevMsg)
             currentModel, cmd
 
-        /// DEV
+        // DEV
         | TryExcel  ->
             let cmd = 
                 Cmd.OfPromise.either

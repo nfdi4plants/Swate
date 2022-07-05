@@ -203,7 +203,7 @@ module TemplateFromDB =
                             Button.Color IsSuccess
                             Button.OnClick (fun e ->
                                 let p = model.ProtocolState.ProtocolSelected.Value
-                                /// Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
+                                // Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
                                 //let validation =
                                 //    model.ProtocolInsertState.ValidationXml.Value |> Some
                                 ProtocolIncreaseTimesUsed p.Id |> ProtocolMsg |> dispatch
@@ -295,12 +295,12 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
         
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Templates"]
 
-        /// Box 1
+        // Box 1
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add template from database."]
 
         TemplateFromDB.showDatabaseProtocolTemplate model dispatch
 
-        /// Box 2
+        // Box 2
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add template(s) from file."]
 
         TemplateFromJsonFile.protocolInsertElement model dispatch

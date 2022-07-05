@@ -59,7 +59,7 @@ let tabs (model:Model) dispatch =
             createNavigationTab Routing.Route.Protocol              model dispatch
             createNavigationTab Routing.Route.FilePicker            model dispatch
             if not isIEBrowser then
-                /// docsrc attribute not supported in iframe in IE
+                // docsrc attribute not supported in iframe in IE
                 createNavigationTab Routing.Route.Dag                   model dispatch
             createNavigationTab Routing.Route.Info                  model dispatch
         else

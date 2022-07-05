@@ -116,7 +116,7 @@ let fileSortElements (model:Model) dispatch =
                     Icon.icon [ Icon.Size IsSmall; Icon.IsRight ]
                         [ Fa.i [ Fa.Solid.Search ]
                             [ ] ]
-                    /// Pseudo dropdown
+                    // Pseudo dropdown
                     Box.box' [Props [Style [
                         yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode
                         Position PositionOptions.Absolute
@@ -154,7 +154,7 @@ let fileSortElements (model:Model) dispatch =
                 ]
             ]
         ]
-        /// Only show the tag list and tag filter (AND or OR) if any tag exists
+        // Only show the tag list and tag filter (AND or OR) if any tag exists
         if model.ProtocolState.ProtocolFilterErTags <> [] || model.ProtocolState.ProtocolFilterTags <> [] then
             Columns.columns [Columns.IsMobile] [
                 Column.column [] [
@@ -189,7 +189,7 @@ let fileSortElements (model:Model) dispatch =
                                 ]
                         ]
                 ]
-                /// tag filter (AND or OR) 
+                // tag filter (AND or OR) 
                 Column.column [
                     Column.Width (Screen.All, Column.IsNarrow)
                     Column.Props [Title (if model.ProtocolState.TagFilterIsAnd then "Templates contain all tags." else "Templates contain at least one tag.")]
@@ -379,10 +379,10 @@ let protocolElementContainer (model:Model) dispatch =
                 let filterTags = Set.union (model.ProtocolState.ProtocolFilterTags |> Set.ofList) (model.ProtocolState.ProtocolFilterErTags |> Set.ofList)
                 Set.intersect tagSet filterTags
                     |> fun intersectSet ->
-                        /// if we want to filter by tag with AND, all tags must match
+                        // if we want to filter by tag with AND, all tags must match
                         if model.ProtocolState.TagFilterIsAnd then
                             intersectSet.Count = filterTags.Count
-                        /// if we want to filter by tag with OR, at least one tag must match
+                        // if we want to filter by tag with OR, at least one tag must match
                         else
                             intersectSet.Count >= 1
             )
