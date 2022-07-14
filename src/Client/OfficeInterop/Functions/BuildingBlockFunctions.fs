@@ -321,12 +321,12 @@ let toTermSearchable (buildingBlock:BuildingBlock) =
                 let tryFindAccession =
                     buildingBlock.TAN.Value.Cells
                     // filter for only row indices related to main column term name
-                    |> Array.filter (fun x -> Array.contains x.Index cellRowIndices)
+                    |> Array.filter (fun x -> Array.contains x.Index cellRowIndices && x.Value.IsSome && x.Value.Value.Trim() <> "")
                     |> Array.sortBy (fun x -> x.Index)
                     |> Array.distinctBy (fun x -> x.Value)
                 // Return error if one term name in row relates to different accessions
                 if tryFindAccession.Length > 1 then
-                    let rowIndices = tryFindAccession|> Array.map (fun x -> string x.Index) |> String.concat ", "
+                    let rowIndices = tryFindAccession |> Array.map (fun x -> string x.Index) |> String.concat ", "
                     failwith $"Swate found different accessions for the same Term! Please check column '{buildingBlock.MainColumn.Header.SwateColumnHeader}', different accession for rows: {rowIndices}."
                 let accession =
                     tryFindAccession
