@@ -21,8 +21,6 @@ module Protocol =
                     Api.swateJsonAPIv1.parseProcessSeqToBuildingBlocks
                 | JsonExportType.Assay ->
                     Api.swateJsonAPIv1.parseAssayJsonToBuildingBlocks
-                | JsonExportType.Table ->
-                    Api.swateJsonAPIv1.parseTableJsonToBuildingBlocks
                 | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
             let cmd =
                 Cmd.OfAsync.either

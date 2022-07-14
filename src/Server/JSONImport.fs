@@ -7,15 +7,15 @@ open ISADotNet.Json
 
 let assayJsonToTable jsonString =
     let assay = Assay.fromString jsonString
-    let tables = AssayCommonAPI.RowWiseAssay.fromAssay assay
+    let tables = QueryModel.QAssay.fromAssay assay
     tables
 
-let tableJsonToTable jsonString =
-    let tables = Json.AssayCommonAPI.RowWiseAssay.fromString jsonString
-    tables
+//let tableJsonToTable jsonString =
+//    let tables = Json.AssayCommonAPI.RowWiseAssay.fromString jsonString
+//    tables
 
 let processSeqJsonToTable jsonString =
     let processSeq = ProcessSequence.fromString jsonString
     let assay = Assay.create(ProcessSequence = List.ofSeq processSeq)
-    let tables = AssayCommonAPI.RowWiseAssay.fromAssay assay
+    let tables = QueryModel.QAssay.fromAssay assay
     tables

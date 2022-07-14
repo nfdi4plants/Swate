@@ -17,7 +17,7 @@ module TemplateMetadata
 
 open System
 open System.IO
-open FSharpSpreadsheetML
+open FsSpreadsheet.ExcelIO
 
 open Shared
 open TemplateTypes

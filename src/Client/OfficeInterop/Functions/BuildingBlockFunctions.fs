@@ -321,6 +321,7 @@ let toTermSearchable (buildingBlock:BuildingBlock) =
                 let tryFindAccession =
                     buildingBlock.TAN.Value.Cells
                     // filter for only row indices related to main column term name
+                    // Filter to remove cells with empty values (Some ""). Otherwise "tryFindAccession.Length > 1" will trigger a failwith some lines below.
                     |> Array.filter (fun x -> Array.contains x.Index cellRowIndices && x.Value.IsSome && x.Value.Value.Trim() <> "")
                     |> Array.sortBy (fun x -> x.Index)
                     |> Array.distinctBy (fun x -> x.Value)

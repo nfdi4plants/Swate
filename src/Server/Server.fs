@@ -40,11 +40,11 @@ let swateJsonAPIv1 = {
         let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
         return parsedJsonStr
     }
-    parseAnnotationTableToTableJson = fun (worksheetName,buildingblocks) -> async {
-        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
-        let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
-        return parsedJsonStr
-    }
+    //parseAnnotationTableToTableJson = fun (worksheetName,buildingblocks) -> async {
+    //    let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+    //    let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+    //    return parsedJsonStr
+    //}
     parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
         let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
@@ -55,23 +55,25 @@ let swateJsonAPIv1 = {
         let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
         return parsedJsonStr
     }
-    parseAnnotationTablesToTableJson = fun worksheetBuildingBlocks -> async {
-        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-        let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
-        return parsedJsonStr
-    }
+    // [<System.ObsoleteAttribute>]
+    //parseAnnotationTablesToTableJson = fun worksheetBuildingBlocks -> async {
+    //    let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+    //    let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
+    //    return parsedJsonStr
+    //}
     parseAssayJsonToBuildingBlocks = fun jsonString -> async {
         let table = JsonImport.assayJsonToTable jsonString
         if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
         let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
         return buildingBlocks
     }
-    parseTableJsonToBuildingBlocks = fun jsonString -> async {
-        let table = JsonImport.tableJsonToTable jsonString
-        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
-        return buildingBlocks
-    }
+    // [<System.ObsoleteAttribute>]
+    //parseTableJsonToBuildingBlocks = fun jsonString -> async {
+    //    let table = JsonImport.tableJsonToTable jsonString
+    //    if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+    //    let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+    //    return buildingBlocks
+    //}
     parseProcessSeqToBuildingBlocks = fun jsonString -> async {
         let table = JsonImport.processSeqJsonToTable jsonString
         if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
@@ -97,10 +99,11 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             return box assay
         }
         /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
+        /// This is the main interop function for SWOBUP.
         toSwateTemplateJson = fun byteArray -> async {
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
             let ms = new MemoryStream(byteArray)
-            let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
+            let doc = FsSpreadsheet.ExcelIO.Spreadsheet.fromStream ms false
             let tableName = metadata.TryGetValue "Table"
             let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
             let assayJson = ISADotNet.Json.Assay.toString assay.Value
@@ -117,11 +120,12 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             let processList = assay |> fun (_,_,_,assay) -> Option.defaultValue [] assay.ProcessSequence
             return box processList
         }
-        toTableJson = fun byteArray -> async {
-            let assay = assayFromByteArray byteArray 
-            let table = assay |> fun (_,_,_,assay) -> assay |> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay
-            return box table
-        }
+        // [<System.ObsoleteAttribute>]
+        //toTableJson = fun byteArray -> async {
+        //    let assay = assayFromByteArray byteArray 
+        //    let table = assay |> fun (_,_,_,assay) -> assay |> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay
+        //    return box table
+        //}
         /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJsonStr = fun byteArray -> async {
             let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
@@ -131,7 +135,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         toSwateTemplateJsonStr = fun byteArray -> async {
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
             let ms = new MemoryStream(byteArray)
-            let doc = FSharpSpreadsheetML.Spreadsheet.fromStream ms false
+            let doc = FsSpreadsheet.ExcelIO.Spreadsheet.fromStream ms false
             let tableName = metadata.TryGetValue "Table"
             let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
             let assayJson = ISADotNet.Json.Assay.toString assay.Value
@@ -149,11 +153,12 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             let processJSon = assay |> fun (_,_,_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
             return processJSon
         }
-        toTableJsonStr = fun byteArray -> async {
-            let assay = assayFromByteArray byteArray 
-            let processJSon = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) 
-            return processJSon
-        }
+        // [<System.ObsoleteAttribute>]
+        //toTableJsonStr = fun byteArray -> async {
+        //    let assay = assayFromByteArray byteArray 
+        //    let processJSon = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) 
+        //    return processJSon
+        //}
         testPostNumber = fun num -> async {
             let res = $"Hey you just sent us a number. Is this your number {num}?"
             return res
@@ -171,6 +176,7 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
     
     {
         //Development
+
         getTestNumber = fun () -> async { return 42 }
 
         //Ontology related requests
@@ -182,6 +188,7 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
             }
 
         // Term related requests
+
         getTermSuggestions = fun (max:int,typedSoFar:string) ->
             async {
                 let dbSearchRes =

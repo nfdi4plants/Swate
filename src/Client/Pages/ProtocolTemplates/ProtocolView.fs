@@ -132,7 +132,6 @@ module TemplateFromJsonFile =
                         Dropdown.content [] [
                             let msg = (UpdateJsonExportType >> ProtocolMsg >> dispatch)
                             dropdownItem JsonExportType.Assay model msg (model.ProtocolState.JsonExportType = JsonExportType.Assay)
-                            dropdownItem JsonExportType.Table model msg (model.ProtocolState.JsonExportType = JsonExportType.Table)
                             dropdownItem JsonExportType.ProcessSeq model msg (model.ProtocolState.JsonExportType = JsonExportType.ProcessSeq)
                         ]
                     ]

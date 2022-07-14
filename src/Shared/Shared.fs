@@ -37,13 +37,11 @@ module SorensenDice =
 type JsonExportType =
 | ProcessSeq
 | Assay
-| Table
 | ProtocolTemplate
     member this.toExplanation =
         match this with
         | ProcessSeq        -> "Sequence of ISA process.json."
         | Assay             -> "ISA assay.json"
-        | Table             -> "Access layer type. table.json utilizes minor ISA-JSON types in a more accessible model."
         | ProtocolTemplate  -> "Schema for Swate protocol template, with template metadata and table json."
 
 /// This type is used to define target for unit term search.
@@ -70,12 +68,12 @@ type IISADotNetCommonAPIv1 = {
     toSwateTemplateJson         : byte [] -> Async<obj>
     toInvestigationJson         : byte [] -> Async<obj>
     toProcessSeqJson            : byte [] -> Async<obj>
-    toTableJson                 : byte [] -> Async<obj>
+    //toTableJson                 : byte [] -> Async<obj>
     toAssayJsonStr              : byte [] -> Async<string>
     toSwateTemplateJsonStr      : byte [] -> Async<string>
     toInvestigationJsonStr      : byte [] -> Async<string>
     toProcessSeqJsonStr         : byte [] -> Async<string>
-    toTableJsonStr              : byte [] -> Async<string>
+    //toTableJsonStr              : byte [] -> Async<string>
     testPostNumber              : int   -> Async<string>
     getTestNumber               : unit  -> Async<string>
 }
@@ -83,12 +81,12 @@ type IISADotNetCommonAPIv1 = {
 type ISwateJsonAPIv1 = {
     parseAnnotationTableToAssayJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
     parseAnnotationTableToProcessSeqJson    : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
-    parseAnnotationTableToTableJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
+    //parseAnnotationTableToTableJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
     parseAnnotationTablesToAssayJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
     parseAnnotationTablesToProcessSeqJson   : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
-    parseAnnotationTablesToTableJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    //parseAnnotationTablesToTableJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
     parseAssayJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
-    parseTableJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+    //parseTableJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
     parseProcessSeqToBuildingBlocks         : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
 }
 

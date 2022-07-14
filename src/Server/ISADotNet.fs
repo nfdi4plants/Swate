@@ -8,7 +8,7 @@ open ISADotNet.Json
 
 module Assay =
 
-    open FSharpSpreadsheetML
+    open FsSpreadsheet.ExcelIO
 
     /// Reads an assay from an xlsx spreadsheetdocument
     ///
@@ -48,7 +48,9 @@ module Assay =
 /// Only use this function for protocol templates from db
 let rowMajorOfTemplateJson jsonString =
     let assay = Assay.fromString jsonString
-    let rowMajorFormat = AssayCommonAPI.RowWiseAssay.fromAssay assay
+    let rowMajorFormat =
+        //AssayCommonAPI.RowWiseAssay.fromAssay assay
+        QueryModel.QAssay.fromAssay assay
     if rowMajorFormat.Sheets.Length <> 1 then
         failwith "Swate was unable to identify the information from the requested template (<Found more than one process in template>). Please open an issue for the developers."
     let template = rowMajorFormat.Sheets.Head
@@ -138,29 +140,50 @@ type ISADotNet.ProcessParameterValue with
             | None      -> Array.empty
         columnPosition, InsertBuildingBlock.create headerPrePrint colHeaderTerm unitTerm value
 
+type QueryModel.ISAValue with
+
+    member this.toInsertBuildingBlock : (int * InsertBuildingBlock) =
+        let buildingBlockType =
+            if this.IsFactorValue then
+                BuildingBlockType.Factor
+            elif this.IsParameterValue then
+                BuildingBlockType.Parameter
+            elif this.IsCharacteristicValue then
+                BuildingBlockType.Characteristics
+            else
+                failwithf "This function should only ever be used to parse Factor/Parameter/Characteristic, instead parsed: %A" this.Value
+        let coldHeaderTermName =
+            if this.HasValue |> not then
+                None
+            else
+                if  this.ValueText = "" then failwith $"Found empty name for column header."
+                Some this.Value.toTermMinimal
+        let columnPosition = getColumnPosition this.Category
+        let unitTerm = if this.HasUnit then this.Unit.toTermMinimal else None
+        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.Parameter coldHeaderTermName.Value.Name
+        let value = Array.singleton this.Value.toTermMinimal
+
+        columnPosition, InsertBuildingBlock.create headerPrePrint coldHeaderTermName unitTerm value
+        
+
 /// extend existing ISADotNet.Json.AssayCommonAPI.RowWiseSheet from ISADotNet library with
 /// static member to map it to the Swate InsertBuildingBlock type used as input for addBuildingBlock functions
-type AssayCommonAPI.RowWiseSheet with
+//type AssayCommonAPI.RowWiseSheet with
+type QueryModel.QSheet with
 
     /// Map ISADotNet type to Swate OfficerInterop type. Only done for first row.
     member this.headerToInsertBuildingBlockList : InsertBuildingBlock list =
         let headerRow = this.Rows.Head
-        let factors = headerRow.FactorValues |> List.map (fun fv -> fv.toInsertBuildingBlock)
-        let parameters = headerRow.ParameterValues |> List.map (fun ppv -> ppv.toInsertBuildingBlock)
-        let characteristics = headerRow.CharacteristicValues |> List.map (fun mav -> mav.toInsertBuildingBlock)
-        let newList = factors@parameters@characteristics
-        newList
+        let cols = headerRow.Values().Values |> List.map (fun fv -> fv.toInsertBuildingBlock)
+        cols
         |> List.sortBy fst
         |> List.map snd
 
     member this.toInsertBuildingBlockList : InsertBuildingBlock list =
         let insertBuildingBlockRowList =
             this.Rows |> List.collect (fun r -> 
-                let factors = r.FactorValues |> List.map (fun fv -> fv.toInsertBuildingBlock)
-                let parameters = r.ParameterValues |> List.map (fun ppv -> ppv.toInsertBuildingBlock)
-                let characteristics = r.CharacteristicValues |> List.map (fun mav -> mav.toInsertBuildingBlock)
-                let newList = factors@parameters@characteristics
-                newList |> List.sortBy fst |> List.map snd
+                let cols = r.Values().Values |> List.map (fun fv -> fv.toInsertBuildingBlock)
+                cols |> List.sortBy fst |> List.map snd
             )
         // group building block values by "InsertBuildingBlock" information (column information without values)
         insertBuildingBlockRowList

@@ -121,8 +121,6 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 Api.swateJsonAPIv1.parseAnnotationTableToProcessSeqJson
             | JsonExportType.Assay ->
                 Api.swateJsonAPIv1.parseAnnotationTableToAssayJson
-            | JsonExportType.Table ->
-                Api.swateJsonAPIv1.parseAnnotationTableToTableJson
             | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
         let cmd =
             Cmd.OfAsync.either
@@ -152,8 +150,6 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 Api.swateJsonAPIv1.parseAnnotationTablesToProcessSeqJson
             | JsonExportType.Assay ->
                 Api.swateJsonAPIv1.parseAnnotationTablesToAssayJson
-            | JsonExportType.Table ->
-                Api.swateJsonAPIv1.parseAnnotationTablesToTableJson
             | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
         let cmd =
             Cmd.OfAsync.either
@@ -191,7 +187,6 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
             match currentModel.JsonExporterModel.XLSXParsingExportType with
             | JsonExportType.ProcessSeq        -> Api.isaDotNetCommonApi.toProcessSeqJsonStr
             | JsonExportType.Assay             -> Api.isaDotNetCommonApi.toAssayJsonStr
-            | JsonExportType.Table             -> Api.isaDotNetCommonApi.toTableJsonStr
             | JsonExportType.ProtocolTemplate  -> Api.isaDotNetCommonApi.toSwateTemplateJsonStr
         let cmd =
             Cmd.OfAsync.either
@@ -258,7 +253,6 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
                         Dropdown.content [] [
                             let msg = (UpdateTableJsonExportType >> JsonExporterMsg >> dispatch)
                             dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.Assay)
-                            dropdownItem JsonExportType.Table model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.Table)
                             dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.ProcessSeq)
                         ]
                     ]
@@ -297,7 +291,6 @@ let parseTablesToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
                         Dropdown.content [] [
                             let msg = (UpdateWorkbookJsonExportType >> JsonExporterMsg >> dispatch)
                             dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.Assay)
-                            dropdownItem JsonExportType.Table model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.Table)
                             dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.ProcessSeq)
                         ]
                     ]
@@ -383,7 +376,6 @@ let xlsxUploadAndParsingMainElement (model:Model) (dispatch: Msg -> unit) =
                         Dropdown.content [] [
                             let msg = (UpdateXLSXParsingExportType >> JsonExporterMsg >> dispatch)
                             dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.Assay)
-                            dropdownItem JsonExportType.Table model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.Table)
                             dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.ProcessSeq)
                             dropdownItem JsonExportType.ProtocolTemplate model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.ProtocolTemplate)
                         ]
