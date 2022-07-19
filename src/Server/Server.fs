@@ -31,8 +31,16 @@ let dagApiv1 = {
 
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
+        printfn "THIS FUNCTION IS HIT"
         let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        System.IO.File.WriteAllText(@"C:\Users\Kevin\source\repos\Swate\src\Server\public\test.txt", assay.ToString())
+        printfn "HIT-1!"
+        let x = ISADotNet.Json.OntologyAnnotation.toString <| OntologyAnnotation.fromString "a" "b" "c"
+        printfn "TRY-1?"
+        let x = ISADotNet.Json.Assay.toString <| Assay.empty
+        printfn "TRY-2?"
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
+        printfn "TRY-3?"
         return parsedJsonStr
     }
     parseAnnotationTableToProcessSeqJson = fun (worksheetName,buildingblocks) -> async {

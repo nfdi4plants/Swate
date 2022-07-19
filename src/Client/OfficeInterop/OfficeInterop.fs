@@ -450,7 +450,6 @@ let getBuildingBlocksAndSheet() =
             let _ = worksheet.load(U2.Case1 "name")
 
             let! name = context.sync().``then``(fun _ -> worksheet.name)
-
             return (name, buildingBlocks)
         }
     )

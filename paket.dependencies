@@ -5,9 +5,9 @@ storage: none
 nuget DynamicObj 0.2.1
 nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
-nuget ISADotNet 0.5.4
-nuget ISADotNet.XLSX 0.5.4
-nuget ISADotNet.Viz 0.5.4
+nuget ISADotNet 0.6.0-preview.1
+nuget ISADotNet.XLSX 0.6.0-preview.1
+nuget ISADotNet.Viz 0.6.0-preview.1
 nuget Neo4j.Driver 4.4.0
 nuget Saturn
 nuget Expecto

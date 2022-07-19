@@ -263,6 +263,7 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
                     Button.Color IsInfo
                     Button.IsFullWidth
                     Button.OnClick(fun e ->
+                        printfn "CLICK!"
                         JsonExporterMsg ParseTableOfficeInteropRequest |> dispatch
                     )
                 ] [
