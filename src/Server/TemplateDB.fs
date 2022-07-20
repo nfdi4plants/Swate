@@ -44,7 +44,7 @@ module Queries =
                 let template =
                     let dbJson = record.["t.templateJson"].As<string>()
                     (dbJson |> rowMajorOfTemplateJson).headerToInsertBuildingBlockList
-                    /// Remove values from template, not wanted for this function
+                    // Remove values from template, not wanted for this function
                     |> List.map (fun ibb -> {ibb with Rows = [||]})
                 { Template.asTemplateMinimal record
                     with TemplateBuildingBlocks = template }
@@ -72,8 +72,8 @@ module Queries =
                     Template.asTemplate,
                     credentials
                 )
-            if Seq.length dbResults = 0 then failwith "Error. Could not find requested template in database, please try again or open a bug report."
-            /// Id is unique and should always only result in one found template
+            if Array.ofSeq dbResults |> Array.length = 0 then failwith "Error. Could not find requested template in database, please try again or open a bug report."
+            // Id is unique and should always only result in one found template
             Seq.head dbResults
 
         member this.increaseTimesUsed(id:string) =

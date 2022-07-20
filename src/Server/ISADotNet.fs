@@ -80,66 +80,6 @@ let getColumnPosition (oa:OntologyAnnotation) =
     let c = oa.Comments |> Option.map (List.find (fun c -> c.Name = Some ColumnPositionCommentName))
     c.Value.Value.Value |> int
 
-//type ISADotNet.MaterialAttributeValue with
-
-//    member this.toInsertBuildingBlock : (int * InsertBuildingBlock) =
-//        let colHeaderTerm =
-//            if this.Category.IsSome && this.Category.Value.CharacteristicType.IsSome then
-//                this.Category.Value.CharacteristicType.Value.toTermMinimal
-//            else
-//                None
-//        if colHeaderTerm.IsNone then failwith $"Could not find name for column header."
-//        if colHeaderTerm.Value.Name = "" then failwith $"Found empty name for column header."
-//        let columnPosition = getColumnPosition this.Category.Value.CharacteristicType.Value
-//        let unitTerm =
-//            if this.Unit.IsSome then this.Unit.Value.toTermMinimal else None
-//        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.Characteristic colHeaderTerm.Value.Name
-//        let value =
-//            match this.Value with
-//            | Some v    -> Array.singleton v.toTermMinimal
-//            | None      -> Array.empty
-//        columnPosition, InsertBuildingBlock.create headerPrePrint colHeaderTerm unitTerm value
-
-//type ISADotNet.FactorValue with
-
-//    member this.toInsertBuildingBlock : (int * InsertBuildingBlock)=
-//        let colHeaderTerm =
-//            if this.Category.IsSome && this.Category.Value.FactorType.IsSome then
-//                this.Category.Value.FactorType.Value.toTermMinimal
-//            else
-//                None
-//        if colHeaderTerm.IsNone then failwith $"Could not find name for column header."
-//        if colHeaderTerm.Value.Name = "" then failwith $"Found empty name for column header."
-//        let columnPosition = getColumnPosition this.Category.Value.FactorType.Value
-//        let unitTerm =
-//            if this.Unit.IsSome then this.Unit.Value.toTermMinimal else None
-//        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.Factor colHeaderTerm.Value.Name
-//        let value =
-//            match this.Value with
-//            | Some v    -> Array.singleton v.toTermMinimal
-//            | None      -> Array.empty
-//        columnPosition, InsertBuildingBlock.create headerPrePrint colHeaderTerm unitTerm value
-
-//type ISADotNet.ProcessParameterValue with
-
-//    member this.toInsertBuildingBlock : (int * InsertBuildingBlock) =
-//        let colHeaderTerm =
-//            if this.Category.IsSome && this.Category.Value.ParameterName.IsSome then
-//                this.Category.Value.ParameterName.Value.toTermMinimal
-//            else
-//                None
-//        if colHeaderTerm.IsNone then failwith $"Could not find name for column header."
-//        if colHeaderTerm.Value.Name = "" then failwith $"Found empty name for column header."
-//        let columnPosition = getColumnPosition this.Category.Value.ParameterName.Value
-//        let unitTerm =
-//            if this.Unit.IsSome then this.Unit.Value.toTermMinimal else None
-//        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.Parameter colHeaderTerm.Value.Name
-//        let value =
-//            match this.Value with
-//            | Some v    -> Array.singleton v.toTermMinimal
-//            | None      -> Array.empty
-//        columnPosition, InsertBuildingBlock.create headerPrePrint colHeaderTerm unitTerm value
-
 type QueryModel.ISAValue with
 
     member this.toInsertBuildingBlock : (int * InsertBuildingBlock) =
@@ -152,18 +92,18 @@ type QueryModel.ISAValue with
                 BuildingBlockType.Characteristic
             else
                 failwithf "This function should only ever be used to parse Factor/Parameter/Characteristic, instead parsed: %A" this.Value
-        let coldHeaderTermName =
-            if this.HasValue |> not then
+        let colHeaderTermName =
+            if this.HasCategory |> not then
                 None
             else
-                if  this.ValueText = "" then failwith $"Found empty name for column header."
-                Some this.Value.toTermMinimal
+                if this.Category.NameText = "" then failwith $"Found empty name for column header."
+                this.Category.toTermMinimal
         let columnPosition = getColumnPosition this.Category
         let unitTerm = if this.HasUnit then this.Unit.toTermMinimal else None
-        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create buildingBlockType coldHeaderTermName.Value.Name
-        let value = Array.singleton this.Value.toTermMinimal
+        let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create buildingBlockType colHeaderTermName.Value.Name
+        let value = if this.HasValue then Array.singleton this.Value.toTermMinimal else [||]
 
-        columnPosition, InsertBuildingBlock.create headerPrePrint coldHeaderTermName unitTerm value
+        columnPosition, InsertBuildingBlock.create headerPrePrint colHeaderTermName unitTerm value
         
 
 /// extend existing ISADotNet.Json.AssayCommonAPI.RowWiseSheet from ISADotNet library with
@@ -174,7 +114,8 @@ type QueryModel.QSheet with
     /// Map ISADotNet type to Swate OfficerInterop type. Only done for first row.
     member this.headerToInsertBuildingBlockList : InsertBuildingBlock list =
         let headerRow = this.Rows.Head
-        let cols = headerRow.Values().Values |> List.map (fun fv -> fv.toInsertBuildingBlock)
+        let rawCols = headerRow.Values().Values
+        let cols = rawCols |> List.map (fun fv -> fv.toInsertBuildingBlock)
         cols
         |> List.sortBy fst
         |> List.map snd

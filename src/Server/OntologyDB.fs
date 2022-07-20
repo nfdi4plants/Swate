@@ -21,7 +21,7 @@ with
         | PerformanceComplete ->
             let s = queryString.Split(" ", StringSplitOptions.RemoveEmptyEntries)
             s
-            /// add "+" to every word so the fulltext search must include the previous word, this highly improves search performance
+            // add "+" to every word so the fulltext search must include the previous word, this highly improves search performance
             |> Array.mapi (fun i str -> if i <> s.Length-1 then "+" + str else str + "*")
             |> String.concat " "
         | Fuzzy         -> queryString.Replace(" ","~ ") + "~"
