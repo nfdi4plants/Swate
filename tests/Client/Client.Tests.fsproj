@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="BuildingBlockView.Tests.fs" />
     <Compile Include="BuildingBlockFunctions.Tests.fs" />
     <Compile Include="Client.Tests.fs" />
   </ItemGroup>

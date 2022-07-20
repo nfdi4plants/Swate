@@ -17,6 +17,7 @@ let all =
             Shared.Tests.shared
 #endif
             BuildingBlockFunctions.tests_buildingBlockFunctions
+            BuildingBlockView.tests_BuildingBlockView
             client
         ]
 

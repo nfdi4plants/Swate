@@ -140,6 +140,17 @@ let case_tableWithFeaturedCol : Column [] =
         }|]
     }|]
 
+let case_tableWithSingleCol : Column [] =
+    [|{
+        Index = 12
+        Header = { SwateColumnHeader = "Protocol REF" }
+        Cells = [|{
+            Index = 1
+            Value = Some "My Fancy Protocol Name"
+            Unit = None
+        }|]
+    }|]
+
 open OfficeInterop.BuildingBlockFunctions.Aux_GetBuildingBlocksPostSync
 
 
@@ -233,11 +244,27 @@ let tests_buildingBlockFunctions = testList "BuildingBlockFunctions" [
         Expect.isTrue buildingBlock_withMainColumnTerms.[0].hasCompleteTerm "Protocol Type hasCompleteTerm"
         Expect.equal buildingBlock_withMainColumnTerms.[0].MainColumnTerm (TermMinimal.create "protocol type" "NFDI4PSO:1000161" |> Some) "MainColumnTerm for 'Protocol Type' differs from expected value"
 
+    testCase "BuildingBlocks from case_tableWithSingleCol" <| fun _ ->
+        let buildingBlocks =
+            sortColsIntoBuildingBlocks case_tableWithSingleCol
+            |> List.rev
+            |> Array.ofList
+
+        let buildingBlock_withMainColumnTerms =
+            buildingBlocks
+            |> Array.map getMainColumnTerm
+
+        Expect.equal buildingBlocks.Length 1 "Different number of BuildingBlocks expected."
+        Expect.equal buildingBlocks.[0].MainColumn.Header.SwateColumnHeader "Protocol REF" "First Building Block must be 'Protocol REF'."
+        Expect.isTrue buildingBlocks.[0].MainColumn.Header.isSingleCol "First Building Block must be 'isSingleCol'."
+        Expect.equal buildingBlock_withMainColumnTerms buildingBlocks "Protocol REF should not change when updating record type with main column terms."
+
     testCase "BuildingBlocks from combined cases" <| fun _ ->
 
         let combinedCases =
             // Array.append adds second arr to the end of first arr, so we need to build backwards using the pipe operator
-            case_tableWithFeaturedCol
+            case_tableWithSingleCol
+            |> Array.append case_tableWithFeaturedCol
             |> Array.append case_tableWithParamsWithUnit
             |> Array.append case_tableWithParameterAndValue
 
@@ -250,7 +277,7 @@ let tests_buildingBlockFunctions = testList "BuildingBlockFunctions" [
             buildingBlocks
             |> Array.map getMainColumnTerm
 
-        Expect.equal buildingBlocks.Length 5 "Different number of BuildingBlocks expected."
+        Expect.equal buildingBlocks.Length 6 "Different number of BuildingBlocks expected."
         // Source Name
         Expect.equal buildingBlocks.[0].MainColumn.Header.SwateColumnHeader "Source Name" "First Building Block must be 'Source Name'."
         Expect.equal buildingBlocks.[0].MainColumn.Cells.[0].Value.Value "test/source/path" ""
@@ -290,4 +317,8 @@ let tests_buildingBlockFunctions = testList "BuildingBlockFunctions" [
             // check main column term correct
         Expect.isTrue buildingBlock_withMainColumnTerms.[4].hasCompleteTerm "Protocol Type hasCompleteTerm"
         Expect.equal buildingBlock_withMainColumnTerms.[4].MainColumnTerm (TermMinimal.create "protocol type" "NFDI4PSO:1000161" |> Some) "MainColumnTerm for 'Protocol Type' differs from expected value"
+
+        // Protocol REF
+        Expect.equal buildingBlocks.[5].MainColumn.Header.SwateColumnHeader "Protocol REF" "First Building Block must be 'Protocol REF'."
+        Expect.isTrue buildingBlocks.[5].MainColumn.Header.isSingleCol "First Building Block must be 'isSingleCol'."
 ]
