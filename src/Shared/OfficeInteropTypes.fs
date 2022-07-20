@@ -28,12 +28,13 @@ module OfficeInteropTypes =
         // Term columns
         | Parameter         
         | Factor            
-        | Characteristics
+        | Characteristic
+        | Component
         // Source columns
         | Source
         // Output columns
         | Sample
-        | Data // [<ObsoleteAttribute>] 
+        | Data // DEPRECATED at v0.6.0 [<ObsoleteAttribute>] 
         | RawDataFile
         | DerivedDataFile
         // Featured Columns
@@ -42,7 +43,7 @@ module OfficeInteropTypes =
         | ProtocolREF
 
         static member listAll = [
-            Parameter; Factor; Characteristics;
+            Parameter; Factor; Characteristic; Component
             //input
             Source;
             //output
@@ -62,7 +63,7 @@ module OfficeInteropTypes =
 
         ///<summary>The name "TermColumn" refers to all columns with the syntax "Parameter/Factor/etc [TERM-NAME]"</summary>
         member this.isTermColumn =
-            match this with | Parameter | Factor | Characteristics -> true | anythingElse -> false
+            match this with | Parameter | Factor | Characteristic | Component -> true | anythingElse -> false
 
         /// <summary>This function returns true if the BuildingBlockType is a featured column. A featured column can
         /// be abstracted by Parameter/Factor/Characteristics and describes one common usecase of either.
@@ -96,8 +97,10 @@ module OfficeInteropTypes =
         static member tryOfString str =
             match str with
             | "Parameter"       -> Some Parameter
-            | "Factor"          -> Some Factor         
-            | "Characteristics" -> Some Characteristics
+            | "Factor"          -> Some Factor
+            // "Characteristics" deprecated in v0.6.0
+            | "Characteristics" | "Characteristic" -> Some Characteristic
+            | "Component" -> Some Component
             | "Sample Name"     -> Some Sample         
             | "Data File Name"  -> Some Data
             | "Raw Data File"       -> Some RawDataFile
@@ -115,7 +118,8 @@ module OfficeInteropTypes =
             match this with
             | Parameter         -> "Parameter"
             | Factor            -> "Factor"
-            | Characteristics   -> "Characteristics"
+            | Characteristic    -> "Characteristic"
+            | Component         -> "Component"
             | Sample            -> "Sample Name"
             | Data              -> "Data File Name"
             | RawDataFile       -> "Raw Data File"
@@ -126,9 +130,10 @@ module OfficeInteropTypes =
 
         member this.toShortExplanation =
             match this with
-            | Parameter         -> "Use parameter columns to annotate your experimental workflow. multiple parameters form a protocol. Example: centrifugation time, precipitate agent, ..."
-            | Factor            -> "Use factor columns to track the experimental conditions that govern your study. Example: temperature,light,..."
-            | Characteristics   -> "Use characteristics columns to annotate interesting properties of your organism. Example: strain,phenotype,... "
+            | Parameter         -> "Use parameter columns to annotate your experimental workflow. Example: centrifugation time and filter pore size."
+            | Factor            -> "Use factor columns to track the experimental conditions that govern your study. Example: temperature and light."
+            | Characteristic    -> "Use characteristics columns to annotate interesting properties of your organism. Example: organism, strain and phenotype. "
+            | Component         -> "Use component columns to annotate any used materials. Example: instrument names, software names, and reagents names."
             | Sample            -> "Use sample columns to mark the name of the sample that your experimental workflow produced."
             | Data              -> "DEPRECATED: Use data columns to mark the data file name that your computational analysis produced."
             | RawDataFile       -> "Use raw data file columns to mark the name of untransformed and unprocessed data files"
@@ -140,13 +145,15 @@ module OfficeInteropTypes =
         member this.toLongExplanation =
             match this with
             | Parameter         ->
-                "Use parameters to annotate your experimental workflow. You can group parameters to create a protocol."
+                "Use parameters to annotate your experimental workflow. You can use any number of characteristics columns."
             | Factor            ->
                 "Use factor columns to track the experimental conditions that govern your study.
                 Most of the time, factors are the most important building blocks for downstream computational analysis."
-            | Characteristics   ->
+            | Characteristic   ->
                 "Use characteristics columns to annotate interesting properties of the source material.
                 You can use any number of characteristics columns."
+            | Component   ->
+                "Use component columns to annotate any used materials. You can use any number of Component columns."
             | Sample            ->
                 "The Sample Name column defines the resulting biological material of the annotated workflow.
                 The name used must be a unique identifier.
@@ -185,20 +192,8 @@ module OfficeInteropTypes =
             match this.Type with
             | BuildingBlockType.Parameter           -> sprintf "Parameter [%s]" this.Name
             | BuildingBlockType.Factor              -> sprintf "Factor [%s]" this.Name
-            | BuildingBlockType.Characteristics     -> sprintf "Characteristics [%s]" this.Name
-            | BuildingBlockType.Sample              -> BuildingBlockType.Sample.toString
-            | BuildingBlockType.Data                -> BuildingBlockType.Data.toString
-            | BuildingBlockType.RawDataFile         -> BuildingBlockType.RawDataFile.toString
-            | BuildingBlockType.DerivedDataFile     -> BuildingBlockType.DerivedDataFile.toString
-            | BuildingBlockType.Source              -> BuildingBlockType.Source.toString
-            | BuildingBlockType.ProtocolType        -> BuildingBlockType.ProtocolType.toString
-            | BuildingBlockType.ProtocolREF         -> BuildingBlockType.ProtocolREF.toString
-
-        member this.toAnnotationTableHeader(id) =
-            match this.Type with
-            | BuildingBlockType.Parameter         -> $"Parameter [{this.Name}#{id}]"
-            | BuildingBlockType.Factor            -> $"Factor [{this.Name}#{id}]"
-            | BuildingBlockType.Characteristics   -> $"Characteristics [{this.Name}#{id}]"
+            | BuildingBlockType.Characteristic      -> sprintf "Characteristic [%s]" this.Name
+            | BuildingBlockType.Component           -> sprintf "Component [%s]" this.Name
             | BuildingBlockType.Sample              -> BuildingBlockType.Sample.toString
             | BuildingBlockType.Data                -> BuildingBlockType.Data.toString
             | BuildingBlockType.RawDataFile         -> BuildingBlockType.RawDataFile.toString

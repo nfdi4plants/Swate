@@ -29,14 +29,6 @@ module Unit =
 [<RequireQualifiedAccess>]
 module MainColumn =
 
-    /// This function will create the mainColumn name from the base name (e.g. 'Parameter [instrument model]' -> Parameter [instrument model#1]).
-    /// The possible addition of an id tag is needed, because column headers need to be unique in excel.
-    /// This will be not necessary for version 0.6.0, as we don't allow multiple instances of the same column in a table + separate indices between main column and reference columns.
-    let createMainColName (newBB:InsertBuildingBlock) (id:int) =
-        match id with
-        | 1             -> newBB.ColumnHeader.toAnnotationTableHeader()
-        | anyOtherId    -> $"{newBB.ColumnHeader.toAnnotationTableHeader(anyOtherId)}" 
-
     /// This function checks if the would be col names already exist. If they do, it ticks up the id tag to keep col names unique.
     /// This function returns the id for the main column.
     /// This will be not necessary for version 0.6.0, as we don't allow multiple instances of the same column in a table + separate indices between main column and reference columns.
@@ -47,7 +39,7 @@ module MainColumn =
                 allColHeaders
                 // Should a column with the same name already exist, then count up the id tag.
                 |> Array.exists (fun existingHeader ->
-                    existingHeader = createMainColName newBB int
+                    existingHeader = newBB.ColumnHeader.toAnnotationTableHeader()
                 )
             if isExisting then
                 loopingCheck (int+1)

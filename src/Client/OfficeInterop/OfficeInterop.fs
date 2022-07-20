@@ -586,7 +586,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                 let checkIdForRefCols() = OfficeInterop.Indexing.RefColumns.findNewIdForReferenceColumns allColHeaders newBB
                 let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit allColHeaders
 
-                let mainColName = OfficeInterop.Indexing.MainColumn.createMainColName newBB (checkIdForMainCol())
+                let mainColName = newBB.ColumnHeader.toAnnotationTableHeader()
                 let tsrColName() = OfficeInterop.Indexing.RefColumns.createTSRColName newBB (checkIdForRefCols())
                 let tanColName() = OfficeInterop.Indexing.RefColumns.createTANColName newBB (checkIdForRefCols())
                 let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader (checkIdForUnitCol())
@@ -841,7 +841,7 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
             let checkIdForRefCols() = OfficeInterop.Indexing.RefColumns.findNewIdForReferenceColumns columnHeaders buildingBlock
             let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit columnHeaders
                 
-            let mainColName = OfficeInterop.Indexing.MainColumn.createMainColName buildingBlock (checkIdForMainCol())
+            let mainColName = buildingBlock.ColumnHeader.toAnnotationTableHeader()
             let tsrColName() = OfficeInterop.Indexing.RefColumns.createTSRColName buildingBlock (checkIdForRefCols())
             let tanColName() = OfficeInterop.Indexing.RefColumns.createTANColName buildingBlock (checkIdForRefCols())
             let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader (checkIdForUnitCol())
@@ -1060,7 +1060,7 @@ let updateUnitForCells (unitTerm:TermMinimal) =
                         InteropLogging.Msg.create InteropLogging.Info $"Created Unit Column {unitColName} for building block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader}."
                     )
                 else
-                    failwith $"You can only add unit to building blocks of the type: {BuildingBlockType.Parameter}, {BuildingBlockType.Characteristics}, {BuildingBlockType.Factor}"
+                    failwith $"You can only add unit to building blocks of the type: {BuildingBlockType.Parameter}, {BuildingBlockType.Characteristic}, {BuildingBlockType.Factor}, {BuildingBlockType.Component}"
 
             return [updateWithUnit]
         }

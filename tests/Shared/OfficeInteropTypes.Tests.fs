@@ -48,8 +48,8 @@ let buildingBlockTypes = testList "buildingBlockTypes" [
         Expect.isFalse header.isTSRCol "isTSRCol"
         Expect.isFalse header.isTermColumn "isTermColumn"
 
-    testCase "Parameter [instrument model]" <| fun _ ->
-        let header = {SwateColumnHeader = "Parameter [instrument model]"}
+    testCase "Parameter [centrifugation time]" <| fun _ ->
+        let header = {SwateColumnHeader = "Parameter [centrifugation time]"}
 
         Expect.isTrue header.isMainColumn "isMainColumn"
         Expect.isFalse header.isSingleCol "isSingleCol"
@@ -61,7 +61,7 @@ let buildingBlockTypes = testList "buildingBlockTypes" [
         Expect.isFalse header.isTSRCol "isTSRCol"
         Expect.isTrue header.isTermColumn "isTermColumn"
 
-        Expect.equal header.tryGetOntologyTerm (Some "instrument model") "tryGetOntologyTerm"
+        Expect.equal header.tryGetOntologyTerm (Some "centrifugation time") "tryGetOntologyTerm"
 
     testCase "Factor [temperature]" <| fun _ ->
         let header = {SwateColumnHeader = "Factor [temperature]"}
@@ -78,7 +78,7 @@ let buildingBlockTypes = testList "buildingBlockTypes" [
 
         Expect.equal header.tryGetOntologyTerm (Some "temperature") "tryGetOntologyTerm"
 
-    testCase "Characteristic [strain]" <| fun _ ->
+    testCase "Characteristics [strain] DEPRECATED 's'" <| fun _ ->
         let header = {SwateColumnHeader = "Characteristics [strain]"}
 
         Expect.isTrue header.isMainColumn "isMainColumn"
@@ -92,4 +92,34 @@ let buildingBlockTypes = testList "buildingBlockTypes" [
         Expect.isTrue header.isTermColumn "isTermColumn"
 
         Expect.equal header.tryGetOntologyTerm (Some "strain") "tryGetOntologyTerm"
+
+    testCase "Characteristic [strain]" <| fun _ ->
+        let header = {SwateColumnHeader = "Characteristic [strain]"}
+
+        Expect.isTrue header.isMainColumn "isMainColumn"
+        Expect.isFalse header.isSingleCol "isSingleCol"
+        Expect.isFalse header.isFeaturedCol "isFeaturedCol"
+        Expect.isFalse header.isInputCol "isInputCol"
+        Expect.isFalse header.isOutputCol "isOutputCol"
+        Expect.isFalse header.isUnitCol "isUnitCol"
+        Expect.isFalse header.isTANCol "isTANCol"
+        Expect.isFalse header.isTSRCol "isTSRCol"
+        Expect.isTrue header.isTermColumn "isTermColumn"
+
+        Expect.equal header.tryGetOntologyTerm (Some "strain") "tryGetOntologyTerm"
+
+    testCase "Component [instrument model]" <| fun _ ->
+        let header = {SwateColumnHeader = "Component [instrument model]"}
+
+        Expect.isTrue header.isMainColumn "isMainColumn"
+        Expect.isFalse header.isSingleCol "isSingleCol"
+        Expect.isFalse header.isFeaturedCol "isFeaturedCol"
+        Expect.isFalse header.isInputCol "isInputCol"
+        Expect.isFalse header.isOutputCol "isOutputCol"
+        Expect.isFalse header.isUnitCol "isUnitCol"
+        Expect.isFalse header.isTANCol "isTANCol"
+        Expect.isFalse header.isTSRCol "isTSRCol"
+        Expect.isTrue header.isTermColumn "isTermColumn"
+
+        Expect.equal header.tryGetOntologyTerm (Some "instrument model") "tryGetOntologyTerm"
 ]

@@ -220,15 +220,18 @@ module BuildingBlock =
     type DropdownPage =
     | Main
     | ProtocolTypes
+    | Output
 
         member this.toString =
             match this with
             | Main -> "Main Page"
             | ProtocolTypes -> "Protocol Columns"
+            | Output -> "Output Columns"
 
         member this.toTooltip =
             match this with
             | ProtocolTypes -> "Protocol columns extend control on table to protocol parsing."
+            | Output -> "Output columns allow to specify the exact type of output for the protocol."
             | _ -> ""
 
     type Model = {

@@ -16,12 +16,12 @@ let tests_BuildingBlockView = testList "BuildingBlockView" [
         let source = BuildingBlockNamePrePrint.init(BuildingBlockType.Source) |> isValidBuildingBlock
         let parameter = BuildingBlockNamePrePrint.create BuildingBlockType.Parameter "instrument model" |> isValidBuildingBlock
         let parameter_nonsense = BuildingBlockNamePrePrint.create BuildingBlockType.Parameter "banana balloon animal" |> isValidBuildingBlock
-        let characteristic = BuildingBlockNamePrePrint.create BuildingBlockType.Characteristics "strain" |> isValidBuildingBlock
-        let factor = BuildingBlockNamePrePrint.create BuildingBlockType.Characteristics "temperature" |> isValidBuildingBlock
+        let characteristic = BuildingBlockNamePrePrint.create BuildingBlockType.Characteristic "strain" |> isValidBuildingBlock
+        let factor = BuildingBlockNamePrePrint.create BuildingBlockType.Factor "temperature" |> isValidBuildingBlock
         /// Featured column should always be valid
         let protocolType = BuildingBlockNamePrePrint.init BuildingBlockType.ProtocolType |> isValidBuildingBlock
 
-        let term_empty = BuildingBlockNamePrePrint.create BuildingBlockType.Characteristics "" |> isValidBuildingBlock
+        let term_empty = BuildingBlockNamePrePrint.create BuildingBlockType.Characteristic "" |> isValidBuildingBlock
 
         Expect.isTrue protocolREF "protocolREF"
         Expect.isTrue source "source"
