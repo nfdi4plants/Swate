@@ -156,7 +156,7 @@ let createAutocompleteSuggestions
                     Class "suggestion"
                 ] [
                     td [
-                        Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline); Tooltip.dataTooltip (if sugg.TooltipText.Trim() <> "" then sugg.TooltipText else "No definition found")
+                        Class "has-tooltip-right has-tooltip-multiline"; Props.Custom ("data-tooltip", if sugg.TooltipText.Trim() <> "" then sugg.TooltipText else "No definition found")
                         Style [FontSize "1.1rem"; Padding "0 0 0 .4rem"; TextAlign TextAlignOptions.Center; VerticalAlign "middle"; Color NFDIColors.Yellow.Darker20]
                     ] [
                         Fa.i [Fa.Solid.InfoCircle] []

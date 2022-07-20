@@ -219,7 +219,17 @@ module BuildingBlock =
     [<RequireQualifiedAccess>]
     type DropdownPage =
     | Main
-    | Featured
+    | ProtocolTypes
+
+        member this.toString =
+            match this with
+            | Main -> "Main Page"
+            | ProtocolTypes -> "Protocol Columns"
+
+        member this.toTooltip =
+            match this with
+            | ProtocolTypes -> "Protocol columns extend control on table to protocol parsing."
+            | _ -> ""
 
     type Model = {
         CurrentBuildingBlock                    : BuildingBlockNamePrePrint

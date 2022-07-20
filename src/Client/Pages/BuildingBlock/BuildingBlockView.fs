@@ -208,7 +208,6 @@ let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
 let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit) (block: BuildingBlockType )  =
     Dropdown.Item.a [
         Dropdown.Item.Props [
-            TabIndex 0
             OnClick (fun e ->
                 e.stopPropagation()
                 BuildingBlockNamePrePrint.init block |> NewBuildingBlockSelected |> BuildingBlockMsg |> dispatch
@@ -218,17 +217,52 @@ let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit
         ]
 
     ] [
-        Text.span [
-            CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
-            Props [
-                Tooltip.dataTooltip (block |> BuildingBlockType.toShortExplanation)
-                Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
-            ]
+        span [
+            Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
+            Class "has-tooltip-multiline"
+            Props.Custom ("data-tooltip", BuildingBlockType.toShortExplanation block)
         ] [
             Fa.i [Fa.Solid.InfoCircle] []
         ]
-        
-        Text.span [] [str block.toString]
+
+        span [] [str block.toString]
+
+
+    ]
+
+let createSubBuildingBlockDropdownLink (model:Model) (dispatch:Messages.Msg -> unit) (subpage: Model.BuildingBlock.DropdownPage) =
+    Dropdown.Item.a [
+        Dropdown.Item.Props [
+            TabIndex 0
+            OnClick (fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                UpdateDropdownPage Model.BuildingBlock.DropdownPage.ProtocolTypes |> BuildingBlockMsg |> dispatch
+            )
+            Style [
+                yield! colorControlInArray model.SiteStyleState.ColorMode;
+                PaddingRight "0.5rem"
+            ]
+        ]
+
+    ] [
+        span [
+            Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
+            Class "has-tooltip-multiline"
+            Props.Custom ("data-tooltip", subpage.toTooltip)
+        ] [
+            Fa.i [Fa.Solid.InfoCircle] []
+        ]
+
+        span [] [
+            str <| subpage.toString
+        ]
+
+        span [
+            Style [ Width "20px"; Float FloatOptions.Right; LineHeight "1.5"; FontSize "1.1rem"]
+        ] [
+            Fa.i [Fa.Solid.ArrowRight] [] 
+        ]
     ]
 
 let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit) =
@@ -255,24 +289,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
             BuildingBlockType.Parameter         |> createBuildingBlockDropdownItem model dispatch
             BuildingBlockType.Factor            |> createBuildingBlockDropdownItem model dispatch
             BuildingBlockType.Characteristics   |> createBuildingBlockDropdownItem model dispatch
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Centered)] ] [
-                Button.button [
-                    Button.OnClick (fun e ->
-                        e.preventDefault()
-                        e.stopPropagation()
-                        UpdateDropdownPage Model.BuildingBlock.DropdownPage.Featured |> BuildingBlockMsg |> dispatch
-                    )
-                    Button.Color IsSuccess
-                    Button.IsInverted
-                    if model.SiteStyleState.IsDarkMode then Button.IsOutlined
-                    Button.Props [Style [
-                        Height "20px"; BorderRadius "4px"; Border "unset"
-                        if model.SiteStyleState.IsDarkMode then BackgroundColor "unset"
-                    ]]
-                ] [
-                    Fa.i [Fa.Regular.Star; Fa.Props [Title "Featured Columns"]] [] 
-                ]
-            ]
+            Model.BuildingBlock.DropdownPage.ProtocolTypes |>  createSubBuildingBlockDropdownLink model dispatch
             Dropdown.divider []
             BuildingBlockType.Sample            |> createBuildingBlockDropdownItem model dispatch
             BuildingBlockType.RawDataFile       |> createBuildingBlockDropdownItem model dispatch
@@ -281,27 +298,16 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                 a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank"] [ str "info" ]
             ]
         ]
-    /// Featured Columns subpage for dropdown
-    let dropdownContentFeaturedColumns (model:Model) (dispatch: Messages.Msg -> unit) =
+    /// Protocol Type subpage for dropdown
+    let dropdownContentProtocolTypeColumns (model:Model) (dispatch: Messages.Msg -> unit) =
         [
+            // Heading
             Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Centered)] ] [
-                //Button.button [
-                //    Button.OnClick (fun e ->
-                //        e.preventDefault()
-                //        e.stopPropagation()
-                //        UpdateDropdownPage Model.BuildingBlock.DropdownPage.Main |> BuildingBlockMsg |> dispatch
-                //    )
-                //    Button.IsInverted
-                //    if model.SiteStyleState.IsDarkMode then Button.IsOutlined
-                //    Button.Color IsBlack
-                //    Button.Props [Style [ Width "20px"; Height "20px"; BorderRadius "4px"; Border "unset"]]
-                //] [
-                //    Fa.i [Fa.Solid.ArrowLeft] [] 
-                //]
-                Heading.h6 [Heading.IsSubtitle; Heading.Modifiers [Modifier.TextWeight TextWeight.Option.Bold]] [str "Featured Columns"]
+                Heading.h6 [Heading.IsSubtitle; Heading.Modifiers [Modifier.TextWeight TextWeight.Option.Bold]] [str BuildingBlock.DropdownPage.ProtocolTypes.toString]
             ]
             Dropdown.divider []
             BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem model dispatch
+            // Navigation element back to main page
             Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
                 Button.button [
                     Button.Modifiers [Modifier.IsPulledLeft]
@@ -341,8 +347,8 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                         match model.AddBuildingBlockState.DropdownPage with
                         | Model.BuildingBlock.DropdownPage.Main ->
                             dropdownContentMain model dispatch
-                        | Model.BuildingBlock.DropdownPage.Featured ->
-                            dropdownContentFeaturedColumns model dispatch
+                        | Model.BuildingBlock.DropdownPage.ProtocolTypes ->
+                            dropdownContentProtocolTypeColumns model dispatch
                         |> fun content -> Dropdown.content [Props [Style [yield! colorControlInArray model.SiteStyleState.ColorMode]] ] content
                     ]
                 ]
@@ -522,7 +528,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
 
     ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Annotation building block selection"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Building Blocks"]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks (columns) to the annotation table."]
         // Input forms, etc related to add building block.

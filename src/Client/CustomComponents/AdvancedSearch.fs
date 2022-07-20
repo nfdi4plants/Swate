@@ -145,7 +145,7 @@ let private createAdvancedTermSearchResultRows relatedInputId resultHandler  (mo
                 Class "suggestion hoverTableEle"
                 //colorControl model.SiteStyleState.ColorMode
             ] [
-                td [Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline);Tooltip.dataTooltip sugg.Description] [
+                td [Class "has-tooltip-right has-tooltip-multiline"; Props.Custom ("data-tooltip", sugg.Description) ] [
                     Fa.i [Fa.Solid.InfoCircle] []
                 ]
                 td [] [

@@ -338,8 +338,8 @@ let validationElements (model:Model) dispatch =
                     header?style?opacity <- 0
                     OfficeInterop.WriteTableValidationToXml (model.ValidationState.TableValidationScheme, model.PersistentStorageState.AppVersion) |> OfficeInteropMsg |> dispatch
                 )
-                Button.Props [Tooltip.dataTooltip "Write checklist info to excel worksheet."]
-                Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
+                Button.Props [Props.Custom ("data-tooltip","Write checklist info to excel worksheet.")]
+                Button.CustomClass "has-tooltip-right has-tooltip-multiline"
             ] [
                 str "Add checklist to workbook"
             ]
@@ -362,8 +362,8 @@ let validationComponent model dispatch =
             Button.Color Color.IsInfo
             Button.IsFullWidth
             Button.OnClick (fun e -> OfficeInterop.GetTableValidationXml |> OfficeInteropMsg |> dispatch )
-            Button.CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-            Button.Props [Style [Margin "1rem 0"]; Tooltip.dataTooltip "Get checklist info for currently shown annotation table."]
+            Button.CustomClass "has-tooltip-right has-tooltip-multiline"
+            Button.Props [Style [Margin "1rem 0"]; Props.Custom ("data-tooltip","Get checklist info for currently shown annotation table.")]
         ] [
             str "Update table representation"
         ]
@@ -371,8 +371,8 @@ let validationComponent model dispatch =
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
             str """Adjust current Swate table checklist. """
             span [
-                Class (Tooltip.ClassName + " " + Tooltip.IsTooltipBottom + " " + Tooltip.IsMultiline)
-                Tooltip.dataTooltip """When hitting "Add checklist to workbook" this information will be saved as part of the workbook."""
+                Class "has-tooltip-right has-tooltip-multiline"
+                Props.Custom ("data-tooltip", """When hitting "Add checklist to workbook" this information will be saved as part of the workbook.""")
                 Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"]
             ] [
                 Fa.i [ Fa.Solid.InfoCircle ] []

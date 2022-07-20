@@ -222,9 +222,9 @@ let dropdownItem (exportType:JsonExportType) (model:Model) msg (isActive:bool) =
 
     ] [
         Text.span [
-            CustomClass (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
+            CustomClass "has-tooltip-right has-tooltip-multiline"
             Props [
-                Tooltip.dataTooltip (exportType.toExplanation)
+                Props.Custom ("data-tooltip", exportType.toExplanation)
                 Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
             ]
         ] [

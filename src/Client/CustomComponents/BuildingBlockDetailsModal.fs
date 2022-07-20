@@ -54,8 +54,8 @@ let rowIndicesToReadable (rowIndices:int []) =
 let infoIcon (txt:string) =
     span [
         Style [Color NFDIColors.Yellow.Base; OverflowY OverflowOptions.Visible]
-        Class (Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline)
-        Tooltip.dataTooltip txt
+        Class ("has-tooltip-right has-tooltip-multiline")
+        Props.Custom ("data-tooltip", txt)
     ] [
         Fa.i [
             Fa.Solid.InfoCircle
