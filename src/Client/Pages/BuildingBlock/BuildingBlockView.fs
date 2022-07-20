@@ -197,12 +197,10 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
         nextState, Cmd.none
 
 let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
-    match block.Type with
-    | BuildingBlockType.Parameter | BuildingBlockType.Characteristics | BuildingBlockType.Factor ->
-        block.Name.Length > 0
-    | BuildingBlockType.Sample | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile | BuildingBlockType.Source | BuildingBlockType.ProtocolType ->
-        true
-    | _ -> false
+    if block.Type.isTermColumn then block.Name.Length > 0
+    elif block.Type.isSingleColumn then true
+    elif block.Type.isFeaturedColumn then true
+    else false
 
 
 let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit) (block: BuildingBlockType )  =
@@ -220,7 +218,7 @@ let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit
         span [
             Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
             Class "has-tooltip-multiline"
-            Props.Custom ("data-tooltip", BuildingBlockType.toShortExplanation block)
+            Props.Custom ("data-tooltip", block.toShortExplanation)
         ] [
             Fa.i [Fa.Solid.InfoCircle] []
         ]
@@ -271,7 +269,7 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit
             str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString ))
         ]
         Text.p [Props [Style [TextAlign TextAlignOptions.Justify]]] [
-            span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type |> BuildingBlockType.toLongExplanation |> str]
+            span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type.toLongExplanation |> str]
             span [] [str " You can find more information on our "]
             a [Href Shared.URLs.AnnotationPrinciplesUrl; Target "_blank"] [str "website"]
             span [] [str "."]
@@ -307,6 +305,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
             ]
             Dropdown.divider []
             BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem model dispatch
+            BuildingBlockType.ProtocolREF       |> createBuildingBlockDropdownItem model dispatch
             // Navigation element back to main page
             Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
                 Button.button [

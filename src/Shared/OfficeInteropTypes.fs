@@ -36,8 +36,10 @@ module OfficeInteropTypes =
         | Data // [<ObsoleteAttribute>] 
         | RawDataFile
         | DerivedDataFile
-        // Special Columns
+        // Featured Columns
         | ProtocolType
+        // Single Columns
+        | ProtocolREF
 
         static member listAll = [
             Parameter; Factor; Characteristics;
@@ -46,8 +48,10 @@ module OfficeInteropTypes =
             //output
             Sample; RawDataFile; DerivedDataFile;
             Data // deprecated
-            // special
+            // Featured
             ProtocolType
+            // Single
+            ProtocolREF
         ]
 
         member this.isInputColumn =
@@ -86,21 +90,8 @@ module OfficeInteropTypes =
         member this.isSingleColumn =
             match this with
             // Input & Output columns
-            | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile -> true
+            | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile | BuildingBlockType.ProtocolREF -> true
             | _ -> false
-
-        static member ofString str =
-            match str with
-            | "Parameter"           -> Parameter
-            | "Factor"              -> Factor         
-            | "Characteristics"     -> Characteristics
-            | "Sample Name"         -> Sample         
-            | "Data File Name"      -> Data
-            | "Raw Data File"       -> RawDataFile
-            | "Derived Data File"   -> DerivedDataFile
-            | "Source Name"         -> Source
-            | "Protocol Type"       -> ProtocolType
-            | anythingElse          -> failwith $"Error: Unable to parse {anythingElse} to BuildingBlockType!"
 
         static member tryOfString str =
             match str with
@@ -113,7 +104,12 @@ module OfficeInteropTypes =
             | "Derived Data File"   -> Some DerivedDataFile
             | "Source Name"     -> Some Source
             | "Protocol Type"   -> Some ProtocolType
+            | "Protocol REF"    -> Some ProtocolREF
             | anythingElse      -> None
+
+        static member ofString str =
+            BuildingBlockType.tryOfString str
+            |> function Some bbt -> bbt | None -> failwith $"Error: Unable to parse '{str}' to BuildingBlockType!"
 
         member this.toString =
             match this with
@@ -126,8 +122,10 @@ module OfficeInteropTypes =
             | DerivedDataFile   -> "Derived Data File"
             | ProtocolType      -> "Protocol Type" 
             | Source            -> "Source Name"
+            | ProtocolREF       -> "Protocol REF"
 
-        static member toShortExplanation = function
+        member this.toShortExplanation =
+            match this with
             | Parameter         -> "Use parameter columns to annotate your experimental workflow. multiple parameters form a protocol. Example: centrifugation time, precipitate agent, ..."
             | Factor            -> "Use factor columns to track the experimental conditions that govern your study. Example: temperature,light,..."
             | Characteristics   -> "Use characteristics columns to annotate interesting properties of your organism. Example: strain,phenotype,... "
@@ -136,9 +134,11 @@ module OfficeInteropTypes =
             | RawDataFile       -> "Use raw data file columns to mark the name of untransformed and unprocessed data files"
             | DerivedDataFile   -> "Use derived data file columns to mark the name of transformed and/or processed data files"
             | Source            -> "The Source column defines the label of the source of your study. This can be anything from a biological sample to a measurement data file."
-            | ProtocolType      -> "Use this column type to define the protocol type according to your preferred endpoint repository." 
+            | ProtocolType      -> "Use this column type to define the protocol type according to your preferred endpoint repository."
+            | ProtocolREF       -> "Use this column type to define your protocol name."
 
-        static member toLongExplanation = function
+        member this.toLongExplanation =
+            match this with
             | Parameter         ->
                 "Use parameters to annotate your experimental workflow. You can group parameters to create a protocol."
             | Factor            ->
@@ -163,7 +163,9 @@ module OfficeInteropTypes =
                 Every annotation table must start with the Source Name column."
             | ProtocolType      ->
                 "Use this column type to define the protocol type according to your preferred endpoint repository.
-                You can use the term search, to search through all available protocol types." 
+                You can use the term search, to search through all available protocol types."
+            | ProtocolREF       ->
+                "Use this column type to define your protocol name. Normally the Excel worksheet name is used, but it is limited to ~32 characters." 
 
     type BuildingBlockNamePrePrint = {
         Type : BuildingBlockType
@@ -190,6 +192,7 @@ module OfficeInteropTypes =
             | BuildingBlockType.DerivedDataFile     -> BuildingBlockType.DerivedDataFile.toString
             | BuildingBlockType.Source              -> BuildingBlockType.Source.toString
             | BuildingBlockType.ProtocolType        -> BuildingBlockType.ProtocolType.toString
+            | BuildingBlockType.ProtocolREF         -> BuildingBlockType.ProtocolREF.toString
 
         member this.toAnnotationTableHeader(id) =
             match this.Type with
@@ -202,6 +205,7 @@ module OfficeInteropTypes =
             | BuildingBlockType.DerivedDataFile     -> BuildingBlockType.DerivedDataFile.toString
             | BuildingBlockType.Source              -> BuildingBlockType.Source.toString
             | BuildingBlockType.ProtocolType        -> BuildingBlockType.ProtocolType.toString
+            | BuildingBlockType.ProtocolREF         -> BuildingBlockType.ProtocolREF.toString
 
         /// Check if .Type is single column type
         member this.isSingleColumn = this.Type.isSingleColumn
