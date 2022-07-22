@@ -116,6 +116,9 @@ open Fable.Core.JsInterop
 
 let simpleSearchComponent model dispatch =
     mainFunctionContainer [
+
+        // main container //
+
         Field.div [] [
             AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
                 dispatch
@@ -125,6 +128,8 @@ let simpleSearchComponent model dispatch =
                 (Some Size.IsLarge)
                 (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState)
         ]
+
+        // relationship directed search switch //
 
         div [] [
             Switch.switchInline [
@@ -149,6 +154,8 @@ let simpleSearchComponent model dispatch =
                 ] 
             ]
         ]
+
+        // "Fill selected cells with this term" - button //
 
         // For some reason columns seem to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
         // It would not be full width. This results in the need to remove padding left/right for Column.column childs.

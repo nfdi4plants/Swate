@@ -253,16 +253,8 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
 
 open Fable.Core.JsInterop
 
-let autocompleteTermSearchComponent
-    (dispatch               : Msg -> unit)
-    (colorMode              : ColorMode)
-    (model                  : Model)
-    (inputPlaceholderText   : string)
-    (inputSize              : ISize option)
-    (autocompleteParams     : AutocompleteParameters<Term>)
-    (isDisabled             : bool)
-    = 
-    Control.div [Control.IsExpanded] [
+let autocompleteTermSearchComponentInputComponent (dispatch: Msg -> unit) isDisabled inputPlaceholderText inputSize (autocompleteParams : AutocompleteParameters<Term>) =
+    Control.p [Control.IsExpanded] [
         Input.input [
             Input.Props [Style [
                 if isDisabled then BorderColor ExcelColors.Colorfull.gray40
@@ -284,12 +276,6 @@ let autocompleteTermSearchComponent
             )
             Input.Id autocompleteParams.InputId  
         ]
-        autocompleteDropdownComponent
-            dispatch
-            colorMode
-            autocompleteParams.DropDownIsVisible
-            autocompleteParams.DropDownIsLoading
-            (createAutocompleteSuggestions dispatch colorMode autocompleteParams)
     ]
 
 let autocompleteTermSearchComponentOfParentOntology
@@ -314,7 +300,7 @@ let autocompleteTermSearchComponentOfParentOntology
             )]
         ]
 
-    Control.div [Control.IsExpanded] [
+    Control.div [] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Field.div [Field.HasAddons] [
             parentOntologyNotificationElement ((model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology) |> not)

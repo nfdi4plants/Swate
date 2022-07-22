@@ -117,10 +117,10 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
         }
         let api =
             match currentModel.JsonExporterModel.TableJsonExportType with
-            | JsonExportType.ProcessSeq ->
-                Api.swateJsonAPIv1.parseAnnotationTableToProcessSeqJson
             | JsonExportType.Assay ->
                 Api.swateJsonAPIv1.parseAnnotationTableToAssayJson
+            | JsonExportType.ProcessSeq ->
+                Api.swateJsonAPIv1.parseAnnotationTableToProcessSeqJson
             | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
         let cmd =
             Cmd.OfAsync.either
@@ -263,7 +263,6 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
                     Button.Color IsInfo
                     Button.IsFullWidth
                     Button.OnClick(fun e ->
-                        printfn "CLICK!"
                         JsonExporterMsg ParseTableOfficeInteropRequest |> dispatch
                     )
                 ] [
