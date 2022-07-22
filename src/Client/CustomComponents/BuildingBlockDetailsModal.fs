@@ -53,7 +53,7 @@ let rowIndicesToReadable (rowIndices:int []) =
 
 let infoIcon (txt:string) =
     span [
-        Style [Color NFDIColors.Yellow.Base; OverflowY OverflowOptions.Visible]
+        Style [Color NFDIColors.Yellow.Base; (*OverflowY OverflowOptions.Visible*)]
         Class ("has-tooltip-right has-tooltip-multiline")
         Props.Custom ("data-tooltip", txt)
     ] [
@@ -161,7 +161,7 @@ let buildingBlockDetailModal (model:Model) dispatch =
             Props [ OnClick closeMsg ]
         ] [ ]
         Notification.notification [
-            Notification.Props [Style [Width "90%"; MaxHeight "80%"; OverflowX OverflowOptions.Auto ]]
+            Notification.Props [Style [Width "90%"; MaxHeight "80%"]]
         ] [
             Notification.delete [Props [OnClick closeMsg]] []
             tableElement baseArr
