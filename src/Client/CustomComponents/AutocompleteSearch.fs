@@ -136,46 +136,82 @@ with
 
 let createAutocompleteSuggestions
     (dispatch: Msg -> unit)
-    (colorMode:ColorMode)
     (autocompleteParams: AutocompleteParameters<'SearchResult>)
     =
 
     let suggestions = 
         if autocompleteParams.Suggestions.Length > 0 then
             autocompleteParams.Suggestions
-            //|> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
-            |> Array.map (fun sugg ->
-                tr [
-                    OnClick (fun _ ->
-                        let e = Browser.Dom.document.getElementById(autocompleteParams.InputId)
-                        e?value <- sugg.Name
-                        sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
-                    OnKeyDown (fun k -> if k.key = "Enter" then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
-                    TabIndex 0
-                    colorControl colorMode
-                    Class "suggestion"
-                ] [
-                    td [
-                        Class "has-tooltip-right has-tooltip-multiline"; Props.Custom ("data-tooltip", if sugg.TooltipText.Trim() <> "" then sugg.TooltipText else "No definition found")
-                        Style [FontSize "1.1rem"; Padding "0 0 0 .4rem"; TextAlign TextAlignOptions.Center; VerticalAlign "middle"; Color NFDIColors.Yellow.Darker20]
+            |> Array.collect (fun sugg ->
+                let id = sprintf "isHidden_%s" sugg.ID 
+                [|
+                    tr [
+                        OnClick (fun _ ->
+                            let e = Browser.Dom.document.getElementById(autocompleteParams.InputId)
+                            e?value <- sugg.Name
+                            sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                        OnKeyDown (fun k -> if k.key = "Enter" then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                        TabIndex 0
+                        Class "suggestion"
                     ] [
-                        Fa.i [Fa.Solid.InfoCircle] []
+                        //td [
+                        //    Class "has-tooltip-right has-tooltip-multiline"; Props.Custom ("data-tooltip", if sugg.TooltipText.Trim() <> "" then sugg.TooltipText else "No definition found")
+                        //    Style [FontSize "1.1rem"; Padding "0 0 0 .4rem"; TextAlign TextAlignOptions.Center; VerticalAlign "middle"; Color NFDIColors.Yellow.Darker20]
+                        //] [
+                        //    Fa.i [Fa.Solid.InfoCircle] []
+                        //]
+                        td [] [
+                            b [] [ str sugg.Name ]
+                        ]
+                        td [if sugg.StatusIsWarning then Style [Color "red"]] [str sugg.Status]
+                        td [
+                            OnClick (
+                                fun e ->
+                                    e.stopPropagation()
+                            )
+                            Style [FontWeight "light"]
+                        ] [
+                            small [] [
+                                AdvancedSearch.createLinkOfAccession sugg.ID
+                        ] ]
+                        td [] [
+                            Button.a [
+                                Button.Size IsSmall
+                                Button.Color IsBlack
+                                Button.IsInverted
+                                Button.OnClick(fun e ->
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    let ele = Browser.Dom.document.getElementById(id)
+                                    let isCollapsed = string ele?style?visibility = "collapse"
+                                    if isCollapsed then 
+                                        ele?style?visibility <- "visible"
+                                    else
+                                        ele?style?visibility <- "collapse"
+                                    ()
+                                )
+                            ] [
+                                Icon.icon [] [
+                                    Fa.i [Fa.Solid.ChevronDown] []
+                                ]
+                            ]
+                        ]
                     ]
-                    td [] [
-                        b [] [str sugg.Name]
-                    ]
-                    td [if sugg.StatusIsWarning then Style [Color "red"]] [str sugg.Status]
-                    td [
-                        OnClick (
-                            fun e ->
-                                e.stopPropagation()
-                        )
-                        Style [FontWeight "light"]
+                    tr [
+                        OnClick (fun e -> e.stopPropagation())
+                        Id id
+                        Style [Visibility "collapse"]
+                        
                     ] [
-                        small [] [
-                            AdvancedSearch.createLinkOfAccession sugg.ID
-                    ] ]
-                ])
+                        td [ColSpan 4] [
+                            Content.content [] [
+                                b [] [ str "Definition: " ]
+                                str sugg.TooltipText
+                            ]
+                        ]
+                    ]
+                |]
+            )
             |> List.ofArray
         else
             [
@@ -186,7 +222,6 @@ let createAutocompleteSuggestions
 
     let alternative =
         tr [
-            colorControl colorMode
             Class "suggestion"
         ] [
             td [ColSpan 4] [
@@ -201,7 +236,6 @@ let createAutocompleteSuggestions
 
     let alternative2 =
         tr [
-            colorControl colorMode
             Class "suggestion"
         ] [
             td [ColSpan 4] [
@@ -218,11 +252,10 @@ let createAutocompleteSuggestions
 
 
 let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (isVisible: bool) (isLoading:bool) (suggestions: ReactElement list)  =
-    Container.container [ ] [
-        Dropdown.content [Props [
+    div [ Style [Position PositionOptions.Relative ]] [
+        div [
             Style [
                 if isVisible then Display DisplayOptions.Block else Display DisplayOptions.None
-                //if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
                 ZIndex "20"
                 Width "100%"
                 MaxHeight "400px"
@@ -230,10 +263,13 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
                 BackgroundColor colorMode.ControlBackground
                 BorderColor     colorMode.ControlForeground
                 MarginTop "-0.5rem"
-                OverflowY OverflowOptions.Scroll
-            ]]
+                OverflowY OverflowOptions.Auto
+                BorderWidth "0 0.5px 0.5px 0.5px"
+                BorderStyle "solid"
+
+            ]
         ] [
-            Table.table [Table.IsFullWidth] [
+            Table.table [Table.IsFullWidth; Table.Props [ colorControl colorMode ]] [
                 if isLoading then
                     tbody [] [
                         tr [] [
@@ -344,5 +380,5 @@ let autocompleteTermSearchComponentOfParentOntology
             colorMode
             autocompleteParams.DropDownIsVisible
             autocompleteParams.DropDownIsLoading
-            (createAutocompleteSuggestions dispatch colorMode autocompleteParams)
+            (createAutocompleteSuggestions dispatch autocompleteParams)
     ]

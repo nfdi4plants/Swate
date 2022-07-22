@@ -388,7 +388,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                 model.SiteStyleState.ColorMode
                 autocompleteParams.DropDownIsVisible
                 autocompleteParams.DropDownIsLoading
-                (AutocompleteSearch.createAutocompleteSuggestions dispatch model.SiteStyleState.ColorMode autocompleteParams)
+                (AutocompleteSearch.createAutocompleteSuggestions dispatch autocompleteParams)
         ]
         // Ontology Unit Term search field
         if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn then
@@ -437,7 +437,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                     model.SiteStyleState.ColorMode
                     unitAutoCompleteParams.DropDownIsVisible
                     unitAutoCompleteParams.DropDownIsLoading
-                    (AutocompleteSearch.createAutocompleteSuggestions dispatch model.SiteStyleState.ColorMode unitAutoCompleteParams)
+                    (AutocompleteSearch.createAutocompleteSuggestions dispatch unitAutoCompleteParams)
             ]
 
             div [] [
@@ -519,7 +519,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
                 model.SiteStyleState.ColorMode
                 changeUnitAutoCompleteParams.DropDownIsVisible
                 changeUnitAutoCompleteParams.DropDownIsLoading
-                (AutocompleteSearch.createAutocompleteSuggestions dispatch model.SiteStyleState.ColorMode changeUnitAutoCompleteParams)
+                (AutocompleteSearch.createAutocompleteSuggestions dispatch changeUnitAutoCompleteParams)
 
         ]
         Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
