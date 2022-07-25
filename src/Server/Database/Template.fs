@@ -1,17 +1,16 @@
-module TemplateDB
+module Database.Template
 
 open Neo4j.Driver
-open System.Data
 open System
 
-open Shared.TermTypes
 open Shared.TemplateTypes
+open Helper
 
 open ISADotNet
 
 module Queries =
 
-    type Template(credentials:OntologyDB.Neo4JCredentials) =
+    type Template(credentials:Neo4JCredentials) =
 
         /// This function tries not to parse templateJson to building blocks, but instead ignores the templateJson
         static member private asTemplateMinimal: IRecord -> Shared.TemplateTypes.Template =
@@ -53,7 +52,7 @@ module Queries =
             let query =
                 """MATCH (t:Template)
                 RETURN t.id, t.name, t.description, t.organisation, t.version, t.authors, t.erTags, t.tags, t.lastUpdated, t.timesUsed"""
-            OntologyDB.Neo4j.runQuery(
+            Neo4j.runQuery(
                 query,
                 None,
                 Template.asTemplateMinimal,
@@ -66,7 +65,7 @@ module Queries =
                 RETURN t.id, t.name, t.description, t.organisation, t.version, t.authors, t.erTags, t.tags, t.lastUpdated, t.timesUsed, t.templateJson"""
             let param = Map [ "Id", id ] |> Some
             let dbResults =
-                OntologyDB.Neo4j.runQuery(
+                Neo4j.runQuery(
                     query,
                     param,
                     Template.asTemplate,
@@ -82,7 +81,7 @@ module Queries =
                 SET t.timesUsed = COALESCE(t.timesUsed,0) + 1
                 RETURN t.id, t.name, t.description, t.organisation, t.version, t.authors, t.erTags, t.tags, t.lastUpdated, t.timesUsed"""
             let param = Map [ "Id", id ] |> Some
-            OntologyDB.Neo4j.runQuery(
+            Neo4j.runQuery(
                 query,
                 param,
                 Template.asTemplate,

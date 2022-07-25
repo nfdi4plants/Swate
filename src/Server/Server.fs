@@ -170,7 +170,9 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         }
     }
 
-let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
+open Database
+
+let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
     /// Neo4j prefix query does not provide any measurement on distance between query and result.
     /// Thats why we apply sorensen dice after the database search.
     let sorensenDiceSortTerms (searchStr:string) (terms: Term []) =
@@ -185,7 +187,7 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllOntologies = fun () ->
             async {
-                let results = OntologyDB.Ontology(credentials).getAll() |> Array.ofSeq
+                let results = Ontology.Ontology(credentials).getAll() |> Array.ofSeq
                 return results
             }
 
@@ -196,10 +198,10 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 let dbSearchRes =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
-                        OntologyDB.Term(credentials).getByAccession foundAccession.Value
+                        Term.Term(credentials).getByAccession foundAccession.Value
                     /// This suggests we search for a term name
                     | notAnAccession ->
-                        OntologyDB.Term(credentials).getByName notAnAccession
+                        Term.Term(credentials).getByName notAnAccession
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let arr = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -211,13 +213,13 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 let dbSearchRes =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
-                        OntologyDB.Term(credentials).getByAccession foundAccession.Value
+                        Database.Term.Term(credentials).getByAccession foundAccession.Value
                     | _ ->
                         if parentTerm.TermAccession = ""
                         then
-                            OntologyDB.Term(credentials).getByNameAndParent_Name(typedSoFar,parentTerm.Name,OntologyDB.FullTextSearch.PerformanceComplete)
+                            Term.Term(credentials).getByNameAndParent_Name(typedSoFar,parentTerm.Name,Helper.FullTextSearch.PerformanceComplete)
                         else
-                            OntologyDB.Term(credentials).getByNameAndParent(typedSoFar,parentTerm,OntologyDB.FullTextSearch.PerformanceComplete)
+                            Term.Term(credentials).getByNameAndParent(typedSoFar,parentTerm,Helper.FullTextSearch.PerformanceComplete)
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -226,7 +228,7 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
             async {
-                let searchRes = OntologyDB.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
+                let searchRes = Database.Term.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
                 return searchRes  
             }
 
@@ -236,13 +238,13 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 let dbSearchRes =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
-                        OntologyDB.Term(credentials).getByAccession foundAccession.Value
+                        Term.Term(credentials).getByAccession foundAccession.Value
                     | _ ->
                         if childTerm.TermAccession = ""
                         then
-                            OntologyDB.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name,OntologyDB.FullTextSearch.PerformanceComplete)
+                            Term.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name,Helper.FullTextSearch.PerformanceComplete)
                         else
-                            OntologyDB.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession,OntologyDB.FullTextSearch.PerformanceComplete)
+                            Term.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession,Helper.FullTextSearch.PerformanceComplete)
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -251,13 +253,13 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
             async {
-                let searchRes = OntologyDB.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
+                let searchRes = Term.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
                 return searchRes  
             }
 
         getTermsForAdvancedSearch = fun advancedSearchOption ->
             async {
-                let result = OntologyDB.Term(credentials).getByAdvancedTermSearch(advancedSearchOption) |> Array.ofSeq
+                let result = Term.Term(credentials).getByAdvancedTermSearch(advancedSearchOption) |> Array.ofSeq
                 let filteredResult =
                     if advancedSearchOption.KeepObsolete then
                         result
@@ -271,9 +273,9 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                 let dbSearchRes =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
-                        OntologyDB.Term(credentials).getByAccession foundAccession.Value
+                        Term.Term(credentials).getByAccession foundAccession.Value
                     | notAnAccession ->
-                        OntologyDB.Term(credentials).getByName(notAnAccession,sourceOntologyName="uo")
+                        Term.Term(credentials).getByName(notAnAccession,sourceOntologyName="uo")
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -288,16 +290,16 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
                     filteredQueries |> Array.map (fun searchTerm ->
                         // check if term accession was found. If so search also by this as it is unique
                         if searchTerm.Term.TermAccession <> "" then
-                            OntologyDB.TermQuery.getByAccession searchTerm.Term.TermAccession
+                            Term.TermQuery.getByAccession searchTerm.Term.TermAccession
                         // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
                         elif searchTerm.IsUnit then
-                            OntologyDB.TermQuery.getByName(searchTerm.Term.Name, searchType=OntologyDB.FullTextSearch.Exact, sourceOntologyName="uo")
+                            Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact, sourceOntologyName="uo")
                         // if none of the above apply we do a standard term search
                         else
-                            OntologyDB.TermQuery.getByName(searchTerm.Term.Name, searchType=OntologyDB.FullTextSearch.Exact)
+                            Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact)
                     )
                 let result =
-                    OntologyDB.Neo4j.runQueries(queries,credentials)
+                    Helper.Neo4j.runQueries(queries,credentials)
                     |> Array.map2 (fun termSearchable dbResults ->
                         // replicate if..elif..else conditions from 'queries'
                         if termSearchable.Term.TermAccession <> "" then
@@ -325,14 +327,14 @@ let ontologyApi (credentials : OntologyDB.Neo4JCredentials) : IOntologyAPIv1 =
 
 let protocolApi credentials = {
     getAllProtocolsWithoutXml = fun () -> async {
-        let protocols = TemplateDB.Queries.Template(credentials).getAll() |> Array.ofSeq
+        let protocols = Template.Queries.Template(credentials).getAll() |> Array.ofSeq
         return protocols
     }
 
-    getProtocolById = fun templateId -> async { return TemplateDB.Queries.Template(credentials).getById(templateId) }
+    getProtocolById = fun templateId -> async { return Template.Queries.Template(credentials).getById(templateId) }
 
     increaseTimesUsedById = fun templateId -> async {
-        let _ = TemplateDB.Queries.Template(credentials).increaseTimesUsed(templateId)
+        let _ = Template.Queries.Template(credentials).increaseTimesUsed(templateId)
         return ()
     }
 }
@@ -341,7 +343,7 @@ let testApi (ctx: HttpContext): ITestAPI = {
     test = fun () -> async {
         let c =
             let settings = ctx.GetService<IConfiguration>()
-            let credentials : OntologyDB.Neo4JCredentials= {
+            let credentials : Helper.Neo4JCredentials= {
                 User        = settings.["neo4j-username"]
                 Pw          = settings.["neo4j-pw"]
                 BoltUrl     = settings.["neo4j-uri"]
@@ -354,14 +356,14 @@ let testApi (ctx: HttpContext): ITestAPI = {
     postTest = fun (termName) -> async {
         let c =
             let settings = ctx.GetService<IConfiguration>()
-            let credentials : OntologyDB.Neo4JCredentials= {
+            let credentials : Helper.Neo4JCredentials= {
                 User        = settings.["neo4j-username"]
                 Pw          = settings.["neo4j-pw"]
                 BoltUrl     = settings.["neo4j-uri"]
                 DatabaseName= settings.["neo4j-db"]
             }
             credentials
-        let exmp = OntologyDB.Term(c).getByName(termName,sourceOntologyName="ms")
+        let exmp = Term.Term(c).getByName(termName,sourceOntologyName="ms")
         return "Info", sprintf "%A" (exmp |> Seq.length)
     }
 }
@@ -459,7 +461,7 @@ let topLevelRouter = router {
     forward @"" (fun next ctx ->
         let credentials =
             let settings = ctx.GetService<IConfiguration>()
-            let (credentials : OntologyDB.Neo4JCredentials) = {
+            let (credentials : Helper.Neo4JCredentials) = {
                 User        = settings.["neo4j-username"]
                 Pw          = settings.["neo4j-pw"]
                 BoltUrl     = settings.["neo4j-uri"]
@@ -472,7 +474,7 @@ let topLevelRouter = router {
     forward @"" (fun next ctx ->
         let credentials =
             let settings = ctx.GetService<IConfiguration>()
-            let (credentials : OntologyDB.Neo4JCredentials) = {
+            let (credentials : Helper.Neo4JCredentials) = {
                 User        = settings.["neo4j-username"]
                 Pw          = settings.["neo4j-pw"]
                 BoltUrl     = settings.["neo4j-uri"]

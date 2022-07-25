@@ -10,8 +10,11 @@
         <Compile Include="Version.fs" />
         <Compile Include="CyjsAdaption.fs" />
         <Compile Include="ISADotNet.fs" />
-        <Compile Include="Database\OntologyDB.fs" />
-        <Compile Include="Database\TemplateDB.fs" />
+        <Compile Include="Database\Helper.fs" />
+        <Compile Include="Database\Ontology.fs" />
+        <Compile Include="Database\Term.fs" />
+        <Compile Include="Database\Template.fs" />
+        <Compile Include="Database\TreeSearch.fs" />
         <Compile Include="TemplateMetadata.fs" />
         <Compile Include="JsonExport.fs" />
         <Compile Include="JsonImport.fs" />
