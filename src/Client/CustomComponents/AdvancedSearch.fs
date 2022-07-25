@@ -294,7 +294,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
     ] [
         // Close modal on click on background
         Modal.background [Props [OnClick (fun e -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)]] []
-        Modal.Card.card [] [
+        Modal.Card.card [Props [Style [MaxWidth "90%"]]] [
             Modal.Card.head [Props [colorBackground model.SiteStyleState.ColorMode]] [
                 // Close modal on click on x-button
                 Modal.Card.title [Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [

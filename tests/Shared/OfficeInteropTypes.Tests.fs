@@ -1,4 +1,4 @@
-module OfficeInteropTypes
+module OfficeInteropTypes.Tests
 
 #if FABLE_COMPILER
 open Fable.Mocha
@@ -8,7 +8,7 @@ open Expecto
 
 open Shared.OfficeInteropTypes
 
-let buildingBlockTypes = testList "buildingBlockTypes" [
+let buildingBlockTypes = testList "BuildingBlockTypes" [
     
     testCase "Source Name" <| fun _ ->
         let header = {SwateColumnHeader = BuildingBlockType.Source.toString}

@@ -200,8 +200,7 @@ let createAutocompleteSuggestions
                     tr [
                         OnClick (fun e -> e.stopPropagation())
                         Id id
-                        Style [Visibility "collapse"]
-                        
+                        Class "suggestion-details"
                     ] [
                         td [ColSpan 4] [
                             Content.content [] [

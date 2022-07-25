@@ -1,4 +1,4 @@
-module BuildingBlockFunctions
+module BuildingBlockFunctions.Tests
 
 open Fable.Mocha
 open Client

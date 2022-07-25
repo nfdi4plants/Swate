@@ -290,9 +290,23 @@ a.navbar-item:hover {
     }
 }
 
-.suggestion :hover{
+tr.suggestion :hover {
     cursor: pointer;
 }
+
+tr.suggestion > td {
+    border: 1px solid transparent
+}
+
+tr.suggestion-details {
+    visibility: collapse
+}
+
+tr.suggestion-details > td {
+    border-top: unset;
+    padding-left: 2rem
+}
+
 
 .delete :hover {
     cursor: pointer;

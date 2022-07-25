@@ -5,6 +5,8 @@
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="JsonImport.Tests.fs" />
+    <Compile Include="JsonExport.Tests.fs" />
     <Compile Include="Server.Tests.fs" />
   </ItemGroup>
   <ItemGroup>

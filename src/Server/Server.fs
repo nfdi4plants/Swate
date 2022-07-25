@@ -32,6 +32,8 @@ let dagApiv1 = {
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
         let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        printfn "HERE:"
+        printfn "%A" assay
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
@@ -93,13 +95,13 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             ISADotNet.XLSX.Investigation.fromStream ms
         jsonStr
     {
-        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
+        // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJson = fun byteArray -> async {
             let assay = assayFromByteArray byteArray |> fun (_,_,_,assay) -> assay
             return box assay
         }
-        /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
-        /// This is the main interop function for SWOBUP.
+        // This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
+        // This is the main interop function for SWOBUP.
         toSwateTemplateJson = fun byteArray -> async {
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
             let ms = new MemoryStream(byteArray)
@@ -110,7 +112,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             metadata.SetValue("TemplateJson",assayJson)
             return box metadata
         }
-        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
+        // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
         toInvestigationJson = fun byteArray -> async {
             let investigation = investigationFromByteArray byteArray
             return box investigation
@@ -126,12 +128,12 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         //    let table = assay |> fun (_,_,_,assay) -> assay |> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay
         //    return box table
         //}
-        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
+        // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJsonStr = fun byteArray -> async {
             let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
             return assayJsonString
         }
-        /// This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
+        // This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
         toSwateTemplateJsonStr = fun byteArray -> async {
             let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
             let ms = new MemoryStream(byteArray)
@@ -143,7 +145,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             let jsonExp = metadata.toJson()
             return jsonExp
         }
-        /// This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
+        // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
         toInvestigationJsonStr = fun byteArray -> async {
             let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
             return investigationJson

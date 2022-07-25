@@ -14,6 +14,7 @@ let server = testList "Server" [
 
 let all = testList "All" [
     Tests.shared
+    JsonImport.Tests.tests_jsonImport
     server
 ]
 
