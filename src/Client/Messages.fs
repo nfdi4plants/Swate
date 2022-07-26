@@ -216,6 +216,7 @@ type Model = {
     JsonExporterModel           : JsonExporter.Model
     TemplateMetadataModel       : TemplateMetadata.Model
     DagModel                    : Dag.Model
+    CytoscapeModel              : Cytoscape.Model
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
     WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
@@ -248,6 +249,7 @@ type Msg =
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | SettingsXmlMsg        of SettingsXml.Msg
 | SettingDataStewardMsg of SettingsDataStewardMsg
+| CytoscapeMsg          of Cytoscape.Msg
 | DagMsg                of Dag.Msg
 //| SettingsProtocolMsg   of SettingsProtocolMsg
 | TopLevelMsg           of TopLevelMsg
@@ -296,5 +298,6 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         JsonExporterModel           = JsonExporter.Model        .init ()
         TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         DagModel                    = Dag.Model                 .init ()
+        CytoscapeModel              = Cytoscape.Model           .init ()
         WarningModal                = None
     }

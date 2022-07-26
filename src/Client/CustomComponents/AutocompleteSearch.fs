@@ -137,6 +137,7 @@ with
 let createAutocompleteSuggestions
     (dispatch: Msg -> unit)
     (autocompleteParams: AutocompleteParameters<'SearchResult>)
+    (model:Model)
     =
 
     let suggestions = 
@@ -183,7 +184,9 @@ let createAutocompleteSuggestions
                                     e.preventDefault()
                                     e.stopPropagation()
                                     let ele = Browser.Dom.document.getElementById(id)
-                                    let isCollapsed = string ele?style?visibility = "collapse"
+                                    let isCollapsed =
+                                        let vis = string ele?style?visibility
+                                        vis = "collapse" || vis = ""
                                     if isCollapsed then 
                                         ele?style?visibility <- "visible"
                                     else
@@ -202,10 +205,26 @@ let createAutocompleteSuggestions
                         Id id
                         Class "suggestion-details"
                     ] [
-                        td [ColSpan 4] [
+                        td [ColSpan 3] [
                             Content.content [] [
                                 b [] [ str "Definition: " ]
                                 str sugg.TooltipText
+                            ]
+                        ]
+                        td [] [
+                            Button.a [
+                                Button.Size IsSmall
+                                Button.Color IsBlack
+                                Button.IsInverted
+                                Button.OnClick(fun e ->
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    Cytoscape.Msg.UpdateShowModal true |> CytoscapeMsg |> dispatch
+                                )
+                            ] [
+                                Icon.icon [] [
+                                    Fa.i [Fa.Solid.Tree] []
+                                ]
                             ]
                         ]
                     ]
@@ -379,5 +398,5 @@ let autocompleteTermSearchComponentOfParentOntology
             colorMode
             autocompleteParams.DropDownIsVisible
             autocompleteParams.DropDownIsLoading
-            (createAutocompleteSuggestions dispatch autocompleteParams)
+            (createAutocompleteSuggestions dispatch autocompleteParams model)
     ]

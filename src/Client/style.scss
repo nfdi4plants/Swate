@@ -72,6 +72,10 @@ a:hover {
     display: inline-block
 }
 
+#cy {
+    height: 300px;
+    display: block
+}
 
 .myNavbarSticky {
     position: sticky;
@@ -294,17 +298,9 @@ tr.suggestion :hover {
     cursor: pointer;
 }
 
-tr.suggestion > td {
-    border: 1px solid transparent
-}
-
 tr.suggestion-details {
-    visibility: collapse
-}
-
-tr.suggestion-details > td {
-    border-top: unset;
-    padding-left: 2rem
+    visibility: collapse;
+    box-shadow: 1px 2px 2px darkgrey
 }
 
 

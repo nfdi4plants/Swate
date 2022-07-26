@@ -135,11 +135,32 @@ let view (model : Model) (dispatch : Msg -> unit) =
             a [ Href (Routing.Route.toRouteUrl Routing.Route.TermSearch) ] [ str "Termsearch" ]
         ]
 
+
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
 
 #endif
+
+module CustomDebugger =
+    open Browser
+    open Thoth.Json
+
+    let ICytoscapeElementDecoder =
+        Decode.succeed (Unchecked.defaultof<Cytoscape.JS.Types.ICytoscape>)
+
+    let ICytoscapElementEncoder ( _ : Cytoscape.JS.Types.ICytoscape)=
+        Encode.string "Cytoscape.JS.Types.ICytoscape element"
+
+    let extra =
+        Extra.empty
+        |> Extra.withCustom ICytoscapElementEncoder ICytoscapeElementDecoder
+
+    let modelDecoder =
+        Decode.Auto.generateDecoder<Model>(extra = extra)
+
+    let modelEncoder =
+        Encode.Auto.generateEncoder<Model>(extra = extra)
 
 Program.mkProgram init Update.update view
 #if DEBUG
@@ -148,6 +169,6 @@ Program.mkProgram init Update.update view
 |> Program.toNavigable (parseHash Routing.Routing.route) Update.urlUpdate
 |> Program.withReactBatched "elmish-app"
 #if DEBUG
-|> Program.withDebugger
+|> Program.withDebuggerCoders CustomDebugger.modelEncoder CustomDebugger.modelDecoder
 #endif
 |> Program.run

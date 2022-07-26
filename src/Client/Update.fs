@@ -763,6 +763,14 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         }
         nextModel, nextCmd
 
+    | CytoscapeMsg msg ->
+        let nextState, nextModel0, nextCmd =
+            Cytoscape.Update.update msg currentModel.CytoscapeModel currentModel 
+        let nextModel =
+            {nextModel0 with
+                CytoscapeModel = nextState}
+        nextModel, nextCmd
+
     | JsonExporterMsg msg ->
         let nextModel, nextCmd = currentModel |> JsonExporter.Core.update msg
         nextModel, nextCmd

@@ -123,6 +123,9 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
             if not model.DevState.DisplayLogList.IsEmpty then
                 CustomComponents.InteropLoggingModal.interopLoggingModal model dispatch
 
+            if model.CytoscapeModel.ShowModal then
+                Cytoscape.View.view model dispatch
+
             yield! bodyChildren
 
             if footerChildren.IsEmpty |> not then
@@ -135,8 +138,8 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
                     ]
                 ]
         ]
-
         div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]] [
             footerContentStatic model dispatch
         ]
+
     ]
