@@ -323,6 +323,12 @@ let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
                     ) filteredQueries
                 return result
             }
+
+        // Tree related requests
+        getTreeByAccession = fun accession -> async {
+            let tree = Database.TreeSearch.Tree(credentials).getByAccession(accession)
+            return Some tree
+        }
     }
 
 let protocolApi credentials = {

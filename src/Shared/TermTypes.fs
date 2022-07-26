@@ -113,3 +113,22 @@ module TermTypes =
 
         member this.hasEmptyTerm =
             this.Term.Name = "" && this.Term.TermAccession = ""
+
+module TreeTypes =
+
+    type TreeTerm = {
+        NodeId: int64
+        Term: TermTypes.Term
+    }
+
+    type TreeRelationship = {
+        RelationshipId: int64
+        StartNodeId: int64
+        EndNodeId: int64
+        Type: string
+    }
+
+    type Tree = {
+        Nodes: TreeTerm list
+        Relationships: TreeRelationship list
+    }
