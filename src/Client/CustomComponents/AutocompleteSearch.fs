@@ -291,7 +291,7 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
         ] [
             Table.table [Table.IsFullWidth; Table.Props [ colorControl colorMode ]] [
                 if isLoading then
-                    tbody [] [
+                    tbody [Style [Height "75px"]] [
                         tr [] [
                             td [Style [TextAlign TextAlignOptions.Center]] [
                                 Loading.loadingComponent
