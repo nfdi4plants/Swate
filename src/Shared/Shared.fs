@@ -111,7 +111,7 @@ type IOntologyAPIv1 = {
     getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
 
     // Tree related requests
-    getTreeByAccession                  : string                                                        -> Async<TreeTypes.Tree option>
+    getTreeByAccession                  : string                                                        -> Async<TreeTypes.Tree>
 }
 
 type IProtocolAPIv1 = {

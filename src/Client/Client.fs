@@ -142,25 +142,25 @@ open Elmish.HMR
 
 #endif
 
-module CustomDebugger =
-    open Browser
-    open Thoth.Json
+//module CustomDebugger =
+//    open Browser
+//    open Thoth.Json
 
-    let ICytoscapeElementDecoder =
-        Decode.succeed (Unchecked.defaultof<Cytoscape.JS.Types.ICytoscape>)
+//    let ICytoscapeElementDecoder =
+//        Decode.succeed (unbox<Cytoscape.JS.Types.ICytoscape> null)
 
-    let ICytoscapElementEncoder ( _ : Cytoscape.JS.Types.ICytoscape)=
-        Encode.string "Cytoscape.JS.Types.ICytoscape element"
+//    let ICytoscapElementEncoder ( _ : Cytoscape.JS.Types.ICytoscape)=
+//        Encode.string "Cytoscape.JS.Types.ICytoscape element"    
 
-    let extra =
-        Extra.empty
-        |> Extra.withCustom ICytoscapElementEncoder ICytoscapeElementDecoder
+//    let extra =
+//        Extra.empty
+//        |> Extra.withCustom ICytoscapElementEncoder ICytoscapeElementDecoder
 
-    let modelDecoder =
-        Decode.Auto.generateDecoder<Model>(extra = extra)
+//    let modelDecoder =
+//        Decode.Auto.generateDecoder<Model>(extra = extra)
 
-    let modelEncoder =
-        Encode.Auto.generateEncoder<Model>(extra = extra)
+//    let modelEncoder =
+//        Encode.Auto.generateEncoder<Model>(extra = extra)
 
 Program.mkProgram init Update.update view
 #if DEBUG
@@ -169,6 +169,7 @@ Program.mkProgram init Update.update view
 |> Program.toNavigable (parseHash Routing.Routing.route) Update.urlUpdate
 |> Program.withReactBatched "elmish-app"
 #if DEBUG
-|> Program.withDebuggerCoders CustomDebugger.modelEncoder CustomDebugger.modelDecoder
+//|> Program.withDebuggerCoders CustomDebugger.modelEncoder CustomDebugger.modelDecoder
+|> Program.withDebugger
 #endif
 |> Program.run

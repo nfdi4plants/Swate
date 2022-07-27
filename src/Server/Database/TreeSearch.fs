@@ -11,8 +11,8 @@ open Helper
 type Term with
     static member ofProperties (dict:System.Collections.Generic.IReadOnlyDictionary<string,obj>)= {
         Accession       = dict["accession"].As<string>()
-        Name            = dict["name"].As<string>()
-        Description     = dict["description"].As<string>()
+        Name            = if dict.ContainsKey "name" then dict["name"].As<string>() else ""
+        Description     = if dict.ContainsKey "description" then dict["description"].As<string>() else ""
         IsObsolete      = dict["isObsolete"].As<bool>()
         FK_Ontology     = ""
     }

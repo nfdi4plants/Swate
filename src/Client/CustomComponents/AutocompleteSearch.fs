@@ -176,55 +176,57 @@ let createAutocompleteSuggestions
                                 AdvancedSearch.createLinkOfAccession sugg.ID
                         ] ]
                         td [] [
-                            Button.a [
-                                Button.Size IsSmall
-                                Button.Color IsBlack
-                                Button.IsInverted
-                                Button.OnClick(fun e ->
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    let ele = Browser.Dom.document.getElementById(id)
-                                    let isCollapsed =
-                                        let vis = string ele?style?visibility
-                                        vis = "collapse" || vis = ""
-                                    if isCollapsed then 
-                                        ele?style?visibility <- "visible"
-                                    else
-                                        ele?style?visibility <- "collapse"
-                                    ()
-                                )
-                            ] [
-                                Icon.icon [] [
-                                    Fa.i [Fa.Solid.ChevronDown] []
+                            Button.list [Button.List.IsRight] [
+                                Button.a [
+                                    Button.Size IsSmall
+                                    Button.Color IsBlack
+                                    Button.IsInverted
+                                    Button.OnClick(fun e ->
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        Cytoscape.Msg.GetTermTree sugg.ID |> CytoscapeMsg |> dispatch
+                                    )
+                                ] [
+                                    Icon.icon [] [
+                                        Fa.i [Fa.Solid.Tree] []
+                                    ]
+                                ]
+                                Button.a [
+                                    Button.Size IsSmall
+                                    Button.Color IsBlack
+                                    Button.IsInverted
+                                    Button.OnClick(fun e ->
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        let ele = Browser.Dom.document.getElementById(id)
+                                        let isCollapsed =
+                                            let vis = string ele?style?visibility
+                                            vis = "collapse" || vis = ""
+                                        if isCollapsed then 
+                                            ele?style?visibility <- "visible"
+                                        else
+                                            ele?style?visibility <- "collapse"
+                                        ()
+                                    )
+                                ] [
+                                    Icon.icon [] [
+                                        Fa.i [Fa.Solid.ChevronDown] []
+                                    ]
                                 ]
                             ]
                         ]
+                        //td [] [
+                        //]
                     ]
                     tr [
                         OnClick (fun e -> e.stopPropagation())
                         Id id
                         Class "suggestion-details"
                     ] [
-                        td [ColSpan 3] [
+                        td [ColSpan 4] [
                             Content.content [] [
                                 b [] [ str "Definition: " ]
                                 str sugg.TooltipText
-                            ]
-                        ]
-                        td [] [
-                            Button.a [
-                                Button.Size IsSmall
-                                Button.Color IsBlack
-                                Button.IsInverted
-                                Button.OnClick(fun e ->
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    Cytoscape.Msg.UpdateShowModal true |> CytoscapeMsg |> dispatch
-                                )
-                            ] [
-                                Icon.icon [] [
-                                    Fa.i [Fa.Solid.Tree] []
-                                ]
                             ]
                         ]
                     ]
