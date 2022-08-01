@@ -25,6 +25,8 @@ module JS =
             abstract member fit: unit -> unit
             abstract member layout: options:obj -> ILayout
             abstract member bind: event:string -> element:string -> (Browser.Types.MouseEvent -> unit) -> unit
+            //[<Emit("$0.use($1)")>] // did not get this to work
+            //abstract member useJs: obj -> unit
 
     open Types
 
@@ -66,5 +68,5 @@ module JS =
     let createEdge id source target =
         {|data = {|id = id; source = source; target = target|}|} |> box
 
-    [<ImportDefault("Cytoscape")>]
+    [<ImportDefault("cytoscape")>]
     let cy(options:obj): ICytoscape = jsNative

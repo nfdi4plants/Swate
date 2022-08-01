@@ -178,8 +178,9 @@ let createAutocompleteSuggestions
                         td [] [
                             Button.list [Button.List.IsRight] [
                                 Button.a [
+                                    Button.Props [Title "Show Term Tree"]
                                     Button.Size IsSmall
-                                    Button.Color IsBlack
+                                    Button.Color IsSuccess
                                     Button.IsInverted
                                     Button.OnClick(fun e ->
                                         e.preventDefault()
@@ -215,8 +216,6 @@ let createAutocompleteSuggestions
                                 ]
                             ]
                         ]
-                        //td [] [
-                        //]
                     ]
                     tr [
                         OnClick (fun e -> e.stopPropagation())
@@ -286,7 +285,6 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
                 OverflowY OverflowOptions.Auto
                 BorderWidth "0 0.5px 0.5px 0.5px"
                 BorderStyle "solid"
-
             ]
         ] [
             Table.table [Table.IsFullWidth; Table.Props [ colorControl colorMode ]] [

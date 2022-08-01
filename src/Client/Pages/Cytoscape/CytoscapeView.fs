@@ -18,21 +18,23 @@ let view (model:Model) (dispatch:Messages.Msg -> unit) =
             Box.box' [] [
                 div [Id "cy"] []
             ]
-            Box.box' [] [
-                Button.a [
-                    Button.OnClick (fun e ->
-                        ()
-                    )
-                ] [
-                    str "Add Cy"
-                ]
-                Button.a [
-                    Button.OnClick (fun e ->
-                        ()
-                    )
-                ] [
-                    str "Update layout"
-                ]
-            ]
+        //    Box.box' [] [
+        //        Button.a [
+        //            Button.OnClick (fun e ->
+        //                Browser.Dom.console.log ("")
+        //                ()
+        //            )
+        //        ] [
+        //            str "Add Cy"
+        //        ]
+        //        Button.a [
+        //            Button.OnClick (fun e ->
+        //                Cytoscape.Graph.cy.Value.center()
+        //                ()
+        //            )
+        //        ] [
+        //            str "Update layout"
+        //        ]
+        //    ]
         ]
     ]
