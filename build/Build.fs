@@ -32,9 +32,9 @@ module ReleaseNoteTasks =
     //)
 
     let updateReleaseNotes = Target.create "release" (fun config ->
-        Release.exists()
+        ReleaseNotes.ensure()
 
-        Release.update(ProjectInfo.gitOwner, ProjectInfo.gitName, config)
+        ReleaseNotes.update(ProjectInfo.gitOwner, ProjectInfo.gitName, config)
 
         let newRelease = ReleaseNotes.load "RELEASE_NOTES.md"
         
@@ -59,10 +59,10 @@ module ReleaseNoteTasks =
                 newVer
                 System.Text.Encoding.UTF8
                 [
-                    (Path.combine __SOURCE_DIRECTORY__ @".assets\assets\manifest.xml")
-                    (Path.combine __SOURCE_DIRECTORY__ @".assets\assets\core_manifest.xml")
-                    (Path.combine __SOURCE_DIRECTORY__ @".assets\assets\experts_manifest.xml")
-                    (Path.combine __SOURCE_DIRECTORY__ "manifest.xml")
+                    System.IO.Path.Combine(__SOURCE_DIRECTORY__, @"..\.assets\assets\manifest.xml")
+                    System.IO.Path.Combine(__SOURCE_DIRECTORY__, @"..\.assets\assets\core_manifest.xml")
+                    System.IO.Path.Combine(__SOURCE_DIRECTORY__, @"..\.assets\assets\experts_manifest.xml")
+                    System.IO.Path.Combine(__SOURCE_DIRECTORY__, "manifest.xml")
                 ]
         
         Trace.trace "Update manifest.xml done!"
@@ -126,7 +126,7 @@ module Docker =
         let releaseNotesPath = "RELEASE_NOTES.md"
         let port = "5000"
 
-        Release.exists()
+        ReleaseNotes.ensure()
         let newRelease = ReleaseNotes.load releaseNotesPath
         let check = Fake.Core.UserInput.getUserInput($"Is version {newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch} correct? (y/n/true/false)" )
 

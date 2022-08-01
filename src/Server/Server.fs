@@ -495,7 +495,6 @@ let topLevelRouter = router {
         createIServiceAPIv1 next ctx
     )
 
-    
     forward @"" (fun next ctx ->
         createISADotNetCommonAPIv1 next ctx
     )
