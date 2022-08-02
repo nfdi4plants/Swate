@@ -21,3 +21,4 @@ release.sh
 /.db/plugins
 /.db/import
 .git
+**/dev.json
