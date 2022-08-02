@@ -38,7 +38,7 @@ module Assay =
                         let headers = Table.getColumnHeaders table
                         let m = Table.toSparseValueMatrix sst sheet table
                         XLSX.AssayFile.Process.fromSparseMatrix sheetName headers m
-                        |> fun (_,_,_,ps) -> Assay.create(ProcessSequence = List.ofSeq ps)
+                        |> fun ps -> Assay.create(ProcessSequence = ps)
                     )
                 )
         )
@@ -80,7 +80,9 @@ let getColumnPosition (oa:OntologyAnnotation) =
     let c = oa.Comments |> Option.map (List.find (fun c -> c.Name = Some ColumnPositionCommentName))
     c.Value.Value.Value |> int
 
-type QueryModel.ISAValue with
+open ISADotNet.QueryModel
+
+type ISAValue with
 
     member this.toInsertBuildingBlock : (int * InsertBuildingBlock) =
         let buildingBlockType =

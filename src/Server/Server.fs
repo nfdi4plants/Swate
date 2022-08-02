@@ -22,7 +22,7 @@ open Microsoft.AspNetCore.Http
 
 let dagApiv1 = {
     parseAnnotationTablesToDagHtml = fun worksheetBuildingBlocks -> async {
-        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let processSequence = Option.defaultValue [] assay.ProcessSequence
         let dag = Viz.DAG.fromProcessSequence (processSequence,Viz.Schema.NFDIBlue) |> CyjsAdaption.MyHTML.toEmbeddedHTML
         return dag
@@ -31,14 +31,14 @@ let dagApiv1 = {
 
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
-        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
         printfn "HERE:"
         printfn "%A" assay
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
     parseAnnotationTableToProcessSeqJson = fun (worksheetName,buildingblocks) -> async {
-        let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
         let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
         return parsedJsonStr
     }
@@ -48,12 +48,12 @@ let swateJsonAPIv1 = {
     //    return parsedJsonStr
     //}
     parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
-        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
     parseAnnotationTablesToProcessSeqJson = fun worksheetBuildingBlocks -> async {
-        let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
         return parsedJsonStr
     }
@@ -97,7 +97,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
     {
         // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJson = fun byteArray -> async {
-            let assay = assayFromByteArray byteArray |> fun (_,_,_,assay) -> assay
+            let assay = assayFromByteArray byteArray |> fun (_,assay) -> assay
             return box assay
         }
         // This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
@@ -119,7 +119,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         }
         toProcessSeqJson = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
-            let processList = assay |> fun (_,_,_,assay) -> Option.defaultValue [] assay.ProcessSequence
+            let processList = assay |> fun (_,assay) -> Option.defaultValue [] assay.ProcessSequence
             return box processList
         }
         // [<System.ObsoleteAttribute>]
@@ -130,7 +130,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         //}
         // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJsonStr = fun byteArray -> async {
-            let assayJsonString = assayFromByteArray byteArray |> fun (_,_,_,assay) -> ISADotNet.Json.Assay.toString assay
+            let assayJsonString = assayFromByteArray byteArray |> fun (_,assay) -> ISADotNet.Json.Assay.toString assay
             return assayJsonString
         }
         // This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
@@ -152,7 +152,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         }
         toProcessSeqJsonStr = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
-            let processJSon = assay |> fun (_,_,_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
+            let processJSon = assay |> fun (_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
             return processJSon
         }
         // [<System.ObsoleteAttribute>]
@@ -350,10 +350,10 @@ let testApi (ctx: HttpContext): ITestAPI = {
         let c =
             let settings = ctx.GetService<IConfiguration>()
             let credentials : Helper.Neo4JCredentials= {
-                User        = settings.["neo4j-username"]
-                Pw          = settings.["neo4j-pw"]
-                BoltUrl     = settings.["neo4j-uri"]
-                DatabaseName= settings.["neo4j-db"]
+                User        = settings.[Helper.Neo4JCredentials.UserVarString]
+                Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
+                BoltUrl     = settings.[Helper.Neo4JCredentials.UriVarString]
+                DatabaseName= settings.[Helper.Neo4JCredentials.DBNameVarString]
             }
             credentials
         //let exmp = OntologyDB.Queries.Term(c).getByAdvancedTermSearch(termName="insturment~ -Shimadzu")
@@ -363,10 +363,10 @@ let testApi (ctx: HttpContext): ITestAPI = {
         let c =
             let settings = ctx.GetService<IConfiguration>()
             let credentials : Helper.Neo4JCredentials= {
-                User        = settings.["neo4j-username"]
-                Pw          = settings.["neo4j-pw"]
-                BoltUrl     = settings.["neo4j-uri"]
-                DatabaseName= settings.["neo4j-db"]
+                User        = settings.[Helper.Neo4JCredentials.UserVarString]
+                Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
+                BoltUrl     = settings.[Helper.Neo4JCredentials.UriVarString]
+                DatabaseName= settings.[Helper.Neo4JCredentials.DBNameVarString]
             }
             credentials
         let exmp = Term.Term(c).getByName(termName,sourceOntologyName="ms")
@@ -467,11 +467,12 @@ let topLevelRouter = router {
     forward @"" (fun next ctx ->
         let credentials =
             let settings = ctx.GetService<IConfiguration>()
+            for i in settings.AsEnumerable() do printfn "%A" i
             let (credentials : Helper.Neo4JCredentials) = {
-                User        = settings.["neo4j-username"]
-                Pw          = settings.["neo4j-pw"]
-                BoltUrl     = settings.["neo4j-uri"]
-                DatabaseName= settings.["neo4j-db"]
+                User        = settings.[Helper.Neo4JCredentials.UserVarString]
+                Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
+                BoltUrl     = settings.[Helper.Neo4JCredentials.UriVarString]
+                DatabaseName= settings.[Helper.Neo4JCredentials.DBNameVarString]
             }
             credentials
         createIOntologyApiv1 credentials next ctx
@@ -481,10 +482,10 @@ let topLevelRouter = router {
         let credentials =
             let settings = ctx.GetService<IConfiguration>()
             let (credentials : Helper.Neo4JCredentials) = {
-                User        = settings.["neo4j-username"]
-                Pw          = settings.["neo4j-pw"]
-                BoltUrl     = settings.["neo4j-uri"]
-                DatabaseName= settings.["neo4j-db"]
+                User        = settings.[Helper.Neo4JCredentials.UserVarString]
+                Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
+                BoltUrl     = settings.[Helper.Neo4JCredentials.UriVarString]
+                DatabaseName= settings.[Helper.Neo4JCredentials.DBNameVarString]
             }
             credentials
         createIProtocolApiv1 credentials next ctx

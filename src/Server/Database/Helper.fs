@@ -26,7 +26,11 @@ type Neo4JCredentials = {
     Pw          : string
     BoltUrl     : string
     DatabaseName: string
-}
+} with
+    static member UserVarString = "NEO4J_USERNAME"
+    static member PwVarString = "NEO4J_PW"
+    static member UriVarString = "NEO4J_URI"
+    static member DBNameVarString = "NEO4J_DBNAME"
 
 type Neo4j =
     
