@@ -96,10 +96,10 @@ module OfficeInteropTypes =
 
         static member tryOfString str =
             match str with
-            | "Parameter"       -> Some Parameter
-            | "Factor"          -> Some Factor
+            | "Parameter" | "Parameter Value"   -> Some Parameter
+            | "Factor" | "Factor Value"         -> Some Factor
             // "Characteristics" deprecated in v0.6.0
-            | "Characteristics" | "Characteristic" -> Some Characteristic
+            | "Characteristics" | "Characteristic" | "Characteristics Value" -> Some Characteristic
             | "Component" -> Some Component
             | "Sample Name"     -> Some Sample         
             | "Data File Name"  -> Some Data
