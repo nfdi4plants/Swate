@@ -7,6 +7,7 @@ open ISADotNet.Json
 
 let assayJsonToTable jsonString =
     let assay = Assay.fromString jsonString
+    //printfn "%A" assay
     let tables = QueryModel.QAssay.fromAssay assay
     tables
 

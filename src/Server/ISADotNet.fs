@@ -85,6 +85,7 @@ open ISADotNet.QueryModel
 type ISAValue with
 
     member this.toInsertBuildingBlock : (int * InsertBuildingBlock) =
+        printfn "Hit1.2!"
         let buildingBlockType =
             if this.IsFactorValue then
                 BuildingBlockType.Factor
@@ -92,8 +93,10 @@ type ISAValue with
                 BuildingBlockType.Parameter
             elif this.IsCharacteristicValue then
                 BuildingBlockType.Characteristic
+            elif this.IsComponent then
+                BuildingBlockType.Component
             else
-                failwithf "This function should only ever be used to parse Factor/Parameter/Characteristic, instead parsed: %A" this.Value
+                failwithf "This function should only ever be used to parse Factor/Parameter/Characteristic/Component, instead parsed: %A" this
         let colHeaderTermName =
             if this.HasCategory |> not then
                 None
@@ -122,12 +125,23 @@ type QueryModel.QSheet with
         |> List.sortBy fst
         |> List.map snd
 
+    /// This function looses input and output names + Component [instrument model]
     member this.toInsertBuildingBlockList : InsertBuildingBlock list =
+        printfn "Hit1!"
         let insertBuildingBlockRowList =
-            this.Rows |> List.collect (fun r -> 
-                let cols = r.Values().Values |> List.map (fun fv -> fv.toInsertBuildingBlock)
+            this.Rows |> List.collect (fun r ->
+                let cols =
+                    let cols = r.Values().Values
+                    printfn "Hit1.1!"
+                    cols |> List.map (fun fv -> fv.toInsertBuildingBlock)
                 cols |> List.sortBy fst |> List.map snd
             )
+        // TODO: Protocol Types
+        let protcolType =
+            let sheetName = Process.decomposeName this.SheetName
+            let protocolName = this.Protocols.Head.Name
+            this.Protocols.Head
+        printfn "Hit2!"
         // group building block values by "InsertBuildingBlock" information (column information without values)
         insertBuildingBlockRowList
         |> List.groupBy (fun buildingBlock ->

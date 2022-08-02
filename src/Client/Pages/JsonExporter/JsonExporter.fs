@@ -161,7 +161,7 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
         currentModel.updateByJsonExporterModel nextModel, cmd
     //
     | ParseTableServerResponse parsedJson ->
-        let n = System.DateTime.Now.ToUniversalTime().ToString("yyyymmdd_hhMMss")
+        let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
         let jsonName = Option.bind (fun x -> Some <| "_" + x.ToString()) currentModel.JsonExporterModel.CurrentExportType |> Option.defaultValue ""
         let _ = download ($"{n}{jsonName}.json",parsedJson)
         let nextModel = {
@@ -196,7 +196,7 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
                 (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
         currentModel.updateByJsonExporterModel nextModel, cmd
     | ParseXLSXToJsonResponse jsonStr ->
-        let n = System.DateTime.Now.ToUniversalTime().ToString("yyyymmdd_hhMMss")
+        let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
         let jsonName = Option.bind (fun x -> Some <| "_" + x.ToString()) currentModel.JsonExporterModel.CurrentExportType |> Option.defaultValue ""
         let _ = download ($"{n}{jsonName}.json",jsonStr)
         let nextModel = {

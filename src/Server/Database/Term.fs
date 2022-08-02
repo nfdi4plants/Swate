@@ -20,9 +20,11 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 let r = record.[$"{termParamName}.name"].As<string>()
                 if isNull r then "" else r
             Description = 
-                let r = record.[$"{termParamName}.description"].As<string>()
+                let r = record.[$"{termParamName}.definition"].As<string>()
                 if isNull r then "" else r
-            IsObsolete = record.[$"{termParamName}.isObsolete"].As<bool>()
+            IsObsolete =
+                let r = record.[$"{termParamName}.is_obsolete"]
+                if isNull r then false else r.As<bool>()
         }
         term
 
@@ -38,13 +40,13 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             if searchType.IsSome && searchType.Value = FullTextSearch.Exact then
                 sprintf
                     """MATCH (node:Term {name: $Name})%s
-                    RETURN node.accession, node.name, node.description, node.isObsolete"""
+                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
                     (if sourceOntologyName.IsSome then sourceOntologyText else "")
             else
                 sprintf
                     """CALL db.index.fulltext.queryNodes("TermName",$Name)
                     YIELD node%s
-                    RETURN node.accession, node.name, node.description, node.isObsolete"""
+                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
                     (if sourceOntologyName.IsSome then sourceOntologyText else "")
         let param =
             Map [
@@ -84,12 +86,12 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                     """CALL db.index.fulltext.queryNodes("%s", $Query) 
                     YIELD node
                     WHERE EXISTS((:Term {accession: node.accession})-[:CONTAINED_IN]->(:Ontology {name: $OntologyName}))
-                    RETURN node.accession, node.name, node.description, node.isObsolete"""
+                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
                     indexName
             else
                 sprintf
                     """CALL db.index.fulltext.queryNodes("%s", $Query) YIELD node
-                    RETURN node.accession, node.name, node.description, node.isObsolete"""
+                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
                     indexName
         let param =
             Map [
@@ -116,7 +118,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     member this.getByAccession(termAccession:string) =
         let query = 
             """MATCH (term:Term {accession: $Accession})
-            RETURN term.accession, term.name, term.description, term.isObsolete"""
+            RETURN term.accession, term.name, term.definition, term.is_obsolete"""
         let param =
             Map ["Accession",termAccession] |> Some
         if session.IsSome then
@@ -138,7 +140,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             sprintf
                 """MATCH (child)-[*1..]->(:Term {accession: $Accession})
-                RETURN child.accession, child.name, child.description, child.isObsolete
+                RETURN child.accession, child.name, child.definition, child.is_obsolete
                 %s"""
                 (if limit.IsSome then "LIMIT $Limit" else "")
         let param =
@@ -167,7 +169,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             sprintf
                 """MATCH (child)-[*1..]->(:Term {accession: $Accession})
-                RETURN child.accession, child.name, child.description, child.isObsolete
+                RETURN child.accession, child.name, child.definition, child.is_obsolete
                 %s"""
                 (if limit.IsSome then "LIMIT $Limit" else "")
         let param =
@@ -203,7 +205,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             YIELD node
             WITH node
             MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {accession: $Accession}) 
-            RETURN child.accession, child.name, child.description, child.isObsolete"""
+            RETURN child.accession, child.name, child.definition, child.is_obsolete"""
         let param =
             Map [
                 "Accession", parentAccession; 
@@ -236,7 +238,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             YIELD node
             WITH node
             MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {accession: $Accession}) 
-            RETURN child.accession, child.name, child.description, child.isObsolete"""
+            RETURN child.accession, child.name, child.definition, child.is_obsolete"""
         let param =
             Map [
                 "Accession", parent.TermAccession; 
@@ -269,7 +271,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             YIELD node
             WITH node
             MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {accession: $Accession}) 
-            RETURN child.accession, child.name, child.description, child.isObsolete"""
+            RETURN child.accession, child.name, child.definition, child.is_obsolete"""
         let param =
             Map [
                 "Accession", parentAccession.TermAccession; 
@@ -301,7 +303,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             YIELD node
             WITH node
             MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {name: $Name}) 
-            RETURN child.accession, child.name, child.description, child.isObsolete"""
+            RETURN child.accession, child.name, child.definition, child.is_obsolete"""
         let param =
             Map [
                 "Name", parentName; 
@@ -326,7 +328,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     member this.getAllByChild(childAccession:TermMinimal) =
         let query = 
             """MATCH (:Term {accession: $Accession})-[*1..]->(parent:Term)
-            RETURN parent.accession, parent.name, parent.description, parent.isObsolete
+            RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete
             """
         let param =
             Map ["Accession",childAccession.TermAccession] |> Some
@@ -357,7 +359,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             YIELD node
             WITH node
             MATCH (:Term {accession: $Accession})-[*1..]->(parent:Term {accession: node.accession})
-            RETURN parent.accession, parent.name, parent.description, parent.isObsolete"""
+            RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete"""
         let param =
             Map [
                 "Accession", childAccession; 
@@ -390,7 +392,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             YIELD node
             WITH node
             MATCH (:Term {name: $Name})-[*1..]->(parent:Term {accession: node.accession})
-            RETURN parent.accession, parent.name, parent.description, parent.isObsolete"""
+            RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete"""
         let param =
             Map [
                 "Name", childName; 
@@ -424,13 +426,13 @@ type TermQuery =
             if searchType.IsSome && searchType.Value = FullTextSearch.Exact then
                 sprintf
                     """MATCH (node:Term {name: $Name})%s
-                    RETURN node.accession, node.name, node.description, node.isObsolete"""
+                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
                     (if sourceOntologyName.IsSome then sourceOntologyText else "")
             else
                 sprintf
                     """CALL db.index.fulltext.queryNodes("TermName",$Name)
                     YIELD node%s
-                    RETURN node.accession, node.name, node.description, node.isObsolete"""
+                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
                     (if sourceOntologyName.IsSome then sourceOntologyText else "")
         let param =
             Map [
@@ -443,7 +445,7 @@ type TermQuery =
     static member getByAccession(termAccession:string) =
         let query = 
             """MATCH (term:Term {accession: $Accession})
-            RETURN term.accession, term.name, term.description, term.isObsolete"""
+            RETURN term.accession, term.name, term.definition, term.is_obsolete"""
         let param =
             Map ["Accession",termAccession] |> Some
         query, param, Term.asTerm("term")

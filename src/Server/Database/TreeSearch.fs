@@ -12,8 +12,8 @@ type Term with
     static member ofProperties (dict:System.Collections.Generic.IReadOnlyDictionary<string,obj>)= {
         Accession       = dict["accession"].As<string>()
         Name            = if dict.ContainsKey "name" then dict["name"].As<string>() else ""
-        Description     = if dict.ContainsKey "description" then dict["description"].As<string>() else ""
-        IsObsolete      = dict["isObsolete"].As<bool>()
+        Description     = if dict.ContainsKey "definition" then dict["definition"].As<string>() else ""
+        IsObsolete      = if dict.ContainsKey "is_obsolete" then dict["is_obsolete"].As<bool>() else false
         FK_Ontology     = ""
     }
 

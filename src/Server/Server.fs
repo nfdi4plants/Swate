@@ -32,8 +32,8 @@ let dagApiv1 = {
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
         let assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
-        printfn "HERE:"
-        printfn "%A" assay
+        //printfn "HERE:"
+        //printfn "%A" assay
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
@@ -66,7 +66,13 @@ let swateJsonAPIv1 = {
     parseAssayJsonToBuildingBlocks = fun jsonString -> async {
         let table = JsonImport.assayJsonToTable jsonString
         if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        let buildingBlocks =
+            table.Sheets
+            |> Array.ofList
+            |> Array.map(fun s ->
+                let ibb = s.toInsertBuildingBlockList |> Array.ofList
+                s.SheetName, ibb
+        )
         return buildingBlocks
     }
     // [<System.ObsoleteAttribute>]
@@ -110,7 +116,7 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
             let assayJson = ISADotNet.Json.Assay.toString assay.Value
             metadata.SetValue("TemplateJson",assayJson)
-            return box metadata
+            return metadata |> box
         }
         // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
         toInvestigationJson = fun byteArray -> async {
@@ -199,7 +205,7 @@ let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
                     match typedSoFar with
                     | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                         Term.Term(credentials).getByAccession foundAccession.Value
-                    /// This suggests we search for a term name
+                    // This suggests we search for a term name
                     | notAnAccession ->
                         Term.Term(credentials).getByName notAnAccession
                     |> Array.ofSeq
@@ -228,6 +234,7 @@ let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
             async {
+                //printfn "HIT: %A" parentTerm
                 let searchRes = Database.Term.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
                 return searchRes  
             }
@@ -467,7 +474,7 @@ let topLevelRouter = router {
     forward @"" (fun next ctx ->
         let credentials =
             let settings = ctx.GetService<IConfiguration>()
-            for i in settings.AsEnumerable() do printfn "%A" i
+            //for i in settings.AsEnumerable() do printfn "%A" i
             let (credentials : Helper.Neo4JCredentials) = {
                 User        = settings.[Helper.Neo4JCredentials.UserVarString]
                 Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
