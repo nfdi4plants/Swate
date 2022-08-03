@@ -53,9 +53,7 @@ module RefColumns =
     /// This is used to create the bracket information for reference (hidden) columns. This function has two modi, one with id tag and one without.
     /// This time no core name is needed as this will always be TSR or TAN.
     let createHiddenColAttributes (newBB:InsertBuildingBlock) (id:int) =
-        /// The following cols are currently always singles (cannot have TSR, TAN, unit cols). For easier refactoring these names are saved in OfficeInterop.Types.
-        let isSingleCol = newBB.ColumnHeader.Type.isSingleColumn
-        if isSingleCol then
+        if newBB.ColumnHeader.Type.isSingleColumn then
             failwith """The function "createHiddenColAttributes" should not get called if there is only a single column in the new building block."""
         /// Try to get existing term accession from InsertBuildingBlock. If none exists do not add any to the header
         let termAccession = if newBB.ColumnTerm.IsSome then newBB.ColumnTerm.Value.TermAccession else ""

@@ -85,7 +85,6 @@ open ISADotNet.QueryModel
 type ISAValue with
 
     member this.toInsertBuildingBlock : (int * InsertBuildingBlock) =
-        printfn "Hit1.2!"
         let buildingBlockType =
             if this.IsFactorValue then
                 BuildingBlockType.Factor
@@ -101,7 +100,7 @@ type ISAValue with
             if this.HasCategory |> not then
                 None
             else
-                if this.Category.NameText = "" then failwith $"Found empty name for column header."
+                printfn "Category: %A" this.Category
                 this.Category.toTermMinimal
         let columnPosition = getColumnPosition this.Category
         let unitTerm = if this.HasUnit then this.Unit.toTermMinimal else None
@@ -127,21 +126,60 @@ type QueryModel.QSheet with
 
     /// This function looses input and output names + Component [instrument model]
     member this.toInsertBuildingBlockList : InsertBuildingBlock list =
-        printfn "Hit1!"
         let insertBuildingBlockRowList =
             this.Rows |> List.collect (fun r ->
                 let cols =
                     let cols = r.Values().Values
-                    printfn "Hit1.1!"
                     cols |> List.map (fun fv -> fv.toInsertBuildingBlock)
                 cols |> List.sortBy fst |> List.map snd
             )
-        // TODO: Protocol Types
-        let protcolType =
-            let sheetName = Process.decomposeName this.SheetName
-            let protocolName = this.Protocols.Head.Name
-            this.Protocols.Head
-        printfn "Hit2!"
+        // Check if protocolREF column exists in assay. because this column is not represented as other columns in isa we need to infer this.
+        let protocolRef =
+            let sheetName, _ = Process.decomposeName this.SheetName
+            let protocolNames = this.Protocols |> List.map (fun x -> x.Name, x)
+            // if sheetname and any protocol name differ then we need to create the protocol ref column
+            let hasProtocolRef = protocolNames |> List.exists (fun (name, _) -> name.IsSome && name.Value <> sheetName)
+            if hasProtocolRef then
+                // header must be protocol ref
+                let header = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.ProtocolREF ""
+                let rows =
+                    this.Protocols
+                    |> Array.ofList
+                    |> Array.collect (fun protRef ->
+                        // row range information is saved in comments and can be accessed + parsed by isadotnet function
+                        let rowStart, rowEnd = protRef.GetRowRange()
+                        [| for _ in rowStart .. rowEnd do
+                            yield TermMinimal.create protRef.Name.Value "" |]
+                    )
+                InsertBuildingBlock.create header None None rows |> Some
+            else
+                None
+                
+        let protocolType =
+            let hasProtocolType =
+                let prots = this.Protocols |> List.choose (fun x -> x.ProtocolType)
+                prots.Length > 0
+            if hasProtocolType then
+                // header must be protocol type
+                let header = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.ProtocolType ""
+                let columnTerm = Some BuildingBlockType.ProtocolType.getFeaturedColumnTermMinimal 
+                let rows =
+                    this.Protocols
+                    |> Array.ofList
+                    |> Array.collect (fun protType ->
+                        // row range information is saved in comments and can be accessed + parsed by isadotnet function
+                        let rowStart, rowEnd = protType.GetRowRange()
+                        let tmEmpty = TermMinimal.create "" ""
+                        [| for _ in rowStart .. rowEnd do
+                            let hasValue = protType.ProtocolType.IsSome
+                            yield
+                                if hasValue then protType.ProtocolType.Value.toTermMinimal |> Option.defaultValue tmEmpty else tmEmpty
+                        |]
+                    )
+                InsertBuildingBlock.create header columnTerm None rows |> Some
+            else
+                None
+
         // group building block values by "InsertBuildingBlock" information (column information without values)
         insertBuildingBlockRowList
         |> List.groupBy (fun buildingBlock ->
@@ -151,3 +189,9 @@ type QueryModel.QSheet with
             let rows = buildingBlocks |> Array.ofList |> Array.collect (fun bb -> bb.Rows)
             InsertBuildingBlock.create header term unit rows
         )
+        |> fun l ->
+            match protocolRef, protocolType with
+            | None, None -> l
+            | Some ref, Some t -> ref::t::l
+            | Some ref, None -> ref::l
+            | None, Some t -> t::l

@@ -746,7 +746,9 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
         let _ = annotationTable.load(U2.Case1 "name")
 
         let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable) 
-    
+
+        /// newBuildingBlocks -> will be added
+        /// alreadyExistingBBs -> will be used for logging
         let newBuildingBlocks, alreadyExistingBBs =
             let newSet = buildingBlocks |> Array.map (fun x -> x.ColumnHeader) |> Set.ofArray
             let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint )|> Set.ofArray
@@ -836,8 +838,6 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
     
         let addBuildingBlock (buildingBlock:InsertBuildingBlock) (currentNextIndex:float) (columnHeaders:string []) =
             /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
-            /// This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
-            let checkIdForMainCol() = OfficeInterop.Indexing.MainColumn.findNewIdForColumn columnHeaders buildingBlock
             let checkIdForRefCols() = OfficeInterop.Indexing.RefColumns.findNewIdForReferenceColumns columnHeaders buildingBlock
             let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit columnHeaders
                 
@@ -845,7 +845,7 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
             let tsrColName() = OfficeInterop.Indexing.RefColumns.createTSRColName buildingBlock (checkIdForRefCols())
             let tanColName() = OfficeInterop.Indexing.RefColumns.createTANColName buildingBlock (checkIdForRefCols())
             let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader (checkIdForUnitCol())
-    
+
             let colNames = [|
                 mainColName
                 if buildingBlock.UnitTerm.IsSome then
@@ -854,15 +854,12 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
                     tsrColName()
                     tanColName()
             |]
-            
+
+            printfn "%A" colNames
+
             // Update storage for variables
             nextIndex <- currentNextIndex + float colNames.Length
-            let updatedHeaderList =
-                if buildingBlock.UnitTerm.IsSome then
-                    unitColName()::mainColName::tsrColName()::tanColName()::allColumnHeaders
-                else
-                    mainColName::tsrColName()::tanColName()::allColumnHeaders 
-            allColumnHeaders <-  updatedHeaderList
+            allColumnHeaders <- (colNames |> List.ofArray)@allColumnHeaders
                 
             let createAllCols =
                 let createCol index =

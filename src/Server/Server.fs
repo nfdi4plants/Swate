@@ -32,8 +32,6 @@ let dagApiv1 = {
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
         let assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
-        //printfn "HERE:"
-        //printfn "%A" assay
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
@@ -234,7 +232,6 @@ let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
 
         getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
             async {
-                //printfn "HIT: %A" parentTerm
                 let searchRes = Database.Term.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
                 return searchRes  
             }
@@ -474,7 +471,6 @@ let topLevelRouter = router {
     forward @"" (fun next ctx ->
         let credentials =
             let settings = ctx.GetService<IConfiguration>()
-            //for i in settings.AsEnumerable() do printfn "%A" i
             let (credentials : Helper.Neo4JCredentials) = {
                 User        = settings.[Helper.Neo4JCredentials.UserVarString]
                 Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
