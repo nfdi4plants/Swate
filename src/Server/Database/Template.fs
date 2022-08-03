@@ -46,10 +46,14 @@ module Queries =
             fun (record:IRecord) -> 
                 let erTags =
                     let dbEntry = record.["t.erTags"] |> defaultOutputWith<string> ""
+                    printfn "erTags: %A" dbEntry
                     if dbEntry = "" then Array.empty else JsonConvert.DeserializeObject<Tag[]> dbEntry |> Array.map (fun x -> x.Term)
+                printfn "erTags-deserialized: %A" erTags
                 let tags =
                     let dbEntry = record.["t.tags"] |> defaultOutputWith<string> ""
-                    if dbEntry = "" then Array.empty else JsonConvert.DeserializeObject<Tag[]> dbEntry |> Array.map (fun x -> x.Term)                    
+                    printfn "tags: %A" dbEntry
+                    if dbEntry = "" then Array.empty else JsonConvert.DeserializeObject<Tag[]> dbEntry |> Array.map (fun x -> x.Term)
+                printfn "tags-deserialized: %A" tags
                 let authors =
                     let dbEntry = record.["t.authors"] |> defaultOutputWith<string> ""
                     if dbEntry = "" then ""
