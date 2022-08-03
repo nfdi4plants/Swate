@@ -7,6 +7,35 @@ open Shared.TemplateTypes
 open Helper
 
 open ISADotNet
+open Newtonsoft.Json
+
+type Author = {
+    [<JsonProperty("First Name")>]
+    FirstName: string
+    [<JsonProperty("Mid Initials")>]
+    MidInitials: string
+    [<JsonProperty("Last Name")>]
+    LastName: string
+    Email: string
+    Phone: string
+    Address: string
+    Affiliation: string
+    ORCID: string
+    Role: string
+    [<JsonProperty("Role Term Accession Number")>]
+    RoleTermAccessionNumber: string
+    [<JsonProperty("Role Term Source REF")>]
+    RoleTermSourceREF: string
+}
+
+type Tag = {
+    [<JsonProperty("#")>]
+    Term: string
+    [<JsonProperty("Term Accession Number")>]
+    TermAccessionNumber: string
+    [<JsonProperty("Term Source REF")>]
+    TermSourceREF: string
+}
 
 module Queries =
 
@@ -14,25 +43,40 @@ module Queries =
 
         /// This function tries not to parse templateJson to building blocks, but instead ignores the templateJson
         static member private asTemplateMinimal: IRecord -> Shared.TemplateTypes.Template =
-            fun (record:IRecord) ->
-                let erTags = record.["t.erTags"].As<string>() |> fun x -> x.Split(", ", StringSplitOptions.RemoveEmptyEntries)
-                let tags = record.["t.tags"].As<string>() |> fun x -> x.Split(", ", StringSplitOptions.RemoveEmptyEntries)
+            fun (record:IRecord) -> 
+                let erTags =
+                    let dbEntry = record.["t.erTags"] |> defaultOutputWith<string> ""
+                    if dbEntry = "" then Array.empty else JsonConvert.DeserializeObject<Tag[]> dbEntry |> Array.map (fun x -> x.Term)
+                let tags =
+                    let dbEntry = record.["t.tags"] |> defaultOutputWith<string> ""
+                    if dbEntry = "" then Array.empty else JsonConvert.DeserializeObject<Tag[]> dbEntry |> Array.map (fun x -> x.Term)                    
+                let authors =
+                    let dbEntry = record.["t.authors"] |> defaultOutputWith<string> ""
+                    if dbEntry = "" then ""
+                    else
+                        JsonConvert.DeserializeObject<Author[]> dbEntry
+                        |> Array.map (fun x ->
+                            // This syntax allows flexible scaling without much more logic.
+                            [x.FirstName; x.MidInitials; x.LastName]
+                            |> List.filter (fun x -> x <> "")
+                            |> String.concat " " 
+                        )
+                        |> fun x -> x
+                        |> String.concat ", "
                 let (template:Shared.TemplateTypes.Template) = {
                     Id                      = record.["t.id"].As<string>()
                     Name                    = record.["t.name"].As<string>()
-                    Description             = record.["t.description"].As<string>()
-                    Organisation            = record.["t.organisation"].As<string>()
+                    Description             = record.["t.description"] |> defaultOutputWith<string> ""
+                    Organisation            = record.["t.organisation"] |> defaultOutputWith<string> ""
                     Version                 = record.["t.version"].As<string>()
-                    Authors                 = record.["t.authors"].As<string>()
+                    Authors                 = authors
                     Er_Tags                 = erTags
                     Tags                    = tags
                     TemplateBuildingBlocks  = []
-                    LastUpdated             =
+                    LastUpdated             = 
                         let r = record.["t.lastUpdated"].As<string>()
                         if isNull r then DateTime.MinValue else DateTime.Parse(r)
-                    Used                    =
-                        let r = record.["t.timesUsed"].As<string>()
-                        if isNull r then 0 else int r
+                    Used                    = record.["t.timesUsed"] |> defaultOutputWith<int> 0
                     // WIP                  
                     Rating                  = 0
                 }

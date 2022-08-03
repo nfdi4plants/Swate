@@ -3,6 +3,9 @@ module Database.Helper
 open System
 open Neo4j.Driver
 
+let defaultOutputWith<'a> (def:'a) (neo4jReturnVal:obj) =
+    if isNull neo4jReturnVal then def else neo4jReturnVal.As<'a>()
+
 type FullTextSearch =
 | Exact
 | Complete

@@ -10,13 +10,9 @@ type Ontology(credentials:Neo4JCredentials) =
         fun (record:IRecord) ->
             let (ontology:Shared.TermTypes.Ontology) = {
                 Name        = record.["o.name"].As<string>()
-                Version     = 
-                    let r = record.["o.version"].As<string>()
-                    if isNull r then "" else r
+                Version     = record.["o.version"] |> defaultOutputWith<string> ""
                 LastUpdated = record.["o.lastUpdated"].As<string>() |> System.DateTime.Parse
-                Author      = 
-                    let r = record.["o.author"].As<string>()
-                    if isNull r then "" else r
+                Author      = record.["o.version"] |> defaultOutputWith<string> ""
             }
             ontology
 

@@ -16,15 +16,9 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let (term:Shared.TermTypes.Term) = {
             Accession = accession
             FK_Ontology = Term.parseAccessionToOntologyName accession
-            Name = 
-                let r = record.[$"{termParamName}.name"].As<string>()
-                if isNull r then "" else r
-            Description = 
-                let r = record.[$"{termParamName}.definition"].As<string>()
-                if isNull r then "" else r
-            IsObsolete =
-                let r = record.[$"{termParamName}.is_obsolete"]
-                if isNull r then false else r.As<bool>()
+            Name = record.[$"{termParamName}.name"] |> defaultOutputWith<string> ""
+            Description = record.[$"{termParamName}.definition"] |> defaultOutputWith<string> ""
+            IsObsolete = record.[$"{termParamName}.is_obsolete"] |> defaultOutputWith<bool> false
         }
         term
 
