@@ -8,7 +8,7 @@ WORKDIR /workspace
 COPY ../. .
 RUN dotnet tool restore
 RUN npm install
-RUN dotnet fable src/Client --run webpack
+RUN dotnet fable src/Client -o src/Client/output -e .fs.js -s --run webpack --config webpack.config.js
 RUN cd src/Server && dotnet publish -c release -o ../../deploy
 
 

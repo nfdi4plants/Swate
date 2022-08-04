@@ -143,7 +143,7 @@ module Docker =
             dockerTagImage()
             Trace.trace $"Pushing image to dockerhub with :latest and :{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}"
             dockerPushImage()
-        /// Check if next SemVer is correct
+        // Check if next SemVer is correct
         match check with
         | "y"|"true"|"Y" ->
             Trace.trace "Perfect! Starting with docker publish"
@@ -229,7 +229,7 @@ Target.create "InstallClient" (fun _ ->
 
 Target.create "bundle" (fun _ ->
     [ "server", dotnet $"publish -c Release -o \"{deployPath}\"" serverPath
-      "client", dotnet "fable src/Client -s --run webpack --config webpack.config.js" "" ]
+      "client", dotnet "fable src/Client -o src/Client/output -e .fs.js -s --run webpack --config webpack.config.js" "" ]
     |> runParallel
 )
 
@@ -252,9 +252,9 @@ Target.create "officedebug" (fun config ->
     if args |> List.contains "--open" then openBrowser developmentUrl
     [ "server", dotnet "watch run" serverPath
       "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" ""
-      /// start up mysql db from docker-compose
+      // start up db + Swobup from docker-compose
       "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
-      /// sideload webapp in excel
+      // sideload webapp in excel
       if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start build/manifest.xml desktop --debug-method web" ""
       ]
     |> runParallel

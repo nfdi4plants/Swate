@@ -17,8 +17,6 @@ release.sh
 *.orig
 *.DotSettings.user
 .assets/swate.zip
-/.db/data
-/.db/plugins
-/.db/import
+.db/
 .git
 **/dev.json
