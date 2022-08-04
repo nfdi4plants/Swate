@@ -230,8 +230,8 @@ module BuildingBlock =
 
         member this.toTooltip =
             match this with
-            | ProtocolTypes -> "Protocol columns extend control on table to protocol parsing."
-            | Output -> "Output columns allow to specify the exact type of output for the protocol."
+            | ProtocolTypes -> "Protocol columns extend control for protocol parsing."
+            | Output -> "Output columns allow to specify the exact output for your table. Per table only one output column is allowed. The value of this column must be a unique identifier."
             | _ -> ""
 
     type Model = {
