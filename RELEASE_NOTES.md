@@ -1,4 +1,4 @@
-### 0.6.0+d0ce176 (Released 2022-9-5)
+### 0.6.0+40620c3 (Released 2022-9-6)
 * Additions:
     * [[#d0ce176](https://github.com/nfdi4plants/Swate/commit/d0ce1769f4982f146e469d738f0023f61193f499)] Update to new url: https://swate.nfdi4plants.org
     * [[#1ccef83](https://github.com/nfdi4plants/Swate/commit/1ccef839ce3b556d06d6b1b381ec919decd8ece2)] Update building block descriptions.
