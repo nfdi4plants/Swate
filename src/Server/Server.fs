@@ -69,6 +69,7 @@ let swateJsonAPIv1 = {
             |> Array.ofList
             |> Array.map(fun s ->
                 let ibb = s.toInsertBuildingBlockList |> Array.ofList
+                //printfn "%A" ibb
                 s.SheetName, ibb
         )
         return buildingBlocks

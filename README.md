@@ -2,7 +2,7 @@
 
 > **Swate** - something or someone that gets you absolutely joyed ([Urban dictionary](https://www.urbandictionary.com/define.php?term=swate))
 
-**Swate** is a **S**wate **W**orkflow **A**nnotation **T**ool for **E**xcel.
+**Swate** is a **S**wate **w**orkflow **a**nnotation **t**ool for **e**xcel.
 
 Swate aims to provide a low-friction workflow annotation experience that makes the usage of controlled vocabularies (ontologies) as easy and intuitive as possible. It is designed to integrate in the familiar spreadsheet environment that is the center of a great deal of data-focused wetlab work.
 

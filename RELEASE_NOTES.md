@@ -1,23 +1,22 @@
-### 0.6.0+231c649 (Released 2022-8-1)
+### 0.6.0+d0ce176 (Released 2022-9-5)
 * Additions:
+    * [[#d0ce176](https://github.com/nfdi4plants/Swate/commit/d0ce1769f4982f146e469d738f0023f61193f499)] Update to new url: https://swate.nfdi4plants.org
+    * [[#1ccef83](https://github.com/nfdi4plants/Swate/commit/1ccef839ce3b556d06d6b1b381ec919decd8ece2)] Update building block descriptions.
+    * [[#5a2595a](https://github.com/nfdi4plants/Swate/commit/5a2595a4a296997d48ca63f9a0d0ef3fecdf0b2c)] Add protocol type functionality
+    * [[#5cdf10c](https://github.com/nfdi4plants/Swate/commit/5cdf10cafb63f28049b931f24e9030fd1314f799)] Update database parsing to include json db values.
+    * [[#c6d3836](https://github.com/nfdi4plants/Swate/commit/c6d38366b1bbae50c519fbe2d1667962c0abe6d8)] Adjust changes according to Swobup naming
+    * [[#bd46fff](https://github.com/nfdi4plants/Swate/commit/bd46fffb2fb9e60b20fbfd7dd6e4cd2d5e3b5efa)] Support official ISADotNet syntax for column headers.
+    * [[#390e96f](https://github.com/nfdi4plants/Swate/commit/390e96ff9df0fa984ebceafebfbb5c8b1821d21f)] Update ISADotNet v 0.6.0-preview.2 :arrow_up:
     * [[#9368483](https://github.com/nfdi4plants/Swate/commit/93684832de507a52144e8706563d5ef8ba6486f2)] Separate #id calculation of main col and ref cols.
     * [[#ba7bad8](https://github.com/nfdi4plants/Swate/commit/ba7bad810b2562d3a348543c889ae8139d04df95)] Make input/output columns cambiable (Issue #203) + improve office logging :sparkles:
-    * [[#1496769](https://github.com/nfdi4plants/Swate/commit/149676905425dadce87dcc48312306da8dcacba4)] cleanup code
     * [[#f527db8](https://github.com/nfdi4plants/Swate/commit/f527db8e0788ed5662def3a6fdc60b9792aaacbc)] Refactor project structure :truck:
     * [[#ce07ca7](https://github.com/nfdi4plants/Swate/commit/ce07ca78ee2df537cccc8ed4f230d1065ddfecde)] Update docker-publish build target
     * [[#3a4283b](https://github.com/nfdi4plants/Swate/commit/3a4283b028450b77a3175d9c4d50889ff4f67782)] Add Client tests logic + build target :white_check_mark:
     * [[#5b21280](https://github.com/nfdi4plants/Swate/commit/5b2128069a9c1abb284738f6b5e3aa7a1a94bf23)] Add Server tests logic + build target :white_check_mark:
-    * [[#33515f7](https://github.com/nfdi4plants/Swate/commit/33515f76bb58c1100434f9ac882fdcb7a28fc562)] Try establish shared tests
-    * [[#5abae7e](https://github.com/nfdi4plants/Swate/commit/5abae7e948853e1c439720367f02fb62f09ed4ec)] revert webpack {userfolder}
-    * [[#b7fcc56](https://github.com/nfdi4plants/Swate/commit/b7fcc56edcffb9ac29a56c68bed36a25a13c47bd)] finish setting up shared tests :sparkles:
     * [[#f3be11c](https://github.com/nfdi4plants/Swate/commit/f3be11c6955e512e8b0e7acfc3b13a2b2144f88c)] Update Data File output column + deprecation checks (Issue #201).
     * [[#1f5f888](https://github.com/nfdi4plants/Swate/commit/1f5f888739227f5e2603de5e6063edbd21903bc3)] Update Source column description.
     * [[#7bf5af7](https://github.com/nfdi4plants/Swate/commit/7bf5af7383ec29b0b6b898cb07a8180a800c5a8d)] Add Protocol Type Featured Column :sparkles::white_check_mark:
-    * [[#4331601](https://github.com/nfdi4plants/Swate/commit/4331601e8574cefe6e0a0e2f4f9e599dc89c3697)] Add TermColumn logic :hammer::white_check_mark:
-    * [[#4b824c4](https://github.com/nfdi4plants/Swate/commit/4b824c4063085b85a811f58442d92254db6f0a63)] "Improve" Featured Columns visuals :lipstick:
     * [[#027e9c2](https://github.com/nfdi4plants/Swate/commit/027e9c261df9ff6dc9dff05a90794d19556f1781)] Update visuals for featured columns.
-    * [[#a13ebd0](https://github.com/nfdi4plants/Swate/commit/a13ebd0f35263ec977e17e9e6c87dc251007f249)] Update ISADotNet v0.5.4 :arrow_up::construction:
-    * [[#f30535c](https://github.com/nfdi4plants/Swate/commit/f30535c15b0b62318b16a90a3196d85155095848)] Update to ISADotNet v0.6.0-preview.1 (Issue #213)
     * [[#96929f2](https://github.com/nfdi4plants/Swate/commit/96929f2f36d9cd58c7bfbb7715f82d73b2dc5de5)] Update Client for Protocol Columns
     * [[#63a6a29](https://github.com/nfdi4plants/Swate/commit/63a6a298c07e7fcc56b80583442406692a1183f2)] Add Protocol REF (Issue #212).
     * [[#4711417](https://github.com/nfdi4plants/Swate/commit/47114172cb6f8c70745e1daad0f00cc7e4b170b9)] Add unit tests (Issue #212) :white_check_mark:
@@ -46,9 +45,8 @@
     * [[#bfec630](https://github.com/nfdi4plants/Swate/commit/bfec63094cbc78cb28644d53df8d654cde087eb4)] Persist active tabs over subpages (Issue #191) :lipstick:.
     * [[#92d973c](https://github.com/nfdi4plants/Swate/commit/92d973cd6a33144c2eafe52eb84b7b52c1fbea15)] Update navbar burger menu to always be visible (Issue #194).
     * [[#bd8e3fb](https://github.com/nfdi4plants/Swate/commit/bd8e3fb946cbe956a730de58508b3a94ae2c27d4)] Separate ER tags from other tags and add curated vs community templates badge (#187, #186).
-* Deletions:
-    * [[#8798197](https://github.com/nfdi4plants/Swate/commit/8798197dbd61b19f8e2581591d3535fcd39b8df7)] Remove some xml comment warnings :hammer:
 * Bugfixes:
+    * [[#e92f5d5](https://github.com/nfdi4plants/Swate/commit/e92f5d593018492a201275b561580624cee36b61)] fix docker-publish
     * [[#28f81bf](https://github.com/nfdi4plants/Swate/commit/28f81bf9e445e86c04684c04f670c534a19d7201)] fix formatting style
     * [[#d8fa207](https://github.com/nfdi4plants/Swate/commit/d8fa207bc94134fa8bbebec5bd9f8e29d004032e)] Temp fix namespace issues to trigger correct intellisense in test project.
     * [[#032ab75](https://github.com/nfdi4plants/Swate/commit/032ab750bb75c9bac5e274c59ba600916c251368)] Update to net6.0 :arrow_up:, fix #210 :bug::white_check_mark:

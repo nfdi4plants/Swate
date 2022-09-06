@@ -23,3 +23,4 @@ release.sh
 /.assets/swate-b-quickstart.zip
 /.assets/swate-win.zip
 .vscode/
+/.db/cache

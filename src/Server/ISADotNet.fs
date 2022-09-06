@@ -100,13 +100,12 @@ type ISAValue with
             if this.HasCategory |> not then
                 None
             else
-                printfn "Category: %A" this.Category
                 this.Category.toTermMinimal
         let columnPosition = getColumnPosition this.Category
         let unitTerm = if this.HasUnit then this.Unit.toTermMinimal else None
         let headerPrePrint = OfficeInteropTypes.BuildingBlockNamePrePrint.create buildingBlockType colHeaderTermName.Value.Name
         let value = if this.HasValue then Array.singleton this.Value.toTermMinimal else [||]
-
+        //printfn "%A" (if this.HasValue then box this.Value else box "")
         columnPosition, InsertBuildingBlock.create headerPrePrint colHeaderTermName unitTerm value
         
 

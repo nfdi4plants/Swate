@@ -2,5 +2,5 @@
     "DB_USER": "neo4j",
     "DB_PASSWORD": "test",
     "DB_URL": "bolt://localhost:7687",
-    "DB_NAME": "swatedb"
+    "DB_NAME": "neo4j"
 }
