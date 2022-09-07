@@ -49,8 +49,8 @@ ECHO Created folder for Swate manifest @%nfdiFolder%.
 ECHO Download Swate manifest to folder..
 
 @REM Download Swate manifests into new folder
-curl.exe --output %nfdiFolder%/swateCore_manifest.xml --url https://raw.githubusercontent.com/nfdi4plants/Swate/developer/.assets/assets/core_manifest.xml
-curl.exe --output %nfdiFolder%/swateExperts_manifest.xml --url https://raw.githubusercontent.com/nfdi4plants/Swate/developer/.assets/assets/experts_manifest.xml
+curl.exe --output %nfdiFolder%/swateCore_manifest.xml --url https://raw.githubusercontent.com/nfdi4plants/Swate/developer/.assets/assets/core_manifest.xml --ssl-no-revoke
+curl.exe --output %nfdiFolder%/swateExperts_manifest.xml --url https://raw.githubusercontent.com/nfdi4plants/Swate/developer/.assets/assets/experts_manifest.xml --ssl-no-revoke
 
 ECHO Share folder with Excel network..
 
