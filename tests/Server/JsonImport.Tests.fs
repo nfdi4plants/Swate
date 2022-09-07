@@ -9,7 +9,7 @@ open JsonImport
 
 open OfficeInteropTypes
 
-let tests_jsonImport_singleTable = testList "JsonImport - Test single table Assay.json import" [
+let tests_jsonImport_termCols = testList "JsonImport - Test single table Assay.json import - TermCols" [
     // // File was created from a single table
     // Component [instrument model], with values
     // Parameter [Bio entity], with free text values
@@ -111,7 +111,59 @@ let tests_jsonImport_singleTable = testList "JsonImport - Test single table Assa
         Expect.equal bb.UnitTerm.Value.Name "microliter" "UnitTerm.Value.Name"
         Expect.equal bb.UnitTerm.Value.TermAccession "UO:0000101" "UnitTerm.Value.TermAccession"
         Expect.equal bb.UnitTerm.Value.toNumberFormat "0.00 \"microliter\"" "UnitTerm.Value.toNumberFormat"
-
-
 ]
 
+let tests_jsonImport_protocolCols = testList "JsonImport - Test single table Assay.json import - ProtocolCols" [
+    // // File was created from a single table
+    // Protocol REF, with values
+    // Protocol Type, with values
+    let jsonString = System.IO.File.ReadAllText("./files/20220803_ProtocolCols_Assay.json")
+    let buildingBlocks =
+        let table = JsonImport.assayJsonToTable jsonString
+        table.Sheets
+        |> Array.ofList
+        |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+    let name_table, buildingBlocks_table = buildingBlocks.[0]
+    testCase "Test file import general." <| fun _ ->
+        Expect.equal buildingBlocks.Length 1 "This file should only include one table."
+        Expect.equal name_table "Sheet1" "Table protocol name should be 'Sheet1_0'"
+        Expect.equal buildingBlocks_table.Length 2 "File should contain 6 building blocks"
+    testCase "Test Protocol REF" <| fun _ ->
+        // // Protocol REF
+        let bb = buildingBlocks_table.[0]
+        Expect.equal bb.ColumnHeader.Type BuildingBlockType.ProtocolREF "ColumnHeader.Type"
+        Expect.isNone bb.ColumnTerm "ColumnTerm isNone"
+        Expect.equal bb.ColumnHeader.Name "" "ColumnHeader.Name"
+        Expect.isTrue bb.ColumnHeader.isSingleColumn "isSingleColumn"
+        Expect.isFalse bb.ColumnHeader.isFeaturedColumn "isFeaturedColumn"
+        Expect.isFalse bb.ColumnHeader.isInputColumn "isInputColumn"
+        Expect.isFalse bb.ColumnHeader.isOutputColumn "isOutputColumn"
+        Expect.isFalse bb.ColumnHeader.isTermColumn "isTermColumn"
+        Expect.isFalse bb.HasUnit "HasUnit"
+        Expect.equal bb.Rows.Length 6 "Rows.Length"
+        let distinctRows = bb.Rows |> Array.distinct
+        Expect.equal distinctRows.Length 2 "distinctRows"
+        Expect.equal distinctRows.[0].Name "MyProtocol" "distinctRows.[0].Name"
+        Expect.equal distinctRows.[1].Name "MyOtherProtocol" "distinctRows.[1].Name"
+        Expect.equal distinctRows.[0].TermAccession "" "distinctRows.[0].TermAccession"
+        Expect.equal distinctRows.[1].TermAccession "" "distinctRows.[1].TermAccession"
+    testCase "Test Protocol Type" <| fun _ ->
+        // // Protocol Type
+        let bb = buildingBlocks_table.[1]
+        Expect.equal bb.ColumnHeader.Type BuildingBlockType.ProtocolType "ColumnHeader.Type"
+        Expect.isSome bb.ColumnTerm "ColumnTerm"
+        Expect.equal bb.ColumnHeader.Name "" "ColumnHeader.Name"
+        Expect.isTrue bb.ColumnHeader.isFeaturedColumn "isFeaturedColumn"
+        Expect.isFalse bb.ColumnHeader.isTermColumn "isTermColumn"
+        Expect.isFalse bb.ColumnHeader.isSingleColumn "isSingleColumn"
+        Expect.isFalse bb.ColumnHeader.isInputColumn "isInputColumn"
+        Expect.isFalse bb.ColumnHeader.isOutputColumn "isOutputColumn"
+        Expect.isFalse bb.HasUnit "HasUnit"
+        Expect.equal bb.Rows.Length 6 "Rows.Length"
+        let distinctRows = bb.Rows |> Array.distinct
+        Expect.equal distinctRows.Length 2 "distinctRows"
+        Expect.equal distinctRows.[0].Name "Growth Protocol" "distinctRows.[0].Name"
+        Expect.equal distinctRows.[1].Name "Spec Growth Protocol" "distinctRows.[1].Name"
+        Expect.equal distinctRows.[0].TermAccession "" "distinctRows.[0].TermAccession"
+        Expect.equal distinctRows.[1].TermAccession "" "distinctRows.[1].TermAccession"
+]
