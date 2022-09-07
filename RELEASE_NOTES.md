@@ -1,62 +1,36 @@
-### 0.6.0+40620c3 (Released 2022-9-6)
+### 0.6.0+0ba730b (Released 2022-9-7)
 * Additions:
     * [[#d0ce176](https://github.com/nfdi4plants/Swate/commit/d0ce1769f4982f146e469d738f0023f61193f499)] Update to new url: https://swate.nfdi4plants.org
     * [[#1ccef83](https://github.com/nfdi4plants/Swate/commit/1ccef839ce3b556d06d6b1b381ec919decd8ece2)] Update building block descriptions.
     * [[#5a2595a](https://github.com/nfdi4plants/Swate/commit/5a2595a4a296997d48ca63f9a0d0ef3fecdf0b2c)] Add protocol type functionality
-    * [[#5cdf10c](https://github.com/nfdi4plants/Swate/commit/5cdf10cafb63f28049b931f24e9030fd1314f799)] Update database parsing to include json db values.
     * [[#c6d3836](https://github.com/nfdi4plants/Swate/commit/c6d38366b1bbae50c519fbe2d1667962c0abe6d8)] Adjust changes according to Swobup naming
     * [[#bd46fff](https://github.com/nfdi4plants/Swate/commit/bd46fffb2fb9e60b20fbfd7dd6e4cd2d5e3b5efa)] Support official ISADotNet syntax for column headers.
-    * [[#390e96f](https://github.com/nfdi4plants/Swate/commit/390e96ff9df0fa984ebceafebfbb5c8b1821d21f)] Update ISADotNet v 0.6.0-preview.2 :arrow_up:
     * [[#9368483](https://github.com/nfdi4plants/Swate/commit/93684832de507a52144e8706563d5ef8ba6486f2)] Separate #id calculation of main col and ref cols.
     * [[#ba7bad8](https://github.com/nfdi4plants/Swate/commit/ba7bad810b2562d3a348543c889ae8139d04df95)] Make input/output columns cambiable (Issue #203) + improve office logging :sparkles:
-    * [[#f527db8](https://github.com/nfdi4plants/Swate/commit/f527db8e0788ed5662def3a6fdc60b9792aaacbc)] Refactor project structure :truck:
-    * [[#ce07ca7](https://github.com/nfdi4plants/Swate/commit/ce07ca78ee2df537cccc8ed4f230d1065ddfecde)] Update docker-publish build target
-    * [[#3a4283b](https://github.com/nfdi4plants/Swate/commit/3a4283b028450b77a3175d9c4d50889ff4f67782)] Add Client tests logic + build target :white_check_mark:
-    * [[#5b21280](https://github.com/nfdi4plants/Swate/commit/5b2128069a9c1abb284738f6b5e3aa7a1a94bf23)] Add Server tests logic + build target :white_check_mark:
     * [[#f3be11c](https://github.com/nfdi4plants/Swate/commit/f3be11c6955e512e8b0e7acfc3b13a2b2144f88c)] Update Data File output column + deprecation checks (Issue #201).
     * [[#1f5f888](https://github.com/nfdi4plants/Swate/commit/1f5f888739227f5e2603de5e6063edbd21903bc3)] Update Source column description.
-    * [[#7bf5af7](https://github.com/nfdi4plants/Swate/commit/7bf5af7383ec29b0b6b898cb07a8180a800c5a8d)] Add Protocol Type Featured Column :sparkles::white_check_mark:
-    * [[#027e9c2](https://github.com/nfdi4plants/Swate/commit/027e9c261df9ff6dc9dff05a90794d19556f1781)] Update visuals for featured columns.
-    * [[#96929f2](https://github.com/nfdi4plants/Swate/commit/96929f2f36d9cd58c7bfbb7715f82d73b2dc5de5)] Update Client for Protocol Columns
     * [[#63a6a29](https://github.com/nfdi4plants/Swate/commit/63a6a298c07e7fcc56b80583442406692a1183f2)] Add Protocol REF (Issue #212).
     * [[#4711417](https://github.com/nfdi4plants/Swate/commit/47114172cb6f8c70745e1daad0f00cc7e4b170b9)] Add unit tests (Issue #212) :white_check_mark:
     * [[#30ba1cd](https://github.com/nfdi4plants/Swate/commit/30ba1cd12122ee876f3567c1e39d7e864d891853)] Add Component building block :sparkles::white_check_mark:
     * [[#71e633f](https://github.com/nfdi4plants/Swate/commit/71e633f5be4a93b2a8031433644452e30d6c0a0d)] Unify autocomplete term search design (Issue #211).
     * [[#3f9bff1](https://github.com/nfdi4plants/Swate/commit/3f9bff14ee68bdb727fc03df8177c14c7b0ad489)] Redesign search results
-    * [[#96a3f88](https://github.com/nfdi4plants/Swate/commit/96a3f88eb0c4dca37c6e9cbe59dd7a8161b524de)] Start verifying json import/export :construction:
-    * [[#2585f7f](https://github.com/nfdi4plants/Swate/commit/2585f7f93b0ba9dd191295104a48f34776caf664)] Move some files :hammer:
-    * [[#499ff57](https://github.com/nfdi4plants/Swate/commit/499ff574c4617aff62622c58ebcd5663c5a6546a)] Refactor database functions :hammer:
-    * [[#2ebff88](https://github.com/nfdi4plants/Swate/commit/2ebff8896fc448722e93d8773034701e27f7c96c)] Add cytoscape npm dependency :heavy_plus_sign:
-    * [[#0e6d424](https://github.com/nfdi4plants/Swate/commit/0e6d424aadd7f676ecb92f11e5b5d0d410ecb019)] Enable Neo4j tree search in backend :sparkles:
-    * [[#ede6673](https://github.com/nfdi4plants/Swate/commit/ede6673ae9dc87f6aca693fcee599f3308fdeeda)] Start setting up cytoscape.js
-    * [[#8522dea](https://github.com/nfdi4plants/Swate/commit/8522dea542a418a38daf0a0f5b1a0523cf8c3b7c)] First set up for tree showcase on terms :sparkles:
-    * [[#2d86dfc](https://github.com/nfdi4plants/Swate/commit/2d86dfce7dd299fccbf16619de54b739889f253e)] Minor style improvement :lipstick:
-    * [[#231c649](https://github.com/nfdi4plants/Swate/commit/231c649f140d251bd8cfac7e3595540e00cae03c)] Clean up first showcase of tree term structure #209
+    * [[#8522dea](https://github.com/nfdi4plants/Swate/commit/231c649f140d251bd8cfac7e3595540e00cae03c)] Clean up first showcase of tree term structure #209
     * [[#8dfa9e2](https://github.com/nfdi4plants/Swate/commit/8dfa9e2f0dfa9e5a42e8030adac041581d549913)] Heavily improve term insert feedback in annotation table (Issue #149, #161)
     * [[#82b896c](https://github.com/nfdi4plants/Swate/commit/82b896c152eee2b411ef8ab506b7932694144f92)] Clean up readme :shower:
     * [[#18641cd](https://github.com/nfdi4plants/Swate/commit/18641cd50a5d7854aaf2a39976479d4cda2d12e7)] Update fill reference column logic, to provide consistent results.
     * [[#2b2413f](https://github.com/nfdi4plants/Swate/commit/2b2413f3f051b096dde8d8322bbafaed6d4ac616)] Implement and/or slider for template tag filter (Issue #195) :sparkles:.
     * [[#bcf077c](https://github.com/nfdi4plants/Swate/commit/bcf077c6b910d9c8c2bdd8402e8953f2f34af657)] Update info page :lipstick: and contact links (Issue #196).
     * [[#f776367](https://github.com/nfdi4plants/Swate/commit/f7763677a81e3913468d2a8c9304cc7da604d5d9)] Update project for docker build automation :whale:
-    * [[#4dc45b7](https://github.com/nfdi4plants/Swate/commit/4dc45b7c882b0fe1ccf6f5391bb3a7fcc6b5f0cc)] Auto insert table for database templates (Issue #146).
-    * [[#822d375](https://github.com/nfdi4plants/Swate/commit/822d375be01fea946faf3601d8f90dfa9ead169e)] Switch to neo4j database :sparkles:.
     * [[#432c14b](https://github.com/nfdi4plants/Swate/commit/432c14b33dee96bfa1074d0078e5dda04b4b6b9b)] Improve parent-child search performance (Issue #117,#193) :racehorse:.
     * [[#7b360e8](https://github.com/nfdi4plants/Swate/commit/7b360e862b19e42eddca47f4ca8245577296c24d)] Update Advanced term search for cleaner input.
     * [[#bfec630](https://github.com/nfdi4plants/Swate/commit/bfec63094cbc78cb28644d53df8d654cde087eb4)] Persist active tabs over subpages (Issue #191) :lipstick:.
     * [[#92d973c](https://github.com/nfdi4plants/Swate/commit/92d973cd6a33144c2eafe52eb84b7b52c1fbea15)] Update navbar burger menu to always be visible (Issue #194).
     * [[#bd8e3fb](https://github.com/nfdi4plants/Swate/commit/bd8e3fb946cbe956a730de58508b3a94ae2c27d4)] Separate ER tags from other tags and add curated vs community templates badge (#187, #186).
 * Bugfixes:
-    * [[#e92f5d5](https://github.com/nfdi4plants/Swate/commit/e92f5d593018492a201275b561580624cee36b61)] fix docker-publish
-    * [[#28f81bf](https://github.com/nfdi4plants/Swate/commit/28f81bf9e445e86c04684c04f670c534a19d7201)] fix formatting style
-    * [[#d8fa207](https://github.com/nfdi4plants/Swate/commit/d8fa207bc94134fa8bbebec5bd9f8e29d004032e)] Temp fix namespace issues to trigger correct intellisense in test project.
-    * [[#032ab75](https://github.com/nfdi4plants/Swate/commit/032ab750bb75c9bac5e274c59ba600916c251368)] Update to net6.0 :arrow_up:, fix #210 :bug::white_check_mark:
     * [[#55fa82c](https://github.com/nfdi4plants/Swate/commit/55fa82cc5df5a4f73acf20707e45578f6552602c)] Improve AddBuildingBlock unit logic :bug::hammer:
     * [[#0b5be6d](https://github.com/nfdi4plants/Swate/commit/0b5be6d8bced276643ebab21de0c6962a5a0b695)] Fixed strict parsing on empty fields (Issue #214) :bug:
-    * [[#365e907](https://github.com/nfdi4plants/Swate/commit/365e907beaf215b5738d7a66ec39e242da329d6e)] Fix template insert bug after ISADotNet update :bug:
     * [[#0dd0c91](https://github.com/nfdi4plants/Swate/commit/0dd0c9157e1e3cad213bcb3a68b4393318ff7585)] Fix clipping issue in building block info :bug:
     * [[#5e45ac8](https://github.com/nfdi4plants/Swate/commit/5e45ac8cbb8a6a031bafeaf49c407b7fd8ee3ba7)] Fix propagation of unit to new building blocks (Issue #183) :bug:.
-    * [[#d63e668](https://github.com/nfdi4plants/Swate/commit/d63e668056d3612c5e40f1c93ab9b65238aad342)] Fix bug in template.xlsx to template.json parsing :bug:
-    * [[#de99630](https://github.com/nfdi4plants/Swate/commit/de99630332c1b12925fdc4c534a105652de27c4d)] Fix bug not incrementing timesUsed for templates :bug:
 
 ### 0.5.3+0eaa644 (Released 2021-12-16)
 * Additions:
