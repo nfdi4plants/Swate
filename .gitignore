@@ -24,3 +24,4 @@ release.sh
 /.assets/swate-win.zip
 .vscode/
 /.db/cache
+/.db/neo4j
