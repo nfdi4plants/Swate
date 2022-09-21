@@ -88,6 +88,8 @@ type ISwateJsonAPIv1 = {
     parseAssayJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
     //parseTableJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
     parseProcessSeqToBuildingBlocks         : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+    /// This endpoint tries to parse any possible json schema (at this point only assay.json and seq<process.json>)
+    tryParseToBuildingBlocks                : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
 }
 
 type IOntologyAPIv1 = {

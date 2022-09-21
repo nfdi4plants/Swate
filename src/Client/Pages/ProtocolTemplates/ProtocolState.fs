@@ -15,16 +15,16 @@ module Protocol =
         // // ------ Process from file ------
         | ParseUploadedFileRequest ->
             let nextModel = { currentState with Loading = true }
-            let api =
-                match currentState.JsonExportType with
-                | JsonExportType.ProcessSeq ->
-                    Api.swateJsonAPIv1.parseProcessSeqToBuildingBlocks
-                | JsonExportType.Assay ->
-                    Api.swateJsonAPIv1.parseAssayJsonToBuildingBlocks
-                | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
+            //let api =
+            //    match currentState.JsonExportType with
+            //    | JsonExportType.ProcessSeq ->
+            //        Api.swateJsonAPIv1.parseProcessSeqToBuildingBlocks
+            //    | JsonExportType.Assay ->
+            //        Api.swateJsonAPIv1.parseAssayJsonToBuildingBlocks
+            //    | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
             let cmd =
                 Cmd.OfAsync.either
-                    api
+                    Api.swateJsonAPIv1.tryParseToBuildingBlocks
                     currentState.UploadedFile
                     (ParseUploadedFileResponse >> ProtocolMsg)
                     (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)

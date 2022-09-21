@@ -87,6 +87,12 @@ let swateJsonAPIv1 = {
         let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
         return buildingBlocks
     }
+    tryParseToBuildingBlocks = fun jsonString -> async {
+        let table = JsonImport.tryToTable jsonString
+        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        return buildingBlocks
+    }
 }
 
 let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =

@@ -116,27 +116,27 @@ module TemplateFromJsonFile =
     let parseJsonToTableEle (model:Model) (dispatch:Messages.Msg -> unit) =
         let hasData = model.ProtocolState.UploadedFile <> ""
         Field.div [Field.HasAddons] [
-            Control.div [] [
-                Dropdown.dropdown [
-                    Dropdown.IsActive model.ProtocolState.ShowJsonTypeDropdown
-                ] [
-                    Dropdown.trigger [] [
-                        Button.a [
-                            Button.OnClick (fun e -> e.stopPropagation(); UpdateShowJsonTypeDropdown (not model.ProtocolState.ShowJsonTypeDropdown) |> ProtocolMsg |> dispatch )
-                        ] [
-                            span [Style [MarginRight "5px"]] [str (model.ProtocolState.JsonExportType.ToString())]
-                            Fa.i [Fa.Solid.AngleDown] []
-                        ]
-                    ]
-                    Dropdown.menu [] [
-                        Dropdown.content [] [
-                            let msg = (UpdateJsonExportType >> ProtocolMsg >> dispatch)
-                            dropdownItem JsonExportType.Assay model msg (model.ProtocolState.JsonExportType = JsonExportType.Assay)
-                            dropdownItem JsonExportType.ProcessSeq model msg (model.ProtocolState.JsonExportType = JsonExportType.ProcessSeq)
-                        ]
-                    ]
-                ]
-            ]
+            //Control.div [] [
+            //    Dropdown.dropdown [
+            //        Dropdown.IsActive model.ProtocolState.ShowJsonTypeDropdown
+            //    ] [
+            //        Dropdown.trigger [] [
+            //            Button.a [
+            //                Button.OnClick (fun e -> e.stopPropagation(); UpdateShowJsonTypeDropdown (not model.ProtocolState.ShowJsonTypeDropdown) |> ProtocolMsg |> dispatch )
+            //            ] [
+            //                span [Style [MarginRight "5px"]] [str (model.ProtocolState.JsonExportType.ToString())]
+            //                Fa.i [Fa.Solid.AngleDown] []
+            //            ]
+            //        ]
+            //        Dropdown.menu [] [
+            //            Dropdown.content [] [
+            //                let msg = (UpdateJsonExportType >> ProtocolMsg >> dispatch)
+            //                dropdownItem JsonExportType.Assay model msg (model.ProtocolState.JsonExportType = JsonExportType.Assay)
+            //                dropdownItem JsonExportType.ProcessSeq model msg (model.ProtocolState.JsonExportType = JsonExportType.ProcessSeq)
+            //            ]
+            //        ]
+            //    ]
+            //]
             Control.div [Control.IsExpanded] [
                 Button.a [
                     if hasData then
