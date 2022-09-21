@@ -1,3 +1,8 @@
+### 0.6.1+37a09cf (Released 2022-9-21)
+* Additions:
+    * [[#37a09cf](https://github.com/nfdi4plants/Swate/commit/37a09cfcc3ddc93e49023fbdab746d3b6e554877)] Simplify Json-Import :sparkles:
+    * [[#f624141](https://github.com/nfdi4plants/Swate/commit/f624141367ec2573e8f1e39066f2cbeedc51edf0)] Merge branch 'kevinf-patch-0.6' of https://github.com/nfdi4plants/Swate into kevinf-patch-0.6
+
 ### 0.6.0+0ba730b (Released 2022-9-7)
 * Additions:
     * [[#d0ce176](https://github.com/nfdi4plants/Swate/commit/d0ce1769f4982f146e469d738f0023f61193f499)] Update to new url: https://swate.nfdi4plants.org
