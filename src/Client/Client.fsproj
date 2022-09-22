@@ -41,7 +41,6 @@
         <Compile Include="CustomComponents\ErrorModal.fs" />
         <Compile Include="CustomComponents\WarningModal.fs" />
         <Compile Include="CustomComponents\BuildingBlockDetailsModal.fs" />
-        <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
         <Compile Include="Pages\Cytoscape\CytoscapeGraph.fs" />
@@ -69,6 +68,10 @@
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\Shared\Shared.fsproj" />
+    </ItemGroup>
+    <ItemGroup>
+        <!--This dependency via paket just kills neo4j connection and i have no idea why. 22.09.2022-->
+        <PackageReference Include="Feliz" Version="1.68.0" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

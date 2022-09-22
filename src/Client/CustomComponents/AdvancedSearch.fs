@@ -85,14 +85,6 @@ let update (advancedTermSearchMsg: AdvancedSearch.Msg) (currentState:AdvancedSea
 
         nextState,Cmd.none
 
-    | ChangePageinationIndex index ->
-        let nextState = {
-            currentState with
-                AdvancedSearchResultPageinationIndex = index
-        }
-
-        nextState,Cmd.none
-
 open Messages
 
 let createLinkOfAccession (accession:string) =
@@ -125,48 +117,207 @@ let private ontologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: O
 
 open Fable.Core.JsInterop
 
-let private createAdvancedTermSearchResultRows relatedInputId resultHandler  (model:Model) (dispatch: Msg -> unit) =
-    if model.AdvancedSearchState.AdvancedSearchTermResults |> Array.isEmpty |> not then
-        model.AdvancedSearchState.AdvancedSearchTermResults
-        |> Array.map (fun sugg ->
-            tr [
-                OnClick (fun e ->
-                    // dont close modal on click
-                    e.stopPropagation()
-                    let relInput = Browser.Dom.document.getElementById(relatedInputId)
-                    // select wanted term
-                    sugg |> resultHandler |> dispatch
-                    // propagate wanted term name to related input on main page
-                    relInput?value <- sugg.Name
-                    // reset advanced term search state
-                    ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch
+module ResultsTable =
+    open Feliz
 
-                )
-                Class "suggestion hoverTableEle"
-                //colorControl model.SiteStyleState.ColorMode
-            ] [
-                td [Class "has-tooltip-right has-tooltip-multiline"; Props.Custom ("data-tooltip", sugg.Description) ] [
-                    Fa.i [Fa.Solid.InfoCircle] []
+    open Shared.TermTypes
+
+    type TableModel = {
+        Data            : Term []
+        ActiveDropdowns : string list
+        ElementsPerPage : int
+        PageIndex       : int
+        Dispatch        : Msg -> unit
+        RelatedInputId  : string 
+        ResultHandler   : Term -> Msg
+    }
+
+    let createPaginationLinkFromIndex (updatePageIndex: int ->unit) (pageIndex:int) (currentPageinationIndex: int)=
+        let isActve = pageIndex = currentPageinationIndex
+        Pagination.Link.a [
+            Pagination.Link.Current isActve
+            Pagination.Link.Props [
+                Style [
+                    if isActve then Color "white"; BackgroundColor NFDIColors.Mint.Base; BorderColor NFDIColors.Mint.Base;
                 ]
-                td [] [
-                    b [] [str sugg.Name]
-                ]
-                td [Style [Color "red"]] [if sugg.IsObsolete then str "obsolete"]
-                td [
-                    OnClick (fun e -> e.stopPropagation())
-                    Style [FontWeight "light"]
-                ] [
-                    small [] [
-                        createLinkOfAccession sugg.Accession
-                    ]
-                ]
-            ])
-    else
-        [|
-            tr [] [
-                td [] [str "No terms found matching your input."]
+                OnClick (fun _ -> pageIndex |> updatePageIndex)
             ]
-        |]
+        ] [
+            span [] [str (string (pageIndex+1))]
+        ]
+
+    let pageinateDynamic (updatePageIndex:int->unit) (currentPageinationIndex: int) (pageCount:int)  = 
+        (*[0 .. pageCount-1].*)
+        [(max 1 (currentPageinationIndex-2)) .. (min (currentPageinationIndex+2) (pageCount-1)) ]
+        |> List.map (
+            fun index -> createPaginationLinkFromIndex updatePageIndex index currentPageinationIndex
+        ) 
+
+    let private createAdvancedTermSearchResultRows (state:TableModel) (setState:TableModel -> unit) =
+        if state.Data |> Array.isEmpty |> not then
+            state.Data
+            |> Array.collect (fun sugg ->
+                let id = sprintf "isHidden_advanced_%s" sugg.Accession 
+                [|
+                    tr [
+                        OnClick (fun e ->
+                            // dont close modal on click
+                            e.stopPropagation()
+                            e.preventDefault()
+                            let relInput = Browser.Dom.document.getElementById(state.RelatedInputId)
+                            // select wanted term
+                            sugg |> state.ResultHandler |> state.Dispatch
+                            // propagate wanted term name to related input on main page
+                            relInput?value <- sugg.Name
+                            // reset advanced term search state
+                            ResetAdvancedSearchState |> AdvancedSearchMsg |> state.Dispatch
+                        )
+                        TabIndex 0
+                        Class "suggestion"
+                    ] [
+                        td [] [
+                            b [] [ str sugg.Name ]
+                        ]
+                        if sugg.IsObsolete then
+                            td [Style [Color "red"]] [str "obsolete"]
+                        else
+                            td [] []
+                        td [
+                            OnClick (
+                                fun e ->
+                                    e.stopPropagation()
+                            )
+                            Style [FontWeight "light"]
+                        ] [
+                            small [] [
+                                createLinkOfAccession sugg.Accession
+                        ] ]
+                        td [] [
+                            Button.list [Button.List.IsRight] [
+                                //Button.a [
+                                //    Button.Props [Title "Show Term Tree"]
+                                //    Button.Size IsSmall
+                                //    Button.Color IsSuccess
+                                //    Button.IsInverted
+                                //    Button.OnClick(fun e ->
+                                //        e.preventDefault()
+                                //        e.stopPropagation()
+                                //        Cytoscape.Msg.GetTermTree sugg.Accession |> CytoscapeMsg |> dispatch
+                                //    )
+                                //] [
+                                //    Icon.icon [] [
+                                //        Fa.i [Fa.Solid.Tree] []
+                                //    ]
+                                //]
+                                Button.a [
+                                    Button.Size IsSmall
+                                    Button.Color IsBlack
+                                    Button.IsInverted
+                                    Button.OnClick(fun e ->
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        if List.contains id state.ActiveDropdowns then
+                                            let nextState = { state with ActiveDropdowns = List.except [id] state.ActiveDropdowns}
+                                            setState nextState
+                                        else
+                                            let nextState = { state with ActiveDropdowns = id::state.ActiveDropdowns}
+                                            setState nextState
+                                    )
+                                ] [
+                                    Icon.icon [] [
+                                        Fa.i [Fa.Solid.ChevronDown] []
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                    tr [
+                        OnClick (fun e -> e.stopPropagation())
+                        Id id
+                        Class "suggestion-details"
+                        if List.contains id state.ActiveDropdowns then
+                            Style [Visibility "visible"]
+                        else
+                            Style [Visibility "collapse"]
+                    ] [
+                        td [ColSpan 4] [
+                            Content.content [] [
+                                b [] [ str "Definition: " ]
+                                str sugg.Description
+                            ]
+                        ]
+                    ]
+                |]
+            )
+        else
+            [|
+                tr [] [
+                    td [] [str "No terms found matching your input."]
+                ]
+            |]
+
+
+    open Feliz
+
+
+    [<ReactComponent>]
+    let paginatedTableComponent (model:Model) (data: TableModel) =
+
+        let handlerState, setState = React.useState data
+        let updatePageIndex (model:TableModel) (ind:int) =
+            let nextState = {model with PageIndex = ind}
+            setState nextState
+
+        if data.Data.Length > 0 then 
+
+            let tableRows = createAdvancedTermSearchResultRows handlerState setState
+            let currentPageinationIndex = handlerState.PageIndex
+            let chunked = tableRows |> Array.chunkBySize data.ElementsPerPage
+            let len = chunked.Length 
+    
+            Container.container [] [
+                Table.table [
+                    Table.IsFullWidth
+                    Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text]]
+                ] [
+                    thead [] []
+                    tbody [] (
+                        chunked.[currentPageinationIndex] |> List.ofArray
+                    )
+                ]
+                Pagination.pagination [Pagination.IsCentered] [
+                    Pagination.previous [
+                        Props [
+                            Style [Cursor "pointer"]
+                            OnClick (fun _ ->
+                                max (currentPageinationIndex - 1) 0 |> updatePageIndex handlerState 
+                            )
+                            Disabled (currentPageinationIndex = 0)
+                        ]
+                    ] [
+                        str "Prev"
+                    ]
+                    Pagination.list [] [
+                        yield createPaginationLinkFromIndex (updatePageIndex handlerState) 0 currentPageinationIndex
+                        if len > 5 && currentPageinationIndex > 3 then yield Pagination.ellipsis []
+                        yield! pageinateDynamic (updatePageIndex handlerState) currentPageinationIndex (len - 1)
+                        if len > 5 && currentPageinationIndex < len-4 then yield Pagination.ellipsis []
+                        if len > 1 then yield createPaginationLinkFromIndex (updatePageIndex handlerState) (len-1) currentPageinationIndex
+                    ]
+                    Pagination.next [
+                        Props [
+                            Style [Cursor "pointer"]
+                            OnClick (fun _ ->
+                                let next = min (currentPageinationIndex + 1) (len - 1)
+                                next |> updatePageIndex handlerState
+                            )
+                            Disabled (currentPageinationIndex = len - 1)
+                        ]
+                    ] [str "Next"]
+                ]
+            ]
+        else
+            div [] []
 
 let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:bool) modalId =
     let checkradioName = "keepObsolete_checkradio"
@@ -205,6 +356,18 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
                             |> AdvancedSearchMsg
                             |> dispatch)
                         Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermName
+                        Input.Props [
+                            OnKeyDown (fun e ->
+                                match e.which with
+                                | 13. ->
+                                    e.preventDefault()
+                                    e.stopPropagation();
+                                    let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                    if isValid then
+                                        StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                                | _ -> ()
+                            )
+                        ]
                     ] 
                 ]
             ]
@@ -225,6 +388,18 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
                             |> AdvancedSearchMsg
                             |> dispatch)
                         Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermDescription
+                        Input.Props [
+                            OnKeyDown (fun e ->
+                                match e.which with
+                                | 13. ->
+                                    e.preventDefault()
+                                    e.stopPropagation();
+                                    let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                    if isValid then
+                                        StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                                | _ -> ()
+                            )
+                        ]
                     ] 
                 ]
             ] 
@@ -277,11 +452,18 @@ let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Ms
                     Loading.loadingComponent
                 ]
             else
-                PaginatedTable.paginatedTableComponent
+                let init: ResultsTable.TableModel = {
+                    Data            = model.AdvancedSearchState.AdvancedSearchTermResults
+                    ActiveDropdowns = []
+                    ElementsPerPage = 10
+                    PageIndex       = 0
+                    Dispatch        = dispatch
+                    ResultHandler   = resultHandler
+                    RelatedInputId  = relatedInputId
+                }
+                ResultsTable.paginatedTableComponent
                     model
-                    dispatch
-                    10
-                    (createAdvancedTermSearchResultRows relatedInputId resultHandler model dispatch)
+                    init
     ]
 
 let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) (dispatch: Msg -> unit) (resultHandler: Term -> Msg) =
@@ -294,7 +476,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
     ] [
         // Close modal on click on background
         Modal.background [Props [OnClick (fun e -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)]] []
-        Modal.Card.card [Props [Style [MaxWidth "90%"]]] [
+        Modal.Card.card [Props [Style [Width "90%"; Height "80%"]]] [
             Modal.Card.head [Props [colorBackground model.SiteStyleState.ColorMode]] [
                 // Close modal on click on x-button
                 Modal.Card.title [Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
@@ -319,41 +501,35 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                     OnKeyDown   (fun k -> if k.key = "Enter" then k.preventDefault())
                     Style [Width "100%"]
                 ] [
-                    Level.level [] [
-                        Level.left [] [
-                            // Show "Back" button NOT on first subpage
-                            if model.AdvancedSearchState.AdvancedTermSearchSubpage <> AdvancedSearchSubpages.InputFormSubpage then
-                                Level.item [] [
-                                    Button.button   [   
-                                        Button.CustomClass "is-danger"
-                                        Button.IsFullWidth
-                                        Button.OnClick (fun e -> e.stopPropagation(); UpdateAdvancedTermSearchSubpage InputFormSubpage |> AdvancedSearchMsg |> dispatch)
-                                    ] [
-                                        str "Back"
-                                    ]
-                                ]
+                    // Show "Back" button NOT on first subpage
+                    if model.AdvancedSearchState.AdvancedTermSearchSubpage <> AdvancedSearchSubpages.InputFormSubpage then
+                        Level.item [] [
+                            Button.button   [   
+                                Button.CustomClass "is-danger"
+                                Button.IsFullWidth
+                                Button.OnClick (fun e -> e.stopPropagation(); e.preventDefault(); UpdateAdvancedTermSearchSubpage InputFormSubpage |> AdvancedSearchMsg |> dispatch)
+                            ] [
+                                str "Back"
+                            ]
                         ]
-                        Level.right [] [
-                            // Show "Start advanced search" button ONLY on first subpage
-                            if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage then
-                                Level.item [] [
-                                    Button.button   [
-                                        let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
-                                        if isValid then
-                                            Button.CustomClass "is-success"
-                                            Button.IsActive true
-                                        else
-                                            Button.CustomClass "is-danger"
-                                            Button.Props [Disabled (not isValid)]
-                                        Button.IsFullWidth
-                                        Button.OnClick (fun e ->
-                                            e.preventDefault()
-                                            e.stopPropagation();
-                                            StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
-                                        )
-                                    ] [ str "Start advanced search"]
-                                ]
-                        ]
+                    // Show "Start advanced search" button ONLY on first subpage
+                    if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage then
+                        Level.item [] [
+                            Button.button   [
+                                let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                if isValid then
+                                    Button.CustomClass "is-success"
+                                    Button.IsActive true
+                                else
+                                    Button.CustomClass "is-danger"
+                                    Button.Props [Disabled (not isValid)]
+                                Button.IsFullWidth
+                                Button.OnClick (fun e ->
+                                    e.preventDefault()
+                                    e.stopPropagation();
+                                    StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                                )
+                            ] [ str "Start advanced search"]
                     ]
                 ]
             ]

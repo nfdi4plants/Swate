@@ -47,7 +47,6 @@ module AdvancedSearch =
         // Client - UI
         | ToggleModal                       of string
         | ToggleOntologyDropdown
-        | ChangePageinationIndex            of int
         | UpdateAdvancedTermSearchSubpage   of AdvancedSearch.AdvancedSearchSubpages
         // Client
         | ResetAdvancedSearchState

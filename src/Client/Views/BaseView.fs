@@ -96,6 +96,7 @@ let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement
         ]
     ] children
 
+
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
     viewContainer model dispatch [
@@ -138,6 +139,7 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
                     ]
                 ]
         ]
+
         div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]] [
             footerContentStatic model dispatch
         ]

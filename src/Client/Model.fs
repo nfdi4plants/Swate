@@ -114,7 +114,6 @@ module AdvancedSearch =
         HasModalVisible                     : bool
         HasOntologyDropdownVisible          : bool
         HasAdvancedSearchResultsLoading     : bool
-        AdvancedSearchResultPageinationIndex: int
     } with
         static member init () = {
             ModalId                             = ""
@@ -124,7 +123,6 @@ module AdvancedSearch =
             AdvancedSearchTermResults           = [||]
             HasAdvancedSearchResultsLoading     = false
             AdvancedTermSearchSubpage           = InputFormSubpage
-            AdvancedSearchResultPageinationIndex= 0
         }
 
 type SiteStyleState = {

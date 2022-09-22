@@ -72,8 +72,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             match termName,termDescription with
             | None, None -> failwith "Cannot execute term search without any term name or term description."
             | Some _, None -> "TermName", termName.Value
-            | Some name, Some desc -> "TermNameAndDescription", sprintf """name: "%s", description: "%s" """ name desc
-            | None, Some _ -> "TermDescription", termDescription.Value
+            | Some name, Some desc -> "TermNameAndDefinition", sprintf """name: "%s", definition: "%s" """ name desc
+            | None, Some _ -> "TermDefinition", termDescription.Value
         let query =
             if advancedSearchOptions.OntologyName.IsSome then
                 sprintf
