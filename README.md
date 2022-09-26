@@ -21,7 +21,7 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
 
 ## Features
 
-For a full in-depth view of all Swate features check the [documentation](https://github.com/nfdi4plants/Swate/wiki).
+For a full in-depth view of all Swate features check the [documentation](https://nfdi4plants.github.io/Swate-docs/).
 
 Feature | Excel 365/ Office online  	| Excel 2019  	|
 |---            |:---:	        |:---:	        |
@@ -41,7 +41,7 @@ Feature | Excel 365/ Office online  	| Excel 2019  	|
 
 ## Install/Use
 
-[Swate installation](https://github.com/nfdi4plants/Swate/wiki/docs01-installing-Swate)
+[Swate installation](https://nfdi4plants.github.io/Swate-docs/docs/UserDocs/Docs01-Installing-Swate.html)
 
 
 ## Contact
