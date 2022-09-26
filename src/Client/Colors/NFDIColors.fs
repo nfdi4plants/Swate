@@ -183,7 +183,7 @@ module Yellow =
 module Red =
 
     [<Literal>]
-    let Base = "#c21f3a"
+    let Base = "#C21F3A"
 
     [<Literal>]
     let Lighter10 =     "#C8354D"

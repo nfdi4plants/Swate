@@ -63,7 +63,7 @@ let dwnButton (model:Model) dispatch csvData =
             elem.click()
             document.body.removeChild(elem) |> ignore
         )
-    ][
+    ] [
         str "Download"
     ]
 
@@ -74,7 +74,7 @@ let text = encodeURIComponent("This is a test input")
 let csvData =
     "col1;col2\n1;2\n3;4"
 
-//a [Href (sprintf """data:text/plain;charset=utf-8,%s""" text); Download "Texti.txt"; Target "_Blank"][str "Click me"]
+//a [Href (sprintf """data:text/plain;charset=utf-8,%s""" text); Download "Texti.txt"; Target "_Blank"] [str "Click me"]
 //Button.button [
 //    Button.Color Color.IsLink
 //    Button.IsFullWidth
@@ -109,6 +109,6 @@ let csvData =
 //        ()
 //    )
 //    Button.Props [Style [MarginBottom "1rem"]]
-//][
+//] [
 //    str "Download Activity Log"
 //]

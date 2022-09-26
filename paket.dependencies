@@ -1,17 +1,18 @@
 source https://api.nuget.org/v3/index.json
-framework: net5.0
+framework: net6.0
 storage: none
 
 nuget DynamicObj 0.2.1
 nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
-nuget ISADotNet.XLSX 0.4.0-preview.1
-nuget ISADotNet.Viz 0.4.0-preview.1
+nuget ISADotNet 0.6.0
+nuget ISADotNet.XLSX 0.6.0
+nuget ISADotNet.Viz 0.6.0
+nuget Neo4j.Driver 4.4.0
 nuget Saturn
 nuget Expecto
 nuget FSharp.Data
 nuget Microsoft.Extensions.Configuration.UserSecrets
-nuget MySql.Data 8.0.21
 
 nuget Fable.Core
 nuget Fable.Elmish
@@ -25,7 +26,6 @@ nuget Fable.Remoting.Client
 nuget Fulma
 nuget Fable.Browser.MediaQueryList
 nuget Fable.Elmish.Browser
-nuget Fulma.Extensions.Wikiki.Tooltip
 nuget Fulma.Extensions.Wikiki.Switch
 nuget System.Text.Encodings.Web
 nuget Thoth.Elmish.Debouncer

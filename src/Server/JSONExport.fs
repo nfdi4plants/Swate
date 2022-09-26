@@ -55,6 +55,7 @@ let parseBuildingBlockToMatrix (buildingBlocks:BuildingBlock []) =
 
 let parseBuildingBlockToAssay (templateName:string) (buildingBlocks:BuildingBlock []) =
     let matrixHeaders, matrix = parseBuildingBlockToMatrix buildingBlocks
+    //printfn "%A" matrixHeaders // contains "Component [instrument model]"
     ISADotNet.XLSX.AssayFile.Assay.fromSparseMatrix templateName matrixHeaders matrix
 
 let parseBuildingBlockSeqsToAssay (worksheetNameBuildingBlocks: (string*BuildingBlock []) []) =

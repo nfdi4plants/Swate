@@ -17,7 +17,7 @@ open TermSearch
 
 let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : TermSearch.Model * Cmd<Messages.Msg> =
     match termSearchMsg with
-    /// Toggle the search by parent ontology option on/off by clicking on a checkbox
+    // Toggle the search by parent ontology option on/off by clicking on a checkbox
     | TermSearch.ToggleSearchByParentOntology ->
         let nextState = {
             currentState with
@@ -116,6 +116,9 @@ open Fable.Core.JsInterop
 
 let simpleSearchComponent model dispatch =
     mainFunctionContainer [
+
+        // main container //
+
         Field.div [] [
             AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
                 dispatch
@@ -123,10 +126,12 @@ let simpleSearchComponent model dispatch =
                 model
                 "Start typing to search for terms"
                 (Some Size.IsLarge)
-                (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState)
+                (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState)
         ]
 
-        div [][
+        // relationship directed search switch //
+
+        div [] [
             Switch.switchInline [
                 Switch.Color IsPrimary
                 Switch.Id "switch-1"
@@ -134,28 +139,30 @@ let simpleSearchComponent model dispatch =
                 Switch.OnChange (fun e ->
                     TermSearch.ToggleSearchByParentOntology |> TermSearchMsg |> dispatch
                     let _ =
-                        let inpId = (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).InputId
+                        let inpId = (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).InputId
                         let e = Browser.Dom.document.getElementById inpId
                         e.focus()
                     ()
                     // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
-                    //((AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
+                    //((AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
                 )
             ] [ str "Use related term directed search." ]
 
             Help.help [ Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]] ] [
-                a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<DbDomain.Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearchMsg |> dispatch)] [
+                a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearchMsg |> dispatch)] [
                     str "Use advanced search"
                 ] 
             ]
         ]
 
-        /// For some reason columns seam to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
-        /// It would not be full width. This results in the need to remove padding left/right for Column.column childs.
+        // "Fill selected cells with this term" - button //
+
+        // For some reason columns seem to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
+        // It would not be full width. This results in the need to remove padding left/right for Column.column childs.
         Columns.columns [
             Columns.IsMobile;
             Columns.Props [Style [Width "100%"; MarginRight "0px"; MarginLeft "0px"]]
-        ][
+        ] [
             Column.column [Column.Props [Style [PaddingLeft "0"; if model.TermSearchState.SelectedTerm.IsNone then PaddingRight "0"]]] [
             // Fill selection confirmation
                 Field.div [] [
@@ -191,7 +198,7 @@ let simpleSearchComponent model dispatch =
                         Button.Props [Title "Copy to Clipboard"]
                         Button.Color IsInfo
                         Button.OnClick (fun e ->
-                            /// trigger icon response
+                            // trigger icon response
                             CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_termsearch"
                             //
                             let t = model.TermSearchState.SelectedTerm.Value
@@ -205,14 +212,14 @@ let simpleSearchComponent model dispatch =
                             Browser.Dom.document.body.appendChild textArea |> ignore
 
                             textArea.focus()
-                            /// Can't belive this actually worked
+                            // Can't belive this actually worked
                             textArea?select()
 
                             let t = Browser.Dom.document.execCommand("copy")
                             Browser.Dom.document.body.removeChild(textArea) |> ignore
                             ()
                         )
-                    ][
+                    ] [
                         CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_termsearch" Fa.Regular.Clipboard Fa.Solid.Check
                     ]
                 ]
@@ -225,7 +232,7 @@ let termSearchComponent (model:Messages.Model) dispatch =
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [
 
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]][ str "Ontology term search"]
+        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Ontology term search"]
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search for an ontology term to fill into the selected field(s)"]
 
@@ -240,7 +247,7 @@ let termSearchComponent (model:Messages.Model) dispatch =
         //    Button.OnClick (fun e ->
         //        GetParentOntology |> ExcelInterop |> dispatch
         //    )
-        //][
+        //] [
         //    str "GetParentOntology"
         //]
 

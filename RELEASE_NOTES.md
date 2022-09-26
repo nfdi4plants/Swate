@@ -1,8 +1,42 @@
-### 0.5.4+ac1bc58 (Released 2021-12-22)
+### 0.6.1+a1732c7 (Released 2022-9-22)
 * Additions:
-    * latest commit #ac1bc58
-    * [[#ac1bc58](https://github.com/nfdi4plants/Swate/commit/ac1bc58e2fb447025dd8cd7812d98d8ed5a7b588)] Update input var name for stored procedures.
-    * [[#84984db](https://github.com/nfdi4plants/Swate/commit/84984db59d2ebcbc01f43103f1994b35463d1958)] Update Swate install zip
+    * [[#a1732c7](https://github.com/nfdi4plants/Swate/commit/a1732c775644081211e079bc708a3fc7e52cc283)] Redesign advanced term search (#222).
+    * [[#37a09cf](https://github.com/nfdi4plants/Swate/commit/37a09cfcc3ddc93e49023fbdab746d3b6e554877)] Simplify Json-Import :sparkles:
+    * [[#f624141](https://github.com/nfdi4plants/Swate/commit/f624141367ec2573e8f1e39066f2cbeedc51edf0)] Merge branch 'kevinf-patch-0.6' of https://github.com/nfdi4plants/Swate into kevinf-patch-0.6
+
+### 0.6.0+0ba730b (Released 2022-9-7)
+* Additions:
+    * [[#d0ce176](https://github.com/nfdi4plants/Swate/commit/d0ce1769f4982f146e469d738f0023f61193f499)] Update to new url: https://swate.nfdi4plants.org
+    * [[#1ccef83](https://github.com/nfdi4plants/Swate/commit/1ccef839ce3b556d06d6b1b381ec919decd8ece2)] Update building block descriptions.
+    * [[#5a2595a](https://github.com/nfdi4plants/Swate/commit/5a2595a4a296997d48ca63f9a0d0ef3fecdf0b2c)] Add protocol type functionality
+    * [[#c6d3836](https://github.com/nfdi4plants/Swate/commit/c6d38366b1bbae50c519fbe2d1667962c0abe6d8)] Adjust changes according to Swobup naming
+    * [[#bd46fff](https://github.com/nfdi4plants/Swate/commit/bd46fffb2fb9e60b20fbfd7dd6e4cd2d5e3b5efa)] Support official ISADotNet syntax for column headers.
+    * [[#9368483](https://github.com/nfdi4plants/Swate/commit/93684832de507a52144e8706563d5ef8ba6486f2)] Separate #id calculation of main col and ref cols.
+    * [[#ba7bad8](https://github.com/nfdi4plants/Swate/commit/ba7bad810b2562d3a348543c889ae8139d04df95)] Make input/output columns cambiable (Issue #203) + improve office logging :sparkles:
+    * [[#f3be11c](https://github.com/nfdi4plants/Swate/commit/f3be11c6955e512e8b0e7acfc3b13a2b2144f88c)] Update Data File output column + deprecation checks (Issue #201).
+    * [[#1f5f888](https://github.com/nfdi4plants/Swate/commit/1f5f888739227f5e2603de5e6063edbd21903bc3)] Update Source column description.
+    * [[#63a6a29](https://github.com/nfdi4plants/Swate/commit/63a6a298c07e7fcc56b80583442406692a1183f2)] Add Protocol REF (Issue #212).
+    * [[#4711417](https://github.com/nfdi4plants/Swate/commit/47114172cb6f8c70745e1daad0f00cc7e4b170b9)] Add unit tests (Issue #212) :white_check_mark:
+    * [[#30ba1cd](https://github.com/nfdi4plants/Swate/commit/30ba1cd12122ee876f3567c1e39d7e864d891853)] Add Component building block :sparkles::white_check_mark:
+    * [[#71e633f](https://github.com/nfdi4plants/Swate/commit/71e633f5be4a93b2a8031433644452e30d6c0a0d)] Unify autocomplete term search design (Issue #211).
+    * [[#3f9bff1](https://github.com/nfdi4plants/Swate/commit/3f9bff14ee68bdb727fc03df8177c14c7b0ad489)] Redesign search results
+    * [[#8522dea](https://github.com/nfdi4plants/Swate/commit/231c649f140d251bd8cfac7e3595540e00cae03c)] Clean up first showcase of tree term structure #209
+    * [[#8dfa9e2](https://github.com/nfdi4plants/Swate/commit/8dfa9e2f0dfa9e5a42e8030adac041581d549913)] Heavily improve term insert feedback in annotation table (Issue #149, #161)
+    * [[#82b896c](https://github.com/nfdi4plants/Swate/commit/82b896c152eee2b411ef8ab506b7932694144f92)] Clean up readme :shower:
+    * [[#18641cd](https://github.com/nfdi4plants/Swate/commit/18641cd50a5d7854aaf2a39976479d4cda2d12e7)] Update fill reference column logic, to provide consistent results.
+    * [[#2b2413f](https://github.com/nfdi4plants/Swate/commit/2b2413f3f051b096dde8d8322bbafaed6d4ac616)] Implement and/or slider for template tag filter (Issue #195) :sparkles:.
+    * [[#bcf077c](https://github.com/nfdi4plants/Swate/commit/bcf077c6b910d9c8c2bdd8402e8953f2f34af657)] Update info page :lipstick: and contact links (Issue #196).
+    * [[#f776367](https://github.com/nfdi4plants/Swate/commit/f7763677a81e3913468d2a8c9304cc7da604d5d9)] Update project for docker build automation :whale:
+    * [[#432c14b](https://github.com/nfdi4plants/Swate/commit/432c14b33dee96bfa1074d0078e5dda04b4b6b9b)] Improve parent-child search performance (Issue #117,#193) :racehorse:.
+    * [[#7b360e8](https://github.com/nfdi4plants/Swate/commit/7b360e862b19e42eddca47f4ca8245577296c24d)] Update Advanced term search for cleaner input.
+    * [[#bfec630](https://github.com/nfdi4plants/Swate/commit/bfec63094cbc78cb28644d53df8d654cde087eb4)] Persist active tabs over subpages (Issue #191) :lipstick:.
+    * [[#92d973c](https://github.com/nfdi4plants/Swate/commit/92d973cd6a33144c2eafe52eb84b7b52c1fbea15)] Update navbar burger menu to always be visible (Issue #194).
+    * [[#bd8e3fb](https://github.com/nfdi4plants/Swate/commit/bd8e3fb946cbe956a730de58508b3a94ae2c27d4)] Separate ER tags from other tags and add curated vs community templates badge (#187, #186).
+* Bugfixes:
+    * [[#55fa82c](https://github.com/nfdi4plants/Swate/commit/55fa82cc5df5a4f73acf20707e45578f6552602c)] Improve AddBuildingBlock unit logic :bug::hammer:
+    * [[#0b5be6d](https://github.com/nfdi4plants/Swate/commit/0b5be6d8bced276643ebab21de0c6962a5a0b695)] Fixed strict parsing on empty fields (Issue #214) :bug:
+    * [[#0dd0c91](https://github.com/nfdi4plants/Swate/commit/0dd0c9157e1e3cad213bcb3a68b4393318ff7585)] Fix clipping issue in building block info :bug:
+    * [[#5e45ac8](https://github.com/nfdi4plants/Swate/commit/5e45ac8cbb8a6a031bafeaf49c407b7fd8ee3ba7)] Fix propagation of unit to new building blocks (Issue #183) :bug:.
 
 ### 0.5.3+0eaa644 (Released 2021-12-16)
 * Additions:
@@ -35,12 +69,12 @@
 * Additions:
     * latest commit #70632951
     * Column headers slimmed, only term accession number in brackets
-        * Unit section slimmed from three columns to one
-        * Units tracked with number section in Excel
-        * Only terms from unit ontology (UO) allowed
+    * Unit section slimmed from three columns to one
+    * Units tracked with number section in Excel
+    * Only terms from unit ontology (UO) allowed
     * Protocol insert is now called template insert and more generalized
-        * Building blocks can only be inserted once
-        * When trying to insert duplicate template no error is thrown, but no building block duplicates are inserted.
+    * Building blocks can only be inserted once
+    * When trying to insert duplicate template no error is thrown, but no building block duplicates are inserted.
     * [[#6c62234](https://github.com/nfdi4plants/Swate/commit/6c62234aeda2d232a6054b278fff4785d8902aba)] Add visualization for source-protocol-sample chains :sparkles:
     * [[#d080748](https://github.com/nfdi4plants/Swate/commit/d080748dd90510f676aefc43aec6905bd3539830)] Add import from json to **multiple** annotation tables :sparkles:
     * [[#16ec188](https://github.com/nfdi4plants/Swate/commit/16ec1880b99d1d0b102d965f413c29ef47fe1669)] Improve server side error feedback.
@@ -248,25 +282,26 @@
 * Bugfixes:
     * Unit Term Search broke due to a change in naming conventions in the stored procedures. Fixed it!
 
-### v0.1-beta - 2020-11-05
-* Release of [Minimal POC milestone](https://github.com/nfdi4plants/Swate/milestone/1?closed=1). Rough feature set:
+### 0.1.1-beta (Released 2020-11-5)
+    * Release of [Minimal POC milestone](https://github.com/nfdi4plants/Swate/milestone/1?closed=1). Rough feature set:
     * Update advanced term search to use stored procedure introduced in 0.0.2-alpha.
-    * Bugfixes:
-	    * Responsive design should now render immediatly upon window size change
-	    * Add-in should not reload after navigating to a new tab for the first time.
-        * Term search input field no longer looses focus after clicking into it.
+* Bugfixes:
+    * 	    * Responsive design should now render immediatly upon window size change
+    * 	    * Add-in should not reload after navigating to a new tab for the first time.
+    * Term search input field no longer looses focus after clicking into it.
 
-### 0.0.2-alpha - 2020-10-29
-* First step on the way to the Minimal POC milestone. Rough feature set:
+### 0.0.2-alpha (Released 2020-10-29)
+    * First step on the way to the Minimal POC milestone. Rough feature set:
     * Add fulltext searches for advanced and simple search queries.
     * Upgrade simple search to use a "is_a directed search". This means the search used subterms to already chosen building blocks as default field of search.
     * AddBuildingBlock automatically adds 2 additional hidden terms in which "Term Source REF" and "Term Accession Number" are automatically inserted.
     * For Developers: We added a docker-compose file to generate a local docker mysql database with adminer for an easier developing process. This feature is initialized as part of ```dotnet fake build -t OfficeDebug```
 
-### 0.0.1-alpha - 2020-07-27
-* First open alpha release of Swate. Rough feature set:
+### 0.0.1-alpha (Released 2020-7-27)
+    * First open alpha release of Swate. Rough feature set:
     * Create annotation tables from existing data
     * Create annotation columns that are conform with our [Annotation Principles draft](https://nfdi4plants.github.io/AnnotationPrinciples/)
     * Autocomplete search for ontology terms. You can use these to either fill cells or annotate column headers
     * Automatic cell formatting for columns that have a unit annotation
     * File picker: open a dialog box to select local files and use their names in the annotation table.
+

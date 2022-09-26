@@ -26,8 +26,8 @@ $warning: $yellow;
 $switch-background-active: $excelPrimary;
 
 @import "~bulma/bulma";
+@import '@creativebulma/bulma-tooltip';
 @import "~bulma-switch";
-@import "~bulma-tooltip";
 @import "~bulma-checkradio";
 @import "~bulma-slider";
 
@@ -55,7 +55,8 @@ a:hover {
 [data-tooltip]:not(.is-loading)::before, [data-tooltip]:not(.is-loading)::after, [data-tooltip]:not(.is-disabled)::before, [data-tooltip]:not(.is-disabled)::after, [data-tooltip]:not([disabled])::before, [data-tooltip]:not([disabled])::after {
     box-sizing: border-box;
     color: #fff;
-    display: inline-block;
+    left: 50px;
+    display: none;
     font-family: BlinkMacSystemFont,-apple-system,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue","Helvetica","Arial",sans-serif;
     font-size: .75rem;
     hyphens: auto;
@@ -65,6 +66,15 @@ a:hover {
     position: absolute;
     visibility: hidden;
     z-index: 1020;
+}
+
+[data-tooltip]:hover::before {
+    display: inline-block
+}
+
+#cy {
+    height: 300px;
+    display: block
 }
 
 .myNavbarSticky {
@@ -164,7 +174,8 @@ a.navbar-item:hover {
 }
 
 .clickableTag:hover {
-    background-color: $lightBlueLighter20 !important;
+    /*background-color: $lightBlueLighter20 !important;*/
+    box-shadow: inset 0 0 0 10em rgba(255, 255, 255, 0.3);
 }
 
 .clickableTagDelete {
@@ -283,9 +294,15 @@ a.navbar-item:hover {
     }
 }
 
-.suggestion :hover{
+tr.suggestion :hover {
     cursor: pointer;
 }
+
+tr.suggestion-details {
+    visibility: collapse;
+    box-shadow: 1px 2px 2px darkgrey
+}
+
 
 .delete :hover {
     cursor: pointer;
@@ -324,17 +341,12 @@ input::-ms-clear {
 
 .myFlexText {
     text-align: justify;
-    margin-bottom: 0.5rem;
     font-size: 1.2rem;
 }
 
 /// Brands
 
 .nfdiIcon {
-    display: inline-block;
-    width: 59px;
-    height: 59px;
-    margin: 2px 1px;
     transition: 0.2s opacity;
 }
 
@@ -344,8 +356,6 @@ input::-ms-clear {
 
 .myFaBrand  {
     padding: 13px;
-    font-size: 30px;
-/*    width: 50px;*/
     text-align: center;
     text-decoration: none;
     margin: 2px 1px;

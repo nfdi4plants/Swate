@@ -21,7 +21,7 @@ let errorModal (model:Model) dispatch =
             Notification.Color IsDanger
             Notification.Props [Style [MaxWidth "80%"; MaxHeight "80%"; OverflowX OverflowOptions.Auto (*CSSProp.Custom ("overflow", "scroll")*)]]
         ] [
-            Notification.delete [Props [OnClick closeMsg]][]
+            Notification.delete [Props [OnClick closeMsg]] []
             str (model.DevState.LastFullError.Value.GetPropagatedError())
         ]
     ]

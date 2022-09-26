@@ -22,18 +22,18 @@ type AutocompleteSuggestion<'SearchResult> = {
     Data            : 'SearchResult 
 }
 with
-    static member ofTerm (term:DbDomain.Term) : AutocompleteSuggestion<DbDomain.Term> = {
+    static member ofTerm (term:Term) : AutocompleteSuggestion<Term> = {
         Name            = term.Name
         ID              = term.Accession
-        TooltipText     = term.Definition
+        TooltipText     = term.Description
         Status          = if term.IsObsolete then "obsolete" else ""
         StatusIsWarning = term.IsObsolete
         Data            = term
     }
 
-    static member ofOntology (ont:DbDomain.Ontology) : AutocompleteSuggestion<DbDomain.Ontology> = {
+    static member ofOntology (ont:Ontology) : AutocompleteSuggestion<Ontology> = {
         Name            = ont.Name
-        ID              = ont.CurrentVersion
+        ID              = ont.Version
         TooltipText     = ""
         Status          = ""
         StatusIsWarning = false
@@ -60,30 +60,30 @@ type AutocompleteParameters<'SearchResult> = {
     OnAdvancedSearch        : ('SearchResult -> Msg)
 }
 with
-    static member ofTermSearchState (state:TermSearch.Model) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofTermSearchState (state:TermSearch.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "TermSearch_ID"
         InputId                 = "TermSearchInput_ID"
 
         StateBinding            = state.TermSearchText
-        Suggestions             = state.TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        Suggestions             = state.TermSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowSuggestions
         DropDownIsLoading       = state.HasSuggestionsLoading
 
         OnInputChangeMsg        = (TermSearch.SearchTermTextChange >> TermSearchMsg )
-        OnSuggestionSelect      = ( fun (term:DbDomain.Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg)
+        OnSuggestionSelect      = ( fun (term:Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg)
 
         HasAdvancedSearch       = true
         AdvancedSearchLinkText  = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun (term:DbDomain.Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg )
+        OnAdvancedSearch        = (fun (term:Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg )
     }
 
-    static member ofAddBuildingBlockUnitState (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockUnitState (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "UnitSearch_ID"
         InputId                 = "UnitSearchInput_ID"
 
         StateBinding            = state.UnitTermSearchText
-        Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowUnitTermSuggestions
         DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
@@ -96,12 +96,12 @@ with
         OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockUnit2State (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockUnit2State (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "Unit2Search_ID"
         InputId                 = "Unit2SearchInput_ID"
 
         StateBinding            = state.Unit2TermSearchText
-        Suggestions             = state.Unit2TermSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        Suggestions             = state.Unit2TermSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowUnit2TermSuggestions
         DropDownIsLoading       = state.HasUnit2TermSuggestionsLoading
@@ -114,12 +114,12 @@ with
         OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockState (state:BuildingBlock.Model) : AutocompleteParameters<DbDomain.Term> = {
+    static member ofAddBuildingBlockState (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "BlockNameSearch_ID"
         InputId                 = "BlockNameSearchInput_ID"
 
         StateBinding            = state.CurrentBuildingBlock.Name
-        Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<DbDomain.Term>.ofTerm
+        Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
         MaxItems                = 5
         DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
         DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
@@ -136,46 +136,101 @@ with
 
 let createAutocompleteSuggestions
     (dispatch: Msg -> unit)
-    (colorMode:ColorMode)
     (autocompleteParams: AutocompleteParameters<'SearchResult>)
+    (model:Model)
     =
 
     let suggestions = 
         if autocompleteParams.Suggestions.Length > 0 then
             autocompleteParams.Suggestions
-            //|> fun s -> s |> Array.take (if s.Length < autocompleteParams.MaxItems then s.Length else autocompleteParams.MaxItems)
-            |> Array.map (fun sugg ->
-                tr [
-                    OnClick (fun _ ->
-                        let e = Browser.Dom.document.getElementById(autocompleteParams.InputId)
-                        e?value <- sugg.Name
-                        sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
-                    OnKeyDown (fun k -> if k.key = "Enter" then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
-                    TabIndex 0
-                    colorControl colorMode
-                    Class "suggestion"
-                ] [
-                    td [
-                        Class (Tooltip.ClassName + " " + Tooltip.IsTooltipRight + " " + Tooltip.IsMultiline); Tooltip.dataTooltip (if sugg.TooltipText.Trim() <> "" then sugg.TooltipText else "No definition found")
-                        Style [FontSize "1.1rem"; Padding "0 0 0 .4rem"; TextAlign TextAlignOptions.Center; VerticalAlign "middle"; Color NFDIColors.Yellow.Darker20]
+            |> Array.collect (fun sugg ->
+                let id = sprintf "isHidden_%s" sugg.ID 
+                [|
+                    tr [
+                        OnClick (fun _ ->
+                            let e = Browser.Dom.document.getElementById(autocompleteParams.InputId)
+                            e?value <- sugg.Name
+                            sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                        OnKeyDown (fun k -> if k.key = "Enter" then sugg.Data |> autocompleteParams.OnSuggestionSelect |> dispatch)
+                        TabIndex 0
+                        Class "suggestion"
                     ] [
-                        Fa.i [Fa.Solid.InfoCircle] []
+                        //td [
+                        //    Class "has-tooltip-right has-tooltip-multiline"; Props.Custom ("data-tooltip", if sugg.TooltipText.Trim() <> "" then sugg.TooltipText else "No definition found")
+                        //    Style [FontSize "1.1rem"; Padding "0 0 0 .4rem"; TextAlign TextAlignOptions.Center; VerticalAlign "middle"; Color NFDIColors.Yellow.Darker20]
+                        //] [
+                        //    Fa.i [Fa.Solid.InfoCircle] []
+                        //]
+                        td [] [
+                            b [] [ str sugg.Name ]
+                        ]
+                        td [if sugg.StatusIsWarning then Style [Color "red"]] [str sugg.Status]
+                        td [
+                            OnClick (
+                                fun e ->
+                                    e.stopPropagation()
+                            )
+                            Style [FontWeight "light"]
+                        ] [
+                            small [] [
+                                AdvancedSearch.createLinkOfAccession sugg.ID
+                        ] ]
+                        td [] [
+                            Button.list [Button.List.IsRight] [
+                                Button.a [
+                                    Button.Props [Title "Show Term Tree"]
+                                    Button.Size IsSmall
+                                    Button.Color IsSuccess
+                                    Button.IsInverted
+                                    Button.OnClick(fun e ->
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        Cytoscape.Msg.GetTermTree sugg.ID |> CytoscapeMsg |> dispatch
+                                    )
+                                ] [
+                                    Icon.icon [] [
+                                        Fa.i [Fa.Solid.Tree] []
+                                    ]
+                                ]
+                                Button.a [
+                                    Button.Size IsSmall
+                                    Button.Color IsBlack
+                                    Button.IsInverted
+                                    Button.OnClick(fun e ->
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        let ele = Browser.Dom.document.getElementById(id)
+                                        let isCollapsed =
+                                            let vis = string ele?style?visibility
+                                            vis = "collapse" || vis = ""
+                                        if isCollapsed then 
+                                            ele?style?visibility <- "visible"
+                                        else
+                                            ele?style?visibility <- "collapse"
+                                        ()
+                                    )
+                                ] [
+                                    Icon.icon [] [
+                                        Fa.i [Fa.Solid.ChevronDown] []
+                                    ]
+                                ]
+                            ]
+                        ]
                     ]
-                    td [] [
-                        b [] [str sugg.Name]
-                    ]
-                    td [if sugg.StatusIsWarning then Style [Color "red"]] [str sugg.Status]
-                    td [
-                        OnClick (
-                            fun e ->
-                                e.stopPropagation()
-                        )
-                        Style [FontWeight "light"]
+                    tr [
+                        OnClick (fun e -> e.stopPropagation())
+                        Id id
+                        Class "suggestion-details"
                     ] [
-                        small [] [
-                            AdvancedSearch.createLinkOfAccession sugg.ID
-                    ] ]
-                ])
+                        td [ColSpan 4] [
+                            Content.content [] [
+                                b [] [ str "Definition: " ]
+                                str sugg.TooltipText
+                            ]
+                        ]
+                    ]
+                |]
+            )
             |> List.ofArray
         else
             [
@@ -186,28 +241,28 @@ let createAutocompleteSuggestions
 
     let alternative =
         tr [
-            colorControl colorMode
             Class "suggestion"
-        ][
+        ] [
             td [ColSpan 4] [
                 str (sprintf "%s " autocompleteParams.AdvancedSearchLinkText)
+                str "Try "
                 a [OnClick (fun _ -> AdvancedSearch.ToggleModal autocompleteParams.ModalId |> AdvancedSearchMsg |> dispatch)] [
-                    str "Use Advanced Search"
-                ] 
+                    str "Advanced Search"
+                ]
+                str "!"
             ]
         ]
 
     let alternative2 =
         tr [
-            colorControl colorMode
             Class "suggestion"
-        ][
+        ] [
             td [ColSpan 4] [
-                str ("You can also request a term by opening an ")
-                a [Href Shared.URLs.Nfdi4psoOntologyUrl; Target "_Blank"] [
-                    str "Issue"
+                str "Still can't find what you need? Get in "
+                a [Href Shared.URLs.Helpdesk.UrlOntologyTopic; Target "_Blank"] [
+                    str "contact"
                 ]
-                str "."
+                str " with us!"
             ]
         ]
 
@@ -216,11 +271,10 @@ let createAutocompleteSuggestions
 
 
 let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (isVisible: bool) (isLoading:bool) (suggestions: ReactElement list)  =
-    Container.container[ ] [
-        Dropdown.content [Props [
+    div [ Style [Position PositionOptions.Relative ]] [
+        div [
             Style [
                 if isVisible then Display DisplayOptions.Block else Display DisplayOptions.None
-                //if model.ShowFillSuggestions then Display DisplayOptions.Block else Display DisplayOptions.None
                 ZIndex "20"
                 Width "100%"
                 MaxHeight "400px"
@@ -228,12 +282,14 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
                 BackgroundColor colorMode.ControlBackground
                 BorderColor     colorMode.ControlForeground
                 MarginTop "-0.5rem"
-                OverflowY OverflowOptions.Scroll
-            ]]
+                OverflowY OverflowOptions.Auto
+                BorderWidth "0 0.5px 0.5px 0.5px"
+                BorderStyle "solid"
+            ]
         ] [
-            Table.table [Table.IsFullWidth] [
+            Table.table [Table.IsFullWidth; Table.Props [ colorControl colorMode ]] [
                 if isLoading then
-                    tbody [] [
+                    tbody [Style [Height "75px"]] [
                         tr [] [
                             td [Style [TextAlign TextAlignOptions.Center]] [
                                 Loading.loadingComponent
@@ -251,17 +307,8 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
 
 open Fable.Core.JsInterop
 
-let autocompleteTermSearchComponent
-    (dispatch: Msg -> unit)
-    (colorMode:ColorMode)
-    (model:Model)
-    (inputPlaceholderText   : string)
-    (inputSize              : ISize option)
-    (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
-    (isDisabled:bool)
-    = 
-    Control.div [Control.IsExpanded] [
-        AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
+let autocompleteTermSearchComponentInputComponent (dispatch: Msg -> unit) isDisabled inputPlaceholderText inputSize (autocompleteParams : AutocompleteParameters<Term>) =
+    Control.p [Control.IsExpanded] [
         Input.input [
             Input.Props [Style [
                 if isDisabled then BorderColor ExcelColors.Colorfull.gray40
@@ -283,12 +330,6 @@ let autocompleteTermSearchComponent
             )
             Input.Id autocompleteParams.InputId  
         ]
-        autocompleteDropdownComponent
-            dispatch
-            colorMode
-            autocompleteParams.DropDownIsVisible
-            autocompleteParams.DropDownIsLoading
-            (createAutocompleteSuggestions dispatch colorMode autocompleteParams)
     ]
 
 let autocompleteTermSearchComponentOfParentOntology
@@ -297,11 +338,11 @@ let autocompleteTermSearchComponentOfParentOntology
     (model:Model)
     (inputPlaceholderText   : string)
     (inputSize              : ISize option)
-    (autocompleteParams     : AutocompleteParameters<DbDomain.Term>)
+    (autocompleteParams     : AutocompleteParameters<Term>)
 
     =
     let parentOntologyNotificationElement show =
-        Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]][
+        Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]] [
             Button.button [
                 Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]
                 Button.IsStatic true
@@ -313,11 +354,11 @@ let autocompleteTermSearchComponentOfParentOntology
             )]
         ]
 
-    Control.div [Control.IsExpanded] [
+    Control.div [] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
-        Field.div [Field.HasAddons][
+        Field.div [Field.HasAddons] [
             parentOntologyNotificationElement ((model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology) |> not)
-            Control.p [Control.IsExpanded][
+            Control.p [Control.IsExpanded] [
                 Input.input [
                     Input.Props [Id autocompleteParams.InputId]
                     Input.Placeholder inputPlaceholderText
@@ -335,7 +376,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         OnDoubleClick (fun e ->
                             if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.TermSearchText = "" then
                                 let parentOnt = model.TermSearchState.ParentOntology.Value
-                                let (parentOntInfo:TermMinimal) = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
+                                let parentOntInfo: TermMinimal = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
                                 TermSearch.GetAllTermsByParentTermRequest parentOntInfo |> TermSearchMsg |> dispatch
                             else
                                 let v = Browser.Dom.document.getElementById autocompleteParams.InputId
@@ -343,7 +384,8 @@ let autocompleteTermSearchComponentOfParentOntology
                         )
                     ]           
                     Input.OnChange (fun e ->
-                        if e.Value = "nice_rgb" then
+                        let x = "01101110 01101001 01100011 01100101 01011111 01110010 01100111 01100010".Split(" ") |> Array.map (fun x -> System.Convert.ToInt32(x, 2) |> char |> string) |> String.concat ""
+                        if e.Value = x then
                             let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
                             UpdateColorMode c |> Messages.StyleChange |> dispatch
                         e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
@@ -356,5 +398,5 @@ let autocompleteTermSearchComponentOfParentOntology
             colorMode
             autocompleteParams.DropDownIsVisible
             autocompleteParams.DropDownIsLoading
-            (createAutocompleteSuggestions dispatch colorMode autocompleteParams)
+            (createAutocompleteSuggestions dispatch autocompleteParams model)
     ]

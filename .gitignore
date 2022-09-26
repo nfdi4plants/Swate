@@ -17,3 +17,11 @@ release.sh
 *.orig
 *.DotSettings.user
 .assets/swate.zip
+/.db/data
+/.db/plugins
+/.db/import
+/.assets/swate-b-quickstart.zip
+/.assets/swate-win.zip
+.vscode/
+/.db/cache
+/.db/neo4j

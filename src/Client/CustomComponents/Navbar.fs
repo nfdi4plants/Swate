@@ -28,41 +28,41 @@ let shortCutIconList model dispatch =
         ShortCutIcon.create
             "Add Annotation Table"
             [
-                Fa.span [Fa.Solid.Plus][]
-                Fa.span [Fa.Solid.Table][]
+                Fa.span [Fa.Solid.Plus] []
+                Fa.span [Fa.Solid.Table] []
             ]
             (fun e -> OfficeInterop.CreateAnnotationTable (model.SiteStyleState.IsDarkMode, e.ctrlKey) |> OfficeInteropMsg |> dispatch)
             "Table"
         ShortCutIcon.create
             "Autoformat Table"
             [
-                Fa.i [Fa.Solid.SyncAlt][]
+                Fa.i [Fa.Solid.SyncAlt] []
             ]
             (fun e -> OfficeInterop.AutoFitTable (not e.ctrlKey) |> OfficeInteropMsg |> dispatch)
             "Formatting"
         ShortCutIcon.create
             "Update Ontology Terms"
             [
-                Fa.span [Fa.Solid.SpellCheck][]
-                span [][str model.ExcelState.FillHiddenColsStateStore.toReadableString]
-                Fa.span [Fa.Solid.Pen][]
+                Fa.span [Fa.Solid.SpellCheck] []
+                span [] [str model.ExcelState.FillHiddenColsStateStore.toReadableString]
+                Fa.span [Fa.Solid.Pen] []
             ]
             (fun _ -> OfficeInterop.FillHiddenColsRequest |> OfficeInteropMsg |> dispatch)
             "Formatting"
         ShortCutIcon.create
             "Remove Building Block"
             [ 
-                Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]][]
-                Fa.span [Fa.Solid.Columns][]
+                Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]] []
+                Fa.span [Fa.Solid.Columns] []
             ]
             (fun _ -> OfficeInterop.RemoveAnnotationBlock |> OfficeInteropMsg |> dispatch)
             "BuildingBlock"
         ShortCutIcon.create
             "Get Building Block Information"
             [ 
-                Fa.span [Fa.Solid.Question; Fa.Props [Style [PaddingRight "0.15rem"]]][]
-                span [][str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
-                Fa.span [Fa.Solid.Columns][]
+                Fa.span [Fa.Solid.Question; Fa.Props [Style [PaddingRight "0.15rem"]]] []
+                span [] [str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
+                Fa.span [Fa.Solid.Columns] []
             ]
             (fun _ -> OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg |> dispatch)
             "BuildingBlock"
@@ -107,7 +107,7 @@ let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
                 Button.Props [Style [ BackgroundColor "transparent"; Height "100%"; if model.SiteStyleState.QuickAcessIconsShown then Color NFDIColors.Yellow.Base]]
                 Button.Color Color.IsWhite
                 Button.IsInverted
-            ][
+            ] [
                 div [Style [
                     Display DisplayOptions.InlineFlex
                     Position PositionOptions.Relative
@@ -122,7 +122,7 @@ let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
                             if model.SiteStyleState.QuickAcessIconsShown then Transform "rotate(-180deg)" else Transform "rotate(0deg)"
                         ]]
                         Fa.Solid.Times
-                    ][]
+                    ] []
                     Fa.i [
                         Fa.Props [Style [
                             Position PositionOptions.Absolute
@@ -131,7 +131,7 @@ let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
                             if model.SiteStyleState.QuickAcessIconsShown then Opacity "0" else Opacity "1"
                         ]]
                         Fa.Solid.EllipsisH
-                    ][]
+                    ] []
                     // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
                     Fa.i [
                         Fa.Props [Style [
@@ -139,14 +139,14 @@ let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
                             Opacity "0" 
                         ]]
                         Fa.Solid.EllipsisH
-                    ][]
+                    ] []
                 ]
             ]
         ]
     ]
 
 let quickAccessListElement model dispatch =
-    div [Style [Display DisplayOptions.Flex; FlexDirection "row"]; Class "hideUnder575px"][
+    div [Style [Display DisplayOptions.Flex; FlexDirection "row"]; Class "hideUnder575px"] [
         yield! navbarShortCutIconList model dispatch
     ]
 
@@ -154,7 +154,7 @@ let quickAccessListElement model dispatch =
 open Fable.Core.JsInterop
 
 let quickAccessScalableNavbar (model:Messages.Model) dispatch =
-    div [Class "hideOver575px"][
+    div [Class "hideOver575px"] [
         Navbar.navbar [
             Navbar.CustomClass "wrapFlexBox"
             Navbar.Props [
@@ -167,7 +167,7 @@ let quickAccessScalableNavbar (model:Messages.Model) dispatch =
                     //BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
                 ]
             ]
-        ][
+        ] [
             Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [Flex "1"]]] [
                 yield! navbarShortCutIconList model dispatch
                 //quickAccessDropdownElement model dispatch true
@@ -208,13 +208,14 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                     Role "button"
                     AriaLabel "menu"
                     Props.AriaExpanded false
+                    Style [Display DisplayOptions.Block]
             ]] [
                 span [AriaHidden true] [ ]
                 span [AriaHidden true] [ ]
                 span [AriaHidden true] [ ]
             ]
         ]
-        div [Class "hideOver575px "][
+        div [Class "hideOver575px "] [
             Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [
                 //BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
                 if model.SiteStyleState.QuickAcessIconsShown |> not then
@@ -224,17 +225,21 @@ let navbarComponent (model : Model) (dispatch : Msg -> unit) =
                 yield! navbarShortCutIconList model dispatch
             ]
         ]
-        Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu"); ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
-            Navbar.Dropdown.div [ ] [
+        Navbar.menu [Navbar.Menu.Props [
+            Style [yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode; if model.SiteStyleState.BurgerVisible then Display DisplayOptions.Block];
+            Id "navbarMenu";
+            Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu");
+        ]] [
+            Navbar.Dropdown.div [ Navbar.Dropdown.Props [Style [if model.SiteStyleState.BurgerVisible then Display DisplayOptions.Block]] ] [
                 Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.NFDITwitterUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                     str "News "
-                    Fa.i [Fa.Brand.Twitter; Fa.Size Fa.FaLarge; Fa.Props [Style [Color "#1DA1F2"]]][]
+                    Fa.i [Fa.Brand.Twitter; Fa.Size Fa.FaLarge; Fa.Props [Style [Color "#1DA1F2"]]] []
                 ]
-                Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.DocsFeatureUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.SwateWiki ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
                     str "How to use"
                 ]
-                Navbar.Item.a [Navbar.Item.Props [Href @"https://github.com/nfdi4plants/Swate/issues/new/choose"; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                    str "Contact Developers"
+                Navbar.Item.a [Navbar.Item.Props [Href Shared.URLs.Helpdesk.Url; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                    str "Contact us!"
                 ]
                 Navbar.Item.a [Navbar.Item.Props [
                     OnClick (fun e ->

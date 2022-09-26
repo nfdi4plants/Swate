@@ -5,7 +5,7 @@ open Fable.React.Props
 open Fulma
 open Shared
 open TermTypes
-open ProtocolTemplateTypes
+open TemplateTypes
 open Thoth.Elmish
 open Routing
 
@@ -25,30 +25,38 @@ type LogItem =
     | Debug of (System.DateTime*string)
     | Info  of (System.DateTime*string)
     | Error of (System.DateTime*string)
+    | Warning of (System.DateTime*string)
 
     static member ofInteropLogginMsg (msg:InteropLogging.Msg) =
         match msg.LogIdentifier with
         | InteropLogging.Info   -> Info (System.DateTime.UtcNow,msg.MessageTxt)
         | InteropLogging.Debug  -> Debug(System.DateTime.UtcNow,msg.MessageTxt)
         | InteropLogging.Error  -> Error(System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Warning -> Warning(System.DateTime.UtcNow,msg.MessageTxt)
 
     static member toTableRow = function
         | Debug (t,m) ->
             tr [] [
                 td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "lightblue"; FontWeight "bold"]] [str "Debug"]
+                td [Style [Color NFDIColors.LightBlue.Base; FontWeight "bold"]] [str "Debug"]
                 td [] [str m]
             ]
         | Info  (t,m) ->
             tr [] [
                 td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "green"; FontWeight "bold"]] [str "Info"]
+                td [Style [Color NFDIColors.Mint.Base; FontWeight "bold"]] [str "Info"]
                 td [] [str m]
             ]
         | Error (t,m) ->
             tr [] [
                 td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color "red"; FontWeight "bold"]] [str "ERROR"]
+                td [Style [Color NFDIColors.Red.Base; FontWeight "bold"]] [str "ERROR"]
+                td [] [str m]
+            ]
+        | Warning (t,m) ->
+            tr [] [
+                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
+                td [Style [Color NFDIColors.Yellow.Base; FontWeight "bold"]] [str "Warning"]
                 td [] [str m]
             ]
 
@@ -57,6 +65,7 @@ type LogItem =
         | "Debug"| "debug"  -> Debug(System.DateTime.UtcNow,message)
         | "Info" | "info"   -> Info (System.DateTime.UtcNow,message)
         | "Error" | "error" -> Error(System.DateTime.UtcNow,message)
+        | "Warning" | "warning" -> Warning(System.DateTime.UtcNow,message)
         | others -> Error(System.DateTime.UtcNow,sprintf "Swate found an unexpected log identifier: %s" others)
 
 type TermSearchMode =
@@ -69,8 +78,8 @@ module TermSearch =
 
         TermSearchText          : string
 
-        SelectedTerm            : DbDomain.Term option
-        TermSuggestions         : DbDomain.Term []
+        SelectedTerm            : Term option
+        TermSuggestions         : Term []
 
         ParentOntology          : TermMinimal option
         SearchByParentOntology  : bool
@@ -91,51 +100,29 @@ module TermSearch =
 
 module AdvancedSearch =
 
-    type AdvancedSearchOptions = {
-        Ontology                : DbDomain.Ontology option
-        SearchTermName          : string
-        MustContainName         : string 
-        SearchTermDefinition    : string
-        MustContainDefinition   : string
-        KeepObsolete            : bool
-        } with
-            static member init() = {
-                Ontology                = None
-                SearchTermName          = ""
-                MustContainName         = "" 
-                SearchTermDefinition    = ""
-                MustContainDefinition   = ""
-                KeepObsolete            = true
-            }
-
     type AdvancedSearchSubpages =
     | InputFormSubpage
     | ResultsSubpage
-    | SelectedResultSubpage of DbDomain.Term
 
     type Model = {
         ModalId                             : string
         ///
-        AdvancedSearchOptions               : AdvancedSearchOptions
-        AdvancedSearchTermResults           : DbDomain.Term []
-        SelectedResult                      : DbDomain.Term option
+        AdvancedSearchOptions               : AdvancedSearchTypes.AdvancedSearchOptions
+        AdvancedSearchTermResults           : Term []
         // Client visual design
         AdvancedTermSearchSubpage           : AdvancedSearchSubpages
         HasModalVisible                     : bool
         HasOntologyDropdownVisible          : bool
         HasAdvancedSearchResultsLoading     : bool
-        AdvancedSearchResultPageinationIndex: int
     } with
         static member init () = {
             ModalId                             = ""
             HasModalVisible                     = false
             HasOntologyDropdownVisible          = false
-            AdvancedSearchOptions               = AdvancedSearchOptions.init ()
+            AdvancedSearchOptions               = AdvancedSearchTypes.AdvancedSearchOptions.init ()
             AdvancedSearchTermResults           = [||]
             HasAdvancedSearchResultsLoading     = false
             AdvancedTermSearchSubpage           = InputFormSubpage
-            AdvancedSearchResultPageinationIndex= 0
-            SelectedResult                      = None
         }
 
 type SiteStyleState = {
@@ -154,14 +141,16 @@ type SiteStyleState = {
 type DevState = {
     LastFullError                       : System.Exception option
     Log                                 : LogItem list
+    DisplayLogList                      : LogItem list
 } with
     static member init () = {
         LastFullError   = None
+        DisplayLogList  = []
         Log             = []
     }
 
 type PersistentStorageState = {
-    SearchableOntologies    : (Set<string>*DbDomain.Ontology) []
+    SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
     HasOntologiesLoaded     : bool
     PageEntry               : SwateEntry
@@ -224,33 +213,56 @@ module FilePicker =
 open OfficeInteropTypes
 
 module BuildingBlock =
+
+    [<RequireQualifiedAccess>]
+    type DropdownPage =
+    | Main
+    | ProtocolTypes
+    | Output
+
+        member this.toString =
+            match this with
+            | Main -> "Main Page"
+            | ProtocolTypes -> "Protocol Columns"
+            | Output -> "Output Columns"
+
+        member this.toTooltip =
+            match this with
+            | ProtocolTypes -> "Protocol columns extend control for protocol parsing."
+            | Output -> "Output columns allow to specify the exact output for your table. Per table only one output column is allowed. The value of this column must be a unique identifier."
+            | _ -> ""
+
     type Model = {
         CurrentBuildingBlock                    : BuildingBlockNamePrePrint
 
-        BuildingBlockSelectedTerm               : DbDomain.Term option
-        BuildingBlockNameSuggestions            : DbDomain.Term []
+        DropdownPage                            : DropdownPage
+
+        BuildingBlockSelectedTerm               : Term option
+        BuildingBlockNameSuggestions            : Term []
         ShowBuildingBlockSelection              : bool
         BuildingBlockHasUnit                    : bool
         ShowBuildingBlockTermSuggestions        : bool
         HasBuildingBlockTermSuggestionsLoading  : bool
 
-        /// This section is used to add a unit directly to a freshly created building block.
+        // This section is used to add a unit directly to a freshly created building block.
         UnitTermSearchText                      : string
-        UnitSelectedTerm                        : DbDomain.Term option
-        UnitTermSuggestions                     : DbDomain.Term []
+        UnitSelectedTerm                        : Term option
+        UnitTermSuggestions                     : Term []
         HasUnitTermSuggestionsLoading           : bool
         ShowUnitTermSuggestions                 : bool
 
-        /// This section is used to add a unit directly to an already existing building block
+        // This section is used to add a unit directly to an already existing building block
         Unit2TermSearchText                     : string
-        Unit2SelectedTerm                       : DbDomain.Term option
-        Unit2TermSuggestions                    : DbDomain.Term []
+        Unit2SelectedTerm                       : Term option
+        Unit2TermSuggestions                    : Term []
         HasUnit2TermSuggestionsLoading          : bool
         ShowUnit2TermSuggestions                : bool
 
     } with
         static member init () = {
             ShowBuildingBlockSelection              = false
+
+            DropdownPage                            = DropdownPage.Main
 
             CurrentBuildingBlock                    = BuildingBlockNamePrePrint.init BuildingBlockType.Parameter
             BuildingBlockSelectedTerm               = None
@@ -259,14 +271,14 @@ module BuildingBlock =
             HasBuildingBlockTermSuggestionsLoading  = false
             BuildingBlockHasUnit                    = false
 
-            /// This section is used to add a unit directly to a freshly created building block.
+            // This section is used to add a unit directly to a freshly created building block.
             UnitTermSearchText                      = ""
             UnitSelectedTerm                        = None
             UnitTermSuggestions                     = [||]
             ShowUnitTermSuggestions                 = false
             HasUnitTermSuggestionsLoading           = false
 
-            /// This section is used to add a unit directly to an already existing building block
+            // This section is used to add a unit directly to an already existing building block
             Unit2TermSearchText                     = ""
             Unit2SelectedTerm                       = None
             Unit2TermSuggestions                    = [||]
@@ -288,7 +300,15 @@ module Validation =
             DisplayedOptionsId          = None
         }
 
+
 module Protocol =
+
+    [<RequireQualifiedAccess>]
+    type CuratedCommunityFilter =
+    | Both
+    | OnlyCurated
+    | OnlyCommunity
+
     /// This model is used for both protocol insert and protocol search
     type Model = {
         // Client 
@@ -298,30 +318,35 @@ module Protocol =
         ShowJsonTypeDropdown    : bool
         JsonExportType          : Shared.JsonExportType
         // ------ Protocol from Database ------
-        ProtocolSelected        : ProtocolTemplate option
+        ProtocolSelected        : Template option
         ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-        ProtocolsAll            : ProtocolTemplate []
+        ProtocolsAll            : Template []
         DisplayedProtDetailsId  : int option
         ProtocolNameSearchQuery : string
         ProtocolTagSearchQuery  : string
-        ProtocolSearchTags      : string list
-
+        ProtocolFilterTags      : string list
+        ProtocolFilterErTags    : string list
+        CuratedCommunityFilter  : CuratedCommunityFilter
+        TagFilterIsAnd          : bool
     } with
         static member init () = {
             // Client
             Loading                 = false
+            ProtocolNameSearchQuery = ""
+            ProtocolTagSearchQuery  = ""
+            ProtocolFilterTags      = []
+            ProtocolFilterErTags    = []
+            CuratedCommunityFilter  = CuratedCommunityFilter.Both
+            TagFilterIsAnd          = true
+            DisplayedProtDetailsId  = None
+            ProtocolSelected        = None
             // // ------ Process from file ------
             UploadedFile            = ""
             ShowJsonTypeDropdown    = false
             JsonExportType          = Shared.JsonExportType.Assay
             // ------ Protocol from Database ------
-            ProtocolSelected        = None
             ProtocolsAll            = [||]
-            DisplayedProtDetailsId  = None
             ValidationXml           = None
-            ProtocolNameSearchQuery = ""
-            ProtocolTagSearchQuery  = ""
-            ProtocolSearchTags      = []
         }
 
 type RequestBuildingBlockInfoStates =
@@ -370,7 +395,7 @@ module SettingsXml =
             ActiveProtocolGroup                     = None
             NextAnnotationTableForActiveProtGroup   = None
             ActiveProtocol                          = None
-            /// Unused
+            // Unused
             NextAnnotationTableForActiveProtocol    = None
             //
             RawXml                                  = None
@@ -386,4 +411,4 @@ type SettingsDataStewardState = {
         PointerJson = None
     }
 
-/// The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'
+// The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

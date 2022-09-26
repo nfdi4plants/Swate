@@ -13,6 +13,8 @@ open Update
 open Shared
 open ExcelJS.Fable.GlobalBindings
 
+let sayHello name = $"Hello {name}"
+
 let initializeAddIn () = Office.onReady()
 
 // defines the initial state and initial command (= side-effect) of the application
@@ -65,19 +67,19 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.Protocol ->
         BaseView.baseViewMainElement model dispatch [
-            Protocol.fileUploadViewComponent model dispatch
+            Protocol.Core.fileUploadViewComponent model dispatch
         ] [
             //Text.p [] [str ""]
         ]
 
     | Routing.Route.JsonExport ->
         BaseView.baseViewMainElement model dispatch [
-            JsonExporter.jsonExporterMainElement model dispatch
+            JsonExporter.Core.jsonExporterMainElement model dispatch
         ] [ (*Footer*) ]
 
     | Routing.Route.TemplateMetadata ->
         BaseView.baseViewMainElement model dispatch [
-            TemplateMetadata.newNameMainElement model dispatch
+            TemplateMetadata.Core.newNameMainElement model dispatch
         ] [ (*Footer*) ]
 
     | Routing.Route.ProtocolSearch ->
@@ -110,13 +112,13 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.Dag ->
         BaseView.baseViewMainElement model dispatch [
-            Dag.mainElement model dispatch
+            Dag.Core.mainElement model dispatch
         ] [ (*Footer*) ]
 
     | Routing.Route.Info ->
         BaseView.baseViewMainElement model dispatch [
             InfoView.infoComponent model dispatch
-        ][
+        ] [
             //Text.p [] [str ""]
         ]
 
@@ -128,16 +130,37 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ]
 
     | Routing.Route.Home ->
-        Container.container [][
-            div [][ str "This is the Swate web host. For a preview click on the following link." ]
+        Container.container [] [
+            div [] [ str "This is the Swate web host. For a preview click on the following link." ]
             a [ Href (Routing.Route.toRouteUrl Routing.Route.TermSearch) ] [ str "Termsearch" ]
         ]
+
 
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
 
 #endif
+
+//module CustomDebugger =
+//    open Browser
+//    open Thoth.Json
+
+//    let ICytoscapeElementDecoder =
+//        Decode.succeed (unbox<Cytoscape.JS.Types.ICytoscape> null)
+
+//    let ICytoscapElementEncoder ( _ : Cytoscape.JS.Types.ICytoscape)=
+//        Encode.string "Cytoscape.JS.Types.ICytoscape element"    
+
+//    let extra =
+//        Extra.empty
+//        |> Extra.withCustom ICytoscapElementEncoder ICytoscapeElementDecoder
+
+//    let modelDecoder =
+//        Decode.Auto.generateDecoder<Model>(extra = extra)
+
+//    let modelEncoder =
+//        Encode.Auto.generateEncoder<Model>(extra = extra)
 
 Program.mkProgram init Update.update view
 #if DEBUG
@@ -146,6 +169,7 @@ Program.mkProgram init Update.update view
 |> Program.toNavigable (parseHash Routing.Routing.route) Update.urlUpdate
 |> Program.withReactBatched "elmish-app"
 #if DEBUG
+//|> Program.withDebuggerCoders CustomDebugger.modelEncoder CustomDebugger.modelDecoder
 |> Program.withDebugger
 #endif
 |> Program.run

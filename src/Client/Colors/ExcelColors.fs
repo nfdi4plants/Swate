@@ -84,7 +84,7 @@ let colorfullMode = {
     ElementForeground       = NFDIColors.white
     Text                    = Colorfull.gray180
     Accent                  = Excel.Primary
-    Fade                    = Excel.Tint30
+    Fade                    = "whitesmoke"
 }
 
 let transparentMode = {

@@ -1,7 +1,7 @@
 namespace TemplateMetadata
 
 open Shared
-open ProtocolTemplateTypes.TemplateMetadata
+open TemplateTypes.Metadata
 
 type Model = {
     Default: obj

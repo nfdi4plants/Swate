@@ -1,4 +1,5 @@
-module Update
+[<AutoOpen>]
+module Update.Update
 
 open Elmish
 open Thoth.Elmish
@@ -50,9 +51,11 @@ module Dev =
 
         | GenericInteropLogs (nextCmd,logs) ->
             let parsedLogs = logs |> List.map LogItem.ofInteropLogginMsg
+            let parsedDisplayLogs = parsedLogs |> List.filter (fun x -> match x with | Error _ | Warning _ -> true; | _ -> false)
             let nextState = {
                 currentState with
                     Log = parsedLogs@currentState.Log
+                    DisplayLogList = parsedDisplayLogs@currentState.DisplayLogList
             }
             nextState, nextCmd
 
@@ -64,6 +67,13 @@ module Dev =
                 }
             nextState, nextCmd
 
+        | UpdateDisplayLogList newList ->
+            let nextState = {
+                currentState with
+                    DisplayLogList = newList
+            }
+            nextState, Cmd.none
+
         | UpdateLastFullError (eOpt) ->
             let nextState = {
                 currentState with
@@ -74,7 +84,7 @@ module Dev =
         | LogTableMetadata ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.getTableMetaData
+                    OfficeInterop.Core.getTableMetaData
                     ()
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -82,7 +92,7 @@ module Dev =
 
 let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
 
-    let handleTermSuggestionRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString =
+    let handleTermSuggestionRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -101,7 +111,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (DbDomain.Term [] * UnitSearchRequest) -> ApiMsg) queryString (relUnit:UnitSearchRequest) =
+    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (Term [] * UnitSearchRequest) -> ApiMsg) queryString (relUnit:UnitSearchRequest) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -120,7 +130,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: DbDomain.Term [] -> ApiMsg) queryString (termMin:TermMinimal) =
+    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString (termMin:TermMinimal) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -140,24 +150,6 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         nextState,nextCmd
 
     match reqMsg with
-    | TestOntologyInsert (a,b,d,e) ->
-
-        let currentCall = {
-            FunctionName = "testOntologyInsert"
-            Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-
-        nextState,
-        Cmd.OfAsync.either
-            Api.api.testOntologyInsert
-            (a,b,d,e)
-            (fun x -> ("Debug",sprintf "Successfully created %A" x) |> ApiSuccess |> Api)
-            (ApiError >> Api)
 
     | GetNewTermSuggestions queryString ->
         handleTermSuggestionRequest
@@ -199,7 +191,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         nextState,
         Cmd.OfAsync.either
             Api.api.getTermsForAdvancedSearch
-            (options.Ontology,options.SearchTermName,options.MustContainName,options.SearchTermDefinition,options.MustContainDefinition,options.KeepObsolete)
+            options
             (AdvancedTermSearchResultsResponse >> Response >> Api)
             (ApiError >> Api)
 
@@ -267,7 +259,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
 let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
 
-    let handleTermSuggestionResponse (responseHandler: DbDomain.Term [] -> Msg) (suggestions: DbDomain.Term[]) =
+    let handleTermSuggestionResponse (responseHandler: Term [] -> Msg) (suggestions: Term[]) =
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -286,7 +278,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-    let handleUnitTermSuggestionResponse (responseHandler: DbDomain.Term [] * UnitSearchRequest -> Msg) (suggestions: DbDomain.Term[]) (relatedUnitSearch:UnitSearchRequest) =
+    let handleUnitTermSuggestionResponse (responseHandler: Term [] * UnitSearchRequest -> Msg) (suggestions: Term[]) (relatedUnitSearch:UnitSearchRequest) =
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -432,7 +424,7 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorageMsg) (curr
     | NewSearchableOntologies onts ->
         let nextState = {
             currentState with
-                SearchableOntologies    = onts |> Array.map (fun ont -> ont.Name |> Suggestion.createBigrams, ont)
+                SearchableOntologies    = onts |> Array.map (fun ont -> ont.Name |> SorensenDice.createBigrams, ont)
                 HasOntologiesLoaded     = true
         }
 
@@ -545,6 +537,22 @@ let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * 
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | DoNothing -> currentModel,Cmd.none
+    | TestMyAPI ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.testAPIv1.test
+                    ()
+                    (curry GenericLog Cmd.none)
+                    (curry GenericError Cmd.none)
+        currentModel, Cmd.map DevMsg cmd
+    | TestMyPostAPI ->
+        let cmd =
+            Cmd.OfAsync.either
+                Api.testAPIv1.postTest
+                    ("instrument Mod")
+                    (curry GenericLog Cmd.none)
+                    (curry GenericError Cmd.none)
+        currentModel, Cmd.map DevMsg cmd
     | Batch msgSeq ->
         let cmd =
             Cmd.batch [
@@ -563,7 +571,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             match pageOpt with
             | Some Routing.Route.Validation ->
                 Cmd.OfPromise.perform
-                    OfficeInterop.getTableRepresentation
+                    OfficeInterop.Core.getTableRepresentation
                     ()
                     (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
             | Some Routing.Route.ProtocolSearch ->
@@ -755,16 +763,24 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         }
         nextModel, nextCmd
 
+    | CytoscapeMsg msg ->
+        let nextState, nextModel0, nextCmd =
+            Cytoscape.Update.update msg currentModel.CytoscapeModel currentModel 
+        let nextModel =
+            {nextModel0 with
+                CytoscapeModel = nextState}
+        nextModel, nextCmd
+
     | JsonExporterMsg msg ->
-        let nextModel, nextCmd = currentModel |> JsonExporter.update msg
+        let nextModel, nextCmd = currentModel |> JsonExporter.Core.update msg
         nextModel, nextCmd
 
     | TemplateMetadataMsg msg ->
-        let nextModel, nextCmd = currentModel |> TemplateMetadata.update msg
+        let nextModel, nextCmd = currentModel |> TemplateMetadata.Core.update msg
         nextModel, nextCmd
 
     | DagMsg msg ->
-        let nextModel, nextCmd = currentModel |> Dag.update msg
+        let nextModel, nextCmd = currentModel |> Dag.Core.update msg
         nextModel, nextCmd
 
     | TopLevelMsg topLevelMsg ->

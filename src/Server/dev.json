@@ -1,3 +1,6 @@
 {
-    "Swate:ConnectionString": "server=127.0.0.1;user id=root;password={PASSWORD}; port=42333;database=SwateDB;allowuservariables=True;persistsecurityinfo=True"
+    "DB_USER": "neo4j",
+    "DB_PASSWORD": "test",
+    "DB_URL": "bolt://localhost:7687",
+    "DB_NAME": "neo4j"
 }

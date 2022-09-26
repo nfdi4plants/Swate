@@ -1,13 +1,13 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>5d6f5462-3401-48ec-9406-d12882e9ad83</Id>
-  <Version>0.5.4</Version>
+  <Version>0.6.1</Version>
   <ProviderName>Computational Systems Biology</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Swate"/>
   <Description DefaultValue="Utility functions to annotate data in a fast and safe way."/>
-  <IconUrl DefaultValue="https://swate.nfdi4plants.de/assets/swate_32x32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://swate.nfdi4plants.de/assets/swate_80x80.png"/>
+  <IconUrl DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_32x32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_80x80.png"/>
   <SupportUrl DefaultValue="https://github.com/nfdi4plants/Swate/issues"/>
   <AppDomains>
     <AppDomain>bio.uni-kl.de</AppDomain>
@@ -16,7 +16,7 @@
     <Host Name="Workbook"/>
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://swate.nfdi4plants.de/"/>
+    <SourceLocation DefaultValue="https://swate-alpha.nfdi4plants.org/"/>
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
@@ -95,29 +95,29 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://swate.nfdi4plants.de/assets/swate_16x16.png"/>
-        <bt:Image id="Icon.20x20" DefaultValue="https://swate.nfdi4plants.de/assets/swate_20x20.png"/>
-        <bt:Image id="Icon.24x24" DefaultValue="https://swate.nfdi4plants.de/assets/swate_24x24.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://swate.nfdi4plants.de/assets/swate_32x32.png"/>
-        <bt:Image id="Icon.40x40" DefaultValue="https://swate.nfdi4plants.de/assets/swate_40x40.png"/>
-        <bt:Image id="Icon.48x48" DefaultValue="https://swate.nfdi4plants.de/assets/swate_48x48.png"/>
-        <bt:Image id="Icon.64x64" DefaultValue="https://swate.nfdi4plants.de/assets/swate_64x64.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://swate.nfdi4plants.de/assets/swate_80x80.png"/>
-        <bt:Image id="Icon.96x96" DefaultValue="https://swate.nfdi4plants.de/assets/swate_96x96.png"/>
-        <bt:Image id="IconE.16x16" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_16x16.png"/>
-        <bt:Image id="IconE.20x20" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_20x20.png"/>
-        <bt:Image id="IconE.24x24" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_24x24.png"/>
-        <bt:Image id="IconE.32x32" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_32x32.png"/>
-        <bt:Image id="IconE.40x40" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_40x40.png"/>
-        <bt:Image id="IconE.48x48" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_48x48.png"/>
-        <bt:Image id="IconE.64x64" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_64x64.png"/>
-        <bt:Image id="IconE.80x80" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_80x80.png"/>
-        <bt:Image id="IconE.96x96" DefaultValue="https://swate.nfdi4plants.de/assets/swate_e_96x96.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_16x16.png"/>
+        <bt:Image id="Icon.20x20" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_20x20.png"/>
+        <bt:Image id="Icon.24x24" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_24x24.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_32x32.png"/>
+        <bt:Image id="Icon.40x40" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_40x40.png"/>
+        <bt:Image id="Icon.48x48" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_48x48.png"/>
+        <bt:Image id="Icon.64x64" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_64x64.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_80x80.png"/>
+        <bt:Image id="Icon.96x96" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_96x96.png"/>
+        <bt:Image id="IconE.16x16" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_16x16.png"/>
+        <bt:Image id="IconE.20x20" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_20x20.png"/>
+        <bt:Image id="IconE.24x24" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_24x24.png"/>
+        <bt:Image id="IconE.32x32" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_32x32.png"/>
+        <bt:Image id="IconE.40x40" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_40x40.png"/>
+        <bt:Image id="IconE.48x48" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_48x48.png"/>
+        <bt:Image id="IconE.64x64" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_64x64.png"/>
+        <bt:Image id="IconE.80x80" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_80x80.png"/>
+        <bt:Image id="IconE.96x96" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_96x96.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
-        <bt:Url id="Swate.Core.Url" DefaultValue="https://swate.nfdi4plants.de/#BuildingBlock"/>
-        <bt:Url id="Swate.Experts.Url" DefaultValue="https://swate.nfdi4plants.de/#Experts/JsonExport"/>
+        <bt:Url id="Swate.Core.Url" DefaultValue="https://swate-alpha.nfdi4plants.org/#BuildingBlock"/>
+        <bt:Url id="Swate.Experts.Url" DefaultValue="https://swate-alpha.nfdi4plants.org/#Experts/JsonExport"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>

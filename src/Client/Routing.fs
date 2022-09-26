@@ -68,6 +68,13 @@ type Route =
         | Route.Validation | Route.TemplateMetadata | Route.JsonExport -> SwateEntry.Expert
         | _ -> SwateEntry.Core
 
+    member this.isActive(currentRoute: Route) =
+        let activeArr=
+            match this with
+            | Route.Protocol    -> [|Route.Protocol; Route.ProtocolSearch|]
+            | any               -> [|any|]
+        Array.contains currentRoute activeArr
+
     static member toIcon (p: Route)=
         let createElem icons name =
             Fable.React.Standard.span [ Fable.React.Props.HTMLAttr.Title name
@@ -117,7 +124,7 @@ module Routing =
             map Route.Settings              (s "Settings")
             map Route.SettingsXml           (s "Settings" </> s "Xml")
             map Route.NotFound              (s "NotFound")
-            /// Redirect
+            // Redirect
             map Route.Validation            (s "Experts")
             map Route.BuildingBlock         (s "Core")
         ]

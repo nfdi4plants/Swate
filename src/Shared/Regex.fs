@@ -25,15 +25,15 @@ module Regex =
         let IdPattern = "#\d+" //  @"(?<=#)\d+(?=[\)\]])" <- Cannot be used in IE11
 
         [<LiteralAttribute>]
-        /// This pattern captures characters between squared brackets, without id: Parameter [biological replicate#2] -> biological replicate
+        // <summary> This pattern captures characters between squared brackets, without id: Parameter [biological replicate#2] -> biological replicate</summary>
         let SquaredBracketsTermNamePattern = "\[.*\]" //  @"(?<= \[)[^#\]]*(?=[\]#])" <- Cannot be used in IE11
 
         [<LiteralAttribute>]
-        /// Used to get unit name from Excel numberFormat: 0.00 "degree Celsius"
+        // Used to get unit name from Excel numberFormat: 0.00 "degree Celsius"
         let DoubleQuotesPattern = "\"(.*?)\""
 
         [<LiteralAttribute>]
-        /// This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
+        // This pattern captures all input coming before an opening square bracket or normal bracket (with whitespace).
         let CoreNamePattern = "^[^[(]*"
 
         //// Hits term accession, without id, NEEDS brackets before and after: ENVO:01001831
@@ -42,7 +42,12 @@ module Regex =
 
         // Hits term accession, without id: ENVO:01001831
         [<LiteralAttribute>]
-        let TermAccessionPatternSimplified = @"[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
+        let TermAccessionPattern = @"[\w]+?:[\d]+"
+
+        // https://obofoundry.org/id-policy.html#mapping-of-owl-ids-to-obo-format-ids
+        // <summary>Regex pattern is designed to hit only Foundry-compliant URIs.</summary>
+        [<LiteralAttribute>]
+        let TermAccessionPatternURI = @"http://purl.obolibrary.org/obo/(?<idspace>[\w]+?)_(?<localid>[\d]+)"
 
     module Aux =
     
@@ -51,7 +56,7 @@ module Regex =
         /// (|Regex|_|) pattern input
         let (|Regex|_|) pattern input =
             let m = Regex.Match(input, pattern)
-            if m.Success then Some(m.Value)
+            if m.Success then Some(m)
             else None
 
     open Pattern
@@ -63,7 +68,7 @@ module Regex =
         match headerStr with
         | Regex SquaredBracketsTermNamePattern value ->
             // trim whitespace AND remove brackets
-            value.Trim().[1..value.Length-2]
+            value.Value.Trim().[1..value.Length-2]
             // remove #id pattern
             |> fun str -> Regex.Replace(str, IdPattern, "")
             |> Some 
@@ -73,7 +78,7 @@ module Regex =
     let parseCoreName (headerStr:string) =
         match headerStr with
         | Regex CoreNamePattern value ->
-            value.Trim()
+            value.Value.Trim()
             |> Some
         | _ ->
             None
@@ -87,10 +92,16 @@ module Regex =
     //    | _ ->
     //        None
 
-    let parseTermAccessionSimplified (headerStr:string) =
-        match headerStr with
-        | Regex TermAccessionPatternSimplified value ->
-            value.Trim().Replace('_',':')
+    /// <summary>This function can be used to extract `IDSPACE:LOCALID` (or: `Term Accession` from Swate header strings or obofoundry conform URI strings.</summary>
+    let parseTermAccession (headerStr:string) =
+        match headerStr.Trim() with
+        | Regex TermAccessionPattern value ->
+            value.Value.Trim()
+            |> Some
+        | Regex TermAccessionPatternURI value ->
+            let idspace = value.Groups.["idspace"].Value
+            let localid = value.Groups.["localid"].Value
+            idspace + ":" + localid
             |> Some
         | _ ->
             None
@@ -99,13 +110,13 @@ module Regex =
         match headerStr with
         | Regex DoubleQuotesPattern value ->
             // remove quotes at beginning and end of matched string
-            value.[1..value.Length-2].Trim()
+            value.Value.[1..value.Length-2].Trim()
             |> Some
         | _ ->
             None
 
     let getId (headerStr:string) =
         match headerStr with
-        | Regex IdPattern value -> value.Trim().[1..] |> Some
+        | Regex IdPattern value -> value.Value.Trim().[1..] |> Some
         | _ ->
             None

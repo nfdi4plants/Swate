@@ -24,7 +24,7 @@ let responsiveFaElement toggle fa faToggled =
                 if toggle then Opacity "0" else Opacity "1"
             ]]
             fa
-        ][]
+        ] []
         Fa.i [
             Fa.Props [Style [
                 Position PositionOptions.Absolute
@@ -36,7 +36,7 @@ let responsiveFaElement toggle fa faToggled =
                 if toggle then Transform "rotate(-180deg)" else Transform "rotate(0deg)"
             ]]
             faToggled
-        ][]
+        ] []
         // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
         Fa.i [
             Fa.Props [Style [
@@ -44,7 +44,7 @@ let responsiveFaElement toggle fa faToggled =
                 Opacity "0" 
             ]]
             fa
-        ][]
+        ] []
     ]
 
 let private createTriggeredId id =
@@ -89,7 +89,7 @@ let responsiveReturnEle id fa faToggled =
                 )
             ]
             fa
-        ][]
+        ] []
         Fa.i [
             Fa.Props [
                 Style [
@@ -113,7 +113,7 @@ let responsiveReturnEle id fa faToggled =
                 )
             ]
             faToggled
-        ][]
+        ] []
         // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
         Fa.i [
             Fa.Props [Style [
@@ -121,5 +121,5 @@ let responsiveReturnEle id fa faToggled =
                 Opacity "0" 
             ]]
             fa
-        ][]
+        ] []
     ]

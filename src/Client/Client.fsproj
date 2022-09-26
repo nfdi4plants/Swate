@@ -1,42 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
+        <TargetFramework>net6.0</TargetFramework>
         <DefineConstants>FABLE_COMPILER</DefineConstants>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-      <NoWarn>FS3369</NoWarn>
-      <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-      <NoWarn>FS3369</NoWarn>
-      <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
     </PropertyGroup>
     <ItemGroup>
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
-        <Compile Include="PageTemplate.md" />
         <Compile Include="Colors\NFDIColors.fs" />
         <Compile Include="Colors\ExcelColors.fs" />
+        <Compile Include="JsBindings\Cytoscape.fs" />
         <Compile Include="JsBindings\HumanReadableIds.fs" />
         <Compile Include="Api.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="OfficeInterop\InteropLogging.fs" />
         <Compile Include="OfficeInterop\CustomXmlTypes.fs" />
         <Compile Include="OfficeInterop\Functions\TemplateMetadataFunctions.fs" />
-        <Compile Include="OfficeInterop\Functions\TermCollectionFunctions.fs" />
         <Compile Include="OfficeInterop\Functions\ColHeaderIndexing.fs" />
         <Compile Include="OfficeInterop\Functions\BuildingBlockFunctions.fs" />
         <Compile Include="OfficeInterop\Functions\CustomXmlFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
+        <Compile Include="States\CytoscapeState.fs" />
         <Compile Include="States\DagState.fs" />
         <Compile Include="States\TemplateMetadataState.fs" />
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="CustomComponents\InteropLoggingModal.fs" />
         <Compile Include="CustomComponents\ActionButton.fs" />
         <Compile Include="CustomComponents\FunctionContainer.fs" />
         <Compile Include="CustomComponents\ResponsiveFA.fs" />
@@ -48,9 +41,11 @@
         <Compile Include="CustomComponents\ErrorModal.fs" />
         <Compile Include="CustomComponents\WarningModal.fs" />
         <Compile Include="CustomComponents\BuildingBlockDetailsModal.fs" />
-        <Compile Include="CustomComponents\PaginatedTable.fs" />
         <Compile Include="CustomComponents\AdvancedSearch.fs" />
         <Compile Include="CustomComponents\AutocompleteSearch.fs" />
+        <Compile Include="Pages\Cytoscape\CytoscapeGraph.fs" />
+        <Compile Include="Pages\Cytoscape\CytoscapeUpdate.fs" />
+        <Compile Include="Pages\Cytoscape\CytoscapeView.fs" />
         <Compile Include="Pages\BuildingBlock\BuildingBlockView.fs" />
         <Compile Include="Pages\TermSearch\TermSearchView.fs" />
         <Compile Include="Pages\ProtocolTemplates\ProtocolState.fs" />
@@ -73,6 +68,10 @@
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\Shared\Shared.fsproj" />
+    </ItemGroup>
+    <ItemGroup>
+        <!--This dependency via paket just kills neo4j connection and i have no idea why. 22.09.2022-->
+        <PackageReference Include="Feliz" Version="1.68.0" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

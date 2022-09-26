@@ -14,7 +14,7 @@ open CustomComponents
 open Fable.Core.JsInterop
 
 let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
-    let isActive = model.PageState.CurrentPage = pageLink
+    let isActive = pageLink.isActive(model.PageState.CurrentPage)
     Tabs.tab [Tabs.Tab.IsActive isActive] [
         a [ //Href (Routing.Route.toRouteUrl pageLink)
             Style [
@@ -29,15 +29,15 @@ let createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> 
             OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
         ] [
             Text.span [] [
-                span [Class "hideUnder775px"][str pageLink.toStringRdbl]
-                span [Class "hideOver775px"][pageLink |> Routing.Route.toIcon]
+                span [Class "hideUnder775px"] [str pageLink.toStringRdbl]
+                span [Class "hideOver775px"] [pageLink |> Routing.Route.toIcon]
             ]
 
         ]
     ]
 
 let tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
-    Tabs.tabs[
+    Tabs.tabs [
         Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
         Tabs.Props [
             Style [
@@ -59,7 +59,7 @@ let tabs (model:Model) dispatch =
             createNavigationTab Routing.Route.Protocol              model dispatch
             createNavigationTab Routing.Route.FilePicker            model dispatch
             if not isIEBrowser then
-                /// docsrc attribute not supported in iframe in IE
+                // docsrc attribute not supported in iframe in IE
                 createNavigationTab Routing.Route.Dag                   model dispatch
             createNavigationTab Routing.Route.Info                  model dispatch
         else
@@ -74,9 +74,9 @@ let tabs (model:Model) dispatch =
 //    tabRow model dispatch [ ]
 
 let footerContentStatic (model:Model) dispatch =
-    div [][
+    div [] [
         str "Swate Release Version "
-        a [Href "https://github.com/nfdi4plants/Swate/releases"][str model.PersistentStorageState.AppVersion]
+        a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
     ]
 
 let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement list) =
@@ -95,6 +95,7 @@ let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement
             MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"
         ]
     ] children
+
 
 /// The base react component for all views in the app. contains the navbar and takes body and footer components to create the full view.
 let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: ReactElement list) (footerChildren: ReactElement list) =
@@ -120,6 +121,12 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
             if model.BuildingBlockDetailsState.ShowDetails then
                 CustomComponents.BuildingBlockDetailsModal.buildingBlockDetailModal model dispatch
 
+            if not model.DevState.DisplayLogList.IsEmpty then
+                CustomComponents.InteropLoggingModal.interopLoggingModal model dispatch
+
+            if model.CytoscapeModel.ShowModal then
+                Cytoscape.View.view model dispatch
+
             yield! bodyChildren
 
             if footerChildren.IsEmpty |> not then
@@ -133,7 +140,8 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
                 ]
         ]
 
-        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]][
+        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]] [
             footerContentStatic model dispatch
         ]
+
     ]

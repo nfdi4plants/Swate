@@ -8,7 +8,7 @@ open Excel
 open GlobalBindings
 
 open Shared.OfficeInteropTypes
-open Shared.ProtocolTemplateTypes.TemplateMetadata
+open Shared.TemplateTypes.Metadata
 
 let private colorOuterBordersWhite (borderSeq:seq<RangeBorder>) =
     borderSeq
@@ -23,8 +23,6 @@ let private colorTopBottomBordersWhite (borderSeq:seq<RangeBorder>) =
         if border.sideIndex = U2.Case1 BorderIndex.EdgeBottom || border.sideIndex = U2.Case1 BorderIndex.EdgeTop then
             border.color <- NFDIColors.white
     )
-
-open Fable.Core.JsInterop
 
 let rec extendMetadataFields (metadatafields:MetadataField) =
     let children = metadatafields.Children |> List.collect extendMetadataFields
@@ -103,18 +101,22 @@ let createTemplateMetadataWorksheet (metadatafields:MetadataField) =
                 )
                 //sndColumn.format.fill.color                         <- ExcelColors.Excel.Tint40
                 sndColumnCells.[idValueIndex].format.fill.color     <- NFDIColors.Red.Base
-                let newComments (*(infoArr: {|Description:string; Name:string|} [])*) =
+                let newComments =
                     extended
                     |> Array.iteri (fun i info ->
                         if info.Description.IsSome && info.Description.Value <> "" then
                             let targetCellRange : U2<Range,string> = U2.Case1 fstColumnCells.[i]
                             let content : U2<CommentRichContent,string> = U2.Case2 info.Description.Value
-                            let comment = context.workbook.comments.add(targetCellRange, content, contentType =  ContentType.Plain)
+                            // WARNING!
+                            // If you use "let comment = ..." outside of this if-else case ONLY the comment with reply will be added
                             if i = idValueIndex then
+                                let comment = context.workbook.comments.add(targetCellRange, content, contentType =  ContentType.Plain)
                                 let reply : U2<CommentRichContent,string> = U2.Case2 $"id={newIdent.ToString()}"
                                 let _ = comment.replies.add(reply, contentType =  ContentType.Plain)
                                 ()
-                            ()
+                            else
+                                let comment = context.workbook.comments.add(targetCellRange, content, contentType =  ContentType.Plain)
+                                ()
                         else
                             ()
                     )

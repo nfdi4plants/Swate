@@ -1,11 +1,11 @@
 namespace Shared
 
-module ProtocolTemplateTypes =
+module TemplateTypes =
 
     open System
 
 
-    module TemplateMetadata =
+    module Metadata =
 
         [<Literal>]
         let TemplateMetadataWorksheetName = "SwateTemplateMetadata" 
@@ -67,13 +67,13 @@ module ProtocolTemplateTypes =
         let private name                    = MetadataField.create("Name", desc="The name of the Swate template.")
         let private version                 = MetadataField.create("Version", desc="The current version of this template in SemVer notation.")
         let private description             = MetadataField.create(DescriptionKey, desc ="The description of this template. Use few sentences for succinctness.")
-        let private docslink                = MetadataField.create("Docslink", desc="The URL to the documentation page.")
-        let private organisation            = MetadataField.create("Organisation", desc="The name of the template associated organisation.")
+        //let private docslink                = MetadataField.create("Docslink", desc="The URL to the documentation page.")
+        let private organisation            = MetadataField.create("Organisation", desc="""The name of the template associated organisation. "DataPLANT" will trigger the "DataPLANT" batch of honor for the template.""")
         let private table                   = MetadataField.create("Table", desc="The name of the Swate annotation table in the workbook of the template's excel file.")
         // er
-        let private er                      = MetadataField.create("ER",desc="A list of all ERs (endpoint repositories) targeted with this template. ERs are realized as Terms: <term ref here>",islist=true, children = [annotationValue; tan; tsr])
+        let private er                      = MetadataField.create("ER",desc="A list of all ERs (endpoint repositories) targeted with this template. ERs are realized as Terms.",islist=true, children = [annotationValue; tan; tsr])
         // tags
-        let private tags                    = MetadataField.create("Tags",desc="A list of all tags associated with this template. Tags are realized as Terms: <term ref here>", islist=true, children = [annotationValue; tan; tsr] )
+        let private tags                    = MetadataField.create("Tags",desc="A list of all tags associated with this template. Tags are realized as Terms.", islist=true, children = [annotationValue; tan; tsr] )
         // person
         let private lastName                = MetadataField.create("Last Name")
         let private firstName               = MetadataField.create("First Name")
@@ -83,33 +83,42 @@ module ProtocolTemplateTypes =
         let private fax                     = MetadataField.create("Fax")
         let private address                 = MetadataField.create("Address")
         let private affiliation             = MetadataField.create("Affiliation")
-        let private roles                   = MetadataField.create("Roles", islist = true, children = [annotationValue; tan; tsr])
-        let private authors                 = MetadataField.create("Authors",desc="The author(s) of this template.", islist = true, children = [lastName; firstName; midIntiials; email; phone; fax; address; affiliation; roles])
+        let private orcid                   = MetadataField.create("ORCID")
+        //let private roles                   = MetadataField.create("Role", children = [annotationValue; tan; tsr])
+        let private roleAnnotationValue     = MetadataField.create("Role")
+        let private roleTAN                 = MetadataField.create("Role Term Accession Number")
+        let private roleTSR                 = MetadataField.create("Role Term Source REF")
+        let private authors                 = MetadataField.create("Authors",desc="The author(s) of this template.", islist = true, children = [lastName; firstName; midIntiials; email; phone; fax; address; affiliation; orcid; roleAnnotationValue; roleTAN; roleTSR])
         // entry
-        let root = MetadataField.createWithExtendedKeys("",children=[id;name;version;description;docslink;organisation;table;er;tags;authors]) 
+        let root = MetadataField.createWithExtendedKeys("",children=[id;name;version;description;(*docslink;*)organisation;table;er;tags;authors]) 
 
-    type ProtocolTemplate = {
+    type Template = {
+        Id                      : string
         Name                    : string
-        Version                 : string
-        Created                 : System.DateTime
-        Author                  : string
         Description             : string
-        DocsLink                : string
+        Organisation            : string
+        Version                 : string
+        Authors                 : string
+        /// endpoint repository tags
+        Er_Tags                 : string []
         Tags                    : string []
         TemplateBuildingBlocks  : OfficeInteropTypes.InsertBuildingBlock list
+        LastUpdated             : System.DateTime
         Used                    : int
         // WIP
         Rating                  : int  
     } with
-        static member create name version created author desc docs tags templateBuildingBlocks used rating  = {
+        static member create id name describtion organisation version lastUpdated author ertags tags templateBuildingBlocks used rating  = {
+            Id                      = id
             Name                    = name
+            Description             = describtion
+            Organisation            = organisation
             Version                 = version
-            Created                 = created 
-            Author                  = author
-            Description             = desc
-            DocsLink                = docs
+            Authors                 = author
+            Er_Tags                 = ertags
             Tags                    = tags
             TemplateBuildingBlocks  = templateBuildingBlocks
+            LastUpdated             = lastUpdated 
             Used                    = used
             // WIP                  
             Rating                  = rating

@@ -14,7 +14,7 @@ var CONFIG = {
     // The tags to include the generated JS and CSS will be automatically injected in the HTML template
     // See https://github.com/jantimon/html-webpack-plugin
     indexHtmlTemplate: './src/Client/index.html',
-    fsharpEntry: './src/Client/Client.fs.js',
+    fsharpEntry: './src/Client/output/Client.fs.js',
     cssEntry: './src/Client/style.scss',
     outputDir: './deploy/public',
     assetsDir: './src/Client/public',
@@ -134,13 +134,15 @@ module.exports = {
         server: {
             type: 'https',
             options: {
-                key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
-                cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
-                ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
+                key: "C:/Users/Kevin/.office-addin-dev-certs/localhost.key",
+                cert: "C:/Users/Kevin/.office-addin-dev-certs/localhost.crt",
+                ca: "C:/Users/Kevin/.office-addin-dev-certs/ca.crt"
+                //key: "{USERFOLDER}/.office-addin-dev-certs/localhost.key",
+                //cert: "{USERFOLDER}/.office-addin-dev-certs/localhost.crt",
+                //ca: "{USERFOLDER}/.office-addin-dev-certs/ca.crt"
             },
         },
         proxy: CONFIG.devServerProxy,
-        hot: true,
         devMiddleware: {
             publicPath: CONFIG.publicPath
         },

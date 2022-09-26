@@ -15,18 +15,16 @@ module Protocol =
         // // ------ Process from file ------
         | ParseUploadedFileRequest ->
             let nextModel = { currentState with Loading = true }
-            let api =
-                match currentState.JsonExportType with
-                | JsonExportType.ProcessSeq ->
-                    Api.swateJsonAPIv1.parseProcessSeqToBuildingBlocks
-                | JsonExportType.Assay ->
-                    Api.swateJsonAPIv1.parseAssayJsonToBuildingBlocks
-                | JsonExportType.Table ->
-                    Api.swateJsonAPIv1.parseTableJsonToBuildingBlocks
-                | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
+            //let api =
+            //    match currentState.JsonExportType with
+            //    | JsonExportType.ProcessSeq ->
+            //        Api.swateJsonAPIv1.parseProcessSeqToBuildingBlocks
+            //    | JsonExportType.Assay ->
+            //        Api.swateJsonAPIv1.parseAssayJsonToBuildingBlocks
+            //    | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
             let cmd =
                 Cmd.OfAsync.either
-                    api
+                    Api.swateJsonAPIv1.tryParseToBuildingBlocks
                     currentState.UploadedFile
                     (ParseUploadedFileResponse >> ProtocolMsg)
                     (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
@@ -36,13 +34,13 @@ module Protocol =
                 match Array.tryExactlyOne buildingBlockTables with
                 | Some (_,buildingBlocks) ->
                     Cmd.OfPromise.either
-                        OfficeInterop.addAnnotationBlocks
+                        OfficeInterop.Core.addAnnotationBlocks
                         buildingBlocks
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 | None ->
                     Cmd.OfPromise.either
-                        OfficeInterop.addAnnotationBlocksInNewSheets
+                        OfficeInterop.Core.addAnnotationBlocksInNewSheets
                         buildingBlockTables
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -84,15 +82,15 @@ module Protocol =
                     Loading = false
             }
             nextState, Cmd.none
-        | GetProtocolByNameRequest protocolName ->
+        | GetProtocolByIdRequest templateId ->
             let cmd =
                 Cmd.OfAsync.either
-                    Api.protocolApi.getProtocolByName
-                    protocolName
-                    (GetProtocolByNameResponse >> ProtocolMsg)
+                    Api.protocolApi.getProtocolById
+                    templateId
+                    (GetProtocolByIdResponse >> ProtocolMsg)
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd
-        | GetProtocolByNameResponse prot -> 
+        | GetProtocolByIdResponse prot -> 
             let nextState = {
                 currentState with
                     ProtocolSelected = Some prot
@@ -100,11 +98,11 @@ module Protocol =
                     DisplayedProtDetailsId = None
             }
             nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.Protocol)
-        | ProtocolIncreaseTimesUsed protocolTemplateName ->
+        | ProtocolIncreaseTimesUsed templateId ->
             let cmd =
                 Cmd.OfAsync.attempt
-                    Api.protocolApi.increaseTimesUsed
-                    protocolTemplateName
+                    Api.protocolApi.increaseTimesUsedById
+                    templateId
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd
                 
@@ -133,14 +131,39 @@ module Protocol =
         | AddProtocolTag tagStr ->
             let nextState = {
                 currentState with
-                    ProtocolSearchTags      = tagStr::currentState.ProtocolSearchTags
+                    ProtocolFilterTags      = tagStr::currentState.ProtocolFilterTags
                     ProtocolTagSearchQuery  = ""
             }
             nextState, Cmd.none
         | RemoveProtocolTag tagStr ->
             let nextState = {
                 currentState with
-                    ProtocolSearchTags = currentState.ProtocolSearchTags |> List.filter (fun x -> x <> tagStr)
+                    ProtocolFilterTags = currentState.ProtocolFilterTags |> List.filter (fun x -> x <> tagStr)
+            }
+            nextState, Cmd.none
+        | AddProtocolErTag tagStr ->
+            let nextState = {
+                currentState with
+                    ProtocolFilterErTags      = tagStr::currentState.ProtocolFilterErTags
+                    ProtocolTagSearchQuery  = ""
+            }
+            nextState, Cmd.none
+        | RemoveProtocolErTag tagStr ->
+            let nextState = {
+                currentState with
+                    ProtocolFilterErTags = currentState.ProtocolFilterErTags |> List.filter (fun x -> x <> tagStr)
+            }
+            nextState, Cmd.none
+        | UpdateCuratedCommunityFilter nextFilter ->
+            let nextState = {
+                currentState with
+                    CuratedCommunityFilter = nextFilter
+            }
+            nextState, Cmd.none
+        | UpdateTagFilterIsAnd isAnd ->
+            let nextState = {
+                currentState with
+                    TagFilterIsAnd = isAnd
             }
             nextState, Cmd.none
         | RemoveSelectedProtocol ->

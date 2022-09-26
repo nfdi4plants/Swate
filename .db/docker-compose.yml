@@ -3,18 +3,32 @@ version: '3.9'
 
 services:
 
-  db:
-    # newer version fail with .net
-    image: mariadb:10.4
-    # command: --default-authentication-plugin=mysql_native_password
+  neo4j:
+    container_name: neo4j_db
+    image: neo4j
     volumes:
-      - ./mysql-dump:/docker-entrypoint-initdb.d
+      - ./data:/data
+      - ./plugins:/plugins
+      - ./import:/import
+    ports:
+      - "7474:7474"
+      - "7687:7687"
     environment:
-      MYSQL_ROOT_PASSWORD: {PASSWORD}
-    ports:
-        - 42333:3306
-
-  adminer:
-    image: adminer
-    ports:
-        - 8085:8080
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,algo.*
+      - NEO4J_dbms_memory_heap_initial__size=4G
+      - NEO4J_dbms_memory_heap_max__size=16G
+      - NEO4J_apoc_uuid_enabled=true
+      - NEO4J_dbms_default__listen__address=0.0.0.0
+      - NEO4J_dbms_allow__upgrade=true
+      - NEO4J_dbms_default__database=SwateDB
+      - NEO4J_AUTH=neo4j/test
+      - NEO4J_dbms_transaction_concurrent_maximum=0
+      - NEO4JLABS_PLUGINS=["graph-data-science", "apoc"]
+    networks: ["Neo4j-Swate"]
+    restart: unless-stopped
+networks: { Neo4j-Swate: {} }
+# use docker volume to persist data outside of a container.
+volumes:
+  Neo4j-Swate:

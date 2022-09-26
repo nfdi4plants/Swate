@@ -24,11 +24,11 @@ let warningModal (model:Model) dispatch =
         ] [
             Notification.delete [
                 Props [OnClick closeMsg]
-            ][]
-            Field.div [][
+            ] []
+            Field.div [] [
                 str message
             ]
-            Field.div [][
+            Field.div [] [
                 Button.a [
                     Button.Color IsWarning
                     Button.Props [Style [Float FloatOptions.Right]]
@@ -36,7 +36,7 @@ let warningModal (model:Model) dispatch =
                         UpdateWarningModal None |> dispatch
                         model.WarningModal.Value.NextMsg |> dispatch
                     )
-                ][
+                ] [
                     str "Continue"
                 ]
             ]

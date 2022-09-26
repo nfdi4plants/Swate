@@ -14,15 +14,21 @@ open Browser.Types
 //TO-DO: Save log as tab seperated file
 
 let debugBox model dispatch =
-    Box.box' [][
+    Box.box' [] [
+        //Button.button [
+        //    Button.Color Color.IsInfo
+        //    Button.IsFullWidth
+        //    Button.OnClick (fun e -> OfficeInterop.TryExcel |> OfficeInteropMsg |> dispatch )
+        //    Button.Props [Style [MarginBottom "1rem"]]
+        //] [
+        //    str "Try Excel"
+        //]
         Button.button [
-            Button.Color Color.IsInfo
-            Button.IsFullWidth
-            Button.OnClick (fun e -> OfficeInterop.TryExcel |> OfficeInteropMsg |> dispatch )
-            Button.Props [Style [MarginBottom "1rem"]]
-        ] [
-            str "Try Excel"
-        ]
+            Button.OnClick(fun e -> TestMyAPI |> dispatch)
+        ] [str "Test api"]
+        Button.button [
+            Button.OnClick(fun e -> TestMyPostAPI |> dispatch)
+        ] [str "Test post api"]
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth
@@ -39,17 +45,17 @@ let debugBox model dispatch =
         //        let nM = {|ModalMessage = message; NextMsg = msg|} |> Some
         //        UpdateWarningModal nM |> dispatch
         //    )
-        //][
+        //] [
         //    str "Test"
         //]
-        Label.label [][str "Dangerzone"]
+        Label.label [] [str "Dangerzone"]
         Container.container [
             Container.Props [Style [
                 Padding "1rem"
                 Border (sprintf "2.5px solid %s" NFDIColors.Red.Base)
                 BorderRadius "10px"
             ]]
-        ][
+        ] [
             Button.a [
                 Button.Color Color.IsWarning
                 Button.IsFullWidth
@@ -65,18 +71,18 @@ let debugBox model dispatch =
                 Button.Props [Style []; Title "Be sure you know what you do. This cannot be undone!"]
             ] [
                 Icon.icon [ ] [
-                    Fa.i [Fa.Solid.ExclamationTriangle][]
+                    Fa.i [Fa.Solid.ExclamationTriangle] []
                 ]
                 span [] [str "Delete All Custom Xml!"]
                 Icon.icon [ ] [
-                    Fa.i [Fa.Solid.ExclamationTriangle][]
+                    Fa.i [Fa.Solid.ExclamationTriangle] []
                 ]
             ]
         ]
     ]
 
 let activityLogComponent (model:Model) dispatch =
-    div [][
+    div [] [
 
         Label.label [Label.Size IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Activity Log"]
 
@@ -90,7 +96,7 @@ let activityLogComponent (model:Model) dispatch =
                 Padding "0.25rem 1rem"
                 MarginBottom "1rem"
             ]
-        ][
+        ] [
             Table.table [
                 Table.IsFullWidth
                 Table.Props [ExcelColors.colorBackground model.SiteStyleState.ColorMode]
