@@ -342,16 +342,15 @@ let autocompleteTermSearchComponentOfParentOntology
 
     =
     let parentOntologyNotificationElement show =
-        Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]] [
+        let parenTermText = if model.TermSearchState.ParentOntology.IsSome then model.TermSearchState.ParentOntology.Value.Name else ""
+        Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]; Control.Props [Title parenTermText; Style [MaxWidth "40%"]]] [
             Button.button [
                 Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]
                 Button.IsStatic true
                 match inputSize with
                 | Some size -> Button.Size size
                 | _ -> ()
-            ] [str (
-                sprintf "%A" (if model.TermSearchState.ParentOntology.IsSome then model.TermSearchState.ParentOntology.Value.Name else "") 
-            )]
+            ] [str parenTermText ]
         ]
 
     Control.div [] [
