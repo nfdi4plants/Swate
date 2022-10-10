@@ -197,9 +197,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
-            WITH node
-            MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {accession: $Accession}) 
-            RETURN child.accession, child.name, child.definition, child.is_obsolete"""
+            WHERE EXISTS ( (:Term {accession: $Accession})<-[*1..]-(node) )
+            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Accession", parentAccession; 
@@ -209,14 +208,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("child")),
+                (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("child")),
+                (Term.asTerm("node")),
                 credentials.Value
             )
 
@@ -230,9 +229,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
-            WITH node
-            MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {accession: $Accession}) 
-            RETURN child.accession, child.name, child.definition, child.is_obsolete"""
+            WHERE EXISTS ( (:Term {accession: $Accession})<-[*1..]-(node) )
+            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Accession", parent.TermAccession; 
@@ -242,14 +240,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("child")),
+                (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("child")),
+                (Term.asTerm("node")),
                 credentials.Value
             )
 
@@ -263,9 +261,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
-            WITH node
-            MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {accession: $Accession}) 
-            RETURN child.accession, child.name, child.definition, child.is_obsolete"""
+            WHERE EXISTS ( (:Term {accession: $Accession})<-[*1..]-(node) )
+            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Accession", parentAccession.TermAccession; 
@@ -275,14 +272,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("child")),
+                (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("child")),
+                (Term.asTerm("node")),
                 credentials.Value
             )
 
@@ -295,9 +292,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
-            WITH node
-            MATCH (child:Term {accession: node.accession})-[*1..]->(a:Term {name: $Name}) 
-            RETURN child.accession, child.name, child.definition, child.is_obsolete"""
+            WHERE EXISTS ( (:Term {name: $Name})<-[*1..]-(node) )
+            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Name", parentName; 
@@ -307,14 +303,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("child")),
+                (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("child")),
+                (Term.asTerm("node")),
                 credentials.Value
             )
 
@@ -351,9 +347,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
-            WITH node
-            MATCH (:Term {accession: $Accession})-[*1..]->(parent:Term {accession: node.accession})
-            RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete"""
+            WHERE EXISTS ( (:Term {accession: $Accession})-[*1..]->(node) )
+            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Accession", childAccession; 
@@ -363,14 +358,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("parent")),
+                (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("parent")),
+                (Term.asTerm("node")),
                 credentials.Value
             )
 
@@ -384,9 +379,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
-            WITH node
-            MATCH (:Term {name: $Name})-[*1..]->(parent:Term {accession: node.accession})
-            RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete"""
+            WHERE EXISTS ( (:Term {name: $Name})-[*1..]->(node) )
+            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Name", childName; 
@@ -396,14 +390,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("parent")),
+                (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
                 query,
                 param,
-                (Term.asTerm("parent")),
+                (Term.asTerm("node")),
                 credentials.Value
             )
 
