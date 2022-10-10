@@ -212,7 +212,9 @@ let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
                         Term.Term(credentials).getByAccession foundAccession.Value
                     // This suggests we search for a term name
                     | notAnAccession ->
-                        Term.Term(credentials).getByName notAnAccession
+                        let searchTextLength = typedSoFar.Length
+                        let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+                        Term.Term(credentials).getByName(notAnAccession, searchmode)
                     |> Array.ofSeq
                     |> sorensenDiceSortTerms typedSoFar
                 let arr = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
