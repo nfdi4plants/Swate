@@ -20,7 +20,8 @@ with
             let s = queryString.Split(" ", StringSplitOptions.RemoveEmptyEntries)
             s
             // add "+" to every word so the fulltext search must include the previous word, this highly improves search performance
-            |> Array.mapi (fun i str -> if i <> s.Length-1 then "+" + str else str + "*")
+            // Searchquality is further improved by $"({str}^4 OR {str}*)". So it will value perfect hits higher then autocomplete hits.
+            |> Array.mapi (fun i str -> if i <> s.Length-1 then "+" + str else $"({str}^4 OR {str}*)")
             |> String.concat " "
         | Fuzzy         -> queryString.Replace(" ","~ ") + "~"
             

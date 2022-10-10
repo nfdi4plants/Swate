@@ -187,6 +187,17 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 credentials.Value
             )
 
+    static member private byParentQuery_Accession =
+        /// 1. Search for fitting terms first (db.index.fulltext.queryNodes, TermName)
+        /// 2. Limit search results by 50. If there are too many results it will reduce kill searchspeed when checking for relationship per searchresult (example: "growth", parent: "NFDI4PSO:1000161")
+        /// 2.5 It is possible to do (:Term {accession: $Accession})<-[*1..]-(node) but this will die whenever there are too many relationships (example: "arabidopsis", parent: "OBI:0100026")
+        /// Therefore i follow the assumption to limit n of searchresult, as they are sorted by best fit already, so whenever the user is close to the result he will get the desired search results.
+        """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+        YIELD node
+        WITH node LIMIT 50
+        WHERE EXISTS ( (node)-[*1..]->(:Term {accession: $Accession}) )
+        RETURN node.accession, node.name, node.definition, node.is_obsolete"""
+
     /// Searchtype defaults to "get child term suggestions with auto complete"
     member this.getByNameAndParent(termName:string,parentAccession:string,?searchType:FullTextSearch) =
         let fulltextSearchStr =
@@ -194,11 +205,6 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 searchType.Value.ofQueryString termName
             else
                 FullTextSearch.Complete.ofQueryString termName
-        let query =
-            """CALL db.index.fulltext.queryNodes("TermName", $Search) 
-            YIELD node
-            WHERE EXISTS ( (:Term {accession: $Accession})<-[*1..]-(node) )
-            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Accession", parentAccession; 
@@ -206,14 +212,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             ] |> Some
         if session.IsSome then
             Neo4j.runQuery(
-                query,
+                Term.byParentQuery_Accession,
                 param,
                 (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
-                query,
+                Term.byParentQuery_Accession,
                 param,
                 (Term.asTerm("node")),
                 credentials.Value
@@ -226,11 +232,6 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 searchType.Value.ofQueryString term.Name
             else
                 FullTextSearch.Complete.ofQueryString term.Name
-        let query =
-            """CALL db.index.fulltext.queryNodes("TermName", $Search) 
-            YIELD node
-            WHERE EXISTS ( (:Term {accession: $Accession})<-[*1..]-(node) )
-            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Accession", parent.TermAccession; 
@@ -238,14 +239,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             ] |> Some 
         if session.IsSome then
             Neo4j.runQuery(
-                query,
+                Term.byParentQuery_Accession,
                 param,
                 (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
-                query,
+                Term.byParentQuery_Accession,
                 param,
                 (Term.asTerm("node")),
                 credentials.Value
@@ -253,31 +254,28 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     // Searchtype defaults to "get child term suggestions with auto complete"
     member this.getByNameAndParent(termName:string,parentAccession:TermMinimal,?searchType:FullTextSearch) =
+        printfn "hit"
         let fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
                 FullTextSearch.Complete.ofQueryString termName
-        let query =
-            """CALL db.index.fulltext.queryNodes("TermName", $Search) 
-            YIELD node
-            WHERE EXISTS ( (:Term {accession: $Accession})<-[*1..]-(node) )
-            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
                 "Accession", parentAccession.TermAccession; 
                 "Search", fulltextSearchStr
             ] |> Some
+        printfn "%A" param
         if session.IsSome then
             Neo4j.runQuery(
-                query,
+                Term.byParentQuery_Accession,
                 param,
                 (Term.asTerm("node")),
                 session = session.Value
             )
         else
             Neo4j.runQuery(
-                query,
+                Term.byParentQuery_Accession,
                 param,
                 (Term.asTerm("node")),
                 credentials.Value
@@ -292,6 +290,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
+            WITH node LIMIT 50
             WHERE EXISTS ( (:Term {name: $Name})<-[*1..]-(node) )
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
@@ -347,6 +346,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
+            WITH node LIMIT 50
             WHERE EXISTS ( (:Term {accession: $Accession})-[*1..]->(node) )
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
@@ -379,6 +379,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             """CALL db.index.fulltext.queryNodes("TermName", $Search) 
             YIELD node
+            WITH node LIMIT 50
             WHERE EXISTS ( (:Term {name: $Name})-[*1..]->(node) )
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
