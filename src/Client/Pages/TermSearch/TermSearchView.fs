@@ -28,11 +28,10 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 
     | SearchTermTextChange newTerm ->
 
-        let triggerNewSearch =
-            newTerm.Length > 2
+        let triggerNewSearch = newTerm.Trim() <> ""
        
         let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
+            (System.TimeSpan.FromSeconds 1.),
             "GetNewTermSuggestions",
             (
                 if triggerNewSearch then

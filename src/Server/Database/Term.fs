@@ -28,20 +28,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
-                FullTextSearch.Complete.ofQueryString termName
+                FullTextSearch.PerformanceComplete.ofQueryString termName
         let query =
             let sourceOntologyText = """ WHERE EXISTS((:Term {accession: node.accession})-[:CONTAINED_IN]->(:Ontology {name: $OntologyName})) """
-            if searchType.IsSome && searchType.Value = FullTextSearch.Exact then
-                sprintf
-                    """MATCH (node:Term {name: $Name})%s
-                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
-                    (if sourceOntologyName.IsSome then sourceOntologyText else "")
-            else
-                sprintf
-                    """CALL db.index.fulltext.queryNodes("TermName",$Name)
-                    YIELD node%s
-                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
-                    (if sourceOntologyName.IsSome then sourceOntologyText else "")
+            sprintf
+                """CALL db.index.fulltext.queryNodes("TermName",$Name)
+                YIELD node%s
+                RETURN node.accession, node.name, node.definition, node.is_obsolete"""
+                (if sourceOntologyName.IsSome then sourceOntologyText else "")
         let param =
             Map [
                 "Name",fulltextSearchStr
