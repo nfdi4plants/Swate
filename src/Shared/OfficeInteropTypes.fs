@@ -74,7 +74,7 @@ module OfficeInteropTypes =
         member this.getFeaturedColumnAccession =
             if this.isFeaturedColumn then
                 match this with
-                | ProtocolType -> "NFDI4PSO:1000161"
+                | ProtocolType -> "DPBO:1000161"
                 | _ -> failwith "This cannot happen"
             else
                 failwith $"'{this}' is not listed as featured column type! No referenced accession available."
