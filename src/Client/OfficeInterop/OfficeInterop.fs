@@ -582,7 +582,6 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
                 // This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
                 // This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
-                let checkIdForMainCol() = OfficeInterop.Indexing.MainColumn.findNewIdForColumn allColHeaders newBB
                 let checkIdForRefCols() = OfficeInterop.Indexing.RefColumns.findNewIdForReferenceColumns allColHeaders newBB
                 let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit allColHeaders
 
@@ -626,7 +625,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                             formatChangedMsg <- (InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}")::formatChangedMsg
                             columnBody.numberFormat <- formats
                         else
-                            let format = createValueMatrix 1 (rowCount-1) "General"
+                            let format = createValueMatrix 1 (rowCount-1) "@"
                             columnBody.numberFormat <- format
                         // hide freshly created column if it is a reference column
                         if colName <> mainColName then
@@ -1054,13 +1053,15 @@ let updateUnitForCells (unitTerm:TermMinimal) =
                         let format = unitTerm.toNumberFormat
                         let formats = createValueMatrix 1 (int tableRange.rowCount - 1) format
                         mainCol.numberFormat <- formats
+                        
                         InteropLogging.Msg.create InteropLogging.Info $"Created Unit Column {unitColName} for building block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader}."
                     )
                 else
-                    failwith $"You can only add unit to building blocks of the type: {BuildingBlockType.Parameter}, {BuildingBlockType.Characteristic}, {BuildingBlockType.Factor}, {BuildingBlockType.Component}"
-
+                    failwith $"You can only add unit to building blocks of the type: {BuildingBlockType.TermColumns}"
+            let! _ = autoFitTable true context
             return [updateWithUnit]
         }
+
     )
 
 /// <summary>This function removes a given building block from a given annotation table.

@@ -42,7 +42,7 @@ module OfficeInteropTypes =
         // Single Columns
         | ProtocolREF
 
-        static member listAll = [
+        static member All = [
             Parameter; Factor; Characteristic; Component
             //input
             Source;
@@ -64,6 +64,10 @@ module OfficeInteropTypes =
         ///<summary>The name "TermColumn" refers to all columns with the syntax "Parameter/Factor/etc [TERM-NAME]"</summary>
         member this.isTermColumn =
             match this with | Parameter | Factor | Characteristic | Component -> true | anythingElse -> false
+
+        static member TermColumns = BuildingBlockType.All |> List.filter (fun x -> x.isTermColumn)
+        static member InputColumns = BuildingBlockType.All |> List.filter (fun x -> x.isInputColumn)
+        static member OutputColumns = BuildingBlockType.All |> List.filter (fun x -> x.isOutputColumn)
 
         /// <summary>This function returns true if the BuildingBlockType is a featured column. A featured column can
         /// be abstracted by Parameter/Factor/Characteristics and describes one common usecase of either.
@@ -245,7 +249,7 @@ module OfficeInteropTypes =
     } with
         static member create headerString = { SwateColumnHeader = headerString }
         member this.isMainColumn =
-            let isExistingType = BuildingBlockType.listAll |> List.tryFind (fun t -> this.SwateColumnHeader.StartsWith t.toString)
+            let isExistingType = BuildingBlockType.All |> List.tryFind (fun t -> this.SwateColumnHeader.StartsWith t.toString)
             match isExistingType with
             | Some t    -> true
             | None      -> false
