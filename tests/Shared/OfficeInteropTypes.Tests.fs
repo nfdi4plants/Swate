@@ -34,7 +34,7 @@ let buildingBlockTypes = testList "BuildingBlockTypes" [
         Expect.isFalse header.isTSRCol "isTSRCol"
         Expect.isFalse header.isTermColumn "isTermColumn"
 
-        Expect.equal header.getFeaturedColAccession "NFDI4PSO:1000161" ""
+        Expect.equal header.getFeaturedColAccession "DPBO:1000161" ""
 
     testCase "Protocol REF" <| fun _ ->
         let header = {SwateColumnHeader = BuildingBlockType.ProtocolREF.toString}
