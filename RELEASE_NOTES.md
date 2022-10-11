@@ -1,8 +1,9 @@
-### 0.6.2+807e643 (Released 2022-10-10)
+### 0.6.2+f98ebb4 (Released 2022-10-11)
 * Additions:
     * [[#4c9a625](https://github.com/nfdi4plants/Swate/commit/4c9a625f51128808d33371cf8dd3d49bb147a9ca)] Improve relationship search performance (Issue #228).
     * [[#13720b4](https://github.com/nfdi4plants/Swate/commit/13720b43da382f55a1f47265b4378070111f317b)] Update Protocol Type column to DPBO.
 * Bugfixes:
+    * [[#28f5bc8](https://github.com/nfdi4plants/Swate/commit/28f5bc8dfe3bd46c10bcbb80b8d8f40a1a735f4e)] Fix wrong shift of ref cols (Issue #231) and change default cell type to "text".
     * [[#2a910e1](https://github.com/nfdi4plants/Swate/commit/2a910e1dfd7176265b7eda9f7ff72deebf865efc)] Fix duplicate results and further improve search performance (Issue #230, #228) :bug::racehorse:
     * [[#b09058d](https://github.com/nfdi4plants/Swate/commit/b09058da8aeef94d38d0f47654590e6254f9d2f1)] Remove min length constraint on term search (Issue #226) :bug:
     * [[#807e643](https://github.com/nfdi4plants/Swate/commit/807e643e59eb2739da1520f5e51d8186482eaa04)] Fix term search field size when parent term name too long (Issue #225) :bug:
