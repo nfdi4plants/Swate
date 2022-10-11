@@ -122,6 +122,8 @@ module Docker =
     let dockerImageName = "freymaurer/swate"
     let dockerContainerName = "swate"
 
+    // Change target to github-packages
+    // https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
     Target.create "docker-publish" (fun _ ->
         let releaseNotesPath = "RELEASE_NOTES.md"
         let port = "5000"
