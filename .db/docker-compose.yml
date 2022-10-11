@@ -1,34 +1,70 @@
-# DEFAULT: Use root/example as user/password credentials
-version: '3.9'
-
+ 
+version: '3.8'
 services:
-
-  neo4j:
-    container_name: neo4j_db
-    image: neo4j
-    volumes:
-      - ./data:/data
-      - ./plugins:/plugins
-      - ./import:/import
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis
+    restart: always
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - '127.0.0.1:6379:6379'
+    command: redis-server --save 20 1 --loglevel warning
+    volumes:
+      - ./cache:/data
+    networks:
+      - swobup_network
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
+    ports:
+      - "0.0.0.0:7474:7474"
+      - "0.0.0.0:7687:7687"
+    networks:
+      - swobup_network
     environment:
-      - NEO4J_apoc_export_file_enabled=true
-      - NEO4J_apoc_import_file_enabled=true
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,algo.*
+      - NEO4J_AUTH=neo4j/test
+      - NEO4J_dbms_memory_pagecache_size=2G
       - NEO4J_dbms_memory_heap_initial__size=4G
       - NEO4J_dbms_memory_heap_max__size=16G
-      - NEO4J_apoc_uuid_enabled=true
       - NEO4J_dbms_default__listen__address=0.0.0.0
-      - NEO4J_dbms_allow__upgrade=true
-      - NEO4J_dbms_default__database=SwateDB
-      - NEO4J_AUTH=neo4j/test
-      - NEO4J_dbms_transaction_concurrent_maximum=0
+      - NEO4J_dbms_default__advertised__address=10.20.51.223
+      - NEO4J_dbms.connector.bolt.address=0.0.0.0:7687
       - NEO4JLABS_PLUGINS=["graph-data-science", "apoc"]
-    networks: ["Neo4j-Swate"]
+      - NEO4J_dbms_security_procedures_unrestricted=algo.*, apoc.*
+    volumes:
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+      - ./neo4j/import:/var/lib/neo4j/import
+      - ./neo4j/plugins:/plugins
     restart: unless-stopped
-networks: { Neo4j-Swate: {} }
-# use docker volume to persist data outside of a container.
-volumes:
-  Neo4j-Swate:
+  swobup:
+    container_name: swobup
+    environment:
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
+      - CELERY_S3_BUCKET=frct-swobupdev
+      - SWOBUP_USERNAME=swobup
+      - SWOBUP_PASSWORD=test
+      - SWOBUP_DATASTORAGE=local
+      - GITHUB_SECRET=test
+      - DB_URL=bolt://neo4j:7687
+      - DB_USER=neo4j
+      - DB_PASSWORD=test
+      - ONTOLOGY_REPOSITORY=nfdi4plants/nfdi4plants_ontology
+      - TEMPLATE_REPOSITORY=nfdi4plants/SWATE_templates
+      - SWATE_API=https://192.168.65.2:3000
+      - TURN_OFF_SSL_VERIFY=True
+      - MAIL_NOTIFICATION=off
+    image: git.bwcloud.uni-freiburg.de:5050/marcel/swobup:latest
+    # https://medium.com/@TimvanBaarsen/how-to-connect-to-the-docker-host-from-inside-a-docker-container-112b4c71bc66#:~:text=As%20of%20Docker%20version%2018.03,on%20Linux%20until%20Docker%2020.10.
+    extra_hosts:
+    # cat /etc/hosts , as bash command in container
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+      - "1111:1111"
+    networks:
+      - swobup_network
+
+networks:
+  swobup_network:
+    driver: bridge
