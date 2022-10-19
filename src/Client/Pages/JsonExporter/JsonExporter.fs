@@ -1,10 +1,8 @@
-[<AutoOpen>]
 module JsonExporter.Core
 
 open Fable.React
 open Fable.React.Props
 open Fulma
-open Fulma.Extensions.Wikiki
 open Fable.FontAwesome
 open Fable.Core.JsInterop
 open Elmish
@@ -14,13 +12,10 @@ open Shared
 open ExcelColors
 open Model
 
-open Shared.OfficeInteropTypes
-open Validation
 open Messages
-open JsonExporter
+open JsonExporter.State
 
 open Browser.Dom
-open Fable.Core.JsInterop
 
 let download(filename, text) =
   let element = document.createElement("a");

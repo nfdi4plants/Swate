@@ -1,4 +1,4 @@
-namespace JsonExporter
+module JsonExporter.State
 
 open Shared
 open Shared.OfficeInteropTypes

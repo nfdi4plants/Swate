@@ -212,7 +212,7 @@ type Model = {
     BuildingBlockDetailsState   : BuildingBlockDetailsState
     ///Used to manage all custom xml settings
     SettingsXmlState            : SettingsXml.Model
-    JsonExporterModel           : JsonExporter.Model
+    JsonExporterModel           : JsonExporter.State.Model
     TemplateMetadataModel       : TemplateMetadata.Model
     DagModel                    : Dag.Model
     CytoscapeModel              : Cytoscape.Model
@@ -222,7 +222,7 @@ type Model = {
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
-    member this.updateByJsonExporterModel (m:JsonExporter.Model) =
+    member this.updateByJsonExporterModel (m:JsonExporter.State.Model) =
         { this with JsonExporterModel = m}
     member this.updateByTemplateMetadataModel (m:TemplateMetadata.Model) =
         { this with TemplateMetadataModel = m}
@@ -243,7 +243,7 @@ type Msg =
 | BuildingBlockMsg      of BuildingBlock.Msg
 | ValidationMsg         of Validation.Msg
 | ProtocolMsg           of Protocol.Msg
-| JsonExporterMsg       of JsonExporter.Msg
+| JsonExporterMsg       of JsonExporter.State.Msg
 | TemplateMetadataMsg   of TemplateMetadata.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | SettingsXmlMsg        of SettingsXml.Msg
@@ -294,7 +294,7 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
         SettingsXmlState            = SettingsXml.Model         .init ()
         SettingsDataStewardState    = SettingsDataStewardState  .init ()
-        JsonExporterModel           = JsonExporter.Model        .init ()
+        JsonExporterModel           = JsonExporter.State.Model  .init ()
         TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         DagModel                    = Dag.Model                 .init ()
         CytoscapeModel              = Cytoscape.Model           .init ()
