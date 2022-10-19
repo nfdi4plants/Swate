@@ -1,5 +1,6 @@
-### 0.6.2+f98ebb4 (Released 2022-10-11)
+### 0.6.2+6a4f5b0 (Released 2022-10-19)
 * Additions:
+    * [[#b0cd88f](https://github.com/nfdi4plants/Swate/commit/b0cd88f082e20200e1e1f8bf7661f849f7c2f54c)] Update docker-compose
     * [[#4c9a625](https://github.com/nfdi4plants/Swate/commit/4c9a625f51128808d33371cf8dd3d49bb147a9ca)] Improve relationship search performance (Issue #228).
     * [[#13720b4](https://github.com/nfdi4plants/Swate/commit/13720b43da382f55a1f47265b4378070111f317b)] Update Protocol Type column to DPBO.
 * Bugfixes:
