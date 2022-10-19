@@ -21,7 +21,6 @@ release.sh
 /.db/plugins
 /.db/import
 /.assets/swate-b-quickstart.zip
-/.assets/swate-win.zip
 .vscode/
 /.db/cache
 /.db/neo4j
