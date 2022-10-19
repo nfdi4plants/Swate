@@ -70,7 +70,7 @@ module ReleaseNoteTasks =
 
     let githubDraft = Target.create "GithubDraft" (fun config ->
 
-        let zipFolderPath = @".assets"
+        let zipFolderPath = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@"..\.assets")
 
         let cleanFolder =
             Trace.trace $"Clean existing .zip files from '{Path.getFullName(zipFolderPath)}'!"
@@ -80,7 +80,7 @@ module ReleaseNoteTasks =
             |> Array.map (fun x -> x.FullName)
             |> File.deleteAll
 
-        let assetPath = System.IO.Path.Combine(__SOURCE_DIRECTORY__,@".assets\assets")
+        let assetPath = System.IO.Path.Combine(zipFolderPath, "assets")
         let assetDir = Fake.IO.DirectoryInfo.ofPath assetPath
 
         let allFiles, quickstartFiles =
@@ -88,9 +88,13 @@ module ReleaseNoteTasks =
             assetsPaths |> Array.map (fun x -> x.FullName),
             assetsPaths |> Array.filter (fun x -> x.Name = "core_manifest.xml") |> Array.map (fun x -> x.FullName)
 
-        Zip.zip assetDir.FullName ".assets\swate-win.zip" allFiles
+        let zipFile = System.IO.Path.Combine(zipFolderPath, "swate-win.zip")
 
-        Zip.zip assetDir.FullName ".assets\swate-b-quickstart.zip" (quickstartFiles)
+        let quickStartZipFile = System.IO.Path.Combine(zipFolderPath, "swate-b-quickstart.zip")
+
+        Zip.zip assetDir.FullName zipFile allFiles
+
+        Zip.zip assetDir.FullName quickStartZipFile (quickstartFiles)
 
         Trace.trace "Assets zipped!"
 
