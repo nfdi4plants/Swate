@@ -18,6 +18,7 @@ let all =
 #endif
             BuildingBlockFunctions.Tests.tests_buildingBlockFunctions
             BuildingBlockView.Tests.tests_BuildingBlockView
+            FilePickerView.Tests.tests_FilePickerView_PathRerooting
             client
         ]
 

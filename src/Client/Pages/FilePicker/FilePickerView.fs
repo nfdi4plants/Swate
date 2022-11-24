@@ -404,6 +404,41 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
 //                dragAndDropClone model dispatch (ele)
 //    ]
 
+/// This logic only works as soon as we can access electron. Will not work in Browser.
+module PathRerooting =
+
+    open Fable.Core
+    open Fable.Core.JsInterop
+
+    let private normalizePath (path:string) =
+        path.Replace('\\','/')
+
+    let listOfSupportedDirectories = ["studies"; "assays"; "workflows"; "runs"] 
+
+    let private matchesSupportedDirectory (str:string) =
+        listOfSupportedDirectories |> List.contains str
+
+    /// <summary>Normalizes path and searches for 'listOfSupportedDirectories' (["studies"; "assays"; "workflows"; "runs"]) in path. reroots path to parent of supported directory if found
+    /// else returns only file name.</summary>
+    let rerootPath (path:string) =
+        let sep = '/'
+        let path = normalizePath path // shadow path variable to normalized
+        let splitPath = path.Split(sep)
+        let tryFindLevel = Array.tryFindIndexBack (fun x -> matchesSupportedDirectory x) splitPath
+        match tryFindLevel with
+        // if we cannot find any of `listOfSupportedDirectories` we just return the file name
+        | None ->
+            splitPath |> Array.last
+        | Some levelIndex ->
+            // If we find one of `listOfSupportedDirectories` we want to reroot relative to the folder containing the investigation file.
+            // It is located one level higher than any of `listOfSupportedDirectories`
+            let rootPath =
+                Array.take levelIndex splitPath // one level higher so `levelIndex` instead of `(levelIndex + 1)`
+                |> String.concat (string sep)
+            let relativePath =
+                path.Replace(rootPath + string sep, "")
+            relativePath
+
 let uploadButton (model:Messages.Model) dispatch inputId =
     Field.div [] [
         input [
@@ -412,11 +447,13 @@ let uploadButton (model:Messages.Model) dispatch inputId =
             Multiple true
             Type "file"
             OnChange (fun ev ->
-                let files :FileList = ev.target?files
+                let files : FileList = ev.target?files
 
                 let fileNames =
                     [ for i=0 to (files.length - 1) do yield files.item i ]
-                    |> List.map (fun f -> f.name)
+                    |> List.map (fun f ->
+                        f.name
+                    )
 
                 Browser.Dom.console.log fileNames
 
