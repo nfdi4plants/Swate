@@ -99,7 +99,7 @@ let createLinkOfAccession (accession:string) =
 let private isValidAdancedSearchOptions (opt:AdvancedSearchOptions) =
     ((
         opt.TermName.Length
-        + opt.TermDescription.Length
+        + opt.TermDefinition.Length
     ) > 0)
 
 let private ontologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: Ontology option)  =
@@ -382,12 +382,12 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
                         //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                         Input.OnChange (fun e ->
                             {model.AdvancedSearchState.AdvancedSearchOptions
-                                with TermDescription = e.Value
+                                with TermDefinition = e.Value
                             }
                             |> UpdateAdvancedTermSearchOptions
                             |> AdvancedSearchMsg
                             |> dispatch)
-                        Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermDescription
+                        Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermDefinition
                         Input.Props [
                             OnKeyDown (fun e ->
                                 match e.which with

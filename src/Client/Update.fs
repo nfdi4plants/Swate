@@ -105,7 +105,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getTermSuggestions
-                (5,queryString)
+                {|n= 5; query = queryString|}
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
@@ -124,13 +124,13 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getUnitTermSuggestions
-                (5,queryString,relUnit)
+                {|n= 5; query = queryString; unit_source_field = relUnit|}
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
         nextState,nextCmd
 
-    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString (termMin:TermMinimal) =
+    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString (parent:TermMinimal) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -143,7 +143,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getTermSuggestionsByParentTerm
-                (5,queryString,termMin)
+                {|n= 5; query = queryString; parent_term = parent|}
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
