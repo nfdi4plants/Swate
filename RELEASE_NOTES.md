@@ -1,3 +1,13 @@
+### 0.6.3+b859e8e (Released 2022-12-1)
+* Additions:
+    * [[#b859e8e](https://github.com/nfdi4plants/Swate/commit/b859e8ed05e57c9ff418bb125d4ab6b4aa0576af)] Link open api docs in info tab
+    * [[#0f56988](https://github.com/nfdi4plants/Swate/commit/0f56988862fe0f37326116ea6b98d54eac31e342)] Update IOntologyAPIv2 to client
+    * [[#c89d554](https://github.com/nfdi4plants/Swate/commit/c89d5542c92d8c1c15b3e2fdc3e3e2320f774b4c)] Add documentation for IOntologyAPIv2 :books:
+    * [[#8989a05](https://github.com/nfdi4plants/Swate/commit/8989a05d1039bdc549faba13575ab6d4b0bc2185)] Set up SwaggerUI docs logic
+    * [[#275fdcc](https://github.com/nfdi4plants/Swate/commit/275fdcc1439682d7809c6ce31312a92017d8c8fe)] Improve search performance for all children/parents :racehorse:
+* Bugfixes:
+    * [[#14b2feb](https://github.com/nfdi4plants/Swate/commit/14b2feb8e403a8da16f3dac785c0f081123e7cf4)] Fix whitespace in username install issue :bug:
+
 ### 0.6.2+6a4f5b0 (Released 2022-10-19)
 * Additions:
     * [[#b0cd88f](https://github.com/nfdi4plants/Swate/commit/b0cd88f082e20200e1e1f8bf7661f849f7c2f54c)] Update docker-compose

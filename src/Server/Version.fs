@@ -3,11 +3,11 @@ namespace System
 open System.Reflection
 
 [<assembly: AssemblyTitleAttribute("SWATE")>]
-[<assembly: AssemblyVersionAttribute("0.6.2")>]
-[<assembly: AssemblyMetadataAttribute("ReleaseDate","19.10.2022")>]
+[<assembly: AssemblyVersionAttribute("0.6.3")>]
+[<assembly: AssemblyMetadataAttribute("ReleaseDate","01.12.2022")>]
 do ()
 
 module internal AssemblyVersionInformation =
     let [<Literal>] AssemblyTitle = "SWATE"
-    let [<Literal>] AssemblyVersion = "0.6.2"
-    let [<Literal>] AssemblyMetadata_ReleaseDate = "19.10.2022"
+    let [<Literal>] AssemblyVersion = "0.6.3"
+    let [<Literal>] AssemblyMetadata_ReleaseDate = "01.12.2022"

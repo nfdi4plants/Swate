@@ -106,7 +106,11 @@ let infoComponent (model : Model) (dispatch : Msg -> unit) =
 
                 ul [] [
                     li [] [p [] [ a [Href Shared.URLs.SwateWiki; Target "_blank"] [ str "User documentation"] ] ]
-                    li [] [p [] [ str "OpenApi docs for "; a [Href (Shared.URLs.Docs.OntologyApi Shared.URLs.Docs.Html); Target "_blank"] [ str "IOntologyDocs"] ] ]
+                    li [] [p [] [
+                        str "OpenApi docs for "
+                        a [Href (Shared.URLs.Docs.OntologyApi Shared.URLs.Docs.Html); Target "_blank"] [ str "IOntologyAPI"]
+                        str "." ]
+                    ]
                 ]
             ]
         ]
