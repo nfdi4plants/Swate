@@ -127,8 +127,11 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     member this.getAllByParent(parentAccession:string, ?limit:int) =
         let query =
             sprintf
-                """MATCH (child)-[*1..]->(:Term {accession: $Accession})
-                RETURN child.accession, child.name, child.definition, child.is_obsolete
+                """MATCH (n:Term {accession: $Accession})
+                CALL apoc.path.subgraphNodes(n, {minLevel: 1, relationshipFilter:'<', labelFilter: "+Term"}) 
+                YIELD node as parent
+                WHERE parent.accession is not null
+                RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete
                 %s"""
                 (if limit.IsSome then "LIMIT $Limit" else "")
         let param =
@@ -310,7 +313,9 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// This function uses only the parent term accession
     member this.getAllByChild(childAccession:TermMinimal) =
         let query = 
-            """MATCH (:Term {accession: $Accession})-[*1..]->(parent:Term)
+            """MATCH (n:Term {accession: $Accession})
+            CALL apoc.path.subgraphNodes(n, {minLevel: 1, relationshipFilter:'>', labelFilter: "+Term"}) YIELD node as parent
+            WHERE parent.accession is not null
             RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete
             """
         let param =
