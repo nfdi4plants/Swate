@@ -61,7 +61,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// The function will error if both term name and term description are None.
     member this.getByAdvancedTermSearch(advancedSearchOptions:Shared.AdvancedSearchTypes.AdvancedSearchOptions) =
         let termName = if advancedSearchOptions.TermName = "" then None else Some advancedSearchOptions.TermName
-        let termDescription = if advancedSearchOptions.TermDescription = "" then None else Some advancedSearchOptions.TermDescription
+        let termDescription = if advancedSearchOptions.TermDefinition = "" then None else Some advancedSearchOptions.TermDefinition
         let indexName, queryInsert =
             match termName,termDescription with
             | None, None -> failwith "Cannot execute term search without any term name or term description."

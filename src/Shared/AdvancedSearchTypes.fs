@@ -2,17 +2,15 @@ namespace Shared
 
 module AdvancedSearchTypes =
 
-    open TermTypes
-
     type AdvancedSearchOptions = {
         OntologyName            : string option
         TermName                : string
-        TermDescription         : string
+        TermDefinition          : string
         KeepObsolete            : bool
         } with
             static member init() = {
                 OntologyName            = None
                 TermName                = ""
-                TermDescription         = ""
+                TermDefinition          = ""
                 KeepObsolete            = false
             }

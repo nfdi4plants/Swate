@@ -162,6 +162,12 @@ open Elmish.HMR
 //    let modelEncoder =
 //        Encode.Auto.generateEncoder<Model>(extra = extra)
 
+
+let view2  (model : Model) (dispatch : Msg -> unit) =
+    div [] [
+        str "Test"
+    ]
+
 Program.mkProgram init Update.update view
 #if DEBUG
 |> Program.withConsoleTrace

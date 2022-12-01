@@ -5,6 +5,8 @@
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <None Include="docs\IOntologyAPIv2.yaml" />
+        <Content Include="docs\IOntologyAPIv2.html" />
         <None Include="index.html" />
         <None Include="paket.references" />
         <None Include="style.scss" />
@@ -66,6 +68,7 @@
         <Compile Include="Update.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
+    <ItemGroup />
     <ItemGroup>
       <ProjectReference Include="..\Shared\Shared.fsproj" />
     </ItemGroup>
