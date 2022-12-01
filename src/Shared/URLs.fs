@@ -25,7 +25,7 @@ module URLs =
         
         let private Base = "/docs"
 
-        let OntologyApi (filetype: FileType)= Base + "/IOntologyAPIv1" + filetype.toStr
+        let OntologyApi (filetype: FileType)= Base + "/IOntologyAPIv2" + filetype.toStr
         
 
     type Helpdesk =
@@ -41,7 +41,7 @@ module URLs =
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
-    let SwateWiki = @"https://github.com/nfdi4plants/Swate/wiki"
+    let SwateWiki = @"https://nfdi4plants.github.io/Swate-docs/index.html"
 
     [<LiteralAttribute>]
     let SwateRepo = @"https://github.com/nfdi4plants/Swate"

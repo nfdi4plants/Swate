@@ -48,8 +48,8 @@ let getInContactElement (model:Model) dispatch =
     Content.content [Content.Props [Style [Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Justify]]] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Get In Contact With Us"]
 
+        h5 [] [str "Swate is part of the DataPLANT organisation."]
         p [] [
-            h5 [] [str "Swate is part of the DataPLANT organisation."]
             a [Href "https://nfdi4plants.de/"; Target "_Blank"; Title "DataPLANT"; Class "nfdiIcon"; Style [Float FloatOptions.Right; MarginLeft "2em"]] [
                 img [Src "https://raw.githubusercontent.com/nfdi4plants/Branding/138420e3b6f9ec9e125c1ca8840874b2be2a1262/logos/DataPLANT_logo_minimal_square_bg_darkblue.svg"; Style [Width "54px"]]
             ]
@@ -99,6 +99,16 @@ let infoComponent (model : Model) (dispatch : Msg -> unit) =
         ]
         Field.div [] [
             introductionElement model dispatch
+        ]
+        Field.div [] [
+            div [] [
+                Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Documentation"]
+
+                ul [] [
+                    li [] [p [] [ a [Href Shared.URLs.SwateWiki; Target "_blank"] [ str "User documentation"] ] ]
+                    li [] [p [] [ str "OpenApi docs for "; a [Href (Shared.URLs.Docs.OntologyApi Shared.URLs.Docs.Html); Target "_blank"] [ str "IOntologyDocs"] ] ]
+                ]
+            ]
         ]
         Field.div [] [
             getInContactElement model dispatch
