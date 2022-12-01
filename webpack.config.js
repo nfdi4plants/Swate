@@ -68,7 +68,7 @@ var TEST_CONFIG = {
     // to a external API server. See https://webpack.js.org/configuration/dev-server/#devserver-proxy
     devServerProxy: undefined,
     babel: undefined,
-    cssEntry: undefined,
+    cssEntry: './src/Client/style.scss',
 }
 
 var path = require('path');

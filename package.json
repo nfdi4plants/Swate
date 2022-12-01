@@ -4,13 +4,13 @@
     ],
     "private": true,
     "engines": {
-        "node": "~16",
+        "node": "~16 || ~18",
         "npm": "~8"
     },
     "scripts": {
-        "start": "webpack-dev-server",
-        "build": "webpack -p",
-        "test:live": "webpack-dev-server --config webpack.tests.config.js"
+        "start": "webpack-dev-server --mode development",
+        "build": "webpack --mode production",
+        "test:live": "webpack-dev-server --mode development --env test"
     },
     "devDependencies": {
         "@babel/core": "^7.16.0",

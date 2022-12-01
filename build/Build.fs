@@ -235,13 +235,13 @@ Target.create "InstallClient" (fun _ ->
 
 Target.create "bundle" (fun _ ->
     [ "server", dotnet $"publish -c Release -o \"{deployPath}\"" serverPath
-      "client", dotnet "fable src/Client -o src/Client/output -e .fs.js -s --run webpack --config webpack.config.js" "" ]
+      "client", dotnet "fable src/Client -o src/Client/output -e .fs.js -s --run npm run build" "" ]
     |> runParallel
 )
 
 Target.create "bundle-linux" (fun _ ->
     [ "server", dotnet $"publish -c Release -r linux-x64 -o \"{deployPath}\"" serverPath
-      "client", dotnet "fable src/Client -s --run webpack --config webpack.config.js" "" ]
+      "client", dotnet "fable src/Client -s --run npm run build" "" ]
     |> runParallel
 )
 
@@ -270,7 +270,7 @@ Target.create "RunTests" (fun _ ->
     run dotnet "build" sharedTestsPath
     [
         "server", dotnet "watch run -p tests/Server" ""
-        "client", dotnet "fable watch tests/Client -o tests/Client/output -e .fs.js -s --run webpack-dev-server --config webpack.tests.config" "" ]
+        "client", dotnet "fable watch tests/Client -o tests/Client/output -e .fs.js -s --run npm run test:live" "" ]
     |> runParallel
 )
 
