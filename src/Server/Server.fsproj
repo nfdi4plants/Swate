@@ -18,10 +18,8 @@
         <Compile Include="TemplateMetadata.fs" />
         <Compile Include="JsonExport.fs" />
         <Compile Include="JsonImport.fs" />
-        <Compile Include="Docs\DocsFunctions.fs" />
-        <Compile Include="Docs\DocsServiceAPIvs1.fs" />
-        <Compile Include="Docs\DocsISADotNetAPIvs1.fs" />
-        <Compile Include="Docs\DocsAnnotationAPIvs1.fs" />
+        <Compile Include="Api\Helper.fs" />
+        <Compile Include="Api\IOntologyAPI.fs" />
         <Compile Include="Server.fs" />
     </ItemGroup>
     <ItemGroup>

@@ -248,7 +248,7 @@ Target.create "bundle-linux" (fun _ ->
 Target.create "Run" (fun _ ->
     run dotnet "build" sharedPath
     [ "server", dotnet "watch run" serverPath
-      "client", dotnet "fable watch src/Client -s --run webpack-dev-server" "" ]
+      "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" "" ]
     |> runParallel
 )
 

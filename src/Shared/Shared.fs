@@ -92,6 +92,7 @@ type ISwateJsonAPIv1 = {
     tryParseToBuildingBlocks                : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
 }
 
+/// <summary>Deprecated</summary>
 type IOntologyAPIv1 = {
     // Development
     getTestNumber               : unit                                          -> Async<int>
@@ -114,6 +115,30 @@ type IOntologyAPIv1 = {
 
     // Tree related requests
     getTreeByAccession                  : string                                                        -> Async<TreeTypes.Tree>
+}
+
+type IOntologyAPIv2 = {
+    // Development
+    getTestNumber                       : unit                                                              -> Async<int>
+
+    // Ontology related requests
+    getAllOntologies                    : unit                                                              -> Async<Ontology []>
+
+    // Term related requests
+    ///
+    getTermSuggestions                  : {| n: int; query: string |}                                       -> Async<Term []>
+    /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
+    getTermSuggestionsByParentTerm      : {| n: int; query: string; parent_term: TermMinimal |}             -> Async<Term []>
+    getAllTermsByParentTerm             : TermMinimal                                                       -> Async<Term []>
+    /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
+    getTermSuggestionsByChildTerm       : {| n: int; query: string; child_term: TermMinimal |}             -> Async<Term []>
+    getAllTermsByChildTerm              : TermMinimal                                                       -> Async<Term []>
+    getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions)                       -> Async<Term []>
+    getUnitTermSuggestions              : {| n: int; query: string; unit_source_field: UnitSearchRequest |} -> Async<Term [] * UnitSearchRequest>
+    getTermsByNames                     : TermSearchable []                                                 -> Async<TermSearchable []>
+
+    // Tree related requests
+    getTreeByAccession                  : string                                                            -> Async<TreeTypes.Tree>
 }
 
 type IProtocolAPIv1 = {
