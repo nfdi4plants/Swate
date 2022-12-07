@@ -19,7 +19,7 @@
         <Compile Include="OfficeInterop\InteropLogging.fs" />
         <Compile Include="OfficeInterop\CustomXmlTypes.fs" />
         <Compile Include="OfficeInterop\Functions\TemplateMetadataFunctions.fs" />
-        <Compile Include="OfficeInterop\Functions\ColHeaderIndexing.fs" />
+        <Compile Include="OfficeInterop\Functions\Indexing.fs" />
         <Compile Include="OfficeInterop\Functions\BuildingBlockFunctions.fs" />
         <Compile Include="OfficeInterop\Functions\CustomXmlFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />

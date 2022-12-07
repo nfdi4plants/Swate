@@ -580,24 +580,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                     |> Array.choose id
                     |> Array.map string
 
-                // This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
-                // This function returns the id for the main column and related reference columns WHEN no unit is contained in the new building block
-                let checkIdForRefCols() = OfficeInterop.Indexing.RefColumns.findNewIdForReferenceColumns allColHeaders newBB
-                let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit allColHeaders
-
-                let mainColName = newBB.ColumnHeader.toAnnotationTableHeader()
-                let tsrColName() = OfficeInterop.Indexing.RefColumns.createTSRColName newBB (checkIdForRefCols())
-                let tanColName() = OfficeInterop.Indexing.RefColumns.createTANColName newBB (checkIdForRefCols())
-                let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader (checkIdForUnitCol())
-
-                let colNames = [|
-                    mainColName
-                    if newBB.UnitTerm.IsSome then
-                        unitColName()
-                    if not newBB.ColumnHeader.Type.isSingleColumn then
-                        tsrColName()
-                        tanColName()
-                |]
+                let columnNames = Indexing.createColumnNames newBB allColHeaders
 
                 /// This logic will only work if there is only one format change
                 let mutable formatChangedMsg : InteropLogging.Msg list = []
@@ -608,7 +591,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                             index   = index,
                             values  = U4.Case1 (col "")
                         )
-                    colNames
+                    columnNames
                     |> Array.mapi (fun i colName ->
                         // create a single column
                         let col = createCol (nextIndex + float i)
@@ -618,7 +601,8 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                         // Fit column width to content
                         columnBody.format.autofitColumns()
                         // Update mainColumn body rows with number format IF building block has unit.
-                        if newBB.UnitTerm.IsSome && colName = mainColName then
+                        // Trim column name to 
+                        if newBB.UnitTerm.IsSome && colName = columnNames.[0] then
                             // create numberFormat for unit columns
                             let format = newBB.UnitTerm.Value.toNumberFormat
                             let formats = createValueMatrix 1 (rowCount-1) format
@@ -628,12 +612,14 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                             let format = createValueMatrix 1 (rowCount-1) "@"
                             columnBody.numberFormat <- format
                         // hide freshly created column if it is a reference column
-                        if colName <> mainColName then
+                        if colName <> columnNames.[0] then
                             columnBody.columnHidden <- true
                         col
                     )
 
-                mainColName, formatChangedMsg
+
+                // 'columnNames.[0]' should only be used for logging, so maybe trim whitespace?
+                columnNames.[0], formatChangedMsg
             )
 
             let! fit = autoFitTableByTable annotationTable context
@@ -692,7 +678,8 @@ let addAnnotationBlockHandler (newBB:InsertBuildingBlock) =
 
             let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
 
-            checkIfBuildingBlockExisting newBB existingBuildingBlocks
+            // comment out, to reenable inserting multiple duplicate building block
+            //checkIfBuildingBlockExisting newBB existingBuildingBlocks
 
             // if newBB is output column and output column already exists in table this returns (Some outputcolumn-building-block), else None.
             let outputColOpt = checkHasExistingOutput newBB existingBuildingBlocks
@@ -836,29 +823,14 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
         let mutable allColumnHeaders = headerVals |> Array.choose id |> Array.map string |> List.ofArray
     
         let addBuildingBlock (buildingBlock:InsertBuildingBlock) (currentNextIndex:float) (columnHeaders:string []) =
-            /// This function checks if the would be col names already exist. If they do it ticks up the id tag to keep col names unique.
-            let checkIdForRefCols() = OfficeInterop.Indexing.RefColumns.findNewIdForReferenceColumns columnHeaders buildingBlock
-            let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit columnHeaders
-                
-            let mainColName = buildingBlock.ColumnHeader.toAnnotationTableHeader()
-            let tsrColName() = OfficeInterop.Indexing.RefColumns.createTSRColName buildingBlock (checkIdForRefCols())
-            let tanColName() = OfficeInterop.Indexing.RefColumns.createTANColName buildingBlock (checkIdForRefCols())
-            let unitColName() = OfficeInterop.Indexing.Unit.createUnitColHeader (checkIdForUnitCol())
 
-            let colNames = [|
-                mainColName
-                if buildingBlock.UnitTerm.IsSome then
-                    unitColName()
-                if not buildingBlock.ColumnHeader.Type.isSingleColumn then
-                    tsrColName()
-                    tanColName()
-            |]
+            let columnNames = Indexing.createColumnNames buildingBlock columnHeaders
 
-            printfn "%A" colNames
+            printfn "%A" columnNames
 
             // Update storage for variables
-            nextIndex <- currentNextIndex + float colNames.Length
-            allColumnHeaders <- (colNames |> List.ofArray)@allColumnHeaders
+            nextIndex <- currentNextIndex + float columnNames.Length
+            allColumnHeaders <- (columnNames |> List.ofArray)@allColumnHeaders
                 
             let createAllCols =
                 let createCol index =
@@ -866,7 +838,7 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
                         index   = index,
                         values  = U4.Case1 (col "")
                     )
-                colNames
+                columnNames
                 |> Array.mapi (fun i colName ->
                     // create a single column
                     let col = createCol (currentNextIndex + float i)
@@ -876,7 +848,7 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
                     // Fit column width to content
                     columnBody.format.autofitColumns()
                     // Update mainColumn body rows with number format IF building block has unit.
-                    if buildingBlock.UnitTerm.IsSome && colName = mainColName then
+                    if buildingBlock.UnitTerm.IsSome && colName = columnNames.[0] then
                         // create numberFormat for unit columns
                         let format = buildingBlock.UnitTerm.Value.toNumberFormat
                         let formats = createValueMatrix 1 (expandedRowCount-1) format
@@ -889,12 +861,12 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
                         let values = createColumnBodyValues buildingBlock expandedRowCount
                         columnBody.values <- values.[i]
                     // hide freshly created column if it is a reference column
-                    if colName <> mainColName then
+                    if colName <> columnNames.[0] then
                         columnBody.columnHidden <- true
                     col
                 )
                 
-            colNames
+            columnNames
     
         let! addNewBuildingBlocks = 
             context.sync().``then``(fun _ ->
@@ -1036,9 +1008,7 @@ let updateUnitForCells (unitTerm:TermMinimal) =
                             headerVals
                             |> Array.choose id
                             |> Array.map string
-                        let checkIdForUnitCol() = OfficeInterop.Indexing.Unit.findNewIdForUnit allColHeaders
-                        let unitColId = checkIdForUnitCol()
-                        let unitColName = OfficeInterop.Indexing.Unit.createUnitColHeader unitColId
+                        let unitColName = OfficeInterop.Indexing.createUnit() |> Indexing.extendName allColHeaders
                         // add column at correct index
                         let unitColumn =
                             annotationTable.columns.add(
