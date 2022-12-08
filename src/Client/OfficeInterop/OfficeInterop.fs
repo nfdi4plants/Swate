@@ -536,6 +536,15 @@ let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuilding
         None
         //if existingOutputOpt.IsSome then failwith $"Swate table contains already one output column \"{existingOutputOpt.Value.MainColumn.Header.SwateColumnHeader}\". Each Swate table can only contain exactly one output column type."
 
+let private checkHasExistingInput (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
+    if newBB.ColumnHeader.isInputColumn then
+        let existingInputOpt =
+            existingBuildingBlocks
+            |> Array.tryFind (fun x -> x.MainColumn.Header.isMainColumn && x.MainColumn.Header.isInputCol)
+        if existingInputOpt.IsSome then
+            failwith $"Swate table contains already input building block \"{newBB.ColumnHeader.toAnnotationTableHeader()}\" in worksheet." 
+
+
 // ExcelApi 1.4
 /// <summary>This function is used to add a new building block to the active annotationTable.</summary>
 let addAnnotationBlock (newBB:InsertBuildingBlock) =
@@ -681,6 +690,7 @@ let addAnnotationBlockHandler (newBB:InsertBuildingBlock) =
             // comment out, to reenable inserting multiple duplicate building block
             //checkIfBuildingBlockExisting newBB existingBuildingBlocks
 
+            checkHasExistingInput newBB existingBuildingBlocks
             // if newBB is output column and output column already exists in table this returns (Some outputcolumn-building-block), else None.
             let outputColOpt = checkHasExistingOutput newBB existingBuildingBlocks
 
@@ -826,7 +836,7 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
 
             let columnNames = Indexing.createColumnNames buildingBlock columnHeaders
 
-            printfn "%A" columnNames
+            //printfn "%A" columnNames
 
             // Update storage for variables
             nextIndex <- currentNextIndex + float columnNames.Length
