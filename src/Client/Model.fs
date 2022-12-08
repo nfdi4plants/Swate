@@ -300,7 +300,6 @@ module Validation =
             DisplayedOptionsId          = None
         }
 
-
 module Protocol =
 
     [<RequireQualifiedAccess>]

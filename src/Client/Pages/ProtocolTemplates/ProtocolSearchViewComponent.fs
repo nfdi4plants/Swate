@@ -22,28 +22,28 @@ let private curatedOrganisationNames = [
 ]
 
 /// Fields of Template that can be searched
+[<RequireQualifiedAccess>]
 type private SearchFields =
 | Name
 | Organisation
 | Authors
-    member private this.toFieldString =
+
+    static member private ofFieldString (str:string) =
+        let str = str.ToLower()
+        match str with
+        | "/o" | "/org"     -> Some Organisation
+        | "/a" | "/authors" -> Some Authors
+        | "/n" | "/reset"   -> Some Name
+        | _ -> None
+
+    member this.toStr =
         match this with
-        | Name          -> None
-        | Organisation  -> Some "/org"
-        | Authors       -> Some "/authors"
+        | Name          -> "/name"
+        | Organisation  -> "/org"
+        | Authors       -> "/auth"
 
     static member GetOfQuery(query:string) =
-        let query = query.ToLower()
-        match query with
-        | isOrg when query.StartsWith(SearchFields.Organisation.toFieldString.Value) -> SearchFields.Organisation
-        | isAuth when query.StartsWith(SearchFields.Authors.toFieldString.Value) -> SearchFields.Authors
-        | _ -> SearchFields.Name
-
-    static member RemoveFromQuery(query:string) =
-        let field = SearchFields.GetOfQuery query
-        let fieldStr = field.toFieldString
-        let strLength = fieldStr |> Option.map (fun x -> x.Length)
-        if strLength.IsSome then query.Remove(0,strLength.Value) else query
+        SearchFields.ofFieldString query
 
 type private ProtocolViewState = {
         DisplayedProtDetailsId  : int option
@@ -53,6 +53,7 @@ type private ProtocolViewState = {
         ProtocolFilterErTags    : string list
         CuratedCommunityFilter  : Model.Protocol.CuratedCommunityFilter
         TagFilterIsAnd          : bool
+        Searchfield             : SearchFields
 } with
     static member init () = {
         ProtocolSearchQuery     = ""
@@ -62,34 +63,55 @@ type private ProtocolViewState = {
         CuratedCommunityFilter  = Model.Protocol.CuratedCommunityFilter.Both
         TagFilterIsAnd          = true
         DisplayedProtDetailsId  = None
+        Searchfield             = SearchFields.Name
     }
 
-let private sortButton icon msg =
-    Button.a [
-        Button.IsOutlined
-        Button.Color IsPrimary
-        Button.OnClick msg
-    ] [
-        Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
-    ]
+[<LiteralAttribute>]
+let private SearchFieldId = "template_searchfield_main"
 
 let private queryField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
     Column.column [ ] [
         Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text; MinWidth "91px"; WhiteSpace WhiteSpaceOptions.Nowrap]]] [str "Search by protocol name"]
-        Control.div [
-            Control.HasIconRight
-        ] [
-            Input.text [
-                Input.Placeholder ".. protocol name"
-                Input.Color IsPrimary
-                Input.ValueOrDefault state.ProtocolSearchQuery
-                Input.OnChange (fun e ->
-                    {state with ProtocolSearchQuery = e.Value; DisplayedProtDetailsId = None} |> setState
-                )
+        let hasSearchAddon = state.Searchfield <> SearchFields.Name
+        Field.div [if hasSearchAddon then Field.HasAddons] [
+            Control.div [
+                Control.Props [Style [if not hasSearchAddon then Display DisplayOptions.None]]
+            ] [
+                Button.a [
+                    Button.IsStatic true
+                ] [ str state.Searchfield.toStr]
             ]
-            Icon.icon [ Icon.Size IsSmall; Icon.IsRight ]
-                [ Fa.i [ Fa.Solid.Search ]
-                    [ ] ] ]
+            Control.div [
+                Control.HasIconRight
+            ] [
+                Input.text [
+                    Input.Placeholder ".. protocol name"
+                    Input.Id SearchFieldId
+                    Input.Color IsPrimary
+                    Input.ValueOrDefault state.ProtocolSearchQuery
+                    Input.OnChange (fun e ->
+                        let query = e.Value
+                        // if query starts with "/" expect intend to search by different field
+                        if query.StartsWith "/" then
+                            let searchField = SearchFields.GetOfQuery query
+                            if searchField.IsSome then
+                                {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
+                                //let inp = Browser.Dom.document.getElementById SearchFieldId
+                        // if query starts NOT with "/" update query
+                        else
+                            {
+                                state with
+                                    ProtocolSearchQuery = query
+                                    DisplayedProtDetailsId = None
+                            }
+                            |> setState
+                    )
+                ]
+                Icon.icon [ Icon.Size IsSmall; Icon.IsRight ]
+                    [ Fa.i [ Fa.Solid.Search ]
+                        [ ] ]
+            ]
+        ]
     ]
 
 let private tagQueryField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
@@ -430,8 +452,7 @@ let ProtocolContainer (model:Model) dispatch =
     let state, setState = React.useState(ProtocolViewState.init)
 
     let sortTableBySearchQuery (protocol:Template []) =
-        let searchField = SearchFields.GetOfQuery state.ProtocolSearchQuery
-        let query = state.ProtocolSearchQuery |> SearchFields.RemoveFromQuery |> fun x -> x.Trim()
+        let query = state.ProtocolSearchQuery.Trim()
         // Only search if field is not empty and does not start with "/".
         // If it starts with "/" and does not match SearchFields then it will never trigger search
         // As soon as it matches SearchFields it will be removed and can become 'query <> ""'
@@ -446,15 +467,16 @@ let ProtocolContainer (model:Model) dispatch =
                 protocol
                 |> Array.map (fun template ->
                     let score =
-                        match searchField with
-                        | Name          ->
+                        match state.Searchfield with
+                        | SearchFields.Name          ->
                             createScore template.Name
-                        | Organisation  ->
+                        | SearchFields.Organisation  ->
                             createScore template.Organisation
-                        | Authors       ->
+                        | SearchFields.Authors       ->
                             let authors = template.Authors.Split([|','; ' '|], StringSplitOptions.TrimEntries)
-                            let scores = authors |> Array.map createScore
-                            Array.max scores
+                            let query = query.ToLower()
+                            let scores = authors |> Array.filter (fun x -> x.ToLower().StartsWith query)
+                            if Array.isEmpty scores then 0.0 else 1.0
                     score, template
                 )
                 |> Array.filter (fun (score,_) -> score > 0.1)
