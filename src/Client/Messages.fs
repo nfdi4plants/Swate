@@ -150,15 +150,6 @@ module Protocol =
         | GetProtocolByIdResponse           of Template
         | ProtocolIncreaseTimesUsed         of protocolName:string
         // Client
-        | UpdateDisplayedProtDetailsId      of int option
-        | UpdateProtocolNameSearchQuery     of string
-        | UpdateProtocolTagSearchQuery      of string
-        | AddProtocolTag                    of string
-        | RemoveProtocolTag                 of string
-        | AddProtocolErTag                  of string
-        | RemoveProtocolErTag               of string
-        | UpdateCuratedCommunityFilter      of Protocol.CuratedCommunityFilter
-        | UpdateTagFilterIsAnd              of bool
         | RemoveSelectedProtocol
         | UpdateLoading                     of bool
 

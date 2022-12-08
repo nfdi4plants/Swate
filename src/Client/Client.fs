@@ -84,7 +84,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
     | Routing.Route.ProtocolSearch ->
         BaseView.baseViewMainElement model dispatch [
-            Protocol.Search.protocolSearchViewComponent model dispatch
+            Protocol.Search.protocolSearchView model dispatch
         ] [
             //Text.p [] [str ""]
         ]

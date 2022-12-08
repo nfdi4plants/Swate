@@ -95,7 +95,7 @@ module Protocol =
                 currentState with
                     ProtocolSelected = Some prot
                     //ValidationXml = Some validation
-                    DisplayedProtDetailsId = None
+                    //DisplayedProtDetailsId = None
             }
             nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.Protocol)
         | ProtocolIncreaseTimesUsed templateId ->
@@ -110,60 +110,6 @@ module Protocol =
         | UpdateLoading nextLoadingState ->
             let nextState = {
                 currentState with Loading = nextLoadingState
-            }
-            nextState, Cmd.none
-        | UpdateDisplayedProtDetailsId idOpt ->
-            let nextState = {
-                currentState with
-                    DisplayedProtDetailsId = idOpt
-            }
-            nextState, Cmd.none
-        | UpdateProtocolNameSearchQuery strVal ->
-            let nextState = {
-                currentState with ProtocolNameSearchQuery = strVal
-            }
-            nextState, Cmd.none
-        | UpdateProtocolTagSearchQuery strVal ->
-            let nextState = {
-                currentState with ProtocolTagSearchQuery = strVal
-            }
-            nextState, Cmd.none
-        | AddProtocolTag tagStr ->
-            let nextState = {
-                currentState with
-                    ProtocolFilterTags      = tagStr::currentState.ProtocolFilterTags
-                    ProtocolTagSearchQuery  = ""
-            }
-            nextState, Cmd.none
-        | RemoveProtocolTag tagStr ->
-            let nextState = {
-                currentState with
-                    ProtocolFilterTags = currentState.ProtocolFilterTags |> List.filter (fun x -> x <> tagStr)
-            }
-            nextState, Cmd.none
-        | AddProtocolErTag tagStr ->
-            let nextState = {
-                currentState with
-                    ProtocolFilterErTags      = tagStr::currentState.ProtocolFilterErTags
-                    ProtocolTagSearchQuery  = ""
-            }
-            nextState, Cmd.none
-        | RemoveProtocolErTag tagStr ->
-            let nextState = {
-                currentState with
-                    ProtocolFilterErTags = currentState.ProtocolFilterErTags |> List.filter (fun x -> x <> tagStr)
-            }
-            nextState, Cmd.none
-        | UpdateCuratedCommunityFilter nextFilter ->
-            let nextState = {
-                currentState with
-                    CuratedCommunityFilter = nextFilter
-            }
-            nextState, Cmd.none
-        | UpdateTagFilterIsAnd isAnd ->
-            let nextState = {
-                currentState with
-                    TagFilterIsAnd = isAnd
             }
             nextState, Cmd.none
         | RemoveSelectedProtocol ->

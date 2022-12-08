@@ -51,6 +51,7 @@
         <Compile Include="Pages\BuildingBlock\BuildingBlockView.fs" />
         <Compile Include="Pages\TermSearch\TermSearchView.fs" />
         <Compile Include="Pages\ProtocolTemplates\ProtocolState.fs" />
+        <Compile Include="Pages\ProtocolTemplates\ProtocolSearchViewComponent.fs" />
         <Compile Include="Pages\ProtocolTemplates\ProtocolSearchView.fs" />
         <Compile Include="Pages\ProtocolTemplates\ProtocolView.fs" />
         <Compile Include="Pages\FilePicker\FilePickerView.fs" />
@@ -68,7 +69,6 @@
         <Compile Include="Update.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
-    <ItemGroup />
     <ItemGroup>
       <ProjectReference Include="..\Shared\Shared.fsproj" />
     </ItemGroup>

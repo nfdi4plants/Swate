@@ -321,24 +321,10 @@ module Protocol =
         ProtocolSelected        : Template option
         ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
         ProtocolsAll            : Template []
-        DisplayedProtDetailsId  : int option
-        ProtocolNameSearchQuery : string
-        ProtocolTagSearchQuery  : string
-        ProtocolFilterTags      : string list
-        ProtocolFilterErTags    : string list
-        CuratedCommunityFilter  : CuratedCommunityFilter
-        TagFilterIsAnd          : bool
     } with
         static member init () = {
             // Client
             Loading                 = false
-            ProtocolNameSearchQuery = ""
-            ProtocolTagSearchQuery  = ""
-            ProtocolFilterTags      = []
-            ProtocolFilterErTags    = []
-            CuratedCommunityFilter  = CuratedCommunityFilter.Both
-            TagFilterIsAnd          = true
-            DisplayedProtDetailsId  = None
             ProtocolSelected        = None
             // // ------ Process from file ------
             UploadedFile            = ""
