@@ -516,7 +516,8 @@ let private checkIfBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBu
     let mainColumnPrints =
         existingBuildingBlocks
         |> Array.choose (fun x ->
-            if x.MainColumn.Header.isMainColumn then
+            // reference columns are now allowed in duplicates (0.6.4)
+            if x.MainColumn.Header.isMainColumn && not x.MainColumn.Header.isTermColumn then
                 x.MainColumn.Header.toBuildingBlockNamePrePrint
             else
                 None
@@ -691,6 +692,7 @@ let addAnnotationBlockHandler (newBB:InsertBuildingBlock) =
             //checkIfBuildingBlockExisting newBB existingBuildingBlocks
 
             checkHasExistingInput newBB existingBuildingBlocks
+            checkIfBuildingBlockExisting newBB existingBuildingBlocks
             // if newBB is output column and output column already exists in table this returns (Some outputcolumn-building-block), else None.
             let outputColOpt = checkHasExistingOutput newBB existingBuildingBlocks
 
