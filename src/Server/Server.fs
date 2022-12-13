@@ -349,18 +349,28 @@ let topLevelRouter = router {
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.StaticFiles
+open Microsoft.AspNetCore.Cors.Infrastructure
 
 // https://cors-test.codehappy.dev/?url=https%3A%2F%2Fswate.nfdi4plants.org%2Fapi%2FIOntologyAPIv2%2FgetAllOntologies&method=get
 /// Enable CORS. Makes external access of Swate API possible
-let configureServices (services:IServiceCollection) =
-    services
-        .AddCors()
-        .AddGiraffe()
+let cors (cors:CorsPolicyBuilder) =
+    cors
+        .AllowAnyOrigin()
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+    |> ignore
+    ()
+
+//let configureServices (services:IServiceCollection) =
+//    services
+//        .AddCors()
+//        .AddGiraffe()
 
 /// Allows serving .yaml files directly
 let config (app:IApplicationBuilder) =
     let provider = new FileExtensionContentTypeProvider()
     provider.Mappings.Add(".yaml", "application/x-yaml")
+    //app.UseCors() |> ignore
     app.UseStaticFiles(
         let opt = new StaticFileOptions()
         opt.ContentTypeProvider <- provider
@@ -371,7 +381,8 @@ let app = application {
     url "http://0.0.0.0:5000" //"http://localhost:5000/"
     use_router topLevelRouter
     app_config config
-    service_config configureServices
+    //service_config configureServices
+    use_cors "CORS_Policy" cors
     memory_cache
     use_static "public"
     use_gzip
