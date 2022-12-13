@@ -1,3 +1,14 @@
+### 0.7.0+d648b9c (Released 2022-12-13)
+* Additions:
+    * [[#e9e9c80](https://github.com/nfdi4plants/Swate/commit/e9e9c80f02e3e24a1c7497c5cd5c4420d371039a)] Allow adding multiple building blocks of the same type (#243).
+    * [[#5ba5744](https://github.com/nfdi4plants/Swate/commit/5ba57448149846952f562614019df1eed22052c2)] Add tests for new indexing :white_check_mark:
+    * [[#92cbb31](https://github.com/nfdi4plants/Swate/commit/92cbb31504270c77a3188bff559078a07b384261)] Refactor protocol search view :art:
+    * [[#a8584b0](https://github.com/nfdi4plants/Swate/commit/a8584b04658a0d1f0ca0f453364ca66b08bd8fe9)] Add template search options (#244).
+    * [[#d648b9c](https://github.com/nfdi4plants/Swate/commit/d648b9c24ad8f0fb4309c1de0a24e4ccbbee54d8)] Enable CORS
+* Bugfixes:
+    * [[#a5ff2cd](https://github.com/nfdi4plants/Swate/commit/a5ff2cd16ea47d6779e4cea38adf636962f9e375)] Fix runtests build target
+    * [[#50b4e98](https://github.com/nfdi4plants/Swate/commit/50b4e9861ded58f59d9dc7f6f7c557db4089679d)] Fix issue with duplicate columns and non term columns :bug:
+
 ### 0.6.3+b859e8e (Released 2022-12-1)
 * Additions:
     * [[#b859e8e](https://github.com/nfdi4plants/Swate/commit/b859e8ed05e57c9ff418bb125d4ab6b4aa0576af)] Link open api docs in info tab
