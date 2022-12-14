@@ -1,3 +1,9 @@
+### 0.7.1+a5a7d62 (Released 2022-12-14)
+* Additions:
+    * [[#a5a7d62](https://github.com/nfdi4plants/Swate/commit/a5a7d62a24ef1545d416e32c1b8be47944d0ed02)] Enable api search by source ontology :sparkles: :books:
+* Bugfixes:
+    * [[#bfae9a8](https://github.com/nfdi4plants/Swate/commit/bfae9a87886bfdf18612c46bb1416d35aaf258b8)] Enable CORS
+
 ### 0.7.0+d648b9c (Released 2022-12-13)
 * Additions:
     * [[#e9e9c80](https://github.com/nfdi4plants/Swate/commit/e9e9c80f02e3e24a1c7497c5cd5c4420d371039a)] Allow adding multiple building blocks of the same type (#243).
