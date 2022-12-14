@@ -307,17 +307,17 @@ let getNeo4JCredentials (ctx: HttpContext) =
     }
     credentials
 
-// https://cors-test.codehappy.dev/?url=https%3A%2F%2Fswate.nfdi4plants.org%2Fapi%2FIOntologyAPIv2%2FgetAllOntologies&method=get
-/// Enable CORS. Makes external access of Swate API possible
-let allow_cors =
-    pipeline {
-        set_header "Access-Control-Allow-Origin" "*"
-        set_header "Access-Control-Allow-Methods" "*"
-        set_header "Access-Control-Allow-Headers" "*"
-    }
+//// https://cors-test.codehappy.dev/?url=https%3A%2F%2Fswate.nfdi4plants.org%2Fapi%2FIOntologyAPIv2%2FgetAllOntologies&method=get
+///// Enable CORS. Makes external access of Swate API possible
+//let allow_cors =
+//    pipeline {
+//        set_header "Access-Control-Allow-Origin" "*"
+//        set_header "Access-Control-Allow-Methods" "*"
+//        set_header "Access-Control-Allow-Headers" "*"
+//    }
 
 let topLevelRouter = router {
-    pipe_through allow_cors
+    //pipe_through allow_cors
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
     get "/test/hello" (getMessage() |> json)
 
@@ -357,9 +357,16 @@ let topLevelRouter = router {
     )
 }
 
-open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.StaticFiles
 open Microsoft.AspNetCore.Cors.Infrastructure
+
+/// Enable CORS. Makes external access of Swate API possible
+let cors_config = fun (b: CorsPolicyBuilder) ->
+    b
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowAnyOrigin()
+    |> ignore
 
 
 /// Allows serving .yaml files directly
@@ -377,6 +384,7 @@ let app = application {
     url "http://0.0.0.0:5000" //"http://localhost:5000/"
     app_config config
     use_router topLevelRouter
+    use_cors "CORS_CONFIG" cors_config
     memory_cache
     use_static "public"
     use_gzip
@@ -385,7 +393,7 @@ let app = application {
 
 app
     .ConfigureAppConfiguration(
-        System.Action<Microsoft.Extensions.Hosting.HostBuilderContext,IConfigurationBuilder> ( fun ctx config ->
+        System.Action<Microsoft.Extensions.Hosting.HostBuilderContext,IConfigurationBuilder> (fun ctx config ->
             config.AddUserSecrets("6de80bdf-2a05-4cf7-a1a8-d08581dfa887") |> ignore
             config.AddJsonFile("dev.json",true,true)            |> ignore
             config.AddJsonFile("production.json",true,true)     |> ignore
