@@ -32,7 +32,7 @@ module V1 =
 
             // Term related requests
 
-            getTermSuggestions = fun (max:int,typedSoFar:string) ->
+            getTermSuggestions = fun (max: int, typedSoFar: string) ->
                 async {
                     let dbSearchRes =
                         match typedSoFar with
@@ -217,7 +217,7 @@ module V2 =
                         | notAnAccession ->
                             let searchTextLength = inp.query.Length
                             let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
-                            Term.Term(credentials).getByName(notAnAccession, searchmode)
+                            Term.Term(credentials).getByName(notAnAccession, searchmode, ?sourceOntologyName = inp.ontology)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes

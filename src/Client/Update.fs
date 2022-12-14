@@ -105,7 +105,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getTermSuggestions
-                {|n= 5; query = queryString|}
+                {|n= 5; query = queryString; ontology = None|}
                 (responseHandler >> Api)
                 (ApiError >> Api)
 

@@ -126,7 +126,7 @@ type IOntologyAPIv2 = {
 
     // Term related requests
     ///
-    getTermSuggestions                  : {| n: int; query: string |}                                       -> Async<Term []>
+    getTermSuggestions                  : {| n: int; query: string; ontology: string option|}                                       -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
     getTermSuggestionsByParentTerm      : {| n: int; query: string; parent_term: TermMinimal |}             -> Async<Term []>
     getAllTermsByParentTerm             : TermMinimal                                                       -> Async<Term []>

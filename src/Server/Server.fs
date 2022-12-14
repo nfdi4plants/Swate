@@ -278,23 +278,6 @@ let createTestApi =
     |> Remoting.withErrorHandler API.Helper.errorHandler
     |> Remoting.buildHttpHandler
 
-///// due to a bug in Fable.Remoting this does currently not work as inteded and is ignored. (https://github.com/Zaid-Ajaj/Fable.Remoting/issues/198)
-//let mainApiController = router {
-
-    ////
-    //forward @"/IOntologyAPIv1" (fun next ctx ->
-    //    let cString = 
-    //        let settings = ctx.GetService<IConfiguration>()
-    //        settings.["Swate:ConnectionString"]
-    //    createIOntologyApiv1 cString next ctx
-    //)
-
-//    //
-//    forward @"/IServiceAPIv1" (fun next ctx ->
-//        createIServiceAPIv1 next ctx
-//    )
-//}
-
 let getMessage() = "Hello from SAFE!"
 
 let getNeo4JCredentials (ctx: HttpContext) =
@@ -368,12 +351,10 @@ let cors_config = fun (b: CorsPolicyBuilder) ->
         .AllowAnyOrigin()
     |> ignore
 
-
 /// Allows serving .yaml files directly
 let config (app:IApplicationBuilder) =
     let provider = new FileExtensionContentTypeProvider()
     provider.Mappings.Add(".yaml", "application/x-yaml")
-    //app.UseCors() |> ignore
     app.UseStaticFiles(
         let opt = new StaticFileOptions()
         opt.ContentTypeProvider <- provider

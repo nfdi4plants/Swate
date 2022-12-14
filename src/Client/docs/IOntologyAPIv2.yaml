@@ -91,6 +91,12 @@ paths:
                   query: 
                     description: Search string
                     type: string
+                  ontology:
+                    description: name of source ontology
+                    type: string
+                required:
+                  - n
+                  - query
             examples:
               term_name:
                 summary: Example search by term name
@@ -102,6 +108,12 @@ paths:
                 value:
                     - n: 5
                       query: "MS:1000031"
+              term_name from ms:
+                summary: Example search by term name in ms ontology
+                value: 
+                    - n: 5
+                      query: "instrument mod"
+                      ontology: "ms"
         required: true
       responses:
         200:
