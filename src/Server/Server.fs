@@ -307,7 +307,17 @@ let getNeo4JCredentials (ctx: HttpContext) =
     }
     credentials
 
+// https://cors-test.codehappy.dev/?url=https%3A%2F%2Fswate.nfdi4plants.org%2Fapi%2FIOntologyAPIv2%2FgetAllOntologies&method=get
+/// Enable CORS. Makes external access of Swate API possible
+let allow_cors =
+    pipeline {
+        set_header "Access-Control-Allow-Origin" "*"
+        set_header "Access-Control-Allow-Methods" "*"
+        set_header "Access-Control-Allow-Headers" "*"
+    }
+
 let topLevelRouter = router {
+    pipe_through allow_cors
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
     get "/test/hello" (getMessage() |> json)
 
@@ -351,20 +361,6 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.StaticFiles
 open Microsoft.AspNetCore.Cors.Infrastructure
 
-// https://cors-test.codehappy.dev/?url=https%3A%2F%2Fswate.nfdi4plants.org%2Fapi%2FIOntologyAPIv2%2FgetAllOntologies&method=get
-/// Enable CORS. Makes external access of Swate API possible
-let cors (cors:CorsPolicyBuilder) =
-    cors
-        .AllowAnyOrigin()
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-    |> ignore
-    ()
-
-//let configureServices (services:IServiceCollection) =
-//    services
-//        .AddCors()
-//        .AddGiraffe()
 
 /// Allows serving .yaml files directly
 let config (app:IApplicationBuilder) =
@@ -375,14 +371,12 @@ let config (app:IApplicationBuilder) =
         let opt = new StaticFileOptions()
         opt.ContentTypeProvider <- provider
         opt
-    )
+    ) 
 
 let app = application {
     url "http://0.0.0.0:5000" //"http://localhost:5000/"
-    use_router topLevelRouter
     app_config config
-    //service_config configureServices
-    use_cors "CORS_Policy" cors
+    use_router topLevelRouter
     memory_cache
     use_static "public"
     use_gzip
