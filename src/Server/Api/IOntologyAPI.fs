@@ -117,7 +117,7 @@ module V1 =
                         | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | notAnAccession ->
-                            Term.Term(credentials).getByName(notAnAccession,sourceOntologyName="uo")
+                            Term.Term(credentials).getByName(notAnAccession,sourceOntologyName= Term.AnyOfSource.String "uo")
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -135,7 +135,7 @@ module V1 =
                                 Term.TermQuery.getByAccession searchTerm.Term.TermAccession
                             // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
                             elif searchTerm.IsUnit then
-                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact, sourceOntologyName="uo")
+                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact, sourceOntologyName= Term.AnyOfSource.String "uo")
                             // if none of the above apply we do a standard term search
                             else
                                 Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact)
@@ -217,7 +217,7 @@ module V2 =
                         | notAnAccession ->
                             let searchTextLength = inp.query.Length
                             let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
-                            Term.Term(credentials).getByName(notAnAccession, searchmode, ?sourceOntologyName = inp.ontology)
+                            Term.Term(credentials).getByName(notAnAccession, searchmode, ?sourceOntologyName = Option.map Term.AnyOfSource.String inp.ontology)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
@@ -293,7 +293,7 @@ module V2 =
                         | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | notAnAccession ->
-                            Term.Term(credentials).getByName(notAnAccession,sourceOntologyName="uo")
+                            Term.Term(credentials).getByName(notAnAccession, sourceOntologyName = Term.AnyOfSource.StringList ["uo"; "dpbo"])
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let res = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
@@ -311,7 +311,7 @@ module V2 =
                                 Term.TermQuery.getByAccession searchTerm.Term.TermAccession
                             // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
                             elif searchTerm.IsUnit then
-                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact, sourceOntologyName="uo")
+                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact, sourceOntologyName = Term.AnyOfSource.StringList ["uo"; "dpbo"])
                             // if none of the above apply we do a standard term search
                             else
                                 Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact)

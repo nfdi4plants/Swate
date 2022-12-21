@@ -221,7 +221,7 @@ let testApi (ctx: HttpContext): ITestAPI = {
                 DatabaseName= settings.[Helper.Neo4JCredentials.DBNameVarString]
             }
             credentials
-        let exmp = Term.Term(c).getByName(termName,sourceOntologyName="ms")
+        let exmp = Term.Term(c).getByName(termName,sourceOntologyName=Term.AnyOfSource.String "ms")
         return "Info", sprintf "%A" (exmp |> Seq.length)
     }
 }

@@ -5,7 +5,10 @@ open Shared.OfficeInteropTypes
 /// This is based on a excel hack on how to add multiple header of the same name to an excel table.,
 /// by just appending more whitespace to the name.
 let extendName (existingNames: string []) (baseName:string) =
-    let rec loop (baseName:string) =
+    /// https://unicode-table.com/en/200B/
+    /// Play with Fire 🔥
+    let zeroWidthChar = '​'
+    let rec loop (baseName:string) = 
         if existingNames |> Array.contains baseName then
             loop (baseName + " ") 
         else
