@@ -192,7 +192,7 @@ Target.create "WebpackConfigSetup" (fun _ ->
             "{USERFOLDER}",userPath.Replace("\\","/")
         ]
         [
-            (Path.combine __SOURCE_DIRECTORY__ "webpack.config.js")
+            (Path.getFullName("webpack.config.js"))
         ]
 )
 
@@ -208,7 +208,7 @@ Target.create "SetLoopbackExempt" (fun _ ->
 )
 
 Target.create "CreateDevCerts" (fun _ ->
-    run npx "office-addin-dev-certs install --days 365" __SOURCE_DIRECTORY__
+    run npx "office-addin-dev-certs install --days 365" ""
 
     let certPath =
         Path.combine

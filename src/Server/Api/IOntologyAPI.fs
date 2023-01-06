@@ -12,8 +12,7 @@ module V1 =
 
     /// <summary>Deprecated</summary>
     let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
-        /// Neo4j prefix query does not provide any measurement on distance between query and result.
-        /// Thats why we apply sorensen dice after the database search.
+        /// We use sorensen dice to avoid scoring mutliple occassions of the same word (Issue https://github.com/nfdi4plants/Swate/issues/247)
         let sorensenDiceSortTerms (searchStr:string) (terms: Term []) =
             terms |> SorensenDice.sortBySimilarity searchStr (fun term -> term.Name)
     
@@ -44,7 +43,6 @@ module V1 =
                             let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
                             Term.Term(credentials).getByName(notAnAccession, searchmode)
                         |> Array.ofSeq
-                        //|> sorensenDiceSortTerms typedSoFar
                     let arr = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
                     return arr
                 }
@@ -63,9 +61,8 @@ module V1 =
                             else
                                 Term.Term(credentials).getByNameAndParent(typedSoFar, parentTerm, searchmode)
                         |> Array.ofSeq
-                        //|> sorensenDiceSortTerms inp.query
-                    let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
-                    return res
+                    let arr = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
+                    return arr
                 }
 
             getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
@@ -187,8 +184,7 @@ module V1 =
 module V2 =
 
     let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv2 =
-        /// Neo4j prefix query does not provide any measurement on distance between query and result.
-        /// Thats why we apply sorensen dice after the database search.
+        /// <summary>We use sorensen dice to avoid scoring mutliple occassions of the same word (Issue https://github.com/nfdi4plants/Swate/issues/247)</summary>
         let sorensenDiceSortTerms (searchStr:string) (terms: Term []) =
             terms |> SorensenDice.sortBySimilarity searchStr (fun term -> term.Name)
     
@@ -221,7 +217,8 @@ module V2 =
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
-                    return arr
+                    let arrSorted = sorensenDiceSortTerms inp.query arr 
+                    return arrSorted
                 }
 
             getTermSuggestionsByParentTerm = fun inp ->
@@ -239,8 +236,9 @@ module V2 =
                                 Term.Term(credentials).getByNameAndParent(inp.query, inp.parent_term, searchmode)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms inp.query
-                    let res = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
-                    return res
+                    let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
+                    let arrSorted = sorensenDiceSortTerms inp.query arr 
+                    return arrSorted
                 }
 
             getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
@@ -265,8 +263,9 @@ module V2 =
                                 Term.Term(credentials).getByNameAndChild(inp.query,inp.child_term.TermAccession,searchmode)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms inp.query
-                    let res = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
-                    return res
+                    let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
+                    let arrSorted = sorensenDiceSortTerms inp.query arr 
+                    return arrSorted
                 }
 
             getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
