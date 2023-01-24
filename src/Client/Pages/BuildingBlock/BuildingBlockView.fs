@@ -455,32 +455,30 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
             ]
 
         Field.div [] [
-            Control.div [] [
-                Button.button   [
-                    let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> isValidBuildingBlock
-                    if isValid then
-                        Button.Color Color.IsSuccess
-                        Button.IsActive true
-                    else
-                        Button.Color Color.IsDanger
-                        Button.Props [Disabled true]
-                    Button.IsFullWidth
-                    Button.OnClick (fun e ->
-                        let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
-                        let colTerm     =
-                            if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then
-                                TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some
-                            elif colName.isFeaturedColumn then
-                                TermMinimal.create colName.Type.toString colName.Type.getFeaturedColumnAccession |> Some
-                            else
-                                None
-                        let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && colName.isTermColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
-                        let newBuildingBlock = InsertBuildingBlock.create colName colTerm unitTerm Array.empty
-                        OfficeInterop.AddAnnotationBlock newBuildingBlock |> OfficeInteropMsg |> dispatch
-                    )
-                ] [
-                    str "Add building block"
-                ]
+            Button.button   [
+                let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> isValidBuildingBlock
+                if isValid then
+                    Button.Color Color.IsSuccess
+                    Button.IsActive true
+                else
+                    Button.Color Color.IsDanger
+                    Button.Props [Disabled true]
+                Button.IsFullWidth
+                Button.OnClick (fun e ->
+                    let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
+                    let colTerm     =
+                        if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then
+                            TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some
+                        elif colName.isFeaturedColumn then
+                            TermMinimal.create colName.Type.toString colName.Type.getFeaturedColumnAccession |> Some
+                        else
+                            None
+                    let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && colName.isTermColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
+                    let newBuildingBlock = InsertBuildingBlock.create colName colTerm unitTerm Array.empty
+                    OfficeInterop.AddAnnotationBlock newBuildingBlock |> OfficeInteropMsg |> dispatch
+                )
+            ] [
+                str "Add building block"
             ]
         ]
     ]
@@ -529,30 +527,28 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
         ]
 
         Field.div [] [
-            Control.div [] [
-                Button.button   [
-                    let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
-                    Button.Color Color.IsSuccess
-                    if isValid then
-                        Button.IsActive true
-                    else
-                        Button.Color Color.IsDanger
-                        Button.Props [Disabled true]
-                    Button.IsFullWidth
-                    Button.OnClick (fun e ->
-                        let unitTerm =
-                            if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
-                        match model.AddBuildingBlockState.Unit2TermSearchText with
-                        | "" ->
-                            curry GenericLog Cmd.none ("Error", "Cannot execute function with empty unit input") |> DevMsg |> dispatch
-                        | hasUnitTerm when model.AddBuildingBlockState.Unit2SelectedTerm.IsSome ->
-                            OfficeInterop.UpdateUnitForCells unitTerm.Value |> OfficeInteropMsg |> dispatch
-                        | freeText ->
-                            OfficeInterop.UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> OfficeInteropMsg |> dispatch
-                    )
-                ] [
-                    str "Update unit for cells"
-                ]
+            Button.button   [
+                let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
+                Button.Color Color.IsSuccess
+                if isValid then
+                    Button.IsActive true
+                else
+                    Button.Color Color.IsDanger
+                    Button.Props [Disabled true]
+                Button.IsFullWidth
+                Button.OnClick (fun e ->
+                    let unitTerm =
+                        if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
+                    match model.AddBuildingBlockState.Unit2TermSearchText with
+                    | "" ->
+                        curry GenericLog Cmd.none ("Error", "Cannot execute function with empty unit input") |> DevMsg |> dispatch
+                    | hasUnitTerm when model.AddBuildingBlockState.Unit2SelectedTerm.IsSome ->
+                        OfficeInterop.UpdateUnitForCells unitTerm.Value |> OfficeInteropMsg |> dispatch
+                    | freeText ->
+                        OfficeInterop.UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> OfficeInteropMsg |> dispatch
+                )
+            ] [
+                str "Update unit for cells"
             ]
         ]
     ]

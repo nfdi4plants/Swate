@@ -79,8 +79,42 @@ let footerContentStatic (model:Model) dispatch =
         a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
     ]
 
+module private ResizeObserver =
+
+    open Fable.Core
+    open Fable.Core.JS
+    open Fable.Core.JsInterop
+
+    type ResizeObserverEntry = {
+        borderBoxSize: obj
+        contentBoxSize: obj
+        contentRect: obj
+        devicePixelContentBoxSize: obj
+        target: obj
+    }
+
+    type ResizeObserver =
+        abstract observe: obj -> unit
+
+    type ResizeObserverStatic =
+        [<Emit("new $0($1)")>]
+        abstract create : (ResizeObserverEntry [] -> unit) -> ResizeObserver
+
+    [<Global("ResizeObserver")>]
+    let MyObserver : ResizeObserverStatic = jsNative
+
+    let observer = MyObserver.create(fun ele -> Browser.Dom.console.log(ele.[0].contentRect))
+
+
 let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement list) =
+    let id = "BaseContainer"
     div [
+        Id id
+        OnLoad(fun e ->
+            let ele = Browser.Dom.document.getElementById(id)
+            Browser.Dom.console.log("log", ele.offsetWidth)
+            ResizeObserver.observer.observe(ele)
+        )
         OnClick (fun e ->
             if model.TermSearchState.ShowSuggestions
                 || model.AddBuildingBlockState.ShowUnitTermSuggestions
@@ -92,7 +126,7 @@ let viewContainer (model: Model) (dispatch: Msg -> unit) (children: ReactElement
                 BuildingBlockMsg BuildingBlock.ToggleSelectionDropdown |> dispatch
         )
         Style [
-            MinHeight "100vh"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"
+            BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"; Display DisplayOptions.Block
         ]
     ] children
 
@@ -105,7 +139,7 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
         Container.container [
             Container.IsFluid
         ] [
-            tabs model dispatch
+            //tabs model dispatch
             //sndRowTabs model dispatch
 
             if (not model.ExcelState.HasAnnotationTable) then
@@ -127,7 +161,7 @@ let baseViewMainElement (model: Model) (dispatch: Msg -> unit) (bodyChildren: Re
             if model.CytoscapeModel.ShowModal then
                 Cytoscape.View.view model dispatch
 
-            yield! bodyChildren
+            //yield! bodyChildren
 
             if footerChildren.IsEmpty |> not then
                 Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
