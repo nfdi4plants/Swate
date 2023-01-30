@@ -125,15 +125,40 @@ module AdvancedSearch =
             AdvancedTermSearchSubpage           = InputFormSubpage
         }
 
+type WindowSize =
+/// < 768
+| Minimal
+/// > 768
+| Mobile
+/// > 1023
+| Tablet
+/// > 1215
+| Desktop
+/// > 1407
+| Widescreen
+with 
+    static member ofWidth (width:int) =
+        match width with
+        | _ when width < 768 -> Minimal
+        | _ when width >= 1407 -> Widescreen
+        | _ when width >= 1215 -> Desktop  
+        | _ when width >= 1023 -> Tablet
+        | _ when width >= 768 -> Mobile
+        | anyElse -> failwithf "'%A' triggered an unexpected error when calculating screen size from width." anyElse         
+
 type SiteStyleState = {
     QuickAcessIconsShown : bool
     BurgerVisible   : bool
+    MainWindowSize  : WindowSize
+    SidebarSize     : WindowSize
     IsDarkMode      : bool
     ColorMode       : ExcelColors.ColorMode
 } with
     static member init (?darkMode) = {
         QuickAcessIconsShown    = false
         BurgerVisible           = false
+        MainWindowSize          = Desktop
+        SidebarSize             = Mobile
         IsDarkMode              = if darkMode.IsSome then darkMode.Value else false
         ColorMode               = if darkMode.IsSome && darkMode.Value = true then ExcelColors.darkMode else ExcelColors.colorfullMode
     }
