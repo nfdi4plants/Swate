@@ -65,7 +65,6 @@
         <Compile Include="Pages\TemplateMetadata\TemplateMetadata.fs" />
         <Compile Include="Pages\Dag\Dag.fs" />
         <Compile Include="Views\NotFoundView.fs" />
-        <Compile Include="Views\BaseView.fs" />
         <Compile Include="Views\SidebarView.fs" />
         <Compile Include="Update\OfficeInteropUpdate.fs" />
         <Compile Include="Update.fs" />

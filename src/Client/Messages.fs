@@ -93,8 +93,6 @@ type ApiMsg =
     | ApiSuccess of (string*string)
 
 type StyleChangeMsg =
-    | ToggleBurger
-    | ToggleQuickAcessIconsShown
     | UpdateColorMode of ColorMode
 
 type PersistentStorageMsg =

@@ -438,28 +438,13 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorageMsg) (curr
 
 let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyleState) : SiteStyleState * Cmd<Msg> =
     match styleChangeMsg with
-    | ToggleBurger          ->
-        let nextState = {
-            currentState with
-                BurgerVisible = not currentState.BurgerVisible
-        }
-
-        nextState,Cmd.none
-
-    | ToggleQuickAcessIconsShown ->
-        let nextState = {
-            currentState with
-                QuickAcessIconsShown = not currentState.QuickAcessIconsShown
-        }
-        nextState, Cmd.none
-
     | UpdateColorMode nextColors -> 
         let nextState = {
             currentState with
                 IsDarkMode = nextColors.Name.StartsWith ExcelColors.darkMode.Name;
                 ColorMode = nextColors
         }
-        nextState,Cmd.none
+        nextState, Cmd.none
 
 let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
     match topLevelMsg with
@@ -585,7 +570,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 CurrentUrl = Route.toRouteUrl page
                 }
             | None -> {
-                CurrentPage = Route.Home
+                CurrentPage = Route.TermSearch
                 CurrentUrl = ""
                 }
         let nextModel = {

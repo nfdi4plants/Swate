@@ -33,29 +33,29 @@ type private SplitWindow = {
             RightWindowWidth    = initSideBar
         }
 
-let private onResize_event (model:SplitWindow) (setModel: SplitWindow -> unit) = (fun (e: Event) ->
-    printfn "FIRE"
+let private calculateNewSideBarSize (model:SplitWindow) (pos:float) =
     let windowWidth = Browser.Dom.window.innerWidth
     // must cast to MouseEvent here. Earlier and `Browser.Dom.document.addEventListener` will make problems, and without i cannot access `pageX`.
-    let newWidthSide_pre = windowWidth - model.RightWindowWidth - model.ScrollbarWidth
+    let newWidthSide_pre = windowWidth - pos - model.ScrollbarWidth
     let maxWidth = int Browser.Dom.window.innerWidth - minWidth - int model.ScrollbarWidth
     // Make sure it does not exceed maxWidth, to prevent increasing over screen size.
     let newWidthSide = System.Math.Min(newWidthSide_pre,maxWidth)
+    newWidthSide
+
+let private onResize_event (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) = (fun (e: Event) ->
+    let new_sidebarWidth = calculateNewSideBarSize model model.RightWindowWidth
     //Browser.Dom.console.log("side: ", newWidthSide)
-    { model with RightWindowWidth = newWidthSide } |> setModel
+    //propagateWindowSize new_sidebarWidth dispatch 
+    { model with RightWindowWidth = new_sidebarWidth } |> setModel
 )
     
 /// <summary> This event changes the size of main window and sidebar </summary>
-let private mouseMove_event (model:SplitWindow) (setModel: SplitWindow -> unit) = (fun (e: Event) ->
-    let windowWidth = Browser.Dom.window.innerWidth
-    // must cast to MouseEvent here. Earlier and `Browser.Dom.document.addEventListener` will make problems, and without i cannot access `pageX`.
+let private mouseMove_event (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) = (fun (e: Event) ->
     let pos = (e :?> MouseEvent).clientX
-    let newWidthSide_pre = windowWidth - pos - model.ScrollbarWidth
-    let maxWidth = int Browser.Dom.window.innerWidth - minWidth - int InitScrollbarWidth
-    // Make sure it does not exceed maxWidth, to prevent increasing over screen size.
-    let newWidthSide = System.Math.Min(newWidthSide_pre,maxWidth)
+    let new_sidebarWidth = calculateNewSideBarSize model pos
+    //propagateWindowSize new_sidebarWidth dispatch 
     //Browser.Dom.console.log("side: ", newWidthSide)
-    { model with RightWindowWidth = newWidthSide } |> setModel
+    { model with RightWindowWidth = new_sidebarWidth } |> setModel
 )
 
 let rec private mouseUp_event (mouseMove : Event -> unit) = (fun e ->
@@ -76,7 +76,7 @@ let private mouseDown_event (mouseMove : Event -> unit) : Event -> unit = (fun e
     Browser.Dom.document.addEventListener("mouseup", mouseUp_event mouseMove, options = !!{|once = true; capture = false; passive = false|})
 )
 
-let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) =
+let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.style [
             style.position.absolute
@@ -87,18 +87,18 @@ let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) =
             style.cursor.columnResize
             style.zIndex 9999
         ]
-        prop.onMouseDown <| mouseDown_event (mouseMove_event model setModel)
+        prop.onMouseDown <| mouseDown_event (mouseMove_event model setModel dispatch)
     ]
 
 // https://jsfiddle.net/gaby/Bek9L/
 // https://stackoverflow.com/questions/6219031/how-can-i-resize-a-div-by-dragging-just-one-side-of-it
 /// Splits screen into two parts. Left and right, with a dragbar in between to change size of right side.
 [<ReactComponent>]
-let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) =
+let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) (dispatch: Messages.Msg -> unit) =
     let (model, setModel) = React.useState(SplitWindow.init)
     if not addListener then
         addListener <- true
-        Browser.Dom.window.addEventListener("resize", onResize_event model setModel)
+        Browser.Dom.window.addEventListener("resize", onResize_event model setModel dispatch)
     Html.div [
         prop.style [
             style.display.flex
@@ -125,7 +125,7 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
                     style.overflow.auto
                 ]
                 prop.children [
-                    dragbar model setModel
+                    dragbar model setModel dispatch
                     yield! right 
                 ]
             ]

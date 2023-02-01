@@ -11,7 +11,6 @@ type SwateEntry =
 /// The different pages of the application. If you add a new page, then add an entry here.
 [<RequireQualifiedAccess>]
 type Route =
-| Home
 | BuildingBlock
 | TermSearch
 | Validation
@@ -29,7 +28,6 @@ type Route =
 
     static member toRouteUrl (route:Route) =
         match route with
-        | Route.Home                -> "/"
         | Route.BuildingBlock       -> "/#BuildingBlock"
         | Route.TermSearch          -> "/#TermSearch"
         | Route.FilePicker          -> "/#FilePicker"
@@ -47,7 +45,6 @@ type Route =
 
     member this.toStringRdbl =
         match this with
-        | Route.Home                -> ""
         | Route.BuildingBlock       -> "Building Blocks"
         | Route.TermSearch          -> "Terms"
         | Route.FilePicker          -> "File Picker"
@@ -84,7 +81,6 @@ type Route =
             )
 
         match p with
-        | Route.Home                -> createElem [Fa.Solid.Home                            ]   (p.toStringRdbl)
         | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
         | Route.BuildingBlock       -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
         | Route.Protocol            -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Table      ]   (p.toStringRdbl)
@@ -109,7 +105,7 @@ module Routing =
     /// The URL is turned into a Result.
     let route : Parser<Route -> Route,_> =
         oneOf [
-            map Route.Home                  (s "")
+            map Route.TermSearch            (s "")
             map Route.TermSearch            (s "TermSearch")
             map Route.BuildingBlock         (s "BuildingBlock")
             map Route.FilePicker            (s "FilePicker")

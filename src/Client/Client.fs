@@ -32,13 +32,14 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
 
 let view (model : Model) (dispatch : Msg -> unit) =
     if model.ExcelState.Host <> "null" && model.ExcelState.Platform <> "null" then
-        SidebarView.sidebarView model dispatch
+        SidebarView.SidebarView model dispatch
     else
         let mainWindow = Seq.singleton <| div [] [str "TEasinmdklasjdmlkasjdlknjaslkj"] 
-        let sideWindow = Seq.singleton <| SidebarView.sidebarView model dispatch
+        let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
         SplitWindowView.Main
             mainWindow
             sideWindow
+            dispatch
             
     
 #if DEBUG

@@ -10,7 +10,16 @@ open ExcelColors
 open Model
 open Messages
 
-type ShortCutIcon = {
+type private NavbarState = {
+    BurgerActive: bool
+    QuickAccessActive: bool
+} with
+    static member init = {
+        BurgerActive = false
+        QuickAccessActive = false
+    }
+
+type private ShortCutIcon = {
     Description : string
     FaList      : ReactElement list
     Msg         : Browser.Types.MouseEvent -> unit
@@ -23,7 +32,7 @@ type ShortCutIcon = {
         Category    = category
     }
 
-let shortCutIconList model dispatch =
+let private shortCutIconList model dispatch =
     [
         ShortCutIcon.create
             "Add Annotation Table"
@@ -68,7 +77,7 @@ let shortCutIconList model dispatch =
             "BuildingBlock"
     ]
     
-let navbarShortCutIconList model dispatch =
+let private navbarShortCutIconList model dispatch =
     [
         for icon in shortCutIconList model dispatch do
             yield
@@ -81,18 +90,17 @@ let navbarShortCutIconList model dispatch =
                 ]
     ]
 
-let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
+let private quickAccessDropdownElement model dispatch (state: NavbarState) (setState: NavbarState -> unit) (isSndNavbar:bool) =
     Navbar.Item.div [
         Navbar.Item.Props [
-            OnClick (fun e -> ToggleQuickAcessIconsShown |> StyleChange |> dispatch)
+            OnClick (fun _ -> setState {state with QuickAccessActive = not state.QuickAccessActive})
             Style [
                 Padding "0px";
                 if isSndNavbar then
                     MarginLeft "auto"
             ]
-            Title (if model.SiteStyleState.QuickAcessIconsShown then "Close quick access" else "Open quick access")
+            Title (if state.QuickAccessActive then "Close quick access" else "Open quick access")
         ]
-        Navbar.Item.CustomClass "hideOver575px"
     ] [
         div [Style [
             Width "100%"
@@ -104,7 +112,7 @@ let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
                 BorderColor model.SiteStyleState.ColorMode.Fade
         ]] [
             Button.a [
-                Button.Props [Style [ BackgroundColor "transparent"; Height "100%"; if model.SiteStyleState.QuickAcessIconsShown then Color NFDIColors.Yellow.Base]]
+                Button.Props [Style [ BackgroundColor "transparent"; Height "100%"; if state.QuickAccessActive then Color NFDIColors.Yellow.Base]]
                 Button.Color Color.IsWhite
                 Button.IsInverted
             ] [
@@ -118,8 +126,8 @@ let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
                             Position PositionOptions.Absolute
                             Display DisplayOptions.Block
                             Transition "opacity 0.25s, transform 0.25s"
-                            if model.SiteStyleState.QuickAcessIconsShown then Opacity "1" else Opacity "0"
-                            if model.SiteStyleState.QuickAcessIconsShown then Transform "rotate(-180deg)" else Transform "rotate(0deg)"
+                            if state.QuickAccessActive then Opacity "1" else Opacity "0"
+                            if state.QuickAccessActive then Transform "rotate(-180deg)" else Transform "rotate(0deg)"
                         ]]
                         Fa.Solid.Times
                     ] []
@@ -128,7 +136,7 @@ let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
                             Position PositionOptions.Absolute
                             Display DisplayOptions.Block
                             Transition "opacity 0.25s, transform 0.25s"
-                            if model.SiteStyleState.QuickAcessIconsShown then Opacity "0" else Opacity "1"
+                            if state.QuickAccessActive then Opacity "0" else Opacity "1"
                         ]]
                         Fa.Solid.EllipsisH
                     ] []
@@ -145,120 +153,106 @@ let quickAccessDropdownElement model dispatch (isSndNavbar:bool) =
         ]
     ]
 
-let quickAccessListElement model dispatch =
-    div [Style [Display DisplayOptions.Flex; FlexDirection "row"]; Class "hideUnder575px"] [
+let private quickAccessListElement model dispatch =
+    div [Style [Display DisplayOptions.Flex; FlexDirection "row"]] [
         yield! navbarShortCutIconList model dispatch
     ]
 
 
 open Fable.Core.JsInterop
 
-let quickAccessScalableNavbar (model:Messages.Model) dispatch =
-    div [Class "hideOver575px"] [
-        Navbar.navbar [
-            Navbar.CustomClass "wrapFlexBox"
-            Navbar.Props [
-                Style [
-                    ZIndex 29
-                    if model.SiteStyleState.QuickAcessIconsShown |> not then
-                        Display DisplayOptions.None
-                    else Display DisplayOptions.Flex
-                    yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode
-                    //BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
-                ]
-            ]
-        ] [
-            Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [Flex "1"]]] [
-                yield! navbarShortCutIconList model dispatch
-                //quickAccessDropdownElement model dispatch true
-            ]
-        ]
-    ]
+open Feliz
 
-let navbarComponent (model : Model) (dispatch : Msg -> unit) =
+[<ReactComponent>]
+let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model.WindowSize) =
+    let state, setState = React.useState(NavbarState.init)
     Navbar.navbar [
         Navbar.CustomClass "myNavbarSticky"
         Navbar.Props [
             Id "swate-mainNavbar"; Props.Role "navigation"; AriaLabel "main navigation" ;
-            Style [yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode]
+            Style [yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode; FlexWrap "wrap"]
         ]
     ] [
-        Navbar.Brand.div [Props [Style [Width "100%"]]] [
-            Navbar.Item.div [
-                Navbar.Item.Props [
-                    OnClick (fun e -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
-                    Style [Width "100px"; Cursor "pointer"; Padding "0 0.4rem"]
+        Html.div [
+            prop.style [style.flexBasis (length.percent 100)]
+            prop.children [
+                Navbar.Brand.div [Props [Style [Width "100%"; ]]] [
+                    // Logo
+                    Navbar.Item.div [
+                        Navbar.Item.Props [
+                            OnClick (fun _ -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
+                            Style [Width "100px"; Cursor "pointer"; Padding "0 0.4rem"]
+                        ]
+                    ] [
+                        let path = if model.PersistentStorageState.PageEntry = Routing.Expert then "_e" else ""
+                        Image.image [] [ img [
+                            Style [MaxHeight "100%"]
+                            Props.Src @$"assets\Swate_logo_for_excel{path}.svg"
+                        ] ]
+                    ]
+
+                    // Quick access buttons
+                    match sidebarsize with
+                    | WindowSize.Mini ->
+                        quickAccessDropdownElement model dispatch state setState false
+                    | _ ->
+                        quickAccessListElement model dispatch
+
+                    Navbar.burger [
+                        Navbar.Burger.IsActive state.BurgerActive
+                        Navbar.Burger.OnClick (fun _ -> setState {state with BurgerActive = not state.BurgerActive})
+                        Navbar.Burger.Modifiers [Modifier.TextColor IsWhite]
+                        Navbar.Burger.Props [
+                            Role "button"
+                            AriaLabel "menu"
+                            Props.AriaExpanded false
+                            Style [Display DisplayOptions.Block]
+                    ]] [
+                        span [AriaHidden true] [ ]
+                        span [AriaHidden true] [ ]
+                        span [AriaHidden true] [ ]
+                    ]
                 ]
-            ] [
-                let path = if model.PersistentStorageState.PageEntry = Routing.Expert then "_e" else ""
-                Image.image [] [ img [
-                    Style [MaxHeight "100%"]
-                    Props.Src @$"assets\Swate_logo_for_excel{path}.svg"
-                ] ]
-            ]
-
-            quickAccessListElement model dispatch
-
-            quickAccessDropdownElement model dispatch false
-            Navbar.burger [
-                Navbar.Burger.IsActive model.SiteStyleState.BurgerVisible
-                Navbar.Burger.OnClick (fun e -> ToggleBurger |> StyleChange |> dispatch)
-                Navbar.Burger.Modifiers [Modifier.TextColor IsWhite]
-                Navbar.Burger.Props [
-                    Role "button"
-                    AriaLabel "menu"
-                    Props.AriaExpanded false
-                    Style [Display DisplayOptions.Block]
-            ]] [
-                span [AriaHidden true] [ ]
-                span [AriaHidden true] [ ]
-                span [AriaHidden true] [ ]
+                Navbar.menu [ Navbar.Menu.Props [
+                    Style [yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode; if state.BurgerActive then Display DisplayOptions.Block];
+                    Id "navbarMenu";
+                    Class (if state.BurgerActive then "navbar-menu is-active" else "navbar-menu");
+                ]] [
+                    Navbar.Dropdown.div [ Navbar.Dropdown.Props [Style [if state.BurgerActive then Display DisplayOptions.Block]] ] [
+                        Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.NFDITwitterUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                            str "News "
+                            Fa.i [Fa.Brand.Twitter; Fa.Size Fa.FaLarge; Fa.Props [Style [Color "#1DA1F2"]]] []
+                        ]
+                        Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.SwateWiki ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                            str "How to use"
+                        ]
+                        Navbar.Item.a [Navbar.Item.Props [Href Shared.URLs.Helpdesk.Url; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
+                            str "Contact us!"
+                        ]
+                        Navbar.Item.a [Navbar.Item.Props [
+                            OnClick (fun _ ->
+                                setState {state with BurgerActive = not state.BurgerActive}
+                                UpdatePageState (Some Routing.Route.Settings) |> dispatch
+                            )
+                            Style [ Color model.SiteStyleState.ColorMode.Text]
+                        ]] [
+                            str "Settings"
+                        ]
+                        Navbar.Item.a [Navbar.Item.Props [
+                            Style [ Color model.SiteStyleState.ColorMode.Text];
+                            OnClick (fun e ->
+                                setState {state with BurgerActive = not state.BurgerActive}
+                                UpdatePageState (Some Routing.Route.ActivityLog) |> dispatch
+                            )
+                        ]] [
+                            str "Activity Log"
+                        ]
+                    ]
+                ]
             ]
         ]
-        div [Class "hideOver575px "] [
-            Navbar.Brand.div [CustomClass "wrapFlexBox"; Props [Style [
-                //BorderTop $".5px solid {model.SiteStyleState.ColorMode.Fade}"
-                if model.SiteStyleState.QuickAcessIconsShown |> not then
-                    Display DisplayOptions.None
-                else Display DisplayOptions.Flex
-            ]]] [
+        if state.QuickAccessActive && sidebarsize = WindowSize.Mini then
+            Navbar.Brand.div [Props [Style [FlexGrow "1"; Display DisplayOptions.Flex]]] [
                 yield! navbarShortCutIconList model dispatch
             ]
-        ]
-        Navbar.menu [Navbar.Menu.Props [
-            Style [yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode; if model.SiteStyleState.BurgerVisible then Display DisplayOptions.Block];
-            Id "navbarMenu";
-            Class (if model.SiteStyleState.BurgerVisible then "navbar-menu is-active" else "navbar-menu");
-        ]] [
-            Navbar.Dropdown.div [ Navbar.Dropdown.Props [Style [if model.SiteStyleState.BurgerVisible then Display DisplayOptions.Block]] ] [
-                Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.NFDITwitterUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                    str "News "
-                    Fa.i [Fa.Brand.Twitter; Fa.Size Fa.FaLarge; Fa.Props [Style [Color "#1DA1F2"]]] []
-                ]
-                Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.SwateWiki ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                    str "How to use"
-                ]
-                Navbar.Item.a [Navbar.Item.Props [Href Shared.URLs.Helpdesk.Url; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                    str "Contact us!"
-                ]
-                Navbar.Item.a [Navbar.Item.Props [
-                    OnClick (fun e ->
-                        ToggleBurger |> StyleChange |> dispatch
-                        UpdatePageState (Some Routing.Route.Settings) |> dispatch
-                    )
-                    Style [ Color model.SiteStyleState.ColorMode.Text]
-                ]] [
-                    str "Settings"
-                ]
-                Navbar.Item.a [Navbar.Item.Props [
-                    Style [ Color model.SiteStyleState.ColorMode.Text];
-                    OnClick (fun e ->
-                        ToggleBurger |> StyleChange |> dispatch
-                        UpdatePageState (Some Routing.Route.ActivityLog) |> dispatch
-                    )
-                ]] [
-                    str "Activity Log"
-                ]
-            ]
-        ]
     ]

@@ -9,6 +9,38 @@ open TemplateTypes
 open Thoth.Elmish
 open Routing
 
+type WindowSize =
+/// < 575
+| Mini
+/// > 575
+| MobileMini
+/// > 768
+| Mobile
+/// > 1023
+| Tablet
+/// > 1215
+| Desktop
+/// > 1407
+| Widescreen
+with
+    member this.threshold =
+        match this with
+        | Mini -> 0
+        | MobileMini -> 575
+        | Mobile -> 768
+        | Tablet -> 1023
+        | Desktop -> 1215
+        | Widescreen -> 1407
+    static member ofWidth (width:int) =
+        match width with
+        | _ when width < MobileMini.threshold -> Mini
+        | _ when width < Mobile.threshold -> MobileMini
+        | _ when width < Tablet.threshold -> Mobile
+        | _ when width < Desktop.threshold -> Tablet
+        | _ when width < Widescreen.threshold -> Desktop  
+        | _ when width >= Widescreen.threshold -> Widescreen
+        | anyElse -> failwithf "'%A' triggered an unexpected error when calculating screen size from width." anyElse        
+
 type Cookies =
 | IsDarkMode
 
@@ -124,41 +156,13 @@ module AdvancedSearch =
             HasAdvancedSearchResultsLoading     = false
             AdvancedTermSearchSubpage           = InputFormSubpage
         }
-
-type WindowSize =
-/// < 768
-| Minimal
-/// > 768
-| Mobile
-/// > 1023
-| Tablet
-/// > 1215
-| Desktop
-/// > 1407
-| Widescreen
-with 
-    static member ofWidth (width:int) =
-        match width with
-        | _ when width < 768 -> Minimal
-        | _ when width >= 1407 -> Widescreen
-        | _ when width >= 1215 -> Desktop  
-        | _ when width >= 1023 -> Tablet
-        | _ when width >= 768 -> Mobile
-        | anyElse -> failwithf "'%A' triggered an unexpected error when calculating screen size from width." anyElse         
+ 
 
 type SiteStyleState = {
-    QuickAcessIconsShown : bool
-    BurgerVisible   : bool
-    MainWindowSize  : WindowSize
-    SidebarSize     : WindowSize
     IsDarkMode      : bool
     ColorMode       : ExcelColors.ColorMode
 } with
     static member init (?darkMode) = {
-        QuickAcessIconsShown    = false
-        BurgerVisible           = false
-        MainWindowSize          = Desktop
-        SidebarSize             = Mobile
         IsDarkMode              = if darkMode.IsSome then darkMode.Value else false
         ColorMode               = if darkMode.IsSome && darkMode.Value = true then ExcelColors.darkMode else ExcelColors.colorfullMode
     }
@@ -223,7 +227,7 @@ type PageState = {
             CurrentUrl = Route.toRouteUrl page
             }
         | None -> {
-            CurrentPage = Route.Home
+            CurrentPage = Route.TermSearch
             CurrentUrl = ""
             }
 

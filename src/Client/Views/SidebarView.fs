@@ -1,111 +1,273 @@
 module SidebarView
 
-open Elmish.Navigation
-open Elmish.UrlParser
-open Elmish
-open Elmish.React
 open Fable.React
 open Fable.React.Props
 open Fulma
+open ExcelColors
 open Model
 open Messages
+open Browser
+open Browser.MediaQueryList
+open Browser.MediaQueryListExtensions
 
-let sidebarView (model:Model) (dispatch: Msg -> unit) =
-    match model.PageState.CurrentPage with
-    | Routing.Route.BuildingBlock ->
-        BaseView.baseViewMainElement model dispatch [
+open CustomComponents
+open Fable.Core.JsInterop
+open Feliz
+
+[<Literal>]
+let private Sidebar_Id = "SidebarContainer-ID"
+
+type private SidebarStyle = {
+    Size        : Model.WindowSize
+} with
+    static member init() =
+        {
+            Size = Model.WindowSize.Tablet
+        }
+
+let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
+    let isActive = pageLink.isActive(model.PageState.CurrentPage)
+    Tabs.tab [Tabs.Tab.IsActive isActive] [
+        a [ //Href (Routing.Route.toRouteUrl pageLink)
+            Style [
+                if isActive then
+                    BorderColor model.SiteStyleState.ColorMode.Accent
+                    BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
+                    Color model.SiteStyleState.ColorMode.Accent
+                    BorderBottomColor model.SiteStyleState.ColorMode.BodyBackground
+                else
+                    BorderBottomColor model.SiteStyleState.ColorMode.Accent
+            ]
+            OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
+        ] [
+            Text.span [] [
+                span [Class "hideUnder775px"] [str pageLink.toStringRdbl]
+                span [Class "hideOver775px"] [pageLink |> Routing.Route.toIcon]
+            ]
+
+        ]
+    ]
+
+let private tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
+    Tabs.tabs [
+        Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
+        Tabs.Props [
+            Style [
+                BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
+                CSSProp.Custom ("overflow","visible")
+                PaddingTop "1rem"
+            ]
+        ]
+    ] [
+        yield! tabs
+    ]
+
+let private tabs (model:Model) dispatch =
+    let isIEBrowser : bool = Browser.Dom.window.document?documentMode 
+    tabRow model dispatch [
+        if model.PersistentStorageState.PageEntry = Routing.SwateEntry.Core then
+            createNavigationTab Routing.Route.BuildingBlock         model dispatch
+            createNavigationTab Routing.Route.TermSearch            model dispatch
+            createNavigationTab Routing.Route.Protocol              model dispatch
+            createNavigationTab Routing.Route.FilePicker            model dispatch
+            if not isIEBrowser then
+                // docsrc attribute not supported in iframe in IE
+                createNavigationTab Routing.Route.Dag                   model dispatch
+            createNavigationTab Routing.Route.Info                  model dispatch
+        else
+            createNavigationTab Routing.Route.JsonExport            model dispatch
+            createNavigationTab Routing.Route.TemplateMetadata      model dispatch
+            createNavigationTab Routing.Route.Validation            model dispatch
+            createNavigationTab Routing.Route.Info                  model dispatch
+    ]
+
+
+//let sndRowTabs (model:Model) dispatch =
+//    tabRow model dispatch [ ]
+
+let private footerContentStatic (model:Model) dispatch =
+    div [] [
+        str "Swate Release Version "
+        a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
+    ]
+
+module private ResizeObserver =
+
+    open Fable.Core
+    open Fable.Core.JS
+    open Fable.Core.JsInterop
+
+    type ResizeObserverEntry = {
+        borderBoxSize: obj
+        contentBoxSize: obj
+        contentRect: obj
+        devicePixelContentBoxSize: obj
+        target: obj
+    }
+
+    //let private propagateMainWindowSize (dispatch: Messages.Msg -> unit) =
+    //    let windowWidth = Browser.Dom.window.innerWidth
+    //    let sidebar = Model.WindowSize.ofWidth (int sidebarSize)
+    //    let mainWindow = Model.WindowSize.ofWidth <| int (windowWidth - sidebarSize)
+    //    (mainWindow, sidebar) |> Messages.StyleChangeMsg.UpdateWindowSizes |> Messages.StyleChange |> dispatch
+
+    type ResizeObserver =
+        abstract observe: obj -> unit
+
+    type ResizeObserverStatic =
+        [<Emit("new $0($1)")>]
+        abstract create : (ResizeObserverEntry [] -> unit) -> ResizeObserver
+
+    [<Global("ResizeObserver")>]
+    let MyObserver : ResizeObserverStatic = jsNative
+
+    let observer (state: SidebarStyle, setState: SidebarStyle -> unit) =
+        MyObserver.create(fun ele ->
+            let width = int ele.[0].contentRect?width
+            //let size = ele.
+            let nextState = {
+                state with
+                    Size = Model.WindowSize.ofWidth width
+            }
+            setState nextState
+        )
+
+
+let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: SidebarStyle) (setState: SidebarStyle -> unit) (children: ReactElement list) =
+
+    div [
+        Id Sidebar_Id
+        OnLoad(fun e ->
+            let ele = Browser.Dom.document.getElementById(Sidebar_Id)
+            ResizeObserver.observer(state, setState).observe(ele)
+        )
+        OnClick (fun e ->
+            if model.TermSearchState.ShowSuggestions
+                || model.AddBuildingBlockState.ShowUnitTermSuggestions
+                || model.AddBuildingBlockState.ShowUnit2TermSuggestions
+                || model.AddBuildingBlockState.ShowBuildingBlockTermSuggestions
+            then
+                TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
+            if model.AddBuildingBlockState.ShowBuildingBlockSelection then
+                BuildingBlockMsg BuildingBlock.ToggleSelectionDropdown |> dispatch
+        )
+        Style [
+            BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"; Display DisplayOptions.Block
+        ]
+    ] children
+
+
+module private Content =
+    let main (model:Model) (dispatch: Msg -> unit) =
+        match model.PageState.CurrentPage with
+        | Routing.Route.BuildingBlock ->
             BuildingBlock.addBuildingBlockComponent model dispatch
-        ] [
-            BuildingBlock.addBuildingBlockFooterComponent model dispatch
-        ]
 
-    | Routing.Route.TermSearch ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.TermSearch ->
             TermSearch.termSearchComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.Validation ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.Validation ->
             Validation.validationComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.FilePicker ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.FilePicker ->
             FilePicker.filePickerComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.Protocol ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.Protocol ->
             Protocol.Core.fileUploadViewComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.JsonExport ->
-        BaseView.baseViewMainElement model dispatch [
+
+        | Routing.Route.JsonExport ->
             JsonExporter.Core.jsonExporterMainElement model dispatch
-        ] [ (*Footer*) ]
 
-    | Routing.Route.TemplateMetadata ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.TemplateMetadata ->
             TemplateMetadata.Core.newNameMainElement model dispatch
-        ] [ (*Footer*) ]
 
-    | Routing.Route.ProtocolSearch ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.ProtocolSearch ->
             Protocol.Search.protocolSearchView model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.ActivityLog ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.ActivityLog ->
             ActivityLog.activityLogComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.Settings ->
-        BaseView.baseViewMainElement model dispatch [
+
+        | Routing.Route.Settings ->
             SettingsView.settingsViewComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.SettingsXml ->
-        BaseView.baseViewMainElement model dispatch [
+
+        | Routing.Route.SettingsXml ->
             SettingsXml.settingsXmlViewComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.Dag ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.Dag ->
             Dag.Core.mainElement model dispatch
-        ] [ (*Footer*) ]
 
-    | Routing.Route.Info ->
-        BaseView.baseViewMainElement model dispatch [
+        | Routing.Route.Info ->
             InfoView.infoComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
 
-    | Routing.Route.NotFound ->
-        BaseView.baseViewMainElement model dispatch [
+
+        | Routing.Route.NotFound ->
             NotFoundView.notFoundComponent model dispatch
+
+    let footer (model:Model) (dispatch: Msg -> unit) =
+        let c =
+            match model.PageState.CurrentPage with
+            | Routing.Route.BuildingBlock ->
+                 BuildingBlock.addBuildingBlockFooterComponent model dispatch
+                 |> List.singleton
+            | _ ->
+                []
+        if List.isEmpty c |> not then
+            Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
+                Content.content [
+                    Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
+                    Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
+                ] [
+                    yield! c
+                ]
+            ]
+        else
+            Html.div []
+        
+
+/// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
+[<ReactComponent>]
+let SidebarView (model: Model) (dispatch: Msg -> unit) =
+    let state, setState = React.useState(SidebarStyle.init)
+    viewContainer model dispatch state setState [
+        Navbar.NavbarComponent model dispatch state.Size
+        //Navbar.quickAccessScalableNavbar model dispatch
+        Container.container [
+            Container.IsFluid
         ] [
-            //Text.p [] [str ""]
+            //tabs model dispatch
+            //sndRowTabs model dispatch
+
+            str <| state.Size.ToString()
+
+            if (not model.ExcelState.HasAnnotationTable) then
+                CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
+
+            // Error Modal element, not shown when no lastFullError
+            if model.DevState.LastFullError.IsSome then
+                CustomComponents.ErrorModal.errorModal model dispatch
+
+            if model.WarningModal.IsSome then
+                CustomComponents.WarningModal.warningModal model dispatch
+
+            if model.BuildingBlockDetailsState.ShowDetails then
+                CustomComponents.BuildingBlockDetailsModal.buildingBlockDetailModal model dispatch
+
+            if not model.DevState.DisplayLogList.IsEmpty then
+                CustomComponents.InteropLoggingModal.interopLoggingModal model dispatch
+
+            if model.CytoscapeModel.ShowModal then
+                Cytoscape.View.view model dispatch
+
+            Content.main model dispatch
+
+            Content.footer model dispatch
         ]
 
-    | Routing.Route.Home ->
-        Container.container [] [
-            div [] [ str "This is the Swate web host. For a preview click on the following link." ]
-            a [ Href (Routing.Route.toRouteUrl Routing.Route.TermSearch) ] [ str "Termsearch" ]
+        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]] [
+            footerContentStatic model dispatch
         ]
+
+    ]

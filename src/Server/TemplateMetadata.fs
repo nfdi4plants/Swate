@@ -72,7 +72,7 @@ let private convertToDynObject (sheetData:DocumentFormat.OpenXml.Spreadsheet.She
     let rows = SheetData.getRows sheetData |> Array.ofSeq
     let rowValues =
         rows
-        |> Array.map (fun row ->
+        |> Array.mapi (fun i row ->
             let spans = row.Spans
             let leftB,rightB = Row.Spans.toBoundaries spans
             [|
@@ -146,5 +146,4 @@ let parseDynMetadataFromByteArr (byteArray:byte []) =
     let sst = Spreadsheet.tryGetSharedStringTable spreadsheet
     let sheetOpt = Spreadsheet.tryGetSheetBySheetName TemplateTypes.Metadata.TemplateMetadataWorksheetName spreadsheet
     if sheetOpt.IsNone then failwith $"Could not find template metadata worksheet: {TemplateTypes.Metadata.TemplateMetadataWorksheetName}"
-
     convertToDynObject sheetOpt.Value sst Metadata.root
