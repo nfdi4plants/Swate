@@ -48,7 +48,7 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
         ]
     ]
 
-let private tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
+let private tabRow (model:Model) (tabs: seq<ReactElement>)=
     Tabs.tabs [
         Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
         Tabs.Props [
@@ -64,7 +64,7 @@ let private tabRow (model:Model) dispatch (tabs: seq<ReactElement>)=
 
 let private tabs (model:Model) dispatch =
     let isIEBrowser : bool = Browser.Dom.window.document?documentMode 
-    tabRow model dispatch [
+    tabRow model [
         if model.PersistentStorageState.PageEntry = Routing.SwateEntry.Core then
             createNavigationTab Routing.Route.BuildingBlock         model dispatch
             createNavigationTab Routing.Route.TermSearch            model dispatch
@@ -82,13 +82,12 @@ let private tabs (model:Model) dispatch =
     ]
 
 
-//let sndRowTabs (model:Model) dispatch =
-//    tabRow model dispatch [ ]
-
-let private footerContentStatic (model:Model) dispatch =
-    div [] [
-        str "Swate Release Version "
-        a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
+let private footer (model:Model) =
+    div [Style [Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Position PositionOptions.Sticky; Width "inherit"; Bottom "0"; TextAlign TextAlignOptions.Center ]] [
+        div [] [
+            str "Swate Release Version "
+            a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
+        ]
     ]
 
 module private ResizeObserver =
@@ -152,7 +151,11 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
                 BuildingBlockMsg BuildingBlock.ToggleSelectionDropdown |> dispatch
         )
         Style [
-            BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text; PaddingBottom "2rem"; Display DisplayOptions.Block
+            BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;
+            Display DisplayOptions.Flex
+            FlexGrow "1"
+            FlexDirection "column"
+            Position PositionOptions.Relative
         ]
     ] children
 
@@ -233,7 +236,7 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
     let state, setState = React.useState(SidebarStyle.init)
     viewContainer model dispatch state setState [
         Navbar.NavbarComponent model dispatch state.Size
-        //Navbar.quickAccessScalableNavbar model dispatch
+
         Container.container [
             Container.IsFluid
         ] [
@@ -265,9 +268,5 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
 
             Content.footer model dispatch
         ]
-
-        div [Style [Position PositionOptions.Fixed; Bottom "0"; Width "100%"; TextAlign TextAlignOptions.Center; Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]] [
-            footerContentStatic model dispatch
-        ]
-
+        footer model
     ]

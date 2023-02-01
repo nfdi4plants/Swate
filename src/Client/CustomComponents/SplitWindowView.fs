@@ -123,6 +123,7 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
                     style.height(length.vh 100)
                     style.width(length.perc 100)
                     style.overflow.auto
+                    style.display.flex
                 ]
                 prop.children [
                     dragbar model setModel dispatch
