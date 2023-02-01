@@ -43,9 +43,10 @@ let private calculateNewSideBarSize (model:SplitWindow) (pos:float) =
     newWidthSide
 
 let private onResize_event (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) = (fun (e: Event) ->
-    let new_sidebarWidth = calculateNewSideBarSize model model.RightWindowWidth
+    let windowWidth = Browser.Dom.window.innerWidth
+    let new_sidebarWidth = calculateNewSideBarSize model (windowWidth - model.RightWindowWidth)
     //Browser.Dom.console.log("side: ", newWidthSide)
-    //propagateWindowSize new_sidebarWidth dispatch 
+    //propagateWindowSize new_sidebarWidth dispatch
     { model with RightWindowWidth = new_sidebarWidth } |> setModel
 )
     

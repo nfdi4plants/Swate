@@ -128,6 +128,7 @@ module private ResizeObserver =
                 state with
                     Size = Model.WindowSize.ofWidth width
             }
+            printfn "[FIRE OBSERVER]"
             setState nextState
         )
 
