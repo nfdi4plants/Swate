@@ -25,7 +25,7 @@ type private SidebarStyle = {
             Size = Model.WindowSize.Tablet
         }
 
-let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
+let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) (sidebarsize: Model.WindowSize) = 
     let isActive = pageLink.isActive(model.PageState.CurrentPage)
     Tabs.tab [Tabs.Tab.IsActive isActive] [
         a [ //Href (Routing.Route.toRouteUrl pageLink)
@@ -41,14 +41,17 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
             OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
         ] [
             Text.span [] [
-                span [Class "hideUnder775px"] [str pageLink.toStringRdbl]
-                span [Class "hideOver775px"] [pageLink |> Routing.Route.toIcon]
+                match sidebarsize with
+                | Mini | MobileMini -> 
+                    span [] [pageLink |> Routing.Route.toIcon]
+                | _ -> 
+                    span [] [str pageLink.toStringRdbl]
             ]
 
         ]
     ]
 
-let private tabRow (model:Model) (tabs: seq<ReactElement>)=
+let private tabRow (model:Model) (tabs: seq<ReactElement>) =
     Tabs.tabs [
         Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
         Tabs.Props [
@@ -62,23 +65,23 @@ let private tabRow (model:Model) (tabs: seq<ReactElement>)=
         yield! tabs
     ]
 
-let private tabs (model:Model) dispatch =
+let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
     let isIEBrowser : bool = Browser.Dom.window.document?documentMode 
     tabRow model [
         if model.PersistentStorageState.PageEntry = Routing.SwateEntry.Core then
-            createNavigationTab Routing.Route.BuildingBlock         model dispatch
-            createNavigationTab Routing.Route.TermSearch            model dispatch
-            createNavigationTab Routing.Route.Protocol              model dispatch
-            createNavigationTab Routing.Route.FilePicker            model dispatch
+            createNavigationTab Routing.Route.BuildingBlock         model dispatch sidebarsize
+            createNavigationTab Routing.Route.TermSearch            model dispatch sidebarsize
+            createNavigationTab Routing.Route.Protocol              model dispatch sidebarsize
+            createNavigationTab Routing.Route.FilePicker            model dispatch sidebarsize
             if not isIEBrowser then
                 // docsrc attribute not supported in iframe in IE
-                createNavigationTab Routing.Route.Dag                   model dispatch
-            createNavigationTab Routing.Route.Info                  model dispatch
+                createNavigationTab Routing.Route.Dag               model dispatch sidebarsize
+            createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
         else
-            createNavigationTab Routing.Route.JsonExport            model dispatch
-            createNavigationTab Routing.Route.TemplateMetadata      model dispatch
-            createNavigationTab Routing.Route.Validation            model dispatch
-            createNavigationTab Routing.Route.Info                  model dispatch
+            createNavigationTab Routing.Route.JsonExport            model dispatch sidebarsize
+            createNavigationTab Routing.Route.TemplateMetadata      model dispatch sidebarsize
+            createNavigationTab Routing.Route.Validation            model dispatch sidebarsize
+            createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
     ]
 
 
@@ -241,7 +244,7 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
         Container.container [
             Container.IsFluid
         ] [
-            //tabs model dispatch
+            tabs model dispatch state.Size
             //sndRowTabs model dispatch
 
             str <| state.Size.ToString()

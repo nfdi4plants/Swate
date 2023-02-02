@@ -34,3 +34,5 @@ let mainFunctionContainer children =
             BorderImageSource $"linear-gradient({colorArr.[if order then 0 else 1]} {100-rndVal}%%, {colorArr.[if order then 1 else 0]})"
             order <- not order
     ] ] children
+
+

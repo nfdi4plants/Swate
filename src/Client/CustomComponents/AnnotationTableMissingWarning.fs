@@ -30,10 +30,16 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
             str "Your worksheet seems to contain no annotation table. You can create one by pressing the button below."
         ]
         Field.div [] [
-            Button.buttonComponent
-                model.SiteStyleState.ColorMode
-                model.SiteStyleState.IsDarkMode
-                "create annotation table"
-                (fun e -> OfficeInterop.CreateAnnotationTable (model.SiteStyleState.IsDarkMode, e.ctrlKey) |> OfficeInteropMsg |> dispatch )
+            Button.button [
+                if model.SiteStyleState.IsDarkMode then
+                    Button.Color IsWarning
+                    Button.IsOutlined
+                else
+                    Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyForeground; Color model.SiteStyleState.ColorMode.Text]]
+                Button.IsFullWidth
+                Button.OnClick (fun e -> OfficeInterop.CreateAnnotationTable (model.SiteStyleState.IsDarkMode, e.ctrlKey) |> OfficeInteropMsg |> dispatch )
+                ] [
+                str "create annotation table"
+            ]                
         ]
     ]

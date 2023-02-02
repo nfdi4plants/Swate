@@ -8,7 +8,7 @@ open Browser.Types
 let mutable private InitScrollbarWidth = 0.0
 let mutable addListener = false
 
-let private minWidth = 300
+let private minWidth = 400
 
 /// If you change anything here. Make sure it is only added ONCE and then removed ONCE!
 /// Note: Add the commented console.logs to ensure.

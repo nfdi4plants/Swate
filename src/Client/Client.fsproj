@@ -31,13 +31,11 @@
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="modals\Controller.fs" />
         <Compile Include="CustomComponents\SplitWindowView.fs" />
         <Compile Include="CustomComponents\InteropLoggingModal.fs" />
-        <Compile Include="CustomComponents\ActionButton.fs" />
         <Compile Include="CustomComponents\FunctionContainer.fs" />
         <Compile Include="CustomComponents\ResponsiveFA.fs" />
-        <Compile Include="CustomComponents\DwnButton.fs" />
-        <Compile Include="CustomComponents\Button.fs" />
         <Compile Include="CustomComponents\AnnotationTableMissingWarning.fs" />
         <Compile Include="CustomComponents\Navbar.fs" />
         <Compile Include="CustomComponents\Loading.fs" />
