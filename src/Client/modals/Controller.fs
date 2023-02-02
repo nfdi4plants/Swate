@@ -26,3 +26,11 @@ let removeModal(name:string) =
     let id = createId name
     let ele = Browser.Dom.document.getElementById(id)
     if not <| isNull ele then ele.remove()
+
+
+// https://shmew.github.io/Feliz.SweetAlert/#/SweetAlert/Examples/Elmish/DynamicQueue
+
+open Elmish
+open Feliz
+open Feliz.ElmishComponents
+open Fable.SimpleJson
