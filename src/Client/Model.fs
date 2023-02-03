@@ -168,12 +168,10 @@ type SiteStyleState = {
     }
 
 type DevState = {
-    LastFullError                       : System.Exception option
     Log                                 : LogItem list
     DisplayLogList                      : LogItem list
 } with
     static member init () = {
-        LastFullError   = None
         DisplayLogList  = []
         Log             = []
     }
@@ -375,12 +373,10 @@ type RequestBuildingBlockInfoStates =
 
 type BuildingBlockDetailsState = {
     CurrentRequestState : RequestBuildingBlockInfoStates
-    ShowDetails         : bool
     BuildingBlockValues : TermSearchable []
 } with
     static member init () = {
         CurrentRequestState = Inactive
-        ShowDetails         = false
         BuildingBlockValues = [||]
     }
 

@@ -1,4 +1,4 @@
-module CustomComponents.Loading
+module Modals.Loading
 
 open Fable.React
 open Fable.React.Props

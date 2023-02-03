@@ -449,7 +449,7 @@ let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Ms
                 div [
                     Style [Width "100%"; Display DisplayOptions.Flex; JustifyContent "center"]
                 ] [
-                    Loading.loadingComponent
+                    Modals.Loading.loadingComponent
                 ]
             else
                 let init: ResultsTable.TableModel = {

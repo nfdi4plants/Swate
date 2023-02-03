@@ -63,21 +63,18 @@ module Dev =
             let nextState = {
                 currentState with
                     Log = LogItem.Error(System.DateTime.Now,e.GetPropagatedError())::currentState.Log
-                    LastFullError = Some (e)
                 }
-            nextState, nextCmd
+            let batch = Cmd.batch [
+                let modalName = "FullError"
+                Cmd.ofSub(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
+                nextCmd
+            ]
+            nextState, batch
 
         | UpdateDisplayLogList newList ->
             let nextState = {
                 currentState with
                     DisplayLogList = newList
-            }
-            nextState, Cmd.none
-
-        | UpdateLastFullError (eOpt) ->
-            let nextState = {
-                currentState with
-                    LastFullError = eOpt
             }
             nextState, Cmd.none
 
@@ -446,15 +443,13 @@ let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyle
         }
         nextState, Cmd.none
 
-let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
+let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
     match topLevelMsg with
     // Client
-    | ToggleShowDetails ->
-        let nb = currentState.ShowDetails |> not
+    | UpdateBuildingBlockValues nextValues ->
         let nextState = {
             currentState with
-                ShowDetails         = nb
-                BuildingBlockValues = if nb = false then [||] else currentState.BuildingBlockValues
+                BuildingBlockValues = nextValues
         }
         nextState, Cmd.none
     | UpdateCurrentRequestState nextRequState ->
@@ -484,11 +479,13 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
     | GetSelectedBuildingBlockTermsResponse searchTermResults ->
         let nextState = {
             currentState with
-                ShowDetails         = true
                 BuildingBlockValues = searchTermResults
                 CurrentRequestState = Inactive
         }
-        nextState, Cmd.none
+        let cmd = Cmd.ofSub(fun dispatch ->
+            Modals.Controller.renderModal("BuildingBlockDetails", Modals.BuildingBlockDetailsModal.buildingBlockDetailModal(nextState, dispatch))
+        )
+        nextState, cmd
 
 let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
     match topLevelMsg with
@@ -545,12 +542,6 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                     msgSeq |> Seq.map Cmd.ofMsg
             ]
         currentModel, cmd
-    | UpdateWarningModal (nextModalOpt) ->
-        let nextModel = {
-            currentModel with
-                WarningModal = nextModalOpt
-        }
-        nextModel, Cmd.none
     | UpdatePageState (pageOpt:Route option) ->
         let nextCmd =
             match pageOpt with
@@ -720,7 +711,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | BuildingBlockDetails buildingBlockDetailsMsg ->
         let nextState, nextCmd =
             currentModel.BuildingBlockDetailsState
-            |> handleBuildingBlockMsg buildingBlockDetailsMsg
+            |> handleBuildingBlockDetailsMsg buildingBlockDetailsMsg
 
         let nextModel = {
             currentModel with

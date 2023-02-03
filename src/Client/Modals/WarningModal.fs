@@ -1,4 +1,4 @@
-module CustomComponents.InteropLoggingModal
+module Modals.WarningModal
 
 open Fable.React
 open Fable.React.Props
@@ -10,9 +10,10 @@ open Model
 open Messages
 open Shared
 
-let interopLoggingModal (model:Model) dispatch =
-    let closeMsg = fun e -> UpdateDisplayLogList [] |> DevMsg |> dispatch
-    let logs = model.DevState.DisplayLogList
+let warningModal (warning:{|NextMsg:Msg; ModalMessage: string|}, model, dispatch) (rmv: _ -> unit) =
+    let msg = fun _ -> warning.NextMsg |> dispatch
+    let closeMsg = rmv
+    let message = warning.ModalMessage
     Modal.modal [ Modal.IsActive true] [
         Modal.background [
             Props [ OnClick closeMsg ]
@@ -24,21 +25,16 @@ let interopLoggingModal (model:Model) dispatch =
                 Props [OnClick closeMsg]
             ] []
             Field.div [] [
-                Table.table [
-                Table.IsFullWidth
-                Table.Props [ExcelColors.colorBackground model.SiteStyleState.ColorMode]
-            ] [
-                tbody [] (
-                    logs
-                    |> List.map LogItem.toTableRow
-                )
-            ]
+                str message
             ]
             Field.div [] [
                 Button.a [
                     Button.Color IsWarning
                     Button.Props [Style [Float FloatOptions.Right]]
-                    Button.OnClick closeMsg
+                    Button.OnClick (fun e ->
+                        closeMsg e
+                        msg e
+                    )
                 ] [
                     str "Continue"
                 ]

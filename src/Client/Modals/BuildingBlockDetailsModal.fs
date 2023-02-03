@@ -1,4 +1,4 @@
-module CustomComponents.BuildingBlockDetailsModal
+module Modals.BuildingBlockDetailsModal
 
 open Fable.React
 open Fable.React.Props
@@ -12,14 +12,14 @@ open Shared
 open TermTypes
 
 
-let getBuildingBlockHeader (terms:TermSearchable []) =
+let private getBuildingBlockHeader (terms:TermSearchable []) =
     terms |> Array.tryFind (fun x -> x.RowIndices = [|0|])
 
-let getBodyRows (terms:TermSearchable []) =
+let private getBodyRows (terms:TermSearchable []) =
     terms |> Array.filter (fun x -> x.RowIndices <> [|0|])
 
 /// used to parse rowIndices into subsequent windows e.g. "1..3, 5..8"
-let windowRowIndices (rowIndices:int [])=
+let private windowRowIndices (rowIndices:int [])=
     let splitArrToContinous (l: int []) =
         l 
         |> Array.indexed 
@@ -43,7 +43,7 @@ let windowRowIndices (rowIndices:int [])=
     sprintedRowIndices |> String.concat ", "
 
 /// parses rowIndices to a nicely formatted sting
-let rowIndicesToReadable (rowIndices:int []) =
+let private rowIndicesToReadable (rowIndices:int []) =
     if rowIndices.Length > 1 then
         windowRowIndices rowIndices
     elif rowIndices = [|0|] then
@@ -51,7 +51,7 @@ let rowIndicesToReadable (rowIndices:int []) =
     else
         $"{rowIndices.[0]}"
 
-let infoIcon (txt:string) =
+let private infoIcon (txt:string) =
     span [
         Style [Color NFDIColors.Yellow.Base; (*OverflowY OverflowOptions.Visible*)]
         Class ("has-tooltip-right has-tooltip-multiline")
@@ -63,10 +63,10 @@ let infoIcon (txt:string) =
     ]
 
 [<Literal>]
-let userSpecificTermMsg = "This Term was not found in the database."
+let private userSpecificTermMsg = "This Term was not found in the database."
 
 /// Parses TermSearchable to table row only for HEADERS. Addresses found search results and free text input.
-let searchResultTermToTableHeaderElement (term:TermSearchable option) =
+let private searchResultTermToTableHeaderElement (term:TermSearchable option) =
     match term with
     | Some isEmpty when isEmpty.Term.Name = "" && isEmpty.Term.TermAccession = "" ->
         tr [] [
@@ -100,7 +100,7 @@ let searchResultTermToTableHeaderElement (term:TermSearchable option) =
 
 
 /// Parses TermSearchable to table row. Addresses found search results and free text input.
-let searchResultTermToTableElement (term:TermSearchable) =
+let private searchResultTermToTableElement (term:TermSearchable) =
     match term with
     | isEmpty when term.Term.Name = "" && term.Term.TermAccession = "" ->
         tr [] [
@@ -126,7 +126,7 @@ let searchResultTermToTableElement (term:TermSearchable) =
     | anythingElse -> failwith $"""Swate encountered an error when trying to parse {anythingElse} to search results."""
 
 /// This element is used if the TermSearchable types for the selected building block do not contain a unit.
-let tableElement (terms:TermSearchable []) =
+let private tableElement (terms:TermSearchable []) =
     let rowHeader = getBuildingBlockHeader terms
     let bodyRows = getBodyRows terms
     Table.table [
@@ -151,15 +151,15 @@ let tableElement (terms:TermSearchable []) =
         ]
     ]
 
-let buildingBlockDetailModal (model:Model) dispatch =
-    let closeMsg = (fun e -> ToggleShowDetails |> BuildingBlockDetails |> dispatch)
+let buildingBlockDetailModal (model:BuildingBlockDetailsState, dispatch) (rmv: _ -> unit) =
+    let closeMsg = fun e ->
+        rmv e
+        UpdateBuildingBlockValues [||] |> BuildingBlockDetails |> dispatch
 
-    let baseArr = model.BuildingBlockDetailsState.BuildingBlockValues |> Array.sortBy (fun x -> x.RowIndices |> Array.min)
+    let baseArr = model.BuildingBlockValues |> Array.sortBy (fun x -> x.RowIndices |> Array.min)
 
     Modal.modal [ Modal.IsActive true ] [
-        Modal.background [
-            Props [ OnClick closeMsg ]
-        ] [ ]
+        Modal.background [ Props [ OnClick closeMsg]] [ ]
         Notification.notification [
             Notification.Props [Style [Width "90%"; MaxHeight "80%"]]
         ] [

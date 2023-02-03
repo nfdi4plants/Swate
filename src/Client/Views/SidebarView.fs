@@ -234,6 +234,8 @@ module private Content =
             Html.div []
         
 
+open Feliz
+
 /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
 [<ReactComponent>]
 let SidebarView (model: Model) (dispatch: Msg -> unit) =
@@ -252,18 +254,8 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
 
-            // Error Modal element, not shown when no lastFullError
-            if model.DevState.LastFullError.IsSome then
-                CustomComponents.ErrorModal.errorModal model dispatch
-
-            if model.WarningModal.IsSome then
-                CustomComponents.WarningModal.warningModal model dispatch
-
-            if model.BuildingBlockDetailsState.ShowDetails then
-                CustomComponents.BuildingBlockDetailsModal.buildingBlockDetailModal model dispatch
-
             if not model.DevState.DisplayLogList.IsEmpty then
-                CustomComponents.InteropLoggingModal.interopLoggingModal model dispatch
+                Modals.InteropLoggingModal.interopLoggingModal model dispatch
 
             if model.CytoscapeModel.ShowModal then
                 Cytoscape.View.view model dispatch

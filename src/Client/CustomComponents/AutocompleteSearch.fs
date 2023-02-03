@@ -292,7 +292,7 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
                     tbody [Style [Height "75px"]] [
                         tr [] [
                             td [Style [TextAlign TextAlignOptions.Center]] [
-                                Loading.loadingComponent
+                                Modals.Loading.loadingComponent
                                 br []
                             ]
                         ]

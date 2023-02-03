@@ -61,8 +61,7 @@ type DevMsg =
     | GenericLog            of Cmd<Messages.Msg> * (string*string)
     | GenericInteropLogs    of Cmd<Messages.Msg> * InteropLogging.Msg list
     | GenericError          of Cmd<Messages.Msg> * exn
-    | UpdateDisplayLogList of LogItem list
-    | UpdateLastFullError   of exn option
+    | UpdateDisplayLogList  of LogItem list
     
 type ApiRequestMsg =
     | GetNewTermSuggestions                     of string
@@ -154,7 +153,7 @@ module Protocol =
 type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockTermsRequest      of TermSearchable []
     | GetSelectedBuildingBlockTermsResponse     of TermSearchable []
-    | ToggleShowDetails
+    | UpdateBuildingBlockValues                 of TermSearchable []
     | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
 
 module SettingsXml =
@@ -207,7 +206,6 @@ type Model = {
     CytoscapeModel              : Cytoscape.Model
     ///Used to manage functions specifically for data stewards
     SettingsDataStewardState    : SettingsDataStewardState
-    WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
@@ -243,8 +241,6 @@ type Msg =
 | TopLevelMsg           of TopLevelMsg
 | UpdatePageState       of Routing.Route option
 | Batch                 of seq<Messages.Msg>
-/// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
-| UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
 /// Top level msg to test specific  api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI
@@ -287,5 +283,4 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         DagModel                    = Dag.Model                 .init ()
         CytoscapeModel              = Cytoscape.Model           .init ()
-        WarningModal                = None
     }

@@ -7,7 +7,8 @@ open Browser.Types
 /// Without this the scrollbar will offset the splitWindowElement
 let mutable private InitScrollbarWidth = 0.0
 let mutable addListener = false
-
+[<Literal>]
+let private sidebarId = "sidebar_window"
 let private minWidth = 400
 
 /// If you change anything here. Make sure it is only added ONCE and then removed ONCE!
@@ -27,10 +28,10 @@ type private SplitWindow = {
     RightWindowWidth    : float
 } with
     static member init() =
-        let initSideBar = 400
+        let initSidebarWidth = 400
         {
             ScrollbarWidth      = InitScrollbarWidth
-            RightWindowWidth    = initSideBar
+            RightWindowWidth    = initSidebarWidth
         }
 
 let private calculateNewSideBarSize (model:SplitWindow) (pos:float) =
@@ -42,16 +43,16 @@ let private calculateNewSideBarSize (model:SplitWindow) (pos:float) =
     let newWidthSide = System.Math.Min(newWidthSide_pre,maxWidth)
     newWidthSide
 
-let private onResize_event (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) = (fun (e: Event) ->
+let private onResize_event (model:SplitWindow) (setModel: SplitWindow -> unit) = (fun (e: Event) ->
+    /// must get width like this, cannot propagate model correctly.
+    let sidebarWindow = Browser.Dom.document.getElementById(sidebarId).clientWidth
     let windowWidth = Browser.Dom.window.innerWidth
-    let new_sidebarWidth = calculateNewSideBarSize model (windowWidth - model.RightWindowWidth)
-    //Browser.Dom.console.log("side: ", newWidthSide)
-    //propagateWindowSize new_sidebarWidth dispatch
+    let new_sidebarWidth = calculateNewSideBarSize model (windowWidth - sidebarWindow)
     { model with RightWindowWidth = new_sidebarWidth } |> setModel
 )
     
 /// <summary> This event changes the size of main window and sidebar </summary>
-let private mouseMove_event (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) = (fun (e: Event) ->
+let private mouseMove_event (model:SplitWindow) (setModel: SplitWindow -> unit) = (fun (e: Event) ->
     let pos = (e :?> MouseEvent).clientX
     let new_sidebarWidth = calculateNewSideBarSize model pos
     //propagateWindowSize new_sidebarWidth dispatch 
@@ -88,7 +89,7 @@ let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatc
             style.cursor.columnResize
             style.zIndex 9999
         ]
-        prop.onMouseDown <| mouseDown_event (mouseMove_event model setModel dispatch)
+        prop.onMouseDown <| mouseDown_event (mouseMove_event model setModel)
     ]
 
 // https://jsfiddle.net/gaby/Bek9L/
@@ -99,7 +100,7 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
     let (model, setModel) = React.useState(SplitWindow.init)
     if not addListener then
         addListener <- true
-        Browser.Dom.window.addEventListener("resize", onResize_event model setModel dispatch)
+        Browser.Dom.window.addEventListener("resize", onResize_event model setModel)
     Html.div [
         prop.style [
             style.display.flex
@@ -116,6 +117,7 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
                 prop.children left
             ]
             Html.div [
+                prop.id sidebarId
                 prop.style [
                     style.float'.right;
                     //style.width (length.px model.RightWindowWidth); // might not be necessary

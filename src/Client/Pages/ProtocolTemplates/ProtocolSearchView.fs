@@ -42,7 +42,7 @@ let protocolSearchView (model:Model) dispatch =
             Help.help [Help.Color IsDanger] [str "No Protocols were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
 
         if isLoading then
-            CustomComponents.Loading.loadingModal
+            Modals.Loading.loadingModal
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search the database for a protocol template you want to use."]
 
