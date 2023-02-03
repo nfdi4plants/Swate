@@ -7,18 +7,6 @@ module Update =
 
     let update (msg:Cytoscape.Msg) (currentState: Cytoscape.Model) (currentModel:Messages.Model) : Cytoscape.Model * Messages.Model  * Cmd<Messages.Msg> =
         match msg with
-        //| Cytoscape.Msg.UpdateCyObject newCyObject ->
-        //    let nextState = {
-        //        currentState with
-        //            CyObject = newCyObject
-        //    }
-        //    nextState, currentModel, Cmd.none
-        | UpdateShowModal toggle ->
-            let nextState = {
-                currentState with
-                    ShowModal = toggle
-            }
-            nextState, currentModel, Cmd.none
         | GetTermTree accession ->
             let cmd =
                 Cmd.OfAsync.either
@@ -26,9 +14,12 @@ module Update =
                     accession
                     (GetTermTreeResponse >> CytoscapeMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            let nextState =
-                { Cytoscape.Model.init(accession) with ShowModal = true }
-            nextState, currentModel, cmd
+            let nextState = Cytoscape.Model.init(accession)
+            let batch = Cmd.batch [
+                Cmd.ofSub (fun _ -> Modals.Controller.renderModal("CytoscapeView", Modals.Cytoscape.view))
+                cmd
+            ]
+            nextState, currentModel, batch
         | GetTermTreeResponse tree ->
             let nextState =
                 { currentState with

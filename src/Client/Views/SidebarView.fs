@@ -131,7 +131,7 @@ module private ResizeObserver =
                 state with
                     Size = Model.WindowSize.ofWidth width
             }
-            printfn "[FIRE OBSERVER]"
+            //printfn "[FIRE OBSERVER]"
             setState nextState
         )
 
@@ -253,9 +253,6 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
 
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
-
-            if model.CytoscapeModel.ShowModal then
-                Cytoscape.View.view model dispatch
 
             Content.main model dispatch
 
