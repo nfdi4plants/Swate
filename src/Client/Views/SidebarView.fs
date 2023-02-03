@@ -254,9 +254,6 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
             if (not model.ExcelState.HasAnnotationTable) then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
 
-            if not model.DevState.DisplayLogList.IsEmpty then
-                Modals.InteropLoggingModal.interopLoggingModal model dispatch
-
             if model.CytoscapeModel.ShowModal then
                 Cytoscape.View.view model dispatch
 

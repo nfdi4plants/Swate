@@ -57,7 +57,12 @@ module Dev =
                     Log = parsedLogs@currentState.Log
                     DisplayLogList = parsedDisplayLogs@currentState.DisplayLogList
             }
-            nextState, nextCmd
+            let batch = Cmd.batch [
+                let modalName = "GenericInteropLogs"
+                Cmd.ofSub(fun dispatch -> Modals.Controller.renderModal(modalName, Modals.InteropLoggingModal.interopLoggingModal(nextState, dispatch)))
+                nextCmd
+            ]
+            nextState, batch
 
         | GenericError (nextCmd, e) ->
             let nextState = {
@@ -65,7 +70,7 @@ module Dev =
                     Log = LogItem.Error(System.DateTime.Now,e.GetPropagatedError())::currentState.Log
                 }
             let batch = Cmd.batch [
-                let modalName = "FullError"
+                let modalName = "GenericError"
                 Cmd.ofSub(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
                 nextCmd
             ]
