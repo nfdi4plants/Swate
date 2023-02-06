@@ -237,12 +237,19 @@ module private Content =
 /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
 [<ReactComponent>]
 let SidebarView (model: Model) (dispatch: Msg -> unit) =
+    let ctx = React.useContext(Context.SpreadsheetDataCtx)
     let state, setState = React.useState(SidebarStyle.init)
     viewContainer model dispatch state setState [
         Navbar.NavbarComponent model dispatch state.Size
 
         Container.container [ Container.IsFluid ] [
             tabs model dispatch state.Size
+
+            Button.button [
+                Button.OnClick(fun _ -> printfn "%A" ctx.State)
+            ] [
+                str "Test"
+            ]
 
             str <| state.Size.ToString()
 

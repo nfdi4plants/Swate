@@ -33,27 +33,27 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
 open Feliz
 
 [<ReactComponent>]
-let SpreadsheetDataCtxProvider (data: {| ctxData: Context.SpreadsheetData; children: seq<ReactElement> |}) = React.contextProvider(Context.SpreadsheetDataCtx, data.ctxData, React.fragment data.children)
+let SpreadsheetDataCtxProvider (data: {| ctxData: Context.SpreadsheetData; child: ReactElement |}) = React.contextProvider(Context.SpreadsheetDataCtx, data.ctxData, data.child)
 
 [<ReactComponent>]
-let View (model : Model) (dispatch : Msg -> unit) =
+let Split_container model dispatch = 
+    let state, setState = React.useState(Context.SpreadsheetData.TestMap)
+    let children =
+        let mainWindow =
+            //Seq.singleton <| div [] [str "TEasinmdklasjdmlkasjdlknjaslkj"]
+            Seq.singleton <| SpreadsheetView.Main model dispatch
+        let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
+        SplitWindowView.Main
+            mainWindow
+            sideWindow
+            dispatch
+    SpreadsheetDataCtxProvider {|child = children; ctxData = Context.SpreadsheetData.create state setState|}
+
+let view (model : Model) (dispatch : Msg -> unit) =
     if model.ExcelState.Host <> "null" && model.ExcelState.Platform <> "null" then
         SidebarView.SidebarView model dispatch
     else
-        let state, setState =
-            let init : Map<int*int,string> = Map.empty
-            React.useState(init)
-        let children =
-            let mainWindow =
-                //Seq.singleton <| div [] [str "TEasinmdklasjdmlkasjdlknjaslkj"]
-                Seq.singleton <| SpreadsheetView.main model dispatch
-            let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
-            SplitWindowView.Main
-                mainWindow
-                sideWindow
-                dispatch
-            |> Seq.singleton
-        SpreadsheetDataCtxProvider {|children = children; ctxData = Context.SpreadsheetData.create state setState|}
+        Split_container model dispatch
             
     
 #if DEBUG
@@ -62,7 +62,7 @@ open Elmish.HMR
 
 #endif
 
-Program.mkProgram init Update.update View
+Program.mkProgram init Update.update view
 #if DEBUG
 |> Program.withConsoleTrace
 #endif

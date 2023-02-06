@@ -7,14 +7,14 @@ type SpreadsheetData = {
     State: Map<int*int,string>
     SetState: Map<int*int,string> -> unit
 } with
-    static member private m =
+    static member TestMap =
         [
             for i in 0 .. 20 do
                 for j in 0 .. 20 do
                     yield (i,j), sprintf "%i - %i" i j
         ] |> Map.ofList
     static member init = {
-        State = SpreadsheetData.m
+        State = SpreadsheetData.TestMap
         SetState = fun _ -> ()
     }
     static member create state setState = {
