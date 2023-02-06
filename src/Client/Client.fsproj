@@ -31,6 +31,7 @@
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="ReactContext.fs" />
         <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
         <Compile Include="Modals\WarningModal.fs" />
@@ -62,6 +63,7 @@
         <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
         <Compile Include="Pages\TemplateMetadata\TemplateMetadata.fs" />
         <Compile Include="Pages\Dag\Dag.fs" />
+        <Compile Include="Views\SpreadsheetView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
         <Compile Include="Views\SidebarView.fs" />
         <Compile Include="Update\OfficeInteropUpdate.fs" />

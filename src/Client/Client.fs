@@ -30,16 +30,30 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
         ]
     model, initialCmd
 
-let view (model : Model) (dispatch : Msg -> unit) =
+open Feliz
+
+[<ReactComponent>]
+let SpreadsheetDataCtxProvider (data: {| ctxData: Context.SpreadsheetData; children: seq<ReactElement> |}) = React.contextProvider(Context.SpreadsheetDataCtx, data.ctxData, React.fragment data.children)
+
+[<ReactComponent>]
+let View (model : Model) (dispatch : Msg -> unit) =
     if model.ExcelState.Host <> "null" && model.ExcelState.Platform <> "null" then
         SidebarView.SidebarView model dispatch
     else
-        let mainWindow = Seq.singleton <| div [] [str "TEasinmdklasjdmlkasjdlknjaslkj"] 
-        let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
-        SplitWindowView.Main
-            mainWindow
-            sideWindow
-            dispatch
+        let state, setState =
+            let init : Map<int*int,string> = Map.empty
+            React.useState(init)
+        let children =
+            let mainWindow =
+                //Seq.singleton <| div [] [str "TEasinmdklasjdmlkasjdlknjaslkj"]
+                Seq.singleton <| SpreadsheetView.main model dispatch
+            let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
+            SplitWindowView.Main
+                mainWindow
+                sideWindow
+                dispatch
+            |> Seq.singleton
+        SpreadsheetDataCtxProvider {|children = children; ctxData = Context.SpreadsheetData.create state setState|}
             
     
 #if DEBUG
@@ -48,7 +62,7 @@ open Elmish.HMR
 
 #endif
 
-Program.mkProgram init Update.update view
+Program.mkProgram init Update.update View
 #if DEBUG
 |> Program.withConsoleTrace
 #endif

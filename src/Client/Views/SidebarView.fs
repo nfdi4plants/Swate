@@ -234,8 +234,6 @@ module private Content =
             Html.div []
         
 
-open Feliz
-
 /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
 [<ReactComponent>]
 let SidebarView (model: Model) (dispatch: Msg -> unit) =
@@ -243,11 +241,8 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
     viewContainer model dispatch state setState [
         Navbar.NavbarComponent model dispatch state.Size
 
-        Container.container [
-            Container.IsFluid
-        ] [
+        Container.container [ Container.IsFluid ] [
             tabs model dispatch state.Size
-            //sndRowTabs model dispatch
 
             str <| state.Size.ToString()
 
