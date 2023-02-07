@@ -3,6 +3,8 @@ module Context
 open Feliz
 open Feliz.ReactApi
 
+let mutable SpreadsheetData_collector : Map<int*int,string> = Map.empty
+
 type SpreadsheetData = {
     State: Map<int*int,string>
     SetState: Map<int*int,string> -> unit

@@ -8,6 +8,7 @@ open Messages
 type private CellState = {
     Selected: bool
     Active: bool
+    /// This value is used to show during input cell editing. After confirming edit it will be used to push update
     Value: string
 } with
     static member init() =
@@ -75,7 +76,7 @@ let Cell(index: (int*int), dataState: Context.SpreadsheetData, isHeader:bool) =
                     prop.onChange(fun e ->
                         setState_cell {state_cell with Value = e}
                     )
-                    prop.defaultValue state_cell.Value
+                    prop.defaultValue state.[index]
                 ]
             else
                 Html.p [
@@ -88,7 +89,7 @@ let Cell(index: (int*int), dataState: Context.SpreadsheetData, isHeader:bool) =
                     //    e.stopPropagation()
                     //    setModel {model with Selected = not model.Selected}
                     //)
-                    prop.text state_cell.Value
+                    prop.text state.[index]
                 ]
         ]
     ]
@@ -118,45 +119,32 @@ let Main (model:Model) (dispatch: Msg -> unit) =
     let state = React.useContext(Context.SpreadsheetDataCtx)
     let rows = state.State.Keys |> Seq.maxBy fst |> fst
     Html.div [
-        Bulma.button.button [
-            prop.onClick(fun _ -> printfn "%A" state.State )
-            prop.text "print map"
+        prop.style [
+            style.width (length.percent 100)
+            style.height (length.percent 100)
+            style.overflowX.scroll
         ]
-        Bulma.button.button [
-            prop.onClick(fun _ ->
-                let set = state.SetState
-                state.State.Change((1,1),fun _ -> Some "This is new!") |> set
-            )
-            prop.text "set 1-1"
-        ]
-        Html.div [
-            prop.style [
-                style.width (length.percent 100)
-                style.height (length.percent 100)
-                style.overflowX.scroll
-            ]
-            prop.children [
-                //
-                Html.table [
-                    Html.thead [
-                        headerRow state model dispatch
-                    ]
-                    Html.tbody [
-                        for rowInd in 1 .. rows do
-                            yield bodyRow state rowInd model dispatch 
-                    ]
+        prop.children [
+            //
+            Html.table [
+                Html.thead [
+                    headerRow state model dispatch
                 ]
-                //Html.div [
-                //    prop.style [
-                //        style.display.flex
-                //        style.flexDirection.row
-                //        style.maxWidth.maxContent
-                //    ]
-                //    prop.children [
-                //        for i in 0 .. model.InputMap_Rows do
-                //            yield row i model dispatch 
-                //    ]
-                //]
+                Html.tbody [
+                    for rowInd in 1 .. rows do
+                        yield bodyRow state rowInd model dispatch 
+                ]
             ]
+            //Html.div [
+            //    prop.style [
+            //        style.display.flex
+            //        style.flexDirection.row
+            //        style.maxWidth.maxContent
+            //    ]
+            //    prop.children [
+            //        for i in 0 .. model.InputMap_Rows do
+            //            yield row i model dispatch 
+            //    ]
+            //]
         ]
     ]

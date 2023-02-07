@@ -245,12 +245,6 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
         Container.container [ Container.IsFluid ] [
             tabs model dispatch state.Size
 
-            Button.button [
-                Button.OnClick(fun _ -> printfn "%A" ctx.State)
-            ] [
-                str "Test"
-            ]
-
             str <| state.Size.ToString()
 
             if (not model.ExcelState.HasAnnotationTable) then

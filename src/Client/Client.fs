@@ -38,6 +38,9 @@ let SpreadsheetDataCtxProvider (data: {| ctxData: Context.SpreadsheetData; child
 [<ReactComponent>]
 let Split_container model dispatch = 
     let state, setState = React.useState(Context.SpreadsheetData.TestMap)
+    let wrapSetState inp =
+        Context.SpreadsheetData_collector <- inp
+        setState inp
     let children =
         let mainWindow =
             //Seq.singleton <| div [] [str "TEasinmdklasjdmlkasjdlknjaslkj"]
@@ -47,7 +50,7 @@ let Split_container model dispatch =
             mainWindow
             sideWindow
             dispatch
-    SpreadsheetDataCtxProvider {|child = children; ctxData = Context.SpreadsheetData.create state setState|}
+    SpreadsheetDataCtxProvider {|child = children; ctxData = Context.SpreadsheetData.create state wrapSetState|}
 
 let view (model : Model) (dispatch : Msg -> unit) =
     if model.ExcelState.Host <> "null" && model.ExcelState.Platform <> "null" then
