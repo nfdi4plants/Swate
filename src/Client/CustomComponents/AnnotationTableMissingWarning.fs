@@ -3,11 +3,9 @@ module CustomComponents.AnnotationTableMissingWarning
 open Fable.React
 open Fable.React.Props
 open Fulma
-open Fulma.Extensions.Wikiki
 open ExcelColors
 open Model
 open Messages
-
 
 let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) =
     Notification.notification [
@@ -21,7 +19,7 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
         ]
     ] [
         Notification.delete [ Props [
-            OnClick (fun e ->
+            OnClick (fun _ ->
                 OfficeInterop.AnnotationTableExists (Shared.OfficeInteropTypes.TryFindAnnoTableResult.Success "Remove Warning Notification") |> OfficeInteropMsg |> dispatch
             )
         ]] [ ]
@@ -37,7 +35,7 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
                 else
                     Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyForeground; Color model.SiteStyleState.ColorMode.Text]]
                 Button.IsFullWidth
-                Button.OnClick (fun e -> OfficeInterop.CreateAnnotationTable (model.SiteStyleState.IsDarkMode, e.ctrlKey) |> OfficeInteropMsg |> dispatch )
+                Button.OnClick (fun e -> OfficeInterop.CreateAnnotationTable e.ctrlKey |> OfficeInteropMsg |> dispatch )
                 ] [
                 str "create annotation table"
             ]                

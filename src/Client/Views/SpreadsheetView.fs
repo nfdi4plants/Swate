@@ -3,6 +3,7 @@ module SpreadsheetView
 open Feliz
 open Feliz.Bulma
 
+open Spreadsheet
 open Messages
 
 type private CellState = {
@@ -28,11 +29,16 @@ type private CellState = {
 // 3. Change value to term
 
 [<ReactComponent>]
-let Cell(index: (int*int), dataState: Context.SpreadsheetData, isHeader:bool) =
-    let state_cell, setState_cell = React.useState(CellState.init(dataState.State.[index]))
+let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
+    let state = model.SpreadsheetModel
+    let term = state.ActiveTable.[index]
+    let state_cell, setState_cell = React.useState(CellState.init(term.Name))
     let innerPadding = style.padding(0, 3)
     let cell : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
-    let state, setState = dataState.State, dataState.SetState
+    /// TODO! Try get from db?
+    let updateMainStateTable dispatch =
+        let nextTerm = {term with Name = state_cell.Value}
+        Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
     cell [
         prop.key $"Cell_{fst index}-{snd index}"
         prop.style [
@@ -59,24 +65,22 @@ let Cell(index: (int*int), dataState: Context.SpreadsheetData, isHeader:bool) =
                     ]
                     // Update main spreadsheet state when leaving focus or...
                     prop.onBlur(fun _ ->
-                        state.Change(index, fun _ -> Some state_cell.Value) |> setState
-                        setState_cell {state_cell with Active = false}
+                        updateMainStateTable dispatch
                     )
                     // .. when pressing "ENTER". "ESCAPE" will negate changes.
                     prop.onKeyDown(fun e ->
                         match e.which with
                         | 13. -> //enter
-                            state.Change(index, fun _ -> Some state_cell.Value) |> setState
-                            setState_cell {state_cell with Active = false}
+                            updateMainStateTable dispatch
                         | 27. -> //escape
-                            setState_cell {state_cell with Active = false; Value = state.[index]}
+                            setState_cell {state_cell with Active = false; Value = term.Name}
                         | _ -> ()
                     )
                     // Only change cell value while typing to increase performance. 
                     prop.onChange(fun e ->
                         setState_cell {state_cell with Value = e}
                     )
-                    prop.defaultValue state.[index]
+                    prop.defaultValue term.Name
                 ]
             else
                 Html.p [
@@ -89,62 +93,44 @@ let Cell(index: (int*int), dataState: Context.SpreadsheetData, isHeader:bool) =
                     //    e.stopPropagation()
                     //    setModel {model with Selected = not model.Selected}
                     //)
-                    prop.text state.[index]
+                    prop.text term.Name
                 ]
         ]
     ]
 
-let private bodyRow (state: Context.SpreadsheetData) (i:int) (model:Model) (dispatch: Msg -> unit) =
-    let r = state.State |> Map.filter (fun (r,_) _ -> r = i)
+let private bodyRow (i:int) (model:Model) (dispatch: Msg -> unit) =
+    let state = model.SpreadsheetModel
+    let r = state.ActiveTable |> Map.filter (fun (r,_) _ -> r = i)
     //Html.div [
     Html.tr [
         for cell in r do
             yield
-                Cell(cell.Key, state, false)
+                Cell(cell.Key, false, model, dispatch)
     ]
 
-let private headerRow (state: Context.SpreadsheetData) (model:Model) (dispatch: Msg -> unit) =
+let private headerRow (model:Model) (dispatch: Msg -> unit) =
     let rowInd = 0
-    let r = state.State |> Map.filter (fun (r,_) _ -> r = rowInd)
+    let state = model.SpreadsheetModel
+    let r = state.ActiveTable |> Map.filter (fun (r,_) _ -> r = rowInd)
     //Html.div [
     Html.tr [
         for cell in r do
             yield
-                Cell(cell.Key, state, true)
+                Cell(cell.Key, true, model, dispatch)
     ]
 
 [<ReactComponent>]
 let Main (model:Model) (dispatch: Msg -> unit) =
+    /// Context provider is created in Client.fs
+    let state = model.SpreadsheetModel
     // builds main container filling all possible space
-    let state = React.useContext(Context.SpreadsheetDataCtx)
-    let rows = state.State.Keys |> Seq.maxBy fst |> fst
-    Html.div [
-        prop.style [
-            style.width (length.percent 100)
-            style.height (length.percent 100)
-            style.overflowX.scroll
+    Html.table [
+        Html.thead [
+            headerRow model dispatch
         ]
-        prop.children [
-            //
-            Html.table [
-                Html.thead [
-                    headerRow state model dispatch
-                ]
-                Html.tbody [
-                    for rowInd in 1 .. rows do
-                        yield bodyRow state rowInd model dispatch 
-                ]
-            ]
-            //Html.div [
-            //    prop.style [
-            //        style.display.flex
-            //        style.flexDirection.row
-            //        style.maxWidth.maxContent
-            //    ]
-            //    prop.children [
-            //        for i in 0 .. model.InputMap_Rows do
-            //            yield row i model dispatch 
-            //    ]
-            //]
+        Html.tbody [
+            let rows = state.ActiveTable.Keys |> Seq.maxBy fst |> fst
+            for rowInd in 1 .. rows do
+                yield bodyRow rowInd model dispatch 
         ]
     ]

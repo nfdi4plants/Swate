@@ -7,11 +7,6 @@ open Elmish.React
 open Fable.React
 open Messages
 open Update
-open ExcelJS.Fable.GlobalBindings
-
-let sayHello name = $"Hello {name}"
-
-let initializeAddIn () = Office.onReady()
 
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
@@ -20,42 +15,25 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
     let initialModel = initializeModel (pageOpt,pageEntry)
     // The initial command from urlUpdate is not needed yet. As we use a reduced variant of subModels with no own Msg system.
     let model, _ = urlUpdate route initialModel
-    let initialCmd =
-        Cmd.batch [
-            Cmd.OfPromise.either
-                initializeAddIn
-                ()
-                (fun x -> (x.host.ToString(),x.platform.ToString()) |> OfficeInterop.Initialized |> OfficeInteropMsg )
-                (curry GenericError Cmd.none >> DevMsg)
-        ]
-    model, initialCmd
+    let cmd = Cmd.ofMsg <| InterfaceMsg SpreadsheetInterface.Initialize 
+    model, cmd
 
 open Feliz
 
 [<ReactComponent>]
-let SpreadsheetDataCtxProvider (data: {| ctxData: Context.SpreadsheetData; child: ReactElement |}) = React.contextProvider(Context.SpreadsheetDataCtx, data.ctxData, data.child)
-
-[<ReactComponent>]
 let Split_container model dispatch = 
-    let state, setState = React.useState(Context.SpreadsheetData.TestMap)
-    let wrapSetState inp =
-        Context.SpreadsheetData_collector <- inp
-        setState inp
-    let children =
-        let mainWindow =
-            //Seq.singleton <| div [] [str "TEasinmdklasjdmlkasjdlknjaslkj"]
-            Seq.singleton <| SpreadsheetView.Main model dispatch
-        let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
-        SplitWindowView.Main
-            mainWindow
-            sideWindow
-            dispatch
-    SpreadsheetDataCtxProvider {|child = children; ctxData = Context.SpreadsheetData.create state wrapSetState|}
+    let mainWindow = Seq.singleton <| MainWindowView.Main model dispatch
+    let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
+    SplitWindowView.Main
+        mainWindow
+        sideWindow
+        dispatch
 
 let view (model : Model) (dispatch : Msg -> unit) =
-    if model.ExcelState.Host <> "null" && model.ExcelState.Platform <> "null" then
+    match model.PersistentStorageState.Host with
+    | Swatehost.Excel (h,p) ->
         SidebarView.SidebarView model dispatch
-    else
+    | _ ->
         Split_container model dispatch
             
     

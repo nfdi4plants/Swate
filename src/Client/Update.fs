@@ -491,16 +491,6 @@ let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (current
             Modals.Controller.renderModal("BuildingBlockDetails", Modals.BuildingBlockDetailsModal.buildingBlockDetailModal(nextState, dispatch))
         )
         nextState, cmd
-
-let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
-    match topLevelMsg with
-    // Client
-    | UpdatePointerJson nextPointerJson ->
-        let nextState = {
-            currentState with
-                PointerJson = nextPointerJson
-        }
-        nextState, Cmd.none
             
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
@@ -602,8 +592,16 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         nextModel, debouncerCmd
 
     | OfficeInteropMsg excelMsg ->
-        let nextModel,nextCmd = currentModel |> Update.OfficeInterop.update excelMsg
+        let nextModel,nextCmd = Update.OfficeInterop.update currentModel excelMsg
         nextModel,nextCmd
+
+    | SpreadsheetMsg msg ->
+        let nextState, nextModel, nextCmd = Update.Spreadsheet.update currentModel.SpreadsheetModel currentModel msg
+        let nextModel' = {nextModel with SpreadsheetModel = nextState}
+        nextModel', nextCmd
+
+    | InterfaceMsg msg ->
+        Update.Interface.update currentModel msg
 
     | TermSearchMsg termSearchMsg ->
         let nextTermSearchState,nextCmd =
@@ -731,16 +729,6 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel = {
             currentModel with
                 SettingsXmlState = nextState
-        }
-        nextModel, nextCmd
-
-    | SettingDataStewardMsg msg ->
-        let nextState, nextCmd =
-            currentModel.SettingsDataStewardState
-            |> handleSettingsDataStewardMsg msg
-        let nextModel = {
-            currentModel with
-                SettingsDataStewardState = nextState
         }
         nextModel, nextCmd
 

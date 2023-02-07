@@ -182,7 +182,6 @@ module private Content =
         | Routing.Route.Protocol ->
             Protocol.Core.fileUploadViewComponent model dispatch
 
-
         | Routing.Route.JsonExport ->
             JsonExporter.Core.jsonExporterMainElement model dispatch
 
@@ -237,7 +236,6 @@ module private Content =
 /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
 [<ReactComponent>]
 let SidebarView (model: Model) (dispatch: Msg -> unit) =
-    let ctx = React.useContext(Context.SpreadsheetDataCtx)
     let state, setState = React.useState(SidebarStyle.init)
     viewContainer model dispatch state setState [
         Navbar.NavbarComponent model dispatch state.Size
@@ -247,7 +245,7 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
 
             str <| state.Size.ToString()
 
-            if (not model.ExcelState.HasAnnotationTable) then
+            if not model.ExcelState.HasAnnotationTable then
                 CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
 
             Content.main model dispatch

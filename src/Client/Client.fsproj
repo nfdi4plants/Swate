@@ -14,6 +14,7 @@
         <Compile Include="Colors\ExcelColors.fs" />
         <Compile Include="JsBindings\Cytoscape.fs" />
         <Compile Include="JsBindings\HumanReadableIds.fs" />
+        <Compile Include="Host.fs" />
         <Compile Include="Api.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="OfficeInterop\InteropLogging.fs" />
@@ -25,13 +26,14 @@
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
+        <Compile Include="States\SpreadsheetInterface.fs" />
+        <Compile Include="States\SpreadsheetData.fs" />
         <Compile Include="States\CytoscapeState.fs" />
         <Compile Include="States\DagState.fs" />
         <Compile Include="States\TemplateMetadataState.fs" />
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
-        <Compile Include="ReactContext.fs" />
         <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
         <Compile Include="Modals\WarningModal.fs" />
@@ -63,19 +65,18 @@
         <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
         <Compile Include="Pages\TemplateMetadata\TemplateMetadata.fs" />
         <Compile Include="Pages\Dag\Dag.fs" />
-        <Compile Include="Views\SpreadsheetView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
+        <Compile Include="Views\SpreadsheetView.fs" />
+        <Compile Include="Views\MainWindowView.fs" />
         <Compile Include="Views\SidebarView.fs" />
+        <Compile Include="Update\SpreadsheetUpdate.fs" />
         <Compile Include="Update\OfficeInteropUpdate.fs" />
+        <Compile Include="Update\InterfaceUpdate.fs" />
         <Compile Include="Update.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\Shared\Shared.fsproj" />
-    </ItemGroup>
-    <ItemGroup>
-        <!--This dependency via paket just kills neo4j connection and i have no idea why. 22.09.2022-->
-        <PackageReference Include="Feliz" Version="1.68.0" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

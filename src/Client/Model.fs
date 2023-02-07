@@ -179,11 +179,13 @@ type DevState = {
 type PersistentStorageState = {
     SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
+    Host                    : Swatehost
     HasOntologiesLoaded     : bool
     PageEntry               : SwateEntry
 } with
     static member init (?pageEntry:SwateEntry) = {
         SearchableOntologies    = [||]
+        Host                    = Swatehost.None
         AppVersion              = ""
         HasOntologiesLoaded     = false
         PageEntry               = if pageEntry.IsSome then pageEntry.Value else SwateEntry.Core
@@ -413,12 +415,5 @@ module SettingsXml =
             FoundTables                             = [||]
             ValidationXmls                          = [||]
         }
-
-type SettingsDataStewardState = {
-    PointerJson : string option
-} with
-    static member init () = {
-        PointerJson = None
-    }
 
 // The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

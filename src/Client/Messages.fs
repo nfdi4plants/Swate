@@ -187,7 +187,8 @@ type Model = {
     AdvancedSearchState         : AdvancedSearch.Model
     ///Use this in the future to model excel stuff like table data
     ExcelState                  : OfficeInterop.Model
-    ///Use this to log Api calls and maybe handle them better
+    /// This should be removed. Overhead making maintainance more difficult
+    /// "Use this to log Api calls and maybe handle them better"
     ApiState                    : ApiState
     ///States regarding File picker functionality
     FilePickerState             : FilePicker.Model
@@ -204,8 +205,8 @@ type Model = {
     TemplateMetadataModel       : TemplateMetadata.Model
     DagModel                    : Dag.Model
     CytoscapeModel              : Cytoscape.Model
-    ///Used to manage functions specifically for data stewards
-    SettingsDataStewardState    : SettingsDataStewardState
+    /// Contains all information about spreadsheet view
+    SpreadsheetModel        : Spreadsheet.Model
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
@@ -236,12 +237,15 @@ type Msg =
 | SettingsXmlMsg        of SettingsXml.Msg
 | SettingDataStewardMsg of SettingsDataStewardMsg
 | CytoscapeMsg          of Cytoscape.Msg
+| SpreadsheetMsg        of Spreadsheet.Msg
 | DagMsg                of Dag.Msg
+/// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
+| InterfaceMsg          of SpreadsheetInterface.Msg
 //| SettingsProtocolMsg   of SettingsProtocolMsg
 | TopLevelMsg           of TopLevelMsg
 | UpdatePageState       of Routing.Route option
 | Batch                 of seq<Messages.Msg>
-/// Top level msg to test specific  api interactions, only for dev.
+/// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI
 | DoNothing
@@ -278,9 +282,9 @@ let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
         ProtocolState               = Protocol.Model            .init ()
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
         SettingsXmlState            = SettingsXml.Model         .init ()
-        SettingsDataStewardState    = SettingsDataStewardState  .init ()
         JsonExporterModel           = JsonExporter.State.Model  .init ()
         TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         DagModel                    = Dag.Model                 .init ()
         CytoscapeModel              = Cytoscape.Model           .init ()
+        SpreadsheetModel            = Spreadsheet.Model     .init ()
     }
