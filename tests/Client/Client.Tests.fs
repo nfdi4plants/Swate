@@ -20,6 +20,7 @@ let all =
             BuildingBlockView.Tests.tests_BuildingBlockView
             FilePickerView.Tests.tests_FilePickerView_PathRerooting
             OfficeInterop.Indexing.Tests.tests_OfficeInterop_Indexing
+            Spreadsheet.Controller.Tests.tests_SpreadsheetController
             client
         ]
 

@@ -40,7 +40,7 @@ let private shortCutIconList model dispatch =
                 Fa.span [Fa.Solid.Plus] []
                 Fa.span [Fa.Solid.Table] []
             ]
-            (fun e -> OfficeInterop.CreateAnnotationTable e.ctrlKey |> OfficeInteropMsg |> dispatch)
+            (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> InterfaceMsg |> dispatch)
             "Table"
         ShortCutIcon.create
             "Autoformat Table"

@@ -35,7 +35,7 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
                 else
                     Button.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyForeground; Color model.SiteStyleState.ColorMode.Text]]
                 Button.IsFullWidth
-                Button.OnClick (fun e -> OfficeInterop.CreateAnnotationTable e.ctrlKey |> OfficeInteropMsg |> dispatch )
+                Button.OnClick (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
                 ] [
                 str "create annotation table"
             ]                

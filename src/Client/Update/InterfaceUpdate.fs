@@ -1,12 +1,18 @@
 namespace Update
 
-open Elmish
-open SpreadsheetInterface
+// <-->
+// This order is required to correctly inferre the correct "Msg"s below.
+// do not touch and remove 
 open Messages
+open OfficeInterop
+open SpreadsheetInterface
+// </-->
+
+open Elmish
 open Model
 open Shared
 open OfficeInteropTypes
-open OfficeInterop
+
 
 module private Helper =
     open ExcelJS.Fable.GlobalBindings
@@ -16,11 +22,11 @@ module private Helper =
 module Interface =
 
     let update (model: Messages.Model) (msg: SpreadsheetInterface.Msg) : Messages.Model * Cmd<Messages.Msg> =
+        let host = model.PersistentStorageState.Host
         match msg with
         | Initialize ->
             let initExcel() = promise {
                 let! tryExcel = Helper.initializeAddIn()
-                Browser.Dom.console.log("[LOG] ",tryExcel)
                 let host =
                     if (isNull >> not) tryExcel.host then
                         Swatehost.Excel (tryExcel.host.ToString(), tryExcel.platform.ToString())
@@ -49,8 +55,23 @@ module Interface =
                         Cmd.OfPromise.either
                             OfficeInterop.Core.tryFindActiveAnnotationTable
                             ()
-                            (AnnotationTableExists >> OfficeInteropMsg)
+                            (OfficeInterop.AnnotationTableExists >> OfficeInteropMsg)
                             (curry GenericError Cmd.none >> DevMsg)
                     | _ -> ()
                 ]
             nextModel, cmd
+        // These messages are guarded against host = Swatehost.None
+        // Swatehost.None should only ever be used during init and is not checked for elsewhere. 
+        | msg ->
+            if host = Swatehost.None then failwith "Host initialisation not finished. Reload Page or contact maintainer."
+            match msg with
+            | Initialize | InitializeResponse _ -> failwith "This is caught before"
+            | CreateAnnotationTable usePrevOutput ->
+                match host with
+                | Swatehost.Excel _ ->
+                    let cmd = OfficeInterop.CreateAnnotationTable usePrevOutput |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | Swatehost.Browser ->
+                    let cmd = Spreadsheet.CreateAnnotationTable usePrevOutput |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"

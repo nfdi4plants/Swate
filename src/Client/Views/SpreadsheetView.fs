@@ -72,6 +72,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                         match e.which with
                         | 13. -> //enter
                             updateMainStateTable dispatch
+                            setState_cell {state_cell with Active = false}
                         | 27. -> //escape
                             setState_cell {state_cell with Active = false; Value = term.Name}
                         | _ -> ()
@@ -101,7 +102,6 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
 let private bodyRow (i:int) (model:Model) (dispatch: Msg -> unit) =
     let state = model.SpreadsheetModel
     let r = state.ActiveTable |> Map.filter (fun (r,_) _ -> r = i)
-    //Html.div [
     Html.tr [
         for cell in r do
             yield
@@ -112,7 +112,6 @@ let private headerRow (model:Model) (dispatch: Msg -> unit) =
     let rowInd = 0
     let state = model.SpreadsheetModel
     let r = state.ActiveTable |> Map.filter (fun (r,_) _ -> r = rowInd)
-    //Html.div [
     Html.tr [
         for cell in r do
             yield
@@ -121,16 +120,18 @@ let private headerRow (model:Model) (dispatch: Msg -> unit) =
 
 [<ReactComponent>]
 let Main (model:Model) (dispatch: Msg -> unit) =
-    /// Context provider is created in Client.fs
     let state = model.SpreadsheetModel
     // builds main container filling all possible space
     Html.table [
-        Html.thead [
-            headerRow model dispatch
-        ]
-        Html.tbody [
-            let rows = state.ActiveTable.Keys |> Seq.maxBy fst |> fst
-            for rowInd in 1 .. rows do
-                yield bodyRow rowInd model dispatch 
+        prop.style [style.height.minContent]
+        prop.children [
+            Html.thead [
+                headerRow model dispatch
+            ]
+            Html.tbody [
+                let rows = state.ActiveTable.Keys |> Seq.maxBy fst |> fst
+                for rowInd in 1 .. rows do
+                    yield bodyRow rowInd model dispatch 
+            ]
         ]
     ]

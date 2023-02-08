@@ -8,6 +8,9 @@ open Fable.React
 open Messages
 open Update
 
+///<summary> This is a basic test case used in Client unit tests </summary>
+let sayHello name = $"Hello {name}"
+
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
     let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
@@ -20,8 +23,7 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
 
 open Feliz
 
-[<ReactComponent>]
-let Split_container model dispatch = 
+let split_container model dispatch = 
     let mainWindow = Seq.singleton <| MainWindowView.Main model dispatch
     let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
     SplitWindowView.Main
@@ -34,7 +36,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
     | Swatehost.Excel (h,p) ->
         SidebarView.SidebarView model dispatch
     | _ ->
-        Split_container model dispatch
+        split_container model dispatch
             
     
 #if DEBUG
