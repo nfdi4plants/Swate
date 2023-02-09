@@ -31,18 +31,20 @@ type private CellState = {
 [<ReactComponent>]
 let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
     let state = model.SpreadsheetModel
-    let term = state.ActiveTable.[index]
-    let state_cell, setState_cell = React.useState(CellState.init(term.Name))
+    let cell = state.ActiveTable.[index]
+    let cell_value = if isHeader then cell.Header.SwateColumnHeader else cell.Body.Term.Name
+    let state_cell, setState_cell = React.useState(CellState.init(cell_value))
     let innerPadding = style.padding(0, 3)
-    let cell : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
+    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     /// TODO! Try get from db?
     let updateMainStateTable dispatch =
-        let nextTerm = {term with Name = state_cell.Value}
+        let nextTerm = cell.updateDisplayValue state_cell.Value
         Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
-    cell [
-        prop.key $"Cell_{fst index}-{snd index}"
+    cell_element [
+        prop.key $"{state.Tables.[state.ActiveTableIndex].Id}_Cell_{fst index}-{snd index}"
         prop.style [
             style.minWidth 100
+            style.height 22
             style.width(length.percent 100)
             style.border(length.px 1, borderStyle.solid, if state_cell.Selected then "green" else "darkgrey")
         ]
@@ -74,14 +76,14 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                             updateMainStateTable dispatch
                             setState_cell {state_cell with Active = false}
                         | 27. -> //escape
-                            setState_cell {state_cell with Active = false; Value = term.Name}
+                            setState_cell {state_cell with Active = false; Value = cell_value}
                         | _ -> ()
                     )
                     // Only change cell value while typing to increase performance. 
                     prop.onChange(fun e ->
                         setState_cell {state_cell with Value = e}
                     )
-                    prop.defaultValue term.Name
+                    prop.defaultValue cell_value
                 ]
             else
                 Html.p [
@@ -94,14 +96,14 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                     //    e.stopPropagation()
                     //    setModel {model with Selected = not model.Selected}
                     //)
-                    prop.text term.Name
+                    prop.text cell_value
                 ]
         ]
     ]
 
 let private bodyRow (i:int) (model:Model) (dispatch: Msg -> unit) =
     let state = model.SpreadsheetModel
-    let r = state.ActiveTable |> Map.filter (fun (r,_) _ -> r = i)
+    let r = state.ActiveTable |> Map.filter (fun (_,r) _ -> r = i)
     Html.tr [
         for cell in r do
             yield
@@ -111,7 +113,7 @@ let private bodyRow (i:int) (model:Model) (dispatch: Msg -> unit) =
 let private headerRow (model:Model) (dispatch: Msg -> unit) =
     let rowInd = 0
     let state = model.SpreadsheetModel
-    let r = state.ActiveTable |> Map.filter (fun (r,_) _ -> r = rowInd)
+    let r = state.ActiveTable |> Map.filter (fun (_,r) _ -> r = rowInd)
     Html.tr [
         for cell in r do
             yield
@@ -123,7 +125,7 @@ let Main (model:Model) (dispatch: Msg -> unit) =
     let state = model.SpreadsheetModel
     // builds main container filling all possible space
     Html.table [
-        prop.style [style.height.minContent]
+        prop.style [style.height.minContent; style.width.minContent]
         prop.children [
             Html.thead [
                 headerRow model dispatch

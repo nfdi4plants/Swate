@@ -246,8 +246,12 @@ module OfficeInteropTypes =
 
     type SwateColumnHeader = {
         SwateColumnHeader: string
+        /// This field was added exclusively for the use in Swates own spreadsheet functionality. It is not used in ExcelInterop.
+        Term: TermMinimal option
     } with
-        static member create headerString = { SwateColumnHeader = headerString }
+        static member create headerString = { SwateColumnHeader = headerString; Term = None }
+        static member init(headerString:string, ?term: TermMinimal) = { SwateColumnHeader = headerString; Term = term }
+        static member init(headerString:SwateColumnHeader, ?term: TermMinimal) = { SwateColumnHeader = headerString.SwateColumnHeader; Term = term }
         member this.isMainColumn =
             let isExistingType = BuildingBlockType.All |> List.tryFind (fun t -> this.SwateColumnHeader.StartsWith t.toString)
             match isExistingType with
@@ -357,6 +361,11 @@ module OfficeInteropTypes =
         static member create ind value unit= {
             Index = ind
             Value = value
+            Unit = unit
+        }
+        static member init(index:int, ?v: string, ?unit: TermMinimal) = {
+            Index = index
+            Value = v
             Unit = unit
         }
 

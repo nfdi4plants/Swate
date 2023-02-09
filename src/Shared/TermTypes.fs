@@ -56,6 +56,11 @@ module TermTypes =
             TermAccession   = term.Accession
         }
 
+        static member empty = {
+            Name            = ""
+            TermAccession   = ""
+        }
+
         /// The numberFormat attribute in Excel allows to create automatic unit extensions.
         /// It uses a special input format which is created by this function and should be used for unit terms.
         member this.toNumberFormat = $"0.00 \"{this.Name}\""

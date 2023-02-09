@@ -235,7 +235,6 @@ type Msg =
 | TemplateMetadataMsg   of TemplateMetadata.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | SettingsXmlMsg        of SettingsXml.Msg
-| SettingDataStewardMsg of SettingsDataStewardMsg
 | CytoscapeMsg          of Cytoscape.Msg
 | SpreadsheetMsg        of Spreadsheet.Msg
 | DagMsg                of Dag.Msg

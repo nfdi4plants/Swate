@@ -150,9 +150,6 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
     
     // This function is used to create the "next" annotationTable name.
     // 'allTableNames' is passed from a previous function and contains a list of all annotationTables.
-    // The function then tests if the freshly created name already exists and if it does it rec executes itself againn with (ind+1)
-    // Due to how this function is written, the tables will not always count up. E.g. annotationTable2 gets deleted then the next table will not be
-    // annotationTable3 or higher but annotationTable2 again. This could in the future lead to problems if information is saved with the table name as identifier.
     let rec findNewTableName allTableNames =
         let id = HumanReadableIds.tableName()
         let newTestName = $"annotationTable{id}"
@@ -233,8 +230,8 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
             let annotationTable = activeSheet.tables.add(U2.Case1 adaptedRange,true)
     
             // Update annotationTable column headers
-            (annotationTable.columns.getItemAt 0.).name <- "Source Name"
-            (annotationTable.columns.getItemAt 1.).name <- "Sample Name"
+            (annotationTable.columns.getItemAt 0.).name <- BuildingBlockType.Source.toString
+            (annotationTable.columns.getItemAt 1.).name <- BuildingBlockType.Sample.toString
     
             if useExistingPrevOutput then
                 let newColValues = prevTableOutput |> Array.map (fun cell -> ResizeArray[|Option.bind (box >> Some) cell.Value|] ) |> ResizeArray

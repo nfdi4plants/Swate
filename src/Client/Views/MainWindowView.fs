@@ -2,6 +2,7 @@ module MainWindowView
 
 open Feliz
 open Feliz.Bulma
+open Messages
 
 open SpreadsheetView
 
@@ -64,17 +65,17 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                         prop.children [
                             Html.ul [
                                 for KeyValue (index,table) in model.SpreadsheetModel.Tables do
-                                    yield Bulma.tab [
-                                        if model.SpreadsheetModel.ActiveTableIndex = index then Bulma.tab.isActive
-                                        prop.children [
-                                            prop.onClick (fun _ -> )
+                                    yield
+                                        Bulma.tab [
+                                            if model.SpreadsheetModel.ActiveTableIndex = index then Bulma.tab.isActive
+                                            prop.onClick (fun _ -> Spreadsheet.UpdateActiveTable index |> SpreadsheetMsg |> dispatch)
                                             prop.children [
                                                 Html.a [prop.text table.Name]
                                             ]
                                         ]
-                                    ]
                                 yield
                                     Bulma.tab [
+                                        prop.onClick (fun _ -> SpreadsheetInterface.CreateAnnotationTable false |> InterfaceMsg |> dispatch)
                                         prop.children [
                                             Html.a [
                                                 Bulma.icon [
