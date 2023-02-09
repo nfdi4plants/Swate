@@ -24,9 +24,23 @@ let saveActiveTable (state: Spreadsheet.Model) : Spreadsheet.Model =
         printfn "%A" nextTables
         {state with Tables = nextTables}
 
-let createAnnotationTable (state: Spreadsheet.Model) : Spreadsheet.Model =
+/// <summary>This is the basic function to create new Tables from an array of InsertBuildingBlocks</summary>
+let createAnnotationTable (name: string option) (insertBuildingBlocks: InsertBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     // calculate next index
     let newIndex = if Map.isEmpty state.Tables then 0 else state.Tables |> Map.maxKeyValue |> (+) 1
+    let swateBuildingBlocks = insertBuildingBlocks |> Array.mapi (fun i bb -> bb.toSwateBuildingBlock i)
+    // parse to active table
+    let activeTable = SwateBuildingBlock.toTableMap swateBuildingBlocks
+    // add new table to tablemap
+    let newTables = state.Tables.Add(newIndex, SwateTable.init(swateBuildingBlocks, ?name = name))
+    { state with
+        Tables = newTables
+        ActiveTableIndex = newIndex
+        ActiveTable = activeTable
+    }
+
+/// <summary>Adds the most basic Swate table consisting of Input column "Source Name" and output column "Sample Name".</summary>
+let createAnnotationTable_new (state: Spreadsheet.Model) : Spreadsheet.Model =
     // create empty rows
     let rows =
         let n_rows = 1
@@ -40,15 +54,6 @@ let createAnnotationTable (state: Spreadsheet.Model) : Spreadsheet.Model =
         let blueprint = BuildingBlockNamePrePrint.init(BuildingBlockType.Sample)
         InsertBuildingBlock.create blueprint None None rows
     // parse to SwateBuildingBlocks
-    let insertBuildingBlock = [|source; sample|]
-    let swateBuildingBlocks = insertBuildingBlock |> Array.mapi (fun i bb -> bb.toSwateBuildingBlock i)
-    // parse to active table
-    let activeTable = SwateBuildingBlock.toTableMap swateBuildingBlocks
-    // add new table to tablemap
-    let newTables = state.Tables.Add(newIndex, SwateTable.init(swateBuildingBlocks))
-    { state with
-        Tables = newTables
-        ActiveTableIndex = newIndex
-        ActiveTable = activeTable
-    }
-    
+    let insertBuildingBlocks = [|source; sample|]
+    let name = HumanReadableIds.tableName()
+    createAnnotationTable (Some name) insertBuildingBlocks state

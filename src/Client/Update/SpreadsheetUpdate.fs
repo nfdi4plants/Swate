@@ -21,7 +21,7 @@ module Spreadsheet =
             let nextState =
                 state
                 |> Controller.saveActiveTable
-                |> Controller.createAnnotationTable
+                |> Controller.createAnnotationTable_new
             nextState, model, Cmd.none
         | UpdateActiveTable nextIndex ->
             let nextState =

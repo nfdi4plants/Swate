@@ -80,9 +80,9 @@ type SwateTable = {
         Name = "New Table"
         BuildingBlocks = Array.empty
     }
-    static member init(buildingblocks: SwateBuildingBlock []) = {
+    static member init(buildingblocks: SwateBuildingBlock [], ?name: string) = {
         Id = System.Guid.NewGuid()
-        Name = "New Table"
+        Name = Option.defaultValue "New Table" name
         BuildingBlocks = buildingblocks
     }
 
