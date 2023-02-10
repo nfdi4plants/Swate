@@ -274,6 +274,8 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit
         ]
     ]
 
+open SidebarComponents
+
 let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
     let autocompleteParamsTerm = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState
     let autocompleteParamsUnit = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState

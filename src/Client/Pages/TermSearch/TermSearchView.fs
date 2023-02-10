@@ -112,6 +112,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 
 open Fable.Core
 open Fable.Core.JsInterop
+open SidebarComponents
 
 let simpleSearchComponent model dispatch =
     mainFunctionContainer [

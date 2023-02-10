@@ -51,7 +51,7 @@ services:
       - SWATE_API=https://192.168.65.2:3000
       - TURN_OFF_SSL_VERIFY=True
       - MAIL_NOTIFICATION=off
-    image: git.bwcloud.uni-freiburg.de:5050/marcel/swobup:latest
+    image: zersk/swobup:latest
     # https://medium.com/@TimvanBaarsen/how-to-connect-to-the-docker-host-from-inside-a-docker-container-112b4c71bc66#:~:text=As%20of%20Docker%20version%2018.03,on%20Linux%20until%20Docker%2020.10.
     extra_hosts:
     # cat /etc/hosts , as bash command in container

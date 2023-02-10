@@ -1,4 +1,4 @@
-module CustomComponents.Navbar
+module SidebarComponents.Navbar
 
 open Fable.React
 open Fable.React.Props

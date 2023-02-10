@@ -25,7 +25,6 @@ type BodyCell = {
                 |> Some
     }
 
-
 type SwateCell =
 | IsBody of BodyCell
 | IsHeader of OfficeInteropTypes.SwateColumnHeader
@@ -55,7 +54,6 @@ with
     // Mirror create functions for SwateColumnHeader
     static member create(headerString: string, ?term: TermTypes.TermMinimal) = OfficeInteropTypes.SwateColumnHeader.init(headerString, ?term = term) |> IsHeader
     static member create(headerString: OfficeInteropTypes.SwateColumnHeader, ?term: TermTypes.TermMinimal) = OfficeInteropTypes.SwateColumnHeader.init(headerString, ?term = term) |> IsHeader
-
 
 open OfficeInteropTypes
 
@@ -106,6 +104,8 @@ type Model = {
 
 type Msg =
 //| UpdateActiveTable of string
-| UpdateTable of (int*int)*SwateCell
-| UpdateActiveTable of int
+| UpdateTable of (int*int) * SwateCell
+| UpdateActiveTable of index:int
+| RemoveTable of index:int
+| RenameTable of index:int * name:string
 | CreateAnnotationTable of tryUsePrevOutput:bool

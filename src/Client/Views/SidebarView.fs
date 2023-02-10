@@ -238,7 +238,7 @@ module private Content =
 let SidebarView (model: Model) (dispatch: Msg -> unit) =
     let state, setState = React.useState(SidebarStyle.init)
     viewContainer model dispatch state setState [
-        Navbar.NavbarComponent model dispatch state.Size
+        SidebarComponents.Navbar.NavbarComponent model dispatch state.Size
 
         Container.container [ Container.IsFluid ] [
             tabs model dispatch state.Size
@@ -246,7 +246,7 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
             str <| state.Size.ToString()
 
             if not model.ExcelState.HasAnnotationTable then
-                CustomComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
+                SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
 
             Content.main model dispatch
 

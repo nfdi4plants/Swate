@@ -66,13 +66,7 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                             Html.ul [
                                 for KeyValue (index,table) in model.SpreadsheetModel.Tables do
                                     yield
-                                        Bulma.tab [
-                                            if model.SpreadsheetModel.ActiveTableIndex = index then Bulma.tab.isActive
-                                            prop.onClick (fun _ -> Spreadsheet.UpdateActiveTable index |> SpreadsheetMsg |> dispatch)
-                                            prop.children [
-                                                Html.a [prop.text table.Name]
-                                            ]
-                                        ]
+                                        MainComponents.FooterTabs.Main {| i = index; table = table; model = model; dispatch = dispatch |}
                                 yield
                                     Bulma.tab [
                                         prop.onClick (fun _ -> SpreadsheetInterface.CreateAnnotationTable false |> InterfaceMsg |> dispatch)

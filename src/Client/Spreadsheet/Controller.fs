@@ -21,7 +21,6 @@ let saveActiveTable (state: Spreadsheet.Model) : Spreadsheet.Model =
             let t = state.Tables.[state.ActiveTableIndex]
             {t with BuildingBlocks = parsed_activeTable}
         let nextTables = state.Tables.Change(state.ActiveTableIndex, fun _ -> Some nextTable)
-        printfn "%A" nextTables
         {state with Tables = nextTables}
 
 /// <summary>This is the basic function to create new Tables from an array of InsertBuildingBlocks</summary>
@@ -57,3 +56,10 @@ let createAnnotationTable_new (state: Spreadsheet.Model) : Spreadsheet.Model =
     let insertBuildingBlocks = [|source; sample|]
     let name = HumanReadableIds.tableName()
     createAnnotationTable (Some name) insertBuildingBlocks state
+
+let findNeighborTables (tableIndex:int) (tables: Map<int,Spreadsheet.SwateTable>) =
+    let keys = tables.Keys
+    let lower = keys |> Seq.tryFindBack (fun k -> k < tableIndex)
+    let higher = keys |> Seq.tryFind (fun k -> k > tableIndex)
+    Option.map (fun i -> i, tables.[i]) lower,
+    Option.map (fun i -> i, tables.[i]) higher

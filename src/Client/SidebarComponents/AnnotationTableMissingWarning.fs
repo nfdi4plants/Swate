@@ -1,4 +1,4 @@
-module CustomComponents.AnnotationTableMissingWarning
+module SidebarComponents.AnnotationTableMissingWarning
 
 open Fable.React
 open Fable.React.Props

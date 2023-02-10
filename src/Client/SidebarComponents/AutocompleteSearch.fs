@@ -1,4 +1,4 @@
-module CustomComponents.AutocompleteSearch
+module SidebarComponents.AutocompleteSearch
 
 open Fable.React
 open Fable.React.Props
