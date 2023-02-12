@@ -63,3 +63,7 @@ module Spreadsheet =
             let nextTable = { state.Tables.[index] with Name = name }
             let nextState = {state with Tables = state.Tables.Change(index, fun _ -> Some nextTable)}
             nextState, model, Cmd.none
+        | UpdateTableOrder (prev_index, new_index) ->
+            let tableOrder = state.TableOrder |> Controller.updateTableOrder (prev_index, new_index)
+            let nextState = { state with TableOrder = tableOrder }
+            nextState, model, Cmd.none

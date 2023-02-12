@@ -69,6 +69,29 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                                         MainComponents.FooterTabs.Main {| i = index; table = table; model = model; dispatch = dispatch |}
                                 yield
                                     Bulma.tab [
+                                        let order = System.Int32.MaxValue
+                                        prop.onDragEnter(fun e ->
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                        )
+                                        prop.onDragOver(fun e ->
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                        )
+                                        prop.onDrop(fun e ->
+                                            // This event fire on the element on which something is dropped! Not on the element which is dropped!
+                                            let data = e.dataTransfer.getData("text")
+                                            let getData = Spreadsheet.Types.FooterReorderData.ofJson data
+                                            match getData with
+                                            | Ok data -> 
+                                                Browser.Dom.console.log(data)
+                                                let prev_index = data.OriginOrder
+                                                let next_index = order
+                                                Spreadsheet.UpdateTableOrder(prev_index, next_index) |> Messages.SpreadsheetMsg |> dispatch
+                                            | _ ->
+                                                ()
+                                        )
+                                        prop.style [style.custom ("order", order)]
                                         prop.onClick (fun _ -> SpreadsheetInterface.CreateAnnotationTable false |> InterfaceMsg |> dispatch)
                                         prop.children [
                                             Html.a [

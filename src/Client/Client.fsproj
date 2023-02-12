@@ -34,6 +34,7 @@
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="Spreadsheet\Types.fs" />
         <Compile Include="Spreadsheet\Parser.fs" />
         <Compile Include="Spreadsheet\Controller.fs" />
         <Compile Include="Modals\Controller.fs" />

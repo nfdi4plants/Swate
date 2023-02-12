@@ -90,17 +90,20 @@ type Model = {
     ActiveTable: Map<(int*int), SwateCell>
     ActiveTableIndex: int
     Tables: Map<int, SwateTable>
+    TableOrder: Map<int, int>
 } with
     static member init() = {
         ActiveTable = Map.empty
         ActiveTableIndex = 0
         Tables = Map.empty
+        TableOrder = Map.empty
     }
-    static member init(data: Dictionary<(int*int), TermTypes.TermMinimal>) = {
-        ActiveTable = Map.empty
-        ActiveTableIndex = 0
-        Tables = Map.empty
-    }
+    //static member init(data: Dictionary<(int*int), TermTypes.TermMinimal>) = {
+    //    ActiveTable = Map.empty
+    //    ActiveTableIndex = 0
+    //    Tables = Map.empty
+    //    TableOrder = Map.empty
+    //}
 
 type Msg =
 //| UpdateActiveTable of string
@@ -108,4 +111,5 @@ type Msg =
 | UpdateActiveTable of index:int
 | RemoveTable of index:int
 | RenameTable of index:int * name:string
+| UpdateTableOrder of pre_index:int * new_index:int
 | CreateAnnotationTable of tryUsePrevOutput:bool

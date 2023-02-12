@@ -32,10 +32,12 @@ let createAnnotationTable (name: string option) (insertBuildingBlocks: InsertBui
     let activeTable = SwateBuildingBlock.toTableMap swateBuildingBlocks
     // add new table to tablemap
     let newTables = state.Tables.Add(newIndex, SwateTable.init(swateBuildingBlocks, ?name = name))
+    let newTableOrder = state.TableOrder.Add(newIndex, newIndex)
     { state with
         Tables = newTables
         ActiveTableIndex = newIndex
         ActiveTable = activeTable
+        TableOrder = newTableOrder
     }
 
 /// <summary>Adds the most basic Swate table consisting of Input column "Source Name" and output column "Sample Name".</summary>
@@ -63,3 +65,24 @@ let findNeighborTables (tableIndex:int) (tables: Map<int,Spreadsheet.SwateTable>
     let higher = keys |> Seq.tryFind (fun k -> k > tableIndex)
     Option.map (fun i -> i, tables.[i]) lower,
     Option.map (fun i -> i, tables.[i]) higher
+
+let updateTableOrder (prevIndex:int, newIndex:int) (m:Map<'a,int>) =
+    printfn $"[UPDATE] {prevIndex} to {newIndex}"
+    m
+    |> Map.toSeq
+    |> Seq.map (fun (id, order) ->
+        // the element to switch
+        if order = prevIndex then 
+            id, newIndex
+        // keep value if smaller then newIndex
+        elif order < newIndex then
+            id, order
+        elif order >= newIndex then
+            id, order + 1
+        else
+            failwith "this should never happen"
+    )
+    |> Seq.sortBy snd
+    // rebase order, this prevents ordering above "+" symbol in footer with System.Int32.MaxValue
+    |> Seq.mapi (fun i (id, _) -> id, i)
+    |> Map.ofSeq

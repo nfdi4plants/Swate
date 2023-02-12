@@ -245,6 +245,10 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
 
             str <| state.Size.ToString()
 
+            Button.button [
+                Button.OnClick (fun _ -> Spreadsheet.UpdateTableOrder (2, 0) |> SpreadsheetMsg |> dispatch)
+            ] [ str "Test button" ]
+
             if not model.ExcelState.HasAnnotationTable then
                 SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
 

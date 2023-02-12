@@ -21,13 +21,14 @@ services:
     environment:
       - NEO4J_AUTH=neo4j/test
       - NEO4J_dbms_memory_pagecache_size=2G
-      - NEO4J_dbms_memory_heap_initial__size=4G
-      - NEO4J_dbms_memory_heap_max__size=16G
+      - NEO4J_dbms_memory_heap_initial__size=5G
+      - NEO4J_dbms_memory_heap_max__size=8G
       - NEO4J_dbms_default__listen__address=0.0.0.0
       - NEO4J_dbms_default__advertised__address=10.20.51.223
       - NEO4J_dbms.connector.bolt.address=0.0.0.0:7687
       - NEO4JLABS_PLUGINS=["graph-data-science", "apoc"]
       - NEO4J_dbms_security_procedures_unrestricted=algo.*, apoc.*
+      - NEO4J_dbms_security_auth__minimum__password__length=4
     volumes:
       - ./neo4j/data:/data
       - ./neo4j/logs:/logs
@@ -38,7 +39,6 @@ services:
     environment:
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
-      - CELERY_S3_BUCKET=frct-swobupdev
       - SWOBUP_USERNAME=swobup
       - SWOBUP_PASSWORD=test
       - SWOBUP_DATASTORAGE=local
@@ -51,7 +51,7 @@ services:
       - SWATE_API=https://192.168.65.2:3000
       - TURN_OFF_SSL_VERIFY=True
       - MAIL_NOTIFICATION=off
-    image: zersk/swobup:latest
+    image: ghcr.io/nfdi4plants/swobup:main
     # https://medium.com/@TimvanBaarsen/how-to-connect-to-the-docker-host-from-inside-a-docker-container-112b4c71bc66#:~:text=As%20of%20Docker%20version%2018.03,on%20Linux%20until%20Docker%2020.10.
     extra_hosts:
     # cat /etc/hosts , as bash command in container

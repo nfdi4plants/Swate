@@ -55,13 +55,49 @@ let private popup (x: int, y: int) renameMsg deleteMsg (rmv: _ -> unit) =
         ]
     ]
 
+open Spreadsheet.Types
+
 [<ReactComponent>]
 let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model; dispatch: Messages.Msg -> unit|}) = // (i: int) (table: Spreadsheet.SwateTable) (model: Messages.Model) dispatch =
     let state, setState = React.useState(FooterTab.init(input.table.Name))
     let dispatch = input.dispatch
-    let id = $"{input.table.Id}_{input.table.Name}"
+    let id = $"ReorderMe_{input.table.Id}_{input.table.Name}"
+    let order = input.model.SpreadsheetModel.TableOrder.[input.i]
     Bulma.tab [
+        prop.draggable true
+        prop.onDrop(fun e ->
+            // This event fire on the element on which something is dropped! Not on the element which is dropped!
+            let data = e.dataTransfer.getData("text")
+            let getData = FooterReorderData.ofJson data
+            match getData with
+            | Ok data -> 
+                Browser.Dom.console.log(data)
+                let prev_index = data.OriginOrder
+                let next_index = order
+                Spreadsheet.UpdateTableOrder(prev_index, next_index) |> Messages.SpreadsheetMsg |> dispatch
+            | _ ->
+                ()
+        )
+        prop.onDragStart(fun e ->
+            e.dataTransfer.clearData() |> ignore
+            let data = FooterReorderData.create order id
+            let dataJson = data.toJson()
+            e.dataTransfer.setData("text", dataJson) |> ignore
+            ()
+        )
+        prop.onDragEnter(fun e ->
+            e.preventDefault()
+            e.stopPropagation()
+        )
+        prop.onDragOver(fun e ->
+            e.preventDefault()
+            e.stopPropagation()
+        )
+        // This will determine the position of the tab
+        prop.style [style.custom ("order", order)]
+        // Use this to ensure updating reactelement correctly
         prop.key id
+        prop.id id
         if input.model.SpreadsheetModel.ActiveTableIndex = input.i then Bulma.tab.isActive
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveTable input.i |> Messages.SpreadsheetMsg |> dispatch)
         prop.onContextMenu(fun e ->
@@ -74,6 +110,7 @@ let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model;
             let name = $"popup_{mousePosition}"
             Modals.Controller.renderModal(name, child)
         )
+        prop.draggable true
         prop.children [
             if state.IsEditable then
                 let updateName = fun e ->
@@ -98,6 +135,6 @@ let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model;
                     prop.defaultValue input.table.Name
                 ]
             else
-                Html.a [prop.text input.table.Name]
+                Html.a [prop.text (input.table.Name + string order)]
         ]
     ]
