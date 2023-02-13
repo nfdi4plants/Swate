@@ -50,6 +50,8 @@ let private initFunctionView dispatch =
         ]
     ]
 
+
+
 let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
     Html.div [
         prop.style [
@@ -61,49 +63,18 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
             Html.div [
                 prop.children [
                     Bulma.tabs [
+                        prop.style [style.overflowY.visible]
                         Bulma.tabs.isBoxed
                         prop.children [
                             Html.ul [
+                                yield Bulma.tab  [
+                                    prop.style [style.width (length.px 20)]
+                                ]
                                 for KeyValue (index,table) in model.SpreadsheetModel.Tables do
                                     yield
                                         MainComponents.FooterTabs.Main {| i = index; table = table; model = model; dispatch = dispatch |}
                                 yield
-                                    Bulma.tab [
-                                        let order = System.Int32.MaxValue
-                                        prop.onDragEnter(fun e ->
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                        )
-                                        prop.onDragOver(fun e ->
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                        )
-                                        prop.onDrop(fun e ->
-                                            // This event fire on the element on which something is dropped! Not on the element which is dropped!
-                                            let data = e.dataTransfer.getData("text")
-                                            let getData = Spreadsheet.Types.FooterReorderData.ofJson data
-                                            match getData with
-                                            | Ok data -> 
-                                                Browser.Dom.console.log(data)
-                                                let prev_index = data.OriginOrder
-                                                let next_index = order
-                                                Spreadsheet.UpdateTableOrder(prev_index, next_index) |> Messages.SpreadsheetMsg |> dispatch
-                                            | _ ->
-                                                ()
-                                        )
-                                        prop.style [style.custom ("order", order)]
-                                        prop.onClick (fun _ -> SpreadsheetInterface.CreateAnnotationTable false |> InterfaceMsg |> dispatch)
-                                        prop.children [
-                                            Html.a [
-                                                Bulma.icon [
-                                                    Bulma.icon.isSmall
-                                                    prop.children [
-                                                        Html.i [prop.className "fa-solid fa-plus"]
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                    ]
+                                    MainComponents.FooterTabs.MainPlus {| dispatch = dispatch |}
                             ]
                         ]
                     ]

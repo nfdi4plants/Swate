@@ -48,6 +48,22 @@ a:hover {
     color: $lightBlueLighter20
 }
 
+.dragover-footertab {
+    position: relative
+}
+
+.dragover-footertab:before {
+    position: absolute;
+    content: "";
+    margin: 0 3px;
+    display: inline-block;
+    border: 7px solid transparent;
+    border-top: 8px solid black;
+    border-bottom: 0 none;
+    top: -3px;
+    left: -9px;
+}
+
 [type=checkbox]:checked.switch.is-primary + label::before, [type=checkbox]:checked.switch.is-primary + label::before {
     background: $mint
 }

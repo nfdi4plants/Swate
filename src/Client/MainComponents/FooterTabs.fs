@@ -5,11 +5,13 @@ open Feliz.Bulma
 
 type private FooterTab = {
     IsEditable: bool
+    IsDraggedOver: bool
     Name: string
 } with
-    static member init(name) = {
+    static member init(?name: string) = {
         IsEditable = false
-        Name = name
+        IsDraggedOver = false
+        Name = Option.defaultValue "" name
     }
 
 let private popup (x: int, y: int) renameMsg deleteMsg (rmv: _ -> unit) =
@@ -57,6 +59,38 @@ let private popup (x: int, y: int) renameMsg deleteMsg (rmv: _ -> unit) =
 
 open Spreadsheet.Types
 
+///<summary>This must be used on dragover events to enable dropping elements on them.</summary>
+let private drag_preventdefault = fun (e: Browser.Types.DragEvent) ->
+    e.preventDefault()
+    e.stopPropagation()
+
+///<summary>This is fired from the element on which something is dropped. Gets the data set during dragstart and uses it to update order.</summary>
+let private drop_handler (eleOrder, state, setState, dispatch) = fun (e: Browser.Types.DragEvent) -> 
+    // This event fire on the element on which something is dropped! Not on the element which is dropped!
+    let data = e.dataTransfer.getData("text")
+    let getData = FooterReorderData.ofJson data
+    setState {state with IsDraggedOver = false}
+    match getData with
+    | Ok data -> 
+        Browser.Dom.console.log(data)
+        let prev_index = data.OriginOrder
+        let next_index = eleOrder
+        Spreadsheet.UpdateTableOrder(prev_index, next_index) |> Messages.SpreadsheetMsg |> dispatch
+    | _ ->
+        ()
+
+///<summary>Sets styling on event, styling must then be removed ondragleave and ondrop.</summary>
+let private dragenter_handler(state, setState) = fun (e: Browser.Types.DragEvent) ->
+    e.preventDefault()
+    e.stopPropagation()
+    setState {state with IsDraggedOver = true}
+        
+///<summary>Removes dragenter styling.</summary>
+let private dragleave_handler(state, setState) = fun (e: Browser.Types.DragEvent) ->
+    e.preventDefault()
+    e.stopPropagation()
+    setState {state with IsDraggedOver = false}
+
 [<ReactComponent>]
 let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model; dispatch: Messages.Msg -> unit|}) = // (i: int) (table: Spreadsheet.SwateTable) (model: Messages.Model) dispatch =
     let state, setState = React.useState(FooterTab.init(input.table.Name))
@@ -64,20 +98,10 @@ let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model;
     let id = $"ReorderMe_{input.table.Id}_{input.table.Name}"
     let order = input.model.SpreadsheetModel.TableOrder.[input.i]
     Bulma.tab [
+        if state.IsDraggedOver then prop.className "dragover-footertab"
         prop.draggable true
-        prop.onDrop(fun e ->
-            // This event fire on the element on which something is dropped! Not on the element which is dropped!
-            let data = e.dataTransfer.getData("text")
-            let getData = FooterReorderData.ofJson data
-            match getData with
-            | Ok data -> 
-                Browser.Dom.console.log(data)
-                let prev_index = data.OriginOrder
-                let next_index = order
-                Spreadsheet.UpdateTableOrder(prev_index, next_index) |> Messages.SpreadsheetMsg |> dispatch
-            | _ ->
-                ()
-        )
+        prop.onDrop <| drop_handler (order, state, setState, dispatch)
+        prop.onDragLeave <| dragleave_handler (state, setState)
         prop.onDragStart(fun e ->
             e.dataTransfer.clearData() |> ignore
             let data = FooterReorderData.create order id
@@ -85,14 +109,8 @@ let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model;
             e.dataTransfer.setData("text", dataJson) |> ignore
             ()
         )
-        prop.onDragEnter(fun e ->
-            e.preventDefault()
-            e.stopPropagation()
-        )
-        prop.onDragOver(fun e ->
-            e.preventDefault()
-            e.stopPropagation()
-        )
+        prop.onDragEnter <| dragenter_handler(state, setState)
+        prop.onDragOver drag_preventdefault
         // This will determine the position of the tab
         prop.style [style.custom ("order", order)]
         // Use this to ensure updating reactelement correctly
@@ -135,6 +153,37 @@ let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model;
                     prop.defaultValue input.table.Name
                 ]
             else
-                Html.a [prop.text (input.table.Name + string order)]
+                Html.a [prop.text (input.table.Name)]
+        ]
+    ]
+
+[<ReactComponent>]
+let MainPlus(input:{|dispatch: Messages.Msg -> unit|}) =
+    let dispatch = input.dispatch
+    let state, setState = React.useState(FooterTab.init())
+    let order = System.Int32.MaxValue
+    let id = "Add-Spreadsheet-Button"
+    Bulma.tab [
+        prop.key id
+        prop.id id
+        if state.IsDraggedOver then prop.className "dragover-footertab"
+        prop.onDragEnter <| dragenter_handler(state, setState)
+        prop.onDragLeave <| dragleave_handler (state, setState)
+        prop.onDragOver drag_preventdefault
+        prop.onDrop <| drop_handler (order, state, setState, dispatch)
+        prop.onClick (fun _ -> SpreadsheetInterface.CreateAnnotationTable false |> Messages.InterfaceMsg |> dispatch)
+        prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
+        prop.children [
+            Html.a [
+                prop.style [style.height.inheritFromParent; style.pointerEvents.none]
+                prop.children[
+                    Bulma.icon [
+                        Bulma.icon.isSmall
+                        prop.children [
+                            Html.i [prop.className "fa-solid fa-plus"]
+                        ]
+                    ]
+                ]
+            ]
         ]
     ]

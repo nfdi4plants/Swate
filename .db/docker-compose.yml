@@ -20,13 +20,13 @@ services:
       - swobup_network
     environment:
       - NEO4J_AUTH=neo4j/test
-      - NEO4J_dbms_memory_pagecache_size=2G
-      - NEO4J_dbms_memory_heap_initial__size=5G
-      - NEO4J_dbms_memory_heap_max__size=8G
-      - NEO4J_dbms_default__listen__address=0.0.0.0
-      - NEO4J_dbms_default__advertised__address=10.20.51.223
+      - NEO4J_server_memory_pagecache_size=2G
+      - NEO4J_server_memory_heap_initial__size=5G
+      - NEO4J_server_memory_heap_max__size=8G
+      - NEO4J_server_default__listen__address=0.0.0.0
+      - NEO4J_server_default__advertised__address=10.20.51.223
       - NEO4J_dbms.connector.bolt.address=0.0.0.0:7687
-      - NEO4JLABS_PLUGINS=["graph-data-science", "apoc"]
+      - NEO4J_PLUGINS=["graph-data-science", "apoc"]
       - NEO4J_dbms_security_procedures_unrestricted=algo.*, apoc.*
       - NEO4J_dbms_security_auth__minimum__password__length=4
     volumes:
