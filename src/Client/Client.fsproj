@@ -34,6 +34,7 @@
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="Spreadsheet\LocalStorage.fs" />
         <Compile Include="Spreadsheet\Types.fs" />
         <Compile Include="Spreadsheet\Parser.fs" />
         <Compile Include="Spreadsheet\Controller.fs" />
@@ -77,6 +78,7 @@
         <Compile Include="Update\OfficeInteropUpdate.fs" />
         <Compile Include="Update\InterfaceUpdate.fs" />
         <Compile Include="Update.fs" />
+        <Compile Include="Init.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
     <ItemGroup>

@@ -249,41 +249,4 @@ type Msg =
 | TestMyPostAPI
 | DoNothing
 
-let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
-    let isDarkMode =
-        let cookies = Browser.Dom.document.cookie
-        let cookiesSplit = cookies.Split([|";"|], System.StringSplitOptions.RemoveEmptyEntries)
-        cookiesSplit
-        |> Array.tryFind (fun x -> x.StartsWith (Cookies.IsDarkMode.toCookieString + "="))
-        |> fun cookieOpt ->
-            if cookieOpt.IsSome then
-                cookieOpt.Value.Replace(Cookies.IsDarkMode.toCookieString + "=","")
-                |> fun cookie ->
-                    match cookie with
-                    | "false"| "False"  -> false
-                    | "true" | "True"   -> true
-                    | anyElse -> false
-            else
-                false
-    {
-        DebouncerState              = Debouncer                 .create ()
-        PageState                   = PageState                 .init pageOpt
-        PersistentStorageState      = PersistentStorageState    .init (pageEntry=pageEntry)
-        DevState                    = DevState                  .init ()
-        SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
-        TermSearchState             = TermSearch.Model          .init ()
-        AdvancedSearchState         = AdvancedSearch.Model      .init ()
-        ExcelState                  = OfficeInterop.Model       .init ()
-        ApiState                    = ApiState                  .init ()
-        FilePickerState             = FilePicker.Model          .init ()
-        AddBuildingBlockState       = BuildingBlock.Model       .init ()
-        ValidationState             = Validation.Model          .init ()
-        ProtocolState               = Protocol.Model            .init ()
-        BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
-        SettingsXmlState            = SettingsXml.Model         .init ()
-        JsonExporterModel           = JsonExporter.State.Model  .init ()
-        TemplateMetadataModel       = TemplateMetadata.Model    .init ()
-        DagModel                    = Dag.Model                 .init ()
-        CytoscapeModel              = Cytoscape.Model           .init ()
-        SpreadsheetModel            = Spreadsheet.Model     .init ()
-    }
+Debouncer                 .create ()

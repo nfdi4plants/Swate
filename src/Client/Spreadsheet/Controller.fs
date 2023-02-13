@@ -67,7 +67,6 @@ let findNeighborTables (tableIndex:int) (tables: Map<int,Spreadsheet.SwateTable>
     Option.map (fun i -> i, tables.[i]) higher
 
 let updateTableOrder (prevIndex:int, newIndex:int) (m:Map<'a,int>) =
-    printfn $"[UPDATE] {prevIndex} to {newIndex}"
     m
     |> Map.toSeq
     |> Seq.map (fun (id, order) ->
@@ -86,3 +85,4 @@ let updateTableOrder (prevIndex:int, newIndex:int) (m:Map<'a,int>) =
     // rebase order, this prevents ordering above "+" symbol in footer with System.Int32.MaxValue
     |> Seq.mapi (fun i (id, _) -> id, i)
     |> Map.ofSeq
+

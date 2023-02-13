@@ -92,18 +92,13 @@ type Model = {
     Tables: Map<int, SwateTable>
     TableOrder: Map<int, int>
 } with
-    static member init() = {
-        ActiveTable = Map.empty
-        ActiveTableIndex = 0
-        Tables = Map.empty
-        TableOrder = Map.empty
-    }
-    //static member init(data: Dictionary<(int*int), TermTypes.TermMinimal>) = {
-    //    ActiveTable = Map.empty
-    //    ActiveTableIndex = 0
-    //    Tables = Map.empty
-    //    TableOrder = Map.empty
-    //}
+    static member init() =
+        {
+            ActiveTable = Map.empty
+            ActiveTableIndex = 0
+            Tables = Map.empty
+            TableOrder = Map.empty
+        }
 
 type Msg =
 //| UpdateActiveTable of string
