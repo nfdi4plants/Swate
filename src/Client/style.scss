@@ -100,22 +100,38 @@ a:hover {
 }
 
 .myNavbarButtonContainer:focus, .myNavbarButtonContainer:focus-within, .myNavbarButtonContainer:hover, .myNavbarButtonContainer.is-active {
-    background-color: transparent !important;
-    border-color: darkgrey
-}
-
-.myNavbarButton {
-    width: 100%;
-    height: 100%;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    display: inline-flex
+    background-color: transparent;
 }
 
 .myNavbarButton:active {
-    background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)) !important
+    background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)) !important
 }
+
+.myNavbarButton {
+    height: 100% !important;
+    width: 100% !important;
+    background-color: transparent !important;
+    border-radius: unset;
+    border-color: transparent !important;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    display: inline-flex;
+    padding: unset
+}
+
+.myNavbarButton:focus, .myNavbarButton:focus-within, .myNavbarButton:hover, .myNavbarButton.is-active {
+    background-color: transparent !important;
+}
+
+.myNavbarButton:focus, .myNavbarButton:focus-within, myNavbarButton.is-active {
+    border-color: white !important;
+}
+
+.myNavbarButton:disabled {
+    filter: brightness(85%);
+}
+
 
 .help {
     @extend .help;

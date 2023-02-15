@@ -108,3 +108,4 @@ type Msg =
 | RenameTable of index:int * name:string
 | UpdateTableOrder of pre_index:int * new_index:int
 | CreateAnnotationTable of tryUsePrevOutput:bool
+| UpdateHistoryPosition of newPosition:int

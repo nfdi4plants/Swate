@@ -19,75 +19,58 @@ type private NavbarState = {
         QuickAccessActive = false
     }
 
-type private ShortCutIcon = {
-    Description : string
-    FaList      : ReactElement list
-    Msg         : Browser.Types.MouseEvent -> unit
-    Category    : string
-} with
-    static member create description faList msg category = {
-        Description = description
-        FaList      = faList
-        Msg         = msg
-        Category    = category
-    }
+open Components.QuickAccessButton
 
 let private shortCutIconList model dispatch =
     [
-        ShortCutIcon.create
-            "Add Annotation Table"
+        QuickAccessButton.create(
+            "Add Annotation Table",
             [
                 Fa.span [Fa.Solid.Plus] []
                 Fa.span [Fa.Solid.Table] []
-            ]
+            ],
             (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> InterfaceMsg |> dispatch)
-            "Table"
-        ShortCutIcon.create
-            "Autoformat Table"
+        )
+        QuickAccessButton.create(
+            "Autoformat Table",
             [
                 Fa.i [Fa.Solid.SyncAlt] []
-            ]
+            ],
             (fun e -> OfficeInterop.AutoFitTable (not e.ctrlKey) |> OfficeInteropMsg |> dispatch)
-            "Formatting"
-        ShortCutIcon.create
-            "Update Ontology Terms"
+        )
+        QuickAccessButton.create(
+            "Update Ontology Terms",
             [
                 Fa.span [Fa.Solid.SpellCheck] []
                 span [] [str model.ExcelState.FillHiddenColsStateStore.toReadableString]
                 Fa.span [Fa.Solid.Pen] []
-            ]
+            ],
             (fun _ -> OfficeInterop.FillHiddenColsRequest |> OfficeInteropMsg |> dispatch)
-            "Formatting"
-        ShortCutIcon.create
-            "Remove Building Block"
+        )
+        QuickAccessButton.create(
+            "Remove Building Block",
             [ 
                 Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]] []
                 Fa.span [Fa.Solid.Columns] []
-            ]
+            ],
             (fun _ -> OfficeInterop.RemoveAnnotationBlock |> OfficeInteropMsg |> dispatch)
-            "BuildingBlock"
-        ShortCutIcon.create
-            "Get Building Block Information"
+        )
+        QuickAccessButton.create(
+            "Get Building Block Information",
             [ 
                 Fa.span [Fa.Solid.Question; Fa.Props [Style [PaddingRight "0.15rem"]]] []
                 span [] [str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
                 Fa.span [Fa.Solid.Columns] []
-            ]
+            ],
             (fun _ -> OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg |> dispatch)
-            "BuildingBlock"
+        )
     ]
     
 let private navbarShortCutIconList model dispatch =
     [
         for icon in shortCutIconList model dispatch do
             yield
-                Navbar.Item.a [Navbar.Item.CustomClass "myNavbarButtonContainer";Navbar.Item.Props [Title icon.Description ;Style [Padding "0px"; MinWidth "45px"]]] [
-                    div [
-                        Class "myNavbarButton"
-                        OnClick icon.Msg
-                       
-                    ] icon.FaList
-                ]
+                icon.toReactElement()
     ]
 
 let private quickAccessDropdownElement model dispatch (state: NavbarState) (setState: NavbarState -> unit) (isSndNavbar:bool) =
@@ -158,8 +141,6 @@ let private quickAccessListElement model dispatch =
         yield! navbarShortCutIconList model dispatch
     ]
 
-
-open Fable.Core.JsInterop
 
 open Feliz
 

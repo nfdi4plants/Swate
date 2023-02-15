@@ -27,7 +27,7 @@
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
         <Compile Include="States\SpreadsheetInterface.fs" />
-        <Compile Include="States\SpreadsheetData.fs" />
+        <Compile Include="States\Spreadsheet.fs" />
         <Compile Include="States\CytoscapeState.fs" />
         <Compile Include="States\DagState.fs" />
         <Compile Include="States\TemplateMetadataState.fs" />
@@ -45,6 +45,8 @@
         <Compile Include="Modals\ErrorModal.fs" />
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
+        <Compile Include="SharedComponents\QuickAccessButton.fs" />
+        <Compile Include="MainComponents\Navbar.fs" />
         <Compile Include="MainComponents\FooterTabs.fs" />
         <Compile Include="SidebarComponents\FunctionContainer.fs" />
         <Compile Include="SidebarComponents\ResponsiveFA.fs" />

@@ -49,6 +49,7 @@ let initializeModel (pageOpt: Routing.Route option, pageEntry: Routing.SwateEntr
 
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
+    Spreadsheet.LocalStorage.onInit()
     let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
     let pageEntry = if route.IsSome then route.Value.toSwateEntry else Routing.SwateEntry.Core
     let initialModel = initializeModel (pageOpt,pageEntry)

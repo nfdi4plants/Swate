@@ -9,10 +9,16 @@ open Parser
 
 module Spreadsheet =
 
+    ///<summary>This function will update the `state` to the session storage history control. It works based of exlusion. As it specifies certain messages not triggering history update.</summary>
+    let private updateSessionStorage (state: Spreadsheet.Model, msg: Spreadsheet.Msg) : unit =
+        match msg with
+        | UpdateActiveTable _ | UpdateHistoryPosition _ -> ()
+        | _ -> Spreadsheet.LocalStorage.tablesToSessionStorage state
+
     let update (state: Spreadsheet.Model) (model: Messages.Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Messages.Model * Cmd<Messages.Msg> =
         /// run this after any message in this update function
         let save = Spreadsheet.LocalStorage.tablesToLocalStorage
-        let inner_update =
+        let inner_update (msg: Spreadsheet.Msg) =
             match msg with
             | UpdateTable (index, cell) ->
                 let nextState =
@@ -70,6 +76,14 @@ module Spreadsheet =
                 let tableOrder = state.TableOrder |> Controller.updateTableOrder (prev_index, new_index)
                 let nextState = { state with TableOrder = tableOrder }
                 nextState, model, Cmd.none
+            | UpdateHistoryPosition (newPosition) ->
+                let nextState = Spreadsheet.LocalStorage.updateHistoryPosition newPosition state
+                nextState, model, Cmd.none
+
+
         // execute inner and follow with save function
-        inner_update
-        |> fun (state, model, cmd) -> save state, model, cmd
+        inner_update msg
+        |> fun (state, model, cmd) ->
+            save state // This will cache the most up to date table state to local storage.
+            updateSessionStorage (state, msg) // this will cache the table state for certain operations in session storage.
+            state, model, cmd

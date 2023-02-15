@@ -15,7 +15,6 @@ let saveActiveTable (state: Spreadsheet.Model) : Spreadsheet.Model =
     if Map.isEmpty state.Tables then
         state
     else
-        printfn "save table!"
         let parsed_activeTable = state.ActiveTable |> SwateBuildingBlock.ofTableMap
         let nextTable =
             let t = state.Tables.[state.ActiveTableIndex]

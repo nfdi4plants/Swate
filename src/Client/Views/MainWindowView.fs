@@ -86,6 +86,7 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
 [<ReactComponent>]
 let Main (model: Messages.Model) dispatch =
     let state = model.SpreadsheetModel
+    let activeTableIsEmpty = Map.isEmpty state.ActiveTable
     Html.div [
         prop.id "MainWindow"
         prop.style [
@@ -95,7 +96,7 @@ let Main (model: Messages.Model) dispatch =
             style.height (length.percent 100)
         ]
         prop.children [
-            let activeTableIsEmpty = Map.isEmpty state.ActiveTable
+            MainComponents.Navbar.Main model dispatch
             Html.div [
                 prop.id "TableContainer"
                 prop.style [
