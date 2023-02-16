@@ -31,21 +31,18 @@ $switch-background-active: $excelPrimary;
 @import "~bulma-checkradio";
 @import "~bulma-slider";
 
+
+/*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/
 .fixed_headers {
     border-collapse: collapse;
     width: max-content;
+    border-style: hidden
 }
 
 .fixed_headers td,
 .fixed_headers thead th {
-    /*padding: 5px;*/
     text-align: left;
 }
-
-/*.fixed_headers thead, textarea {
-    background-color: #333;
-    color: #FDFDFD;
-}*/
 
 .fixed_headers thead tr {
     position: relative;
@@ -58,16 +55,14 @@ $switch-background-active: $excelPrimary;
 .fixed_headers thead th {
     position: sticky;
     top: 0; /* REQUIRED: https://stackoverflow.com/a/43707215 */
-    /*background-color: #333;*/
     resize: horizontal;
     overflow: auto;
-    min-width: 70px;
+    z-index: 2
 }
 
 html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     font-size: 14px;
-    /*    background: #F0F2F4;*/
     min-width: 400px;
     height: 100vh
 }

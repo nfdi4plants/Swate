@@ -79,6 +79,9 @@ module Spreadsheet =
             | UpdateHistoryPosition (newPosition) ->
                 let nextState = Spreadsheet.LocalStorage.updateHistoryPosition newPosition state
                 nextState, model, Cmd.none
+            | AddRows (n) ->
+                let nextState = Spreadsheet.Controller.addRows n state
+                nextState, model, Cmd.none
             | Reset ->
                 let nextState = Spreadsheet.Controller.resetTableState()
                 nextState, model, Cmd.none

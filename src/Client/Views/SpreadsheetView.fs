@@ -47,7 +47,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
         prop.style [
             style.minWidth 100
             style.height 22
-            //style.width(length.percent 100)
+            if isHeader then style.backgroundColor.coral
             style.border(length.px 1, borderStyle.solid, if state_cell.Selected then "green" else "darkgrey")
         ]
         prop.onDoubleClick(fun e ->
@@ -125,18 +125,23 @@ let private headerRow (model:Model) (dispatch: Msg -> unit) =
 [<ReactComponent>]
 let Main (model:Model) (dispatch: Msg -> unit) =
     let state = model.SpreadsheetModel
-    // builds main container filling all possible space
-    Html.table [
-        prop.className "fixed_headers"
-        //prop.style [style.height.minContent; style.width.minContent]
+    Html.div [
+        prop.style [style.border(1, borderStyle.solid, "grey"); style.width.minContent]
         prop.children [
-            Html.thead [
-                headerRow model dispatch
-            ]
-            Html.tbody [
-                let rows = state.ActiveTable.Keys |> Seq.maxBy fst |> fst
-                for rowInd in 1 .. rows do
-                    yield bodyRow rowInd model dispatch 
+            Html.table [
+                prop.className "fixed_headers"
+                //prop.style [style.height.minContent; style.width.minContent]
+                prop.children [
+                    Html.thead [
+                        headerRow model dispatch
+                    ]
+                    Html.tbody [
+                        let rows = state.ActiveTable.Keys |> Seq.maxBy snd |> snd
+                        printfn "[ROWS] %A" rows
+                        for rowInd in 1 .. rows do
+                            yield bodyRow rowInd model dispatch 
+                    ]
+                ]
             ]
         ]
     ]

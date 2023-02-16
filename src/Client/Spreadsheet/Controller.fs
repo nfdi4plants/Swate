@@ -89,3 +89,31 @@ let resetTableState() : Spreadsheet.Model =
     Spreadsheet.LocalStorage.resetAll()
     Spreadsheet.Model.init()
 
+///<summary>Add `n` rows to active table.</summary>
+let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let keys = state.ActiveTable.Keys
+    let maxRow = keys |> Seq.maxBy snd |> snd
+    let maxCol = keys |> Seq.maxBy fst |> fst
+    /// create new keys to add to active table
+    let newKeys = [
+        // iterate over all columns
+        for c in 0 .. maxCol do
+            // then create for EACH COLUMN and EACH ROW ABOVE maxRow UNTIL maxRow + number of new rows
+            for r in (maxRow + 1) .. (maxRow + n) do
+                yield c, r
+    ]
+    /// This MUST be 0, so no overlap between existing keys and new keys exists.
+    /// This is important as Map.add would replace previous values on that key.
+    let checkNewKeys =
+        let keySet = keys |> Set.ofSeq
+        let newKeysSet = newKeys |> Set.ofList
+        Set.intersect keySet newKeysSet
+        |> Set.count
+    if checkNewKeys <> 0 then failwith "Error in `addRows` function. Unable to add new rows without replacing existing values. Please contact us with a bug report."
+    let nextActiveTable =
+        let prev = state.ActiveTable |> Map.toList
+        let next = newKeys |> List.map (fun x -> x, SwateCell.create(TermMinimal.empty))
+        prev@next
+        |> Map.ofList
+    let nextState = {state with ActiveTable = nextActiveTable}
+    nextState

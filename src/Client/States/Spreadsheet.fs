@@ -87,6 +87,7 @@ type SwateTable = {
 open System.Collections.Generic
 
 type Model = {
+    /// Keys: column * row
     ActiveTable: Map<(int*int), SwateCell>
     ActiveTableIndex: int
     Tables: Map<int, SwateTable>
@@ -109,5 +110,6 @@ type Msg =
 | UpdateTableOrder of pre_index:int * new_index:int
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | UpdateHistoryPosition of newPosition:int
+| AddRows of int
 /// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
 | Reset
