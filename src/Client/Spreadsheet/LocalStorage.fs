@@ -2,16 +2,20 @@ module Spreadsheet.LocalStorage
 
 open Fable.SimpleJson
 
+
+/// stores maximum number of states to save
+let MaxHistory = 30
+let CurrentHistoryPosition_init = 0
+let AvailableHistoryItems_init = 0
+
 // ----!----
 // I know these mutables are not best practise but i really did not want to add those to elmish.
 // ----!----
-
 /// stores current position
-let mutable CurrentHistoryPosition = 0
+let mutable CurrentHistoryPosition = CurrentHistoryPosition_init
 /// store how many states are saved currently
-let mutable AvailableHistoryItems = 0
-/// stores maximum number of states to save
-let MaxHistory = 30
+let mutable AvailableHistoryItems = AvailableHistoryItems_init
+
 
 module Keys = 
 
@@ -172,6 +176,12 @@ let tableOfLocalStorage () : Spreadsheet.Model =
     match json with
     | Some json -> Spreadsheet.Model.ofJson json
     | None      -> failwith $"No tables cached!"
+
+let resetAll() =
+    CurrentHistoryPosition <- CurrentHistoryPosition_init
+    AvailableHistoryItems <- AvailableHistoryItems_init
+    Browser.WebStorage.localStorage.clear()
+    Browser.WebStorage.sessionStorage.clear()
 
 type Spreadsheet.Model with
     ///</summary>This function tries to get the data model from local storage saved under "swate_spreadsheet_key"</summary>

@@ -7,7 +7,7 @@ open Messages
 
 open Components.QuickAccessButton
 
-let quickAccessButtonList (model: Model) dispatch =
+let quickAccessButtonListStart (model: Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
@@ -19,7 +19,6 @@ let quickAccessButtonList (model: Model) dispatch =
                     Bulma.icon [Html.i [prop.className "fa-solid fa-rotate-left"]]
                 ],
                 (fun _ ->
-                    printfn "FIRE"
                     let newPosition = Spreadsheet.LocalStorage.CurrentHistoryPosition + 1
                     let newPosition_clamped = System.Math.Min(newPosition, Spreadsheet.LocalStorage.MaxHistory - 1)
                     if newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition then
@@ -35,7 +34,6 @@ let quickAccessButtonList (model: Model) dispatch =
                     Bulma.icon [Html.i [prop.className "fa-solid fa-rotate-right"]]
                 ],
                 (fun _ ->
-                    printfn "FIRE"
                     let newPosition = Spreadsheet.LocalStorage.CurrentHistoryPosition - 1
                     let newPosition_clamped = System.Math.Max(newPosition, 0)
                     if newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition then
@@ -44,6 +42,24 @@ let quickAccessButtonList (model: Model) dispatch =
                         Spreadsheet.UpdateHistoryPosition newPosition_clamped |> Msg.SpreadsheetMsg |> dispatch
                 ),
                 isActive = (Spreadsheet.LocalStorage.CurrentHistoryPosition > 0)
+            ).toReactElement()
+        ]
+    ]
+
+
+let quickAccessButtonListEnd (model: Model) dispatch =
+    Html.div [
+        prop.style [
+            style.display.flex; style.flexDirection.row
+        ]
+        prop.children [
+            QuickAccessButton.create(
+                "Reset",
+                [
+                    Bulma.icon [Html.i [prop.className "fa-sharp fa-solid fa-trash";]]
+                ],
+                (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
+                buttonProps = [Bulma.color.isDanger; Bulma.button.isInverted; Bulma.button.isOutlined]
             ).toReactElement()
         ]
     ]
@@ -59,9 +75,18 @@ let Main (model: Messages.Model) dispatch =
         ]
         prop.children [
             Bulma.navbarBrand.div [
+
+            ]
+            Bulma.navbarMenu [
+                Bulma.navbarMenu.isActive
                 prop.ariaLabel "menu"
                 prop.children [
-                    quickAccessButtonList model dispatch
+                    Bulma.navbarStart.div [
+                        quickAccessButtonListStart model dispatch
+                    ]
+                    Bulma.navbarEnd.div [
+                        quickAccessButtonListEnd model dispatch
+                    ]
                 ]
             ]
         ]

@@ -40,6 +40,7 @@
         <Compile Include="Spreadsheet\Controller.fs" />
         <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
+        <Compile Include="Modals\ResetTable.fs" />
         <Compile Include="Modals\WarningModal.fs" />
         <Compile Include="Modals\InteropLoggingModal.fs" />
         <Compile Include="Modals\ErrorModal.fs" />

@@ -109,3 +109,5 @@ type Msg =
 | UpdateTableOrder of pre_index:int * new_index:int
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | UpdateHistoryPosition of newPosition:int
+/// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
+| Reset

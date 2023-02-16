@@ -99,40 +99,51 @@ a:hover {
     top: 0
 }
 
-.myNavbarButtonContainer:focus, .myNavbarButtonContainer:focus-within, .myNavbarButtonContainer:hover, .myNavbarButtonContainer.is-active {
-    background-color: transparent;
-}
-
-.myNavbarButton:active {
-    background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)) !important
-}
-
 .myNavbarButton {
     height: 100% !important;
     width: 100% !important;
-    background-color: transparent !important;
+    background-color: transparent;
     border-radius: unset;
     border-color: transparent !important;
     align-items: center;
     justify-content: center;
     color: white;
     display: inline-flex;
-    padding: unset
+    padding: unset;
+    box-shadow: unset !important
 }
 
-.myNavbarButton:focus, .myNavbarButton:focus-within, .myNavbarButton:hover, .myNavbarButton.is-active {
-    background-color: transparent !important;
+.myNavbarButton:not([disabled]):active {
+    background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)) !important
 }
 
-.myNavbarButton:focus, .myNavbarButton:focus-within, myNavbarButton.is-active {
+.myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within, .myNavbarButton:not([disabled]):hover {
+    background-color: transparent;
+    color: white
+}
+
+.myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within {
     border-color: white !important;
 }
 
-.myNavbarButton:disabled {
-    filter: brightness(85%);
+.myNavbarButton:not([disabled]):focus:not(:focus-visible), .myNavbarButton:not([disabled]):focus-within:not(:focus-visible) {
+    border-color: transparent !important;
 }
 
+.myNavbarButton[disabled] {
+    filter: brightness(85%);
+    background-color: transparent;
+    color: white;
+}
 
+.myNavbarButton[disabled]:focus, .myNavbarButton[disabled]:focus-within {
+    box-shadow: unset
+}
+
+/*.myNavbarButton[disabled]:hover {
+    color: white
+}
+*/
 .help {
     @extend .help;
     font-size: 0.85rem;
@@ -453,4 +464,8 @@ input::-ms-clear {
         margin-bottom: 0.5rem;
         font-size: 0.8rem;
     }
+}
+
+.danger_important {
+    color: $red !important
 }

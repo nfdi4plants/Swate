@@ -12,7 +12,7 @@ module Spreadsheet =
     ///<summary>This function will update the `state` to the session storage history control. It works based of exlusion. As it specifies certain messages not triggering history update.</summary>
     let private updateSessionStorage (state: Spreadsheet.Model, msg: Spreadsheet.Msg) : unit =
         match msg with
-        | UpdateActiveTable _ | UpdateHistoryPosition _ -> ()
+        | UpdateActiveTable _ | UpdateHistoryPosition _ | Reset -> ()
         | _ -> Spreadsheet.LocalStorage.tablesToSessionStorage state
 
     let update (state: Spreadsheet.Model) (model: Messages.Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Messages.Model * Cmd<Messages.Msg> =
@@ -78,6 +78,9 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | UpdateHistoryPosition (newPosition) ->
                 let nextState = Spreadsheet.LocalStorage.updateHistoryPosition newPosition state
+                nextState, model, Cmd.none
+            | Reset ->
+                let nextState = Spreadsheet.Controller.resetTableState()
                 nextState, model, Cmd.none
 
 

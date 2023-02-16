@@ -85,3 +85,7 @@ let updateTableOrder (prevIndex:int, newIndex:int) (m:Map<'a,int>) =
     |> Seq.mapi (fun i (id, _) -> id, i)
     |> Map.ofSeq
 
+let resetTableState() : Spreadsheet.Model =
+    Spreadsheet.LocalStorage.resetAll()
+    Spreadsheet.Model.init()
+
