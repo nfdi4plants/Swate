@@ -38,8 +38,10 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     /// TODO! Try get from db?
     let updateMainStateTable dispatch =
-        let nextTerm = cell.updateDisplayValue state_cell.Value
-        Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
+        // Only update if changed
+        if state_cell.Value <> cell_value then
+            let nextTerm = cell.updateDisplayValue state_cell.Value
+            Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
     cell_element [
         prop.key $"{state.Tables.[state.ActiveTableIndex].Id}_Cell_{fst index}-{snd index}"
         prop.style [
