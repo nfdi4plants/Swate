@@ -45,7 +45,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
         prop.style [
             style.minWidth 100
             style.height 22
-            style.width(length.percent 100)
+            //style.width(length.percent 100)
             style.border(length.px 1, borderStyle.solid, if state_cell.Selected then "green" else "darkgrey")
         ]
         prop.onDoubleClick(fun e ->
@@ -125,7 +125,8 @@ let Main (model:Model) (dispatch: Msg -> unit) =
     let state = model.SpreadsheetModel
     // builds main container filling all possible space
     Html.table [
-        prop.style [style.height.minContent; style.width.minContent]
+        prop.className "fixed_headers"
+        //prop.style [style.height.minContent; style.width.minContent]
         prop.children [
             Html.thead [
                 headerRow model dispatch
