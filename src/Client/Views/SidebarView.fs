@@ -246,7 +246,12 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
             str <| state.Size.ToString()
 
             Button.button [
-                Button.OnClick (fun _ -> Spreadsheet.AddRows 4 |> SpreadsheetMsg |> dispatch)
+                Button.OnClick (fun _ ->
+                    //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
+                    //()
+                    //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
+                    ()
+                )
             ] [ str "Test button" ]
 
             if not model.ExcelState.HasAnnotationTable then

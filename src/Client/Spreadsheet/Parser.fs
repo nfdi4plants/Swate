@@ -31,6 +31,13 @@ module SwateBuildingBlock =
         |]
         SwateBuildingBlock.create(index, header, rows)
 
+    let ofTableMap_list (m: Map<int*int,SwateCell>) : SwateBuildingBlock list =
+        let maxColIndex = m.Keys |> Seq.maxBy fst |> fst
+        [
+            for i in 0 .. maxColIndex do
+                yield ofTableMap_byIndex i m
+        ]
+
     let ofTableMap (m: Map<int*int,SwateCell>) : SwateBuildingBlock [] =
         let maxColIndex = m.Keys |> Seq.maxBy fst |> fst
         [|
@@ -38,9 +45,9 @@ module SwateBuildingBlock =
                 yield ofTableMap_byIndex i m
         |]
 
-    let toTableMap (buildingBlocks: SwateBuildingBlock []) : Map<int*int,SwateCell> =
+    let toTableMap (buildingBlocks: seq<SwateBuildingBlock>) : Map<int*int,SwateCell> =
         buildingBlocks
-        |> Array.collect (fun bb ->
+        |> Seq.collect (fun bb ->
             let columnIndex = bb.Index
             let header = (columnIndex, 0), IsHeader bb.Header
             let rows =
@@ -52,6 +59,6 @@ module SwateBuildingBlock =
                 yield! rows
             |]
         )
-        |> Map.ofArray
+        |> Map.ofSeq
         
 

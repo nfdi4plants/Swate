@@ -6,6 +6,8 @@ open Model
 open Shared
 open OfficeInteropTypes
 open Parser
+open Spreadsheet.Table
+open Spreadsheet.Sidebar
 
 module Spreadsheet =
 
@@ -20,17 +22,21 @@ module Spreadsheet =
         let save = Spreadsheet.LocalStorage.tablesToLocalStorage
         let inner_update (msg: Spreadsheet.Msg) =
             match msg with
-            | UpdateTable (index, cell) ->
-                let nextState =
-                    let nextTable = state.ActiveTable.Change(index, fun _ -> Some cell)
-                    {state with ActiveTable = nextTable}
-                nextState, model, Cmd.none
             | CreateAnnotationTable usePrevOutput ->
-                printfn "usePrevOutput not implemented yet"
+                printfn "implemented usePrevOutput for new table input column"
                 let nextState =
                     state
                     |> Controller.saveActiveTable
                     |> Controller.createAnnotationTable_new
+                nextState, model, Cmd.none
+            | AddAnnotationBlock minBuildingBlockInfo ->
+                printfn "implement adding building block after selected col index"
+                let nextState = Controller.addBuildingBlock state minBuildingBlockInfo
+                nextState, model, Cmd.none
+            | UpdateTable (index, cell) ->
+                let nextState =
+                    let nextTable = state.ActiveTable.Change(index, fun _ -> Some cell)
+                    {state with ActiveTable = nextTable}
                 nextState, model, Cmd.none
             | UpdateActiveTable nextIndex ->
                 let nextState =
@@ -44,29 +50,7 @@ module Spreadsheet =
                         }
                 nextState, model, Cmd.none
             | RemoveTable removeIndex ->
-                let nextTables = state.Tables.Remove(removeIndex)
-                let nextState =
-                    // If the only existing table was removed inti model from beginning
-                    if nextTables = Map.empty then
-                        Spreadsheet.Model.init()
-                    else
-                        // if active table is removed get the next closest table and set it active
-                        if state.ActiveTableIndex = removeIndex then
-                            let nextTable_Index =
-                                    let neighbors = Controller.findNeighborTables removeIndex nextTables
-                                    match neighbors with
-                                    | Some (i, _), _ -> i
-                                    | None, Some (i, _) -> i
-                                    // This is a fallback option
-                                    | _ -> nextTables.Keys |> Seq.head
-                            let nextTable = state.Tables.[nextTable_Index].BuildingBlocks |> SwateBuildingBlock.toTableMap
-                            { state with
-                                ActiveTableIndex = nextTable_Index
-                                Tables = nextTables
-                                ActiveTable = nextTable }
-                        // Tables still exist and an inactive one was removed. Just remove it.
-                        else
-                            { state with Tables = nextTables }
+                let nextState = Controller.removeTable removeIndex state
                 nextState, model, Cmd.none
             | RenameTable (index, name) ->
                 let nextTable = { state.Tables.[index] with Name = name }
@@ -80,10 +64,16 @@ module Spreadsheet =
                 let nextState = Spreadsheet.LocalStorage.updateHistoryPosition newPosition state
                 nextState, model, Cmd.none
             | AddRows (n) ->
-                let nextState = Spreadsheet.Controller.addRows n state
+                let nextState = Controller.addRows n state
                 nextState, model, Cmd.none
             | Reset ->
-                let nextState = Spreadsheet.Controller.resetTableState()
+                let nextState = Controller.resetTableState()
+                nextState, model, Cmd.none
+            | DeleteRow index ->
+                let nextState = Controller.deleteRow index state
+                nextState, model, Cmd.none
+            | DeleteColumn index ->
+                let nextState = Controller.deleteColumn index state
                 nextState, model, Cmd.none
 
 

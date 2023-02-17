@@ -15,8 +15,10 @@ type private FooterTab = {
     }
 
 let private popup (x: int, y: int) renameMsg deleteMsg (rmv: _ -> unit) =
+    /// This element will remove the contextmenu when clicking anywhere else
     let rmv_element = Html.div [
         prop.onClick rmv
+        prop.onContextMenu(fun e -> e.preventDefault(); rmv e)
         prop.style [
             style.position.fixedRelativeToWindow
             style.backgroundColor.transparent

@@ -34,8 +34,56 @@ type private CellState = {
 
 // 3. Change value to term
 
+let private contextmenu (x: int, y: int) deleteRow deleteCol (rmv: _ -> unit) =
+    /// This element will remove the contextmenu when clicking anywhere else
+    let rmv_element = Html.div [
+        prop.onClick rmv
+        prop.onContextMenu(fun e -> e.preventDefault(); rmv e)
+        prop.style [
+            style.position.fixedRelativeToWindow
+            style.backgroundColor.transparent
+            style.left 0
+            style.top 0
+            style.right 0
+            style.bottom 0
+            style.display.block
+        ]
+    ]
+    let button (name:string, msg, props) = Html.li [
+        Bulma.button.button [
+            prop.style [style.borderRadius 0]
+            prop.onClick msg
+            Bulma.button.isFullWidth
+            Bulma.button.isSmall
+            yield! props
+            prop.text name
+        ]
+    ]
+    Html.div [
+        prop.style [
+            let height = 53
+            style.backgroundColor "white"
+            style.position.absolute
+            style.left x
+            style.top (y - height)
+            style.zIndex 20
+            style.width 100
+            style.height height
+            style.zIndex 31 // to overlap navbar
+        ]
+        prop.children [
+            rmv_element
+            Html.ul [
+                button ("Delete Row", deleteRow rmv, [])
+                button ("Delete Column", deleteCol rmv, [])
+            ]
+        ]
+    ]
+
 [<ReactComponent>]
 let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
+    let index_column = fst index
+    let index_row = snd index
     let state = model.SpreadsheetModel
     let cell = state.ActiveTable.[index]
     let cell_value = if isHeader then cell.Header.SwateColumnHeader else cell.Body.Term.Name
@@ -51,7 +99,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
             Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
         setState_cell {state_cell with Active = false}
     cell_element [
-        prop.key $"{state.Tables.[state.ActiveTableIndex].Id}_Cell_{fst index}-{snd index}"
+        prop.key $"{state.Tables.[state.ActiveTableIndex].Id}_Cell_{index_column}-{index_row}"
         prop.style [
             style.minWidth 100
             style.height 22
@@ -63,6 +111,19 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
             e.stopPropagation()
             if not state_cell.Active then setState_cell {state_cell with Active = true}
         )
+        if not isHeader then
+            prop.onContextMenu(fun e ->
+                e.stopPropagation()
+                e.preventDefault()
+                let mousePosition = int e.pageX, int e.pageY
+                //let deleteMsg rmv = fun e -> rmv e; Spreadsheet.RemoveTable input.i |> Messages.SpreadsheetMsg |> dispatch
+                //let renameMsg rmv = fun e -> rmv e; {state with IsEditable = true} |> setState
+                let deleteRow rmv = fun e -> rmv e; Spreadsheet.DeleteRow index_row |> Messages.SpreadsheetMsg |> dispatch
+                let deleteColumn rmv = fun e -> rmv e; Spreadsheet.DeleteColumn index_column |> Messages.SpreadsheetMsg |> dispatch
+                let child = contextmenu mousePosition deleteRow deleteColumn
+                let name = $"context_{mousePosition}"
+                Modals.Controller.renderModal(name, child)
+            )
         prop.children [
             if state_cell.Active then
                 //Html.input [
@@ -142,7 +203,6 @@ let Main (model:Model) (dispatch: Msg -> unit) =
                     ]
                     Html.tbody [
                         let rows = state.ActiveTable.Keys |> Seq.maxBy snd |> snd
-                        printfn "[ROWS] %A" rows
                         for rowInd in 1 .. rows do
                             yield bodyRow rowInd model dispatch 
                     ]

@@ -93,13 +93,13 @@ let Main (model: Messages.Model) dispatch =
                 prop.ariaLabel "menu"
                 prop.children [
                     Bulma.navbarStart.div [
-                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("margin-right", "auto")]
+                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                         prop.children [
                             quickAccessButtonListStart model dispatch
                         ]
                     ]
                     Bulma.navbarEnd.div [
-                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("margin-left", "auto")]
+                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("marginLeft", "auto")]
                         prop.children [
                             quickAccessButtonListEnd model dispatch
                         ]

@@ -27,6 +27,7 @@
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
         <Compile Include="States\SpreadsheetInterface.fs" />
+        <Compile Include="States\SpreadsheetUITypes.fs" />
         <Compile Include="States\Spreadsheet.fs" />
         <Compile Include="States\CytoscapeState.fs" />
         <Compile Include="States\DagState.fs" />
@@ -37,7 +38,9 @@
         <Compile Include="Spreadsheet\LocalStorage.fs" />
         <Compile Include="Spreadsheet\Types.fs" />
         <Compile Include="Spreadsheet\Parser.fs" />
-        <Compile Include="Spreadsheet\Controller.fs" />
+        <Compile Include="Spreadsheet\Helper.fs" />
+        <Compile Include="Spreadsheet\Table.Controller.fs" />
+        <Compile Include="Spreadsheet\Sidebar.Controller.fs" />
         <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
         <Compile Include="Modals\ResetTable.fs" />

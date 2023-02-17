@@ -1,14 +1,12 @@
-module Spreadsheet.Controller
+module Spreadsheet.Table.Controller
 
 open System.Collections.Generic
 open Shared.TermTypes
 open Shared.OfficeInteropTypes
 open Spreadsheet
 open Parser
-
-module Map =
-    let maxKeyValue (m:Map<'Key,'Value>) =
-        m.Keys |> Seq.max
+open Types
+open Helper
 
 /// <summary>This function is used to save the active table to the tables map. is only executed if tables map is not empty.</summary>
 let saveActiveTable (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -21,49 +19,6 @@ let saveActiveTable (state: Spreadsheet.Model) : Spreadsheet.Model =
             {t with BuildingBlocks = parsed_activeTable}
         let nextTables = state.Tables.Change(state.ActiveTableIndex, fun _ -> Some nextTable)
         {state with Tables = nextTables}
-
-/// <summary>This is the basic function to create new Tables from an array of InsertBuildingBlocks</summary>
-let createAnnotationTable (name: string option) (insertBuildingBlocks: InsertBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    // calculate next index
-    let newIndex = if Map.isEmpty state.Tables then 0 else state.Tables |> Map.maxKeyValue |> (+) 1
-    let swateBuildingBlocks = insertBuildingBlocks |> Array.mapi (fun i bb -> bb.toSwateBuildingBlock i)
-    // parse to active table
-    let activeTable = SwateBuildingBlock.toTableMap swateBuildingBlocks
-    // add new table to tablemap
-    let newTables = state.Tables.Add(newIndex, SwateTable.init(swateBuildingBlocks, ?name = name))
-    let newTableOrder = state.TableOrder.Add(newIndex, newIndex)
-    { state with
-        Tables = newTables
-        ActiveTableIndex = newIndex
-        ActiveTable = activeTable
-        TableOrder = newTableOrder
-    }
-
-/// <summary>Adds the most basic Swate table consisting of Input column "Source Name" and output column "Sample Name".</summary>
-let createAnnotationTable_new (state: Spreadsheet.Model) : Spreadsheet.Model =
-    // create empty rows
-    let rows =
-        let n_rows = 1
-        Array.init n_rows (fun _ -> TermMinimal.empty)
-    // create source column
-    let source =
-        let blueprint = BuildingBlockNamePrePrint.init(BuildingBlockType.Source)
-        InsertBuildingBlock.create blueprint None None rows
-    // create sample column
-    let sample =
-        let blueprint = BuildingBlockNamePrePrint.init(BuildingBlockType.Sample)
-        InsertBuildingBlock.create blueprint None None rows
-    // parse to SwateBuildingBlocks
-    let insertBuildingBlocks = [|source; sample|]
-    let name = HumanReadableIds.tableName()
-    createAnnotationTable (Some name) insertBuildingBlocks state
-
-let findNeighborTables (tableIndex:int) (tables: Map<int,Spreadsheet.SwateTable>) =
-    let keys = tables.Keys
-    let lower = keys |> Seq.tryFindBack (fun k -> k < tableIndex)
-    let higher = keys |> Seq.tryFind (fun k -> k > tableIndex)
-    Option.map (fun i -> i, tables.[i]) lower,
-    Option.map (fun i -> i, tables.[i]) higher
 
 let updateTableOrder (prevIndex:int, newIndex:int) (m:Map<'a,int>) =
     m
@@ -88,6 +43,30 @@ let updateTableOrder (prevIndex:int, newIndex:int) (m:Map<'a,int>) =
 let resetTableState() : Spreadsheet.Model =
     Spreadsheet.LocalStorage.resetAll()
     Spreadsheet.Model.init()
+
+let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let nextTables = state.Tables.Remove(removeIndex)
+    // If the only existing table was removed init model from beginning
+    if nextTables = Map.empty then
+        Spreadsheet.Model.init()
+    else
+        // if active table is removed get the next closest table and set it active
+        if state.ActiveTableIndex = removeIndex then
+            let nextTable_Index =
+                let neighbors = findNeighborTables removeIndex nextTables
+                match neighbors with
+                | Some (i, _), _ -> i
+                | None, Some (i, _) -> i
+                // This is a fallback option
+                | _ -> nextTables.Keys |> Seq.head
+            let nextTable = state.Tables.[nextTable_Index].BuildingBlocks |> SwateBuildingBlock.toTableMap
+            { state with
+                ActiveTableIndex = nextTable_Index
+                Tables = nextTables
+                ActiveTable = nextTable }
+        // Tables still exist and an inactive one was removed. Just remove it.
+        else
+            { state with Tables = nextTables }
 
 ///<summary>Add `n` rows to active table.</summary>
 let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -117,3 +96,27 @@ let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
         |> Map.ofList
     let nextState = {state with ActiveTable = nextActiveTable}
     nextState
+
+let deleteRow (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let nextTable = 
+        state.ActiveTable
+        |> Map.toArray
+        |> Array.filter (fun ((_,r),_) -> r <> index)
+        |> Array.map (fun ((c,r),cvalue) ->
+            let updateIndex = if r > index then r-1 else r
+            (c,updateIndex), cvalue
+        )
+        |> Map.ofArray
+    {state with ActiveTable = nextTable}
+
+let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let nextTable = 
+        state.ActiveTable
+        |> Map.toArray
+        |> Array.filter (fun ((c,_),_) -> c <> index)
+        |> Array.map (fun ((c,r),cvalue) ->
+            let updateIndex = if c > index then c-1 else c
+            (updateIndex,r), cvalue
+        )
+        |> Map.ofArray
+    {state with ActiveTable = nextTable}
