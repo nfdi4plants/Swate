@@ -47,6 +47,8 @@
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
         <Compile Include="SharedComponents\QuickAccessButton.fs" />
+        <Compile Include="MainComponents\AddRows.fs" />
+        <Compile Include="MainComponents\SpreadsheetView.fs" />
         <Compile Include="MainComponents\Navbar.fs" />
         <Compile Include="MainComponents\FooterTabs.fs" />
         <Compile Include="SidebarComponents\FunctionContainer.fs" />
@@ -74,7 +76,6 @@
         <Compile Include="Pages\Dag\Dag.fs" />
         <Compile Include="Views\SplitWindowView.fs" />
         <Compile Include="Views\NotFoundView.fs" />
-        <Compile Include="Views\SpreadsheetView.fs" />
         <Compile Include="Views\MainWindowView.fs" />
         <Compile Include="Views\SidebarView.fs" />
         <Compile Include="Update\SpreadsheetUpdate.fs" />

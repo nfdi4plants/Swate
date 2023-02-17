@@ -20,8 +20,8 @@ let quickAccessButtonListStart (model: Model) dispatch =
                 ],
                 (fun _ ->
                     let newPosition = Spreadsheet.LocalStorage.CurrentHistoryPosition + 1
-                    let newPosition_clamped = System.Math.Min(newPosition, Spreadsheet.LocalStorage.MaxHistory - 1)
-                    if newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition then
+                    let newPosition_clamped = System.Math.Min(newPosition, Spreadsheet.LocalStorage.AvailableHistoryItems)
+                    if newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition || newPosition_clamped = Spreadsheet.LocalStorage.MaxHistory then
                         ()
                     else
                         Spreadsheet.UpdateHistoryPosition newPosition_clamped |> Msg.SpreadsheetMsg |> dispatch

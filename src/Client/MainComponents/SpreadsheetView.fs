@@ -1,4 +1,4 @@
-module SpreadsheetView
+module MainComponents.SpreadsheetView
 
 open Feliz
 open Feliz.Bulma
@@ -11,18 +11,24 @@ type private CellState = {
     Active: bool
     /// This value is used to show during input cell editing. After confirming edit it will be used to push update
     Value: string
+    Width: int
+    Height: int
 } with
     static member init() =
         {
             Selected    = false
             Active      = false
             Value       = ""
+            Width       = 0
+            Height      = 0
         }
     static member init(v: string) =
         {
             Selected    = false
             Active      = false
             Value       = v
+            Width       = 0
+            Height      = 0
         }
 
 
@@ -37,11 +43,13 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
     let innerPadding = style.padding(0, 3)
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     /// TODO! Try get from db?
+    /// Update change to mainState and exit active input.
     let updateMainStateTable dispatch =
         // Only update if changed
         if state_cell.Value <> cell_value then
             let nextTerm = cell.updateDisplayValue state_cell.Value
             Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
+        setState_cell {state_cell with Active = false}
     cell_element [
         prop.key $"{state.Tables.[state.ActiveTableIndex].Id}_Cell_{fst index}-{snd index}"
         prop.style [
@@ -66,6 +74,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                         style.height.unset
                         style.borderRadius(0)
                         style.border(0,borderStyle.none,"")
+                        style.backgroundColor.transparent
                     ]
                     // Update main spreadsheet state when leaving focus or...
                     prop.onBlur(fun _ ->
@@ -76,7 +85,6 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                         match e.which with
                         | 13. -> //enter
                             updateMainStateTable dispatch
-                            setState_cell {state_cell with Active = false}
                         | 27. -> //escape
                             setState_cell {state_cell with Active = false; Value = cell_value}
                         | _ -> ()
@@ -88,16 +96,13 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                     prop.defaultValue cell_value
                 ]
             else
+                let id = sprintf "span,%A" index
                 Html.p [
+                    prop.id id
                     prop.style [
                         innerPadding
                         style.width(length.percent 100)
                     ]
-                    //prop.onClick(fun e ->
-                    //    e.preventDefault()
-                    //    e.stopPropagation()
-                    //    setModel {model with Selected = not model.Selected}
-                    //)
                     prop.text cell_value
                 ]
         ]

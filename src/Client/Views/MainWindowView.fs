@@ -4,7 +4,6 @@ open Feliz
 open Feliz.Bulma
 open Messages
 
-open SpreadsheetView
 
 let private initFunctionView dispatch =
     Html.div [
@@ -51,7 +50,6 @@ let private initFunctionView dispatch =
     ]
 
 
-
 let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
     Html.div [
         prop.style [
@@ -82,8 +80,6 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
             ]
         ]
     ]
-
-open Fable.Core.JsInterop
 
 [<ReactComponent>]
 let Main (model: Messages.Model) dispatch =
@@ -116,38 +112,8 @@ let Main (model: Messages.Model) dispatch =
                     | true ->
                         initFunctionView dispatch
                     | false ->
-                        SpreadsheetView.Main model dispatch
-                        Html.div [
-                            prop.id "ExpandTable"
-                            prop.title "Add rows"
-                            prop.style [style.flexGrow 1; style.justifyContent.center; style.display.inheritFromParent]
-                            prop.children [
-                                Html.div [
-                                    prop.style [style.height.maxContent; style.display.flex; style.paddingTop (length.rem 1)]
-                                    prop.children [
-                                        Bulma.input.number [
-                                            prop.id "n_row_input"
-                                            prop.min init_RowsToAdd
-                                            prop.onChange(fun e -> setState_rows e)
-                                            prop.defaultValue init_RowsToAdd
-                                            prop.style [style.width(50)]
-                                        ]
-                                        Bulma.button.a [
-                                            Bulma.button.isRounded
-                                            prop.onClick(fun _ ->
-                                                let inp = Browser.Dom.document.getElementById "n_row_input"
-                                                inp?Value <- init_RowsToAdd
-                                                setState_rows init_RowsToAdd
-                                                Spreadsheet.AddRows state_rows |> SpreadsheetMsg |> dispatch
-                                            )
-                                            prop.children [
-                                                Bulma.icon [Html.i [prop.className "fa-solid fa-plus"]]
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
+                        MainComponents.SpreadsheetView.Main model dispatch
+                        MainComponents.AddRows.Main init_RowsToAdd state_rows setState_rows dispatch
                 ]
             ]
             match activeTableIsEmpty with | true -> () | false -> spreadsheetSelectionFooter model dispatch

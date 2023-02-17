@@ -3,8 +3,8 @@ module Spreadsheet.LocalStorage
 open Fable.SimpleJson
 
 
-/// stores maximum number of states to save
-let MaxHistory = 30
+/// stores maximum number of states to save, inclusive of active state
+let MaxHistory = 31
 let CurrentHistoryPosition_init = 0
 let AvailableHistoryItems_init = 0
 
@@ -91,7 +91,6 @@ let updateHistoryPosition (newPosition: int) (state: Spreadsheet.Model) : Spread
     | _ when isSmallerZero || isEqual || isBiggerMax ->
         state
     | _ ->
-        printfn "[HISTORY] new position: %i" newPosition
         /// Run this first so an error breaks the function before any mutables are changed
         let state = Spreadsheet.Model.fromSession(newPosition)
         Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, string newPosition)
