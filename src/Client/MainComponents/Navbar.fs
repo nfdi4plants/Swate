@@ -7,12 +7,15 @@ open Messages
 
 open Components.QuickAccessButton
 
+
+
 let quickAccessButtonListStart (model: Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
+            
             QuickAccessButton.create(
                 "Back",
                 [
@@ -21,7 +24,10 @@ let quickAccessButtonListStart (model: Model) dispatch =
                 (fun _ ->
                     let newPosition = Spreadsheet.LocalStorage.CurrentHistoryPosition + 1
                     let newPosition_clamped = System.Math.Min(newPosition, Spreadsheet.LocalStorage.AvailableHistoryItems)
-                    if newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition || newPosition_clamped = Spreadsheet.LocalStorage.MaxHistory then
+                    let noChange = newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition
+                    let overMax = newPosition_clamped = Spreadsheet.LocalStorage.MaxHistory
+                    let notEnoughHistory = Spreadsheet.LocalStorage.AvailableHistoryItems - (Spreadsheet.LocalStorage.CurrentHistoryPosition + 1) <= 0
+                    if noChange || overMax || notEnoughHistory then
                         ()
                     else
                         Spreadsheet.UpdateHistoryPosition newPosition_clamped |> Msg.SpreadsheetMsg |> dispatch
