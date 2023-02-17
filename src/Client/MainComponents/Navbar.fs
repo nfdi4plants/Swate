@@ -71,21 +71,32 @@ let Main (model: Messages.Model) dispatch =
         prop.role "navigation"
         prop.ariaLabel "main navigation"
         prop.style [
-            yield! ExcelColors.colorElementInArray_Feliz model.SiteStyleState.ColorMode; style.flexWrap.wrap
+            yield! ExcelColors.colorElementInArray_Feliz model.SiteStyleState.ColorMode;
+            style.flexWrap.wrap; style.alignItems.stretch; style.display.flex;
+            style.minHeight(length.rem 3.25)
         ]
         prop.children [
             Bulma.navbarBrand.div [
 
             ]
-            Bulma.navbarMenu [
-                Bulma.navbarMenu.isActive
+            Html.div [
+                prop.style [
+                    style.display.flex; style.flexGrow 1; style.flexShrink 0;
+                    style.alignItems.stretch; 
+                ]
                 prop.ariaLabel "menu"
                 prop.children [
                     Bulma.navbarStart.div [
-                        quickAccessButtonListStart model dispatch
+                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("margin-right", "auto")]
+                        prop.children [
+                            quickAccessButtonListStart model dispatch
+                        ]
                     ]
                     Bulma.navbarEnd.div [
-                        quickAccessButtonListEnd model dispatch
+                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("margin-left", "auto")]
+                        prop.children [
+                            quickAccessButtonListEnd model dispatch
+                        ]
                     ]
                 ]
             ]

@@ -23,6 +23,7 @@ type QuickAccessButton = {
             prop.title this.Description
             prop.style [
                 style.padding 0; style.minWidth(length.px 45)
+                style.display.flex; style.alignItems.center
                 if isDisabled then
                     style.cursor.notAllowed
             ]
