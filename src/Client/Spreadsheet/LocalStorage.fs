@@ -189,6 +189,7 @@ type Spreadsheet.Model with
         match try_swate_spreadsheet_key with
         | Some json ->
             let state = Spreadsheet.Model.ofJson json
+            tablesToSessionStorage state
             state
         | None ->
             Spreadsheet.Model.init()
