@@ -133,7 +133,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                     DeleteColumn    = fun rmv e  -> rmv e; Spreadsheet.DeleteColumn index_column |> Messages.SpreadsheetMsg |> dispatch
                     Copy            = fun rmv e  -> rmv e; Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
                     Cut             = fun rmv e  -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
-                    Paste           = fun rmv e  -> rmv e; Spreadsheet.InsertCell index |> Messages.SpreadsheetMsg |> dispatch
+                    Paste           = fun rmv e  -> rmv e; Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
         
                 }
                 let child = contextmenu mousePosition funcs

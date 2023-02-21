@@ -47,7 +47,6 @@ let private extendBuildingBlockToRowMax (rowMax: int) (bb: InsertBuildingBlock) 
     if bb.Rows.Length < rowMax then
         //e.g. 2 values, but 5 rows, but row index 0 is header, so rowMax index is 4, which means 5 items, but one header so -1 = 4
         let diff = rowMax - bb.Rows.Length 
-        printfn "[ADD] diff: %A" diff
         let rows = [|
             if bb.HasValues then yield! bb.Rows
             yield! Array.init diff (fun _ -> TermMinimal.empty)
@@ -57,13 +56,31 @@ let private extendBuildingBlockToRowMax (rowMax: int) (bb: InsertBuildingBlock) 
         bb
 
 let addBuildingBlock (state: Spreadsheet.Model) (insertBuildingBlock: InsertBuildingBlock) : Spreadsheet.Model =
+    let selectedCellExists: bool = not state.SelectedCells.IsEmpty
     let table = state.ActiveTable
-    let maxColumnKey, maxRowKey = table |> Map.maxKeys
+    let maxColKey, maxRowKey = table |> Map.maxKeys
+    let mutable nextColKey =
+        // if cell is selected get column of selected cell we want to insert AFTER
+        if selectedCellExists then
+            state.SelectedCells |> Set.toArray |> Array.head |> fst
+        // if no cell selected insert at the end
+        else
+            maxColKey
+        // add one to last column index OR to selected column index to append one to the right.
+        |> (+) 1
+    printfn "NEXTCOLKEY: %A" nextColKey
     let swateBuildingBlock =
         insertBuildingBlock
         |> extendBuildingBlockToRowMax maxRowKey
-        |> fun x -> x.toSwateBuildingBlock(maxColumnKey + 1)
-    let existing = SwateBuildingBlock.ofTableMap_list table
+        |> fun x -> x.toSwateBuildingBlock(nextColKey)
+    let existing =
+        let l = SwateBuildingBlock.ofTableMap_list table
+        if selectedCellExists then
+            l |> List.map (fun sb ->
+                if sb.Index >= nextColKey then {sb with Index = sb.Index + 1} else sb
+            )  
+        else
+            l
     let nextTable = swateBuildingBlock::existing |> SwateBuildingBlock.toTableMap
     let nextState = {
         state with ActiveTable = nextTable

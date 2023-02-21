@@ -259,7 +259,7 @@ Target.create "officedebug" (fun config ->
     [ "server", dotnet "watch run" serverPath
       "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" ""
       // start up db + Swobup from docker-compose
-      "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
+      //"database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
       // sideload webapp in excel
       if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start build/manifest.xml desktop --debug-method web" ""
       ]

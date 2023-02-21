@@ -17,9 +17,9 @@ let private onKeydownEvent (dispatch: Messages.Msg -> unit) =
             Spreadsheet.CutSelectedCell |> Messages.SpreadsheetMsg |> dispatch
         // Ctrl + v
         | true, 86. ->
-            Spreadsheet.InsertSelectedCell |> Messages.SpreadsheetMsg |> dispatch
+            Spreadsheet.PasteSelectedCell |> Messages.SpreadsheetMsg |> dispatch
         | _, _ -> ()
 
 let addOnKeydownEvent dispatch =
-    //Browser.Dom.document.body.removeEventListener("keydown", onKeydownEvent model dispatch)
+    Browser.Dom.document.body.removeEventListener("keydown", onKeydownEvent dispatch)
     Browser.Dom.document.body.addEventListener("keydown", onKeydownEvent dispatch)
