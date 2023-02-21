@@ -14,7 +14,7 @@ module Spreadsheet =
     ///<summary>This function will update the `state` to the session storage history control. It works based of exlusion. As it specifies certain messages not triggering history update.</summary>
     let private updateSessionStorage (state: Spreadsheet.Model, msg: Spreadsheet.Msg) : unit =
         match msg with
-        | UpdateActiveTable _ | UpdateHistoryPosition _ | Reset -> ()
+        | UpdateActiveTable _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | CopySelectedCell | CopyCell _ -> ()
         | _ -> Spreadsheet.LocalStorage.tablesToSessionStorage state
 
     let update (state: Spreadsheet.Model) (model: Messages.Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Messages.Model * Cmd<Messages.Msg> =
@@ -74,6 +74,34 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | DeleteColumn index ->
                 let nextState = Controller.deleteColumn index state
+                nextState, model, Cmd.none
+            | UpdateSelectedCells nextSelectedCells ->
+                let nsc = if state.SelectedCells = nextSelectedCells then Set.empty else nextSelectedCells
+                let nextState = {state with SelectedCells = nsc}
+                nextState, model, Cmd.none
+            | CopyCell index ->
+                let nextState = Controller.copyCell index state
+                nextState, model, Cmd.none
+            | CopySelectedCell ->
+                let nextState =
+                    if state.SelectedCells.IsEmpty then state else
+                        Controller.copySelectedCell state
+                nextState, model, Cmd.none
+            | CutCell index ->
+                let nextState = Controller.cutCell index state
+                nextState, model, Cmd.none
+            | CutSelectedCell ->
+                let nextState =
+                    if state.SelectedCells.IsEmpty then state else
+                        Controller.cutSelectedCell state
+                nextState, model, Cmd.none
+            | PasteCell index ->
+                let nextState = if Controller.clipboardCell.IsNone then state else Controller.insertCell index state
+                nextState, model, Cmd.none
+            | PasteSelectedCell ->
+                let nextState =
+                    if state.SelectedCells.IsEmpty || Controller.clipboardCell.IsNone then state else
+                        Controller.insertSelectedCell state
                 nextState, model, Cmd.none
 
 

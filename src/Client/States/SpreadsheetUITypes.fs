@@ -52,8 +52,12 @@ with
     static member create(termName: string, ?termAccession: string, ?unitName: string, ?unitAccession: string) =
         BodyCell.create(termName, ?termAccession = termAccession, ?unitName = unitName, ?unitAccession = unitAccession) |> IsBody
     // Mirror create functions for SwateColumnHeader
-    static member create(headerString: string, ?term: TermTypes.TermMinimal) = OfficeInteropTypes.SwateColumnHeader.init(headerString, ?term = term) |> IsHeader
-    static member create(headerString: OfficeInteropTypes.SwateColumnHeader, ?term: TermTypes.TermMinimal) = OfficeInteropTypes.SwateColumnHeader.init(headerString, ?term = term) |> IsHeader
+    static member create(headerString: string, ?term: TermTypes.TermMinimal) =
+        OfficeInteropTypes.SwateColumnHeader.init(headerString, ?term = term) |> IsHeader
+    static member create(headerString: OfficeInteropTypes.SwateColumnHeader, ?term: TermTypes.TermMinimal) =
+        OfficeInteropTypes.SwateColumnHeader.init(headerString, ?term = term) |> IsHeader
+    static member emptyBody = SwateCell.create(Shared.TermTypes.TermMinimal.empty)
+    static member emptyHeader = SwateCell.create(headerString = "empty")
 
 open OfficeInteropTypes
 

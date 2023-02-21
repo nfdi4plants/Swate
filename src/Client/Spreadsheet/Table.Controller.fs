@@ -120,3 +120,54 @@ let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
         )
         |> Map.ofArray
     {state with ActiveTable = nextTable}
+
+let mutable clipboardCell: SwateCell option = None
+
+let copyCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let cell = state.ActiveTable.[index]
+    clipboardCell <- Some cell
+    state
+
+let copySelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
+    /// Array.head is used until multiple cells are supported, should this ever be intended
+    let index = state.SelectedCells |> Set.toArray |> Array.head
+    copyCell index state
+
+let cutCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let cell = state.ActiveTable.[index]
+    // Remove selected cell value
+    let emptyCell = if cell.isBody then SwateCell.emptyBody elif cell.isHeader then SwateCell.emptyHeader else failwithf "Could not read cell type for index: %A" index
+    let nextActiveTable = state.ActiveTable.Add(index, emptyCell)
+    let nextState = {state with ActiveTable = nextActiveTable}
+    clipboardCell <- Some cell
+    nextState
+
+let cutSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
+    /// Array.head is used until multiple cells are supported, should this ever be intended
+    let index = state.SelectedCells |> Set.toArray |> Array.head
+    cutCell index state
+
+let insertCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let selectedCell = state.ActiveTable.[index]
+    let table = state.ActiveTable
+    match clipboardCell with
+    // Don't update if no cell in saved
+    | None -> state
+    | Some (IsBody cell) ->          
+        // Don't update if saved cell is body and next cell is not body
+        match selectedCell with
+        | IsBody _ ->
+            let nextTable = table.Add(index, IsBody cell)
+            {state with ActiveTable = nextTable}
+        | _ -> state
+    | Some (IsHeader cell) ->
+        // Don't update if saved cell is header and next cell is not header
+        match selectedCell with
+        | IsHeader _ ->
+            let nextTable = table.Add(index, IsHeader cell)
+            {state with ActiveTable = nextTable}
+        | _ -> state
+
+let insertSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let index = state.SelectedCells |> Set.toArray |> Array.head
+    insertCell index state

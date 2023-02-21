@@ -7,34 +7,31 @@ open Spreadsheet
 open Messages
 
 type private CellState = {
-    Selected: bool
     Active: bool
     /// This value is used to show during input cell editing. After confirming edit it will be used to push update
     Value: string
-    Width: int
-    Height: int
 } with
     static member init() =
         {
-            Selected    = false
             Active      = false
             Value       = ""
-            Width       = 0
-            Height      = 0
         }
     static member init(v: string) =
         {
-            Selected    = false
             Active      = false
             Value       = v
-            Width       = 0
-            Height      = 0
         }
 
+type private ContextFunctions = {
+    DeleteRow       : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    DeleteColumn    : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    Copy            : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    Cut             : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    Paste           : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        
+}
 
-// 3. Change value to term
-
-let private contextmenu (x: int, y: int) deleteRow deleteCol (rmv: _ -> unit) =
+let private contextmenu (x: int, y: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
     /// This element will remove the contextmenu when clicking anywhere else
     let rmv_element = Html.div [
         prop.onClick rmv
@@ -49,34 +46,46 @@ let private contextmenu (x: int, y: int) deleteRow deleteCol (rmv: _ -> unit) =
             style.display.block
         ]
     ]
-    let button (name:string, msg, props) = Html.li [
+    let button (name:string, icon: string, msg, props) = Html.li [
         Bulma.button.button [
-            prop.style [style.borderRadius 0]
+            prop.style [style.borderRadius 0; style.justifyContent.spaceBetween]
             prop.onClick msg
             Bulma.button.isFullWidth
-            Bulma.button.isSmall
+            //Bulma.button.isSmall
+            Bulma.color.isBlack
+            Bulma.button.isInverted
             yield! props
-            prop.text name
+            prop.children [
+                Bulma.icon [Html.i [prop.className icon]]
+                Html.span name
+            ]
         ]
+    ]
+    let divider = Html.li [
+        Html.div [ prop.style [style.border(2, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0)] ]
+    ]
+    let buttonList = [
+        button ("Copy", "fa-solid fa-copy", funcs.Copy rmv, [])
+        button ("Cut", "fa-solid fa-scissors", funcs.Cut rmv, [])
+        button ("Paste", "fa-solid fa-paste",  funcs.Paste rmv, [prop.disabled Spreadsheet.Table.Controller.clipboardCell.IsNone])
+        divider
+        button ("Delete Row", "fa-solid fa-delete-left", funcs.DeleteRow rmv, [])
+        button ("Delete Column", "fa-solid fa-delete-left fa-rotate-270", funcs.DeleteColumn rmv, [])
     ]
     Html.div [
         prop.style [
-            let height = 53
             style.backgroundColor "white"
             style.position.absolute
             style.left x
-            style.top (y - height)
+            style.top (y - 40)
             style.zIndex 20
-            style.width 100
-            style.height height
+            style.width 150
             style.zIndex 31 // to overlap navbar
+            style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base)
         ]
         prop.children [
             rmv_element
-            Html.ul [
-                button ("Delete Row", deleteRow rmv, [])
-                button ("Delete Column", deleteCol rmv, [])
-            ]
+            Html.ul buttonList
         ]
     ]
 
@@ -89,6 +98,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
     let cell_value = if isHeader then cell.Header.SwateColumnHeader else cell.Body.Term.Name
     let state_cell, setState_cell = React.useState(CellState.init(cell_value))
     let innerPadding = style.padding(0, 3)
+    let isSelected = state.SelectedCells.Contains index
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     /// TODO! Try get from db?
     /// Update change to mainState and exit active input.
@@ -103,12 +113,14 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
         prop.style [
             style.minWidth 100
             style.height 22
+            style.border(length.px 1, borderStyle.solid, "darkgrey")
             if isHeader then style.backgroundColor.coral
-            style.border(length.px 1, borderStyle.solid, if state_cell.Selected then "green" else "darkgrey")
+            if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
         ]
         prop.onDoubleClick(fun e ->
             e.preventDefault()
             e.stopPropagation()
+            UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
             if not state_cell.Active then setState_cell {state_cell with Active = true}
         )
         if not isHeader then
@@ -116,11 +128,15 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                 e.stopPropagation()
                 e.preventDefault()
                 let mousePosition = int e.pageX, int e.pageY
-                //let deleteMsg rmv = fun e -> rmv e; Spreadsheet.RemoveTable input.i |> Messages.SpreadsheetMsg |> dispatch
-                //let renameMsg rmv = fun e -> rmv e; {state with IsEditable = true} |> setState
-                let deleteRow rmv = fun e -> rmv e; Spreadsheet.DeleteRow index_row |> Messages.SpreadsheetMsg |> dispatch
-                let deleteColumn rmv = fun e -> rmv e; Spreadsheet.DeleteColumn index_column |> Messages.SpreadsheetMsg |> dispatch
-                let child = contextmenu mousePosition deleteRow deleteColumn
+                let funcs = {
+                    DeleteRow       = fun rmv e  -> rmv e; Spreadsheet.DeleteRow index_row |> Messages.SpreadsheetMsg |> dispatch
+                    DeleteColumn    = fun rmv e  -> rmv e; Spreadsheet.DeleteColumn index_column |> Messages.SpreadsheetMsg |> dispatch
+                    Copy            = fun rmv e  -> rmv e; Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
+                    Cut             = fun rmv e  -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
+                    Paste           = fun rmv e  -> rmv e; Spreadsheet.InsertCell index |> Messages.SpreadsheetMsg |> dispatch
+        
+                }
+                let child = contextmenu mousePosition funcs
                 let name = $"context_{mousePosition}"
                 Modals.Controller.renderModal(name, child)
             )
@@ -157,12 +173,20 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                     prop.defaultValue cell_value
                 ]
             else
-                let id = sprintf "span,%A" index
+                let id = sprintf "span_%A" index
                 Html.p [
+                    prop.onClick(fun _ ->
+                        let next = Set([index])
+                        UpdateSelectedCells next |> SpreadsheetMsg |> dispatch
+                    )
+                    //prop.onBlur(fun _ ->
+                    //    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                    //)
                     prop.id id
                     prop.style [
                         innerPadding
                         style.width(length.percent 100)
+                        style.height(length.percent 100)
                     ]
                     prop.text cell_value
                 ]
