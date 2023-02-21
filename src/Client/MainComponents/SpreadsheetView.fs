@@ -89,7 +89,7 @@ let private contextmenu (x: int, y: int) (funcs:ContextFunctions) (rmv: _ -> uni
         ]
     ]
 
-let cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value)=
+let private cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value) =
     Bulma.input.text [
         prop.style [
             if isHeader then style.fontWeight.bold
@@ -122,9 +122,9 @@ let cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit, setSta
     ]
 
 [<ReactComponent>]
-let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
-    let index_column = fst index
-    let index_row = snd index
+let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    let columnIndex = fst index
+    let rowIndex = snd index
     let state = model.SpreadsheetModel
     let cell = state.ActiveTable.[index]
     let cell_value = if isHeader then cell.Header.SwateColumnHeader else cell.Body.Term.Name
@@ -141,7 +141,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
             Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
         setState_cell {state_cell with Active = false}
     cell_element [
-        prop.key $"{state.Tables.[state.ActiveTableIndex].Id}_Cell_{index_column}-{index_row}"
+        prop.key $"{state.Tables.[state.ActiveTableIndex].Id}_Cell_{columnIndex}-{rowIndex}"
         prop.style [
             style.minWidth 100
             style.height 22
@@ -171,8 +171,8 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                 e.preventDefault()
                 let mousePosition = int e.pageX, int e.pageY
                 let funcs = {
-                    DeleteRow       = fun rmv e  -> rmv e; Spreadsheet.DeleteRow index_row |> Messages.SpreadsheetMsg |> dispatch
-                    DeleteColumn    = fun rmv e  -> rmv e; Spreadsheet.DeleteColumn index_column |> Messages.SpreadsheetMsg |> dispatch
+                    DeleteRow       = fun rmv e  -> rmv e; Spreadsheet.DeleteRow rowIndex |> Messages.SpreadsheetMsg |> dispatch
+                    DeleteColumn    = fun rmv e  -> rmv e; Spreadsheet.DeleteColumn columnIndex |> Messages.SpreadsheetMsg |> dispatch
                     Copy            = fun rmv e  -> rmv e; Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
                     Cut             = fun rmv e  -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
                     Paste           = fun rmv e  -> rmv e; Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
@@ -186,13 +186,14 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                 prop.style [
                     style.display.flex;
                     style.justifyContent.spaceBetween;
-                    style.height.inheritFromParent;
-                    style.width.inheritFromParent
+                    style.height(length.percent 100);
+                    style.minHeight(22)
+                    style.width(length.percent 100)
+                    style.alignItems.center
                 ]
                 prop.children [
                     if state_cell.Active then
                         cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cell_value)
-                        
                     else
                         let id = sprintf "span_%A" index
                         Html.span [
@@ -203,40 +204,56 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                             ]
                             prop.text cell_value
                         ]
-                        if isHeader then
-                            Bulma.icon [
-                                prop.style [
-                                    style.cursor.pointer
-                                ]
-                                prop.children [Html.i [prop.className "fa-solid fa-square-caret-up fa-rotate-90"]]
+                    if isHeader then
+                        Bulma.icon [
+                            prop.style [
+                                style.cursor.pointer
                             ]
+                            prop.onDoubleClick(fun e ->
+                                e.stopPropagation()
+                                e.preventDefault()
+                                ()
+                            )
+                            prop.onClick(fun e ->
+                                e.stopPropagation()
+                                e.preventDefault()
+                                let nextState = if state_extend.Contains(columnIndex) then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
+                                setState_extend nextState
+                            )
+                            prop.children [Html.i [prop.className "fa-solid fa-square-caret-up fa-rotate-90"; prop.style [style.fontSize(length.em 1)]]]
+                        ]
                 ]
             ]
         ]
     ]
 
-let private bodyRow (i:int) (model:Model) (dispatch: Msg -> unit) =
-    let state = model.SpreadsheetModel
-    let r = state.ActiveTable |> Map.filter (fun (_,r) _ -> r = i)
+let private bodyRow (i:int) (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
+    let r = model.SpreadsheetModel.ActiveTable |> Map.filter (fun (_,r) _ -> r = i)
     Html.tr [
-        for cell in r do
+        for KeyValue ((column,row),cell) in r do
+            let isExtended = state.Contains(column)
             yield
-                Cell(cell.Key, false, model, dispatch)
+                Cell((column,row), false, state, setState, model, dispatch)
+            if isExtended then
+                yield Cell((column,row), false, state, setState, model, dispatch)
     ]
 
-let private headerRow (model:Model) (dispatch: Msg -> unit) =
+let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
     let rowInd = 0
-    let state = model.SpreadsheetModel
-    let r = state.ActiveTable |> Map.filter (fun (_,r) _ -> r = rowInd)
+    let r = model.SpreadsheetModel.ActiveTable |> Map.filter (fun (_,r) _ -> r = rowInd)
     Html.tr [
-        for cell in r do
+        for KeyValue ((column,row),cell) in r do
+            let isExtended = state.Contains(column)
             yield
-                Cell(cell.Key, true, model, dispatch)
+                Cell((column,row), true, state, setState, model, dispatch)
+            if isExtended then
+                yield Cell((column,row), true, state, setState, model, dispatch)
     ]
 
 [<ReactComponent>]
 let Main (model:Model) (dispatch: Msg -> unit) =
-    let state, setState : Set<int*int> * (Set<int*int> -> unit) = React.useState(Set.empty)
+    /// This state is used to track which columns are expanded
+    let state, setState : Set<int> * (Set<int> -> unit) = React.useState(Set.empty)
     Html.div [
         prop.style [style.border(1, borderStyle.solid, "grey"); style.width.minContent]
         prop.children [
@@ -245,12 +262,12 @@ let Main (model:Model) (dispatch: Msg -> unit) =
                 //prop.style [style.height.minContent; style.width.minContent]
                 prop.children [
                     Html.thead [
-                        headerRow model dispatch
+                        headerRow state setState model dispatch
                     ]
                     Html.tbody [
                         let rows = model.SpreadsheetModel.ActiveTable.Keys |> Seq.maxBy snd |> snd
                         for rowInd in 1 .. rows do
-                            yield bodyRow rowInd model dispatch 
+                            yield bodyRow rowInd state setState model dispatch 
                     ]
                 ]
             ]
