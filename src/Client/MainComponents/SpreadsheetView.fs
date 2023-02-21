@@ -91,6 +91,7 @@ let private contextmenu (x: int, y: int) (funcs:ContextFunctions) (rmv: _ -> uni
 
 let private cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value) =
     Bulma.input.text [
+        prop.autoFocus true
         prop.style [
             if isHeader then style.fontWeight.bold
             style.width(length.percent 100)
@@ -121,6 +122,25 @@ let private cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit
         prop.defaultValue cell_value
     ]
 
+let private extendHeaderButton (state_extend: Set<int>, columnIndex, setState_extend) =
+    Bulma.icon [
+        prop.style [
+            style.cursor.pointer
+        ]
+        prop.onDoubleClick(fun e ->
+            e.stopPropagation()
+            e.preventDefault()
+            ()
+        )
+        prop.onClick(fun e ->
+            e.stopPropagation()
+            e.preventDefault()
+            let nextState = if state_extend.Contains(columnIndex) then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
+            setState_extend nextState
+        )
+        prop.children [Html.i [prop.className "fa-solid fa-square-caret-up fa-rotate-90"; prop.style [style.fontSize(length.em 1)]]]
+    ]
+
 [<ReactComponent>]
 let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
     let columnIndex = fst index
@@ -146,25 +166,12 @@ let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_exten
             style.minWidth 100
             style.height 22
             style.border(length.px 1, borderStyle.solid, "darkgrey")
-            style.padding(length.em 0.5,length.em 0.75)
+            style.position.relative
             if isHeader then
                 style.color(NFDIColors.white)
                 style.backgroundColor(NFDIColors.DarkBlue.Base)
             if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
         ]
-        prop.onDoubleClick(fun e ->
-            e.preventDefault()
-            e.stopPropagation()
-            UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-            if not state_cell.Active then setState_cell {state_cell with Active = true}
-        )
-        prop.onClick(fun _ ->
-            if not state_cell.Active then
-                let next = Set([index])
-                UpdateSelectedCells next |> SpreadsheetMsg |> dispatch
-            else
-                ()
-        )
         if not isHeader then
             prop.onContextMenu(fun e ->
                 e.stopPropagation()
@@ -189,8 +196,22 @@ let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_exten
                     style.height(length.percent 100);
                     style.minHeight(22)
                     style.width(length.percent 100)
+                    style.padding(length.em 0.5,length.em 0.75)
                     style.alignItems.center
                 ]
+                prop.onDoubleClick(fun e ->
+                    e.preventDefault()
+                    e.stopPropagation()
+                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                    if not state_cell.Active then setState_cell {state_cell with Active = true}
+                )
+                prop.onClick(fun _ ->
+                    if not state_cell.Active then
+                        let next = Set([index])
+                        UpdateSelectedCells next |> SpreadsheetMsg |> dispatch
+                    else
+                        ()
+                )
                 prop.children [
                     if state_cell.Active then
                         cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cell_value)
@@ -205,23 +226,7 @@ let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_exten
                             prop.text cell_value
                         ]
                     if isHeader then
-                        Bulma.icon [
-                            prop.style [
-                                style.cursor.pointer
-                            ]
-                            prop.onDoubleClick(fun e ->
-                                e.stopPropagation()
-                                e.preventDefault()
-                                ()
-                            )
-                            prop.onClick(fun e ->
-                                e.stopPropagation()
-                                e.preventDefault()
-                                let nextState = if state_extend.Contains(columnIndex) then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
-                                setState_extend nextState
-                            )
-                            prop.children [Html.i [prop.className "fa-solid fa-square-caret-up fa-rotate-90"; prop.style [style.fontSize(length.em 1)]]]
-                        ]
+                        extendHeaderButton(state_extend, columnIndex, setState_extend)
                 ]
             ]
         ]
