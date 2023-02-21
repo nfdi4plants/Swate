@@ -89,6 +89,38 @@ let private contextmenu (x: int, y: int) (funcs:ContextFunctions) (rmv: _ -> uni
         ]
     ]
 
+let cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value)=
+    Bulma.input.text [
+        prop.style [
+            if isHeader then style.fontWeight.bold
+            style.width(length.percent 100)
+            style.height.unset
+            style.borderRadius(0)
+            style.border(0,borderStyle.none,"")
+            style.backgroundColor.transparent
+            if isHeader then
+                style.color(NFDIColors.white)
+        ]
+        // Update main spreadsheet state when leaving focus or...
+        prop.onBlur(fun _ ->
+            updateMainStateTable()
+        )
+        // .. when pressing "ENTER". "ESCAPE" will negate changes.
+        prop.onKeyDown(fun e ->
+            match e.which with
+            | 13. -> //enter
+                updateMainStateTable()
+            | 27. -> //escape
+                setState_cell {state_cell with Active = false; Value = cell_value}
+            | _ -> ()
+        )
+        // Only change cell value while typing to increase performance. 
+        prop.onChange(fun e ->
+            setState_cell {state_cell with Value = e}
+        )
+        prop.defaultValue cell_value
+    ]
+
 [<ReactComponent>]
 let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
     let index_column = fst index
@@ -102,7 +134,7 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     /// TODO! Try get from db?
     /// Update change to mainState and exit active input.
-    let updateMainStateTable dispatch =
+    let updateMainStateTable() =
         // Only update if changed
         if state_cell.Value <> cell_value then
             let nextTerm = cell.updateDisplayValue state_cell.Value
@@ -114,7 +146,10 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
             style.minWidth 100
             style.height 22
             style.border(length.px 1, borderStyle.solid, "darkgrey")
-            if isHeader then style.backgroundColor.coral
+            style.padding(length.em 0.5,length.em 0.75)
+            if isHeader then
+                style.color(NFDIColors.white)
+                style.backgroundColor(NFDIColors.DarkBlue.Base)
             if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
         ]
         prop.onDoubleClick(fun e ->
@@ -122,6 +157,13 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
             e.stopPropagation()
             UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
             if not state_cell.Active then setState_cell {state_cell with Active = true}
+        )
+        prop.onClick(fun _ ->
+            if not state_cell.Active then
+                let next = Set([index])
+                UpdateSelectedCells next |> SpreadsheetMsg |> dispatch
+            else
+                ()
         )
         if not isHeader then
             prop.onContextMenu(fun e ->
@@ -134,62 +176,42 @@ let Cell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                     Copy            = fun rmv e  -> rmv e; Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
                     Cut             = fun rmv e  -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
                     Paste           = fun rmv e  -> rmv e; Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
-        
                 }
                 let child = contextmenu mousePosition funcs
                 let name = $"context_{mousePosition}"
                 Modals.Controller.renderModal(name, child)
             )
         prop.children [
-            if state_cell.Active then
-                //Html.input [
-                Bulma.input.text [
-                    prop.style [
-                        if isHeader then style.fontWeight.bold
-                        innerPadding
-                        style.width(length.percent 100)
-                        style.height.unset
-                        style.borderRadius(0)
-                        style.border(0,borderStyle.none,"")
-                        style.backgroundColor.transparent
-                    ]
-                    // Update main spreadsheet state when leaving focus or...
-                    prop.onBlur(fun _ ->
-                        updateMainStateTable dispatch
-                    )
-                    // .. when pressing "ENTER". "ESCAPE" will negate changes.
-                    prop.onKeyDown(fun e ->
-                        match e.which with
-                        | 13. -> //enter
-                            updateMainStateTable dispatch
-                        | 27. -> //escape
-                            setState_cell {state_cell with Active = false; Value = cell_value}
-                        | _ -> ()
-                    )
-                    // Only change cell value while typing to increase performance. 
-                    prop.onChange(fun e ->
-                        setState_cell {state_cell with Value = e}
-                    )
-                    prop.defaultValue cell_value
+            Html.div [
+                prop.style [
+                    style.display.flex;
+                    style.justifyContent.spaceBetween;
+                    style.height.inheritFromParent;
+                    style.width.inheritFromParent
                 ]
-            else
-                let id = sprintf "span_%A" index
-                Html.p [
-                    prop.onClick(fun _ ->
-                        let next = Set([index])
-                        UpdateSelectedCells next |> SpreadsheetMsg |> dispatch
-                    )
-                    //prop.onBlur(fun _ ->
-                    //    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-                    //)
-                    prop.id id
-                    prop.style [
-                        innerPadding
-                        style.width(length.percent 100)
-                        style.height(length.percent 100)
-                    ]
-                    prop.text cell_value
+                prop.children [
+                    if state_cell.Active then
+                        cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cell_value)
+                        
+                    else
+                        let id = sprintf "span_%A" index
+                        Html.span [
+                            prop.id id
+                            prop.style [
+                                innerPadding
+                                style.flexGrow 1
+                            ]
+                            prop.text cell_value
+                        ]
+                        if isHeader then
+                            Bulma.icon [
+                                prop.style [
+                                    style.cursor.pointer
+                                ]
+                                prop.children [Html.i [prop.className "fa-solid fa-square-caret-up fa-rotate-90"]]
+                            ]
                 ]
+            ]
         ]
     ]
 
@@ -214,7 +236,7 @@ let private headerRow (model:Model) (dispatch: Msg -> unit) =
 
 [<ReactComponent>]
 let Main (model:Model) (dispatch: Msg -> unit) =
-    let state = model.SpreadsheetModel
+    let state, setState : Set<int*int> * (Set<int*int> -> unit) = React.useState(Set.empty)
     Html.div [
         prop.style [style.border(1, borderStyle.solid, "grey"); style.width.minContent]
         prop.children [
@@ -226,7 +248,7 @@ let Main (model:Model) (dispatch: Msg -> unit) =
                         headerRow model dispatch
                     ]
                     Html.tbody [
-                        let rows = state.ActiveTable.Keys |> Seq.maxBy snd |> snd
+                        let rows = model.SpreadsheetModel.ActiveTable.Keys |> Seq.maxBy snd |> snd
                         for rowInd in 1 .. rows do
                             yield bodyRow rowInd model dispatch 
                     ]
