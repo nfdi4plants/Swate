@@ -69,7 +69,7 @@ type Spreadsheet.Model with
         | None ->
             failwith "Could not find any history."
 
-///<summary>Update mutable variables based on session storage. Must be done on main init event.</summary>
+///<summary>Update mutable variables based on session storage. Must be done on main after checking if host <> Excel.</summary>
 let onInit() =
     let position = tryGetSessionItem(Keys.swate_session_history_position)
     if position.IsSome then
@@ -188,9 +188,12 @@ type Spreadsheet.Model with
         let try_swate_spreadsheet_key = tryGetLocalItem(swate_spreadsheet_key)
         match try_swate_spreadsheet_key with
         | Some json ->
-            let state = Spreadsheet.Model.ofJson json
-            tablesToSessionStorage state
-            state
+            try 
+                let state = Spreadsheet.Model.ofJson json
+                tablesToSessionStorage state
+                state
+            with
+                | _ -> Spreadsheet.Model.init()
         | None ->
             Spreadsheet.Model.init()
             

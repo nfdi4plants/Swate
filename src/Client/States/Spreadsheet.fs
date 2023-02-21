@@ -3,6 +3,9 @@ namespace Spreadsheet
 open Shared
 open OfficeInteropTypes
 
+
+///<summary>If you change this model, it will kill caching for users! if you apply changes to it, make sure to keep a version
+///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>
 type Model = {
     /// Keys: column * row
     ActiveTable: Map<(int*int), SwateCell>

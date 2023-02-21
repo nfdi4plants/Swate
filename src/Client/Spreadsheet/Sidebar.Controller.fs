@@ -56,26 +56,25 @@ let private extendBuildingBlockToRowMax (rowMax: int) (bb: InsertBuildingBlock) 
         bb
 
 let addBuildingBlock (state: Spreadsheet.Model) (insertBuildingBlock: InsertBuildingBlock) : Spreadsheet.Model =
-    let selectedCellExists: bool = not state.SelectedCells.IsEmpty
     let table = state.ActiveTable
     let maxColKey, maxRowKey = table |> Map.maxKeys
-    let mutable nextColKey =
+    let nextColKey =
         // if cell is selected get column of selected cell we want to insert AFTER
-        if selectedCellExists then
+        if not state.SelectedCells.IsEmpty then
             state.SelectedCells |> Set.toArray |> Array.head |> fst
         // if no cell selected insert at the end
         else
             maxColKey
         // add one to last column index OR to selected column index to append one to the right.
         |> (+) 1
-    printfn "NEXTCOLKEY: %A" nextColKey
     let swateBuildingBlock =
         insertBuildingBlock
         |> extendBuildingBlockToRowMax maxRowKey
         |> fun x -> x.toSwateBuildingBlock(nextColKey)
     let existing =
         let l = SwateBuildingBlock.ofTableMap_list table
-        if selectedCellExists then
+        // if insert is not at the end, reindex all columns with higher index.
+        if nextColKey <> maxColKey + 1 then
             l |> List.map (fun sb ->
                 if sb.Index >= nextColKey then {sb with Index = sb.Index + 1} else sb
             )  
