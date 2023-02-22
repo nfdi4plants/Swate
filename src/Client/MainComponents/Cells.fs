@@ -168,11 +168,27 @@ module private EventPresets =
         let name = $"context_{mousePosition}"
         Modals.Controller.renderModal(name, child)
 
-    let onClickSelect (index: int*int, state_cell, dispatch)=
-        fun _ ->
+    let onClickSelect (index: int*int, state_cell, selectedCells: Set<int*int>, dispatch)=
+        fun (e: Browser.Types.MouseEvent) ->
+            // don't select cell if active(editable)
             if not state_cell.Active then
-                let next = Set([index])
-                UpdateSelectedCells next |> SpreadsheetMsg |> dispatch
+                match e.ctrlKey with
+                | true ->
+                    let createSetOfIndex (columnMin:int, columnMax, rowMin:int, rowMax: int) =
+                        [
+                            for c in columnMin .. columnMax do
+                                for r in rowMin .. rowMax do
+                                    c, r
+                        ] |> Set.ofList
+                    let source = selectedCells.MinimumElement
+                    let target = index
+                    let columnMin, columnMax = System.Math.Min(fst source, fst target), System.Math.Max(fst source, fst target)
+                    let rowMin, rowMax = System.Math.Min(snd source, snd target), System.Math.Max(snd source, snd target)
+                    let set = createSetOfIndex (columnMin,columnMax,rowMin,rowMax)
+                    UpdateSelectedCells set |> SpreadsheetMsg |> dispatch
+                | false ->
+                    let next = if selectedCells = Set([index]) then Set.empty else Set([index])
+                    UpdateSelectedCells next |> SpreadsheetMsg |> dispatch
             else
                 ()
             
@@ -213,7 +229,7 @@ let TANCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     if not state_cell.Active then setState_cell {state_cell with Active = true}
                 )
-                prop.onClick <| EventPresets.onClickSelect(index, state_cell, dispatch)
+                prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
                 prop.children [
                     if state_cell.Active then
                         let updateMainStateTable() =
@@ -281,7 +297,7 @@ let UnitCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     if not state_cell.Active then setState_cell {state_cell with Active = true}
                 )
-                prop.onClick <| EventPresets.onClickSelect(index, state_cell, dispatch)
+                prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
                 prop.children [
                     if not isHeader && state_cell.Active then
                         let updateMainStateTable() =
@@ -353,7 +369,7 @@ let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_exten
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     if not state_cell.Active then setState_cell {state_cell with Active = true}
                 )
-                prop.onClick <| EventPresets.onClickSelect(index, state_cell, dispatch)
+                prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
                 prop.children [
                     if state_cell.Active then
                         /// TODO! Try get from db?

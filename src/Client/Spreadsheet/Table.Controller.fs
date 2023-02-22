@@ -130,7 +130,7 @@ let copyCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
 
 let copySelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     /// Array.head is used until multiple cells are supported, should this ever be intended
-    let index = state.SelectedCells |> Set.toArray |> Array.head
+    let index = state.SelectedCells |> Set.toArray |> Array.min
     copyCell index state
 
 let cutCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -144,10 +144,10 @@ let cutCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
 
 let cutSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     /// Array.head is used until multiple cells are supported, should this ever be intended
-    let index = state.SelectedCells |> Set.toArray |> Array.head
+    let index = state.SelectedCells |> Set.toArray |> Array.min
     cutCell index state
 
-let insertCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let pasteCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let selectedCell = state.ActiveTable.[index]
     let table = state.ActiveTable
     match clipboardCell with
@@ -168,9 +168,18 @@ let insertCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
             {state with ActiveTable = nextTable}
         | _ -> state
 
-let insertSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let index = state.SelectedCells |> Set.toArray |> Array.head
-    insertCell index state
+let pasteSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
+    if state.SelectedCells.IsEmpty then
+        state
+    else
+        let arr = state.SelectedCells |> Set.toArray
+        // TODO:
+        //let isOneColumn =
+        //    let c = fst arr.[0] // can just use head of selected cells as all must be same column
+        //    arr |> Array.forall (fun x -> fst x = c)
+        //if not isOneColumn then failwith "Can only paste cells in one column at a time!"
+        let minIndex = state.SelectedCells |> Set.toArray |> Array.min
+        pasteCell minIndex state
 
 let fillColumnWithTerm (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let column = fst index

@@ -76,8 +76,7 @@ module Spreadsheet =
                 let nextState = Controller.deleteColumn index state
                 nextState, model, Cmd.none
             | UpdateSelectedCells nextSelectedCells ->
-                let nsc = if state.SelectedCells = nextSelectedCells then Set.empty else nextSelectedCells
-                let nextState = {state with SelectedCells = nsc}
+                let nextState = {state with SelectedCells = nextSelectedCells}
                 nextState, model, Cmd.none
             | CopyCell index ->
                 let nextState = Controller.copyCell index state
@@ -96,12 +95,12 @@ module Spreadsheet =
                         Controller.cutSelectedCell state
                 nextState, model, Cmd.none
             | PasteCell index ->
-                let nextState = if Controller.clipboardCell.IsNone then state else Controller.insertCell index state
+                let nextState = if Controller.clipboardCell.IsNone then state else Controller.pasteCell index state
                 nextState, model, Cmd.none
             | PasteSelectedCell ->
                 let nextState =
                     if state.SelectedCells.IsEmpty || Controller.clipboardCell.IsNone then state else
-                        Controller.insertSelectedCell state
+                        Controller.pasteSelectedCell state
                 nextState, model, Cmd.none
             | FillColumnWithTerm index ->
                 let nextState = Controller.fillColumnWithTerm index state
