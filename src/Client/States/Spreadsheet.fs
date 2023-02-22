@@ -38,9 +38,10 @@ type Msg =
 | CopySelectedCell
 | CutSelectedCell
 | PasteSelectedCell
-| CopyCell of (int*int)
-| CutCell of (int*int)
-| PasteCell of (int*int)
+| CopyCell of index:(int*int)
+| CutCell of index:(int*int)
+| PasteCell of index:(int*int)
+| FillColumnWithTerm of index:(int*int)
 /// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
 | Reset
 // <--> INTEROP <-->

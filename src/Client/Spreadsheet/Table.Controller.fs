@@ -171,3 +171,18 @@ let insertCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
 let insertSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     let index = state.SelectedCells |> Set.toArray |> Array.head
     insertCell index state
+
+let fillColumnWithTerm (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let column = fst index
+    let term = state.ActiveTable.[index]
+    let nextActiveTable =
+        state.ActiveTable
+        |> Map.map (fun (c,r) v ->
+            // change term value in same column but NOT in header
+            if c = column && r <> 0 then
+                term
+            else
+                v
+        )
+    let nextState = {state with ActiveTable = nextActiveTable}
+    nextState

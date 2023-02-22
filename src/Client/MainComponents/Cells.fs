@@ -28,6 +28,7 @@ type private ContextFunctions = {
     Copy            : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     Cut             : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     Paste           : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    FillColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     RowIndex        : int
     ColumnIndex     : int
 }
@@ -65,12 +66,15 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv
     let divider = Html.li [
         Html.div [ prop.style [style.border(2, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0)] ]
     ]
+    let isHeaderRow = funcs.RowIndex = 0
     let buttonList = [
+        button ("Fill Column", "fa-solid fa-file-signature", funcs.FillColumn rmv, [prop.disabled isHeaderRow])
+        divider
         button ("Copy", "fa-solid fa-copy", funcs.Copy rmv, [])
         button ("Cut", "fa-solid fa-scissors", funcs.Cut rmv, [])
         button ("Paste", "fa-solid fa-paste",  funcs.Paste rmv, [prop.disabled Spreadsheet.Table.Controller.clipboardCell.IsNone])
         divider
-        button ("Delete Row", "fa-solid fa-delete-left", funcs.DeleteRow rmv, [prop.disabled (funcs.RowIndex = 0)])
+        button ("Delete Row", "fa-solid fa-delete-left", funcs.DeleteRow rmv, [prop.disabled isHeaderRow])
         button ("Delete Column", "fa-solid fa-delete-left fa-rotate-270", funcs.DeleteColumn rmv, [])
     ]
     Html.div [
@@ -151,11 +155,12 @@ module private EventPresets =
         e.preventDefault()
         let mousePosition = int e.pageX, int e.pageY
         let funcs = {
-            DeleteRow       = fun rmv e  -> rmv e; Spreadsheet.DeleteRow (snd index) |> Messages.SpreadsheetMsg |> dispatch
-            DeleteColumn    = fun rmv e  -> rmv e; Spreadsheet.DeleteColumn (fst index) |> Messages.SpreadsheetMsg |> dispatch
-            Copy            = fun rmv e  -> rmv e; Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
-            Cut             = fun rmv e  -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
-            Paste           = fun rmv e  -> rmv e; Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
+            DeleteRow       = fun rmv e -> rmv e; Spreadsheet.DeleteRow (snd index) |> Messages.SpreadsheetMsg |> dispatch
+            DeleteColumn    = fun rmv e -> rmv e; Spreadsheet.DeleteColumn (fst index) |> Messages.SpreadsheetMsg |> dispatch
+            Copy            = fun rmv e -> rmv e; Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
+            Cut             = fun rmv e -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
+            Paste           = fun rmv e -> rmv e; Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
+            FillColumn      = fun rmv e -> rmv e; Spreadsheet.FillColumnWithTerm index |> Messages.SpreadsheetMsg |> dispatch
             RowIndex        = snd index
             ColumnIndex     = fst index
         }

@@ -103,6 +103,9 @@ module Spreadsheet =
                     if state.SelectedCells.IsEmpty || Controller.clipboardCell.IsNone then state else
                         Controller.insertSelectedCell state
                 nextState, model, Cmd.none
+            | FillColumnWithTerm index ->
+                let nextState = Controller.fillColumnWithTerm index state
+                nextState, model, Cmd.none
 
 
         // execute inner and follow with save function
