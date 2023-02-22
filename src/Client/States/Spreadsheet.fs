@@ -47,3 +47,4 @@ type Msg =
 // <--> INTEROP <-->
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | AddAnnotationBlock of InsertBuildingBlock
+| InsertOntologyTerm of TermTypes.TermMinimal

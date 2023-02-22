@@ -172,8 +172,8 @@ let pasteSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     if state.SelectedCells.IsEmpty then
         state
     else
-        let arr = state.SelectedCells |> Set.toArray
         // TODO:
+        //let arr = state.SelectedCells |> Set.toArray
         //let isOneColumn =
         //    let c = fst arr.[0] // can just use head of selected cells as all must be same column
         //    arr |> Array.forall (fun x -> fst x = c)

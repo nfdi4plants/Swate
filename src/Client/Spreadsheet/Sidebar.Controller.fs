@@ -55,7 +55,8 @@ let private extendBuildingBlockToRowMax (rowMax: int) (bb: InsertBuildingBlock) 
     else
         bb
 
-let addBuildingBlock (state: Spreadsheet.Model) (insertBuildingBlock: InsertBuildingBlock) : Spreadsheet.Model =
+
+let addBuildingBlock(insertBuildingBlock: InsertBuildingBlock) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     let maxColKey, maxRowKey = table |> Map.maxKeys
     let nextColKey =
@@ -84,4 +85,23 @@ let addBuildingBlock (state: Spreadsheet.Model) (insertBuildingBlock: InsertBuil
     let nextState = {
         state with ActiveTable = nextTable
     }
+    nextState
+
+let insertTerm (term:TermMinimal) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let table = state.ActiveTable
+    /// Filter out header row
+    let arr = state.SelectedCells |> Set.toArray
+    /// Make sure only one column is selected
+    let isOneColumn =
+        let columnIndex = fst arr.[0] // can just use head of selected cells as all must be same column
+        arr |> Array.forall (fun x -> fst x = columnIndex)
+    if not isOneColumn then failwith "Can only paste cells in one column at a time!"
+    let selected = arr |> Array.filter (fun (c,r) -> r <> 0)
+    let nextActiveTable = table |> Map.map (fun key v ->
+        if Array.contains key selected then
+            IsBody {v.Body with Term = term}
+        else
+            v
+    )
+    let nextState = { state with ActiveTable = nextActiveTable }
     nextState

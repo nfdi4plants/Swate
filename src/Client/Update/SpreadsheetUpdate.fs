@@ -30,8 +30,10 @@ module Spreadsheet =
                     |> Controller.createAnnotationTable_new
                 nextState, model, Cmd.none
             | AddAnnotationBlock minBuildingBlockInfo ->
-                printfn "implement adding building block after selected col index"
-                let nextState = Controller.addBuildingBlock state minBuildingBlockInfo
+                let nextState = Controller.addBuildingBlock minBuildingBlockInfo state
+                nextState, model, Cmd.none
+            | InsertOntologyTerm termMinimal ->
+                let nextState = Controller.insertTerm termMinimal state
                 nextState, model, Cmd.none
             | UpdateTable (index, cell) ->
                 let nextState =
