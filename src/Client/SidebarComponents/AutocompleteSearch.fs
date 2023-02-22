@@ -52,7 +52,7 @@ type AutocompleteParameters<'SearchResult> = {
     DropDownIsVisible       : bool
     DropDownIsLoading       : bool
 
-    OnInputChangeMsg        : (string -> Msg)
+    OnInputChangeMsg        : ((string*TermMinimal option) -> Msg)
     OnSuggestionSelect      : ('SearchResult -> Msg)
 
     HasAdvancedSearch       : bool
@@ -89,7 +89,7 @@ with
         DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (fun str -> BuildingBlock.Msg.SearchUnitTermTextChange (str, Unit1) |> BuildingBlockMsg)
+        OnInputChangeMsg        = (fun (str,_) -> BuildingBlock.Msg.SearchUnitTermTextChange (str, Unit1) |> BuildingBlockMsg)
         OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
@@ -107,7 +107,7 @@ with
         DropDownIsLoading       = state.HasUnit2TermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (fun str -> BuildingBlock.Msg.SearchUnitTermTextChange (str,Unit2) |> BuildingBlockMsg)
+        OnInputChangeMsg        = (fun (str,_) -> BuildingBlock.Msg.SearchUnitTermTextChange (str,Unit2) |> BuildingBlockMsg)
         OnSuggestionSelect      = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
@@ -124,7 +124,7 @@ with
         DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
         DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
 
-        OnInputChangeMsg        = (BuildingBlock.Msg.BuildingBlockNameChange >> BuildingBlockMsg)
+        OnInputChangeMsg        = (fst >> BuildingBlock.Msg.BuildingBlockNameChange >> BuildingBlockMsg)
         OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
@@ -326,7 +326,8 @@ let autocompleteTermSearchComponentInputComponent (dispatch: Msg -> unit) isDisa
                 )
             ]      
             Input.OnChange (
-                fun e -> e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
+                // ignore this "None". AutocompleteParameters is pure spagetthi and needs to be removed. Absolute dumpster fire. 
+                fun e -> (e.Value, None) |> autocompleteParams.OnInputChangeMsg |> dispatch
             )
             Input.Id autocompleteParams.InputId  
         ]
@@ -341,9 +342,9 @@ let autocompleteTermSearchComponentOfParentOntology
     (autocompleteParams     : AutocompleteParameters<Term>)
 
     =
-    let parentOntologyNotificationElement show =
-        let parenTermText = if model.TermSearchState.ParentOntology.IsSome then model.TermSearchState.ParentOntology.Value.Name else ""
-        Control.p [ Control.Modifiers [ Modifier.IsHidden (Screen.All, show)]; Control.Props [Title parenTermText; Style [MaxWidth "40%"]]] [
+    let parentOntologyNotificationElement (parentTerm: TermMinimal) =
+        let parenTermText = parentTerm.Name
+        Control.p [ Control.Props [Title parenTermText; Style [MaxWidth "40%"]]] [
             Button.button [
                 Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]
                 Button.IsStatic true
@@ -353,10 +354,39 @@ let autocompleteTermSearchComponentOfParentOntology
             ] [str parenTermText ]
         ]
 
+    let hasParentTerm =
+        match model.PersistentStorageState.Host with
+        | Swatehost.Excel _ -> model.TermSearchState.ParentOntology.IsSome 
+        | Swatehost.Browser ->
+            let header = model.SpreadsheetModel.getSelectedColumnHeader
+            match header with
+            | Some h ->
+                let termSelected = h.isTermColumn && h.Term.IsSome
+                let featuredSelected = h.isFeaturedCol
+                termSelected || featuredSelected
+            | None -> false
+        | _ -> false
+
+    let parentTerm =
+        match model.PersistentStorageState.Host with
+        | Swatehost.Excel _ -> model.TermSearchState.ParentOntology
+        | Swatehost.Browser ->
+            let header = model.SpreadsheetModel.getSelectedColumnHeader
+            header
+            |> Option.bind (fun header ->
+                if header.isTermColumn then
+                    header.Term
+                elif header.isFeaturedCol then
+                    Some header.getFeaturedColTermMinimal
+                else
+                    None
+            )
+        | _ -> None
+
     Control.div [] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Field.div [Field.HasAddons] [
-            parentOntologyNotificationElement ((model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.SearchByParentOntology) |> not)
+            if hasParentTerm && model.TermSearchState.SearchByParentOntology then parentOntologyNotificationElement parentTerm.Value
             Control.p [Control.IsExpanded] [
                 Input.input [
                     Input.Props [Id autocompleteParams.InputId]
@@ -368,18 +398,19 @@ let autocompleteTermSearchComponentOfParentOntology
                     Input.Props [
                         OnFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
-                            OfficeInterop.GetParentTerm |> OfficeInteropMsg |> dispatch
-                            let el = Browser.Dom.document.getElementById autocompleteParams.InputId
-                            el.focus()
+                            match model.PersistentStorageState.Host with
+                            | Swatehost.Excel _ ->
+                                OfficeInterop.GetParentTerm |> OfficeInteropMsg |> dispatch
+                                let el = Browser.Dom.document.getElementById autocompleteParams.InputId
+                                el.focus()
+                            | _ -> ()
                         )
                         OnDoubleClick (fun e ->
-                            if model.TermSearchState.ParentOntology.IsSome && model.TermSearchState.TermSearchText = "" then
-                                let parentOnt = model.TermSearchState.ParentOntology.Value
-                                let parentOntInfo: TermMinimal = { Name = parentOnt.Name; TermAccession = parentOnt.TermAccession }
-                                TermSearch.GetAllTermsByParentTermRequest parentOntInfo |> TermSearchMsg |> dispatch
+                            if hasParentTerm && model.TermSearchState.TermSearchText = "" then
+                                TermSearch.GetAllTermsByParentTermRequest parentTerm.Value |> TermSearchMsg |> dispatch
                             else
                                 let v = Browser.Dom.document.getElementById autocompleteParams.InputId
-                                v?value |> autocompleteParams.OnInputChangeMsg |> dispatch
+                                (v?value, parentTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
                         )
                     ]           
                     Input.OnChange (fun e ->
@@ -387,7 +418,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         if e.Value = x then
                             let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
                             UpdateColorMode c |> Messages.StyleChange |> dispatch
-                        e.Value |> autocompleteParams.OnInputChangeMsg |> dispatch
+                        (e.Value, parentTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
                     )
                 ]
             ]

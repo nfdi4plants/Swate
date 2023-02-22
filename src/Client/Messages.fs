@@ -33,7 +33,7 @@ module TermSearch =
 
     type Msg =
         | ToggleSearchByParentOntology
-        | SearchTermTextChange                  of string
+        | SearchTermTextChange                  of searchString:string * parentTerm: TermMinimal option
         | TermSuggestionUsed                    of Term
         | NewSuggestions                        of Term []
         | StoreParentOntologyFromOfficeInterop  of TermMinimal option

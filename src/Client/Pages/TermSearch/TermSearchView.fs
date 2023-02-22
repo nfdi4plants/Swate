@@ -26,7 +26,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 
         nextState, Cmd.none
 
-    | SearchTermTextChange newTerm ->
+    | SearchTermTextChange (newTerm, parentTerm) ->
 
         let triggerNewSearch = newTerm.Trim() <> ""
        
@@ -35,7 +35,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
             "GetNewTermSuggestions",
             (
                 if triggerNewSearch then
-                    match currentState.ParentOntology, currentState.SearchByParentOntology with
+                    match parentTerm, currentState.SearchByParentOntology with
                     | Some termMin, true ->
                         (newTerm,termMin) |> (GetNewTermSuggestionsByParentTerm >> Request >> Api)
                     | None,_ | _, false ->

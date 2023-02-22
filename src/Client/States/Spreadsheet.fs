@@ -22,6 +22,11 @@ type Model = {
             Tables = Map.empty
             TableOrder = Map.empty
         }
+    member this.getSelectedColumnHeader =
+        if this.SelectedCells.IsEmpty then None else
+            let column = this.SelectedCells |> Set.toList |> List.minBy fst |> fst
+            let header = this.ActiveTable.[column,0]
+            Some header.Header
 
 type Msg =
 // <--> UI <-->
