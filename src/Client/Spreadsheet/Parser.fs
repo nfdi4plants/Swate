@@ -8,7 +8,7 @@ type InsertBuildingBlock with
     member this.toSwateBuildingBlock(index:int) : SwateBuildingBlock =
         let header =
             let str = this.ColumnHeader.toAnnotationTableHeader()
-            SwateColumnHeader.init(str, ?term = this.ColumnTerm)
+            SwateColumnHeader.init(str, ?term = this.ColumnTerm, hasUnit = this.HasUnit)
         let unit = this.UnitTerm
         let rows =
             if this.HasValues then

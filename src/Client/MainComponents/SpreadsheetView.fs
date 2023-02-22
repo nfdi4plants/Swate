@@ -89,6 +89,24 @@ let private contextmenu (x: int, y: int) (funcs:ContextFunctions) (rmv: _ -> uni
         ]
     ]
 
+let private cellStyle (specificStyle: IStyleAttribute list) = prop.style [
+        style.minWidth 100
+        style.height 22
+        style.border(length.px 1, borderStyle.solid, "darkgrey")
+        yield! specificStyle
+    ]
+
+let private cellInnerContainerStyle (specificStyle: IStyleAttribute list) = prop.style [
+        style.display.flex;
+        style.justifyContent.spaceBetween;
+        style.height(length.percent 100);
+        style.minHeight(35)
+        style.width(length.percent 100)
+        style.padding(length.em 0.5,length.em 0.75)
+        style.alignItems.center
+        yield! specificStyle
+    ]
+
 let private cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value) =
     Bulma.input.text [
         prop.autoFocus true
@@ -122,7 +140,136 @@ let private cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit
         prop.defaultValue cell_value
     ]
 
+open Shared.TermTypes
+open Shared.OfficeInteropTypes
+
+///<summary> Only apply this element to SwateCell if header has term. </summary>
+[<ReactComponent>]
+let private TANCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
+    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
+    let columnIndex = fst index
+    let rowIndex = snd index
+    let state = model.SpreadsheetModel
+    let cell = state.ActiveTable.[index]
+    let cellValue =
+        if isHeader then
+            let tan = cell.Header.Term |> Option.map (fun x -> x.TermAccession) |> Option.defaultValue ""
+            tan
+        elif cell.isBody && cell.Body.Unit.IsSome then
+            cell.Body.Unit.Value.TermAccession
+        elif cell.isBody then
+            cell.Body.Term.TermAccession
+        else FreeTextInput
+    let state_cell, setState_cell = React.useState(CellState.init(cellValue))
+    let isSelected = state.SelectedCells.Contains index
+    cell_element [
+        prop.key $"Cell_{columnIndex}-{rowIndex}_Unit"
+        cellStyle [
+            if isHeader then
+                style.color(NFDIColors.white)
+                style.backgroundColor(NFDIColors.DarkBlue.Lighter20)
+            if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
+        ]
+        prop.children [
+            Html.div [
+                cellInnerContainerStyle []
+                prop.onDoubleClick(fun e ->
+                    e.preventDefault()
+                    e.stopPropagation()
+                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                    if not state_cell.Active then setState_cell {state_cell with Active = true}
+                )
+                prop.children [
+                    if state_cell.Active then
+                        let updateMainStateTable() =
+                            // Only update if changed
+                            if state_cell.Value <> cellValue then
+                                // Updating unit name should remove unit tsr/tan
+                                let nextTerm = 
+                                    match cell with
+                                    | IsHeader header ->
+                                        let nextTerm = header.Term |> Option.map (fun t -> {t with TermAccession = state_cell.Value}) |> Option.defaultValue (TermMinimal.create "" state_cell.Value )
+                                        let nextHeader = {header with Term = Some nextTerm}
+                                        IsHeader nextHeader
+                                    | IsBody body ->
+                                        /// if cell has unit, update unit, not term
+                                        let nextTerm =
+                                            let t = if body.Unit.IsSome then body.Unit.Value else body.Term
+                                            { t with TermAccession = state_cell.Value} 
+                                        let nextBody = if body.Unit.IsSome then {body with Unit = Some nextTerm} else {body with Term = nextTerm} 
+                                        IsBody nextBody
+                                Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
+                            setState_cell {state_cell with Active = false}
+                        cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
+                    else
+                        let displayValue =
+                            if isHeader then
+                                $"{ColumnCoreNames.TermAccessionNumber.toString} ({cellValue})"
+                            else
+                                cellValue
+                        Html.span [
+                            prop.style [
+                                style.flexGrow 1
+                            ]
+                            prop.text displayValue
+                        ]
+                ]
+            ]
+        ]
+    ]
+
+[<ReactComponent>]
+let private UnitCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
+    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
+    let columnIndex = fst index
+    let rowIndex = snd index
+    let state = model.SpreadsheetModel
+    let cell = state.ActiveTable.[index]
+    let cellValue = if isHeader then ColumnCoreNames.Unit.toString elif cell.isBody && cell.Body.Unit.IsSome then cell.Body.Unit.Value.Name else "Unknown"
+    let state_cell, setState_cell = React.useState(CellState.init(cellValue))
+    let isSelected = state.SelectedCells.Contains index
+    cell_element [
+        prop.key $"Cell_{columnIndex}-{rowIndex}_Unit"
+        cellStyle [
+            if isHeader then
+                style.color(NFDIColors.white)
+                style.backgroundColor(NFDIColors.DarkBlue.Lighter20)
+            if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
+        ]
+        prop.children [
+            Html.div [
+                cellInnerContainerStyle []
+                prop.onDoubleClick(fun e ->
+                    e.preventDefault()
+                    e.stopPropagation()
+                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                    if not state_cell.Active then setState_cell {state_cell with Active = true}
+                )
+                prop.children [
+                    if not isHeader && state_cell.Active then
+                        let updateMainStateTable() =
+                            // Only update if changed
+                            if state_cell.Value <> cellValue then
+                                // Updating unit name should remove unit tsr/tan
+                                let nextTerm = {cell.Body.Unit.Value with Name = state_cell.Value}
+                                let nextBody = IsBody { cell.Body with Unit = nextTerm |> Some }
+                                Msg.UpdateTable (index, nextBody) |> SpreadsheetMsg |> dispatch
+                            setState_cell {state_cell with Active = false}
+                        cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
+                    else
+                        Html.span [
+                            prop.style [
+                                style.flexGrow 1
+                            ]
+                            prop.text cellValue
+                        ]
+                ]
+            ]
+        ]
+    ]
+
 let private extendHeaderButton (state_extend: Set<int>, columnIndex, setState_extend) =
+    let isExtended = state_extend.Contains(columnIndex)
     Bulma.icon [
         prop.style [
             style.cursor.pointer
@@ -135,10 +282,10 @@ let private extendHeaderButton (state_extend: Set<int>, columnIndex, setState_ex
         prop.onClick(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let nextState = if state_extend.Contains(columnIndex) then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
+            let nextState = if isExtended then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
             setState_extend nextState
         )
-        prop.children [Html.i [prop.className "fa-solid fa-square-caret-up fa-rotate-90"; prop.style [style.fontSize(length.em 1)]]]
+        prop.children [Html.i [prop.classes ["fa-sharp"; "fa-solid"; "fa-angles-up"; if isExtended then "fa-rotate-270" else "fa-rotate-90"]; prop.style [style.fontSize(length.em 1)]]]
     ]
 
 [<ReactComponent>]
@@ -147,26 +294,21 @@ let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_exten
     let rowIndex = snd index
     let state = model.SpreadsheetModel
     let cell = state.ActiveTable.[index]
-    let cell_value = if isHeader then cell.Header.SwateColumnHeader else cell.Body.Term.Name
-    let state_cell, setState_cell = React.useState(CellState.init(cell_value))
-    let innerPadding = style.padding(0, 3)
+    let cellValue = if isHeader then cell.Header.SwateColumnHeader else cell.Body.Term.Name
+    let state_cell, setState_cell = React.useState(CellState.init(cellValue))
     let isSelected = state.SelectedCells.Contains index
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     /// TODO! Try get from db?
     /// Update change to mainState and exit active input.
     let updateMainStateTable() =
         // Only update if changed
-        if state_cell.Value <> cell_value then
+        if state_cell.Value <> cellValue then
             let nextTerm = cell.updateDisplayValue state_cell.Value
             Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
         setState_cell {state_cell with Active = false}
     cell_element [
-        prop.key $"{state.Tables.[state.ActiveTableIndex].Id}_Cell_{columnIndex}-{rowIndex}"
-        prop.style [
-            style.minWidth 100
-            style.height 22
-            style.border(length.px 1, borderStyle.solid, "darkgrey")
-            style.position.relative
+        prop.key $"Cell_{columnIndex}-{rowIndex}"
+        cellStyle [
             if isHeader then
                 style.color(NFDIColors.white)
                 style.backgroundColor(NFDIColors.DarkBlue.Base)
@@ -190,15 +332,7 @@ let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_exten
             )
         prop.children [
             Html.div [
-                prop.style [
-                    style.display.flex;
-                    style.justifyContent.spaceBetween;
-                    style.height(length.percent 100);
-                    style.minHeight(22)
-                    style.width(length.percent 100)
-                    style.padding(length.em 0.5,length.em 0.75)
-                    style.alignItems.center
-                ]
+                cellInnerContainerStyle []
                 prop.onDoubleClick(fun e ->
                     e.preventDefault()
                     e.stopPropagation()
@@ -214,18 +348,21 @@ let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_exten
                 )
                 prop.children [
                     if state_cell.Active then
-                        cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cell_value)
+                        cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
                     else
-                        let id = sprintf "span_%A" index
+                        let displayName =
+                            if cell.isBody && cell.Body.Unit.IsSome then
+                                let name = if cellValue = "" then None else Some cellValue
+                                name |> Option.map (fun x -> x + " " + cell.Body.Unit.Value.Name) |> Option.defaultValue ""
+                            else
+                                cellValue
                         Html.span [
-                            prop.id id
                             prop.style [
-                                innerPadding
                                 style.flexGrow 1
                             ]
-                            prop.text cell_value
+                            prop.text displayName
                         ]
-                    if isHeader then
+                    if isHeader && (cell.Header.isTermColumn || cell.Header.isFeaturedCol) then
                         extendHeaderButton(state_extend, columnIndex, setState_extend)
                 ]
             ]
@@ -236,11 +373,15 @@ let private bodyRow (i:int) (state:Set<int>) setState (model:Model) (dispatch: M
     let r = model.SpreadsheetModel.ActiveTable |> Map.filter (fun (_,r) _ -> r = i)
     Html.tr [
         for KeyValue ((column,row),cell) in r do
-            let isExtended = state.Contains(column)
+            let header = model.SpreadsheetModel.ActiveTable.[column,0]
             yield
                 Cell((column,row), false, state, setState, model, dispatch)
-            if isExtended then
-                yield Cell((column,row), false, state, setState, model, dispatch)
+            if header.Header.isTermColumn || header.Header.isFeaturedCol then
+                let isExtended = state.Contains(column)
+                if isExtended then
+                    if header.Header.HasUnit then
+                        yield UnitCell((column,row), false, model, dispatch)
+                    yield TANCell((column,row), false, model, dispatch)
     ]
 
 let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
@@ -248,11 +389,14 @@ let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> 
     let r = model.SpreadsheetModel.ActiveTable |> Map.filter (fun (_,r) _ -> r = rowInd)
     Html.tr [
         for KeyValue ((column,row),cell) in r do
-            let isExtended = state.Contains(column)
             yield
                 Cell((column,row), true, state, setState, model, dispatch)
-            if isExtended then
-                yield Cell((column,row), true, state, setState, model, dispatch)
+            if cell.Header.isTermColumn || cell.Header.isFeaturedCol then
+                let isExtended = state.Contains(column)
+                if isExtended then
+                    if cell.Header.HasUnit then
+                        yield UnitCell((column,row), true, model, dispatch)
+                    yield TANCell((column,row), true, model, dispatch)
     ]
 
 [<ReactComponent>]
@@ -260,11 +404,10 @@ let Main (model:Model) (dispatch: Msg -> unit) =
     /// This state is used to track which columns are expanded
     let state, setState : Set<int> * (Set<int> -> unit) = React.useState(Set.empty)
     Html.div [
-        prop.style [style.border(1, borderStyle.solid, "grey"); style.width.minContent]
+        prop.style [style.border(1, borderStyle.solid, "grey"); style.width.minContent; style.marginRight(length.vw 10)]
         prop.children [
             Html.table [
                 prop.className "fixed_headers"
-                //prop.style [style.height.minContent; style.width.minContent]
                 prop.children [
                     Html.thead [
                         headerRow state setState model dispatch
