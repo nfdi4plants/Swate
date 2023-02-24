@@ -27,6 +27,9 @@ type Model = {
             let column = this.SelectedCells |> Set.toList |> List.minBy fst |> fst
             let header = this.ActiveTable.[column,0]
             Some header.Header
+    member this.headerIsSelected =
+        if this.SelectedCells.IsEmpty then false else
+            this.SelectedCells |> Set.toList |> List.exists (fun (c,r) -> r = 0)
 
 type Msg =
 // <--> UI <-->

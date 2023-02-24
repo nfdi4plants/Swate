@@ -357,7 +357,7 @@ let autocompleteTermSearchComponentOfParentOntology
     let hasParentTerm =
         match model.PersistentStorageState.Host with
         | Swatehost.Excel _ -> model.TermSearchState.ParentOntology.IsSome 
-        | Swatehost.Browser ->
+        | Swatehost.Browser when not model.SpreadsheetModel.headerIsSelected ->
             let header = model.SpreadsheetModel.getSelectedColumnHeader
             match header with
             | Some h ->

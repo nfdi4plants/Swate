@@ -206,7 +206,7 @@ type Model = {
     DagModel                    : Dag.Model
     CytoscapeModel              : Cytoscape.Model
     /// Contains all information about spreadsheet view
-    SpreadsheetModel        : Spreadsheet.Model
+    SpreadsheetModel            : Spreadsheet.Model
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}

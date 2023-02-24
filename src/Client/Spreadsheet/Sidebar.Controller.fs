@@ -113,7 +113,8 @@ let insertTerm (term:TermMinimal) (state: Spreadsheet.Model) : Spreadsheet.Model
             if header.isTermColumn then
                 let core = header.getColumnCoreName |> Option.map BuildingBlockType.ofString
                 if core.IsSome then
-                    IsHeader {header with Term = Some term}
+                    let nameBlueprint = BuildingBlockNamePrePrint.create core.Value term.Name
+                    IsHeader {header with Term = Some term; SwateColumnHeader = nameBlueprint.toAnnotationTableHeader() }
                 else
                     cell
             else
