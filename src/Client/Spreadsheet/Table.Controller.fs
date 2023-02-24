@@ -136,7 +136,7 @@ let copySelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
 let cutCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = state.ActiveTable.[index]
     // Remove selected cell value
-    let emptyCell = if cell.isBody then SwateCell.emptyBody elif cell.isHeader then SwateCell.emptyHeader else failwithf "Could not read cell type for index: %A" index
+    let emptyCell = SwateCell.emptyOfCell cell
     let nextActiveTable = state.ActiveTable.Add(index, emptyCell)
     let nextState = {state with ActiveTable = nextActiveTable}
     clipboardCell <- Some cell
@@ -148,25 +148,25 @@ let cutSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     cutCell index state
 
 let pasteCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let selectedCell = state.ActiveTable.[index]
+    let targetCell = state.ActiveTable.[index]
     let table = state.ActiveTable
-    match clipboardCell with
+    match clipboardCell, targetCell with
     // Don't update if no cell in saved
-    | None -> state
-    | Some (IsBody cell) ->          
-        // Don't update if saved cell is body and next cell is not body
-        match selectedCell with
-        | IsBody _ ->
-            let nextTable = table.Add(index, IsBody cell)
-            {state with ActiveTable = nextTable}
-        | _ -> state
-    | Some (IsHeader cell) ->
-        // Don't update if saved cell is header and next cell is not header
-        match selectedCell with
-        | IsHeader _ ->
-            let nextTable = table.Add(index, IsHeader cell)
-            {state with ActiveTable = nextTable}
-        | _ -> state
+    | None, _ -> state
+     // Don't update if source cell and target cell are not of same type
+    | Some (IsTerm _), IsTerm _ ->          
+        let nextTable = table.Add(index, clipboardCell.Value)
+        {state with ActiveTable = nextTable}
+    | Some (IsFreetext _), IsFreetext _ ->
+        let nextTable = table.Add(index, clipboardCell.Value)
+        {state with ActiveTable = nextTable}
+    | Some (IsUnit _), IsUnit _ ->
+        let nextTable = table.Add(index, clipboardCell.Value)
+        {state with ActiveTable = nextTable}
+    | Some (IsHeader _), IsHeader _ ->
+        let nextTable = table.Add(index, clipboardCell.Value)
+        {state with ActiveTable = nextTable}
+    | _,_ -> state
 
 let pasteSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     if state.SelectedCells.IsEmpty then

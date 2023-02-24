@@ -194,23 +194,24 @@ module private EventPresets =
             
 ///<summary> Only apply this element to SwateCell if header has term. </summary>
 [<ReactComponent>]
-let TANCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
-    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
+let TANCell(index: (int*int), model: Model, dispatch) =
     let columnIndex = fst index
     let rowIndex = snd index
     let state = model.SpreadsheetModel
     let cell = state.ActiveTable.[index]
+    let isHeader = cell.isHeader
     let cellValue =
         if isHeader then
             let tan = cell.Header.Term |> Option.map (fun x -> x.TermAccession) |> Option.defaultValue ""
             tan
-        elif cell.isBody && cell.Body.Unit.IsSome then
-            cell.Body.Unit.Value.TermAccession
-        elif cell.isBody then
-            cell.Body.Term.TermAccession
-        else FreeTextInput
+        elif cell.isUnit then
+            cell.Unit.Unit.TermAccession
+        elif cell.isTerm then
+            cell.Term.Term.TermAccession
+        else "Unknown"
     let state_cell, setState_cell = React.useState(CellState.init(cellValue))
     let isSelected = state.SelectedCells.Contains index
+    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     cell_element [
         prop.key $"Cell_{columnIndex}-{rowIndex}_TAN"
         cellStyle [
@@ -242,13 +243,17 @@ let TANCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                                         let nextTerm = header.Term |> Option.map (fun t -> {t with TermAccession = state_cell.Value}) |> Option.defaultValue (TermMinimal.create "" state_cell.Value )
                                         let nextHeader = {header with Term = Some nextTerm}
                                         IsHeader nextHeader
-                                    | IsBody body ->
-                                        /// if cell has unit, update unit, not term
-                                        let nextTerm =
-                                            let t = if body.Unit.IsSome then body.Unit.Value else body.Term
-                                            { t with TermAccession = state_cell.Value} 
-                                        let nextBody = if body.Unit.IsSome then {body with Unit = Some nextTerm} else {body with Term = nextTerm} 
-                                        IsBody nextBody
+                                    | IsTerm t_cell ->
+                                        let nextTermCell =
+                                            let term = { t_cell.Term with TermAccession = state_cell.Value }
+                                            { t_cell with Term = term } 
+                                        IsTerm nextTermCell
+                                    | IsUnit u_cell ->
+                                        let nextUnitCell =
+                                            let unit = { u_cell.Unit with TermAccession = state_cell.Value }
+                                            { u_cell with Unit = unit } 
+                                        IsUnit nextUnitCell
+                                    | IsFreetext _ -> failwith "This should never trigger, as the TAN column is only added for unit or term column"
                                 Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
                             setState_cell {state_cell with Active = false}
                         cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
@@ -270,15 +275,16 @@ let TANCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
     ]
 
 [<ReactComponent>]
-let UnitCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
-    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
+let UnitCell(index: (int*int), model: Model, dispatch) =
     let columnIndex = fst index
     let rowIndex = snd index
     let state = model.SpreadsheetModel
     let cell = state.ActiveTable.[index]
-    let cellValue = if isHeader then ColumnCoreNames.Unit.toString elif cell.isBody && cell.Body.Unit.IsSome then cell.Body.Unit.Value.Name else "Unknown"
+    let isHeader = cell.isHeader
+    let cellValue = if isHeader then ColumnCoreNames.Unit.toString elif cell.isUnit then cell.Unit.Unit.Name else "Unknown"
     let state_cell, setState_cell = React.useState(CellState.init(cellValue))
     let isSelected = state.SelectedCells.Contains index
+    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     cell_element [
         prop.key $"Cell_{columnIndex}-{rowIndex}_Unit"
         cellStyle [
@@ -303,9 +309,9 @@ let UnitCell(index: (int*int), isHeader:bool, model: Model, dispatch) =
                         let updateMainStateTable() =
                             // Only update if changed
                             if state_cell.Value <> cellValue then
-                                // Updating unit name should remove unit tsr/tan
-                                let nextTerm = {cell.Body.Unit.Value with Name = state_cell.Value}
-                                let nextBody = IsBody { cell.Body with Unit = nextTerm |> Some }
+                                // This column only exists for unit cells
+                                let nextTerm = {cell.Unit.Unit with Name = state_cell.Value}
+                                let nextBody = IsUnit { cell.Unit with Unit = nextTerm }
                                 Msg.UpdateTable (index, nextBody) |> SpreadsheetMsg |> dispatch
                             setState_cell {state_cell with Active = false}
                         cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
@@ -342,12 +348,13 @@ let private extendHeaderButton (state_extend: Set<int>, columnIndex, setState_ex
     ]
 
 [<ReactComponent>]
-let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+let Cell(index: (int*int), state_extend: Set<int>, setState_extend, model: Model, dispatch) =
     let columnIndex = fst index
     let rowIndex = snd index
     let state = model.SpreadsheetModel
     let cell = state.ActiveTable.[index]
-    let cellValue = if isHeader then cell.Header.SwateColumnHeader else cell.Body.Term.Name
+    let isHeader = cell.isHeader
+    let cellValue = cell.displayValue
     let state_cell, setState_cell = React.useState(CellState.init(cellValue))
     let isSelected = state.SelectedCells.Contains index
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
@@ -383,9 +390,9 @@ let Cell(index: (int*int), isHeader:bool, state_extend: Set<int>, setState_exten
                         cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
                     else
                         let displayName =
-                            if cell.isBody && cell.Body.Unit.IsSome then
+                            if cell.isUnit then
                                 let name = if cellValue = "" then None else Some cellValue
-                                name |> Option.map (fun x -> x + " " + cell.Body.Unit.Value.Name) |> Option.defaultValue ""
+                                name |> Option.map (fun x -> x + " " + cell.Unit.Unit.Name) |> Option.defaultValue ""
                             else
                                 cellValue
                         Html.span [

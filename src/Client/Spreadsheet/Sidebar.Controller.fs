@@ -90,18 +90,34 @@ let addBuildingBlock(insertBuildingBlock: InsertBuildingBlock) (state: Spreadshe
 let insertTerm (term:TermMinimal) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     /// Filter out header row
-    let arr = state.SelectedCells |> Set.toArray
+    let selected = state.SelectedCells |> Set.toArray
     /// Make sure only one column is selected
     let isOneColumn =
-        let columnIndex = fst arr.[0] // can just use head of selected cells as all must be same column
-        arr |> Array.forall (fun x -> fst x = columnIndex)
-    if not isOneColumn then failwith "Can only paste cells in one column at a time!"
-    let selected = arr |> Array.filter (fun (c,r) -> r <> 0)
-    let nextActiveTable = table |> Map.map (fun key v ->
-        if Array.contains key selected then
-            IsBody {v.Body with Term = term}
-        else
-            v
+        let columnIndex = fst selected.[0] // can just use head of selected cells as all must be same column
+        selected |> Array.forall (fun x -> fst x = columnIndex)
+    if not isOneColumn then failwith "Can only paste term in one column at a time!"
+    /// Make sure either one column header is selected or only body cells are selected
+    let onlyOrNoHeader =
+        let hasHeader = selected |> Array.exists (fun (_,r) -> r = 0)
+        if hasHeader then selected.Length = 1 else true
+    if not onlyOrNoHeader then failwith "Can only paste term in header or body at a time!"
+    let nextActiveTable = table |> Map.map (fun key cell ->
+        let isSelected = Array.contains key selected
+        match isSelected, cell with
+        | false, _ -> cell
+        | true, IsTerm t_cell -> IsTerm {t_cell with Term = term}
+        | true, IsUnit u_cell -> IsUnit {u_cell with Unit = term}
+        | true, IsFreetext f_cell -> IsFreetext {f_cell with Value = term.Name}
+        // only update header if header is term column
+        | true, IsHeader header -> 
+            if header.isTermColumn then
+                let core = header.getColumnCoreName |> Option.map BuildingBlockType.ofString
+                if core.IsSome then
+                    IsHeader {header with Term = Some term}
+                else
+                    cell
+            else
+                cell
     )
     let nextState = { state with ActiveTable = nextActiveTable }
     nextState

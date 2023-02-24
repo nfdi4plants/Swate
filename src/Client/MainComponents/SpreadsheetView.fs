@@ -7,14 +7,14 @@ open Spreadsheet
 open Messages
 open Spreadsheet.Cells
 
-let private referenceColumns (state:Set<int>, header:SwateCell, isHeader: bool, (columnIndex: int, rowIndex:int), model, dispatch) =
+let private referenceColumns (state:Set<int>, header:SwateCell, (columnIndex: int, rowIndex:int), model, dispatch) =
     if header.Header.isTermColumn || header.Header.isFeaturedCol then
         [
             let isExtended = state.Contains(columnIndex)
             if isExtended then
                 if header.Header.HasUnit then
-                    yield UnitCell((columnIndex,rowIndex), isHeader, model, dispatch)
-                yield TANCell((columnIndex,rowIndex), isHeader, model, dispatch)
+                    yield UnitCell((columnIndex,rowIndex), model, dispatch)
+                yield TANCell((columnIndex,rowIndex), model, dispatch)
         ]
     else []
 
@@ -24,8 +24,8 @@ let private bodyRow (i:int) (state:Set<int>) setState (model:Model) (dispatch: M
         for KeyValue ((column,row),cell) in r do
             let header = model.SpreadsheetModel.ActiveTable.[column,0]
             yield
-                Cell((column,row), false, state, setState, model, dispatch)
-            yield! referenceColumns(state, header, false, (column,row), model, dispatch)
+                Cell((column,row), state, setState, model, dispatch)
+            yield! referenceColumns(state, header, (column,row), model, dispatch)
     ]
 
 let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
@@ -34,8 +34,8 @@ let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> 
     Html.tr [
         for KeyValue ((column,row),cell) in r do
             yield
-                Cell((column,row), true, state, setState, model, dispatch)
-            yield! referenceColumns(state, cell, true, (column,row), model, dispatch)
+                Cell((column,row), state, setState, model, dispatch)
+            yield! referenceColumns(state, cell, (column,row), model, dispatch)
     ]
 
 [<ReactComponent>]

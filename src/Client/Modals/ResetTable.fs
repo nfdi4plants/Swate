@@ -18,7 +18,7 @@ let Main (dispatch) (rmv: _ -> unit) =
             Bulma.modalBackground [ prop.onClick rmv ]
             Bulma.modalCard [
                 Bulma.modalCardHead [
-                    Bulma.modalCardTitle "Danger!"
+                    Bulma.modalCardTitle "Attention!"
                     Bulma.delete [ prop.onClick rmv ]
                 ]
                 Bulma.modalCardBody [

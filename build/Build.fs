@@ -126,6 +126,13 @@ module Docker =
     let dockerImageName = "freymaurer/swate"
     let dockerContainerName = "swate"
 
+    // Create nightly (https://de.wikipedia.org/wiki/Nightly_Build)
+    // 1: docker build -t swate -f build/Dockerfile.publish .
+    // 2: docker run -it -p 5000:5000 swate
+    //      -> http://localhost:5000
+    // 3: docker tag swate:latest freymaurer/swate.nightly:latest
+    // 4: docker push freymaurer/swate.nightly:latest
+
     // Change target to github-packages
     // https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
     Target.create "docker-publish" (fun _ ->

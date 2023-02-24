@@ -9,12 +9,11 @@ type InsertBuildingBlock with
         let header =
             let str = this.ColumnHeader.toAnnotationTableHeader()
             SwateColumnHeader.init(str, ?term = this.ColumnTerm, hasUnit = this.HasUnit)
-        let unit = this.UnitTerm
         let rows =
-            if this.HasValues then
-                this.Rows |> Array.mapi (fun i t -> i + 1, BodyCell.create(t, ?unit = unit))
-            else
-                [||]
+            match this.HasValues, this.HasUnit with
+            | true, true    -> this.Rows |> Array.mapi (fun i t -> i + 1, SwateCell.create(t.Name, ?unit = this.UnitTerm))
+            | true, false   -> this.Rows |> Array.mapi (fun i t -> i + 1, SwateCell.create(t))
+            | false, _      ->  [||]
         SwateBuildingBlock.create(index, header, rows)
 
 module SwateBuildingBlock =
@@ -26,8 +25,7 @@ module SwateBuildingBlock =
         let rows = [|
             for KeyValue ((_,rk),c) in column do
                 if rk <> 0 then
-                    yield
-                        rk, c.Body
+                    yield rk, c
         |]
         SwateBuildingBlock.create(index, header, rows)
 
@@ -52,7 +50,7 @@ module SwateBuildingBlock =
             let header = (columnIndex, 0), IsHeader bb.Header
             let rows =
                 bb.Rows |> Array.map (fun (i,c) ->
-                    (columnIndex, i), IsBody c
+                    (columnIndex, i), c
                 )
             [|
                 yield header

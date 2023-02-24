@@ -308,11 +308,12 @@ module OfficeInteropTypes =
             this.SwateColumnHeader.StartsWith ColumnCoreNames.TermAccessionNumber.toString
         member this.isTSRCol =
             this.SwateColumnHeader.StartsWith ColumnCoreNames.TermSourceRef.toString
+        /// TSR, TAN or Unit
         member this.isReference =
             this.isTSRCol
             || this.isTANCol
             || this.isUnitCol
-        member this.getColumnCoreName = parseCoreName this.SwateColumnHeader |> Option.bind (fun x -> x.Trim() |> Some)
+        member this.getColumnCoreName = parseCoreName this.SwateColumnHeader |> Option.map (fun x -> x.Trim())
         member this.toBuildingBlockNamePrePrint =
             match this.getColumnCoreName, this.tryGetOntologyTerm with
             | Some swatecore, None ->
@@ -338,6 +339,7 @@ module OfficeInteropTypes =
         /// <summary>Get term Accession in TSR or TAN from column header</summary>
         member this.tryGetTermAccession = parseTermAccession this.SwateColumnHeader
         /// <summary>Get column header hash id from main column. E.g. Parameter [Instrument Model#2]</summary>
+        [<Obsolete("Swate no longer uses #id pattern, instead expands column name with whitespaces. As this is less invasive.")>]
         member this.tryGetHeaderId =
             let brackets = parseSquaredTermNameBrackets this.SwateColumnHeader
             match brackets with
