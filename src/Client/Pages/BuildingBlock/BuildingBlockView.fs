@@ -567,7 +567,10 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         // Input forms, etc related to add building block.
         addBuildingBlockElements model dispatch
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add/Update unit reference to existing building block."]
-        // Input forms, etc related to add unit to existing building block.
-        addUnitToExistingBlockElements model dispatch
+        match model.PersistentStorageState.Host with
+        | Swatehost.Excel _ ->
+            Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add/Update unit reference to existing building block."]
+            // Input forms, etc related to add unit to existing building block.
+            addUnitToExistingBlockElements model dispatch
+        | _ -> ()
     ]

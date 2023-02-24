@@ -245,14 +245,14 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
 
             str <| state.Size.ToString()
 
-            Button.button [
-                Button.OnClick (fun _ ->
-                    //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
-                    //()
-                    //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
-                    ()
-                )
-            ] [ str "Test button" ]
+            //Button.button [
+            //    Button.OnClick (fun _ ->
+            //        //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
+            //        //()
+            //        //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
+            //        ()
+            //    )
+            //] [ str "Test button" ]
 
             match model.PersistentStorageState.Host with
             | Swatehost.Excel _ ->
