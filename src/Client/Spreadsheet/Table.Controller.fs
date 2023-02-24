@@ -91,7 +91,17 @@ let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     if checkNewKeys <> 0 then failwith "Error in `addRows` function. Unable to add new rows without replacing existing values. Please contact us with a bug report."
     let nextActiveTable =
         let prev = state.ActiveTable |> Map.toList
-        let next = newKeys |> List.map (fun x -> x, SwateCell.create(TermMinimal.empty))
+        let cellTypes =
+            prev
+            // remove header and row information
+            |> List.choose (fun (index,v) -> if snd index <> 0 then Some (fst index, v) else None)
+            |> List.distinctBy (fun (column,_) -> column) // get one cell for each column
+            |> Map.ofList
+        let next =
+            newKeys
+            |> List.map (fun x ->
+                x, SwateCell.emptyOfCell cellTypes.[fst x]
+            )
         prev@next
         |> Map.ofList
     let nextState = {state with ActiveTable = nextActiveTable}
@@ -154,7 +164,7 @@ let pasteCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     // Don't update if no cell in saved
     | None, _ -> state
      // Don't update if source cell and target cell are not of same type
-    | Some (IsTerm _), IsTerm _ ->          
+    | Some (IsTerm _), IsTerm _ ->
         let nextTable = table.Add(index, clipboardCell.Value)
         {state with ActiveTable = nextTable}
     | Some (IsFreetext _), IsFreetext _ ->

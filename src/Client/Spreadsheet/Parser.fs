@@ -10,10 +10,11 @@ type InsertBuildingBlock with
             let str = this.ColumnHeader.toAnnotationTableHeader()
             SwateColumnHeader.init(str, ?term = this.ColumnTerm, hasUnit = this.HasUnit)
         let rows =
+            printfn "%b, %b, %b" this.HasValues  header.isTermColumn this.HasUnit
             match this.HasValues, header.isTermColumn, this.HasUnit with
             | true, true, true    -> this.Rows |> Array.mapi (fun i t -> i + 1, SwateCell.create(t.Name, ?unit = this.UnitTerm))
             | true, true, false   -> this.Rows |> Array.mapi (fun i t -> i + 1, SwateCell.create(t))
-            | true, false, _  -> this.Rows |> Array.mapi (fun i t -> i + 1, SwateCell.create(t.Name))
+            | true, false, _      -> this.Rows |> Array.mapi (fun i t -> i + 1, SwateCell.create(t.Name))
             | false, _, _         ->  [||]
         SwateBuildingBlock.create(index, header, rows)
 
