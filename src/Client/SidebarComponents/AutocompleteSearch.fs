@@ -354,7 +354,7 @@ let autocompleteTermSearchComponentOfParentOntology
             ] [str parenTermText ]
         ]
 
-    let hasParentTerm =
+    let useParentTerm =
         match model.PersistentStorageState.Host with
         | Swatehost.Excel _ -> model.TermSearchState.ParentOntology.IsSome 
         | Swatehost.Browser when not model.SpreadsheetModel.headerIsSelected ->
@@ -383,10 +383,14 @@ let autocompleteTermSearchComponentOfParentOntology
             )
         | _ -> None
 
+    // REF-Parent-Term:
+    // `useParentTerm` is used to show if parent term should be used for search. `useParentTerm` can be false, altough `parentTerm`.IsSome.
+    // Therefore we need to doublecheck `useParentTerm` to pass option.
+
     Control.div [] [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
         Field.div [Field.HasAddons] [
-            if hasParentTerm && model.TermSearchState.SearchByParentOntology then parentOntologyNotificationElement parentTerm.Value
+            if useParentTerm && model.TermSearchState.SearchByParentOntology then parentOntologyNotificationElement parentTerm.Value
             Control.p [Control.IsExpanded] [
                 Input.input [
                     Input.Props [Id autocompleteParams.InputId]
@@ -406,11 +410,13 @@ let autocompleteTermSearchComponentOfParentOntology
                             | _ -> ()
                         )
                         OnDoubleClick (fun e ->
-                            if hasParentTerm && model.TermSearchState.TermSearchText = "" then
+                            if useParentTerm && model.TermSearchState.TermSearchText = "" then
                                 TermSearch.GetAllTermsByParentTermRequest parentTerm.Value |> TermSearchMsg |> dispatch
                             else
+                                /// REF-Parent-Term
+                                let parenTerm = if useParentTerm then parentTerm else None
                                 let v = Browser.Dom.document.getElementById autocompleteParams.InputId
-                                (v?value, parentTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
+                                (v?value, parenTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
                         )
                     ]           
                     Input.OnChange (fun e ->
@@ -418,7 +424,9 @@ let autocompleteTermSearchComponentOfParentOntology
                         if e.Value = x then
                             let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
                             UpdateColorMode c |> Messages.StyleChange |> dispatch
-                        (e.Value, parentTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
+                        /// REF-Parent-Term
+                        let parenTerm = if useParentTerm then parentTerm else None
+                        (e.Value, parenTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
                     )
                 ]
             ]
