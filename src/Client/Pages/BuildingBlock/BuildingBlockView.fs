@@ -560,7 +560,6 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Building Blocks"]
 
@@ -571,6 +570,4 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add/Update unit reference to existing building block."]
         // Input forms, etc related to add unit to existing building block.
         addUnitToExistingBlockElements model dispatch
-
-
     ]

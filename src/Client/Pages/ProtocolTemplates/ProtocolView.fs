@@ -281,7 +281,7 @@ module TemplateFromDB =
 
 
 let fileUploadViewComponent (model:Messages.Model) dispatch =
-    Content.content [ Content.Props [
+    form [ 
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
@@ -289,8 +289,7 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
             if model.ProtocolState.ShowJsonTypeDropdown then
                 UpdateShowJsonTypeDropdown false |> ProtocolMsg |> dispatch
         )
-        Style [MinHeight "100vh"]
-    ]] [
+    ] [
         
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Templates"]
 

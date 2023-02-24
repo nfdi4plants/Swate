@@ -64,7 +64,8 @@ html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     font-size: 14px;
     min-width: 400px;
-    height: 100vh
+    height: 100vh;
+    overflow: auto
 }
 
 a {
@@ -123,6 +124,7 @@ a:hover {
 .myNavbarSticky {
     position: sticky;
     position: -webkit-sticky;
+    min-height: min-content;
     top: 0
 }
 
