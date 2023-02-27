@@ -113,11 +113,34 @@ let deleteRow (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
         |> Map.toArray
         |> Array.filter (fun ((_,r),_) -> r <> index)
         |> Array.map (fun ((c,r),cvalue) ->
-            let updateIndex = if r > index then r-1 else r
-            (c,updateIndex), cvalue
+            let updatedIndex = if r > index then r-1 else r
+            (c,updatedIndex), cvalue
         )
         |> Map.ofArray
-    {state with ActiveTable = nextTable}
+    {state with ActiveTable = nextTable; SelectedCells = Set.empty }
+
+let deleteRows (indexArr: int []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let filter (table:Map<int*int,SwateCell>) =
+        table
+        |> Map.toArray
+        |> Array.filter (fun ((_,r),_) -> Array.contains r indexArr |> not)
+    let mutable rowIndex = 0
+    let reindex (mapArr:((int*int)*SwateCell) []) =
+        mapArr
+        |> Array.groupBy (fun ((c,r),v) -> r)
+        |> Array.sortBy fst
+        |> Array.collect (fun (_,arr) ->
+            let nextRowIndex = rowIndex
+            rowIndex <- rowIndex + 1
+            arr |> Array.map (fun ((c,_),v) -> (c,nextRowIndex),v)
+        )
+    let nextTable =
+        state.ActiveTable
+        |> filter
+        |> reindex
+        |> Map.ofArray
+    {state with ActiveTable = nextTable; SelectedCells = Set.empty }
+    
 
 let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let nextTable = 
@@ -129,7 +152,7 @@ let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
             (updateIndex,r), cvalue
         )
         |> Map.ofArray
-    {state with ActiveTable = nextTable}
+    {state with ActiveTable = nextTable; SelectedCells = Set.empty}
 
 let mutable clipboardCell: SwateCell option = None
 

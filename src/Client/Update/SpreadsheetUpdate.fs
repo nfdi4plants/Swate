@@ -74,6 +74,9 @@ module Spreadsheet =
             | DeleteRow index ->
                 let nextState = Controller.deleteRow index state
                 nextState, model, Cmd.none
+            | DeleteRows indexArr ->
+                let nextState = Controller.deleteRows indexArr state
+                nextState, model, Cmd.none
             | DeleteColumn index ->
                 let nextState = Controller.deleteColumn index state
                 nextState, model, Cmd.none

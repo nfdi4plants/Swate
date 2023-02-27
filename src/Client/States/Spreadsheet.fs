@@ -42,6 +42,7 @@ type Msg =
 | UpdateHistoryPosition of newPosition:int
 | AddRows of int
 | DeleteRow of int
+| DeleteRows of int []
 | DeleteColumn of int
 | CopySelectedCell
 | CutSelectedCell

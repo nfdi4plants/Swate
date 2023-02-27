@@ -150,12 +150,20 @@ open Shared.OfficeInteropTypes
 
 module private EventPresets =
 
-    let onContextMenu (index: int*int, dispatch) = fun (e: Browser.Types.MouseEvent) ->
+    let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Types.MouseEvent) ->
         e.stopPropagation()
         e.preventDefault()
         let mousePosition = int e.pageX, int e.pageY
+        /// if there are selected cells in the same column as the clicked event, delete all selected rows.
+        let deleteRowEvent _ =
+            let s = Set.toArray model.SpreadsheetModel.SelectedCells
+            if Array.isEmpty s |> not && Array.forall (fun (c,r) -> c = fst index) s && Array.contains index s then
+                let indexArr = s |> Array.map snd |> Array.distinct
+                Spreadsheet.DeleteRows indexArr |> Messages.SpreadsheetMsg |> dispatch
+            else
+                Spreadsheet.DeleteRow (snd index) |> Messages.SpreadsheetMsg |> dispatch
         let funcs = {
-            DeleteRow       = fun rmv e -> rmv e; Spreadsheet.DeleteRow (snd index) |> Messages.SpreadsheetMsg |> dispatch
+            DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
             DeleteColumn    = fun rmv e -> rmv e; Spreadsheet.DeleteColumn (fst index) |> Messages.SpreadsheetMsg |> dispatch
             Copy            = fun rmv e -> rmv e; Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
             Cut             = fun rmv e -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
@@ -220,7 +228,7 @@ let TANCell(index: (int*int), model: Model, dispatch) =
                 style.backgroundColor(NFDIColors.DarkBlue.Lighter20)
             if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
         ]
-        prop.onContextMenu <| EventPresets.onContextMenu (index, dispatch)
+        prop.onContextMenu <| EventPresets.onContextMenu (index, model, dispatch)
         prop.children [
             Html.div [
                 cellInnerContainerStyle []
@@ -293,7 +301,7 @@ let UnitCell(index: (int*int), model: Model, dispatch) =
                 style.backgroundColor(NFDIColors.DarkBlue.Lighter20)
             if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
         ]
-        prop.onContextMenu <| EventPresets.onContextMenu (index, dispatch)
+        prop.onContextMenu <| EventPresets.onContextMenu (index, model, dispatch)
         prop.children [
             Html.div [
                 cellInnerContainerStyle []
@@ -366,7 +374,7 @@ let Cell(index: (int*int), state_extend: Set<int>, setState_extend, model: Model
                 style.backgroundColor(NFDIColors.DarkBlue.Base)
             if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
         ]
-        prop.onContextMenu <| EventPresets.onContextMenu (index, dispatch)
+        prop.onContextMenu <| EventPresets.onContextMenu (index, model, dispatch)
         prop.children [
             Html.div [
                 cellInnerContainerStyle []
