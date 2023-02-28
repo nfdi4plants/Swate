@@ -119,7 +119,7 @@ let TANCell(index: (int*int), model: Model, dispatch) =
             cell.Unit.Unit.TermAccession
         elif cell.isTerm then
             cell.Term.Term.TermAccession
-        else "Unknown"
+        else ""
     let state_cell, setState_cell = React.useState(CellState.init(cellValue))
     let isSelected = state.SelectedCells.Contains index
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
@@ -164,7 +164,11 @@ let TANCell(index: (int*int), model: Model, dispatch) =
                                             let unit = { u_cell.Unit with TermAccession = state_cell.Value }
                                             { u_cell with Unit = unit } 
                                         IsUnit nextUnitCell
-                                    | IsFreetext _ -> failwith "This should never trigger, as the TAN column is only added for unit or term column"
+                                    | IsFreetext _ ->
+                                        let t_cell = cell.toTermCell.Term
+                                        let term = {t_cell.Term with TermAccession = state_cell.Value}
+                                        let nextCell = {t_cell with Term = term}
+                                        IsTerm nextCell
                                 Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
                             setState_cell {state_cell with Active = false}
                         cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
