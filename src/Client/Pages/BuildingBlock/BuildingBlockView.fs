@@ -195,9 +195,9 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
         nextState, Cmd.none
 
 let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
-    if block.Type.isTermColumn then block.Name.Length > 0
+    if block.Type.isFeaturedColumn then true
+    elif block.Type.isTermColumn then block.Name.Length > 0
     elif block.Type.isSingleColumn then true
-    elif block.Type.isFeaturedColumn then true
     else false
 
 
@@ -375,7 +375,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                     ]
                 ]
                 // Ontology Term search field
-                if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn then
+                if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn && model.AddBuildingBlockState.CurrentBuildingBlock.Type.isFeaturedColumn |> not then
                     AutocompleteSearch.autocompleteTermSearchComponentInputComponent
                         dispatch
                         false // isDisabled
@@ -393,7 +393,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                 (AutocompleteSearch.createAutocompleteSuggestions dispatch autocompleteParams model)
         ]
         // Ontology Unit Term search field
-        if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn then
+        if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn && model.AddBuildingBlockState.CurrentBuildingBlock.Type.isFeaturedColumn |> not then
             let unitAutoCompleteParams = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState
             Field.div [] [
                 Field.div [Field.HasAddons] [

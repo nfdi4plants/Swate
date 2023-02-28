@@ -2,29 +2,7 @@ namespace Spreadsheet
 
 open Shared
 open TermTypes
-
-//type BodyCell = {
-//    Term: TermMinimal
-//    /// can only contain unit if header is None
-//    Unit: TermMinimal option
-//} with
-//    static member internal create(v: TermMinimal, ?unit: TermMinimal) = {
-//        Term = v
-//        Unit = unit
-//    }
-//    static member internal create(termName: string, ?termAccession: string, ?unit: TermMinimal) = {
-//        Term = TermTypes.TermMinimal.create termName (Option.defaultValue "" termAccession)
-//        Unit = unit
-//    }
-//    static member internal create(termName: string, ?termAccession: string, ?unitName: string, ?unitAccession: string) = {
-//        Term = TermTypes.TermMinimal.create termName (Option.defaultValue "" termAccession)
-//        Unit =
-//            if unitName.IsNone && unitAccession.IsNone then None else
-//                TermTypes.TermMinimal.create
-//                    (Option.defaultValue "" unitName)
-//                    (Option.defaultValue "" unitAccession)
-//                |> Some
-//    }
+open OfficeInteropTypes
 
 type UnitCell = {
     Value: string
@@ -68,16 +46,58 @@ type TermCell = {
         Term = TermMinimal.empty
     }
 
+type HeaderCell = {
+    BuildingBlockType: OfficeInteropTypes.BuildingBlockType
+    DisplayValue: string
+    HasUnit: bool
+    Term: TermMinimal option
+} with
+    member this.isTermColumn = this.BuildingBlockType.isTermColumn
+    member this.isFeaturedColumn = this.BuildingBlockType.isFeaturedColumn
+    member this.getFeaturedTerm = this.BuildingBlockType.getFeaturedColumnTermMinimal
+    member this.updateDisplayValue =
+        let n = this.Term |> Option.map (fun x -> x.Name) |> Option.defaultValue ""
+        let blueprint = OfficeInteropTypes.BuildingBlockNamePrePrint.create this.BuildingBlockType n
+        {this with DisplayValue = blueprint.toAnnotationTableHeader()}
+    static member create(b_type:OfficeInteropTypes.BuildingBlockType, ?hasUnit: bool, ?term: TermMinimal) =
+        let temp = {
+            BuildingBlockType = b_type
+            DisplayValue = ""
+            HasUnit = Option.defaultValue false hasUnit
+            Term = term
+        }
+        temp.updateDisplayValue
+
+        
+
 type SwateCell =
 | IsUnit of UnitCell
 | IsFreetext of FreetextCell
 | IsTerm of TermCell
-| IsHeader of OfficeInteropTypes.SwateColumnHeader
+| IsHeader of HeaderCell
 with
     member this.isHeader = match this with | IsHeader _ -> true | _ -> false
     member this.isUnit = match this with | IsUnit _ -> true | _ -> false
     member this.isTerm = match this with | IsTerm _ -> true | _ -> false
     member this.isFreetext = match this with | IsFreetext _ -> true | _ -> false
+    member this.toUnitCell =
+        match this with
+        | IsUnit _ -> this
+        | IsFreetext text -> SwateCell.create(text.Value, ?unit = None)
+        | IsTerm term -> SwateCell.create(unit = term.Term)
+        | IsHeader _ -> failwith "Cannot parse header cell to unit cell"
+    member this.toTermCell =
+        match this with
+        | IsTerm _ -> this
+        | IsUnit unit -> SwateCell.create(unit.Unit)
+        | IsFreetext text -> SwateCell.create(text.Value, ?uid = None)
+        | IsHeader _ -> failwith "Cannot parse header cell to term cell"
+    member this.toFreetext =
+        match this with
+        | IsFreetext _ -> this
+        | IsTerm term -> SwateCell.create(term.Term.Name)
+        | IsUnit unit -> SwateCell.create(unit.Unit.Name)
+        | IsHeader _ -> failwith "Cannot parse header cell to freetext cell"
     member this.Unit =
         match this with
         | IsUnit c -> c
@@ -95,42 +115,40 @@ with
         | IsHeader cc -> cc
         | _ -> failwith "Not a ColumnHeader."
     /// This is used to update the main column value
-    member this.updateDisplayValue (v: string) =    
+    member this.updateDisplayValue (v: string) =
         match this with
-        | IsHeader c        -> IsHeader {c with SwateColumnHeader = v}
+        | IsHeader c        -> printfn "updateDisplayValue for isHeader not implemented"; IsHeader c
         | IsTerm c          -> IsTerm {c with Term = {c.Term with Name = v}}
         | IsUnit c          -> IsUnit {c with Value = v}
         | IsFreetext c      -> IsFreetext {c with Value = v}
     member this.displayValue =
         match this with
-        | IsHeader c        -> c.SwateColumnHeader
+        | IsHeader c        -> c.DisplayValue
         | IsTerm c          -> c.Term.Name
         | IsUnit c          -> c.Value
         | IsFreetext c      -> c.Value
     // Mirror create functions for body cells
     /// Creates TermCell
-    static member create(term: TermTypes.TermMinimal) = TermCell.create(term) |> IsTerm
+    static member create(term: TermTypes.TermMinimal) : SwateCell = TermCell.create(term) |> IsTerm
     /// Creates TermCell
-    static member create(name: string, ?uid: string) = TermCell.create(name, ?uid = uid) |> IsTerm
+    static member create(name: string, ?uid: string) : SwateCell = TermCell.create(name, ?uid = uid) |> IsTerm
     /// Creates UnitCell
-    static member create(value:string, ?unit: TermTypes.TermMinimal) = UnitCell.create(value, ?unit = unit) |> IsUnit
+    static member create(value:string, ?unit: TermTypes.TermMinimal) : SwateCell = UnitCell.create(value, ?unit = unit) |> IsUnit
     /// Creates UnitCell
-    static member create(value:string, ?name: string, ?uid: string) = UnitCell.create(value, ?name = name, ?uid = uid) |> IsUnit
+    static member create(value:string, ?name: string, ?uid: string) : SwateCell = UnitCell.create(value, ?name = name, ?uid = uid) |> IsUnit
     /// Creates UnitCell
-    static member create(unit: TermTypes.TermMinimal, ?value:string) = UnitCell.create(Option.defaultValue "" value, unit = unit) |> IsUnit
+    static member create(unit: TermTypes.TermMinimal, ?value:string) : SwateCell = UnitCell.create(Option.defaultValue "" value, unit = unit) |> IsUnit
     /// Creates UnitCell
-    static member create(name: string, uid: string, ?value:string) = UnitCell.create(Option.defaultValue "" value, name = name, uid = uid) |> IsUnit
+    static member create(name: string, uid: string, ?value:string) : SwateCell = UnitCell.create(Option.defaultValue "" value, name = name, uid = uid) |> IsUnit
     /// Creates FreetextCell
-    static member create(value: string) = FreetextCell.create(value) |> IsFreetext
+    static member create(value: string) : SwateCell = FreetextCell.create(value) |> IsFreetext
     // Mirror create functions for SwateColumnHeader
     /// Creates HeaderCell
-    static member createHeader(headerString: string, ?term: TermTypes.TermMinimal) = OfficeInteropTypes.SwateColumnHeader.init(headerString, ?term = term) |> IsHeader
-    /// Creates HeaderCell
-    static member createHeader(headerString: OfficeInteropTypes.SwateColumnHeader, ?term: TermTypes.TermMinimal) = OfficeInteropTypes.SwateColumnHeader.init(headerString, ?term = term) |> IsHeader
+    static member createHeader(b_type:OfficeInteropTypes.BuildingBlockType, ?hasUnit: bool, ?term: TermMinimal) = HeaderCell.create(b_type, ?hasUnit = hasUnit, ?term = term) |> IsHeader
     static member emptyTerm = IsTerm TermCell.empty
     static member emptyFreetext = IsFreetext FreetextCell.empty
     static member emptyUnit = IsUnit UnitCell.empty
-    static member emptyHeader = SwateCell.createHeader(headerString = "empty")
+    static member emptyHeader = SwateCell.createHeader(BuildingBlockType.Freetext "Freetext")
     static member emptyOfCell (cell: SwateCell) =
         match cell with
         | IsHeader _ -> SwateCell.emptyHeader
@@ -138,11 +156,9 @@ with
         | IsUnit _ -> SwateCell.emptyUnit
         | IsFreetext _ -> SwateCell.emptyFreetext
 
-open OfficeInteropTypes
-
 type SwateBuildingBlock = {
     Index: int
-    Header: SwateColumnHeader
+    Header: HeaderCell
     Rows: (int*SwateCell) []
 } with
     static member create(index: int, header, rows) = {

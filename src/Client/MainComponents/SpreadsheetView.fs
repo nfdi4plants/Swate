@@ -8,7 +8,7 @@ open Messages
 open Spreadsheet.Cells
 
 let private referenceColumns (state:Set<int>, header:SwateCell, (columnIndex: int, rowIndex:int), model, dispatch) =
-    if header.Header.isTermColumn || header.Header.isFeaturedCol then
+    if header.Header.isTermColumn then
         [
             let isExtended = state.Contains(columnIndex)
             if isExtended then

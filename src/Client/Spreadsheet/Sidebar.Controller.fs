@@ -111,12 +111,7 @@ let insertTerm (term:TermMinimal) (state: Spreadsheet.Model) : Spreadsheet.Model
         // only update header if header is term column
         | true, IsHeader header -> 
             if header.isTermColumn then
-                let core = header.getColumnCoreName |> Option.map BuildingBlockType.ofString
-                if core.IsSome then
-                    let nameBlueprint = BuildingBlockNamePrePrint.create core.Value term.Name
-                    IsHeader {header with Term = Some term; SwateColumnHeader = nameBlueprint.toAnnotationTableHeader() }
-                else
-                    cell
+                {header with Term = Some term}.updateDisplayValue |> IsHeader
             else
                 cell
     )

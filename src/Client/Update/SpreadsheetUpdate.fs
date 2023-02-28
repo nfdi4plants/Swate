@@ -110,6 +110,9 @@ module Spreadsheet =
             | FillColumnWithTerm index ->
                 let nextState = Controller.fillColumnWithTerm index state
                 nextState, model, Cmd.none
+            | EditColumn (columnIndex, newCellType) ->
+                let nextState = Controller.editColumn columnIndex newCellType state 
+                nextState, model, Cmd.none
 
 
         // execute inner and follow with save function

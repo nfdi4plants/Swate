@@ -362,8 +362,7 @@ let autocompleteTermSearchComponentOfParentOntology
             match header with
             | Some h ->
                 let termSelected = h.isTermColumn && h.Term.IsSome
-                let featuredSelected = h.isFeaturedCol
-                termSelected || featuredSelected
+                termSelected
             | None -> false
         | _ -> false
 
@@ -376,8 +375,8 @@ let autocompleteTermSearchComponentOfParentOntology
             |> Option.bind (fun header ->
                 if header.isTermColumn then
                     header.Term
-                elif header.isFeaturedCol then
-                    Some header.getFeaturedColTermMinimal
+                elif header.isFeaturedColumn then
+                    Some header.getFeaturedTerm
                 else
                     None
             )

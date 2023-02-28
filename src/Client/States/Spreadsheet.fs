@@ -30,7 +30,8 @@ type Model = {
     member this.headerIsSelected =
         if this.SelectedCells.IsEmpty then false else
             this.SelectedCells |> Set.toList |> List.exists (fun (c,r) -> r = 0)
-
+    member this.getColumn(index:int) =
+        this.ActiveTable |> Map.toArray |> Array.choose (fun ((c,r),v) -> if c = index then Some (r,v) else None)
 type Msg =
 // <--> UI <-->
 | UpdateTable of (int*int) * SwateCell
@@ -51,6 +52,8 @@ type Msg =
 | CutCell of index:(int*int)
 | PasteCell of index:(int*int)
 | FillColumnWithTerm of index:(int*int)
+/// Update column of index to new column type defined by given SwateCell.emptyXXX
+| EditColumn of index: int * newType: SwateCell 
 /// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
 | Reset
 // <--> INTEROP <-->

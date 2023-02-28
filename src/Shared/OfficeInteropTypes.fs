@@ -41,6 +41,8 @@ module OfficeInteropTypes =
         | ProtocolType
         // Single Columns
         | ProtocolREF
+        // everything else
+        | Freetext of string
 
         static member All = [
             Parameter; Factor; Characteristic; Component
@@ -63,7 +65,7 @@ module OfficeInteropTypes =
 
         ///<summary>The name "TermColumn" refers to all columns with the syntax "Parameter/Factor/etc [TERM-NAME]"</summary>
         member this.isTermColumn =
-            match this with | Parameter | Factor | Characteristic | Component -> true | anythingElse -> false
+            match this with | Parameter | Factor | Characteristic | Component | ProtocolType -> true | anythingElse -> false
 
         static member TermColumns = BuildingBlockType.All |> List.filter (fun x -> x.isTermColumn)
         static member InputColumns = BuildingBlockType.All |> List.filter (fun x -> x.isInputColumn)
@@ -95,7 +97,7 @@ module OfficeInteropTypes =
         member this.isSingleColumn =
             match this with
             // Input & Output columns
-            | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile | BuildingBlockType.ProtocolREF -> true
+            | BuildingBlockType.Sample| BuildingBlockType.Source | BuildingBlockType.Data | BuildingBlockType.RawDataFile | BuildingBlockType.DerivedDataFile | BuildingBlockType.ProtocolREF | Freetext _ -> true
             | _ -> false
 
         static member tryOfString str =
@@ -112,7 +114,7 @@ module OfficeInteropTypes =
             | "Source Name"     -> Some Source
             | "Protocol Type"   -> Some ProtocolType
             | "Protocol REF"    -> Some ProtocolREF
-            | anythingElse      -> None
+            | anythingElse      -> Some <| Freetext anythingElse
 
         static member ofString str =
             BuildingBlockType.tryOfString str
@@ -131,6 +133,7 @@ module OfficeInteropTypes =
             | ProtocolType      -> "Protocol Type" 
             | Source            -> "Source Name"
             | ProtocolREF       -> "Protocol REF"
+            | Freetext str      -> str
 
         /// By Martin Kuhl 04.08.2022, https://github.com/Martin-Kuhl
         member this.toShortExplanation =
@@ -146,6 +149,7 @@ module OfficeInteropTypes =
             | Source            -> "The Source column efines the input of your table. This input value must be a unique identifier for an organism or a sample. The number of Source Name columns per table is limited to one."
             | ProtocolType      -> "Defines the protocol type according to your preferred endpoint repository."
             | ProtocolREF       -> "Defines the protocol name."
+            | Freetext _        -> failwith "Freetext BuildingBlockType should not be parsed"
 
         /// By Martin Kuhl 04.08.2022, https://github.com/Martin-Kuhl
         member this.toLongExplanation =
@@ -185,7 +189,8 @@ module OfficeInteropTypes =
                 "Use this column type to define the protocol type according to your preferred endpoint repository.
                 You can use the term search, to search through all available protocol types."
             | ProtocolREF       ->
-                "Use this column type to define your protocol name. Normally the Excel worksheet name is used, but it is limited to ~32 characters." 
+                "Use this column type to define your protocol name. Normally the Excel worksheet name is used, but it is limited to ~32 characters."
+            | Freetext _        -> failwith "Freetext BuildingBlockType should not be parsed"
 
     type BuildingBlockNamePrePrint = {
         Type : BuildingBlockType
@@ -214,6 +219,7 @@ module OfficeInteropTypes =
             | BuildingBlockType.Source              -> BuildingBlockType.Source.toString
             | BuildingBlockType.ProtocolType        -> BuildingBlockType.ProtocolType.toString
             | BuildingBlockType.ProtocolREF         -> BuildingBlockType.ProtocolREF.toString
+            | BuildingBlockType.Freetext str        -> (BuildingBlockType.Freetext str).toString
 
         /// Check if .Type is single column type
         member this.isSingleColumn = this.Type.isSingleColumn

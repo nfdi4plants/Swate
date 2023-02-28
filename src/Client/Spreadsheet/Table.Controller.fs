@@ -228,3 +228,23 @@ let fillColumnWithTerm (index: int*int) (state: Spreadsheet.Model) : Spreadsheet
         )
     let nextState = {state with ActiveTable = nextActiveTable}
     nextState
+
+/// Ui depends on main column name, maybe change this to depends on BuildingBlockType?
+/// Header main column name must be updated
+
+let editColumn (columnIndex: int) (newType: SwateCell) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let table = state.ActiveTable
+    let updateHeader (header: HeaderCell) =
+        match newType with
+        | IsUnit _ -> {header with HasUnit = true; Term = header.Term}.updateDisplayValue |> IsHeader
+        | IsTerm _ -> {header with HasUnit = false; Term = header.Term}.updateDisplayValue |> IsHeader
+        | IsFreetext _ -> SwateCell.emptyHeader
+        | IsHeader _ -> failwith "This is no viable input."
+    let nextTable =
+        table
+        |> Map.map (fun (c,r) cv ->
+            match r with
+            | 0 when c = columnIndex -> printfn "HIT!"; updateHeader cv.Header
+            | _ -> cv
+        )
+    {state with ActiveTable = nextTable}

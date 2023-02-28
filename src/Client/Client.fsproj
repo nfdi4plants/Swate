@@ -43,6 +43,7 @@
         <Compile Include="Spreadsheet\Sidebar.Controller.fs" />
         <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
+        <Compile Include="Modals\EditColumn.fs" />
         <Compile Include="Modals\ResetTable.fs" />
         <Compile Include="Modals\WarningModal.fs" />
         <Compile Include="Modals\InteropLoggingModal.fs" />
@@ -50,6 +51,7 @@
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
         <Compile Include="SharedComponents\QuickAccessButton.fs" />
+        <Compile Include="MainComponents\ContextMenu.fs" />
         <Compile Include="MainComponents\Cells.fs" />
         <Compile Include="MainComponents\KeyboardShortcuts.fs" />
         <Compile Include="MainComponents\AddRows.fs" />
