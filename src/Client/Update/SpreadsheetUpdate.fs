@@ -31,11 +31,10 @@ module Spreadsheet =
 
         match msg with
         | CreateAnnotationTable usePrevOutput ->
-            printfn "implemented usePrevOutput for new table input column"
             let cmd = createPromiseCmd(fun _ ->
                 state
                 |> Controller.saveActiveTable
-                |> Controller.createAnnotationTable_new
+                |> Controller.createAnnotationTable_new usePrevOutput 
             )
             state, model, cmd
         | AddAnnotationBlock minBuildingBlockInfo ->

@@ -173,7 +173,7 @@ let MainPlus(input:{|dispatch: Messages.Msg -> unit|}) =
         prop.onDragLeave <| dragleave_handler (state, setState)
         prop.onDragOver drag_preventdefault
         prop.onDrop <| drop_handler (order, state, setState, dispatch)
-        prop.onClick (fun _ -> SpreadsheetInterface.CreateAnnotationTable false |> Messages.InterfaceMsg |> dispatch)
+        prop.onClick (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
             Html.a [

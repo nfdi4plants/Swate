@@ -7,13 +7,13 @@ open Spreadsheet
 open Parser
 open Types
 
-/// <summary>This is the basic function to create new Tables from an array of InsertBuildingBlocks</summary>
-let createAnnotationTable (name: string option) (insertBuildingBlocks: InsertBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+/// <summary>This is the basic function to create new Tables from an array of SwateBuildingBlocks</summary>
+let createAnnotationTable (name: string option) (swateBuildingBlocks: SwateBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     // calculate next index
     let newIndex = if Map.isEmpty state.Tables then 0 else state.Tables |> Map.maxKey |> (+) 1
-    let swateBuildingBlocks = insertBuildingBlocks |> Array.mapi (fun i bb -> bb.toSwateBuildingBlock i)
     // parse to active table
     let activeTable = SwateBuildingBlock.toTableMap swateBuildingBlocks
+    printfn "%A" activeTable
     // add new table to tablemap
     let newTables = state.Tables.Add(newIndex, SwateTable.init(swateBuildingBlocks, ?name = name))
     let newTableOrder = state.TableOrder.Add(newIndex, newIndex)
@@ -24,24 +24,37 @@ let createAnnotationTable (name: string option) (insertBuildingBlocks: InsertBui
         TableOrder = newTableOrder
     }
 
+/// <summary>This is the basic function to create new Tables from an array of InsertBuildingBlocks</summary>
+let createAnnotationTable_ofInsertBuildingBlock (name: string option) (insertBuildingBlocks: InsertBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let swateBuildingBlocks = insertBuildingBlocks |> Array.mapi (fun i bb -> bb.toSwateBuildingBlock i)
+    createAnnotationTable name swateBuildingBlocks state
+
 /// <summary>Adds the most basic Swate table consisting of Input column "Source Name" and output column "Sample Name".</summary>
-let createAnnotationTable_new (state: Spreadsheet.Model) : Spreadsheet.Model =
+let createAnnotationTable_new (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let mutable n_rows = 1
+    let lastOutput =
+        if usePrevOutput then
+            let bbs = SwateBuildingBlock.ofTableMap state.ActiveTable
+            bbs |> Array.tryFind (fun bb -> bb.Header.isOutputColumn)
+        else
+            None
+    if lastOutput.IsSome then
+        n_rows <- lastOutput.Value.Rows.Length
     // create empty rows
-    let rows =
-        let n_rows = 1
-        Array.init n_rows (fun _ -> TermMinimal.empty)
+    let rows = Array.init n_rows (fun i -> i+1, SwateCell.emptyFreetext)
     // create source column
+    let sourceDefault = SwateBuildingBlock.create(0,HeaderCell.create(BuildingBlockType.Source), rows)
     let source =
-        let blueprint = BuildingBlockNamePrePrint.init(BuildingBlockType.Source)
-        InsertBuildingBlock.create blueprint None None rows
+        if lastOutput.IsSome then
+            SwateBuildingBlock.create(0,HeaderCell.create(BuildingBlockType.Source), lastOutput.Value.Rows)
+        else
+            sourceDefault
     // create sample column
-    let sample =
-        let blueprint = BuildingBlockNamePrePrint.init(BuildingBlockType.Sample)
-        InsertBuildingBlock.create blueprint None None rows
+    let sample = SwateBuildingBlock.create(1,HeaderCell.create(BuildingBlockType.Sample),rows)
     // parse to SwateBuildingBlocks
-    let insertBuildingBlocks = [|source; sample|]
+    let bbs = [|source; sample|]
     let name = HumanReadableIds.tableName()
-    createAnnotationTable (Some name) insertBuildingBlocks state
+    createAnnotationTable (Some name) bbs state
 
 let private extendBuildingBlockToRowMax (rowMax: int) (bb: InsertBuildingBlock) =
     if bb.Rows.Length < rowMax then
