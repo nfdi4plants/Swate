@@ -20,29 +20,39 @@ let saveActiveTable (state: Spreadsheet.Model) : Spreadsheet.Model =
         let nextTables = state.Tables.Change(state.ActiveTableIndex, fun _ -> Some nextTable)
         {state with Tables = nextTables}
 
-let updateTableOrder (prevIndex:int, newIndex:int) (m:Map<'a,int>) =
-    m
-    |> Map.toSeq
-    |> Seq.map (fun (id, order) ->
-        // the element to switch
-        if order = prevIndex then 
-            id, newIndex
-        // keep value if smaller then newIndex
-        elif order < newIndex then
-            id, order
-        elif order >= newIndex then
-            id, order + 1
-        else
-            failwith "this should never happen"
-    )
-    |> Seq.sortBy snd
-    // rebase order, this prevents ordering above "+" symbol in footer with System.Int32.MaxValue
-    |> Seq.mapi (fun i (id, _) -> id, i)
-    |> Map.ofSeq
+let updateTableOrder (prevIndex:int, newIndex:int) (state:Spreadsheet.Model) =
+    let m = state.TableOrder
+    let tableOrder =
+        m
+        |> Map.toSeq
+        |> Seq.map (fun (id, order) ->
+            // the element to switch
+            if order = prevIndex then 
+                id, newIndex
+            // keep value if smaller then newIndex
+            elif order < newIndex then
+                id, order
+            elif order >= newIndex then
+                id, order + 1
+            else
+                failwith "this should never happen"
+        )
+        |> Seq.sortBy snd
+        // rebase order, this prevents ordering above "+" symbol in footer with System.Int32.MaxValue
+        |> Seq.mapi (fun i (id, _) -> id, i)
+        |> Map.ofSeq
+    { state with TableOrder = tableOrder }
 
 let resetTableState() : Spreadsheet.Model =
     Spreadsheet.LocalStorage.resetAll()
     Spreadsheet.Model.init()
+
+let renameTable (tableIndex:int) (newName: string) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let isNotUnique = state.Tables.Values |> Seq.map (fun x -> x.Name) |> Seq.contains newName
+    if isNotUnique then failwith "Table names must be unique"
+    let nextTable = { state.Tables.[tableIndex] with Name = newName }
+    let nextState = {state with Tables = state.Tables.Change(tableIndex, fun _ -> Some nextTable)}
+    nextState
 
 let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let nextTables = state.Tables.Remove(removeIndex)

@@ -4,122 +4,126 @@ open Elmish
 open Spreadsheet
 open Model
 open Shared
-open OfficeInteropTypes
 open Parser
 open Spreadsheet.Table
 open Spreadsheet.Sidebar
 
 module Spreadsheet =
 
-    ///<summary>This function will update the `state` to the session storage history control. It works based of exlusion. As it specifies certain messages not triggering history update.</summary>
-    let private updateSessionStorage (state: Spreadsheet.Model, msg: Spreadsheet.Msg) : unit =
+    ///<summary>This function will return the correct success message.
+    /// Can return `SuccessNoHistory` or `Success`, both will save state to local storage but only `Success` will save state to session storage history control.
+    /// It works based of exlusion. As it specifies certain messages not triggering history update.</summary>
+    let updateSessionStorageMsg (msg: Spreadsheet.Msg) =
         match msg with
-        | UpdateActiveTable _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | CopySelectedCell | CopyCell _ -> ()
-        | _ -> Spreadsheet.LocalStorage.tablesToSessionStorage state
+        | UpdateActiveTable _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | CopySelectedCell | CopyCell _ -> Spreadsheet.SuccessNoHistory
+        | _ -> Spreadsheet.Success       
 
     let update (state: Spreadsheet.Model) (model: Messages.Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Messages.Model * Cmd<Messages.Msg> =
-        /// run this after any message in this update function
-        let save = Spreadsheet.LocalStorage.tablesToLocalStorage
-        let inner_update (msg: Spreadsheet.Msg) =
-            match msg with
-            | CreateAnnotationTable usePrevOutput ->
-                printfn "implemented usePrevOutput for new table input column"
-                let nextState =
-                    state
-                    |> Controller.saveActiveTable
-                    |> Controller.createAnnotationTable_new
-                nextState, model, Cmd.none
-            | AddAnnotationBlock minBuildingBlockInfo ->
-                let nextState = Controller.addBuildingBlock minBuildingBlockInfo state
-                nextState, model, Cmd.none
-            | InsertOntologyTerm termMinimal ->
-                let nextState = Controller.insertTerm termMinimal state
-                nextState, model, Cmd.none
-            | UpdateTable (index, cell) ->
-                let nextState =
-                    let nextTable = state.ActiveTable.Change(index, fun _ -> Some cell)
-                    {state with ActiveTable = nextTable}
-                nextState, model, Cmd.none
-            | UpdateActiveTable nextIndex ->
-                let nextState =
-                    state
-                    |> Controller.saveActiveTable
-                    |> fun state ->
-                        let nextTable = state.Tables.[nextIndex].BuildingBlocks |> SwateBuildingBlock.toTableMap
-                        { state with
-                            ActiveTableIndex = nextIndex
-                            ActiveTable = nextTable
-                        }
-                nextState, model, Cmd.none
-            | RemoveTable removeIndex ->
-                let nextState = Controller.removeTable removeIndex state
-                nextState, model, Cmd.none
-            | RenameTable (index, name) ->
-                let isNotUnique = state.Tables.Values |> Seq.map (fun x -> x.Name) |> Seq.contains name
-                if isNotUnique then failwith "Table names must be unique"
-                let nextTable = { state.Tables.[index] with Name = name }
-                let nextState = {state with Tables = state.Tables.Change(index, fun _ -> Some nextTable)}
-                nextState, model, Cmd.none
-            | UpdateTableOrder (prev_index, new_index) ->
-                let tableOrder = state.TableOrder |> Controller.updateTableOrder (prev_index, new_index)
-                let nextState = { state with TableOrder = tableOrder }
-                nextState, model, Cmd.none
-            | UpdateHistoryPosition (newPosition) ->
-                let nextState = Spreadsheet.LocalStorage.updateHistoryPosition newPosition state
-                nextState, model, Cmd.none
-            | AddRows (n) ->
-                let nextState = Controller.addRows n state
-                nextState, model, Cmd.none
-            | Reset ->
-                let nextState = Controller.resetTableState()
-                nextState, model, Cmd.none
-            | DeleteRow index ->
-                let nextState = Controller.deleteRow index state
-                nextState, model, Cmd.none
-            | DeleteRows indexArr ->
-                let nextState = Controller.deleteRows indexArr state
-                nextState, model, Cmd.none
-            | DeleteColumn index ->
-                let nextState = Controller.deleteColumn index state
-                nextState, model, Cmd.none
-            | UpdateSelectedCells nextSelectedCells ->
-                let nextState = {state with SelectedCells = nextSelectedCells}
-                nextState, model, Cmd.none
-            | CopyCell index ->
-                let nextState = Controller.copyCell index state
-                nextState, model, Cmd.none
-            | CopySelectedCell ->
-                let nextState =
-                    if state.SelectedCells.IsEmpty then state else
-                        Controller.copySelectedCell state
-                nextState, model, Cmd.none
-            | CutCell index ->
-                let nextState = Controller.cutCell index state
-                nextState, model, Cmd.none
-            | CutSelectedCell ->
-                let nextState =
-                    if state.SelectedCells.IsEmpty then state else
-                        Controller.cutSelectedCell state
-                nextState, model, Cmd.none
-            | PasteCell index ->
-                let nextState = if Controller.clipboardCell.IsNone then state else Controller.pasteCell index state
-                nextState, model, Cmd.none
-            | PasteSelectedCell ->
-                let nextState =
-                    if state.SelectedCells.IsEmpty || Controller.clipboardCell.IsNone then state else
-                        Controller.pasteSelectedCell state
-                nextState, model, Cmd.none
-            | FillColumnWithTerm index ->
-                let nextState = Controller.fillColumnWithTerm index state
-                nextState, model, Cmd.none
-            | EditColumn (columnIndex, newCellType, b_type) ->
-                let nextState = Controller.editColumn (columnIndex, newCellType, b_type) state 
-                nextState, model, Cmd.none
+        let createPromiseCmd (func: unit -> Spreadsheet.Model) =
+            let nextState() = promise {
+                return func()
+            }
+            Cmd.OfPromise.either
+                nextState
+                ()
+                (updateSessionStorageMsg msg >> Messages.SpreadsheetMsg)
+                (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
 
-
-        // execute inner and follow with save function
-        inner_update msg
-        |> fun (state, model, cmd) ->
-            save state // This will cache the most up to date table state to local storage.
-            updateSessionStorage (state, msg) // this will cache the table state for certain operations in session storage.
+        match msg with
+        | CreateAnnotationTable usePrevOutput ->
+            printfn "implemented usePrevOutput for new table input column"
+            let cmd = createPromiseCmd(fun _ ->
+                state
+                |> Controller.saveActiveTable
+                |> Controller.createAnnotationTable_new
+            )
             state, model, cmd
+        | AddAnnotationBlock minBuildingBlockInfo ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.addBuildingBlock minBuildingBlockInfo state
+            state, model, cmd
+        | InsertOntologyTerm termMinimal ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.insertTerm termMinimal state
+            state, model, cmd
+        | UpdateTable (index, cell) ->
+            let cmd = createPromiseCmd <| fun _ ->
+                let nextTable = state.ActiveTable.Change(index, fun _ -> Some cell)
+                {state with ActiveTable = nextTable}
+            state, model, cmd
+        | UpdateActiveTable nextIndex ->
+            let cmd = createPromiseCmd <| fun _ ->
+                state
+                |> Controller.saveActiveTable
+                |> fun state ->
+                    let nextTable = state.Tables.[nextIndex].BuildingBlocks |> SwateBuildingBlock.toTableMap
+                    { state with
+                        ActiveTableIndex = nextIndex
+                        ActiveTable = nextTable
+                    }
+            state, model, cmd
+        | RemoveTable removeIndex ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.removeTable removeIndex state
+            state, model, cmd
+        | RenameTable (index, name) ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.renameTable index name state
+            state, model, cmd
+        | UpdateTableOrder (prev_index, new_index) ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.updateTableOrder (prev_index, new_index) state
+            state, model, cmd
+        | UpdateHistoryPosition (newPosition) ->
+            let cmd = createPromiseCmd <| fun _ -> Spreadsheet.LocalStorage.updateHistoryPosition newPosition state
+            state, model, cmd
+        | AddRows (n) ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.addRows n state
+            state, model, cmd
+        | Reset ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.resetTableState()
+            state, model, cmd
+        | DeleteRow index ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.deleteRow index state
+            state, model, cmd
+        | DeleteRows indexArr ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.deleteRows indexArr state
+            state, model, cmd
+        | DeleteColumn index ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.deleteColumn index state
+            state, model, cmd
+        | UpdateSelectedCells nextSelectedCells ->
+            let cmd = createPromiseCmd <| fun _ -> {state with SelectedCells = nextSelectedCells}
+            state, model, cmd
+        | CopyCell index ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.copyCell index state
+            state, model, cmd
+        | CopySelectedCell ->
+            let cmd = createPromiseCmd <| fun _ ->
+                if state.SelectedCells.IsEmpty then state else
+                    Controller.copySelectedCell state
+            state, model, cmd
+        | CutCell index ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.cutCell index state
+            state, model, cmd
+        | CutSelectedCell ->
+            let cmd = createPromiseCmd <| fun _ ->
+                if state.SelectedCells.IsEmpty then state else
+                    Controller.cutSelectedCell state
+            state, model, cmd
+        | PasteCell index ->
+            let cmd = createPromiseCmd <| fun _ -> if Controller.clipboardCell.IsNone then state else Controller.pasteCell index state
+            state, model, cmd
+        | PasteSelectedCell ->
+            let cmd = createPromiseCmd <| fun _ ->
+                if state.SelectedCells.IsEmpty || Controller.clipboardCell.IsNone then state else
+                    Controller.pasteSelectedCell state
+            state, model, cmd
+        | FillColumnWithTerm index ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.fillColumnWithTerm index state
+            state, model, cmd
+        | EditColumn (columnIndex, newCellType, b_type) ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.editColumn (columnIndex, newCellType, b_type) state 
+            state, model, cmd
+        | Success nextState ->
+            Spreadsheet.LocalStorage.tablesToLocalStorage nextState // This will cache the most up to date table state to local storage.
+            Spreadsheet.LocalStorage.tablesToSessionStorage nextState // this will cache the table state for certain operations in session storage.
+            nextState, model, Cmd.none
+        | SuccessNoHistory nextState ->
+            Spreadsheet.LocalStorage.tablesToLocalStorage nextState // This will cache the most up to date table state to local storage.
+            nextState, model, Cmd.none
