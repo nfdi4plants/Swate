@@ -48,25 +48,38 @@ type TermCell = {
 
 type HeaderCell = {
     BuildingBlockType: OfficeInteropTypes.BuildingBlockType
-    DisplayValue: string
     HasUnit: bool
     Term: TermMinimal option
 } with
     member this.isTermColumn = this.BuildingBlockType.isTermColumn
     member this.isFeaturedColumn = this.BuildingBlockType.isFeaturedColumn
     member this.getFeaturedTerm = this.BuildingBlockType.getFeaturedColumnTermMinimal
-    member this.updateDisplayValue =
+    member this.DisplayValue =
         let n = this.Term |> Option.map (fun x -> x.Name) |> Option.defaultValue ""
         let blueprint = OfficeInteropTypes.BuildingBlockNamePrePrint.create this.BuildingBlockType n
-        {this with DisplayValue = blueprint.toAnnotationTableHeader()}
-    static member create(b_type:OfficeInteropTypes.BuildingBlockType, ?hasUnit: bool, ?term: TermMinimal) =
-        let temp = {
+        blueprint.toAnnotationTableHeader()
+    member this.updateDisplayValue(v:string) =
+        let header = SwateColumnHeader.create (v)
+        let blueprint = header.toBuildingBlockNamePrePrint
+        // if not parsable then freetext
+        // remove unit and term
+        if blueprint.IsNone then
+            {this with BuildingBlockType = BuildingBlockType.Freetext v; HasUnit = false; Term = None}
+        // if is featured column, set type and term
+        elif blueprint.Value.isFeaturedColumn then
+            {this with BuildingBlockType = blueprint.Value.Type; Term = Some header.getFeaturedColTermMinimal}
+        // if is term set term
+        elif blueprint.Value.isTermColumn then
+            let term = TermMinimal.create blueprint.Value.Name (this.Term |> Option.map (fun x -> x.TermAccession) |> Option.defaultValue "" )
+            {this with BuildingBlockType = blueprint.Value.Type; Term = Some term}
+        // This is input/output
+        else
+            {this with BuildingBlockType = blueprint.Value.Type; Term = None; HasUnit = false}
+    static member create(b_type:OfficeInteropTypes.BuildingBlockType, ?hasUnit: bool, ?term: TermMinimal) = {
             BuildingBlockType = b_type
-            DisplayValue = ""
             HasUnit = Option.defaultValue false hasUnit
             Term = term
         }
-        temp.updateDisplayValue
 
         
 
@@ -117,7 +130,7 @@ with
     /// This is used to update the main column value
     member this.updateDisplayValue (v: string) =
         match this with
-        | IsHeader c        -> printfn "updateDisplayValue for isHeader not implemented"; IsHeader c
+        | IsHeader c        -> IsHeader <| c.updateDisplayValue(v)
         | IsTerm c          -> IsTerm {c with Term = {c.Term with Name = v}}
         | IsUnit c          -> IsUnit {c with Value = v}
         | IsFreetext c      -> IsFreetext {c with Value = v}

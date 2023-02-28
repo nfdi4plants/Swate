@@ -111,7 +111,7 @@ let insertTerm (term:TermMinimal) (state: Spreadsheet.Model) : Spreadsheet.Model
         // only update header if header is term column
         | true, IsHeader header -> 
             if header.isTermColumn then
-                {header with Term = Some term}.updateDisplayValue |> IsHeader
+                {header with Term = Some term} |> IsHeader
             else
                 cell
     )

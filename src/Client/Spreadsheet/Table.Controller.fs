@@ -236,8 +236,8 @@ let editColumn (columnIndex: int) (newType: SwateCell) (state: Spreadsheet.Model
     let table = state.ActiveTable
     let updateHeader (header: HeaderCell) =
         match newType with
-        | IsUnit _ -> {header with HasUnit = true; Term = header.Term}.updateDisplayValue |> IsHeader
-        | IsTerm _ -> {header with HasUnit = false; Term = header.Term}.updateDisplayValue |> IsHeader
+        | IsUnit _ -> {header with HasUnit = true; Term = header.Term} |> IsHeader
+        | IsTerm _ -> {header with HasUnit = false; Term = header.Term} |> IsHeader
         | IsFreetext _ -> SwateCell.emptyHeader
         | IsHeader _ -> failwith "This is no viable input."
     let nextTable =
