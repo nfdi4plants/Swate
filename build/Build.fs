@@ -40,7 +40,7 @@ module ReleaseNoteTasks =
         
         let releaseDate =
             if newRelease.Date.IsSome then newRelease.Date.Value.ToShortDateString() else "WIP"
-        
+
         Fake.DotNet.AssemblyInfoFile.createFSharp  "src/Server/Version.fs"
             [   Fake.DotNet.AssemblyInfo.Title "SWATE"
                 Fake.DotNet.AssemblyInfo.Version newRelease.AssemblyVersion

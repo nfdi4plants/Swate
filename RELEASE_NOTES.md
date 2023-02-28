@@ -1,5 +1,12 @@
-### 0.8.0+747fba2 (Released 2023-2-23)
+### 0.8.0+13c6ef5 (Released 2023-2-28)
 * Additions:
+    * [[#1823f9d](https://github.com/nfdi4plants/Swate/commit/1823f9d7074afd12d83c0df837a574b616d1f9ad)] Make table model more robust #283:sparkles:
+    * [[#716b2cc](https://github.com/nfdi4plants/Swate/commit/716b2cc3dfc4f27807b42169b8b9319e9bcfc0c6)] Do not show update unit in BuildingBlock page outside Excel.
+    * [[#61bcf24](https://github.com/nfdi4plants/Swate/commit/61bcf24e0ec8c9a9ae851c71b143ecf44f2ef898)] Update header cell logic
+    * [[#7504fcc](https://github.com/nfdi4plants/Swate/commit/7504fccd5bce01d956484e0122aa0a3dcfc41162)] Finish updating header model
+    * [[#ef36e47](https://github.com/nfdi4plants/Swate/commit/ef36e4764ca969f5899259caea4bf5b2936be8f1)] Finish edit column logic :sparkles:#283
+    * [[#0344b68](https://github.com/nfdi4plants/Swate/commit/0344b685979c7c0df4eac71d711c30a5dc727e15)] Make table names unique #279
+    * [[#13c6ef5](https://github.com/nfdi4plants/Swate/commit/13c6ef5b629ac50b9b9f2c81fe27776bf6f2dadf)] Add error handling #284
     * [[#747fba2](https://github.com/nfdi4plants/Swate/commit/747fba2eb5ce2a2bd4ecabd0d961deb18aa94b3b)] Add parent directed termsearch insert #254
     * [[#ea3d785](https://github.com/nfdi4plants/Swate/commit/ea3d7852daa737190604c3258119065c2e43d8da)] Add standalone term insert #254
     * [[#de0f946](https://github.com/nfdi4plants/Swate/commit/de0f9460ff1bd185c48a3be248b16aab190405a1)] Add very basic multi select for cells #254
@@ -33,9 +40,17 @@
     * [[#03633d7](https://github.com/nfdi4plants/Swate/commit/03633d756a895d36e21a7440cf91be38e490e349)] Push to remote
     * [[#f7c67ad](https://github.com/nfdi4plants/Swate/commit/f7c67ad7ed5c2a62398736efceb1c7017a1d142d)] Improve search speed in specific ontologies :racehorse: and search units in DPBO (#239, #240)
 * Deletions:
+    * [[#43f804b](https://github.com/nfdi4plants/Swate/commit/43f804bf30aea8cdff4782cebd0246ba4485644b)] Add multi row delete :sparkles:
     * [[#04ff21b](https://github.com/nfdi4plants/Swate/commit/04ff21b10b58acdba7029776a89f6f385917145e)] Add keyboard shortcuts and option to copy/cut/paste :sparkles:#267
     * [[#e90bf45](https://github.com/nfdi4plants/Swate/commit/e90bf45a427a6da265c181130fba9a9db1128edb)] Remove lots of deprecated elements :fire:
 * Bugfixes:
+    * [[#b617000](https://github.com/nfdi4plants/Swate/commit/b617000c0b36e76bb077675708a2ada1208d20f7)] Fix navbar styling issue :art:
+    * [[#40c1bb8](https://github.com/nfdi4plants/Swate/commit/40c1bb8a5f0217e7cd5bb1a90b8306203a979ce2)] Fix directed search not on header
+    * [[#e9a4b66](https://github.com/nfdi4plants/Swate/commit/e9a4b66c446a16ffc82b8e58e26f050831d1f186)] One more fix to term insert into header
+    * [[#9bc7649](https://github.com/nfdi4plants/Swate/commit/9bc76499ced57b2707714fe6065be9e4f50e4d13)] Fxi building block insert for non term columns :bug:
+    * [[#2554524](https://github.com/nfdi4plants/Swate/commit/2554524f115cf253c15a8e653579ffc69fefc25f)] Fix error in addrow function
+    * [[#bd87270](https://github.com/nfdi4plants/Swate/commit/bd87270ecfab71a6ef3c71e9ab346794dd33f679)] Fix input in accession after manual header editing
+    * [[#f0e7c61](https://github.com/nfdi4plants/Swate/commit/f0e7c6150af56463f21274303c86f36461d9c88f)] Fix add rows element position
     * [[#bad3275](https://github.com/nfdi4plants/Swate/commit/bad3275c4ae6e976a9f3e6755d961b80fd1c1ce2)] Further table view fixes
     * [[#71e1cd5](https://github.com/nfdi4plants/Swate/commit/71e1cd50ca978144aacc5aca85f7df7ce8642978)] Fix some styling and init expand methods
     * [[#d943613](https://github.com/nfdi4plants/Swate/commit/d9436137269e0cb76a71818a10a9b874ebc1b128)] Fix minor session storage bug
