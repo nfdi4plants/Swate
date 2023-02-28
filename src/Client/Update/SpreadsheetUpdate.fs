@@ -55,6 +55,8 @@ module Spreadsheet =
                 let nextState = Controller.removeTable removeIndex state
                 nextState, model, Cmd.none
             | RenameTable (index, name) ->
+                let isNotUnique = state.Tables.Values |> Seq.map (fun x -> x.Name) |> Seq.contains name
+                if isNotUnique then failwith "Table names must be unique"
                 let nextTable = { state.Tables.[index] with Name = name }
                 let nextState = {state with Tables = state.Tables.Change(index, fun _ -> Some nextTable)}
                 nextState, model, Cmd.none
