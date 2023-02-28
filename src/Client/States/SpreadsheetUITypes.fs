@@ -93,37 +93,68 @@ with
     member this.isUnit = match this with | IsUnit _ -> true | _ -> false
     member this.isTerm = match this with | IsTerm _ -> true | _ -> false
     member this.isFreetext = match this with | IsFreetext _ -> true | _ -> false
-    member this.toUnitCell =
+    member this.toUnitCell() =
         match this with
         | IsUnit _ -> this
         | IsFreetext text -> SwateCell.create(text.Value, ?unit = None)
         | IsTerm term -> SwateCell.create(unit = term.Term)
         | IsHeader _ -> failwith "Cannot parse header cell to unit cell"
-    member this.toTermCell =
+    member this.toTermCell() =
         match this with
         | IsTerm _ -> this
         | IsUnit unit -> SwateCell.create(unit.Unit)
         | IsFreetext text -> SwateCell.create(text.Value, ?uid = None)
         | IsHeader _ -> failwith "Cannot parse header cell to term cell"
-    member this.toFreetext =
+    member this.toFreetextCell() =
         match this with
         | IsFreetext _ -> this
         | IsTerm term -> SwateCell.create(term.Term.Name)
         | IsUnit unit -> SwateCell.create(unit.Unit.Name)
         | IsHeader _ -> failwith "Cannot parse header cell to freetext cell"
-    member this.Unit =
+    member this.toFreetextHeader() =
+        if not this.isHeader then failwith "toFreetextHeader function can only be used on Header cells"
+        let header = this.Header
+        { header with
+            BuildingBlockType = BuildingBlockType.Freetext "Freetext"
+            Term = None
+            HasUnit = false
+        }
+    member this.toTermHeader(?b_type: BuildingBlockType) =
+        if not this.isHeader then failwith "toTermHeader function can only be used on Header cells"
+        let header = this.Header
+        let b_type = Option.defaultValue BuildingBlockType.Parameter b_type
+        if (header.isTermColumn || header.isFeaturedColumn) && header.Term.IsSome then
+            {header with HasUnit = false; BuildingBlockType = b_type}
+        else
+            { header with
+                BuildingBlockType = b_type
+                Term = header.Term |> Option.defaultValue TermMinimal.empty |> Some
+            }
+    member this.toUnitHeader(?b_type: BuildingBlockType) =
+        if not this.isHeader then failwith "toUnitHeader function can only be used on Header cells"
+        let header = this.Header
+        let b_type = Option.defaultValue BuildingBlockType.Parameter b_type
+        if (header.isTermColumn || header.isFeaturedColumn) && header.Term.IsSome then
+            {header with HasUnit = true; BuildingBlockType = b_type}
+        else
+            { header with
+                BuildingBlockType = b_type
+                Term = header.Term |> Option.defaultValue TermMinimal.empty |> Some
+                HasUnit = true
+            }
+    member this.Unit : UnitCell =
         match this with
         | IsUnit c -> c
         | _ -> failwith "Not a Swate UnitCell."
-    member this.Term =
+    member this.Term : TermCell=
         match this with
         | IsTerm c -> c
         | _ -> failwith "Not a Swate TermCell."
-    member this.Freetext =
+    member this.Freetext : FreetextCell =
         match this with
         | IsFreetext c -> c
         | _ -> failwith "Not a Swate TermCell."
-    member this.Header =
+    member this.Header : HeaderCell =
         match this with
         | IsHeader cc -> cc
         | _ -> failwith "Not a ColumnHeader."

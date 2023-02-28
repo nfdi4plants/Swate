@@ -53,7 +53,7 @@ type Msg =
 | PasteCell of index:(int*int)
 | FillColumnWithTerm of index:(int*int)
 /// Update column of index to new column type defined by given SwateCell.emptyXXX
-| EditColumn of index: int * newType: SwateCell 
+| EditColumn of index: int * newType: SwateCell * b_type: BuildingBlockType option
 /// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
 | Reset
 // <--> INTEROP <-->

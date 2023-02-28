@@ -469,13 +469,13 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                 Button.OnClick (fun e ->
                     let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
                     let colTerm     =
-                        if model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then
-                            TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some
-                        elif colName.isFeaturedColumn then
+                        if colName.isFeaturedColumn then
                             TermMinimal.create colName.Type.toString colName.Type.getFeaturedColumnAccession |> Some
+                        elif model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then
+                            TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some
                         else
                             None
-                    let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && colName.isTermColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
+                    let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && colName.isTermColumn && not colName.isFeaturedColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
                     let newBuildingBlock = InsertBuildingBlock.create colName colTerm unitTerm Array.empty
                     SpreadsheetInterface.AddAnnotationBlock newBuildingBlock |> InterfaceMsg |> dispatch
                 )

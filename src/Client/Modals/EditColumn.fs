@@ -16,18 +16,18 @@ type private ColumnType =
 | Term
 
 type private EditState = {
-    CurrentType: ColumnType
     NextType: ColumnType
+    BuildingBlockType: BuildingBlockType option
 } with
     static member init(columnHeader: HeaderCell) =
-        let c_type =
+        let b_type, c_type =
             match columnHeader with
-            | unit when columnHeader.HasUnit -> Unit
-            | term when columnHeader.Term.IsSome -> Term
-            | ft -> Freetext
+            | unit when columnHeader.HasUnit -> Some columnHeader.BuildingBlockType, Unit
+            | term when columnHeader.Term.IsSome -> Some columnHeader.BuildingBlockType, Term
+            | ft -> None, Freetext
         {
-            CurrentType = c_type
             NextType = c_type
+            BuildingBlockType = b_type
         }
 
 let private updateField state setState =
@@ -79,6 +79,30 @@ let private updateField state setState =
         ]
     ]
 
+open Fable.Core.JsInterop
+
+let private buildingBlockField (state: EditState) (setState: EditState -> unit) =
+    let options = BuildingBlockType.TermColumns
+    Bulma.field.div [
+        Bulma.label [prop.text "Select building block type"]
+        Bulma.select [
+            prop.value (Option.defaultValue BuildingBlockType.Parameter state.BuildingBlockType |> fun x -> x.toString)
+            prop.onChange(fun (e: Browser.Types.Event) ->
+                let b_type = string e.target?value |> BuildingBlockType.ofString
+                let nextState = {state with BuildingBlockType = Some b_type}
+                printfn "%A" nextState
+                setState nextState
+            )
+            prop.children [
+                for termColumn in options do
+                    yield Html.option [
+                        prop.value termColumn.toString
+                        prop.text termColumn.toString
+                    ]
+            ]
+        ]
+    ]
+
 let private previewField (column : (int*SwateCell) []) state =
     Bulma.field.div [
         Bulma.label [prop.text "Preview"]
@@ -89,18 +113,25 @@ let private previewField (column : (int*SwateCell) []) state =
                 prop.children [
                     Html.thead [
                         Html.tr [
-                            let header = (snd column.[0]).Header
+                            let header = (snd column.[0])
+                            let headerUpdated =
+                                match state.NextType, state.BuildingBlockType with
+                                | Unit, Some bb -> header.toUnitHeader(bb)
+                                | Unit, None -> header.toUnitHeader()
+                                | Term, Some bb -> header.toTermHeader(bb)
+                                | Term, None -> header.toTermHeader() 
+                                | Freetext, _ -> header.toFreetextHeader()
                             match state.NextType with
-                            | Unit ->
-                                let uid = if header.Term.IsSome then header.Term.Value.TermAccession else ""
-                                Html.th $"{header.DisplayValue}"
-                                Html.th "Unit"
-                                Html.th $"{ColumnCoreNames.TermAccessionNumber.toString} ({uid})"
                             | Freetext -> 
-                                Html.th $"{header.DisplayValue}"
+                                Html.th $"{headerUpdated.DisplayValue}"
                             | Term ->
-                                let uid = if header.Term.IsSome then header.Term.Value.TermAccession else ""
-                                Html.th $"{header.DisplayValue}"
+                                let uid = headerUpdated.Term.Value.TermAccession
+                                Html.th $"{headerUpdated.DisplayValue}"
+                                Html.th $"{ColumnCoreNames.TermAccessionNumber.toString} ({uid})"
+                            | Unit ->
+                                let uid = headerUpdated.Term.Value.TermAccession
+                                Html.th $"{headerUpdated.DisplayValue}"
+                                Html.th $"{ColumnCoreNames.Unit.toString}"
                                 Html.th $"{ColumnCoreNames.TermAccessionNumber.toString} ({uid})"
                         ]
                     ]
@@ -109,9 +140,9 @@ let private previewField (column : (int*SwateCell) []) state =
                             for _,cell in Array.skip 1 column |> Array.truncate 9 do
                                 let cellUpdated =
                                     match state.NextType with
-                                    | Unit -> cell.toUnitCell
-                                    | Freetext -> cell.toFreetext
-                                    | Term -> cell.toTermCell
+                                    | Unit -> cell.toUnitCell()
+                                    | Freetext -> cell.toFreetextCell()
+                                    | Term -> cell.toTermCell()
                                 Html.tr [
                                     match state.NextType with
                                     | Unit ->
@@ -131,7 +162,7 @@ let private previewField (column : (int*SwateCell) []) state =
         ]
     ]
 
-let private footer columnIndex rmv state dispatch =
+let private footer columnIndex rmv (lastState: EditState) (state: EditState) dispatch =
     Bulma.modalCardFoot [
         Bulma.button.a [
             prop.onClick rmv
@@ -139,10 +170,10 @@ let private footer columnIndex rmv state dispatch =
             prop.text "Back"
         ]
         Bulma.button.a [
-            prop.disabled (state.NextType = state.CurrentType)
+            prop.disabled <| (state = lastState)
             prop.onClick (fun e ->
                 let nt = match state.NextType with | Unit -> SwateCell.emptyUnit | Term -> SwateCell.emptyTerm | Freetext -> SwateCell.emptyFreetext
-                Spreadsheet.EditColumn (columnIndex, nt) |> SpreadsheetMsg |> dispatch
+                Spreadsheet.EditColumn (columnIndex, nt, state.BuildingBlockType) |> SpreadsheetMsg |> dispatch
                 rmv e;
             )
             Bulma.color.isSuccess
@@ -154,6 +185,7 @@ let private footer columnIndex rmv state dispatch =
 let Main (columnIndex: int) (model: Messages.Model) (dispatch) (rmv: _ -> unit) =
     let column : (int*SwateCell) [] = model.SpreadsheetModel.getColumn(columnIndex)
     let header = column |> Array.sortBy fst |> Array.head |> snd |> fun header -> header.Header
+    let last = EditState.init(header)
     let state, setState = React.useState(EditState.init(header))
     Bulma.modal [
         Bulma.modal.isActive
@@ -168,9 +200,11 @@ let Main (columnIndex: int) (model: Messages.Model) (dispatch) (rmv: _ -> unit) 
                     ]
                     Bulma.modalCardBody [
                         updateField state setState
+                        if state.NextType = Unit || state.NextType = Term then
+                            buildingBlockField state setState
                         previewField column state
                     ]
-                    footer columnIndex rmv state dispatch
+                    footer columnIndex rmv last state dispatch
                 ]
             ]
         ]

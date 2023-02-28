@@ -165,7 +165,7 @@ let TANCell(index: (int*int), model: Model, dispatch) =
                                             { u_cell with Unit = unit } 
                                         IsUnit nextUnitCell
                                     | IsFreetext _ ->
-                                        let t_cell = cell.toTermCell.Term
+                                        let t_cell = cell.toTermCell().Term
                                         let term = {t_cell.Term with TermAccession = state_cell.Value}
                                         let nextCell = {t_cell with Term = term}
                                         IsTerm nextCell

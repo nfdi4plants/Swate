@@ -70,9 +70,8 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv
             style.position.absolute
             style.left mousex
             style.top (mousey - 40)
-            style.zIndex 20
             style.width 150
-            style.zIndex 31 // to overlap navbar
+            style.zIndex 40 // to overlap navbar
             style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base)
         ]
         prop.children [

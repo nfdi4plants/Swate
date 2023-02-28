@@ -232,19 +232,27 @@ let fillColumnWithTerm (index: int*int) (state: Spreadsheet.Model) : Spreadsheet
 /// Ui depends on main column name, maybe change this to depends on BuildingBlockType?
 /// Header main column name must be updated
 
-let editColumn (columnIndex: int) (newType: SwateCell) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let editColumn (columnIndex: int, newType: SwateCell, b_type: BuildingBlockType option)  (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
-    let updateHeader (header: HeaderCell) =
+    let updateHeader (header: SwateCell) =
         match newType with
-        | IsUnit _ -> {header with HasUnit = true; Term = header.Term} |> IsHeader
-        | IsTerm _ -> {header with HasUnit = false; Term = header.Term} |> IsHeader
-        | IsFreetext _ -> SwateCell.emptyHeader
+        | IsUnit _ -> header.toUnitHeader(?b_type = b_type)
+        | IsTerm _ -> header.toTermHeader(?b_type = b_type)
+        | IsFreetext _ -> header.toFreetextHeader()
+        | IsHeader _ -> failwith "This is no viable input."
+        |> IsHeader
+    let updateBody (cell: SwateCell) =
+        match newType with
+        | IsUnit _ -> cell.toUnitCell()
+        | IsTerm _ -> cell.toTermCell()
+        | IsFreetext _ -> cell.toFreetextCell()
         | IsHeader _ -> failwith "This is no viable input."
     let nextTable =
         table
         |> Map.map (fun (c,r) cv ->
             match r with
-            | 0 when c = columnIndex -> printfn "HIT!"; updateHeader cv.Header
+            | 0 when c = columnIndex -> updateHeader cv
+            | _ when c = columnIndex -> updateBody cv
             | _ -> cv
         )
     {state with ActiveTable = nextTable}
