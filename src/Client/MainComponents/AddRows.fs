@@ -10,7 +10,10 @@ let Main (init_RowsToAdd: int) (state_rows: int) (setState_rows: int -> unit) (d
     Html.div [
         prop.id "ExpandTable"
         prop.title "Add rows"
-        prop.style [style.flexGrow 1; style.justifyContent.center; style.display.inheritFromParent; style.padding(length.rem 1)]
+        prop.style [
+            style.flexGrow 1; style.justifyContent.center; style.display.inheritFromParent; style.padding(length.rem 1)
+            style.position.sticky; style.left 0
+        ]
         prop.children [
             Html.div [
                 prop.style [style.height.maxContent; style.display.flex;]
