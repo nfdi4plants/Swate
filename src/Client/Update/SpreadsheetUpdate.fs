@@ -42,6 +42,9 @@ module Spreadsheet =
         | AddAnnotationBlocks minBuildingBlockInfos ->
             let cmd = createPromiseCmd <| fun _ -> Controller.addBuildingBlocks minBuildingBlockInfos state
             state, model, cmd
+        | ImportFile tables ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.createAnnotationTables tables state
+            state, model, cmd
         | InsertOntologyTerm termMinimal ->
             let cmd = createPromiseCmd <| fun _ -> Controller.insertTerm termMinimal state
             state, model, cmd

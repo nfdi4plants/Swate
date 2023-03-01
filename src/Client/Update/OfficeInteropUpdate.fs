@@ -62,6 +62,15 @@ module OfficeInterop =
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel, cmd
 
+        | ImportFile buildingBlockTables ->
+            let nextCmd =
+                Cmd.OfPromise.either
+                    OfficeInterop.Core.addAnnotationBlocksInNewSheets
+                    buildingBlockTables
+                    (curry GenericInteropLogs Cmd.none >> DevMsg)
+                    (curry GenericError Cmd.none >> DevMsg)
+            currentModel, nextCmd
+
         | RemoveAnnotationBlock ->
             let cmd =
                 Cmd.OfPromise.either

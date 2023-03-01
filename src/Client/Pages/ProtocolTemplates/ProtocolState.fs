@@ -13,58 +13,18 @@ module Protocol =
 
         match fujMsg with
         // // ------ Process from file ------
-        | ParseUploadedFileRequest ->
+        | ParseUploadedFileRequest nextFileStr ->
             let nextModel = { currentState with Loading = true }
-            //let api =
-            //    match currentState.JsonExportType with
-            //    | JsonExportType.ProcessSeq ->
-            //        Api.swateJsonAPIv1.parseProcessSeqToBuildingBlocks
-            //    | JsonExportType.Assay ->
-            //        Api.swateJsonAPIv1.parseAssayJsonToBuildingBlocks
-            //    | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
             let cmd =
                 Cmd.OfAsync.either
                     Api.swateJsonAPIv1.tryParseToBuildingBlocks
-                    currentState.UploadedFile
+                    nextFileStr
                     (ParseUploadedFileResponse >> ProtocolMsg)
                     (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
             nextModel, cmd
         | ParseUploadedFileResponse buildingBlockTables ->
-            let nextCmd =
-                match Array.tryExactlyOne buildingBlockTables with
-                | Some (_,buildingBlocks) ->
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.addAnnotationBlocks
-                        buildingBlocks
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-                | None ->
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.addAnnotationBlocksInNewSheets
-                        buildingBlockTables
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-            currentState, nextCmd
-        // Client
-        | UpdateJsonExportType nextType ->
-            let nextModel = {
-                currentState with
-                    ShowJsonTypeDropdown    = false
-                    JsonExportType          = nextType
-            }
-            nextModel, Cmd.none
-        | UpdateUploadFile nextFileStr ->
-            let nextModel = {
-                currentState with
-                    UploadedFile = nextFileStr
-            }
-            nextModel, Cmd.none
-        | UpdateShowJsonTypeDropdown show ->
-            let nextModel = {
-                currentState with
-                    ShowJsonTypeDropdown = show
-            }
-            nextModel, Cmd.none 
+            let nextState = { currentState with UploadedFileParsed = buildingBlockTables; Loading = false }
+            nextState, Cmd.none
         // ------ Protocol from Database ------
         | GetAllProtocolsRequest ->
             let nextState = {currentState with Loading = true}
@@ -118,4 +78,7 @@ module Protocol =
                     ProtocolSelected = None
                     ValidationXml = None
             }
+            nextState, Cmd.none
+        | RemoveUploadedFileParsed ->
+            let nextState = {currentState with UploadedFileParsed = Array.empty}
             nextState, Cmd.none

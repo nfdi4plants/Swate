@@ -66,4 +66,5 @@ type Msg =
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | AddAnnotationBlock of InsertBuildingBlock
 | AddAnnotationBlocks of InsertBuildingBlock []
+| ImportFile of (string*InsertBuildingBlock []) []
 | InsertOntologyTerm of TermTypes.TermMinimal

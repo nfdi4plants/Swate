@@ -44,7 +44,7 @@ module TemplateFromJsonFile =
                         let reader = Browser.Dom.FileReader.Create()
 
                         reader.onload <- fun evt ->
-                            UpdateUploadFile evt.target?result |> ProtocolMsg |> dispatch
+                            ParseUploadedFileRequest evt.target?result |> ProtocolMsg |> dispatch
                                    
                         reader.onerror <- fun evt ->
                             curry GenericLog Cmd.none ("Error", evt.Value) |> DevMsg |> dispatch
@@ -71,7 +71,7 @@ module TemplateFromJsonFile =
         ]
 
     let fileUploadEle (model:Model) dispatch =
-        let hasData = model.ProtocolState.UploadedFile <> ""
+        let hasData = model.ProtocolState.UploadedFileParsed <> Array.empty
         Columns.columns [Columns.IsMobile] [
             Column.column [] [
                 fileUploadButton model dispatch
@@ -79,7 +79,7 @@ module TemplateFromJsonFile =
             if hasData then
                 Column.column [Column.Width(Screen.All, Column.IsNarrow)] [
                     Button.a [
-                        Button.OnClick (fun e -> UpdateUploadFile "" |> ProtocolMsg |> dispatch)
+                        Button.OnClick (fun e -> RemoveUploadedFileParsed |> ProtocolMsg |> dispatch)
                         Button.Color IsDanger
                     ] [
                         Fa.i [Fa.Solid.Times] []
@@ -113,30 +113,9 @@ module TemplateFromJsonFile =
             Text.span [] [str (exportType.ToString())]
         ]
     
-    let parseJsonToTableEle (model:Model) (dispatch:Messages.Msg -> unit) =
-        let hasData = model.ProtocolState.UploadedFile <> ""
+    let importToTableEle (model:Model) (dispatch:Messages.Msg -> unit) =
+        let hasData = model.ProtocolState.UploadedFileParsed <> Array.empty
         Field.div [Field.HasAddons] [
-            //Control.div [] [
-            //    Dropdown.dropdown [
-            //        Dropdown.IsActive model.ProtocolState.ShowJsonTypeDropdown
-            //    ] [
-            //        Dropdown.trigger [] [
-            //            Button.a [
-            //                Button.OnClick (fun e -> e.stopPropagation(); UpdateShowJsonTypeDropdown (not model.ProtocolState.ShowJsonTypeDropdown) |> ProtocolMsg |> dispatch )
-            //            ] [
-            //                span [Style [MarginRight "5px"]] [str (model.ProtocolState.JsonExportType.ToString())]
-            //                Fa.i [Fa.Solid.AngleDown] []
-            //            ]
-            //        ]
-            //        Dropdown.menu [] [
-            //            Dropdown.content [] [
-            //                let msg = (UpdateJsonExportType >> ProtocolMsg >> dispatch)
-            //                dropdownItem JsonExportType.Assay model msg (model.ProtocolState.JsonExportType = JsonExportType.Assay)
-            //                dropdownItem JsonExportType.ProcessSeq model msg (model.ProtocolState.JsonExportType = JsonExportType.ProcessSeq)
-            //            ]
-            //        ]
-            //    ]
-            //]
             Control.div [Control.IsExpanded] [
                 Button.a [
                     if hasData then
@@ -146,8 +125,8 @@ module TemplateFromJsonFile =
                         Button.Props [Disabled true]
                     Button.Color IsInfo
                     Button.IsFullWidth
-                    Button.OnClick(fun e ->
-                        ProtocolMsg ParseUploadedFileRequest |> dispatch
+                    Button.OnClick(fun _ ->
+                        SpreadsheetInterface.ImportFile model.ProtocolState.UploadedFileParsed |> InterfaceMsg |> dispatch
                     )
                 ] [
                     str "Insert json"
@@ -174,7 +153,7 @@ module TemplateFromJsonFile =
                 fileUploadEle model dispatch
             ]
 
-            parseJsonToTableEle model dispatch
+            importToTableEle model dispatch
         ]
 
 module TemplateFromDB = 
@@ -285,10 +264,6 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-        OnClick (fun e ->
-            if model.ProtocolState.ShowJsonTypeDropdown then
-                UpdateShowJsonTypeDropdown false |> ProtocolMsg |> dispatch
-        )
     ] [
         
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Templates"]
@@ -302,11 +277,4 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add template(s) from file."]
 
         TemplateFromJsonFile.protocolInsertElement model dispatch
-
-        //div [] [
-        //    str (
-        //        let dataStr = model.ProtocolState.UploadData
-        //        if dataStr = "" then "no upload data found" else sprintf "%A" model.ProtocolState.UploadData
-        //    )
-        //]
     ]

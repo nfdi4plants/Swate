@@ -342,9 +342,7 @@ module Protocol =
         // Client 
         Loading                 : bool
         // // ------ Process from file ------
-        UploadedFile            : string
-        ShowJsonTypeDropdown    : bool
-        JsonExportType          : Shared.JsonExportType
+        UploadedFileParsed      : (string*InsertBuildingBlock []) []
         // ------ Protocol from Database ------
         ProtocolSelected        : Template option
         ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
@@ -355,9 +353,7 @@ module Protocol =
             Loading                 = false
             ProtocolSelected        = None
             // // ------ Process from file ------
-            UploadedFile            = ""
-            ShowJsonTypeDropdown    = false
-            JsonExportType          = Shared.JsonExportType.Assay
+            UploadedFileParsed      = [||]
             // ------ Protocol from Database ------
             ProtocolsAll            = [||]
             ValidationXml           = None

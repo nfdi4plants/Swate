@@ -243,7 +243,7 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
         Container.container [ Container.IsFluid ] [
             tabs model dispatch state.Size
 
-            str <| state.Size.ToString()
+            //str <| state.Size.ToString()
 
             //Button.button [
             //    Button.OnClick (fun _ ->

@@ -96,6 +96,15 @@ module Interface =
                     let cmd = Spreadsheet.AddAnnotationBlocks minBuildingBlockInfos |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | ImportFile tables ->
+                match host with
+                | Swatehost.Excel _ ->
+                    let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | Swatehost.Browser ->
+                    let cmd = Spreadsheet.ImportFile tables |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
             | InsertOntologyTerm termMinimal ->
                 match host with
                 | Swatehost.Excel _ ->

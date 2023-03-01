@@ -133,13 +133,10 @@ module Protocol =
 
     type Msg =
         // // ------ Process from file ------
-        | ParseUploadedFileRequest
+        | ParseUploadedFileRequest          of raw:string
         | ParseUploadedFileResponse         of (string * InsertBuildingBlock []) []
         // Client
-        /// Update JsonExportType which defines the type of json which is supposedly uploaded. Determines function which will be used for parsing.
-        | UpdateJsonExportType              of Shared.JsonExportType
-        | UpdateUploadFile                  of jsonString:string
-        | UpdateShowJsonTypeDropdown        of bool
+        | RemoveUploadedFileParsed
         // // ------ Protocol from Database ------
         | GetAllProtocolsRequest
         | GetAllProtocolsResponse           of Template []

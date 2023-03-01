@@ -13,7 +13,6 @@ let createAnnotationTable (name: string option) (swateBuildingBlocks: SwateBuild
     let newIndex = if Map.isEmpty state.Tables then 0 else state.Tables |> Map.maxKey |> (+) 1
     // parse to active table
     let activeTable = SwateBuildingBlock.toTableMap swateBuildingBlocks
-    printfn "%A" activeTable
     // add new table to tablemap
     let newTables = state.Tables.Add(newIndex, SwateTable.init(swateBuildingBlocks, ?name = name))
     let newTableOrder = state.TableOrder.Add(newIndex, newIndex)
@@ -28,6 +27,19 @@ let createAnnotationTable (name: string option) (swateBuildingBlocks: SwateBuild
 let createAnnotationTable_ofInsertBuildingBlock (name: string option) (insertBuildingBlocks: InsertBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let swateBuildingBlocks = insertBuildingBlocks |> Array.mapi (fun i bb -> bb.toSwateBuildingBlock i)
     createAnnotationTable name swateBuildingBlocks state
+
+/// <summary>This function is used to create multiple tables at once.</summary>
+let createAnnotationTables (tables: (string*InsertBuildingBlock []) []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let max = tables.Length-1
+    let rec add (ind: int) tempState =
+        if ind > max then
+            tempState
+        else
+            let name, bbs = tables.[ind]
+            let swateBuildingBlocks = bbs |> Array.mapi (fun i bb -> bb.toSwateBuildingBlock i)
+            let next = createAnnotationTable (Some name) swateBuildingBlocks tempState
+            add (ind + 1) next
+    add 0 state
 
 /// <summary>Adds the most basic Swate table consisting of Input column "Source Name" and output column "Sample Name".</summary>
 let createAnnotationTable_new (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Model =

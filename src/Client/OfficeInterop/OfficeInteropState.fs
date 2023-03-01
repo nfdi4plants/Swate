@@ -33,6 +33,7 @@ type Msg =
     | InsertOntologyTerm                    of TermMinimal
     | AddAnnotationBlock                    of InsertBuildingBlock
     | AddAnnotationBlocks                   of InsertBuildingBlock [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | ImportFile                            of (string*InsertBuildingBlock []) []
     | RemoveAnnotationBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | AutoFitTable                          of hideRefCols:bool
