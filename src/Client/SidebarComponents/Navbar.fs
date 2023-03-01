@@ -53,7 +53,7 @@ let private shortCutIconList model dispatch =
                 Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]] []
                 Fa.span [Fa.Solid.Columns] []
             ],
-            (fun _ -> OfficeInterop.RemoveAnnotationBlock |> OfficeInteropMsg |> dispatch)
+            (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.create(
             "Get Building Block Information",

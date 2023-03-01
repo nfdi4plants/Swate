@@ -114,4 +114,21 @@ module Interface =
                     let cmd = Spreadsheet.InsertOntologyTerm termMinimal |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | RemoveBuildingBlock ->
+                match host with
+                | Swatehost.Excel _ ->
+                    let cmd = OfficeInterop.RemoveBuildingBlock |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | Swatehost.Browser ->
+                    if Set.isEmpty model.SpreadsheetModel.SelectedCells then failwith "No column selected"
+                    let selectedColumns, _ = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.unzip
+                    let distinct = selectedColumns |> Array.distinct
+                    let cmd =
+                        if distinct.Length <> 1 then
+                            let msg = Failure("Please select one column only if you want to use `Remove Building Block`.")
+                            GenericError (Cmd.none,msg) |> DevMsg |> Cmd.ofMsg
+                        else
+                            Spreadsheet.DeleteColumn (distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
                 

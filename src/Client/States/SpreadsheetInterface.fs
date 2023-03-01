@@ -8,6 +8,7 @@ type Msg =
 | Initialize
 | InitializeResponse of Swatehost
 | CreateAnnotationTable of tryUsePrevOutput:bool
+| RemoveBuildingBlock
 | AddAnnotationBlock of InsertBuildingBlock
 | AddAnnotationBlocks of InsertBuildingBlock []
 | ImportFile of (string*InsertBuildingBlock []) []

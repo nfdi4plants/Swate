@@ -34,7 +34,7 @@ type Msg =
     | AddAnnotationBlock                    of InsertBuildingBlock
     | AddAnnotationBlocks                   of InsertBuildingBlock [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | ImportFile                            of (string*InsertBuildingBlock []) []
-    | RemoveAnnotationBlock
+    | RemoveBuildingBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | AutoFitTable                          of hideRefCols:bool
     // Term search functions
