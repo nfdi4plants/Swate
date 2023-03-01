@@ -56,22 +56,30 @@ let createAnnotationTable_new (usePrevOutput:bool) (state: Spreadsheet.Model) : 
     let name = HumanReadableIds.tableName()
     createAnnotationTable (Some name) bbs state
 
-let private extendBuildingBlockToRowMax (rowMax: int) (bb: InsertBuildingBlock) =
+let private extendBuildingBlockToRowMax (rowMax: int) (bb: SwateBuildingBlock) =
     if bb.Rows.Length < rowMax then
         //e.g. 2 values, but 5 rows, but row index 0 is header, so rowMax index is 4, which means 5 items, but one header so -1 = 4
         let diff = rowMax - bb.Rows.Length 
         let rows = [|
-            if bb.HasValues then yield! bb.Rows
-            yield! Array.init diff (fun _ -> TermMinimal.empty)
+            yield! bb.Rows
+            yield! Array.init diff (fun i ->
+                let index = i + bb.Rows.Length + 1 //i = 0..diff, +1 to adjust for header, +bb.Rows.Length to add on existing rows.
+                let extendRows =
+                    if bb.Rows <> Array.empty then
+                        snd bb.Rows.[0]
+                    else
+                        bb.Header.getEmptyBodyCell
+                index, extendRows
+            )
         |]
         {bb with Rows = rows}
     else
         bb
 
-
 let addBuildingBlock(insertBuildingBlock: InsertBuildingBlock) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
-    let maxColKey, maxRowKey = table |> Map.maxKeys
+    let mutable maxColKey, maxRowKey = table |> Map.maxKeys
+    maxRowKey <- System.Math.Max(insertBuildingBlock.Rows.Length, maxRowKey)
     let nextColKey =
         // if cell is selected get column of selected cell we want to insert AFTER
         if not state.SelectedCells.IsEmpty then
@@ -81,22 +89,59 @@ let addBuildingBlock(insertBuildingBlock: InsertBuildingBlock) (state: Spreadshe
             maxColKey
         // add one to last column index OR to selected column index to append one to the right.
         |> (+) 1
-    let swateBuildingBlock =
-        insertBuildingBlock
-        |> extendBuildingBlockToRowMax maxRowKey
-        |> fun x -> x.toSwateBuildingBlock(nextColKey)
+    let swateBuildingBlock = insertBuildingBlock.toSwateBuildingBlock(nextColKey)
+    let nNewColumns = 1
+    let existing =
+        let l = SwateBuildingBlock.ofTableMap_list table
+        // if insert is not at the end, reindex all columns with higher index.
+        if nextColKey <> maxColKey + nNewColumns then
+            l |> List.map (fun sb ->
+                if sb.Index >= nextColKey then {sb with Index = sb.Index + nNewColumns} else sb
+            )  
+        else
+            l
+    let nextTable = (swateBuildingBlock::existing) |> List.map (extendBuildingBlockToRowMax maxRowKey) |> SwateBuildingBlock.toTableMap 
+    let nextState = {
+        state with ActiveTable = nextTable; SelectedCells = Set.empty
+    }
+    nextState
+
+let addBuildingBlocks(insertBuildingBlocks: InsertBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let table = state.ActiveTable
+    let mutable maxColKey, maxRowKey = table |> Map.maxKeys
+    maxRowKey <-
+        let maxRowNew = insertBuildingBlocks |> Array.map (fun x -> x.Rows.Length) |> Array.max
+        System.Math.Max(maxRowNew, maxRowKey)
+    let mutable nextColKey =
+        // if cell is selected get column of selected cell we want to insert AFTER
+        if not state.SelectedCells.IsEmpty then
+            state.SelectedCells |> Set.toArray |> Array.head |> fst
+        // if no cell selected insert at the end
+        else
+            maxColKey
+        // add one to last column index OR to selected column index to append one to the right.
+        |> (+) 1
+    let nNewColumns = insertBuildingBlocks.Length
     let existing =
         let l = SwateBuildingBlock.ofTableMap_list table
         // if insert is not at the end, reindex all columns with higher index.
         if nextColKey <> maxColKey + 1 then
             l |> List.map (fun sb ->
-                if sb.Index >= nextColKey then {sb with Index = sb.Index + 1} else sb
+                if sb.Index >= nextColKey then {sb with Index = sb.Index + nNewColumns} else sb
             )  
         else
             l
-    let nextTable = swateBuildingBlock::existing |> SwateBuildingBlock.toTableMap
+    let swateBuildingBlocks =
+        insertBuildingBlocks
+        |> Array.map (fun bbs ->
+            let sbb = bbs.toSwateBuildingBlock(nextColKey)
+            nextColKey <- nextColKey + 1
+            sbb
+        )
+        |> List.ofArray
+    let nextTable = (swateBuildingBlocks@existing) |> List.map (extendBuildingBlockToRowMax maxRowKey) |> SwateBuildingBlock.toTableMap
     let nextState = {
-        state with ActiveTable = nextTable
+        state with ActiveTable = nextTable; SelectedCells = Set.empty
     }
     nextState
 

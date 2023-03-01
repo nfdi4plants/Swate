@@ -31,14 +31,16 @@ module Spreadsheet =
 
         match msg with
         | CreateAnnotationTable usePrevOutput ->
-            let cmd = createPromiseCmd(fun _ ->
+            let cmd = createPromiseCmd <| fun _ ->
                 state
                 |> Controller.saveActiveTable
                 |> Controller.createAnnotationTable_new usePrevOutput 
-            )
             state, model, cmd
         | AddAnnotationBlock minBuildingBlockInfo ->
             let cmd = createPromiseCmd <| fun _ -> Controller.addBuildingBlock minBuildingBlockInfo state
+            state, model, cmd
+        | AddAnnotationBlocks minBuildingBlockInfos ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.addBuildingBlocks minBuildingBlockInfos state
             state, model, cmd
         | InsertOntologyTerm termMinimal ->
             let cmd = createPromiseCmd <| fun _ -> Controller.insertTerm termMinimal state

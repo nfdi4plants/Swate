@@ -512,6 +512,7 @@ let ProtocolContainer (model:Model) dispatch =
         |> filterTableByTags
         |> filterTableByCuratedCommunityFilter
         |> sortTableBySearchQuery
+        |> Array.sortBy (fun template -> template.Name, template.Organisation)
 
     mainFunctionContainer [
         Field.div [] [

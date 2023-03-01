@@ -9,5 +9,6 @@ type Msg =
 | InitializeResponse of Swatehost
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | AddAnnotationBlock of InsertBuildingBlock
+| AddAnnotationBlocks of InsertBuildingBlock []
 /// Inserts TermMinimal to selected fields of one column
 | InsertOntologyTerm of TermTypes.TermMinimal

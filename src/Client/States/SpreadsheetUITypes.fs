@@ -81,9 +81,7 @@ type HeaderCell = {
             BuildingBlockType = b_type
             HasUnit = Option.defaultValue false hasUnit
             Term = term
-        }
-
-        
+        }       
 
 type SwateCell =
 | IsUnit of UnitCell
@@ -202,6 +200,14 @@ with
         | IsUnit _ -> SwateCell.emptyUnit
         | IsFreetext _ -> SwateCell.emptyFreetext
 
+type HeaderCell with
+    member this.getEmptyBodyCell =
+        match this.HasUnit, this.isTermColumn with
+        | true, true -> SwateCell.emptyUnit
+        | false, true -> SwateCell.emptyTerm
+        | false, false -> SwateCell.emptyFreetext
+        | anyelse -> failwith $"Unexpected pattern trying to create bodycell for header: {anyelse}"
+
 type SwateBuildingBlock = {
     Index: int
     Header: HeaderCell
@@ -212,6 +218,7 @@ type SwateBuildingBlock = {
         Header = header
         Rows = rows
     }
+    member this.hasValues = this.Rows.Length <> 0
 
 type SwateTable = {
     Id: System.Guid

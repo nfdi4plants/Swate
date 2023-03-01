@@ -87,6 +87,15 @@ module Interface =
                     let cmd = Spreadsheet.AddAnnotationBlock minBuildingBlockInfo |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | AddAnnotationBlocks minBuildingBlockInfos ->
+                match host with
+                | Swatehost.Excel _ ->
+                    let cmd = OfficeInterop.AddAnnotationBlocks minBuildingBlockInfos |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | Swatehost.Browser ->
+                    let cmd = Spreadsheet.AddAnnotationBlocks minBuildingBlockInfos |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
             | InsertOntologyTerm termMinimal ->
                 match host with
                 | Swatehost.Excel _ ->
