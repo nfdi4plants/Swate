@@ -8,8 +8,6 @@ open Parser
 open Types
 open Helper
 
-
-
 /// <summary>This is the basic function to create new Tables from an array of SwateBuildingBlocks</summary>
 let createAnnotationTable (name: string option) (swateBuildingBlocks: SwateBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let rowMax = swateBuildingBlocks |> Array.map (fun bb -> bb.Rows.Length) |> Seq.max

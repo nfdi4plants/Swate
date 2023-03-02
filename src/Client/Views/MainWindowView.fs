@@ -4,52 +4,6 @@ open Feliz
 open Feliz.Bulma
 open Messages
 
-
-let private initFunctionView dispatch =
-    Html.div [
-        prop.style [
-            style.height.inheritFromParent
-            style.width.inheritFromParent
-            style.display.flex
-            style.justifyContent.center
-            style.alignItems.center
-        ]
-        prop.children [
-            Html.div [
-                prop.style [style.height.minContent; style.display.inheritFromParent; style.justifyContent.spaceBetween]
-                prop.children [
-                    let buttonStyle = prop.style [style.flexDirection.column; style.height.unset; style.width(length.px 140); style.margin(length.rem 1.5)]
-                    Bulma.button.span [
-                        Bulma.button.isLarge
-                        buttonStyle
-                        Bulma.color.isPrimary
-                        prop.onClick(fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
-                        prop.children [
-                            Html.div [
-                                Html.i [prop.className "fas fa-plus"]
-                                Html.i [prop.className "fas fa-table"]
-                            ]
-                            Html.div "New Table"
-                        ]
-                    ]
-                    Bulma.button.span [
-                        Bulma.button.isLarge
-                        buttonStyle
-                        Bulma.color.isInfo
-                        prop.children [
-                            Html.div [
-                                Html.i [prop.className "fas fa-plus"]
-                                Html.i [prop.className "fas fa-table"]
-                            ]
-                            Html.div "Import File"
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ]
-
-
 let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
     Html.div [
         prop.style [
@@ -110,7 +64,7 @@ let Main (model: Messages.Model) dispatch =
                     //
                     match activeTableIsEmpty with
                     | true ->
-                        initFunctionView dispatch
+                        MainComponents.NoTablesElement.Main dispatch
                     | false ->
                         MainComponents.SpreadsheetView.Main model dispatch
                         MainComponents.AddRows.Main init_RowsToAdd state_rows setState_rows dispatch

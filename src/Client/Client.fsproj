@@ -51,6 +51,7 @@
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
         <Compile Include="SharedComponents\QuickAccessButton.fs" />
+        <Compile Include="MainComponents\NoTablesElement.fs" />
         <Compile Include="MainComponents\ContextMenu.fs" />
         <Compile Include="MainComponents\Cells.fs" />
         <Compile Include="MainComponents\KeyboardShortcuts.fs" />

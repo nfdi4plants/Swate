@@ -4,6 +4,7 @@ open Feliz
 open Feliz.Bulma
 
 open Spreadsheet
+open MainComponents
 open Messages
 
 type private CellState = {

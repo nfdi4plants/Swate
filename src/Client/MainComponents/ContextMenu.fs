@@ -1,4 +1,4 @@
-module Spreadsheet.ContextMenu
+module MainComponents.ContextMenu
 
 open Feliz
 open Feliz.Bulma

@@ -71,7 +71,7 @@ module OfficeInterop =
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel, nextCmd
 
-        | RemoveAnnotationBlock ->
+        | RemoveBuildingBlock ->
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.removeSelectedAnnotationBlock

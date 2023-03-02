@@ -53,18 +53,19 @@ type Msg =
 | CutCell of index:(int*int)
 | PasteCell of index:(int*int)
 | FillColumnWithTerm of index:(int*int)
-// <--> Result Messages <-->
-/// This message will save `Model` to local storage and to session storage for history
-| Success of Model
-/// This message will save `Model` to local storage
-| SuccessNoHistory of Model
 /// Update column of index to new column type defined by given SwateCell.emptyXXX
 | EditColumn of index: int * newType: SwateCell * b_type: BuildingBlockType option
 /// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
 | Reset
+| ParseFileUpload of byte []
 // <--> INTEROP <-->
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | AddAnnotationBlock of InsertBuildingBlock
 | AddAnnotationBlocks of InsertBuildingBlock []
 | ImportFile of (string*InsertBuildingBlock []) []
 | InsertOntologyTerm of TermTypes.TermMinimal
+// <--> Result Messages <-->
+/// This message will save `Model` to local storage and to session storage for history
+| Success of Model
+/// This message will save `Model` to local storage
+| SuccessNoHistory of Model

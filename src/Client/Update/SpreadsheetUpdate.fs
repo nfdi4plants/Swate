@@ -124,6 +124,14 @@ module Spreadsheet =
         | EditColumn (columnIndex, newCellType, b_type) ->
             let cmd = createPromiseCmd <| fun _ -> Controller.editColumn (columnIndex, newCellType, b_type) state 
             state, model, cmd
+        | ParseFileUpload bytes ->
+            let cmd =
+                Cmd.OfAsync.either
+                    Api.templateApi.tryParseToBuildingBlocks
+                    bytes
+                    (ImportFile >> Messages.SpreadsheetMsg)
+                    (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
+            state, model, cmd
         | Success nextState ->
             Spreadsheet.LocalStorage.tablesToLocalStorage nextState // This will cache the most up to date table state to local storage.
             Spreadsheet.LocalStorage.tablesToSessionStorage nextState // this will cache the table state for certain operations in session storage.
