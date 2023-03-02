@@ -81,7 +81,7 @@ let private mouseDown_event (mouseMove : Event -> unit) : Event -> unit = (fun e
 let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.style [
-            style.position.absolute
+            style.position.sticky
             style.width (length.px 5)
             style.height (length.perc 100)
             style.float'.left
@@ -104,6 +104,7 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
     Html.div [
         prop.style [
             style.display.flex
+            style.minWidth.minContent
         ]
         prop.children [
             Html.div [
