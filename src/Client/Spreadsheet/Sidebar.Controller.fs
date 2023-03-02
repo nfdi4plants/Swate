@@ -6,9 +6,14 @@ open Shared.OfficeInteropTypes
 open Spreadsheet
 open Parser
 open Types
+open Helper
+
+
 
 /// <summary>This is the basic function to create new Tables from an array of SwateBuildingBlocks</summary>
 let createAnnotationTable (name: string option) (swateBuildingBlocks: SwateBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let rowMax = swateBuildingBlocks |> Array.map (fun bb -> bb.Rows.Length) |> Seq.max
+    let swateBuildingBlocks = swateBuildingBlocks |> Array.map (extendBuildingBlockToRowMax rowMax)
     // calculate next index
     let newIndex = if Map.isEmpty state.Tables then 0 else state.Tables |> Map.maxKey |> (+) 1
     // parse to active table
@@ -68,26 +73,6 @@ let createAnnotationTable_new (usePrevOutput:bool) (state: Spreadsheet.Model) : 
     let name = HumanReadableIds.tableName()
     createAnnotationTable (Some name) bbs state
 
-let private extendBuildingBlockToRowMax (rowMax: int) (bb: SwateBuildingBlock) =
-    if bb.Rows.Length < rowMax then
-        //e.g. 2 values, but 5 rows, but row index 0 is header, so rowMax index is 4, which means 5 items, but one header so -1 = 4
-        let diff = rowMax - bb.Rows.Length 
-        let rows = [|
-            yield! bb.Rows
-            yield! Array.init diff (fun i ->
-                let index = i + bb.Rows.Length + 1 //i = 0..diff, +1 to adjust for header, +bb.Rows.Length to add on existing rows.
-                let extendRows =
-                    if bb.Rows <> Array.empty then
-                        snd bb.Rows.[0]
-                    else
-                        bb.Header.getEmptyBodyCell
-                index, extendRows
-            )
-        |]
-        {bb with Rows = rows}
-    else
-        bb
-
 let addBuildingBlock(insertBuildingBlock: InsertBuildingBlock) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     let mutable maxColKey, maxRowKey = table |> Map.maxKeys
@@ -120,6 +105,7 @@ let addBuildingBlock(insertBuildingBlock: InsertBuildingBlock) (state: Spreadshe
 
 let addBuildingBlocks(insertBuildingBlocks: InsertBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
+    printfn "%A" insertBuildingBlocks
     let mutable maxColKey, maxRowKey = table |> Map.maxKeys
     maxRowKey <-
         let maxRowNew = insertBuildingBlocks |> Array.map (fun x -> x.Rows.Length) |> Array.max

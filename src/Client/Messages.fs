@@ -133,7 +133,7 @@ module Protocol =
 
     type Msg =
         // // ------ Process from file ------
-        | ParseUploadedFileRequest          of raw:string
+        | ParseUploadedFileRequest          of raw: byte []
         | ParseUploadedFileResponse         of (string * InsertBuildingBlock []) []
         // Client
         | RemoveUploadedFileParsed

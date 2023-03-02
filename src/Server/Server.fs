@@ -22,7 +22,7 @@ open Microsoft.AspNetCore.Http
 
 let dagApiv1 = {
     parseAnnotationTablesToDagHtml = fun worksheetBuildingBlocks -> async {
-        let assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let processSequence = Option.defaultValue [] assay.ProcessSequence
         let dag = Viz.DAG.fromProcessSequence (processSequence,Viz.Schema.NFDIBlue) |> CyjsAdaption.MyHTML.toEmbeddedHTML
         return dag
@@ -31,38 +31,27 @@ let dagApiv1 = {
 
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
-        let assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let assay = Export.parseBuildingBlockToAssay worksheetName buildingblocks
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
     parseAnnotationTableToProcessSeqJson = fun (worksheetName,buildingblocks) -> async {
-        let assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
+        let assay = Export.parseBuildingBlockToAssay worksheetName buildingblocks
         let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
         return parsedJsonStr
     }
-    //parseAnnotationTableToTableJson = fun (worksheetName,buildingblocks) -> async {
-    //    let factors, protocol, assay = JsonExport.parseBuildingBlockToAssay worksheetName buildingblocks
-    //    let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
-    //    return parsedJsonStr
-    //}
     parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
-        let assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
     parseAnnotationTablesToProcessSeqJson = fun worksheetBuildingBlocks -> async {
-        let assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
         return parsedJsonStr
     }
-    // [<System.ObsoleteAttribute>]
-    //parseAnnotationTablesToTableJson = fun worksheetBuildingBlocks -> async {
-    //    let factors, protocol, assay =  JsonExport.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-    //    let parsedJsonStr = (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) assay
-    //    return parsedJsonStr
-    //}
     parseAssayJsonToBuildingBlocks = fun jsonString -> async {
-        let table = JsonImport.assayJsonToTable jsonString
+        let table = Import.Json.fromAssay jsonString
         if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
         let buildingBlocks =
             table.Sheets
@@ -82,13 +71,7 @@ let swateJsonAPIv1 = {
     //    return buildingBlocks
     //}
     parseProcessSeqToBuildingBlocks = fun jsonString -> async {
-        let table = JsonImport.processSeqJsonToTable jsonString
-        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
-        return buildingBlocks
-    }
-    tryParseToBuildingBlocks = fun jsonString -> async {
-        let table = JsonImport.tryToTable jsonString
+        let table = Import.Json.fromProcessSeq jsonString
         if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
         let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
         return buildingBlocks
@@ -133,12 +116,6 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
             let processList = assay |> fun (_,assay) -> Option.defaultValue [] assay.ProcessSequence
             return box processList
         }
-        // [<System.ObsoleteAttribute>]
-        //toTableJson = fun byteArray -> async {
-        //    let assay = assayFromByteArray byteArray 
-        //    let table = assay |> fun (_,_,_,assay) -> assay |> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay
-        //    return box table
-        //}
         // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJsonStr = fun byteArray -> async {
             let assayJsonString = assayFromByteArray byteArray |> fun (_,assay) -> ISADotNet.Json.Assay.toString assay
@@ -163,15 +140,9 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
         }
         toProcessSeqJsonStr = fun byteArray -> async {
             let assay = assayFromByteArray byteArray 
-            let processJSon = assay |> fun (_,assay) -> Option.defaultValue "" (Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence) 
+            let processJSon = assay |> fun (_,assay) -> Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence |> Option.defaultValue "" 
             return processJSon
         }
-        // [<System.ObsoleteAttribute>]
-        //toTableJsonStr = fun byteArray -> async {
-        //    let assay = assayFromByteArray byteArray 
-        //    let processJSon = assay |> fun (_,_,_,assay) -> assay |> (ISADotNet.Json.AssayCommonAPI.RowWiseAssay.fromAssay >> ISADotNet.Json.AssayCommonAPI.RowWiseAssay.toString) 
-        //    return processJSon
-        //}
         testPostNumber = fun num -> async {
             let res = $"Hey you just sent us a number. Is this your number {num}?"
             return res
@@ -183,17 +154,24 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
 
 open Database
 
-let protocolApi credentials = {
-    getAllProtocolsWithoutXml = fun () -> async {
+let templateApi credentials = {
+    getAllTemplatesWithoutXml = fun () -> async {
         let protocols = Template.Queries.Template(credentials).getAll() |> Array.ofSeq
         return protocols
     }
 
-    getProtocolById = fun templateId -> async { return Template.Queries.Template(credentials).getById(templateId) }
+    getTemplateById = fun templateId -> async { return Template.Queries.Template(credentials).getById(templateId) }
 
     increaseTimesUsedById = fun templateId -> async {
         let _ = Template.Queries.Template(credentials).increaseTimesUsed(templateId)
         return ()
+    }
+
+    tryParseToBuildingBlocks = fun jsonString -> async {
+        let table = Import.tryToTable jsonString
+        if table.Sheets.Length = 0 then failwith "Unable to identitfy supported file formats! We currently support assay.json and seq<process.json>, as well as Swate .xlsx files."
+        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        return buildingBlocks
     }
 }
 
@@ -226,10 +204,10 @@ let testApi (ctx: HttpContext): ITestAPI = {
     }
 }
 
-let createIProtocolApiv1 credentials =
+let createITemplateApiv1 credentials =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (protocolApi credentials)
+    |> Remoting.fromValue (templateApi credentials)
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler API.Helper.errorHandler
     |> Remoting.buildHttpHandler
@@ -315,7 +293,7 @@ let topLevelRouter = router {
 
     forward @"" (fun next ctx ->
         let credentials = getNeo4JCredentials ctx
-        createIProtocolApiv1 credentials next ctx
+        createITemplateApiv1 credentials next ctx
     )
 
     //

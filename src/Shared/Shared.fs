@@ -33,6 +33,12 @@ module SorensenDice =
             calculateDistance resultSet searchSet
         )
 
+/// This type is used to define target for unit term search.
+type UnitSearchRequest =
+| Unit1
+| Unit2
+
+///<summary>This type is still used for JsonExporter page.</summary>
 [<RequireQualifiedAccess>]
 type JsonExportType =
 | ProcessSeq
@@ -43,11 +49,6 @@ type JsonExportType =
         | ProcessSeq        -> "Sequence of ISA process.json."
         | Assay             -> "ISA assay.json"
         | ProtocolTemplate  -> "Schema for Swate protocol template, with template metadata and table json."
-
-/// This type is used to define target for unit term search.
-type UnitSearchRequest =
-| Unit1
-| Unit2
 
 /// Development api
 type ITestAPI = {
@@ -88,8 +89,7 @@ type ISwateJsonAPIv1 = {
     parseAssayJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
     //parseTableJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
     parseProcessSeqToBuildingBlocks         : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
-    /// This endpoint tries to parse any possible json schema (at this point only assay.json and seq<process.json>)
-    tryParseToBuildingBlocks                : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+
 }
 
 /// <summary>Deprecated</summary>
@@ -141,10 +141,12 @@ type IOntologyAPIv2 = {
     getTreeByAccession                  : string                                                            -> Async<TreeTypes.Tree>
 }
 
-type IProtocolAPIv1 = {
-    getAllProtocolsWithoutXml       : unit                      -> Async<Template []>
-    getProtocolById                 : string                    -> Async<Template>
-    increaseTimesUsedById           : string                    -> Async<unit>
+type ITemplateAPIv1 = {
+    getAllTemplatesWithoutXml       : unit      -> Async<Template []>
+    getTemplateById                 : string    -> Async<Template>
+    increaseTimesUsedById           : string    -> Async<unit>
+    /// This endpoint tries to parse any supported import data type (at this point only assay.json and seq<process.json>).
+    tryParseToBuildingBlocks        : byte []   -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
 }
 
         

@@ -16,8 +16,8 @@
         <Compile Include="Database\Template.fs" />
         <Compile Include="Database\TreeSearch.fs" />
         <Compile Include="TemplateMetadata.fs" />
-        <Compile Include="JsonExport.fs" />
-        <Compile Include="JsonImport.fs" />
+        <Compile Include="Export.fs" />
+        <Compile Include="Import.fs" />
         <Compile Include="Api\Helper.fs" />
         <Compile Include="Api\IOntologyAPI.fs" />
         <Compile Include="Server.fs" />

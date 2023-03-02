@@ -13,12 +13,12 @@ module Protocol =
 
         match fujMsg with
         // // ------ Process from file ------
-        | ParseUploadedFileRequest nextFileStr ->
+        | ParseUploadedFileRequest bytes ->
             let nextModel = { currentState with Loading = true }
             let cmd =
                 Cmd.OfAsync.either
-                    Api.swateJsonAPIv1.tryParseToBuildingBlocks
-                    nextFileStr
+                    Api.templateApi.tryParseToBuildingBlocks
+                    bytes
                     (ParseUploadedFileResponse >> ProtocolMsg)
                     (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
             nextModel, cmd
@@ -30,7 +30,7 @@ module Protocol =
             let nextState = {currentState with Loading = true}
             let cmd =
                 Cmd.OfAsync.either
-                    Api.protocolApi.getAllProtocolsWithoutXml
+                    Api.templateApi.getAllTemplatesWithoutXml
                     ()
                     (GetAllProtocolsResponse >> ProtocolMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -45,7 +45,7 @@ module Protocol =
         | GetProtocolByIdRequest templateId ->
             let cmd =
                 Cmd.OfAsync.either
-                    Api.protocolApi.getProtocolById
+                    Api.templateApi.getTemplateById
                     templateId
                     (GetProtocolByIdResponse >> ProtocolMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -61,7 +61,7 @@ module Protocol =
         | ProtocolIncreaseTimesUsed templateId ->
             let cmd =
                 Cmd.OfAsync.attempt
-                    Api.protocolApi.increaseTimesUsedById
+                    Api.templateApi.increaseTimesUsedById
                     templateId
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd
