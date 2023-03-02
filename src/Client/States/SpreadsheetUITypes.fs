@@ -111,11 +111,12 @@ with
         | IsTerm term -> SwateCell.create(term.Term.Name)
         | IsUnit unit -> SwateCell.create(unit.Unit.Name)
         | IsHeader _ -> failwith "Cannot parse header cell to freetext cell"
-    member this.toFreetextHeader() =
+    member this.toFreetextHeader(?b_type) =
         if not this.isHeader then failwith "toFreetextHeader function can only be used on Header cells"
         let header = this.Header
+        let b_type = Option.defaultValue (BuildingBlockType.Freetext "Freetext") b_type
         { header with
-            BuildingBlockType = BuildingBlockType.Freetext "Freetext"
+            BuildingBlockType = b_type
             Term = None
             HasUnit = false
         }

@@ -24,7 +24,7 @@ type private EditState = {
             match columnHeader with
             | unit when columnHeader.HasUnit -> Some columnHeader.BuildingBlockType, Unit
             | term when columnHeader.Term.IsSome -> Some columnHeader.BuildingBlockType, Term
-            | ft -> None, Freetext
+            | ft -> Some columnHeader.BuildingBlockType, Freetext
         {
             NextType = c_type
             BuildingBlockType = b_type
@@ -90,7 +90,6 @@ let private buildingBlockField (state: EditState) (setState: EditState -> unit) 
             prop.onChange(fun (e: Browser.Types.Event) ->
                 let b_type = string e.target?value |> BuildingBlockType.ofString
                 let nextState = {state with BuildingBlockType = Some b_type}
-                printfn "%A" nextState
                 setState nextState
             )
             prop.children [
@@ -120,7 +119,8 @@ let private previewField (column : (int*SwateCell) []) state =
                                 | Unit, None -> header.toUnitHeader()
                                 | Term, Some bb -> header.toTermHeader(bb)
                                 | Term, None -> header.toTermHeader() 
-                                | Freetext, _ -> header.toFreetextHeader()
+                                | Freetext, Some bb -> header.toFreetextHeader(bb)
+                                | Freetext, None -> header.toFreetextHeader() 
                             match state.NextType with
                             | Freetext -> 
                                 Html.th $"{headerUpdated.DisplayValue}"
