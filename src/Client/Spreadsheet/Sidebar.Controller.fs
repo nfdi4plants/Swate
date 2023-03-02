@@ -71,39 +71,56 @@ let createAnnotationTable_new (usePrevOutput:bool) (state: Spreadsheet.Model) : 
     let name = HumanReadableIds.tableName()
     createAnnotationTable (Some name) bbs state
 
+///<summary>If n.isOutputColumn and existing contains output column, return Some Existing-Output-Column-Index.</summary>
+let private checkExistingOutput(n: InsertBuildingBlock, existing: SwateBuildingBlock list) =
+    if n.ColumnHeader.isOutputColumn then
+        existing
+        |> List.tryFind (fun sbb -> sbb.Header.isOutputColumn)
+        |> Option.map (fun sbb -> sbb.Index)
+    else
+        None
+
 let addBuildingBlock(insertBuildingBlock: InsertBuildingBlock) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     let mutable maxColKey, maxRowKey = table |> Map.maxKeys
     maxRowKey <- System.Math.Max(insertBuildingBlock.Rows.Length, maxRowKey)
-    let nextColKey =
-        // if cell is selected get column of selected cell we want to insert AFTER
-        if not state.SelectedCells.IsEmpty then
-            state.SelectedCells |> Set.toArray |> Array.head |> fst
-        // if no cell selected insert at the end
-        else
-            maxColKey
-        // add one to last column index OR to selected column index to append one to the right.
-        |> (+) 1
-    let swateBuildingBlock = insertBuildingBlock.toSwateBuildingBlock(nextColKey)
-    let nNewColumns = 1
-    let existing =
-        let l = SwateBuildingBlock.ofTableMap_list table
-        // if insert is not at the end, reindex all columns with higher index.
-        if nextColKey <> maxColKey + nNewColumns then
-            l |> List.map (fun sb ->
-                if sb.Index >= nextColKey then {sb with Index = sb.Index + nNewColumns} else sb
-            )  
-        else
-            l
-    let nextTable = (swateBuildingBlock::existing) |> List.map (extendBuildingBlockToRowMax maxRowKey) |> SwateBuildingBlock.toTableMap 
-    let nextState = {
-        state with ActiveTable = nextTable; SelectedCells = Set.empty
-    }
-    nextState
+    let mutable existing = SwateBuildingBlock.ofTableMap_list table
+    let isOutputReplacement = checkExistingOutput(insertBuildingBlock,existing)
+    match isOutputReplacement with
+    | Some index ->
+        let state = Table.Controller.editColumn(index,SwateCell.emptyFreetext,Some insertBuildingBlock.ColumnHeader.Type) state
+        let msg = $"Found existing output column. Changed output column to \"{insertBuildingBlock.ColumnHeader.toAnnotationTableHeader()}\"."
+        let modal = Modals.WarningModal.warningModalSimple(msg)
+        Modals.Controller.renderModal("ColumnReplaced", modal)
+        state
+    | None ->
+        let nextColKey =
+            // if cell is selected get column of selected cell we want to insert AFTER
+            if not state.SelectedCells.IsEmpty then
+                state.SelectedCells |> Set.toArray |> Array.head |> fst
+            // if no cell selected insert at the end
+            else
+                maxColKey
+            // add one to last column index OR to selected column index to append one to the right.
+            |> (+) 1
+        let swateBuildingBlock = insertBuildingBlock.toSwateBuildingBlock(nextColKey)
+        let nNewColumns = 1
+        existing <-
+            // if insert is not at the end, reindex all columns with higher index.
+            if nextColKey <> maxColKey + nNewColumns then
+                existing |> List.map (fun sb ->
+                    if sb.Index >= nextColKey then {sb with Index = sb.Index + nNewColumns} else sb
+                )  
+            else
+                existing
+        let nextTable = (swateBuildingBlock::existing) |> List.map (extendBuildingBlockToRowMax maxRowKey) |> SwateBuildingBlock.toTableMap
+        let nextState = {
+            state with ActiveTable = nextTable; SelectedCells = Set.empty
+        }
+        nextState
 
 let addBuildingBlocks(insertBuildingBlocks: InsertBuildingBlock []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
-    printfn "%A" insertBuildingBlocks
     let mutable maxColKey, maxRowKey = table |> Map.maxKeys
     maxRowKey <-
         let maxRowNew = insertBuildingBlocks |> Array.map (fun x -> x.Rows.Length) |> Array.max

@@ -141,6 +141,13 @@ let colorControlInArray (mode:ColorMode) =
         Color           mode.Text
     ]
 
+let colorControlInArray_Feliz (mode:ColorMode) =
+    [
+        style.backgroundColor mode.ControlBackground
+        style.borderColor     mode.ControlForeground
+        style.color           mode.Text
+    ]
+
 let colorBackground (mode:ColorMode) =
     Style [
         BackgroundColor mode.BodyBackground

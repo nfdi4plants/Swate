@@ -248,7 +248,7 @@ let editColumn (columnIndex: int, newType: SwateCell, b_type: BuildingBlockType 
         match newType with
         | IsUnit _ -> header.toUnitHeader(?b_type = b_type)
         | IsTerm _ -> header.toTermHeader(?b_type = b_type)
-        | IsFreetext _ -> header.toFreetextHeader()
+        | IsFreetext _ -> header.toFreetextHeader(?b_type = b_type)
         | IsHeader _ -> failwith "This is no viable input."
         |> IsHeader
     let updateBody (cell: SwateCell) =

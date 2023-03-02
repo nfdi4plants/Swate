@@ -41,3 +41,35 @@ let warningModal (warning:{|NextMsg:Msg; ModalMessage: string|}, model, dispatch
             ]
         ]
     ]
+
+open Feliz
+open Feliz.Bulma
+open ExcelColors
+
+let warningModalSimple (warning: string) (rmv: _ -> unit) =
+    let closeMsg = rmv
+    Bulma.modal [
+        Bulma.modal.isActive
+        prop.children [
+            Bulma.modalBackground [ prop.onClick rmv ]
+            Bulma.notification [
+                prop.style [style.maxWidth (length.percent 80); style.maxHeight (length.percent 80); style.overflowX.auto; ]
+                prop.children [
+                    Bulma.delete [
+                        prop.onClick closeMsg
+                    ]
+                    Bulma.field.div warning
+                    Bulma.field.div [
+                        Bulma.button.a [
+                            Bulma.color.isWarning
+                            prop.style [style.float'.right]
+                            prop.onClick (fun e ->
+                                closeMsg e
+                            )
+                            prop.text "Continue"
+                        ] 
+                    ]
+                ]
+            ]
+        ]
+    ]

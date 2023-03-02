@@ -35,12 +35,6 @@
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
-        <Compile Include="Spreadsheet\LocalStorage.fs" />
-        <Compile Include="Spreadsheet\Types.fs" />
-        <Compile Include="Spreadsheet\Parser.fs" />
-        <Compile Include="Spreadsheet\Helper.fs" />
-        <Compile Include="Spreadsheet\Table.Controller.fs" />
-        <Compile Include="Spreadsheet\Sidebar.Controller.fs" />
         <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
         <Compile Include="Modals\EditColumn.fs" />
@@ -50,6 +44,12 @@
         <Compile Include="Modals\ErrorModal.fs" />
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
+        <Compile Include="Spreadsheet\LocalStorage.fs" />
+        <Compile Include="Spreadsheet\Types.fs" />
+        <Compile Include="Spreadsheet\Parser.fs" />
+        <Compile Include="Spreadsheet\Helper.fs" />
+        <Compile Include="Spreadsheet\Table.Controller.fs" />
+        <Compile Include="Spreadsheet\Sidebar.Controller.fs" />
         <Compile Include="SharedComponents\QuickAccessButton.fs" />
         <Compile Include="MainComponents\NoTablesElement.fs" />
         <Compile Include="MainComponents\ContextMenu.fs" />
