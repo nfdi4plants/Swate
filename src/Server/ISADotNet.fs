@@ -179,6 +179,9 @@ type QueryModel.QSheet with
             else
                 None
 
+        //printfn "INPUTS: %A" this.Inputs
+        //printfn "OUTPUTS: %A" this.Outputs
+
         // group building block values by "InsertBuildingBlock" information (column information without values)
         insertBuildingBlockRowList
         |> List.groupBy (fun buildingBlock ->

@@ -476,7 +476,6 @@ let uploadButton (model:Messages.Model) dispatch inputId =
         ]
     ]
 
-
 //let fileNameElements (model:Messages.Model) dispatch =
 //    div [ ] [
 //        if model.FilePickerState.FileNames <> [] then
@@ -507,7 +506,6 @@ let uploadButton (model:Messages.Model) dispatch inputId =
 
 let sortButton icon msg =
     Button.a [
-        Button.Color IsInfo
         Button.OnClick msg
     ] [
         Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
@@ -518,7 +516,6 @@ let fileSortElements (model:Messages.Model) dispatch =
         Button.list [] [
             Button.a [
                 Button.Props [Title "Copy to Clipboard"]
-                Button.Color IsInfo
                 Button.OnClick (fun e ->
                     CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
                     let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
@@ -576,6 +573,7 @@ module FileNameTable =
 
     let moveUpButton (id,fileName) (model:Model) dispatch =
         Button.a [
+            Button.Size IsSmall
             Button.OnClick (fun _ ->
                 let sortedList =
                     model.FilePickerState.FileNames
@@ -592,7 +590,6 @@ module FileNameTable =
                     |> List.mapi (fun i v -> i+1, snd v)
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
-            Button.Size IsSmall
         ] [
             Fa.i [Fa.Solid.ArrowUp] []
         ]
