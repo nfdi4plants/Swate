@@ -32,7 +32,6 @@ module OfficeInterop =
                 currentModel.ExcelState with
                     HasAnnotationTable = exists
             }
-
             currentModel.updateByExcelState nextState,Cmd.none
 
         | InsertOntologyTerm (term) ->

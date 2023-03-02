@@ -92,8 +92,7 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
             Spreadsheet.DeleteRows indexArr |> Messages.SpreadsheetMsg |> dispatch
         else
             Spreadsheet.DeleteRow (snd index) |> Messages.SpreadsheetMsg |> dispatch
-    let editColumnEvent _ =
-        Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
+    let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
     let funcs = {
         DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
         DeleteColumn    = fun rmv e -> rmv e; Spreadsheet.DeleteColumn (fst index) |> Messages.SpreadsheetMsg |> dispatch

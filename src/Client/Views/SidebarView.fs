@@ -254,13 +254,9 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
             //    )
             //] [ str "Test button" ]
 
-            match model.PersistentStorageState.Host with
-            | Swatehost.Excel _ ->
-                if not model.ExcelState.HasAnnotationTable then
-                    SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
-            | Swatehost.Browser | Swatehost.Electron ->
-                if model.SpreadsheetModel.ActiveTable = Map.empty then
-                    SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
+            match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
+            | Swatehost.Excel _, true ->
+                SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
             | _ -> ()
 
             Content.main model dispatch

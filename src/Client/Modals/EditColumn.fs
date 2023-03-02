@@ -118,9 +118,9 @@ let private previewField (column : (int*SwateCell) []) state =
                                 | Unit, Some bb -> header.toUnitHeader(bb)
                                 | Unit, None -> header.toUnitHeader()
                                 | Term, Some bb -> header.toTermHeader(bb)
-                                | Term, None -> header.toTermHeader() 
+                                | Term, None -> header.toTermHeader()
                                 | Freetext, Some bb -> header.toFreetextHeader(bb)
-                                | Freetext, None -> header.toFreetextHeader() 
+                                | Freetext, None -> header.toFreetextHeader()
                             match state.NextType with
                             | Freetext -> 
                                 Html.th $"{headerUpdated.DisplayValue}"
