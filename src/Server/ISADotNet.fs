@@ -107,7 +107,17 @@ type ISAValue with
         let value = if this.HasValue then Array.singleton this.Value.toTermMinimal else [||]
         //printfn "%A" (if this.HasValue then box this.Value else box "")
         columnPosition, InsertBuildingBlock.create headerPrePrint colHeaderTermName unitTerm value
-        
+
+
+type IOType with
+    member this.toBuildingBlockType =
+        match this with
+        | Source -> BuildingBlockType.Source
+        | Sample -> BuildingBlockType.Sample
+        | Data -> BuildingBlockType.Data
+        | RawData -> BuildingBlockType.RawDataFile
+        | ProcessedData -> BuildingBlockType.DerivedDataFile
+        | anyElse -> failwith $"Cannot parse {anyElse} IsaDotNet IOType to BuildingBlockType."
 
 /// extend existing ISADotNet.Json.AssayCommonAPI.RowWiseSheet from ISADotNet library with
 /// static member to map it to the Swate InsertBuildingBlock type used as input for addBuildingBlock functions
@@ -179,8 +189,44 @@ type QueryModel.QSheet with
             else
                 None
 
-        printfn "INPUTS: %A" this.Inputs
-        printfn "OUTPUTS: %A" this.Outputs
+        /// https://github.com/nfdi4plants/ISADotNet/issues/80
+        /// This needs to be fixed! For now we only have one input so we can assume "Source" but should this change we need to adapt.
+        /// As Soon as this is fixed, create one function for both input and output with (string*IOType option) list as input.
+        let input =
+            if List.isEmpty this.Inputs then
+                None
+            else
+                let names, types = this.Inputs |> List.unzip
+                let inputType =
+                    //let distinct = (List.choose id >> List.distinct) types
+                    //try
+                    //    distinct |> List.exactlyOne
+                    //with
+                    //    | _ -> failwith $"Cannot have input of multiple types: {distinct}"
+                    IOType.Source.toBuildingBlockType
+                let header = OfficeInteropTypes.BuildingBlockNamePrePrint.create inputType ""
+                let rows = names |> List.map (fun x -> TermMinimal.create x "") |> Array.ofList
+                InsertBuildingBlock.create header None None rows |> Some
+
+        /// https://github.com/nfdi4plants/ISADotNet/issues/80
+        let output =
+            if List.isEmpty this.Outputs then
+                None
+            else
+                let names, types = this.Outputs |> List.unzip
+                //printfn "[OUTPUTS]: %A" this.Outputs
+                //printfn "[OUTUT_TYPES]: %A" types
+                let inputType =
+                //    let distinct = (List.choose id >> List.distinct) types
+                //    try
+                //        distinct |> List.exactlyOne
+                //    with
+                //        | _ -> failwith $"Cannot have input of multiple types: {distinct}"
+                //    |> fun d -> d.toBuildingBlockType
+                    IOType.Sample.toBuildingBlockType
+                let header = OfficeInteropTypes.BuildingBlockNamePrePrint.create inputType ""
+                let rows = names |> List.map (fun x -> TermMinimal.create x "") |> Array.ofList
+                InsertBuildingBlock.create header None None rows |> Some
 
         // group building block values by "InsertBuildingBlock" information (column information without values)
         insertBuildingBlockRowList
@@ -191,9 +237,17 @@ type QueryModel.QSheet with
             let rows = buildingBlocks |> Array.ofList |> Array.collect (fun bb -> bb.Rows)
             InsertBuildingBlock.create header term unit rows
         )
-        |> fun l ->
+        |> fun l -> // add special columns
             match protocolRef, protocolType with
             | None, None -> l
             | Some ref, Some t -> ref::t::l
             | Some ref, None -> ref::l
             | None, Some t -> t::l
+        |> fun l -> // add input
+            match input with
+            | Some i -> i::l
+            | None -> l
+        |> fun l -> // add output
+            match output with
+            | Some o -> l@[o]
+            | None -> l
