@@ -10,11 +10,47 @@ open Fable.Core.JsInterop
 
 open Elmish
 
-let buttonStyle = prop.style [style.flexDirection.column; style.height.unset; style.width(length.px 140); style.margin(length.rem 1.5)]
+let private buttonStyle = prop.style [style.flexDirection.column; style.height.unset; style.width(length.px 140); style.margin(length.rem 1.5)]
+
+module private UploadHandler =
+
+    open Fable.Core.JsInterop
+
+    let mutable styleCounter = 0
+
+    [<Literal>]
+    let id = "droparea"
+    let updateMsg = fun r -> r |> ParseFileUpload |> SpreadsheetMsg
+
+    let setActive_DropArea() =
+        styleCounter <- styleCounter + 1
+        let ele = Browser.Dom.document.getElementById(id)
+        ele?style?border <- $"2px solid {NFDIColors.Mint.Base}"
+
+    let setInActive_DropArea() =
+        styleCounter <- (System.Math.Max(styleCounter - 1,0))
+        if styleCounter <= 0 then
+            let ele = Browser.Dom.document.getElementById(id)
+            ele?style?border <- "unset"
+
+    let ondrop dispatch =
+        fun (e: Browser.Types.DragEvent) ->
+            e.preventDefault()
+            if e.dataTransfer.items <> null then
+                let item = e.dataTransfer.items.[0]
+                if item.kind = "file" then
+                    setInActive_DropArea()
+                    styleCounter <- 0
+                    let file = item.getAsFile()
+                    let reader = Browser.Dom.FileReader.Create()
+                    reader.onload <- (fun _ -> updateMsg !!reader.result |> dispatch)
+                    reader.readAsArrayBuffer(file)
 
 let private uploadNewTable dispatch =
     let uploadId = "UploadFiles_MainWindowInit"
     Bulma.label [
+        //prop.onDragEnter <| UploadHandler.dontBubble
+        //prop.onDragLeave <| UploadHandler.dontBubble
         prop.style [style.fontWeight.normal]
         prop.children [
             Html.input [
@@ -30,7 +66,6 @@ let private uploadNewTable dispatch =
                         let reader = Browser.Dom.FileReader.Create()
 
                         reader.onload <- fun evt ->
-                            printfn "HIT!" 
                             let (r: byte []) = evt.target?result
                             r |> ParseFileUpload |> SpreadsheetMsg |> dispatch
                                    
@@ -69,6 +104,8 @@ let private uploadNewTable dispatch =
 
 let createNewTable dispatch =
     Bulma.button.span [
+        //prop.onDragEnter <| UploadHandler.dontBubble
+        //prop.onDragLeave <| UploadHandler.dontBubble
         Bulma.button.isLarge
         buttonStyle
         Bulma.color.isPrimary
@@ -82,8 +119,22 @@ let createNewTable dispatch =
         ]
     ]
 
-let Main dispatch =
+let Main (dispatch: Messages.Msg -> unit) =
     Html.div [
+        prop.id UploadHandler.id
+        prop.onDragEnter (fun e ->
+            e.preventDefault()
+            if e.dataTransfer.items <> null then
+                let item = e.dataTransfer.items.[0]
+                if item.kind = "file" then
+                    UploadHandler.setActive_DropArea()
+        )
+        prop.onDragLeave(fun e ->
+            //e.preventDefault()
+            UploadHandler.setInActive_DropArea()
+        )
+        prop.onDragOver(fun e -> e.preventDefault())
+        prop.onDrop <| UploadHandler.ondrop dispatch
         prop.style [
             style.height.inheritFromParent
             style.width.inheritFromParent
