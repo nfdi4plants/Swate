@@ -48,6 +48,9 @@ module Spreadsheet =
         | InsertOntologyTerm termMinimal ->
             let cmd = createPromiseCmd <| fun _ -> Controller.insertTerm termMinimal state
             state, model, cmd
+        | InsertOntologyTerms termMinimals ->
+            let cmd = createPromiseCmd <| fun _ -> Controller.insertTerms termMinimals state
+            state, model, cmd
         | UpdateTable (index, cell) ->
             let cmd = createPromiseCmd <| fun _ ->
                 let nextTable = state.ActiveTable.Change(index, fun _ -> Some cell)

@@ -14,3 +14,4 @@ type Msg =
 | ImportFile of (string*InsertBuildingBlock []) []
 /// Inserts TermMinimal to selected fields of one column
 | InsertOntologyTerm of TermTypes.TermMinimal
+| InsertFileNames of string list

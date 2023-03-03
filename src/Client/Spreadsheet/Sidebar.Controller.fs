@@ -188,3 +188,32 @@ let insertTerm (term:TermMinimal) (state: Spreadsheet.Model) : Spreadsheet.Model
     )
     let nextState = { state with ActiveTable = nextActiveTable }
     nextState
+
+let insertTerms (term:TermMinimal []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let table = state.ActiveTable
+    /// Filter out header row
+    let selected = state.SelectedCells |> Set.toArray
+    /// Make sure only one column is selected
+    let isOneColumn =
+        let columnIndex = fst selected.[0] // can just use head of selected cells as all must be same column
+        selected |> Array.forall (fun x -> fst x = columnIndex)
+    if not isOneColumn then failwith "Can only paste terms in one column at a time!"
+    /// Make sure either one column header is selected or only body cells are selected
+    let hasHeader = selected |> Array.exists (fun (_,r) -> r = 0)
+    if hasHeader then failwith "Can only paste multiple terms in table body!"
+    let mutable index = 0
+    let nextActiveTable = table |> Map.map (fun key cell ->
+        let isSelected = Array.contains key selected
+        let next =
+            let term = Array.tryItem index term
+            match isSelected, cell with
+            | false, _ | true, IsHeader _ -> cell
+            | true, IsTerm t_cell -> if term.IsSome then IsTerm {t_cell with Term = term.Value} else cell
+            | true, IsUnit u_cell -> if term.IsSome then IsUnit {u_cell with Unit = term.Value} else cell
+            | true, IsFreetext f_cell -> if term.IsSome then IsFreetext {f_cell with Value = term.Value.Name} else cell
+        if next <> cell then
+            index <- index + 1;
+        next
+    )
+    let nextState = { state with ActiveTable = nextActiveTable }
+    nextState

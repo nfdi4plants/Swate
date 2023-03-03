@@ -81,7 +81,7 @@ let private mouseDown_event (mouseMove : Event -> unit) : Event -> unit = (fun e
 let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.style [
-            style.position.sticky
+            style.position.absolute
             style.width (length.px 5)
             style.height (length.perc 100)
             style.float'.left

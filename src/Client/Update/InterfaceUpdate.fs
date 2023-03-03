@@ -10,8 +10,8 @@ open SpreadsheetInterface
 
 open Elmish
 open Model
-open Shared
 open OfficeInteropTypes
+open Shared
 
 
 module private Helper =
@@ -114,6 +114,16 @@ module Interface =
                     model, cmd
                 | Swatehost.Browser ->
                     let cmd = Spreadsheet.InsertOntologyTerm termMinimal |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
+            | InsertFileNames fileNames ->
+                match host with
+                | Swatehost.Excel _ ->
+                    let cmd = OfficeInterop.InsertFileNames fileNames |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | Swatehost.Browser ->
+                    let arr = fileNames |> List.toArray |> Array.map (fun x -> TermTypes.TermMinimal.create x "")
+                    let cmd = Spreadsheet.InsertOntologyTerms arr |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | RemoveBuildingBlock ->

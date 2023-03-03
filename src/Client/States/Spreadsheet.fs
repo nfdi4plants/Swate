@@ -64,6 +64,7 @@ type Msg =
 | AddAnnotationBlocks of InsertBuildingBlock []
 | ImportFile of (string*InsertBuildingBlock []) []
 | InsertOntologyTerm of TermTypes.TermMinimal
+| InsertOntologyTerms of TermTypes.TermMinimal []
 // <--> Result Messages <-->
 /// This message will save `Model` to local storage and to session storage for history
 | Success of Model
