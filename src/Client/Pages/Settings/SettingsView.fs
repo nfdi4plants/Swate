@@ -81,6 +81,39 @@ let customXmlSettings (model:Model) dispatch =
         ]
     ]
 
+let swateExperts (model:Model) dispatch =
+    Level.level [Level.Level.IsMobile] [
+        Level.left [] [
+            str "Swate.Experts"
+        ]
+        Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
+            Button.a [
+                Button.Color IsInfo
+                Button.IsOutlined
+                Button.OnClick (fun _ -> Msg.Batch [UpdateIsExpert true; UpdatePageState (Some Routing.Route.JsonExport)] |> dispatch ) 
+            ] [
+                str "Swate.Experts"
+            ]
+        ]
+    ]
+
+let swateCore (model:Model) dispatch =
+    Level.level [Level.Level.IsMobile] [
+        Level.left [] [
+            str "Swate.Core"
+        ]
+        Level.right [ Props [ Style [if model.SiteStyleState.IsDarkMode then Color model.SiteStyleState.ColorMode.Text else Color model.SiteStyleState.ColorMode.Fade]]] [
+            Button.a [
+                Button.Color IsInfo
+                Button.IsOutlined
+                Button.OnClick (fun _ -> Msg.Batch [UpdateIsExpert false; UpdatePageState (Some Routing.Route.BuildingBlock)] |> dispatch ) 
+            ] [
+                str "Swate.Core"
+            ]
+        ]
+    ]
+    
+
 let settingsViewComponent (model:Model) dispatch =
     div [
         //Style [MaxWidth "500px"]
@@ -93,6 +126,12 @@ let settingsViewComponent (model:Model) dispatch =
         if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
             toggleRgbModeElement model dispatch
 
+        //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Advanced Settings"]
+        //customXmlSettings model dispatch
+
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Advanced Settings"]
-        customXmlSettings model dispatch
+        if model.PageState.IsExpert then 
+            swateCore model dispatch
+        else
+            swateExperts model dispatch
     ]

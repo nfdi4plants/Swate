@@ -33,7 +33,6 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.
 
         let nextModel = {
             currentModel with
-                PersistentStorageState = { currentModel.PersistentStorageState with PageEntry = SwateEntry.Core }
                 PageState = nextPageState
         }
         nextModel,Cmd.none
@@ -552,18 +551,30 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextPageState =
             match pageOpt with
             | Some page -> {
-                CurrentPage = page
-                CurrentUrl = Route.toRouteUrl page
+                currentModel.PageState with
+                    CurrentPage = page
+                    CurrentUrl = Route.toRouteUrl page
                 }
             | None -> {
-                CurrentPage = Route.TermSearch
-                CurrentUrl = ""
+                currentModel.PageState with
+                    CurrentPage = Route.TermSearch
+                    CurrentUrl = ""
                 }
         let nextModel = {
             currentModel with
                 PageState = nextPageState
         }
         nextModel, nextCmd
+    | UpdateIsExpert b ->
+        let nextPageState = {
+            currentModel.PageState with
+                IsExpert = b
+        }
+        let nextModel = {
+            currentModel with
+                PageState = nextPageState
+        }
+        nextModel, Cmd.none        
     // does not work due to office.js ->
     // https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
     //| Navigate route ->

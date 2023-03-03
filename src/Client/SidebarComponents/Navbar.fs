@@ -165,7 +165,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                             Style [Width "100px"; Cursor "pointer"; Padding "0 0.4rem"]
                         ]
                     ] [
-                        let path = if model.PersistentStorageState.PageEntry = Routing.Expert then "_e" else ""
+                        let path = if model.PageState.CurrentPage.isExpert then "_e" else ""
                         Image.image [] [ img [
                             Style [MaxHeight "100%"]
                             Props.Src @$"assets\Swate_logo_for_excel{path}.svg"

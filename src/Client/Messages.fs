@@ -163,7 +163,6 @@ type SettingsDataStewardMsg =
     // Client
     | UpdatePointerJson of string option
 
-
 type TopLevelMsg =
     | CloseSuggestions
 
@@ -240,6 +239,7 @@ type Msg =
 //| SettingsProtocolMsg   of SettingsProtocolMsg
 | TopLevelMsg           of TopLevelMsg
 | UpdatePageState       of Routing.Route option
+| UpdateIsExpert        of bool
 | Batch                 of seq<Messages.Msg>
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI

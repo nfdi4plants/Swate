@@ -4,10 +4,6 @@ open Elmish.UrlParser
 open Fable.FontAwesome
 open Fulma.Extensions.Wikiki
 
-type SwateEntry =
-| Core
-| Expert
-
 /// The different pages of the application. If you add a new page, then add an entry here.
 [<RequireQualifiedAccess>]
 type Route =
@@ -60,10 +56,10 @@ type Route =
         | Route.SettingsXml         -> "Xml Settings"
         | Route.NotFound            -> "NotFound"
 
-    member this.toSwateEntry =
+    member this.isExpert =
         match this with
-        | Route.Validation | Route.TemplateMetadata | Route.JsonExport -> SwateEntry.Expert
-        | _ -> SwateEntry.Core
+        | Route.Validation | Route.TemplateMetadata | Route.JsonExport -> true
+        | _ -> false
 
     member this.isActive(currentRoute: Route) =
         let activeArr=

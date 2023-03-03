@@ -181,14 +181,12 @@ type PersistentStorageState = {
     AppVersion              : string
     Host                    : Swatehost
     HasOntologiesLoaded     : bool
-    PageEntry               : SwateEntry
 } with
-    static member init (?pageEntry:SwateEntry) = {
+    static member init () = {
         SearchableOntologies    = [||]
         Host                    = Swatehost.None
         AppVersion              = ""
         HasOntologiesLoaded     = false
-        PageEntry               = if pageEntry.IsSome then pageEntry.Value else SwateEntry.Core
     }
 
 type ApiCallStatus =
@@ -219,16 +217,19 @@ type ApiState = {
 type PageState = {
     CurrentPage : Routing.Route
     CurrentUrl  : string
+    IsExpert    : bool
 } with
     static member init (pageOpt:Route option) = 
         match pageOpt with
         | Some page -> {
             CurrentPage = page
             CurrentUrl = Route.toRouteUrl page
+            IsExpert = page.isExpert
             }
         | None -> {
             CurrentPage = Route.TermSearch
             CurrentUrl = ""
+            IsExpert = false
             }
 
 module FilePicker =

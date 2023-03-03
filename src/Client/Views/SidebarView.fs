@@ -68,7 +68,7 @@ let private tabRow (model:Model) (tabs: seq<ReactElement>) =
 let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
     let isIEBrowser : bool = Browser.Dom.window.document?documentMode 
     tabRow model [
-        if model.PersistentStorageState.PageEntry = Routing.SwateEntry.Core then
+        if not model.PageState.IsExpert then
             createNavigationTab Routing.Route.BuildingBlock         model dispatch sidebarsize
             createNavigationTab Routing.Route.TermSearch            model dispatch sidebarsize
             createNavigationTab Routing.Route.Protocol              model dispatch sidebarsize
@@ -80,7 +80,7 @@ let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
         else
             createNavigationTab Routing.Route.JsonExport            model dispatch sidebarsize
             createNavigationTab Routing.Route.TemplateMetadata      model dispatch sidebarsize
-            createNavigationTab Routing.Route.Validation            model dispatch sidebarsize
+            //createNavigationTab Routing.Route.Validation            model dispatch sidebarsize
             createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
     ]
 

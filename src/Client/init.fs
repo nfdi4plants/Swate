@@ -8,7 +8,7 @@ open Update
 open Thoth.Elmish
 open Spreadsheet.LocalStorage
 
-let initializeModel (pageOpt: Routing.Route option, pageEntry: Routing.SwateEntry) =
+let initializeModel (pageOpt: Routing.Route option) =
     let isDarkMode =
         let cookies = Browser.Dom.document.cookie
         let cookiesSplit = cookies.Split([|";"|], System.StringSplitOptions.RemoveEmptyEntries)
@@ -27,7 +27,7 @@ let initializeModel (pageOpt: Routing.Route option, pageEntry: Routing.SwateEntr
     {
         DebouncerState              = Debouncer                 .create ()
         PageState                   = PageState                 .init pageOpt
-        PersistentStorageState      = PersistentStorageState    .init (pageEntry=pageEntry)
+        PersistentStorageState      = PersistentStorageState    .init ()
         DevState                    = DevState                  .init ()
         SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
         TermSearchState             = TermSearch.Model          .init ()
@@ -50,8 +50,7 @@ let initializeModel (pageOpt: Routing.Route option, pageEntry: Routing.SwateEntr
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
     let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
-    let pageEntry = if route.IsSome then route.Value.toSwateEntry else Routing.SwateEntry.Core
-    let initialModel = initializeModel (pageOpt,pageEntry)
+    let initialModel = initializeModel (pageOpt)
     // The initial command from urlUpdate is not needed yet. As we use a reduced variant of subModels with no own Msg system.
     let model, _ = urlUpdate route initialModel
     let cmd = Cmd.ofMsg <| InterfaceMsg SpreadsheetInterface.Initialize 

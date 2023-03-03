@@ -10,7 +10,6 @@ open SpreadsheetInterface
 
 open Elmish
 open Model
-open OfficeInteropTypes
 open Shared
 
 
