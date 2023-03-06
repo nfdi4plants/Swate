@@ -4,7 +4,7 @@ open System.Collections.Generic
 open Shared.TermTypes
 open Shared.OfficeInteropTypes
 open Spreadsheet
-open Parser
+open TypeConverter
 open Types
 open Helper
 

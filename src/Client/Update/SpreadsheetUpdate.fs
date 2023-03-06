@@ -4,9 +4,10 @@ open Elmish
 open Spreadsheet
 open Model
 open Shared
-open Parser
+open TypeConverter
 open Spreadsheet.Table
 open Spreadsheet.Sidebar
+open Spreadsheet.Export
 
 module Spreadsheet =
 
@@ -135,6 +136,32 @@ module Spreadsheet =
                     (ImportFile >> Messages.SpreadsheetMsg)
                     (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
             state, model, cmd
+        | ExportJsonTable ->
+            let exportJsonState = {model.JsonExporterModel with Loading = true}
+            let nextModel = model.updateByJsonExporterModel exportJsonState
+            let func() = promise {
+                return Controller.getTable state
+            }
+            let cmd =
+                Cmd.OfPromise.either
+                    func
+                    ()
+                    (JsonExporter.State.ParseTableServerRequest >> Messages.JsonExporterMsg)
+                    (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
+            state, nextModel, cmd
+        | ExportJsonTables ->
+            let exportJsonState = {model.JsonExporterModel with Loading = true}
+            let nextModel = model.updateByJsonExporterModel exportJsonState
+            let func() = promise {
+                return Controller.getTables state
+            }
+            let cmd =
+                Cmd.OfPromise.either
+                    func
+                    ()
+                    (JsonExporter.State.ParseTablesServerRequest >> Messages.JsonExporterMsg)
+                    (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
+            state, nextModel, cmd
         | Success nextState ->
             Spreadsheet.LocalStorage.tablesToLocalStorage nextState // This will cache the most up to date table state to local storage.
             Spreadsheet.LocalStorage.tablesToSessionStorage nextState // this will cache the table state for certain operations in session storage.

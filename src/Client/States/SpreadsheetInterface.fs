@@ -15,3 +15,7 @@ type Msg =
 /// Inserts TermMinimal to selected fields of one column
 | InsertOntologyTerm of TermTypes.TermMinimal
 | InsertFileNames of string list
+/// Starts chain to export active table to isa json
+| ExportJsonTable
+/// Starts chain to export all tables to isa json
+| ExportJsonTables

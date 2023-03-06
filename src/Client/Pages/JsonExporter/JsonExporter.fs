@@ -257,8 +257,8 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
                 Button.a [
                     Button.Color IsInfo
                     Button.IsFullWidth
-                    Button.OnClick(fun e ->
-                        JsonExporterMsg ParseTableOfficeInteropRequest |> dispatch
+                    Button.OnClick(fun _ ->
+                        InterfaceMsg SpreadsheetInterface.ExportJsonTable |> dispatch
                     )
                 ] [
                     str "Download as isa json"
@@ -295,8 +295,8 @@ let parseTablesToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
                 Button.a [
                     Button.Color IsInfo
                     Button.IsFullWidth
-                    Button.OnClick(fun e ->
-                        JsonExporterMsg ParseTablesOfficeInteropRequest |> dispatch
+                    Button.OnClick(fun _ ->
+                        InterfaceMsg SpreadsheetInterface.ExportJsonTables |> dispatch
                     )
                 ] [
                     str "Download as isa json"

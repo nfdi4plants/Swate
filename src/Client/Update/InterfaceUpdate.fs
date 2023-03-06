@@ -142,4 +142,23 @@ module Interface =
                             Spreadsheet.DeleteColumn (distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | ExportJsonTable ->
+                match host with
+                | Swatehost.Excel _ ->
+                    let cmd = JsonExporterMsg JsonExporter.State.ParseTableOfficeInteropRequest |> Cmd.ofMsg
+                    model, cmd
+                | Swatehost.Browser ->
+                    let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTable |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
+            | ExportJsonTables ->
+                match host with
+                | Swatehost.Excel _ ->
+                    let cmd = JsonExporterMsg JsonExporter.State.ParseTablesOfficeInteropRequest |> Cmd.ofMsg
+                    model, cmd
+                | Swatehost.Browser ->
+                    let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTables |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
+                
                 

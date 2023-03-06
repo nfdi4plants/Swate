@@ -65,6 +65,10 @@ type Msg =
 | ImportFile of (string*InsertBuildingBlock []) []
 | InsertOntologyTerm of TermTypes.TermMinimal
 | InsertOntologyTerms of TermTypes.TermMinimal []
+/// Starts chain to export active table to isa json
+| ExportJsonTable
+/// Starts chain to export all tables to isa json
+| ExportJsonTables
 // <--> Result Messages <-->
 /// This message will save `Model` to local storage and to session storage for history
 | Success of Model
