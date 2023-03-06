@@ -41,7 +41,7 @@ let swateJsonAPIv1 = {
         return parsedJsonStr
     }
     parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
-        let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        let assay = Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
         let parsedJsonStr = ISADotNet.Json.Assay.toString assay
         return parsedJsonStr
     }
@@ -294,6 +294,10 @@ let topLevelRouter = router {
     forward @"" (fun next ctx ->
         let credentials = getNeo4JCredentials ctx
         createITemplateApiv1 credentials next ctx
+    )
+
+    forward "" (fun next ctx ->
+        API.IExportAPI.V1.createExportApi () next ctx
     )
 
     //

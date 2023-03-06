@@ -20,6 +20,7 @@
         <Compile Include="Import.fs" />
         <Compile Include="Api\Helper.fs" />
         <Compile Include="Api\IOntologyAPI.fs" />
+        <Compile Include="Api\IExportAPI.fs" />
         <Compile Include="Server.fs" />
     </ItemGroup>
     <ItemGroup>

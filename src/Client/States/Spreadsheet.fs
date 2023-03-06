@@ -69,6 +69,10 @@ type Msg =
 | ExportJsonTable
 /// Starts chain to export all tables to isa json
 | ExportJsonTables
+/// Starts chain to export all tables to xlsx swate tables.
+| ExportXlsx
+| ExportXlsxServerRequest of (string*BuildingBlock []) []
+| ExportXlsxServerResponse of byte []
 // <--> Result Messages <-->
 /// This message will save `Model` to local storage and to session storage for history
 | Success of Model

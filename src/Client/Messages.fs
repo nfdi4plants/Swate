@@ -167,7 +167,6 @@ type TopLevelMsg =
     | CloseSuggestions
 
 type Model = {
-
     ///PageState
     PageState                   : PageState
     ///Data that needs to be persistent once loaded

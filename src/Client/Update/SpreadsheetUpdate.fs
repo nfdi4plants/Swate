@@ -8,8 +8,29 @@ open TypeConverter
 open Spreadsheet.Table
 open Spreadsheet.Sidebar
 open Spreadsheet.Export
+open Fable.Remoting.Client
+open Fable.Remoting.Client.InternalUtilities
 
 module Spreadsheet =
+
+    module Helper =
+        open Browser
+        open Fable.Core
+        open Fable.Core.JS
+        open Fable.Core.JsInterop
+
+        let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
+            //let element = document.createElement("a");
+            //let url = createObjectUrl
+            //element.setAttribute("href", "data:text/plain;charset=utf-8," +  Fable.Core.JS.encodeURIComponent(text));
+            //element.setAttribute("download", filename);
+
+            //element?style?display <- "None";
+            //let _ = document.body.appendChild(element);
+
+            //element.click();
+
+            //document.body.removeChild(element);
 
     ///<summary>This function will return the correct success message.
     /// Can return `SuccessNoHistory` or `Success`, both will save state to local storage but only `Success` will save state to session storage history control.
@@ -162,6 +183,37 @@ module Spreadsheet =
                     (JsonExporter.State.ParseTablesServerRequest >> Messages.JsonExporterMsg)
                     (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
             state, nextModel, cmd
+        | ExportXlsx ->
+            // we highjack this loading function
+            let exportJsonState = {model.JsonExporterModel with Loading = true}
+            let nextModel = model.updateByJsonExporterModel exportJsonState
+            let func() = promise {
+                return Controller.getTables state
+            }
+            let cmd =
+                Cmd.OfPromise.either
+                    func
+                    ()
+                    (ExportXlsxServerRequest >> Messages.SpreadsheetMsg)
+                    (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
+            state, nextModel, cmd
+        | ExportXlsxServerRequest tables ->
+            let cmd =
+                Cmd.OfAsync.either
+                    Api.exportApi.toAssayXlsx
+                    tables
+                    (ExportXlsxServerResponse >> Messages.SpreadsheetMsg)
+                    (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
+            state, model, cmd
+        | ExportXlsxServerResponse xlsxBytes ->
+            let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
+            let _ = Helper.download ($"{n}_assay.xlsx",xlsxBytes)
+            let nextJsonExporter = {
+                model.JsonExporterModel with
+                    Loading             = false
+            }
+            let nextModel = model.updateByJsonExporterModel nextJsonExporter
+            state, nextModel, Cmd.none
         | Success nextState ->
             Spreadsheet.LocalStorage.tablesToLocalStorage nextState // This will cache the most up to date table state to local storage.
             Spreadsheet.LocalStorage.tablesToSessionStorage nextState // this will cache the table state for certain operations in session storage.

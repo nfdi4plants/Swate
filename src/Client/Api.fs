@@ -38,3 +38,8 @@ let testAPIv1 : ITestAPI =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<ITestAPI>
+
+let exportApi : IExportAPIv1 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<IExportAPIv1>

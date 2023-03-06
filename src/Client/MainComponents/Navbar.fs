@@ -7,8 +7,6 @@ open Messages
 
 open Components.QuickAccessButton
 
-
-
 let quickAccessButtonListStart (model: Model) dispatch =
     Html.div [
         prop.style [
@@ -59,6 +57,13 @@ let quickAccessButtonListEnd (model: Model) dispatch =
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
+            QuickAccessButton.create(
+                "Save as xlsx",
+                [
+                    Bulma.icon [Html.i [prop.className "fa-solid fa-floppy-disk";]]
+                ],
+                (fun _ -> SpreadsheetMsg Spreadsheet.ExportXlsx |> dispatch)
+            ).toReactElement()
             QuickAccessButton.create(
                 "Reset",
                 [

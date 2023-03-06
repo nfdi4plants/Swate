@@ -89,7 +89,10 @@ type ISwateJsonAPIv1 = {
     parseAssayJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
     //parseTableJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
     parseProcessSeqToBuildingBlocks         : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+}
 
+type IExportAPIv1 = {
+    toAssayXlsx                             : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<byte []>
 }
 
 /// <summary>Deprecated</summary>
