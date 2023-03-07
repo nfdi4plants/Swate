@@ -73,6 +73,20 @@ type SwateBuildingBlock with
                 None
         BuildingBlock.create mainColumn tsr tan unit this.Header.Term
 
+type TermTypes.TermSearchable with
+    ///<summary>Converts TermSearchable to SwateCell type. If no search result is found returns previous cell `sc`.</summary>
+    member this.toSwateCell (sc:SwateCell) =
+        let isHeader = this.RowIndices = [|0|]
+        let isUnit = this.IsUnit
+        if this.SearchResultTerm.IsNone then
+            sc
+        else
+            match this.SearchResultTerm, sc with
+            | Some res, IsHeader c when isHeader -> IsHeader {c with Term = TermTypes.TermMinimal.ofTerm res |> Some}
+            | Some res, IsUnit c when isUnit -> IsUnit {c with Unit = TermTypes.TermMinimal.ofTerm res}
+            | Some res, IsTerm c -> IsTerm {c with Term = TermTypes.TermMinimal.ofTerm res}
+            | anythingElse -> failwithf "Unable to convert search results to table: [Current_Cell] %A; [SearchResults] %A" anythingElse this
+
 module SwateBuildingBlock =
     
     ///<summary> Parse column of index `index` from ActiveTableMap `m` to SwateBuildingBlock. </summary>

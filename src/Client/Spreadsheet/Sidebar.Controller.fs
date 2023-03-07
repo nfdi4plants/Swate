@@ -218,6 +218,7 @@ let insertTerms (term:TermMinimal []) (state: Spreadsheet.Model) : Spreadsheet.M
     let nextState = { state with ActiveTable = nextActiveTable }
     nextState
 
+///<summary> This function is used to get information for the "Update Ontology Terms" Quick access button</summary>
 let getUpdateTermColumns (state: Spreadsheet.Model) =
     let swate_bbs = SwateBuildingBlock.ofTableMap state.ActiveTable
     let bbs = swate_bbs |> Array.map (fun x -> x.toBuildingBlock)
@@ -226,6 +227,16 @@ let getUpdateTermColumns (state: Spreadsheet.Model) =
     let msg = deprecationMsgs
     terms, msg
 
+///<summary> This function is used to write the results from "Update Ontology Terms" Quick access button</summary>
 let setUpdateTermColumns (terms: TermSearchable []) (state: Spreadsheet.Model) =
-    printfn "[TERMS]: %A" terms
-    state
+    let mutable table = state.ActiveTable
+    terms
+    |> Array.iter (fun term ->
+        for row in term.RowIndices do
+            let key = term.ColIndex,row
+            let changeCell newCell = table.Add(key, newCell)
+            let sc = table.[key]
+            let newCell = term.toSwateCell(sc)
+            table <- changeCell newCell
+    )
+    {state with ActiveTable = table}

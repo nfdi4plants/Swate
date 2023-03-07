@@ -326,7 +326,7 @@ module V2 =
                                     else
                                         // search by accession must be unique, and has unique restriction in database, so there can only be 0 or 1 result
                                         let r = dbResults |> Array.exactlyOne
-                                        if r.Name <> termSearchable.Term.Name then 
+                                        if termSearchable.Term.Name <> "" && r.Name <> termSearchable.Term.Name then 
                                             failwith $"""Found mismatch between Term Accession and Term Name. Term name "{termSearchable.Term.Name}" and term accession "{termSearchable.Term.TermAccession}",
                                             but accession belongs to name "{r.Name}" (ontology: {r.FK_Ontology})"""
                                         Some r
