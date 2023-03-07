@@ -217,3 +217,15 @@ let insertTerms (term:TermMinimal []) (state: Spreadsheet.Model) : Spreadsheet.M
     )
     let nextState = { state with ActiveTable = nextActiveTable }
     nextState
+
+let getUpdateTermColumns (state: Spreadsheet.Model) =
+    let swate_bbs = SwateBuildingBlock.ofTableMap state.ActiveTable
+    let bbs = swate_bbs |> Array.map (fun x -> x.toBuildingBlock)
+    let deprecationMsgs = OfficeInterop.Core.checkForDeprecation bbs
+    let terms = bbs |> Array.collect OfficeInterop.BuildingBlockFunctions.toTermSearchable
+    let msg = deprecationMsgs
+    terms, msg
+
+let setUpdateTermColumns (terms: TermSearchable []) (state: Spreadsheet.Model) =
+    printfn "[TERMS]: %A" terms
+    state

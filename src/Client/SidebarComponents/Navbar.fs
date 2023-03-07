@@ -45,7 +45,7 @@ let private shortCutIconList model dispatch =
                 span [] [str model.ExcelState.FillHiddenColsStateStore.toReadableString]
                 Fa.span [Fa.Solid.Pen] []
             ],
-            (fun _ -> OfficeInterop.FillHiddenColsRequest |> OfficeInteropMsg |> dispatch)
+            (fun _ -> SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.create(
             "Remove Building Block",

@@ -47,7 +47,7 @@ type SwateBuildingBlock with
                 None
         let tsr =
             if this.Header.isTermColumn then
-                let h = SwateColumnHeader.create(ColumnCoreNames.TermSourceRef.toString)
+                let h = SwateColumnHeader.create($"{ColumnCoreNames.TermSourceRef.toString} ({this.Header.Term.Value.TermAccession})")
                 let r = rows |> Array.map (fun (ind,x) ->
                     match x with
                     | IsUnit c -> Cell.create ind (Some c.Unit.accessionToTSR) None
@@ -60,7 +60,7 @@ type SwateBuildingBlock with
                 None
         let tan =
             if this.Header.isTermColumn then
-                let h = SwateColumnHeader.create(ColumnCoreNames.TermAccessionNumber.toString)
+                let h = SwateColumnHeader.create($"{ColumnCoreNames.TermAccessionNumber.toString} ({this.Header.Term.Value.TermAccession})")
                 let r = rows |> Array.map (fun (ind,x) ->
                     match x with
                     | IsUnit c -> Cell.create ind (Some c.Unit.accessionToTAN) None

@@ -1,5 +1,6 @@
 namespace Update
 
+open Messages
 open Elmish
 open Spreadsheet
 open Model
@@ -20,17 +21,6 @@ module Spreadsheet =
         open Fable.Core.JsInterop
 
         let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
-            //let element = document.createElement("a");
-            //let url = createObjectUrl
-            //element.setAttribute("href", "data:text/plain;charset=utf-8," +  Fable.Core.JS.encodeURIComponent(text));
-            //element.setAttribute("download", filename);
-
-            //element?style?display <- "None";
-            //let _ = document.body.appendChild(element);
-
-            //element.click();
-
-            //document.body.removeChild(element);
 
     ///<summary>This function will return the correct success message.
     /// Can return `SuccessNoHistory` or `Success`, both will save state to local storage but only `Success` will save state to session storage history control.
@@ -214,6 +204,45 @@ module Spreadsheet =
             }
             let nextModel = model.updateByJsonExporterModel nextJsonExporter
             state, nextModel, Cmd.none
+        | UpdateTermColumns ->
+            let getUpdateTermColumns() = promise {
+                return Controller.getUpdateTermColumns state
+            }
+            let cmd =
+                Cmd.OfPromise.either
+                    getUpdateTermColumns
+                    ()
+                    (fun (searchTerms,deprecationLogs) ->
+                        // Push possible deprecation messages by piping through "GenericInteropLogs"
+                        Messages.GenericInteropLogs (
+                            // This will be executed after "deprecationLogs" are handled by "GenericInteropLogs"
+                            Messages.SearchForInsertTermsRequest searchTerms |> Messages.Request |> Messages.Api |> Cmd.ofMsg,
+                            // This will be pushed to Activity logs, or as wanring modal to user in case of LogIdentifier.Warning
+                            deprecationLogs
+                        )
+                        |> Messages.DevMsg
+                    )
+                    (Messages.curry Messages.GenericError (OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
+            let stateCmd = OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
+            let cmds = Cmd.batch [cmd; stateCmd]
+            state, model, cmds
+        | UpdateTermColumnsResponse terms ->
+            let nextExcelState = {
+                model.ExcelState with
+                    FillHiddenColsStateStore = OfficeInterop.FillHiddenColsState.ExcelWriteFoundTerms
+            }
+            let nextModel = model.updateByExcelState nextExcelState
+            let setUpdateTermColumns terms = promise {return Controller.setUpdateTermColumns terms state}
+            let cmd =
+                Cmd.OfPromise.either
+                    setUpdateTermColumns
+                    (terms)
+                    (fun r -> Msg.Batch [
+                        Spreadsheet.Success r |> SpreadsheetMsg
+                        OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg
+                    ])
+                    (curry GenericError (OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
+            state, nextModel, cmd
         | Success nextState ->
             Spreadsheet.LocalStorage.tablesToLocalStorage nextState // This will cache the most up to date table state to local storage.
             Spreadsheet.LocalStorage.tablesToSessionStorage nextState // this will cache the table state for certain operations in session storage.

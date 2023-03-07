@@ -125,7 +125,7 @@ let TANCell(index: (int*int), model: Model, dispatch) =
     let isSelected = state.SelectedCells.Contains index
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     cell_element [
-        prop.key $"Cell_{columnIndex}-{rowIndex}_TAN"
+        prop.key $"Cell_{state.ActiveTableIndex}-{columnIndex}-{rowIndex}_TAN"
         cellStyle [
             if isHeader then
                 style.color(NFDIColors.white)
@@ -202,7 +202,7 @@ let UnitCell(index: (int*int), model: Model, dispatch) =
     let isSelected = state.SelectedCells.Contains index
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     cell_element [
-        prop.key $"Cell_{columnIndex}-{rowIndex}_Unit"
+        prop.key $"Cell_{state.ActiveTableIndex}-{columnIndex}-{rowIndex}_Unit"
         cellStyle [
             if isHeader then
                 style.color(NFDIColors.white)
@@ -275,7 +275,7 @@ let Cell(index: (int*int), state_extend: Set<int>, setState_extend, model: Model
     let isSelected = state.SelectedCells.Contains index
     let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
     cell_element [
-        prop.key $"Cell_{columnIndex}-{rowIndex}"
+        prop.key $"Cell_{state.ActiveTableIndex}-{columnIndex}-{rowIndex}"
         cellStyle [
             if isHeader then
                 style.color(NFDIColors.white)

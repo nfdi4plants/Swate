@@ -58,7 +58,7 @@ module Dev =
             }
             let batch = Cmd.batch [
                 let modalName = "GenericInteropLogs"
-                Cmd.ofSub(fun dispatch -> Modals.Controller.renderModal(modalName, Modals.InteropLoggingModal.interopLoggingModal(nextState, dispatch)))
+                if List.isEmpty parsedDisplayLogs |> not then Cmd.ofSub(fun dispatch -> Modals.Controller.renderModal(modalName, Modals.InteropLoggingModal.interopLoggingModal(nextState, dispatch)))
                 nextCmd
             ]
             nextState, batch
@@ -368,7 +368,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
                 callHistory = finishedCall::currentState.callHistory
         }
         let cmd =
-            OfficeInterop.FillHiddenColumns (termsWithSearchResult) |> OfficeInteropMsg |> Cmd.ofMsg
+            SpreadsheetInterface.UpdateTermColumnsResponse termsWithSearchResult |> InterfaceMsg |> Cmd.ofMsg
         let loggingCmd =
              ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
         nextState, Cmd.batch [cmd; loggingCmd]
@@ -399,6 +399,7 @@ open Messages
 let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messages.Msg> =
     match apiMsg with
     | ApiError e ->
+        
         let failedCall = {
             currentState.currentCall with
                 Status = Failed (e.GetPropagatedError())
@@ -409,8 +410,13 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messag
                 currentCall = noCall
                 callHistory = failedCall::currentState.callHistory
         }
+        let batch = Cmd.batch [
+            let modalName = "GenericError"
+            Cmd.ofSub(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
+            curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName (e.GetPropagatedError())) |> DevMsg |> Cmd.ofMsg
+        ]
 
-        nextState, curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName (e.GetPropagatedError())) |> DevMsg |> Cmd.ofMsg
+        nextState, batch
 
     | ApiSuccess (level,logMsg) ->
         currentState, curry GenericLog Cmd.none (level,logMsg) |> DevMsg |> Cmd.ofMsg

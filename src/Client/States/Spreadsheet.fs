@@ -65,6 +65,8 @@ type Msg =
 | ImportFile of (string*InsertBuildingBlock []) []
 | InsertOntologyTerm of TermTypes.TermMinimal
 | InsertOntologyTerms of TermTypes.TermMinimal []
+| UpdateTermColumns
+| UpdateTermColumnsResponse of TermTypes.TermSearchable []
 /// Starts chain to export active table to isa json
 | ExportJsonTable
 /// Starts chain to export all tables to isa json

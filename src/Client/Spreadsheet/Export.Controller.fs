@@ -13,6 +13,8 @@ let getTable (state: Spreadsheet.Model) =
     let name = state.Tables.[state.ActiveTableIndex].Name
     let swate_bbs = SwateBuildingBlock.ofTableMap state.ActiveTable
     let bbs = swate_bbs |> Array.map (fun x -> x.toBuildingBlock)
+    printfn "[MAINCOL] %A" <| (bbs.[1].MainColumn)
+    printfn "[HEADER] %A" <| (bbs.[1].MainColumnTerm)
     name, bbs
 
 ///<summary> Returns all tables.</summary>
