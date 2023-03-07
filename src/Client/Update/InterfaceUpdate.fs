@@ -160,5 +160,14 @@ module Interface =
                     let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTables |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-                
+            | EditBuildingBlock ->
+                match host with
+                | Swatehost.Excel _ ->
+                    let cmd = OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | Swatehost.Browser ->
+                    let selectedIndex = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
+                    let cmd = Cmd.ofSub (fun dispatch -> Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main selectedIndex model dispatch))
+                    model, cmd
+                | _ -> failwith "not implemented"
                 

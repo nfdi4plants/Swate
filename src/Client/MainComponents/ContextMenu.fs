@@ -6,7 +6,6 @@ open Feliz.Bulma
 open Spreadsheet
 open Messages
 
-
 type private ContextFunctions = {
     DeleteRow       : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     DeleteColumn    : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit

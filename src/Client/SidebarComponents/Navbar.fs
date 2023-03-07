@@ -62,7 +62,7 @@ let private shortCutIconList model dispatch =
                 span [] [str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
                 Fa.span [Fa.Solid.Columns] []
             ],
-            (fun _ -> OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg |> dispatch)
+            (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
         )
     ]
     

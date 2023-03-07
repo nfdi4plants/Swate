@@ -12,6 +12,8 @@ type Msg =
 | AddAnnotationBlock of InsertBuildingBlock
 | AddAnnotationBlocks of InsertBuildingBlock []
 | ImportFile of (string*InsertBuildingBlock []) []
+/// Open modal for selected building block, allows editing on standalone only.
+| EditBuildingBlock
 /// Inserts TermMinimal to selected fields of one column
 | InsertOntologyTerm of TermTypes.TermMinimal
 | InsertFileNames of string list
