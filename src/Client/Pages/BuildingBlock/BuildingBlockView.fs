@@ -1,4 +1,4 @@
-module BuildingBlock
+module BuildingBlock.Core
 
 open Fable.React
 open Fable.React.Props
@@ -17,26 +17,75 @@ open CustomComponents
 open OfficeInteropTypes
 open Elmish
 
-let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
+let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
     match addBuildingBlockMsg with
+    | GetHeaderSuggestions (queryString,uiSetter) ->
+        let cmd = 
+            Cmd.OfAsync.either
+                Api.api.getTermSuggestions
+                {|n= 5; query = queryString; ontology = None|}
+                (fun t -> GetHeaderSuggestionsResponse (t,uiSetter) |> BuildingBlockMsg)
+                (curry GenericError Cmd.none >> DevMsg)
+        state, cmd
+    | GetHeaderSuggestionsResponse (termSuggestions, uiSetter) ->
+        let nextState = { state with HeaderSearchResults = termSuggestions }
+        let state, setState = uiSetter.state, uiSetter.setState
+        setState {state with SearchIsLoading = false; SearchIsActive = true}
+        nextState, Cmd.none
+    | SelectHeaderTerm term ->
+        let nextState = { state with HeaderSelectedTerm = term}
+        nextState, Cmd.none
+    | GetBodySuggestions (queryString,uiSetter) ->
+        let cmd = 
+            Cmd.OfAsync.either
+                Api.api.getTermSuggestions
+                {|n= 5; query = queryString; ontology = None|}
+                (fun t -> GetBodySuggestionsResponse (t,uiSetter) |> BuildingBlockMsg)
+                (curry GenericError Cmd.none >> DevMsg)
+        state, cmd
+    | GetBodySuggestionsByParent (queryString,parentTerm,uiSetter) ->
+        let cmd = 
+            Cmd.OfAsync.either
+                Api.api.getTermSuggestionsByParentTerm
+                {|n= 5; query = queryString; parent_term = parentTerm|}
+                (fun t -> GetBodySuggestionsResponse (t,uiSetter) |> BuildingBlockMsg)
+                (curry GenericError Cmd.none >> DevMsg)
+        state, cmd
+    | GetBodyTermsByParent (parentTerm,uiSetter) ->
+        let cmd = 
+            Cmd.OfAsync.either
+                Api.api.getAllTermsByParentTerm
+                parentTerm
+                (fun t -> GetBodySuggestionsResponse (t,uiSetter) |> BuildingBlockMsg)
+                (curry GenericError Cmd.none >> DevMsg)
+        state, cmd
+    | GetBodySuggestionsResponse (termSuggestions, uiSetter) ->
+        let nextState = { state with BodySearchResults = termSuggestions }
+        let state, setState = uiSetter.state, uiSetter.setState
+        setState {state with SearchIsLoading = false; SearchIsActive = true}
+        nextState, Cmd.none
+    | SelectBodyTerm term ->
+        let nextState = { state with BodySelectedTerm = term}
+        nextState, Cmd.none
+    // Below everything is more or less deprecated
     | UpdateDropdownPage newDropdownPage ->
         let nextState = {
-            currentState with
+            state with
                 DropdownPage = newDropdownPage
         }
         nextState, Cmd.none
     | NewBuildingBlockSelected nextBB ->
         let nextState = {
-            currentState with
-                CurrentBuildingBlock = if not nextBB.isSingleColumn && currentState.BuildingBlockSelectedTerm.IsSome then {nextBB with Name = currentState.BuildingBlockSelectedTerm.Value.Name} else nextBB
+            state with
+                CurrentBuildingBlock = if not nextBB.isSingleColumn && state.BuildingBlockSelectedTerm.IsSome then {nextBB with Name = state.BuildingBlockSelectedTerm.Value.Name} else nextBB
                 ShowBuildingBlockSelection = false
         }
         nextState, Cmd.none
 
     | ToggleSelectionDropdown ->
         let nextState = {
-            currentState with
-                ShowBuildingBlockSelection = not currentState.ShowBuildingBlockSelection
+            state with
+                ShowBuildingBlockSelection = not state.ShowBuildingBlockSelection
         }
 
         nextState,Cmd.none
@@ -59,14 +108,14 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
         let nextState =
             match relUnit with
             | Unit1 ->
-                { currentState with
+                { state with
                     UnitTermSearchText                  = newTerm
                     UnitSelectedTerm                    = None
                     ShowUnitTermSuggestions             = triggerNewSearch
                     HasUnitTermSuggestionsLoading       = true
                 }
             | Unit2 ->
-                { currentState with
+                { state with
                     Unit2TermSearchText                  = newTerm
                     Unit2SelectedTerm                    = None
                     ShowUnit2TermSuggestions             = triggerNewSearch
@@ -80,13 +129,13 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
         let nextState =
             match relUnit with
             | Unit1 ->
-                { currentState with
+                { state with
                         UnitTermSuggestions             = suggestions
                         ShowUnitTermSuggestions         = true
                         HasUnitTermSuggestionsLoading   = false
                 }
             | Unit2 ->
-                { currentState with
+                { state with
                     Unit2TermSuggestions             = suggestions
                     ShowUnit2TermSuggestions         = true
                     HasUnit2TermSuggestionsLoading   = false
@@ -99,14 +148,14 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
         let nextState =
             match relUnit with
             | Unit1 ->
-                { currentState with
+                { state with
                     UnitTermSearchText              = suggestion.Name
                     UnitSelectedTerm                = Some suggestion
                     ShowUnitTermSuggestions         = false
                     HasUnitTermSuggestionsLoading   = false
                 }
             | Unit2 ->
-                { currentState with
+                { state with
                     Unit2TermSearchText             = suggestion.Name
                     Unit2SelectedTerm               = Some suggestion
                     ShowUnit2TermSuggestions        = false
@@ -116,8 +165,7 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
 
     | BuildingBlockNameChange newName ->
 
-        let triggerNewSearch =
-            newName.Length > 2
+        let triggerNewSearch = newName.Length > 2
    
         let (delay, bounceId, msgToBounce) =
             (System.TimeSpan.FromSeconds 0.5),
@@ -130,12 +178,12 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
             )
 
         let nextBB = {
-            currentState.CurrentBuildingBlock with
+            state.CurrentBuildingBlock with
                 Name = newName
         }
 
         let nextState = {
-            currentState with
+            state with
                 CurrentBuildingBlock                    = nextBB
                 BuildingBlockSelectedTerm               = None
                 ShowBuildingBlockTermSuggestions        = triggerNewSearch
@@ -147,7 +195,7 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
     | NewBuildingBlockNameSuggestions suggestions ->
 
         let nextState = {
-            currentState with
+            state with
                 BuildingBlockNameSuggestions            = suggestions
                 ShowBuildingBlockTermSuggestions        = true
                 HasBuildingBlockTermSuggestionsLoading  = false
@@ -158,12 +206,12 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
     | BuildingBlockNameSuggestionUsed suggestion ->
         
         let nextBB = {
-            currentState.CurrentBuildingBlock with
+            state.CurrentBuildingBlock with
                 Name = suggestion.Name
         }
 
         let nextState = {
-            currentState with
+            state with
                 CurrentBuildingBlock                    = nextBB
 
                 BuildingBlockSelectedTerm               = Some suggestion
@@ -174,17 +222,17 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
 
     | ToggleBuildingBlockHasUnit ->
 
-        let hasUnit = not currentState.BuildingBlockHasUnit
+        let hasUnit = not state.BuildingBlockHasUnit
 
         let nextState =
             if hasUnit then
                 {
-                    currentState with
+                    state with
                         BuildingBlockHasUnit = hasUnit
                 }
             else
                 {
-                currentState with
+                state with
                     BuildingBlockHasUnit = hasUnit
                     UnitSelectedTerm = None
                     UnitTermSearchText = ""
@@ -193,73 +241,6 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (currentState: BuildingBlock.
                     HasUnitTermSuggestionsLoading = false
                 }
         nextState, Cmd.none
-
-let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =
-    if block.Type.isFeaturedColumn then true
-    elif block.Type.isTermColumn then block.Name.Length > 0
-    elif block.Type.isSingleColumn then true
-    else false
-
-
-let createBuildingBlockDropdownItem (model:Model) (dispatch:Messages.Msg -> unit) (block: BuildingBlockType )  =
-    Dropdown.Item.a [
-        Dropdown.Item.Props [
-            OnClick (fun e ->
-                e.stopPropagation()
-                BuildingBlockNamePrePrint.init block |> NewBuildingBlockSelected |> BuildingBlockMsg |> dispatch
-            )
-            OnKeyDown (fun k -> if (int k.which) = 13 then BuildingBlockNamePrePrint.init block |> NewBuildingBlockSelected |> BuildingBlockMsg |> dispatch)
-            colorControl model.SiteStyleState.ColorMode
-        ]
-
-    ] [
-        span [
-            Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
-            Class "has-tooltip-multiline"
-            Props.Custom ("data-tooltip", block.toShortExplanation)
-        ] [
-            Fa.i [Fa.Solid.InfoCircle] []
-        ]
-
-        span [] [str block.toString]
-
-
-    ]
-
-let createSubBuildingBlockDropdownLink (model:Model) (dispatch:Messages.Msg -> unit) (subpage: Model.BuildingBlock.DropdownPage) =
-    Dropdown.Item.a [
-        Dropdown.Item.Props [
-            TabIndex 0
-            OnClick (fun e ->
-                e.preventDefault()
-                e.stopPropagation()
-                UpdateDropdownPage subpage |> BuildingBlockMsg |> dispatch
-            )
-            Style [
-                yield! colorControlInArray model.SiteStyleState.ColorMode;
-                PaddingRight "0.5rem"
-            ]
-        ]
-
-    ] [
-        span [
-            Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
-            Class "has-tooltip-multiline"
-            Props.Custom ("data-tooltip", subpage.toTooltip)
-        ] [
-            Fa.i [Fa.Solid.InfoCircle] []
-        ]
-
-        span [] [
-            str <| subpage.toString
-        ]
-
-        span [
-            Style [ Width "20px"; Float FloatOptions.Right; LineHeight "1.5"; FontSize "1.1rem"]
-        ] [
-            Fa.i [Fa.Solid.ArrowRight] [] 
-        ]
-    ]
 
 let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit) =
     Content.content [ ] [
@@ -279,71 +260,6 @@ open SidebarComponents
 let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
     let autocompleteParamsTerm = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState
     let autocompleteParamsUnit = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState
-
-    /// Navigation element back to main page
-    let backToMainDropdownButton (model:Model) (dispatch:Messages.Msg -> unit) =
-        Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
-            Button.button [
-                Button.Modifiers [Modifier.IsPulledLeft]
-                Button.OnClick (fun e ->
-                    e.preventDefault()
-                    e.stopPropagation()
-                    UpdateDropdownPage Model.BuildingBlock.DropdownPage.Main |> BuildingBlockMsg |> dispatch
-                )
-                Button.IsInverted
-                if model.SiteStyleState.IsDarkMode then Button.IsOutlined
-                Button.Color IsBlack
-                Button.Props [Style [ Width "20px"; Height "20px"; BorderRadius "4px"; Border "unset"]]
-            ] [
-                Fa.i [Fa.Solid.ArrowLeft] [] 
-            ]
-            a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank"] [ str "info" ]
-        ]
-
-    /// Main column types subpage for dropdown
-    let dropdownContentMain (model:Model) (dispatch:Messages.Msg -> unit) =
-        [
-            BuildingBlockType.Source            |> createBuildingBlockDropdownItem model dispatch
-            Dropdown.divider []
-            BuildingBlockType.Parameter         |> createBuildingBlockDropdownItem model dispatch
-            BuildingBlockType.Factor            |> createBuildingBlockDropdownItem model dispatch
-            BuildingBlockType.Characteristic    |> createBuildingBlockDropdownItem model dispatch
-            BuildingBlockType.Component         |> createBuildingBlockDropdownItem model dispatch
-            Model.BuildingBlock.DropdownPage.ProtocolTypes |>  createSubBuildingBlockDropdownLink model dispatch
-            Dropdown.divider []
-            Model.BuildingBlock.DropdownPage.Output |>  createSubBuildingBlockDropdownLink model dispatch
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
-                a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank"] [ str "info" ]
-            ]
-        ]
-    /// Protocol Type subpage for dropdown
-    let dropdownContentProtocolTypeColumns (model:Model) (dispatch: Messages.Msg -> unit) =
-        [
-            // Heading
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Centered)] ] [
-                Heading.h6 [Heading.IsSubtitle; Heading.Modifiers [Modifier.TextWeight TextWeight.Option.Bold]] [str BuildingBlock.DropdownPage.ProtocolTypes.toString]
-            ]
-            Dropdown.divider []
-            BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem model dispatch
-            BuildingBlockType.ProtocolREF       |> createBuildingBlockDropdownItem model dispatch
-            // Navigation element back to main page
-            backToMainDropdownButton model dispatch
-        ]
-
-    /// Output columns subpage for dropdown
-    let dropdownContentOutputColumns (model:Model) (dispatch: Messages.Msg -> unit) =
-        [
-            // Heading
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Centered)] ] [
-                Heading.h6 [Heading.IsSubtitle; Heading.Modifiers [Modifier.TextWeight TextWeight.Option.Bold]] [str BuildingBlock.DropdownPage.Output.toString]
-            ]
-            Dropdown.divider []
-            BuildingBlockType.Sample            |> createBuildingBlockDropdownItem model dispatch
-            BuildingBlockType.RawDataFile       |> createBuildingBlockDropdownItem model dispatch
-            BuildingBlockType.DerivedDataFile   |> createBuildingBlockDropdownItem model dispatch
-            // Navigation element back to main page
-            backToMainDropdownButton model dispatch
-        ]
 
     mainFunctionContainer [
         AdvancedSearch.advancedSearchModal model autocompleteParamsTerm.ModalId autocompleteParamsTerm.InputId dispatch autocompleteParamsTerm.OnAdvancedSearch
@@ -365,11 +281,11 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
                         Dropdown.menu [ ] [
                             match model.AddBuildingBlockState.DropdownPage with
                             | Model.BuildingBlock.DropdownPage.Main ->
-                                dropdownContentMain model dispatch
+                                Helper.DropdownElements.dropdownContentMain model dispatch
                             | Model.BuildingBlock.DropdownPage.ProtocolTypes ->
-                                dropdownContentProtocolTypeColumns model dispatch
+                                Helper.DropdownElements.dropdownContentProtocolTypeColumns model dispatch
                             | Model.BuildingBlock.DropdownPage.Output ->
-                                dropdownContentOutputColumns model dispatch
+                                Helper.DropdownElements.dropdownContentOutputColumns model dispatch
                             |> fun content -> Dropdown.content [Props [Style [yield! colorControlInArray model.SiteStyleState.ColorMode]] ] content
                         ]
                     ]
@@ -458,7 +374,7 @@ let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
 
         Field.div [] [
             Button.button   [
-                let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> isValidBuildingBlock
+                let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> Helper.isValidBuildingBlock
                 if isValid then
                     Button.Color Color.IsSuccess
                     Button.IsActive true
@@ -565,6 +481,13 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
 
         Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks (columns) to the annotation table."]
         // Input forms, etc related to add building block.
+        match model.PersistentStorageState.Host with
+        | Swatehost.Excel _ ->
+            addBuildingBlockElements model dispatch
+        | _ ->
+            SearchComponent.Main model dispatch
+            
+        
         addBuildingBlockElements model dispatch
 
         match model.PersistentStorageState.Host with

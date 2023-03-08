@@ -6,7 +6,9 @@ open Spreadsheet
 
 type InsertBuildingBlock with
     member this.toSwateBuildingBlock(index:int) : SwateBuildingBlock =
-        let header = HeaderCell.create(this.ColumnHeader.Type, ?term = this.ColumnTerm, hasUnit = this.HasUnit)
+        let header =
+            let term = this.ColumnTerm |> Option.defaultValue (TermTypes.TermMinimal.create this.ColumnHeader.Name "")
+            HeaderCell.create(this.ColumnHeader.Type, term = term, hasUnit = this.HasUnit)
         let rows =
             match this.HasValues, header.isTermColumn, this.HasUnit with
             | _, true, true       -> // even if no values exist, we want to add unit to body cells.

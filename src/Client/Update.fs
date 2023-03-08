@@ -28,7 +28,7 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.
     | None ->
         let nextPageState = {
             currentModel.PageState with
-                CurrentPage = Route.TermSearch
+                CurrentPage = Route.BuildingBlock
         }
 
         let nextModel = {
@@ -698,7 +698,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | BuildingBlockMsg addBuildingBlockMsg ->
         let nextAddBuildingBlockState,nextCmd = 
             currentModel.AddBuildingBlockState
-            |> BuildingBlock.update addBuildingBlockMsg
+            |> BuildingBlock.Core.update addBuildingBlockMsg
 
         let nextModel = {
             currentModel with

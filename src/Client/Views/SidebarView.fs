@@ -168,7 +168,7 @@ module private Content =
     let main (model:Model) (dispatch: Msg -> unit) =
         match model.PageState.CurrentPage with
         | Routing.Route.BuildingBlock ->
-            BuildingBlock.addBuildingBlockComponent model dispatch
+            BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
         | Routing.Route.TermSearch ->
             TermSearch.termSearchComponent model dispatch
@@ -216,7 +216,7 @@ module private Content =
         let c =
             match model.PageState.CurrentPage with
             | Routing.Route.BuildingBlock ->
-                 BuildingBlock.addBuildingBlockFooterComponent model dispatch
+                 BuildingBlock.Core.addBuildingBlockFooterComponent model dispatch
                  |> List.singleton
             | _ ->
                 []

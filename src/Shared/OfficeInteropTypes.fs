@@ -146,7 +146,7 @@ module OfficeInteropTypes =
             | Data              -> "DEPRECATED: Use data columns to mark the data file name that your computational analysis produced."
             | RawDataFile       -> "The Raw Data File column defines untransformed and unprocessed data files"
             | DerivedDataFile   -> "The Derived Data File column defines transformed and/or processed data files"
-            | Source            -> "The Source column efines the input of your table. This input value must be a unique identifier for an organism or a sample. The number of Source Name columns per table is limited to one."
+            | Source            -> "The Source column defines the input of your table. This input value must be a unique identifier for an organism or a sample. The number of Source Name columns per table is limited to one."
             | ProtocolType      -> "Defines the protocol type according to your preferred endpoint repository."
             | ProtocolREF       -> "Defines the protocol name."
             | Freetext _        -> failwith "Freetext BuildingBlockType should not be parsed"

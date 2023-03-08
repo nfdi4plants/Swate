@@ -65,6 +65,9 @@ module TermTypes =
         /// It uses a special input format which is created by this function and should be used for unit terms.
         member this.toNumberFormat = $"0.00 \"{this.Name}\""
 
+        /// This still returns only minimal information, but in term format
+        member this.toTerm = createTerm this.TermAccession this.Name "" false ""
+
         /// The numberFormat attribute in Excel allows to create automatic unit extensions.
         /// The format is created as $"0.00 \"{MinimalTerm.Name}\"", this function is meant to reverse this, altough term accession is lost.
         static member ofNumberFormat (formatStr:string) =

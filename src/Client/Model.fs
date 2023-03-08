@@ -106,6 +106,28 @@ type TermSearchMode =
 
 module TermSearch =
 
+    type TermSearchUIState = {
+        /// This always referrs to the string typed into the input field.
+        SearchText              : string
+        SearchIsActive          : bool
+        SearchIsLoading         : bool
+    } with
+        static member init() = {
+            SearchText              = ""
+            SearchIsActive          = false
+            SearchIsLoading         = false
+        }
+        static member init(term: Term option) = {
+            SearchText              = term |> Option.map (fun x -> x.Name) |> Option.defaultValue ""
+            SearchIsActive          = false
+            SearchIsLoading         = false
+        }
+
+    type TermSearchUIController = {
+        state: TermSearchUIState
+        setState: TermSearchUIState -> unit
+    }
+
     type Model = {
 
         TermSearchText          : string
@@ -262,7 +284,29 @@ module BuildingBlock =
             | Output -> "Output columns allow to specify the exact output for your table. Per table only one output column is allowed. The value of this column must be a unique identifier."
             | _ -> ""
 
+    type BuildingBlockUIState = {
+        DropdownIsActive        : bool
+        DropdownPage            : DropdownPage
+        BuildingBlockType       : BuildingBlockType
+    } with
+        static member init() = {
+            DropdownIsActive        = false
+            DropdownPage            = DropdownPage.Main
+            BuildingBlockType       = BuildingBlockType.Parameter
+        }
+
     type Model = {
+
+        /// This always referrs to any term applied to the header.
+        HeaderSearchResults                     : Term []
+        /// This always referrs to any term applied to the header.
+        HeaderSelectedTerm                      : Term option
+        /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
+        BodySearchResults                       : Term []
+        /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
+        BodySelectedTerm                        : Term option
+
+        // Below everything is more or less deprecated
         CurrentBuildingBlock                    : BuildingBlockNamePrePrint
 
         DropdownPage                            : DropdownPage
@@ -290,6 +334,13 @@ module BuildingBlock =
 
     } with
         static member init () = {
+
+            HeaderSearchResults                     = [||]
+            HeaderSelectedTerm                      = None
+            BodySearchResults                       = [||]
+            BodySelectedTerm                        = None
+
+            /// Below everything is more or less deprecated
             ShowBuildingBlockSelection              = false
 
             DropdownPage                            = DropdownPage.Main

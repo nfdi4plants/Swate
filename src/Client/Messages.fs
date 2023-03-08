@@ -105,7 +105,19 @@ module FilePicker =
 
 module BuildingBlock =
 
+    open TermSearch
+
     type Msg =
+    | GetHeaderSuggestions of string*TermSearchUIController
+    | GetHeaderSuggestionsResponse of Term []*TermSearchUIController
+    | SelectHeaderTerm of Term option
+    | GetBodySuggestions of string*TermSearchUIController
+    | GetBodySuggestionsByParent of string*TermMinimal*TermSearchUIController
+    /// Returns all child terms
+    | GetBodyTermsByParent of TermMinimal*TermSearchUIController
+    | GetBodySuggestionsResponse of Term []*TermSearchUIController
+    | SelectBodyTerm of Term option
+    // Below everything is more or less deprecated
     | UpdateDropdownPage        of BuildingBlock.DropdownPage
 
     | NewBuildingBlockSelected  of BuildingBlockNamePrePrint

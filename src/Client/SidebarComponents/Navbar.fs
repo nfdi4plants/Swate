@@ -21,6 +21,7 @@ type private NavbarState = {
 
 open Components.QuickAccessButton
 
+
 let private shortCutIconList model dispatch =
     [
         QuickAccessButton.create(
@@ -31,13 +32,17 @@ let private shortCutIconList model dispatch =
             ],
             (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> InterfaceMsg |> dispatch)
         )
-        QuickAccessButton.create(
-            "Autoformat Table",
-            [
-                Fa.i [Fa.Solid.SyncAlt] []
-            ],
-            (fun e -> OfficeInterop.AutoFitTable (not e.ctrlKey) |> OfficeInteropMsg |> dispatch)
-        )
+        match model.PersistentStorageState.Host with
+        | Swatehost.Excel _ ->
+            QuickAccessButton.create(
+                "Autoformat Table",
+                [
+                    Fa.i [Fa.Solid.SyncAlt] []
+                ],
+                (fun e -> OfficeInterop.AutoFitTable (not e.ctrlKey) |> OfficeInteropMsg |> dispatch)
+            )
+        | _ ->
+            ()
         QuickAccessButton.create(
             "Update Ontology Terms",
             [
