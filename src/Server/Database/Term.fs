@@ -4,6 +4,36 @@ open Neo4j.Driver
 open Shared.TermTypes
 open Helper
 
+
+module private Queries =
+    let filterNodeSourceOntology = """ WITH node
+    MATCH (node)-[:CONTAINED_IN]->(:Ontology {name: $OntologyName}) """
+    let filterNodeSourceOntologies = """ WITH node
+    MATCH (node)-[:CONTAINED_IN]->(o:Ontology WHERE o.name in $OntologyNames) """
+
+    let fullTextNameQuery (hasOntologyFilter: string) =
+        sprintf
+            """CALL db.index.fulltext.queryNodes("TermName",$Name)
+            YIELD node%s
+            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
+            hasOntologyFilter
+
+/// <summary> This type is used to allow searching through only one ontology or multiple ontologies </summary>
+[<RequireQualifiedAccess>]
+type AnyOfSource =
+| String of string
+| StringList of string list
+with
+    member this.toFilterQuery =
+        match this with
+        | AnyOfSource.String _ -> Queries.filterNodeSourceOntology
+        | AnyOfSource.StringList _ -> Queries.filterNodeSourceOntologies
+
+    member this.toParamTuple =
+        match this with
+        | AnyOfSource.String str -> "OntologyName", str |> box
+        | AnyOfSource.StringList strList -> "OntologyNames", strList |> box
+
 type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     static member private parseAccessionToOntologyName (accession:string) =
@@ -23,23 +53,19 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         term
 
     /// Searchtype defaults to "get term suggestions with auto complete".
-    member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:string) =
+    member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfSource) =
         let fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
                 FullTextSearch.PerformanceComplete.ofQueryString termName
         let query =
-            let sourceOntologyText = """ WHERE EXISTS((:Term {accession: node.accession})-[:CONTAINED_IN]->(:Ontology {name: $OntologyName})) """
-            sprintf
-                """CALL db.index.fulltext.queryNodes("TermName",$Name)
-                YIELD node%s
-                RETURN node.accession, node.name, node.definition, node.is_obsolete"""
-                (if sourceOntologyName.IsSome then sourceOntologyText else "")
+            Queries.fullTextNameQuery
+                (if sourceOntologyName.IsSome then sourceOntologyName.Value.toFilterQuery else "")
         let param =
             Map [
-                "Name",fulltextSearchStr
-                if sourceOntologyName.IsSome then "OntologyName", sourceOntologyName.Value
+                "Name",fulltextSearchStr |> box
+                if sourceOntologyName.IsSome then sourceOntologyName.Value.toParamTuple
             ] |> Some
         if session.IsSome then
             Neo4j.runQuery(
@@ -55,13 +81,12 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 (Term.asTerm("node")),
                 credentials.Value
             )
-                
 
     /// This function will allow for raw apache lucene input. It is possible to search either term name or description or both.
     /// The function will error if both term name and term description are None.
     member this.getByAdvancedTermSearch(advancedSearchOptions:Shared.AdvancedSearchTypes.AdvancedSearchOptions) =
         let termName = if advancedSearchOptions.TermName = "" then None else Some advancedSearchOptions.TermName
-        let termDescription = if advancedSearchOptions.TermDescription = "" then None else Some advancedSearchOptions.TermDescription
+        let termDescription = if advancedSearchOptions.TermDefinition = "" then None else Some advancedSearchOptions.TermDefinition
         let indexName, queryInsert =
             match termName,termDescription with
             | None, None -> failwith "Cannot execute term search without any term name or term description."
@@ -83,8 +108,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                     indexName
         let param =
             Map [
-                if advancedSearchOptions.OntologyName.IsSome then "OntologyName", advancedSearchOptions.OntologyName.Value
-                "Query", queryInsert
+                if advancedSearchOptions.OntologyName.IsSome then "OntologyName", box advancedSearchOptions.OntologyName.Value
+                "Query", box queryInsert
             ] |> Some
         if session.IsSome then
             Neo4j.runQuery(
@@ -101,14 +126,13 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 credentials.Value
             )
 
-
     /// Exact match for unique identifier term accession.
     member this.getByAccession(termAccession:string) =
         let query = 
             """MATCH (term:Term {accession: $Accession})
             RETURN term.accession, term.name, term.definition, term.is_obsolete"""
         let param =
-            Map ["Accession",termAccession] |> Some
+            Map ["Accession", box termAccession] |> Some
         if session.IsSome then
             Neo4j.runQuery(
                 query,
@@ -127,8 +151,11 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     member this.getAllByParent(parentAccession:string, ?limit:int) =
         let query =
             sprintf
-                """MATCH (child)-[*1..]->(:Term {accession: $Accession})
-                RETURN child.accession, child.name, child.definition, child.is_obsolete
+                """MATCH (n:Term {accession: $Accession})
+                CALL apoc.path.subgraphNodes(n, {minLevel: 1, relationshipFilter:'<', labelFilter: "+Term"}) 
+                YIELD node as parent
+                WHERE parent.accession is not null
+                RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete
                 %s"""
                 (if limit.IsSome then "LIMIT $Limit" else "")
         let param =
@@ -201,8 +228,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 FullTextSearch.Complete.ofQueryString termName
         let param =
             Map [
-                "Accession", parentAccession; 
-                "Search", fulltextSearchStr
+                "Accession", box parentAccession; 
+                "Search", box fulltextSearchStr
             ] |> Some
         if session.IsSome then
             Neo4j.runQuery(
@@ -228,8 +255,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 FullTextSearch.Complete.ofQueryString term.Name
         let param =
             Map [
-                "Accession", parent.TermAccession; 
-                "Search", fulltextSearchStr
+                "Accession", box parent.TermAccession; 
+                "Search", box fulltextSearchStr
             ] |> Some 
         if session.IsSome then
             Neo4j.runQuery(
@@ -256,8 +283,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 FullTextSearch.Complete.ofQueryString termName
         let param =
             Map [
-                "Accession", parentAccession.TermAccession; 
-                "Search", fulltextSearchStr
+                "Accession", box parentAccession.TermAccession; 
+                "Search", box fulltextSearchStr
             ] |> Some
         printfn "%A" param
         if session.IsSome then
@@ -289,8 +316,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
-                "Name", parentName; 
-                "Search", fulltextSearchStr
+                "Name", box parentName; 
+                "Search", box fulltextSearchStr
             ] |> Some
         if session.IsSome then
             Neo4j.runQuery(
@@ -310,11 +337,13 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// This function uses only the parent term accession
     member this.getAllByChild(childAccession:TermMinimal) =
         let query = 
-            """MATCH (:Term {accession: $Accession})-[*1..]->(parent:Term)
+            """MATCH (n:Term {accession: $Accession})
+            CALL apoc.path.subgraphNodes(n, {minLevel: 1, relationshipFilter:'>', labelFilter: "+Term"}) YIELD node as parent
+            WHERE parent.accession is not null
             RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete
             """
         let param =
-            Map ["Accession",childAccession.TermAccession] |> Some
+            Map ["Accession", box childAccession.TermAccession] |> Some
         if session.IsSome then
             Neo4j.runQuery(
                 query,
@@ -345,8 +374,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
-                "Accession", childAccession; 
-                "Search", fulltextSearchStr
+                "Accession", box childAccession; 
+                "Search", box fulltextSearchStr
             ] |> Some
         if session.IsSome then
             Neo4j.runQuery(
@@ -378,8 +407,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
-                "Name", childName; 
-                "Search", fulltextSearchStr
+                "Name", box childName; 
+                "Search", box fulltextSearchStr
             ] |> Some
         if session.IsSome then
             Neo4j.runQuery(
@@ -398,29 +427,26 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
 type TermQuery = 
 
-    static member getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:string) =
+    static member getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfSource) =
         let fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
                 FullTextSearch.Complete.ofQueryString termName
         let query =
-            let sourceOntologyText = """ WHERE EXISTS((:Term {accession: node.accession})-[:CONTAINED_IN]->(:Ontology {name: $OntologyName})) """
+            //let sourceOntologyText = """ WHERE EXISTS((:Term {accession: node.accession})-[:CONTAINED_IN]->(:Ontology {name: $OntologyName})) """
             if searchType.IsSome && searchType.Value = FullTextSearch.Exact then
                 sprintf
                     """MATCH (node:Term {name: $Name})%s
                     RETURN node.accession, node.name, node.definition, node.is_obsolete"""
-                    (if sourceOntologyName.IsSome then sourceOntologyText else "")
+                    (if sourceOntologyName.IsSome then sourceOntologyName.Value.toFilterQuery else "")
             else
-                sprintf
-                    """CALL db.index.fulltext.queryNodes("TermName",$Name)
-                    YIELD node%s
-                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
-                    (if sourceOntologyName.IsSome then sourceOntologyText else "")
+                Queries.fullTextNameQuery
+                    (if sourceOntologyName.IsSome then sourceOntologyName.Value.toFilterQuery else "")
         let param =
             Map [
-                "Name",fulltextSearchStr
-                if sourceOntologyName.IsSome then "OntologyName", sourceOntologyName.Value
+                "Name", box fulltextSearchStr
+                if sourceOntologyName.IsSome then sourceOntologyName.Value.toParamTuple
             ] |> Some
         query, param, Term.asTerm("node")
 
@@ -430,5 +456,5 @@ type TermQuery =
             """MATCH (term:Term {accession: $Accession})
             RETURN term.accession, term.name, term.definition, term.is_obsolete"""
         let param =
-            Map ["Accession",termAccession] |> Some
+            Map ["Accession", box termAccession] |> Some
         query, param, Term.asTerm("term")

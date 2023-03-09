@@ -10,6 +10,24 @@ module URLs =
         let replaced = accessionStr.Replace(":","_")
         TermAccessionBaseUrl + replaced
 
+    [<RequireQualifiedAccessAttribute>]
+    module Docs =
+
+        type FileType =
+        | Html
+        | Yaml
+         with
+            member this.toStr =
+                match this with
+                | Html -> ".html"
+                | Yaml -> ".yaml"
+
+        
+        let private Base = "/docs"
+
+        let OntologyApi (filetype: FileType)= Base + "/IOntologyAPIv2" + filetype.toStr
+        
+
     type Helpdesk =
         static member Url = @"https://support.nfdi4plants.org"
 
@@ -19,12 +37,11 @@ module URLs =
 
         static member UrlTemplateTopic = Helpdesk.Url + "/?topic=Metadata_SwateTemplate"
 
-
     [<LiteralAttribute>]
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
-    let SwateWiki = @"https://github.com/nfdi4plants/Swate/wiki"
+    let SwateWiki = @"https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/SwateManual/index.html"
 
     [<LiteralAttribute>]
     let SwateRepo = @"https://github.com/nfdi4plants/Swate"

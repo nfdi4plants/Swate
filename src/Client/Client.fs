@@ -5,164 +5,37 @@ open Elmish.UrlParser
 open Elmish
 open Elmish.React
 open Fable.React
-open Fable.React.Props
-open Fulma
-open Model
 open Messages
 open Update
-open Shared
-open ExcelJS.Fable.GlobalBindings
 
+///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
 
-let initializeAddIn () = Office.onReady()
+open Feliz
 
-// defines the initial state and initial command (= side-effect) of the application
-let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
-    let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
-    let pageEntry = if route.IsSome then route.Value.toSwateEntry else Routing.SwateEntry.Core
-    let initialModel = initializeModel (pageOpt,pageEntry)
-    // The initial command from urlUpdate is not needed yet. As we use a reduced variant of subModels with no own Msg system.
-    let model, _ = urlUpdate route initialModel
-    let initialCmd =
-        Cmd.batch [
-            Cmd.OfPromise.either
-                initializeAddIn
-                ()
-                (fun x -> (x.host.ToString(),x.platform.ToString()) |> OfficeInterop.Initialized |> OfficeInteropMsg )
-                (curry GenericError Cmd.none >> DevMsg)
-        ]
-    model, initialCmd
+let split_container model dispatch = 
+    let mainWindow = Seq.singleton <| MainWindowView.Main model dispatch
+    let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
+    SplitWindowView.Main
+        mainWindow
+        sideWindow
+        dispatch
 
 let view (model : Model) (dispatch : Msg -> unit) =
-
-    match model.PageState.CurrentPage with
-    | Routing.Route.BuildingBlock ->
-        BaseView.baseViewMainElement model dispatch [
-            BuildingBlock.addBuildingBlockComponent model dispatch
-        ] [
-            BuildingBlock.addBuildingBlockFooterComponent model dispatch
-        ]
-
-    | Routing.Route.TermSearch ->
-        BaseView.baseViewMainElement model dispatch [
-            TermSearch.termSearchComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.Validation ->
-        BaseView.baseViewMainElement model dispatch [
-            Validation.validationComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.FilePicker ->
-        BaseView.baseViewMainElement model dispatch [
-            FilePicker.filePickerComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.Protocol ->
-        BaseView.baseViewMainElement model dispatch [
-            Protocol.Core.fileUploadViewComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.JsonExport ->
-        BaseView.baseViewMainElement model dispatch [
-            JsonExporter.Core.jsonExporterMainElement model dispatch
-        ] [ (*Footer*) ]
-
-    | Routing.Route.TemplateMetadata ->
-        BaseView.baseViewMainElement model dispatch [
-            TemplateMetadata.Core.newNameMainElement model dispatch
-        ] [ (*Footer*) ]
-
-    | Routing.Route.ProtocolSearch ->
-        BaseView.baseViewMainElement model dispatch [
-            Protocol.Search.protocolSearchViewComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.ActivityLog ->
-        BaseView.baseViewMainElement model dispatch [
-            ActivityLog.activityLogComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.Settings ->
-        BaseView.baseViewMainElement model dispatch [
-            SettingsView.settingsViewComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.SettingsXml ->
-        BaseView.baseViewMainElement model dispatch [
-            SettingsXml.settingsXmlViewComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.Dag ->
-        BaseView.baseViewMainElement model dispatch [
-            Dag.Core.mainElement model dispatch
-        ] [ (*Footer*) ]
-
-    | Routing.Route.Info ->
-        BaseView.baseViewMainElement model dispatch [
-            InfoView.infoComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.NotFound ->
-        BaseView.baseViewMainElement model dispatch [
-            NotFoundView.notFoundComponent model dispatch
-        ] [
-            //Text.p [] [str ""]
-        ]
-
-    | Routing.Route.Home ->
-        Container.container [] [
-            div [] [ str "This is the Swate web host. For a preview click on the following link." ]
-            a [ Href (Routing.Route.toRouteUrl Routing.Route.TermSearch) ] [ str "Termsearch" ]
-        ]
-
-
+    match model.PersistentStorageState.Host with
+    | Swatehost.Excel (h,p) ->
+        SidebarView.SidebarView model dispatch
+    | _ ->
+        split_container model dispatch
+            
+    
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
 
 #endif
 
-//module CustomDebugger =
-//    open Browser
-//    open Thoth.Json
-
-//    let ICytoscapeElementDecoder =
-//        Decode.succeed (unbox<Cytoscape.JS.Types.ICytoscape> null)
-
-//    let ICytoscapElementEncoder ( _ : Cytoscape.JS.Types.ICytoscape)=
-//        Encode.string "Cytoscape.JS.Types.ICytoscape element"    
-
-//    let extra =
-//        Extra.empty
-//        |> Extra.withCustom ICytoscapElementEncoder ICytoscapeElementDecoder
-
-//    let modelDecoder =
-//        Decode.Auto.generateDecoder<Model>(extra = extra)
-
-//    let modelEncoder =
-//        Encode.Auto.generateEncoder<Model>(extra = extra)
-
-Program.mkProgram init Update.update view
+Program.mkProgram Init.init Update.update view
 #if DEBUG
 |> Program.withConsoleTrace
 #endif

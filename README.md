@@ -12,37 +12,25 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
 <!-- TOC -->
 ## Table of contents
 
-- [Features](#features)
+- [Docs](#docs)
 - [Install/Use](#installuse)
 - [Contact](#contact)
 
 <!-- /TOC -->
 
+## Docs
 
-## Features
+- Ontology term search
+- ISA conform output
+- Minimal information standards
 
-For a full in-depth view of all Swate features check the [documentation](https://nfdi4plants.github.io/Swate-docs/).
+Try our [quickstart](https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/QuickStart_swate.html) or a more in-depth [walkthrough](https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/QuickStart_swate_walkthrough.html).
 
-Feature | Excel 365/ Office online  	| Excel 2019  	|
-|---            |:---:	        |:---:	        |
-|  **Core**     |  	            |
-| Adding and managing <br> building blocks|<span style="color:#1FC2A7">✓</span>|<span style="color:#1FC2A7">✓</span>|
-| Ontology Term search <br> and insert|<span style="color:#1FC2A7">✓</span>| <span style="color:#1FC2A7">✓</span>
-| Ontology Term update | <span style="color:#1FC2A7">✓</span> |<span style="color:#1FC2A7">✓</span>|
-| Add Templates|<span style="color:#1FC2A7">✓</span>|<span style="color:#1FC2A7">✓</span>
-| Copy filenames into table| <span style="color:#1FC2A7">✓</span>| <span style="color:#1FC2A7">✓</span>
-| Display DAG| <span style="color:#1FC2A7">✓</span>| <span style="color:#c21f3a">x</span>
-|  **Experts**     |  	            |
-| Export Swate information | <span style="color:#1FC2A7">✓</span>| <span style="color:#c21f3a">x</span>
-| Create Template Metadata | <span style="color:#1FC2A7">✓</span>| <span style="color:#c21f3a">x</span>
-| Write Checklist Custom Xml | <span style="color:#1FC2A7">✓</span>| <span style="color:#1FC2A7">✓</span>
-| Edit Custom Xml | <span style="color:#1FC2A7">✓</span>| <span style="color:#1FC2A7">✓</span>
-
+For a full in-depth view of all Swate features check the [documentation](https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/SwateManual/index.html).
 
 ## Install/Use
 
-[Swate installation](https://nfdi4plants.github.io/Swate-docs/docs/UserDocs/Docs01-Installing-Swate.html)
-
+[Swate installation](https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/SwateManual/Docs01-Installing-Swate.html)
 
 ## Contact
 

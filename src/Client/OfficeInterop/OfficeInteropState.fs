@@ -17,30 +17,24 @@ type FillHiddenColsState =
         | ExcelWriteFoundTerms  -> "Write Terms"
 
 type Model = {
-    Host                        : string
-    Platform                    : string
     HasAnnotationTable          : bool
-    TablesHaveAutoEditHandler   : bool
     FillHiddenColsStateStore    : FillHiddenColsState
 } with
     static member init () = {
-        Host                = ""
-        Platform            = ""
         HasAnnotationTable  = false
-        TablesHaveAutoEditHandler = false
         FillHiddenColsStateStore = Inactive
     }
 
 type Msg =
     // create and update table element functions
-    | Initialized                           of (string*string)
-    | CreateAnnotationTable                 of isDark:bool * tryUsePrevOutput:bool 
+    | CreateAnnotationTable                 of tryUsePrevOutput:bool 
     | AnnotationtableCreated
     | AnnotationTableExists                 of TryFindAnnoTableResult
     | InsertOntologyTerm                    of TermMinimal
     | AddAnnotationBlock                    of InsertBuildingBlock
     | AddAnnotationBlocks                   of InsertBuildingBlock [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | RemoveAnnotationBlock
+    | ImportFile                            of (string*InsertBuildingBlock []) []
+    | RemoveBuildingBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | AutoFitTable                          of hideRefCols:bool
     // Term search functions

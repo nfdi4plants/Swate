@@ -40,7 +40,7 @@ module ReleaseNoteTasks =
         
         let releaseDate =
             if newRelease.Date.IsSome then newRelease.Date.Value.ToShortDateString() else "WIP"
-        
+
         Fake.DotNet.AssemblyInfoFile.createFSharp  "src/Server/Version.fs"
             [   Fake.DotNet.AssemblyInfo.Title "SWATE"
                 Fake.DotNet.AssemblyInfo.Version newRelease.AssemblyVersion
@@ -126,6 +126,13 @@ module Docker =
     let dockerImageName = "freymaurer/swate"
     let dockerContainerName = "swate"
 
+    // Create nightly (https://de.wikipedia.org/wiki/Nightly_Build)
+    // 1: docker build -t swate -f build/Dockerfile.publish .
+    // 2: docker run -it -p 5000:5000 swate
+    //      -> http://localhost:5000
+    // 3: docker tag swate:latest freymaurer/swate.nightly:latest
+    // 4: docker push freymaurer/swate.nightly:latest
+
     // Change target to github-packages
     // https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
     Target.create "docker-publish" (fun _ ->
@@ -192,7 +199,7 @@ Target.create "WebpackConfigSetup" (fun _ ->
             "{USERFOLDER}",userPath.Replace("\\","/")
         ]
         [
-            (Path.combine __SOURCE_DIRECTORY__ "webpack.config.js")
+            (Path.getFullName("webpack.config.js"))
         ]
 )
 
@@ -208,7 +215,7 @@ Target.create "SetLoopbackExempt" (fun _ ->
 )
 
 Target.create "CreateDevCerts" (fun _ ->
-    run npx "office-addin-dev-certs install --days 365" __SOURCE_DIRECTORY__
+    run npx "office-addin-dev-certs install --days 365" ""
 
     let certPath =
         Path.combine
@@ -235,20 +242,20 @@ Target.create "InstallClient" (fun _ ->
 
 Target.create "bundle" (fun _ ->
     [ "server", dotnet $"publish -c Release -o \"{deployPath}\"" serverPath
-      "client", dotnet "fable src/Client -o src/Client/output -e .fs.js -s --run webpack --config webpack.config.js" "" ]
+      "client", dotnet "fable src/Client -o src/Client/output -e .fs.js -s --run npm run build" "" ]
     |> runParallel
 )
 
 Target.create "bundle-linux" (fun _ ->
     [ "server", dotnet $"publish -c Release -r linux-x64 -o \"{deployPath}\"" serverPath
-      "client", dotnet "fable src/Client -s --run webpack --config webpack.config.js" "" ]
+      "client", dotnet "fable src/Client -s --run npm run build" "" ]
     |> runParallel
 )
 
 Target.create "Run" (fun _ ->
     run dotnet "build" sharedPath
     [ "server", dotnet "watch run" serverPath
-      "client", dotnet "fable watch src/Client -s --run webpack-dev-server" "" ]
+      "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" "" ]
     |> runParallel
 )
 
@@ -269,8 +276,8 @@ Target.create "officedebug" (fun config ->
 Target.create "RunTests" (fun _ ->
     run dotnet "build" sharedTestsPath
     [
-        "server", dotnet "watch run -p tests/Server" ""
-        "client", dotnet "fable watch tests/Client -o tests/Client/output -e .fs.js -s --run webpack-dev-server --config webpack.tests.config" "" ]
+        "server", dotnet "watch run --project tests/Server" ""
+        "client", dotnet "fable watch tests/Client -o tests/Client/output -e .fs.js -s --run npm run test:live" "" ]
     |> runParallel
 )
 

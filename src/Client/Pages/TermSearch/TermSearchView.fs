@@ -26,7 +26,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 
         nextState, Cmd.none
 
-    | SearchTermTextChange newTerm ->
+    | SearchTermTextChange (newTerm, parentTerm) ->
 
         let triggerNewSearch = newTerm.Trim() <> ""
        
@@ -35,7 +35,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
             "GetNewTermSuggestions",
             (
                 if triggerNewSearch then
-                    match currentState.ParentOntology, currentState.SearchByParentOntology with
+                    match parentTerm, currentState.SearchByParentOntology with
                     | Some termMin, true ->
                         (newTerm,termMin) |> (GetNewTermSuggestionsByParentTerm >> Request >> Api)
                     | None,_ | _, false ->
@@ -112,6 +112,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 
 open Fable.Core
 open Fable.Core.JsInterop
+open SidebarComponents
 
 let simpleSearchComponent model dispatch =
     mainFunctionContainer [
@@ -180,7 +181,7 @@ let simpleSearchComponent model dispatch =
                             Button.OnClick (fun _ ->
                                 if hasText then
                                     let term = if model.TermSearchState.SelectedTerm.IsSome then TermMinimal.ofTerm model.TermSearchState.SelectedTerm.Value else TermMinimal.create model.TermSearchState.TermSearchText ""
-                                    OfficeInterop.InsertOntologyTerm term |> OfficeInteropMsg |> dispatch
+                                    SpreadsheetInterface.InsertOntologyTerm term |> InterfaceMsg |> dispatch
                             )
                         ] [
                             str "Fill selected cells with this term"
@@ -226,7 +227,7 @@ let simpleSearchComponent model dispatch =
     ]
 
 let termSearchComponent (model:Messages.Model) dispatch =
-    form [
+    div [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [

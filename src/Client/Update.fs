@@ -28,12 +28,11 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.
     | None ->
         let nextPageState = {
             currentModel.PageState with
-                CurrentPage = Route.TermSearch
+                CurrentPage = Route.BuildingBlock
         }
 
         let nextModel = {
             currentModel with
-                PersistentStorageState = { currentModel.PersistentStorageState with PageEntry = SwateEntry.Core }
                 PageState = nextPageState
         }
         nextModel,Cmd.none
@@ -57,27 +56,29 @@ module Dev =
                     Log = parsedLogs@currentState.Log
                     DisplayLogList = parsedDisplayLogs@currentState.DisplayLogList
             }
-            nextState, nextCmd
+            let batch = Cmd.batch [
+                let modalName = "GenericInteropLogs"
+                if List.isEmpty parsedDisplayLogs |> not then Cmd.ofSub(fun dispatch -> Modals.Controller.renderModal(modalName, Modals.InteropLoggingModal.interopLoggingModal(nextState, dispatch)))
+                nextCmd
+            ]
+            nextState, batch
 
         | GenericError (nextCmd, e) ->
             let nextState = {
                 currentState with
                     Log = LogItem.Error(System.DateTime.Now,e.GetPropagatedError())::currentState.Log
-                    LastFullError = Some (e)
                 }
-            nextState, nextCmd
+            let batch = Cmd.batch [
+                let modalName = "GenericError"
+                Cmd.ofSub(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
+                nextCmd
+            ]
+            nextState, batch
 
         | UpdateDisplayLogList newList ->
             let nextState = {
                 currentState with
                     DisplayLogList = newList
-            }
-            nextState, Cmd.none
-
-        | UpdateLastFullError (eOpt) ->
-            let nextState = {
-                currentState with
-                    LastFullError = eOpt
             }
             nextState, Cmd.none
 
@@ -105,13 +106,13 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getTermSuggestions
-                (5,queryString)
+                {|n= 5; query = queryString; ontology = None|}
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
         nextState,nextCmd
 
-    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (Term [] * UnitSearchRequest) -> ApiMsg) queryString (relUnit:UnitSearchRequest) =
+    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (Term []) -> ApiMsg) queryString =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -124,13 +125,13 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getUnitTermSuggestions
-                (5,queryString,relUnit)
+                {|n= 5; query = queryString|}
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
         nextState,nextCmd
 
-    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString (termMin:TermMinimal) =
+    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString (parent:TermMinimal) =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -143,7 +144,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getTermSuggestionsByParentTerm
-                (5,queryString,termMin)
+                {|n= 5; query = queryString; parent_term = parent|}
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
@@ -164,17 +165,10 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             queryString
             parentOntology
 
-    | GetNewUnitTermSuggestions (queryString,relUnit) ->
+    | GetNewUnitTermSuggestions (queryString) ->
         handleUnitTermSuggestionRequest
             "getUnitTermSuggestions"
             (UnitTermSuggestionResponse >> Response)
-            queryString
-            relUnit
-
-    | GetNewBuildingBlockNameSuggestions queryString ->
-        handleTermSuggestionRequest
-            "getBuildingBlockNameSuggestions"
-            (BuildingBlockNameSuggestionsResponse >> Response)
             queryString
 
     | GetNewAdvancedTermSearchResults options ->
@@ -278,7 +272,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-    let handleUnitTermSuggestionResponse (responseHandler: Term [] * UnitSearchRequest -> Msg) (suggestions: Term[]) (relatedUnitSearch:UnitSearchRequest) =
+    let handleUnitTermSuggestionResponse (responseHandler: Term [] -> Msg) (suggestions: Term[]) =
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -292,7 +286,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         let cmds = Cmd.batch [
             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            (suggestions,relatedUnitSearch) |> responseHandler |> Cmd.ofMsg
+            (suggestions) |> responseHandler |> Cmd.ofMsg
         ]
 
         nextState, cmds
@@ -304,19 +298,11 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
             (TermSearch.NewSuggestions >> TermSearchMsg)
             suggestions
 
-    | UnitTermSuggestionResponse (suggestions,relUnit) ->
+    | UnitTermSuggestionResponse (suggestions) ->
 
         handleUnitTermSuggestionResponse
             (BuildingBlock.Msg.NewUnitTermSuggestions >> BuildingBlockMsg)
-            suggestions
-            relUnit
-            
-
-    | BuildingBlockNameSuggestionsResponse suggestions ->
-
-        handleTermSuggestionResponse
-            (BuildingBlock.Msg.NewBuildingBlockNameSuggestions >> BuildingBlockMsg)
-            suggestions
+            suggestions            
 
     | AdvancedTermSearchResultsResponse results ->
         let finishedCall = {
@@ -367,7 +353,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
                 callHistory = finishedCall::currentState.callHistory
         }
         let cmd =
-            OfficeInterop.FillHiddenColumns (termsWithSearchResult) |> OfficeInteropMsg |> Cmd.ofMsg
+            SpreadsheetInterface.UpdateTermColumnsResponse termsWithSearchResult |> InterfaceMsg |> Cmd.ofMsg
         let loggingCmd =
              ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
         nextState, Cmd.batch [cmd; loggingCmd]
@@ -398,6 +384,7 @@ open Messages
 let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messages.Msg> =
     match apiMsg with
     | ApiError e ->
+        
         let failedCall = {
             currentState.currentCall with
                 Status = Failed (e.GetPropagatedError())
@@ -408,8 +395,13 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messag
                 currentCall = noCall
                 callHistory = failedCall::currentState.callHistory
         }
+        let batch = Cmd.batch [
+            let modalName = "GenericError"
+            Cmd.ofSub(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
+            curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName (e.GetPropagatedError())) |> DevMsg |> Cmd.ofMsg
+        ]
 
-        nextState, curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName (e.GetPropagatedError())) |> DevMsg |> Cmd.ofMsg
+        nextState, batch
 
     | ApiSuccess (level,logMsg) ->
         currentState, curry GenericLog Cmd.none (level,logMsg) |> DevMsg |> Cmd.ofMsg
@@ -438,38 +430,21 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorageMsg) (curr
 
 let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyleState) : SiteStyleState * Cmd<Msg> =
     match styleChangeMsg with
-    | ToggleBurger          ->
-        let nextState = {
-            currentState with
-                BurgerVisible = not currentState.BurgerVisible
-        }
-
-        nextState,Cmd.none
-
-    | ToggleQuickAcessIconsShown ->
-        let nextState = {
-            currentState with
-                QuickAcessIconsShown = not currentState.QuickAcessIconsShown
-        }
-        nextState, Cmd.none
-
     | UpdateColorMode nextColors -> 
         let nextState = {
             currentState with
                 IsDarkMode = nextColors.Name.StartsWith ExcelColors.darkMode.Name;
                 ColorMode = nextColors
         }
-        nextState,Cmd.none
+        nextState, Cmd.none
 
-let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
+let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
     match topLevelMsg with
     // Client
-    | ToggleShowDetails ->
-        let nb = currentState.ShowDetails |> not
+    | UpdateBuildingBlockValues nextValues ->
         let nextState = {
             currentState with
-                ShowDetails         = nb
-                BuildingBlockValues = if nb = false then [||] else currentState.BuildingBlockValues
+                BuildingBlockValues = nextValues
         }
         nextState, Cmd.none
     | UpdateCurrentRequestState nextRequState ->
@@ -499,21 +474,13 @@ let handleBuildingBlockMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: 
     | GetSelectedBuildingBlockTermsResponse searchTermResults ->
         let nextState = {
             currentState with
-                ShowDetails         = true
                 BuildingBlockValues = searchTermResults
                 CurrentRequestState = Inactive
         }
-        nextState, Cmd.none
-
-let handleSettingsDataStewardMsg (topLevelMsg:SettingsDataStewardMsg) (currentState: SettingsDataStewardState) : SettingsDataStewardState * Cmd<Msg> =
-    match topLevelMsg with
-    // Client
-    | UpdatePointerJson nextPointerJson ->
-        let nextState = {
-            currentState with
-                PointerJson = nextPointerJson
-        }
-        nextState, Cmd.none
+        let cmd = Cmd.ofSub(fun dispatch ->
+            Modals.Controller.renderModal("BuildingBlockDetails", Modals.BuildingBlockDetailsModal.buildingBlockDetailModal(nextState, dispatch))
+        )
+        nextState, cmd
             
 let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
     match topLevelMsg with
@@ -527,8 +494,6 @@ let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * 
                 }
                 AddBuildingBlockState = {
                     currentModel.AddBuildingBlockState with
-                        ShowBuildingBlockTermSuggestions = false
-                        ShowUnitTermSuggestions = false
                         ShowUnit2TermSuggestions = false
                 }
         }
@@ -560,12 +525,6 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                     msgSeq |> Seq.map Cmd.ofMsg
             ]
         currentModel, cmd
-    | UpdateWarningModal (nextModalOpt) ->
-        let nextModel = {
-            currentModel with
-                WarningModal = nextModalOpt
-        }
-        nextModel, Cmd.none
     | UpdatePageState (pageOpt:Route option) ->
         let nextCmd =
             match pageOpt with
@@ -581,18 +540,30 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextPageState =
             match pageOpt with
             | Some page -> {
-                CurrentPage = page
-                CurrentUrl = Route.toRouteUrl page
+                currentModel.PageState with
+                    CurrentPage = page
+                    CurrentUrl = Route.toRouteUrl page
                 }
             | None -> {
-                CurrentPage = Route.Home
-                CurrentUrl = ""
+                currentModel.PageState with
+                    CurrentPage = Route.TermSearch
+                    CurrentUrl = ""
                 }
         let nextModel = {
             currentModel with
                 PageState = nextPageState
         }
         nextModel, nextCmd
+    | UpdateIsExpert b ->
+        let nextPageState = {
+            currentModel.PageState with
+                IsExpert = b
+        }
+        let nextModel = {
+            currentModel with
+                PageState = nextPageState
+        }
+        nextModel, Cmd.none        
     // does not work due to office.js ->
     // https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
     //| Navigate route ->
@@ -621,8 +592,16 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         nextModel, debouncerCmd
 
     | OfficeInteropMsg excelMsg ->
-        let nextModel,nextCmd = currentModel |> Update.OfficeInterop.update excelMsg
+        let nextModel,nextCmd = Update.OfficeInterop.update currentModel excelMsg
         nextModel,nextCmd
+
+    | SpreadsheetMsg msg ->
+        let nextState, nextModel, nextCmd = Update.Spreadsheet.update currentModel.SpreadsheetModel currentModel msg
+        let nextModel' = {nextModel with SpreadsheetModel = nextState}
+        nextModel', nextCmd
+
+    | InterfaceMsg msg ->
+        Update.Interface.update currentModel msg
 
     | TermSearchMsg termSearchMsg ->
         let nextTermSearchState,nextCmd =
@@ -638,7 +617,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | AdvancedSearchMsg advancedSearchMsg ->
         let nextAdvancedSearchState,nextCmd =
             currentModel.AdvancedSearchState
-            |> AdvancedSearch.update advancedSearchMsg
+            |> SidebarComponents.AdvancedSearch.update advancedSearchMsg
 
         let nextModel = {
             currentModel with
@@ -702,7 +681,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | BuildingBlockMsg addBuildingBlockMsg ->
         let nextAddBuildingBlockState,nextCmd = 
             currentModel.AddBuildingBlockState
-            |> BuildingBlock.update addBuildingBlockMsg
+            |> BuildingBlock.Core.update addBuildingBlockMsg
 
         let nextModel = {
             currentModel with
@@ -735,7 +714,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | BuildingBlockDetails buildingBlockDetailsMsg ->
         let nextState, nextCmd =
             currentModel.BuildingBlockDetailsState
-            |> handleBuildingBlockMsg buildingBlockDetailsMsg
+            |> handleBuildingBlockDetailsMsg buildingBlockDetailsMsg
 
         let nextModel = {
             currentModel with
@@ -750,16 +729,6 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let nextModel = {
             currentModel with
                 SettingsXmlState = nextState
-        }
-        nextModel, nextCmd
-
-    | SettingDataStewardMsg msg ->
-        let nextState, nextCmd =
-            currentModel.SettingsDataStewardState
-            |> handleSettingsDataStewardMsg msg
-        let nextModel = {
-            currentModel with
-                SettingsDataStewardState = nextState
         }
         nextModel, nextCmd
 

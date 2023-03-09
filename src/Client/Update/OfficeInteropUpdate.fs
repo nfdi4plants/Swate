@@ -8,9 +8,8 @@ open OfficeInterop
 open Shared
 open OfficeInteropTypes
 
-
 module OfficeInterop = 
-    let update (excelInteropMsg: OfficeInterop.Msg) (currentModel:Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
+    let update (currentModel:Messages.Model) (excelInteropMsg: OfficeInterop.Msg) : Messages.Model * Cmd<Messages.Msg> =
 
         match excelInteropMsg with
 
@@ -24,29 +23,6 @@ module OfficeInterop =
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel, cmd
 
-        | Initialized (h,p) ->
-            let welcomeMsg = sprintf "Ready to go in %s running on %s" h p
-
-            let nextModel = {
-                currentModel.ExcelState with
-                    Host        = h
-                    Platform    = p
-            } 
-
-            let cmd =
-                Cmd.batch [
-                    Cmd.ofMsg (GetAppVersion |> Request |> Api)
-                    Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.tryFindActiveAnnotationTable
-                        ()
-                        (AnnotationTableExists >> OfficeInteropMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-                    Cmd.ofMsg (curry GenericLog Cmd.none ("Info",welcomeMsg) |> DevMsg)
-                ]
-
-            currentModel.updateByExcelState nextModel, cmd
-
         | AnnotationTableExists annoTableOpt ->
             let exists =
                 match annoTableOpt with
@@ -56,7 +32,6 @@ module OfficeInterop =
                 currentModel.ExcelState with
                     HasAnnotationTable = exists
             }
-
             currentModel.updateByExcelState nextState,Cmd.none
 
         | InsertOntologyTerm (term) ->
@@ -86,7 +61,16 @@ module OfficeInterop =
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel, cmd
 
-        | RemoveAnnotationBlock ->
+        | ImportFile buildingBlockTables ->
+            let nextCmd =
+                Cmd.OfPromise.either
+                    OfficeInterop.Core.addAnnotationBlocksInNewSheets
+                    buildingBlockTables
+                    (curry GenericInteropLogs Cmd.none >> DevMsg)
+                    (curry GenericError Cmd.none >> DevMsg)
+            currentModel, nextCmd
+
+        | RemoveBuildingBlock ->
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.removeSelectedAnnotationBlock
@@ -104,7 +88,8 @@ module OfficeInterop =
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel, cmd
 
-        | CreateAnnotationTable (isDark, tryUsePrevOutput) ->
+        | CreateAnnotationTable(tryUsePrevOutput) ->
+            let isDark = currentModel.SiteStyleState.IsDarkMode
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.createAnnotationTable  

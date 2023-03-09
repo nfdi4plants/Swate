@@ -3,7 +3,7 @@
 @REM https://docs.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins
 
 SET nfdiFolderName=nfdi_manifests
-SET nfdiFolder=%LOCALAPPDATA%\%nfdiFolderName%
+SET nfdiFolder="%LOCALAPPDATA%\%nfdiFolderName%"
 SET computer=%computername%
 SET user=%USERNAME%
 SET nfdiShareName=nfdi_manifest_%user%
@@ -55,7 +55,7 @@ curl.exe --output %nfdiFolder%/swateExperts_manifest.xml --url https://raw.githu
 ECHO Share folder with Excel network..
 
 @REM Share folder with user
-net share %nfdiShareName%=%nfdiFolder% /grant:%user%,FULL
+net share "%nfdiShareName%"=%nfdiFolder% /grant:"%user%",FULL
 
 ECHO Create registry file for Excel..
 
@@ -71,7 +71,8 @@ ECHO Create registry file for Excel..
 
 ECHO Execute registry file for Excel..
 
-%nfdiFolder%/TrustNetworkShareCatalog.reg
+cd %nfdiFolder%
+TrustNetworkShareCatalog.reg
 
 REM https://stackoverflow.com/questions/2048509/how-to-echo-with-different-colors-in-the-windows-command-line
 

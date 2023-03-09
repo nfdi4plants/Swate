@@ -13,64 +13,24 @@ module Protocol =
 
         match fujMsg with
         // // ------ Process from file ------
-        | ParseUploadedFileRequest ->
+        | ParseUploadedFileRequest bytes ->
             let nextModel = { currentState with Loading = true }
-            //let api =
-            //    match currentState.JsonExportType with
-            //    | JsonExportType.ProcessSeq ->
-            //        Api.swateJsonAPIv1.parseProcessSeqToBuildingBlocks
-            //    | JsonExportType.Assay ->
-            //        Api.swateJsonAPIv1.parseAssayJsonToBuildingBlocks
-            //    | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
             let cmd =
                 Cmd.OfAsync.either
-                    Api.swateJsonAPIv1.tryParseToBuildingBlocks
-                    currentState.UploadedFile
+                    Api.templateApi.tryParseToBuildingBlocks
+                    bytes
                     (ParseUploadedFileResponse >> ProtocolMsg)
                     (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
             nextModel, cmd
         | ParseUploadedFileResponse buildingBlockTables ->
-            let nextCmd =
-                match Array.tryExactlyOne buildingBlockTables with
-                | Some (_,buildingBlocks) ->
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.addAnnotationBlocks
-                        buildingBlocks
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-                | None ->
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.addAnnotationBlocksInNewSheets
-                        buildingBlockTables
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-            currentState, nextCmd
-        // Client
-        | UpdateJsonExportType nextType ->
-            let nextModel = {
-                currentState with
-                    ShowJsonTypeDropdown    = false
-                    JsonExportType          = nextType
-            }
-            nextModel, Cmd.none
-        | UpdateUploadFile nextFileStr ->
-            let nextModel = {
-                currentState with
-                    UploadedFile = nextFileStr
-            }
-            nextModel, Cmd.none
-        | UpdateShowJsonTypeDropdown show ->
-            let nextModel = {
-                currentState with
-                    ShowJsonTypeDropdown = show
-            }
-            nextModel, Cmd.none 
+            let nextState = { currentState with UploadedFileParsed = buildingBlockTables; Loading = false }
+            nextState, Cmd.none
         // ------ Protocol from Database ------
         | GetAllProtocolsRequest ->
             let nextState = {currentState with Loading = true}
             let cmd =
                 Cmd.OfAsync.either
-                    Api.protocolApi.getAllProtocolsWithoutXml
+                    Api.templateApi.getAllTemplatesWithoutXml
                     ()
                     (GetAllProtocolsResponse >> ProtocolMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -85,7 +45,7 @@ module Protocol =
         | GetProtocolByIdRequest templateId ->
             let cmd =
                 Cmd.OfAsync.either
-                    Api.protocolApi.getProtocolById
+                    Api.templateApi.getTemplateById
                     templateId
                     (GetProtocolByIdResponse >> ProtocolMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -95,13 +55,13 @@ module Protocol =
                 currentState with
                     ProtocolSelected = Some prot
                     //ValidationXml = Some validation
-                    DisplayedProtDetailsId = None
+                    //DisplayedProtDetailsId = None
             }
             nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.Protocol)
         | ProtocolIncreaseTimesUsed templateId ->
             let cmd =
                 Cmd.OfAsync.attempt
-                    Api.protocolApi.increaseTimesUsedById
+                    Api.templateApi.increaseTimesUsedById
                     templateId
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd
@@ -112,64 +72,13 @@ module Protocol =
                 currentState with Loading = nextLoadingState
             }
             nextState, Cmd.none
-        | UpdateDisplayedProtDetailsId idOpt ->
-            let nextState = {
-                currentState with
-                    DisplayedProtDetailsId = idOpt
-            }
-            nextState, Cmd.none
-        | UpdateProtocolNameSearchQuery strVal ->
-            let nextState = {
-                currentState with ProtocolNameSearchQuery = strVal
-            }
-            nextState, Cmd.none
-        | UpdateProtocolTagSearchQuery strVal ->
-            let nextState = {
-                currentState with ProtocolTagSearchQuery = strVal
-            }
-            nextState, Cmd.none
-        | AddProtocolTag tagStr ->
-            let nextState = {
-                currentState with
-                    ProtocolFilterTags      = tagStr::currentState.ProtocolFilterTags
-                    ProtocolTagSearchQuery  = ""
-            }
-            nextState, Cmd.none
-        | RemoveProtocolTag tagStr ->
-            let nextState = {
-                currentState with
-                    ProtocolFilterTags = currentState.ProtocolFilterTags |> List.filter (fun x -> x <> tagStr)
-            }
-            nextState, Cmd.none
-        | AddProtocolErTag tagStr ->
-            let nextState = {
-                currentState with
-                    ProtocolFilterErTags      = tagStr::currentState.ProtocolFilterErTags
-                    ProtocolTagSearchQuery  = ""
-            }
-            nextState, Cmd.none
-        | RemoveProtocolErTag tagStr ->
-            let nextState = {
-                currentState with
-                    ProtocolFilterErTags = currentState.ProtocolFilterErTags |> List.filter (fun x -> x <> tagStr)
-            }
-            nextState, Cmd.none
-        | UpdateCuratedCommunityFilter nextFilter ->
-            let nextState = {
-                currentState with
-                    CuratedCommunityFilter = nextFilter
-            }
-            nextState, Cmd.none
-        | UpdateTagFilterIsAnd isAnd ->
-            let nextState = {
-                currentState with
-                    TagFilterIsAnd = isAnd
-            }
-            nextState, Cmd.none
         | RemoveSelectedProtocol ->
             let nextState = {
                 currentState with
                     ProtocolSelected = None
                     ValidationXml = None
             }
+            nextState, Cmd.none
+        | RemoveUploadedFileParsed ->
+            let nextState = {currentState with UploadedFileParsed = Array.empty}
             nextState, Cmd.none

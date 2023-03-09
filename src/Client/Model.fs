@@ -9,6 +9,38 @@ open TemplateTypes
 open Thoth.Elmish
 open Routing
 
+type WindowSize =
+/// < 575
+| Mini
+/// > 575
+| MobileMini
+/// > 768
+| Mobile
+/// > 1023
+| Tablet
+/// > 1215
+| Desktop
+/// > 1407
+| Widescreen
+with
+    member this.threshold =
+        match this with
+        | Mini -> 0
+        | MobileMini -> 575
+        | Mobile -> 768
+        | Tablet -> 1023
+        | Desktop -> 1215
+        | Widescreen -> 1407
+    static member ofWidth (width:int) =
+        match width with
+        | _ when width < MobileMini.threshold -> Mini
+        | _ when width < Mobile.threshold -> MobileMini
+        | _ when width < Tablet.threshold -> Mobile
+        | _ when width < Desktop.threshold -> Tablet
+        | _ when width < Widescreen.threshold -> Desktop  
+        | _ when width >= Widescreen.threshold -> Widescreen
+        | anyElse -> failwithf "'%A' triggered an unexpected error when calculating screen size from width." anyElse        
+
 type Cookies =
 | IsDarkMode
 
@@ -68,11 +100,21 @@ type LogItem =
         | "Warning" | "warning" -> Warning(System.DateTime.UtcNow,message)
         | others -> Error(System.DateTime.UtcNow,sprintf "Swate found an unexpected log identifier: %s" others)
 
-type TermSearchMode =
-    | Simple
-    | Advanced
-
 module TermSearch =
+
+    type TermSearchUIState = {
+        SearchIsActive          : bool
+        SearchIsLoading         : bool
+    } with
+        static member init() = {
+            SearchIsActive          = false
+            SearchIsLoading         = false
+        }
+
+    type TermSearchUIController = {
+        state: TermSearchUIState
+        setState: TermSearchUIState -> unit
+    }
 
     type Model = {
 
@@ -124,27 +166,25 @@ module AdvancedSearch =
             HasAdvancedSearchResultsLoading     = false
             AdvancedTermSearchSubpage           = InputFormSubpage
         }
+        static member BuildingBlockHeaderId = "BuildingBlockHeader_ATS_Id"
+        static member BuildingBlockBodyId = "BuildingBlockBody_ATS_Id"
+
+ 
 
 type SiteStyleState = {
-    QuickAcessIconsShown : bool
-    BurgerVisible   : bool
     IsDarkMode      : bool
     ColorMode       : ExcelColors.ColorMode
 } with
     static member init (?darkMode) = {
-        QuickAcessIconsShown    = false
-        BurgerVisible           = false
         IsDarkMode              = if darkMode.IsSome then darkMode.Value else false
         ColorMode               = if darkMode.IsSome && darkMode.Value = true then ExcelColors.darkMode else ExcelColors.colorfullMode
     }
 
 type DevState = {
-    LastFullError                       : System.Exception option
     Log                                 : LogItem list
     DisplayLogList                      : LogItem list
 } with
     static member init () = {
-        LastFullError   = None
         DisplayLogList  = []
         Log             = []
     }
@@ -152,14 +192,14 @@ type DevState = {
 type PersistentStorageState = {
     SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
+    Host                    : Swatehost
     HasOntologiesLoaded     : bool
-    PageEntry               : SwateEntry
 } with
-    static member init (?pageEntry:SwateEntry) = {
+    static member init () = {
         SearchableOntologies    = [||]
+        Host                    = Swatehost.None
         AppVersion              = ""
         HasOntologiesLoaded     = false
-        PageEntry               = if pageEntry.IsSome then pageEntry.Value else SwateEntry.Core
     }
 
 type ApiCallStatus =
@@ -190,16 +230,19 @@ type ApiState = {
 type PageState = {
     CurrentPage : Routing.Route
     CurrentUrl  : string
+    IsExpert    : bool
 } with
     static member init (pageOpt:Route option) = 
         match pageOpt with
         | Some page -> {
             CurrentPage = page
             CurrentUrl = Route.toRouteUrl page
+            IsExpert = page.isExpert
             }
         | None -> {
-            CurrentPage = Route.Home
+            CurrentPage = Route.TermSearch
             CurrentUrl = ""
+            IsExpert = false
             }
 
 module FilePicker =
@@ -232,25 +275,31 @@ module BuildingBlock =
             | Output -> "Output columns allow to specify the exact output for your table. Per table only one output column is allowed. The value of this column must be a unique identifier."
             | _ -> ""
 
+    type BuildingBlockUIState = {
+        DropdownIsActive        : bool
+        DropdownPage            : DropdownPage
+        BuildingBlockType       : BuildingBlockType
+    } with
+        static member init() = {
+            DropdownIsActive        = false
+            DropdownPage            = DropdownPage.Main
+            BuildingBlockType       = BuildingBlockType.Parameter
+        }
+
     type Model = {
-        CurrentBuildingBlock                    : BuildingBlockNamePrePrint
 
-        DropdownPage                            : DropdownPage
+        HeaderSearchText                        : string
+        /// This always referrs to any term applied to the header.
+        HeaderSearchResults                     : Term []
+        /// This always referrs to any term applied to the header.
+        HeaderSelectedTerm                      : Term option
+        BodySearchText                          : string
+        /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
+        BodySearchResults                       : Term []
+        /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
+        BodySelectedTerm                        : Term option
 
-        BuildingBlockSelectedTerm               : Term option
-        BuildingBlockNameSuggestions            : Term []
-        ShowBuildingBlockSelection              : bool
-        BuildingBlockHasUnit                    : bool
-        ShowBuildingBlockTermSuggestions        : bool
-        HasBuildingBlockTermSuggestionsLoading  : bool
-
-        // This section is used to add a unit directly to a freshly created building block.
-        UnitTermSearchText                      : string
-        UnitSelectedTerm                        : Term option
-        UnitTermSuggestions                     : Term []
-        HasUnitTermSuggestionsLoading           : bool
-        ShowUnitTermSuggestions                 : bool
-
+        // Below everything is more or less deprecated
         // This section is used to add a unit directly to an already existing building block
         Unit2TermSearchText                     : string
         Unit2SelectedTerm                       : Term option
@@ -260,24 +309,15 @@ module BuildingBlock =
 
     } with
         static member init () = {
-            ShowBuildingBlockSelection              = false
 
-            DropdownPage                            = DropdownPage.Main
+            HeaderSearchText                        = ""
+            HeaderSearchResults                     = [||]
+            HeaderSelectedTerm                      = None
+            BodySearchText                          = ""
+            BodySearchResults                       = [||]
+            BodySelectedTerm                        = None
 
-            CurrentBuildingBlock                    = BuildingBlockNamePrePrint.init BuildingBlockType.Parameter
-            BuildingBlockSelectedTerm               = None
-            BuildingBlockNameSuggestions            = [||]
-            ShowBuildingBlockTermSuggestions        = false
-            HasBuildingBlockTermSuggestionsLoading  = false
-            BuildingBlockHasUnit                    = false
-
-            // This section is used to add a unit directly to a freshly created building block.
-            UnitTermSearchText                      = ""
-            UnitSelectedTerm                        = None
-            UnitTermSuggestions                     = [||]
-            ShowUnitTermSuggestions                 = false
-            HasUnitTermSuggestionsLoading           = false
-
+            // Below everything is more or less deprecated
             // This section is used to add a unit directly to an already existing building block
             Unit2TermSearchText                     = ""
             Unit2SelectedTerm                       = None
@@ -300,7 +340,6 @@ module Validation =
             DisplayedOptionsId          = None
         }
 
-
 module Protocol =
 
     [<RequireQualifiedAccess>]
@@ -314,36 +353,18 @@ module Protocol =
         // Client 
         Loading                 : bool
         // // ------ Process from file ------
-        UploadedFile            : string
-        ShowJsonTypeDropdown    : bool
-        JsonExportType          : Shared.JsonExportType
+        UploadedFileParsed      : (string*InsertBuildingBlock []) []
         // ------ Protocol from Database ------
         ProtocolSelected        : Template option
         ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
         ProtocolsAll            : Template []
-        DisplayedProtDetailsId  : int option
-        ProtocolNameSearchQuery : string
-        ProtocolTagSearchQuery  : string
-        ProtocolFilterTags      : string list
-        ProtocolFilterErTags    : string list
-        CuratedCommunityFilter  : CuratedCommunityFilter
-        TagFilterIsAnd          : bool
     } with
         static member init () = {
             // Client
             Loading                 = false
-            ProtocolNameSearchQuery = ""
-            ProtocolTagSearchQuery  = ""
-            ProtocolFilterTags      = []
-            ProtocolFilterErTags    = []
-            CuratedCommunityFilter  = CuratedCommunityFilter.Both
-            TagFilterIsAnd          = true
-            DisplayedProtDetailsId  = None
             ProtocolSelected        = None
             // // ------ Process from file ------
-            UploadedFile            = ""
-            ShowJsonTypeDropdown    = false
-            JsonExportType          = Shared.JsonExportType.Assay
+            UploadedFileParsed      = [||]
             // ------ Protocol from Database ------
             ProtocolsAll            = [||]
             ValidationXml           = None
@@ -361,12 +382,10 @@ type RequestBuildingBlockInfoStates =
 
 type BuildingBlockDetailsState = {
     CurrentRequestState : RequestBuildingBlockInfoStates
-    ShowDetails         : bool
     BuildingBlockValues : TermSearchable []
 } with
     static member init () = {
         CurrentRequestState = Inactive
-        ShowDetails         = false
         BuildingBlockValues = [||]
     }
 
@@ -403,12 +422,5 @@ module SettingsXml =
             FoundTables                             = [||]
             ValidationXmls                          = [||]
         }
-
-type SettingsDataStewardState = {
-    PointerJson : string option
-} with
-    static member init () = {
-        PointerJson = None
-    }
 
 // The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

@@ -33,7 +33,7 @@ module TermSearch =
 
     type Msg =
         | ToggleSearchByParentOntology
-        | SearchTermTextChange                  of string
+        | SearchTermTextChange                  of searchString:string * parentTerm: TermMinimal option
         | TermSuggestionUsed                    of Term
         | NewSuggestions                        of Term []
         | StoreParentOntologyFromOfficeInterop  of TermMinimal option
@@ -61,14 +61,12 @@ type DevMsg =
     | GenericLog            of Cmd<Messages.Msg> * (string*string)
     | GenericInteropLogs    of Cmd<Messages.Msg> * InteropLogging.Msg list
     | GenericError          of Cmd<Messages.Msg> * exn
-    | UpdateDisplayLogList of LogItem list
-    | UpdateLastFullError   of exn option
+    | UpdateDisplayLogList  of LogItem list
     
 type ApiRequestMsg =
     | GetNewTermSuggestions                     of string
     | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
-    | GetNewBuildingBlockNameSuggestions        of string
-    | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
+    | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedSearchTypes.AdvancedSearchOptions
     | FetchAllOntologies
     /// TermSearchable [] is created by officeInterop and passed to server for db search.
@@ -79,8 +77,7 @@ type ApiRequestMsg =
 type ApiResponseMsg =
     | TermSuggestionResponse                    of Term []
     | AdvancedTermSearchResultsResponse         of Term []
-    | BuildingBlockNameSuggestionsResponse      of Term []
-    | UnitTermSuggestionResponse                of Term [] * relatedUnitSearch:UnitSearchRequest
+    | UnitTermSuggestionResponse                of Term []
     | FetchAllOntologiesResponse                of Ontology []
     | SearchForInsertTermsResponse              of TermSearchable []  
     //
@@ -93,8 +90,6 @@ type ApiMsg =
     | ApiSuccess of (string*string)
 
 type StyleChangeMsg =
-    | ToggleBurger
-    | ToggleQuickAcessIconsShown
     | UpdateColorMode of ColorMode
 
 type PersistentStorageMsg =
@@ -108,20 +103,25 @@ module FilePicker =
 
 module BuildingBlock =
 
+    open TermSearch
+
     type Msg =
-    | UpdateDropdownPage        of BuildingBlock.DropdownPage
-
-    | NewBuildingBlockSelected  of BuildingBlockNamePrePrint
-    | BuildingBlockNameChange   of string
-    | ToggleSelectionDropdown
-
-    | BuildingBlockNameSuggestionUsed   of Term
-    | NewBuildingBlockNameSuggestions   of Term []
-
-    | SearchUnitTermTextChange  of searchString:string * relatedUnitSearch:UnitSearchRequest
-    | UnitTermSuggestionUsed    of unitTerm:Term* relatedUnitSearch:UnitSearchRequest
-    | NewUnitTermSuggestions    of Term [] * relatedUnitSearch:UnitSearchRequest
-    | ToggleBuildingBlockHasUnit
+    | UpdateHeaderSearchText of string
+    | GetHeaderSuggestions of string*TermSearchUIController
+    | GetHeaderSuggestionsResponse of Term []*TermSearchUIController
+    | SelectHeaderTerm of Term option
+    | UpdateBodySearchText of string
+    | GetBodySuggestions of string*TermSearchUIController
+    | GetBodySuggestionsByParent of string*TermMinimal*TermSearchUIController
+    /// Returns all child terms
+    | GetBodyTermsByParent of TermMinimal*TermSearchUIController
+    | GetBodySuggestionsResponse of Term []*TermSearchUIController
+    | SelectBodyTerm of Term option
+    // Below everything is more or less deprecated
+    // Is still used for unit update in office
+    | SearchUnitTermTextChange  of searchString:string
+    | UnitTermSuggestionUsed    of unitTerm:Term
+    | NewUnitTermSuggestions    of Term []
 
 module Validation =
 
@@ -136,13 +136,10 @@ module Protocol =
 
     type Msg =
         // // ------ Process from file ------
-        | ParseUploadedFileRequest
+        | ParseUploadedFileRequest          of raw: byte []
         | ParseUploadedFileResponse         of (string * InsertBuildingBlock []) []
         // Client
-        /// Update JsonExportType which defines the type of json which is supposedly uploaded. Determines function which will be used for parsing.
-        | UpdateJsonExportType              of Shared.JsonExportType
-        | UpdateUploadFile                  of jsonString:string
-        | UpdateShowJsonTypeDropdown        of bool
+        | RemoveUploadedFileParsed
         // // ------ Protocol from Database ------
         | GetAllProtocolsRequest
         | GetAllProtocolsResponse           of Template []
@@ -150,22 +147,13 @@ module Protocol =
         | GetProtocolByIdResponse           of Template
         | ProtocolIncreaseTimesUsed         of protocolName:string
         // Client
-        | UpdateDisplayedProtDetailsId      of int option
-        | UpdateProtocolNameSearchQuery     of string
-        | UpdateProtocolTagSearchQuery      of string
-        | AddProtocolTag                    of string
-        | RemoveProtocolTag                 of string
-        | AddProtocolErTag                  of string
-        | RemoveProtocolErTag               of string
-        | UpdateCuratedCommunityFilter      of Protocol.CuratedCommunityFilter
-        | UpdateTagFilterIsAnd              of bool
         | RemoveSelectedProtocol
         | UpdateLoading                     of bool
 
 type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockTermsRequest      of TermSearchable []
     | GetSelectedBuildingBlockTermsResponse     of TermSearchable []
-    | ToggleShowDetails
+    | UpdateBuildingBlockValues                 of TermSearchable []
     | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
 
 module SettingsXml =
@@ -178,12 +166,10 @@ type SettingsDataStewardMsg =
     // Client
     | UpdatePointerJson of string option
 
-
 type TopLevelMsg =
     | CloseSuggestions
 
 type Model = {
-
     ///PageState
     PageState                   : PageState
     ///Data that needs to be persistent once loaded
@@ -199,7 +185,8 @@ type Model = {
     AdvancedSearchState         : AdvancedSearch.Model
     ///Use this in the future to model excel stuff like table data
     ExcelState                  : OfficeInterop.Model
-    ///Use this to log Api calls and maybe handle them better
+    /// This should be removed. Overhead making maintainance more difficult
+    /// "Use this to log Api calls and maybe handle them better"
     ApiState                    : ApiState
     ///States regarding File picker functionality
     FilePickerState             : FilePicker.Model
@@ -216,9 +203,8 @@ type Model = {
     TemplateMetadataModel       : TemplateMetadata.Model
     DagModel                    : Dag.Model
     CytoscapeModel              : Cytoscape.Model
-    ///Used to manage functions specifically for data stewards
-    SettingsDataStewardState    : SettingsDataStewardState
-    WarningModal                : {|NextMsg:Msg; ModalMessage: string|} option
+    /// Contains all information about spreadsheet view
+    SpreadsheetModel            : Spreadsheet.Model
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
@@ -247,56 +233,17 @@ type Msg =
 | TemplateMetadataMsg   of TemplateMetadata.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | SettingsXmlMsg        of SettingsXml.Msg
-| SettingDataStewardMsg of SettingsDataStewardMsg
 | CytoscapeMsg          of Cytoscape.Msg
+| SpreadsheetMsg        of Spreadsheet.Msg
 | DagMsg                of Dag.Msg
+/// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
+| InterfaceMsg          of SpreadsheetInterface.Msg
 //| SettingsProtocolMsg   of SettingsProtocolMsg
 | TopLevelMsg           of TopLevelMsg
 | UpdatePageState       of Routing.Route option
+| UpdateIsExpert        of bool
 | Batch                 of seq<Messages.Msg>
-/// This function is used to pass any 'Msg' through a warning modal, where the user needs to verify his decision.
-| UpdateWarningModal    of {|NextMsg:Msg; ModalMessage: string|} option
-/// Top level msg to test specific  api interactions, only for dev.
+/// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI
 | DoNothing
-
-let initializeModel (pageOpt: Route option, pageEntry:SwateEntry) =
-    let isDarkMode =
-        let cookies = Browser.Dom.document.cookie
-        let cookiesSplit = cookies.Split([|";"|], System.StringSplitOptions.RemoveEmptyEntries)
-        cookiesSplit
-        |> Array.tryFind (fun x -> x.StartsWith (Cookies.IsDarkMode.toCookieString + "="))
-        |> fun cookieOpt ->
-            if cookieOpt.IsSome then
-                cookieOpt.Value.Replace(Cookies.IsDarkMode.toCookieString + "=","")
-                |> fun cookie ->
-                    match cookie with
-                    | "false"| "False"  -> false
-                    | "true" | "True"   -> true
-                    | anyElse -> false
-            else
-                false
-    {
-        DebouncerState              = Debouncer                 .create ()
-        PageState                   = PageState                 .init pageOpt
-        PersistentStorageState      = PersistentStorageState    .init (pageEntry=pageEntry)
-        DevState                    = DevState                  .init ()
-        SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
-        TermSearchState             = TermSearch.Model          .init ()
-        AdvancedSearchState         = AdvancedSearch.Model      .init ()
-        ExcelState                  = OfficeInterop.Model       .init ()
-        ApiState                    = ApiState                  .init ()
-        FilePickerState             = FilePicker.Model          .init ()
-        AddBuildingBlockState       = BuildingBlock.Model       .init ()
-        ValidationState             = Validation.Model          .init ()
-        ProtocolState               = Protocol.Model            .init ()
-        BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
-        SettingsXmlState            = SettingsXml.Model         .init ()
-        SettingsDataStewardState    = SettingsDataStewardState  .init ()
-        JsonExporterModel           = JsonExporter.State.Model  .init ()
-        TemplateMetadataModel       = TemplateMetadata.Model    .init ()
-        DagModel                    = Dag.Model                 .init ()
-        CytoscapeModel              = Cytoscape.Model           .init ()
-        WarningModal                = None
-    }

@@ -6,6 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Spreadsheet\Controller.Tests.fs" />
+    <Compile Include="OfficeInterop.Indexing.Tests.fs" />
+    <Compile Include="FilePickerView.Tests.fs" />
     <Compile Include="BuildingBlockView.Tests.fs" />
     <Compile Include="BuildingBlockFunctions.Tests.fs" />
     <Compile Include="Client.Tests.fs" />

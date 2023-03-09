@@ -2,9 +2,12 @@ source https://api.nuget.org/v3/index.json
 framework: net6.0
 storage: none
 
+nuget Feliz.ElmishComponents 1.2.0
+nuget FSharp.Core ~> 6
 nuget DynamicObj 0.2.1
 nuget ExcelJS.Fable
 nuget Fable.Remoting.Giraffe
+nuget Microsoft.AspNetCore.Authentication.JwtBearer 6.0.13
 nuget ISADotNet 0.6.0
 nuget ISADotNet.XLSX 0.6.0
 nuget ISADotNet.Viz 0.6.0
@@ -13,24 +16,29 @@ nuget Saturn
 nuget Expecto
 nuget FSharp.Data
 nuget Microsoft.Extensions.Configuration.UserSecrets
+nuget System.Text.Encodings.Web
 
-nuget Fable.Core
-nuget Fable.Elmish
+nuget Fable.Core ~> 3
+nuget Fable.Elmish 3.1.0
 nuget Fable.Elmish.React
 nuget Fable.Elmish.Debugger
 nuget Fable.Elmish.HMR
-nuget Fable.FontAwesome.Free
-nuget Fable.Mocha
-nuget Fable.React
-nuget Fable.Remoting.Client
-nuget Fulma
-nuget Fable.Browser.MediaQueryList
 nuget Fable.Elmish.Browser
-nuget Fulma.Extensions.Wikiki.Switch
-nuget System.Text.Encodings.Web
+nuget Fable.Mocha
+nuget Fable.React 7.4.3
+nuget Fable.Remoting.Client
+nuget Feliz ~> 1
+nuget Feliz.CompilerPlugins ~> 1
+nuget Feliz.Bulma
+nuget Feliz.UseElmish
+nuget Fable.Browser.MediaQueryList
 nuget Thoth.Elmish.Debouncer
 
 nuget Fable.SimpleJson
 nuget Fable.SimpleXml
+
+nuget Fulma
+nuget Fable.FontAwesome.Free
+nuget Fulma.Extensions.Wikiki.Switch
 nuget Fulma.Extensions.Wikiki.Checkradio
 nuget Fulma.Extensions.Wikiki.Slider

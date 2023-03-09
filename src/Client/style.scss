@@ -32,12 +32,40 @@ $switch-background-active: $excelPrimary;
 @import "~bulma-slider";
 
 
+/*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/
+.fixed_headers {
+    border-collapse: collapse;
+    width: max-content;
+    border-style: hidden
+}
+
+.fixed_headers td,
+.fixed_headers thead th {
+    text-align: left;
+}
+
+.fixed_headers thead tr {
+    position: relative;
+}
+
+.fixed_headers tbody tr:nth-child(even) {
+    background-color: #DDD;
+}
+
+.fixed_headers thead th {
+    position: sticky;
+    top: 0; /* REQUIRED: https://stackoverflow.com/a/43707215 */
+    resize: horizontal;
+    overflow: auto;
+    z-index: 2
+}
+
 html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     font-size: 14px;
-    /*    background: #F0F2F4;*/
-    min-width: 300px;
-    height: 100vh
+    min-width: 400px;
+    height: 100vh;
+    overflow: auto
 }
 
 a {
@@ -46,6 +74,22 @@ a {
 
 a:hover {
     color: $lightBlueLighter20
+}
+
+.dragover-footertab {
+    position: relative
+}
+
+.dragover-footertab:before {
+    position: absolute;
+    content: "";
+    margin: 0 3px;
+    display: inline-block;
+    border: 7px solid transparent;
+    border-top: 8px solid black;
+    border-bottom: 0 none;
+    top: -3px;
+    left: -9px;
 }
 
 [type=checkbox]:checked.switch.is-primary + label::before, [type=checkbox]:checked.switch.is-primary + label::before {
@@ -80,27 +124,55 @@ a:hover {
 .myNavbarSticky {
     position: sticky;
     position: -webkit-sticky;
+    min-height: min-content;
     top: 0
 }
 
-.myNavbarButtonContainer:focus, .myNavbarButtonContainer:focus-within, .myNavbarButtonContainer:hover, .myNavbarButtonContainer.is-active {
-    background-color: transparent !important;
-    border-color: darkgrey
-}
-
 .myNavbarButton {
-    width: 100%;
-    height: 100%;
+    height: 100% !important;
+    width: 100% !important;
+    background-color: transparent;
+    border-radius: unset;
+    border-color: transparent !important;
     align-items: center;
     justify-content: center;
     color: white;
-    display: inline-flex
+    display: inline-flex;
+    padding: unset;
+    box-shadow: unset !important
 }
 
-.myNavbarButton:active {
-    background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)) !important
+.myNavbarButton:not([disabled]):active {
+    background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)) !important
 }
 
+.myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within, .myNavbarButton:not([disabled]):hover {
+    background-color: transparent;
+}
+
+.myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within {
+    border-color: white !important;
+}
+
+.myNavbarButton:not([disabled]):focus:not(:focus-visible), .myNavbarButton:not([disabled]):focus-within:not(:focus-visible) {
+    border-color: transparent !important;
+    color: white
+}
+
+.myNavbarButton[disabled] {
+    filter: brightness(85%);
+    background-color: transparent;
+    color: white;
+}
+
+.myNavbarButton[disabled]:focus, .myNavbarButton[disabled]:focus-within {
+    box-shadow: unset
+}
+
+/*.myNavbarButton[disabled]:hover {
+    color: white
+}
+*/
 .help {
     @extend .help;
     font-size: 0.85rem;
@@ -421,4 +493,27 @@ input::-ms-clear {
         margin-bottom: 0.5rem;
         font-size: 0.8rem;
     }
+}
+
+.danger_important {
+    color: $red !important
+}
+
+kbd {
+    margin: 0px 0.1em;
+    padding: 0.1em 0.6em;
+    border-radius: 3px;
+    border: 1px solid rgb(204, 204, 204);
+    color: rgb(51, 51, 51);
+    line-height: 1.4;
+    font-family: Arial,Helvetica,sans-serif;
+    font-size: 10px;
+    display: inline-block;
+    box-shadow: 0px 1px 0px rgba(0,0,0,0.2), inset 0px 0px 0px 2px #ffffff;
+    background-color: rgb(247, 247, 247);
+    -moz-box-shadow: 0 1px 0px rgba(0, 0, 0, 0.2), 0 0 0 2px #ffffff inset;
+    -webkit-box-shadow: 0 1px 0px rgba(0, 0, 0, 0.2), 0 0 0 2px #ffffff inset;
+    -moz-border-radius: 3px;
+    -webkit-border-radius: 3px;
+    text-shadow: 0 1px 0 #fff;
 }

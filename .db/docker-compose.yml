@@ -1,10 +1,8 @@
- 
 version: '3.8'
 services:
   redis:
     image: redis:6.2-alpine
     container_name: redis
-    restart: always
     ports:
       - '127.0.0.1:6379:6379'
     command: redis-server --save 20 1 --loglevel warning
@@ -22,26 +20,25 @@ services:
       - swobup_network
     environment:
       - NEO4J_AUTH=neo4j/test
-      - NEO4J_dbms_memory_pagecache_size=2G
-      - NEO4J_dbms_memory_heap_initial__size=4G
-      - NEO4J_dbms_memory_heap_max__size=16G
-      - NEO4J_dbms_default__listen__address=0.0.0.0
-      - NEO4J_dbms_default__advertised__address=10.20.51.223
+      - NEO4J_server_memory_pagecache_size=2G
+      - NEO4J_server_memory_heap_initial__size=5G
+      - NEO4J_server_memory_heap_max__size=8G
+      - NEO4J_server_default__listen__address=0.0.0.0
+      - NEO4J_server_default__advertised__address=10.20.51.223
       - NEO4J_dbms.connector.bolt.address=0.0.0.0:7687
-      - NEO4JLABS_PLUGINS=["graph-data-science", "apoc"]
+      - NEO4J_PLUGINS=["graph-data-science", "apoc"]
       - NEO4J_dbms_security_procedures_unrestricted=algo.*, apoc.*
+      - NEO4J_dbms_security_auth__minimum__password__length=4
     volumes:
       - ./neo4j/data:/data
       - ./neo4j/logs:/logs
       - ./neo4j/import:/var/lib/neo4j/import
       - ./neo4j/plugins:/plugins
-    restart: unless-stopped
   swobup:
     container_name: swobup
     environment:
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
-      - CELERY_S3_BUCKET=frct-swobupdev
       - SWOBUP_USERNAME=swobup
       - SWOBUP_PASSWORD=test
       - SWOBUP_DATASTORAGE=local
@@ -54,7 +51,7 @@ services:
       - SWATE_API=https://192.168.65.2:3000
       - TURN_OFF_SSL_VERIFY=True
       - MAIL_NOTIFICATION=off
-    image: git.bwcloud.uni-freiburg.de:5050/marcel/swobup:latest
+    image: ghcr.io/nfdi4plants/swobup:main
     # https://medium.com/@TimvanBaarsen/how-to-connect-to-the-docker-host-from-inside-a-docker-container-112b4c71bc66#:~:text=As%20of%20Docker%20version%2018.03,on%20Linux%20until%20Docker%2020.10.
     extra_hosts:
     # cat /etc/hosts , as bash command in container

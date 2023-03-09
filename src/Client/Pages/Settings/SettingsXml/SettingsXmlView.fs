@@ -292,8 +292,8 @@ let textAreaEle (model:Model) dispatch =
                                 xmlEle.Value |> Fable.SimpleXml.Generator.ofXmlElement |> Fable.SimpleXml.Generator.serializeXml
                             let msg = OfficeInterop.Msg.UpdateSwateCustomXml rmvWhiteSpace |> OfficeInteropMsg
                             let modalBody = "Changes in this field could potentially invalidate your checklist and protocol xml. Please safe a copy before clicking 'Continue'."
-                            let nM = {|ModalMessage = modalBody; NextMsg = msg|} |> Some
-                            UpdateWarningModal nM |> dispatch
+                            let nM = {|ModalMessage = modalBody; NextMsg = msg|}
+                            Modals.Controller.renderModal("Warning", Modals.WarningModal.warningModal(nM, model, dispatch))
                         else
                             curry DevMsg.GenericError Cmd.none (System.Exception("Could not parse element to valid xml.")) |> DevMsg |> dispatch
                             

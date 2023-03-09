@@ -1,7 +1,6 @@
 module NotFoundView
 
 open Fable.React
-open Model
 open Messages
 
 let notFoundComponent (model:Model) (dispatch:Msg -> unit) =

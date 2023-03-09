@@ -19,7 +19,6 @@ module Graph =
             cy.Value?nodes(str)
         cy.Value.center(mainNode)
         
-
     let createClickEvent (ev) =
         cy.Value.bind "click" "node" ev
 

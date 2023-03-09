@@ -33,376 +33,40 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
         }
         nextState, Cmd.none
 
+/// This logic only works as soon as we can access electron. Will not work in Browser.
+module PathRerooting =
 
-//[<Literal>]
-//let fileTileHeight = "50px"
+    open Fable.Core
+    open Fable.Core.JsInterop
 
-//[<Literal>]
-//let fileTileHeightHalfed = "25px"
+    let private normalizePath (path:string) =
+        path.Replace('\\','/')
 
-//[<Literal>]
-//let fileElementContainerId = "File_Element_Container_DragAndDrop"
+    let listOfSupportedDirectories = ["studies"; "assays"; "workflows"; "runs"] 
 
-//let getNewOrder dragDown dragUp dragEleOrder droppedOnEleOrder changeEleOrder = 
-//    if dragDown then
-//        if changeEleOrder < dragEleOrder
-//        then
-//            changeEleOrder
-//        elif changeEleOrder > droppedOnEleOrder
-//        then
-//            changeEleOrder
-//        elif changeEleOrder = dragEleOrder
-//        then
-//            droppedOnEleOrder
-//        elif changeEleOrder > dragEleOrder && changeEleOrder <= droppedOnEleOrder
-//        then
-//            changeEleOrder - 1
-//        else
-//            failwith (
-//                sprintf
-//                    "Found unknown combination for reordering list elements:
-//                        dragEleOrder: %i
-//                        droppedOnEleOrder: %i"
-//                    dragEleOrder droppedOnEleOrder
-//                )
-//    elif dragUp then
-//        if changeEleOrder < droppedOnEleOrder
-//        then
-//            changeEleOrder
-//        elif changeEleOrder > dragEleOrder
-//        then
-//            changeEleOrder
-//        elif changeEleOrder >= droppedOnEleOrder && changeEleOrder < dragEleOrder
-//        then
-//            changeEleOrder + 1
-//        elif changeEleOrder = dragEleOrder
-//        then
-//            droppedOnEleOrder
-//        else
-//            failwith (
-//                sprintf
-//                    "Found unknown combination for reordering list elements:
-//                        dragEleOrder: %i
-//                        droppedOnEleOrder: %i"
-//                    dragEleOrder droppedOnEleOrder
-//            )
-//    else
-//        failwith "Unknown pattern 0.2"
+    let private matchesSupportedDirectory (str:string) =
+        listOfSupportedDirectories |> List.contains str
 
-//let createEleId id = sprintf "draggable_filePickerEle_%s" id
-//let createWrapperId id = sprintf "wrapper_filerPickerEle_%s" id 
-//let createCloneId id = sprintf "draggable_filePickerEle_%s_Clone" id
-
-//let mutable coordinates : {|x:float; y:float|} option = None
-//let mutable dropped: bool = true
-//let mutable mustUpdateModel: bool = false
-
-//let dragAndDropClone (model:Messages.Model) dispatch id =
-//    let cloneId = createCloneId id
-//    let eleId = createEleId id
-//    let clone() = Browser.Dom.document.getElementById(cloneId)
-//    let child() = Browser.Dom.document.getElementById(eleId)
-//    div [
-//        Id cloneId
-//        Style [
-//            Cursor "pointer";
-//            Padding "1rem 1.5rem";
-//            Position PositionOptions.Absolute
-//            Opacity "0"
-//            Visibility "hidden"
-//            PointerEvents "none"
-//            ZIndex 2
-//        ]
-//        Class "clone"
-
-//        OnTransitionEnd (fun eve ->
-//            if eve.propertyName = "top"
-//                then
-//                    let clone = clone()
-//                    if mustUpdateModel then
-//                        // Update model list
-//                        let newList =
-//                            [
-//                                for ind,name in model.FilePickerState.FileNames do
-//                                    yield (
-//                                        let wrapperId = createWrapperId name
-//                                        let wrapper = Browser.Dom.document.getElementById(wrapperId)
-//                                        let wrapperOrder = wrapper?style?order
-//                                        //printfn "trigger reorder model %i -> %i,%s" ind (int wrapperOrder) name
-//                                        wrapper?style?order <- 0
-//                                        int wrapperOrder,name
-
-//                                    )
-//                            ] |> fun updatedOrderList ->
-//                                    let sortedList = List.sortBy fst updatedOrderList
-//                                    UpdateFileNames ( sortedList ) |> FilePickerMsg |> dispatch
-//                        mustUpdateModel <- false
-//                        clone?style?opacity <- 0
-//                        //clone?style?visibility <- "hidden"
-//                        clone?style?transition <- "all 0s ease 0s"
-//                        child()?style?opacity <- "1"
-//                    else
-//                        clone?style?opacity <- 0
-//                        //clone?style?visibility <- "hidden"
-//                        clone?style?transition <- "all 0s ease 0s"
-//                        child()?style?opacity <- "1"
-//        )
-//        OnDragOver(fun e -> e.preventDefault())
-//    ] [
-//        Delete.delete [
-//            Delete.Props [ Style [
-//                MarginRight "2rem"
-//            ]]
-//        ] []
-//        let fileName = model.FilePickerState.FileNames |> List.find (fun (ind,name) -> id = name) |> snd
-//        str (sprintf "%s" fileName)
-//    ]
-
-//let findIndByFileName (model:Messages.Model) id =
-//    model.FilePickerState.FileNames |> List.find (fun (ind,name) -> name = id) |> fst
-
-//let dragAndDropElement (model:Messages.Model) (dispatch: Messages.Msg -> unit) id =
-//    let eleId = createEleId id
-//    let wrapperId = createWrapperId id
-//    let cloneId = createCloneId id
-//    let parent() = Browser.Dom.document.getElementById(wrapperId)
-//    let child() = Browser.Dom.document.getElementById(eleId)
-//    let clone() = Browser.Dom.document.getElementById(cloneId)
-//    // tile
-//    div [
-//        Id eleId
-//        Style [
-//            Cursor "pointer";
-//            Padding "1rem 1.5rem";
-//            Position PositionOptions.Relative
-//            TextOverflow "Ellipsis"
-//            OverflowX OverflowOptions.Hidden
-//            WhiteSpace WhiteSpaceOptions.Nowrap
-//        ]
-//        Draggable true
-//        OnDragStart (fun eve ->
-//            dropped <- false
-//            eve.stopPropagation()
-//            let offset = child().getBoundingClientRect()
-//            let windowScrollY = Browser.Dom.window.scrollY
-//            parent()?style?height <- "0px"
-//            // display stopped working, so we use opacity now.
-//            child()?style?opacity <- "0"
-//            let clone = clone()
-//            let x = offset.left
-//            let y = offset.top + windowScrollY - offset.height
-//            clone?style?left <- sprintf "%.0fpx" x
-//            clone?style?top <- sprintf "%.0fpx" y
-//            coordinates <- Some {|x = x; y = y|}
-//            clone?style?opacity <- 1
-//            clone?style?visibility <- "unset"
-//            // https://www.digitalocean.com/community/tutorials/js-drag-and-drop-vanilla-js
-//            let set =
-//                eve
-//                    .dataTransfer
-//                    .setData("text/plain", id)
-//            ()
-//        )
-//        OnDragOver(fun e -> e.preventDefault())
-//        OnDrag (fun eve ->
-//            let clone = clone()
-//            let offset = clone.getBoundingClientRect()
-//            let x = eve.pageX - (offset.width * 0.5)
-//            let y = eve.pageY - (1.5 * offset.height)
-//            clone?style?left <- sprintf "%.0fpx" x
-//            clone?style?top <- sprintf "%.0fpx" y
-//        )
-//        OnDragEnter (fun eve ->
-//            eve.stopPropagation()
-//            eve.preventDefault()
-//            //eve.target?style?backgroundColor <- "lightgrey"
-//            //eve.target?style?borderBottom <- "5px solid darkgrey"
-//            parent()?style?backgroundColor <- model.SiteStyleState.ColorMode.ControlForeground
-//            parent()?style?borderBottom <- "5px solid darkgrey"
-//        )
-//        OnDragLeave (fun eve ->
-//            eve.preventDefault()
-//            //eve.target?style?backgroundColor <- ExcelColors.colorfullMode.BodyBackground
-//            //eve.target?style?borderBottom <- "0px solid darkgrey"
-//            parent()?style?backgroundColor <- model.SiteStyleState.ColorMode.BodyBackground
-//            parent()?style?borderBottom <- "0px solid darkgrey"
-//        )
-//        OnDragEnd (fun eve ->
-//            // restore wrapper 
-//            parent()?style?height <- fileTileHeight
-//            let slideClone =
-//                if coordinates.IsNone then failwith "Unknown Drag and Drop pattern 0.2"
-//                if dropped then
-//                    ()
-//                else
-//                    let clone = clone()
-//                    clone?style?transition  <- "0.5s ease"
-//                    clone?style?left        <- sprintf "%.0fpx" coordinates.Value.x
-//                    clone?style?top         <- sprintf "%.0fpx" coordinates.Value.y
-//                    coordinates <- None
-//                    dropped <- true
-//            ()
-//        )
-//        OnDrop (fun eve ->
-//            //eve.stopPropagation()
-//            eve.preventDefault()
-//            dropped <- true
-//            parent()?style?backgroundColor  <- model.SiteStyleState.ColorMode.BodyBackground
-//            parent()?style?borderBottom     <- "0px solid darkgrey"
-
-//            let prevId      = eve.dataTransfer.getData("text")
-//            let prevEle     = Browser.Dom.document.getElementById(createEleId prevId)
-//            let prevWrapper = Browser.Dom.document.getElementById(createWrapperId prevId)
-//            let prevClone   = Browser.Dom.document.getElementById(createCloneId prevId)
-//            let dragEleOrder = findIndByFileName model prevId
-//            let dragDown     = dragEleOrder < findIndByFileName model id //parent()?style?order
-//            let dragUp       = dragEleOrder > findIndByFileName model id //parent()?style?order
-
-//            let droppenOnEleOrder     =
-//                if dragDown then
-//                    //parent()?style?order
-//                    findIndByFileName model id 
-//                elif dragUp then
-//                    let pOrder = findIndByFileName model id  //parent()?style?order
-//                    (int pOrder) + 1
-//                else failwith "Unknown Pattern 0.1"
-
-//            let updateOrder =
-//                for ind,fileName in model.FilePickerState.FileNames do
-//                    let w = Browser.Dom.document.getElementById(createWrapperId fileName)
-//                    w?style?order <- ind
-//                    let changeEleOrder = ind //w?style?order
-//                    let newOrder =
-//                        getNewOrder dragDown dragUp dragEleOrder droppenOnEleOrder changeEleOrder
-//                    //printfn "dragEleOrder %i, droppedOnEleOrder %i, changeEleOrder %i, newOrder: %i" dragEleOrder droppenOnEleOrder changeEleOrder newOrder
-//                    w?style?order <- newOrder
-//                    //printfn "trigger reorderList for: %i -> %i,%s" ind newOrder fileName
-
-//            mustUpdateModel <- true
-//            prevWrapper?style?height <- fileTileHeight
-
-//            let cloneSlide =
-//                let offset = prevWrapper.getBoundingClientRect()
-//                let windowScrollY = Browser.Dom.window.scrollY
-//                let clone = prevClone
-
-//                let x = offset.left
-//                let y = offset.top + windowScrollY - 50.
-//                clone?style?transition <- "0.5s ease"
-//                clone?style?left <- sprintf "%.0fpx" x
-//                clone?style?top <- sprintf "%.0fpx" y
-//            ()
-//        )
-//    ] [
-//        Delete.delete [
-//            Delete.OnClick (fun _ ->
-//                let newList =
-//                    model.FilePickerState.FileNames
-//                    |> List.sortBy fst
-//                    |> List.map snd
-//                    |> List.filter (fun name -> name <> id)
-//                    |> List.mapi (fun i name -> i+1,name)
-//                newList |> UpdateFileNames |> FilePickerMsg |> dispatch
-//            )
-//            Delete.Props [ Style [
-//                if dropped = false then PointerEvents "none"
-//                MarginRight "2rem"
-//            ]]
-//        ] []
-//        str (sprintf "%s" id)
-//        Icon.icon [Icon.Props [Style [Float FloatOptions.Right; Color "darkgrey"]]] [
-//            Fa.i [ Fa.Solid.ArrowsAlt] []
-//        ]
-//    ]
-    
-
-//let fileElement (model:Messages.Model) dispatch (id:string) =
-//    let wrapperId   = createWrapperId id
-//    let order       = model.FilePickerState.FileNames |> List.find (fun (ind,name) -> name = id) |> fst
-//    // wrapper
-//    // https://codepen.io/osublake/pen/XJQKVX
-//    div [
-//        Id wrapperId
-//        Style [
-//            Height fileTileHeight
-//            Transition "0.5s height ease"
-//            Order 0
-//        ]
-//        OnDragOver(fun e -> e.preventDefault())
-//    ] [
-//        dragAndDropElement model dispatch id
-//    ]
-
-//let placeOnTopElement model dispatch =
-//    div [
-//        OnDragOver(fun e -> e.preventDefault())
-//        OnDragEnter (fun eve ->
-//            eve.stopPropagation()
-//            eve.preventDefault()
-//            eve.target?style?borderBottom <- "2px solid darkgrey")
-//        OnDragLeave (fun eve ->
-//            eve.preventDefault()
-//            eve.target?style?borderBottom <- "2px solid white" ) //(sprintf "2px solid %s" ExcelColors.colorfullMode.BodyBackground) )
-//        OnDrop (fun eve ->
-//            eve.preventDefault()
-//            eve.target?style?borderBottom <- "2px solid white" //(sprintf "2px solid %s" ExcelColors.colorfullMode.BodyBackground)
-//            dropped <- true
-//            let prevId      = eve.dataTransfer.getData("text")
-//            let prevWrapper = Browser.Dom.document.getElementById(createWrapperId prevId)
-//            let prevClone   = Browser.Dom.document.getElementById(createCloneId prevId)
-//            //printfn "prev id: %i" prevId
-
-//            // always position at position 1
-//            let droppedOnEleOrder = 1
-//            let dragEleOrder = findIndByFileName model prevId
-//            //printfn "up: %b, down: %b" dragUp dragDown
-
-//            let updateOrder =
-//                for ind,fileName in model.FilePickerState.FileNames do
-//                    let w = Browser.Dom.document.getElementById(createWrapperId fileName)
-//                    w?style?order <- ind
-//                    let changeEleOrder = ind //w?style?order
-//                    let newOrder =
-//                        getNewOrder false true dragEleOrder droppedOnEleOrder changeEleOrder
-//                    //printfn "dragEleOrder %i, droppedOnEleOrder %i, changeEleOrder %i, newOrder: %i" dragEleOrder droppenOnEleOrder changeEleOrder newOrder
-//                    w?style?order <- newOrder
-//                    //printfn "trigger reorderList for: %i -> %i,%s" ind newOrder fileName
-
-//            mustUpdateModel <- true
-//            prevWrapper?style?height <- fileTileHeight
-
-//            let cloneSlide =
-//                let offset = prevWrapper.getBoundingClientRect()
-//                let windowScrollY = Browser.Dom.window.scrollY
-//                let clone = prevClone
-
-//                let x = offset.left
-//                let y = offset.top + windowScrollY - 50.
-//                clone?style?transition <- "0.5s ease"
-//                clone?style?left <- sprintf "%.0fpx" x
-//                clone?style?top <- sprintf "%.0fpx" y
-//            ()
-//        )
-//        Style [
-//            Height fileTileHeightHalfed
-//            Order "-1"
-//            BorderBottom "2px solid white"
-//        ]
-//    ] []
-    
-//let fileElementContainer (model:Messages.Model) dispatch =
-//    div [
-//        Style [Display DisplayOptions.Flex; FlexDirection "column"]
-//        Id fileElementContainerId
-//    ] [
-//        yield
-//            placeOnTopElement model dispatch
-//        for ind,ele in model.FilePickerState.FileNames do
-//            yield 
-//                fileElement model dispatch (ele)
-//            yield
-//                dragAndDropClone model dispatch (ele)
-//    ]
+    /// <summary>Normalizes path and searches for 'listOfSupportedDirectories' (["studies"; "assays"; "workflows"; "runs"]) in path. reroots path to parent of supported directory if found
+    /// else returns only file name.</summary>
+    let rerootPath (path:string) =
+        let sep = '/'
+        let path = normalizePath path // shadow path variable to normalized
+        let splitPath = path.Split(sep)
+        let tryFindLevel = Array.tryFindIndexBack (fun x -> matchesSupportedDirectory x) splitPath
+        match tryFindLevel with
+        // if we cannot find any of `listOfSupportedDirectories` we just return the file name
+        | None ->
+            splitPath |> Array.last
+        | Some levelIndex ->
+            // If we find one of `listOfSupportedDirectories` we want to reroot relative to the folder containing the investigation file.
+            // It is located one level higher than any of `listOfSupportedDirectories`
+            let rootPath =
+                Array.take levelIndex splitPath // one level higher so `levelIndex` instead of `(levelIndex + 1)`
+                |> String.concat (string sep)
+            let relativePath =
+                path.Replace(rootPath + string sep, "")
+            relativePath
 
 let uploadButton (model:Messages.Model) dispatch inputId =
     Field.div [] [
@@ -412,11 +76,13 @@ let uploadButton (model:Messages.Model) dispatch inputId =
             Multiple true
             Type "file"
             OnChange (fun ev ->
-                let files :FileList = ev.target?files
+                let files : FileList = ev.target?files
 
                 let fileNames =
                     [ for i=0 to (files.length - 1) do yield files.item i ]
-                    |> List.map (fun f -> f.name)
+                    |> List.map (fun f ->
+                        f.name
+                    )
 
                 Browser.Dom.console.log fileNames
 
@@ -439,38 +105,22 @@ let uploadButton (model:Messages.Model) dispatch inputId =
         ]
     ]
 
-
-//let fileNameElements (model:Messages.Model) dispatch =
-//    div [ ] [
-//        if model.FilePickerState.FileNames <> [] then
-//            fileElementContainer model dispatch
-
-//            Button.a [
-//                Button.IsFullWidth
-//                if model.FilePickerState.FileNames |> List.isEmpty then
-//                    yield! [
-//                        Button.Disabled true
-//                        Button.IsActive false
-//                        Button.Color Color.IsDanger
-//                    ]
-//                else
-//                    Button.Color Color.IsSuccess
-//                Button.OnClick (fun e ->
-//                    OfficeInterop.InsertFileNames (model.FilePickerState.FileNames |> List.map snd) |> OfficeInteropMsg |> dispatch 
-//                )
-
-//            ] [
-//                str "Insert File Names"
-//            ]
-//        else
-//            div [] [
-//                str "All names from your selected files will be displayed here."
-//            ]
-//    ]
+let insertButton (model:Messages.Model) dispatch =
+    Field.div [] [
+        Button.button [
+            Button.Color IsSuccess
+            Button.IsFullWidth
+            Button.OnClick (fun e ->
+                let fileNames = model.FilePickerState.FileNames |> List.map snd
+                SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch
+            )
+        ] [
+            str "Insert file names"
+        ]
+    ]
 
 let sortButton icon msg =
     Button.a [
-        Button.Color IsInfo
         Button.OnClick msg
     ] [
         Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
@@ -481,7 +131,6 @@ let fileSortElements (model:Messages.Model) dispatch =
         Button.list [] [
             Button.a [
                 Button.Props [Title "Copy to Clipboard"]
-                Button.Color IsInfo
                 Button.OnClick (fun e ->
                     CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
                     let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
@@ -539,6 +188,7 @@ module FileNameTable =
 
     let moveUpButton (id,fileName) (model:Model) dispatch =
         Button.a [
+            Button.Size IsSmall
             Button.OnClick (fun _ ->
                 let sortedList =
                     model.FilePickerState.FileNames
@@ -555,7 +205,6 @@ module FileNameTable =
                     |> List.mapi (fun i v -> i+1, snd v)
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
-            Button.Size IsSmall
         ] [
             Fa.i [Fa.Solid.ArrowUp] []
         ]
@@ -624,6 +273,7 @@ let fileContainer (model:Messages.Model) dispatch inputId=
 
             FileNameTable.table model dispatch
             //fileNameElements model dispatch
+            insertButton model dispatch
     ]
 
 let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =

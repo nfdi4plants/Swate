@@ -1,3 +1,39 @@
+### 0.8.0+1ac8965 (Released 2023-3-9)
+* Additions:
+    * [[#11a5688](https://github.com/nfdi4plants/Swate/commit/11a568808a300d2e90d6dc0d0402d6f45b6142bf)] Redesign add building block function :sparkles:#268
+    * [[#f7c67ad](https://github.com/nfdi4plants/Swate/commit/f7c67ad7ed5c2a62398736efceb1c7017a1d142d)] Improve search speed in specific ontologies :racehorse: and search units in DPBO (#239, #240)
+    * [[#04ff21b](https://github.com/nfdi4plants/Swate/commit/04ff21b10b58acdba7029776a89f6f385917145e)] Add keyboard shortcuts and option to copy/cut/paste :sparkles:#267
+    * [[#43f804b](https://github.com/nfdi4plants/Swate/commit/43f804bf30aea8cdff4782cebd0246ba4485644b)] Add multi row delete :sparkles:
+* Bugfixes:
+    * [[#752a631](https://github.com/nfdi4plants/Swate/commit/752a631a9d4cd0bd4f465f3330ed56213b5dd6dc)] Fix strange search result order (#247)
+
+### 0.7.1+a5a7d62 (Released 2022-12-14)
+* Additions:
+    * [[#a5a7d62](https://github.com/nfdi4plants/Swate/commit/a5a7d62a24ef1545d416e32c1b8be47944d0ed02)] Enable api search by source ontology :sparkles: :books:
+* Bugfixes:
+    * [[#bfae9a8](https://github.com/nfdi4plants/Swate/commit/bfae9a87886bfdf18612c46bb1416d35aaf258b8)] Enable CORS
+
+### 0.7.0+d648b9c (Released 2022-12-13)
+* Additions:
+    * [[#e9e9c80](https://github.com/nfdi4plants/Swate/commit/e9e9c80f02e3e24a1c7497c5cd5c4420d371039a)] Allow adding multiple building blocks of the same type (#243).
+    * [[#5ba5744](https://github.com/nfdi4plants/Swate/commit/5ba57448149846952f562614019df1eed22052c2)] Add tests for new indexing :white_check_mark:
+    * [[#92cbb31](https://github.com/nfdi4plants/Swate/commit/92cbb31504270c77a3188bff559078a07b384261)] Refactor protocol search view :art:
+    * [[#a8584b0](https://github.com/nfdi4plants/Swate/commit/a8584b04658a0d1f0ca0f453364ca66b08bd8fe9)] Add template search options (#244).
+    * [[#d648b9c](https://github.com/nfdi4plants/Swate/commit/d648b9c24ad8f0fb4309c1de0a24e4ccbbee54d8)] Enable CORS
+* Bugfixes:
+    * [[#a5ff2cd](https://github.com/nfdi4plants/Swate/commit/a5ff2cd16ea47d6779e4cea38adf636962f9e375)] Fix runtests build target
+    * [[#50b4e98](https://github.com/nfdi4plants/Swate/commit/50b4e9861ded58f59d9dc7f6f7c557db4089679d)] Fix issue with duplicate columns and non term columns :bug:
+
+### 0.6.3+b859e8e (Released 2022-12-1)
+* Additions:
+    * [[#b859e8e](https://github.com/nfdi4plants/Swate/commit/b859e8ed05e57c9ff418bb125d4ab6b4aa0576af)] Link open api docs in info tab
+    * [[#0f56988](https://github.com/nfdi4plants/Swate/commit/0f56988862fe0f37326116ea6b98d54eac31e342)] Update IOntologyAPIv2 to client
+    * [[#c89d554](https://github.com/nfdi4plants/Swate/commit/c89d5542c92d8c1c15b3e2fdc3e3e2320f774b4c)] Add documentation for IOntologyAPIv2 :books:
+    * [[#8989a05](https://github.com/nfdi4plants/Swate/commit/8989a05d1039bdc549faba13575ab6d4b0bc2185)] Set up SwaggerUI docs logic
+    * [[#275fdcc](https://github.com/nfdi4plants/Swate/commit/275fdcc1439682d7809c6ce31312a92017d8c8fe)] Improve search performance for all children/parents :racehorse:
+* Bugfixes:
+    * [[#14b2feb](https://github.com/nfdi4plants/Swate/commit/14b2feb8e403a8da16f3dac785c0f081123e7cf4)] Fix whitespace in username install issue :bug:
+
 ### 0.6.2+6a4f5b0 (Released 2022-10-19)
 * Additions:
     * [[#b0cd88f](https://github.com/nfdi4plants/Swate/commit/b0cd88f082e20200e1e1f8bf7661f849f7c2f54c)] Update docker-compose
