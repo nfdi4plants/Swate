@@ -33,11 +33,6 @@ module SorensenDice =
             calculateDistance resultSet searchSet
         )
 
-/// This type is used to define target for unit term search.
-type UnitSearchRequest =
-| Unit1
-| Unit2
-
 ///<summary>This type is still used for JsonExporter page.</summary>
 [<RequireQualifiedAccess>]
 type JsonExportType =
@@ -113,7 +108,7 @@ type IOntologyAPIv1 = {
     getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                      -> Async<Term []>
     getAllTermsByChildTerm              : TermMinimal                                                   -> Async<Term []>
     getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions)                   -> Async<Term []>
-    getUnitTermSuggestions              : (int*string*UnitSearchRequest)                                -> Async<Term [] * UnitSearchRequest>
+    getUnitTermSuggestions              : (int*string)                                                  -> Async<Term []>
     getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
 
     // Tree related requests
@@ -137,7 +132,7 @@ type IOntologyAPIv2 = {
     getTermSuggestionsByChildTerm       : {| n: int; query: string; child_term: TermMinimal |}             -> Async<Term []>
     getAllTermsByChildTerm              : TermMinimal                                                       -> Async<Term []>
     getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions)                       -> Async<Term []>
-    getUnitTermSuggestions              : {| n: int; query: string; unit_source_field: UnitSearchRequest |} -> Async<Term [] * UnitSearchRequest>
+    getUnitTermSuggestions              : {| n: int; query: string|} -> Async<Term []>
     getTermsByNames                     : TermSearchable []                                                 -> Async<TermSearchable []>
 
     // Tree related requests

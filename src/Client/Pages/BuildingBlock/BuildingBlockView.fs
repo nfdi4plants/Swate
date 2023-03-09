@@ -73,30 +73,8 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
     | SelectBodyTerm term ->
         let nextState = { state with BodySelectedTerm = term}
         nextState, Cmd.none
-    // Below everything is more or less deprecated
-    | UpdateDropdownPage newDropdownPage ->
-        let nextState = {
-            state with
-                DropdownPage = newDropdownPage
-        }
-        nextState, Cmd.none
-    | NewBuildingBlockSelected nextBB ->
-        let nextState = {
-            state with
-                CurrentBuildingBlock = if not nextBB.isSingleColumn && state.BuildingBlockSelectedTerm.IsSome then {nextBB with Name = state.BuildingBlockSelectedTerm.Value.Name} else nextBB
-                ShowBuildingBlockSelection = false
-        }
-        nextState, Cmd.none
 
-    | ToggleSelectionDropdown ->
-        let nextState = {
-            state with
-                ShowBuildingBlockSelection = not state.ShowBuildingBlockSelection
-        }
-
-        nextState,Cmd.none
-
-    | SearchUnitTermTextChange (newTerm,relUnit) ->
+    | SearchUnitTermTextChange (newTerm) ->
 
         let triggerNewSearch =
             newTerm.Length > 2
@@ -106,160 +84,54 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
             "GetNewUnitTermSuggestions",
             (
                 if triggerNewSearch then
-                    (newTerm,relUnit) |> (GetNewUnitTermSuggestions >> Request >> Api)
+                    (newTerm) |> (GetNewUnitTermSuggestions >> Request >> Api)
                 else
                     DoNothing
             )
 
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { state with
-                    UnitTermSearchText                  = newTerm
-                    UnitSelectedTerm                    = None
-                    ShowUnitTermSuggestions             = triggerNewSearch
-                    HasUnitTermSuggestionsLoading       = true
-                }
-            | Unit2 ->
-                { state with
-                    Unit2TermSearchText                  = newTerm
-                    Unit2SelectedTerm                    = None
-                    ShowUnit2TermSuggestions             = triggerNewSearch
-                    HasUnit2TermSuggestionsLoading       = true
-                }
-
-        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
-
-    | NewUnitTermSuggestions (suggestions,relUnit) ->
-
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { state with
-                        UnitTermSuggestions             = suggestions
-                        ShowUnitTermSuggestions         = true
-                        HasUnitTermSuggestionsLoading   = false
-                }
-            | Unit2 ->
-                { state with
-                    Unit2TermSuggestions             = suggestions
-                    ShowUnit2TermSuggestions         = true
-                    HasUnit2TermSuggestionsLoading   = false
-                }
-
-        nextState,Cmd.none
-
-    | UnitTermSuggestionUsed (suggestion, relUnit) ->
-
-        let nextState =
-            match relUnit with
-            | Unit1 ->
-                { state with
-                    UnitTermSearchText              = suggestion.Name
-                    UnitSelectedTerm                = Some suggestion
-                    ShowUnitTermSuggestions         = false
-                    HasUnitTermSuggestionsLoading   = false
-                }
-            | Unit2 ->
-                { state with
-                    Unit2TermSearchText             = suggestion.Name
-                    Unit2SelectedTerm               = Some suggestion
-                    ShowUnit2TermSuggestions        = false
-                    HasUnit2TermSuggestionsLoading  = false
-                }
-        nextState, Cmd.none
-
-    | BuildingBlockNameChange newName ->
-
-        let triggerNewSearch = newName.Length > 2
-   
-        let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
-            "GetNewBuildingBlockNameTermSuggestions",
-            (
-                if triggerNewSearch then
-                    newName  |> (GetNewBuildingBlockNameSuggestions >> Request >> Api)
-                else
-                    DoNothing
-            )
-
-        let nextBB = {
-            state.CurrentBuildingBlock with
-                Name = newName
-        }
-
         let nextState = {
             state with
-                CurrentBuildingBlock                    = nextBB
-                BuildingBlockSelectedTerm               = None
-                ShowBuildingBlockTermSuggestions        = triggerNewSearch
-                HasBuildingBlockTermSuggestionsLoading  = true
+                Unit2TermSearchText                  = newTerm
+                Unit2SelectedTerm                    = None
+                ShowUnit2TermSuggestions             = triggerNewSearch
+                HasUnit2TermSuggestionsLoading       = true
         }
 
         nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
 
-    | NewBuildingBlockNameSuggestions suggestions ->
+    | NewUnitTermSuggestions suggestions ->
 
         let nextState = {
             state with
-                BuildingBlockNameSuggestions            = suggestions
-                ShowBuildingBlockTermSuggestions        = true
-                HasBuildingBlockTermSuggestionsLoading  = false
+                Unit2TermSuggestions             = suggestions
+                ShowUnit2TermSuggestions         = true
+                HasUnit2TermSuggestionsLoading   = false
         }
 
         nextState,Cmd.none
 
-    | BuildingBlockNameSuggestionUsed suggestion ->
-        
-        let nextBB = {
-            state.CurrentBuildingBlock with
-                Name = suggestion.Name
-        }
-
-        let nextState = {
+    | UnitTermSuggestionUsed suggestion ->
+        let nextState ={
             state with
-                CurrentBuildingBlock                    = nextBB
-
-                BuildingBlockSelectedTerm               = Some suggestion
-                ShowBuildingBlockTermSuggestions        = false
-                HasBuildingBlockTermSuggestionsLoading  = false
+                Unit2TermSearchText             = suggestion.Name
+                Unit2SelectedTerm               = Some suggestion
+                ShowUnit2TermSuggestions        = false
+                HasUnit2TermSuggestionsLoading  = false
         }
         nextState, Cmd.none
 
-    | ToggleBuildingBlockHasUnit ->
-
-        let hasUnit = not state.BuildingBlockHasUnit
-
-        let nextState =
-            if hasUnit then
-                {
-                    state with
-                        BuildingBlockHasUnit = hasUnit
-                }
-            else
-                {
-                state with
-                    BuildingBlockHasUnit = hasUnit
-                    UnitSelectedTerm = None
-                    UnitTermSearchText = ""
-                    UnitTermSuggestions = [||]
-                    ShowUnitTermSuggestions = false
-                    HasUnitTermSuggestionsLoading = false
-                }
-        nextState, Cmd.none
-
-let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit) =
-    Content.content [ ] [
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ 
-            str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString ))
-        ]
-        Text.p [Props [Style [TextAlign TextAlignOptions.Justify]]] [
-            span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type.toLongExplanation |> str]
-            span [] [str " You can find more information on our "]
-            a [Href Shared.URLs.AnnotationPrinciplesUrl; Target "_blank"] [str "website"]
-            span [] [str "."]
-        ]
-    ]
+//let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit) =
+//    Content.content [ ] [
+//        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ 
+//            str (sprintf "More about %s:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString ))
+//        ]
+//        Text.p [Props [Style [TextAlign TextAlignOptions.Justify]]] [
+//            span [] [model.AddBuildingBlockState.CurrentBuildingBlock.Type.toLongExplanation |> str]
+//            span [] [str " You can find more information on our "]
+//            a [Href Shared.URLs.AnnotationPrinciplesUrl; Target "_blank"] [str "website"]
+//            span [] [str "."]
+//        ]
+//    ]
 
 open SidebarComponents
 

@@ -146,13 +146,9 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
         )
         OnClick (fun e ->
             if model.TermSearchState.ShowSuggestions
-                || model.AddBuildingBlockState.ShowUnitTermSuggestions
                 || model.AddBuildingBlockState.ShowUnit2TermSuggestions
-                || model.AddBuildingBlockState.ShowBuildingBlockTermSuggestions
             then
                 TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
-            if model.AddBuildingBlockState.ShowBuildingBlockSelection then
-                BuildingBlockMsg BuildingBlock.ToggleSelectionDropdown |> dispatch
         )
         Style [
             BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;
@@ -211,28 +207,7 @@ module private Content =
 
         | Routing.Route.NotFound ->
             NotFoundView.notFoundComponent model dispatch
-
-    let footer (model:Model) (dispatch: Msg -> unit) =
-        let c =
-            match model.PageState.CurrentPage with
-            | Routing.Route.BuildingBlock ->
-                 BuildingBlock.Core.addBuildingBlockFooterComponent model dispatch
-                 |> List.singleton
-            | _ ->
-                []
-        if List.isEmpty c |> not then
-            Footer.footer [ Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]] [
-                Content.content [
-                    Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Left)]
-                    Content.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode] 
-                ] [
-                    yield! c
-                ]
-            ]
-        else
-            Html.div []
         
-
 /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
 [<ReactComponent>]
 let SidebarView (model: Model) (dispatch: Msg -> unit) =
@@ -260,8 +235,6 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
             | _ -> ()
 
             Content.main model dispatch
-
-            Content.footer model dispatch
         ]
         footer model
     ]

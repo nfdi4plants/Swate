@@ -112,7 +112,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
         nextState,nextCmd
 
-    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (Term [] * UnitSearchRequest) -> ApiMsg) queryString (relUnit:UnitSearchRequest) =
+    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (Term []) -> ApiMsg) queryString =
         let currentCall = {
             FunctionName = apiFunctionname
             Status = Pending
@@ -125,7 +125,7 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
         let nextCmd = 
             Cmd.OfAsync.either
                 Api.api.getUnitTermSuggestions
-                {|n= 5; query = queryString; unit_source_field = relUnit|}
+                {|n= 5; query = queryString|}
                 (responseHandler >> Api)
                 (ApiError >> Api)
 
@@ -165,17 +165,10 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             queryString
             parentOntology
 
-    | GetNewUnitTermSuggestions (queryString,relUnit) ->
+    | GetNewUnitTermSuggestions (queryString) ->
         handleUnitTermSuggestionRequest
             "getUnitTermSuggestions"
             (UnitTermSuggestionResponse >> Response)
-            queryString
-            relUnit
-
-    | GetNewBuildingBlockNameSuggestions queryString ->
-        handleTermSuggestionRequest
-            "getBuildingBlockNameSuggestions"
-            (BuildingBlockNameSuggestionsResponse >> Response)
             queryString
 
     | GetNewAdvancedTermSearchResults options ->
@@ -279,7 +272,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         nextState, cmds
 
-    let handleUnitTermSuggestionResponse (responseHandler: Term [] * UnitSearchRequest -> Msg) (suggestions: Term[]) (relatedUnitSearch:UnitSearchRequest) =
+    let handleUnitTermSuggestionResponse (responseHandler: Term [] -> Msg) (suggestions: Term[]) =
         let finishedCall = {
             currentState.currentCall with
                 Status = Successfull
@@ -293,7 +286,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         let cmds = Cmd.batch [
             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            (suggestions,relatedUnitSearch) |> responseHandler |> Cmd.ofMsg
+            (suggestions) |> responseHandler |> Cmd.ofMsg
         ]
 
         nextState, cmds
@@ -305,19 +298,11 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
             (TermSearch.NewSuggestions >> TermSearchMsg)
             suggestions
 
-    | UnitTermSuggestionResponse (suggestions,relUnit) ->
+    | UnitTermSuggestionResponse (suggestions) ->
 
         handleUnitTermSuggestionResponse
             (BuildingBlock.Msg.NewUnitTermSuggestions >> BuildingBlockMsg)
-            suggestions
-            relUnit
-            
-
-    | BuildingBlockNameSuggestionsResponse suggestions ->
-
-        handleTermSuggestionResponse
-            (BuildingBlock.Msg.NewBuildingBlockNameSuggestions >> BuildingBlockMsg)
-            suggestions
+            suggestions            
 
     | AdvancedTermSearchResultsResponse results ->
         let finishedCall = {
@@ -509,8 +494,6 @@ let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * 
                 }
                 AddBuildingBlockState = {
                     currentModel.AddBuildingBlockState with
-                        ShowBuildingBlockTermSuggestions = false
-                        ShowUnitTermSuggestions = false
                         ShowUnit2TermSuggestions = false
                 }
         }

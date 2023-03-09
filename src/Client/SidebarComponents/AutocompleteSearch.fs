@@ -78,23 +78,23 @@ with
         OnAdvancedSearch        = (fun (term:Term) -> term |> TermSearch.TermSuggestionUsed |> TermSearchMsg )
     }
 
-    static member ofAddBuildingBlockUnitState (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
-        ModalId                 = "UnitSearch_ID"
-        InputId                 = "UnitSearchInput_ID"
+    //static member ofAddBuildingBlockUnitState (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
+    //    ModalId                 = "UnitSearch_ID"
+    //    InputId                 = "UnitSearchInput_ID"
 
-        StateBinding            = state.UnitTermSearchText
-        Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
-        MaxItems                = 5
-        DropDownIsVisible       = state.ShowUnitTermSuggestions
-        DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
+    //    StateBinding            = state.UnitTermSearchText
+    //    Suggestions             = state.UnitTermSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
+    //    MaxItems                = 5
+    //    DropDownIsVisible       = state.ShowUnitTermSuggestions
+    //    DropDownIsLoading       = state.HasUnitTermSuggestionsLoading
 
-        AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (fun (str,_) -> BuildingBlock.Msg.SearchUnitTermTextChange (str, Unit1) |> BuildingBlockMsg)
-        OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
+    //    AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
+    //    OnInputChangeMsg        = (fun (str,_) -> BuildingBlock.Msg.SearchUnitTermTextChange (str, Unit1) |> BuildingBlockMsg)
+    //    OnSuggestionSelect      = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
 
-        HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
-    }
+    //    HasAdvancedSearch       = true
+    //    OnAdvancedSearch        = (fun sugg -> (sugg, Unit1) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
+    //}
 
     static member ofAddBuildingBlockUnit2State (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
         ModalId                 = "Unit2Search_ID"
@@ -107,30 +107,30 @@ with
         DropDownIsLoading       = state.HasUnit2TermSuggestionsLoading
 
         AdvancedSearchLinkText   = "Can't find the unit you are looking for?"
-        OnInputChangeMsg        = (fun (str,_) -> BuildingBlock.Msg.SearchUnitTermTextChange (str,Unit2) |> BuildingBlockMsg)
-        OnSuggestionSelect      = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
+        OnInputChangeMsg        = (fun (str,_) -> BuildingBlock.Msg.SearchUnitTermTextChange (str) |> BuildingBlockMsg)
+        OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
 
         HasAdvancedSearch       = true
-        OnAdvancedSearch        = (fun sugg -> (sugg, Unit2) |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
+        OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlock.Msg.UnitTermSuggestionUsed |> BuildingBlockMsg)
     }
 
-    static member ofAddBuildingBlockState (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
-        ModalId                 = "BlockNameSearch_ID"
-        InputId                 = "BlockNameSearchInput_ID"
+    //static member ofAddBuildingBlockState (state:BuildingBlock.Model) : AutocompleteParameters<Term> = {
+    //    ModalId                 = "BlockNameSearch_ID"
+    //    InputId                 = "BlockNameSearchInput_ID"
 
-        StateBinding            = state.CurrentBuildingBlock.Name
-        Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
-        MaxItems                = 5
-        DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
-        DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
+    //    StateBinding            = state.CurrentBuildingBlock.Name
+    //    Suggestions             = state.BuildingBlockNameSuggestions |> Array.map AutocompleteSuggestion<Term>.ofTerm
+    //    MaxItems                = 5
+    //    DropDownIsVisible       = state.ShowBuildingBlockTermSuggestions
+    //    DropDownIsLoading       = state.HasBuildingBlockTermSuggestionsLoading
 
-        OnInputChangeMsg        = (fst >> BuildingBlock.Msg.BuildingBlockNameChange >> BuildingBlockMsg)
-        OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
+    //    OnInputChangeMsg        = (fst >> BuildingBlock.Msg.BuildingBlockNameChange >> BuildingBlockMsg)
+    //    OnSuggestionSelect      = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
 
-        HasAdvancedSearch       = true
-        AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
-        OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
-    }
+    //    HasAdvancedSearch       = true
+    //    AdvancedSearchLinkText   = "Cant find the Term you are looking for?"
+    //    OnAdvancedSearch        = (fun sugg -> sugg |> BuildingBlock.Msg.BuildingBlockNameSuggestionUsed |> BuildingBlockMsg)
+    //}
 
 
 

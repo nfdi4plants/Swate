@@ -300,24 +300,6 @@ module BuildingBlock =
         BodySelectedTerm                        : Term option
 
         // Below everything is more or less deprecated
-        CurrentBuildingBlock                    : BuildingBlockNamePrePrint
-
-        DropdownPage                            : DropdownPage
-
-        BuildingBlockSelectedTerm               : Term option
-        BuildingBlockNameSuggestions            : Term []
-        ShowBuildingBlockSelection              : bool
-        BuildingBlockHasUnit                    : bool
-        ShowBuildingBlockTermSuggestions        : bool
-        HasBuildingBlockTermSuggestionsLoading  : bool
-
-        // This section is used to add a unit directly to a freshly created building block.
-        UnitTermSearchText                      : string
-        UnitSelectedTerm                        : Term option
-        UnitTermSuggestions                     : Term []
-        HasUnitTermSuggestionsLoading           : bool
-        ShowUnitTermSuggestions                 : bool
-
         // This section is used to add a unit directly to an already existing building block
         Unit2TermSearchText                     : string
         Unit2SelectedTerm                       : Term option
@@ -335,25 +317,7 @@ module BuildingBlock =
             BodySearchResults                       = [||]
             BodySelectedTerm                        = None
 
-            /// Below everything is more or less deprecated
-            ShowBuildingBlockSelection              = false
-
-            DropdownPage                            = DropdownPage.Main
-
-            CurrentBuildingBlock                    = BuildingBlockNamePrePrint.init BuildingBlockType.Parameter
-            BuildingBlockSelectedTerm               = None
-            BuildingBlockNameSuggestions            = [||]
-            ShowBuildingBlockTermSuggestions        = false
-            HasBuildingBlockTermSuggestionsLoading  = false
-            BuildingBlockHasUnit                    = false
-
-            // This section is used to add a unit directly to a freshly created building block.
-            UnitTermSearchText                      = ""
-            UnitSelectedTerm                        = None
-            UnitTermSuggestions                     = [||]
-            ShowUnitTermSuggestions                 = false
-            HasUnitTermSuggestionsLoading           = false
-
+            // Below everything is more or less deprecated
             // This section is used to add a unit directly to an already existing building block
             Unit2TermSearchText                     = ""
             Unit2SelectedTerm                       = None

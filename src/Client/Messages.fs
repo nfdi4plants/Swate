@@ -66,8 +66,7 @@ type DevMsg =
 type ApiRequestMsg =
     | GetNewTermSuggestions                     of string
     | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
-    | GetNewBuildingBlockNameSuggestions        of string
-    | GetNewUnitTermSuggestions                 of string*relatedUnitSearch:UnitSearchRequest
+    | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedSearchTypes.AdvancedSearchOptions
     | FetchAllOntologies
     /// TermSearchable [] is created by officeInterop and passed to server for db search.
@@ -78,8 +77,7 @@ type ApiRequestMsg =
 type ApiResponseMsg =
     | TermSuggestionResponse                    of Term []
     | AdvancedTermSearchResultsResponse         of Term []
-    | BuildingBlockNameSuggestionsResponse      of Term []
-    | UnitTermSuggestionResponse                of Term [] * relatedUnitSearch:UnitSearchRequest
+    | UnitTermSuggestionResponse                of Term []
     | FetchAllOntologiesResponse                of Ontology []
     | SearchForInsertTermsResponse              of TermSearchable []  
     //
@@ -120,19 +118,10 @@ module BuildingBlock =
     | GetBodySuggestionsResponse of Term []*TermSearchUIController
     | SelectBodyTerm of Term option
     // Below everything is more or less deprecated
-    | UpdateDropdownPage        of BuildingBlock.DropdownPage
-
-    | NewBuildingBlockSelected  of BuildingBlockNamePrePrint
-    | BuildingBlockNameChange   of string
-    | ToggleSelectionDropdown
-
-    | BuildingBlockNameSuggestionUsed   of Term
-    | NewBuildingBlockNameSuggestions   of Term []
-
-    | SearchUnitTermTextChange  of searchString:string * relatedUnitSearch:UnitSearchRequest
-    | UnitTermSuggestionUsed    of unitTerm:Term* relatedUnitSearch:UnitSearchRequest
-    | NewUnitTermSuggestions    of Term [] * relatedUnitSearch:UnitSearchRequest
-    | ToggleBuildingBlockHasUnit
+    // Is still used for unit update in office
+    | SearchUnitTermTextChange  of searchString:string
+    | UnitTermSuggestionUsed    of unitTerm:Term
+    | NewUnitTermSuggestions    of Term []
 
 module Validation =
 

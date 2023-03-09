@@ -107,7 +107,7 @@ module V1 =
                     return filteredResult
                 }
 
-            getUnitTermSuggestions = fun (max:int,typedSoFar:string, unit:UnitSearchRequest) ->
+            getUnitTermSuggestions = fun (max:int,typedSoFar:string) ->
                 async {
                     let dbSearchRes =
                         match typedSoFar with
@@ -118,7 +118,7 @@ module V1 =
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
-                    return (res, unit)
+                    return res
                 }
 
             getTermsByNames = fun (queryArr) ->
@@ -296,7 +296,7 @@ module V2 =
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let res = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
-                    return (res, inp.unit_source_field)
+                    return (res)
                 }
 
             getTermsByNames = fun (queryArr) ->
