@@ -108,9 +108,11 @@ module BuildingBlock =
     open TermSearch
 
     type Msg =
+    | UpdateHeaderSearchText of string
     | GetHeaderSuggestions of string*TermSearchUIController
     | GetHeaderSuggestionsResponse of Term []*TermSearchUIController
     | SelectHeaderTerm of Term option
+    | UpdateBodySearchText of string
     | GetBodySuggestions of string*TermSearchUIController
     | GetBodySuggestionsByParent of string*TermMinimal*TermSearchUIController
     /// Returns all child terms

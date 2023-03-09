@@ -19,6 +19,9 @@ open Elmish
 
 let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
     match addBuildingBlockMsg with
+    | UpdateHeaderSearchText str ->
+        let nextState = {state with HeaderSearchText = str}
+        nextState, Cmd.none
     | GetHeaderSuggestions (queryString,uiSetter) ->
         let cmd = 
             Cmd.OfAsync.either
@@ -33,7 +36,10 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
         setState {state with SearchIsLoading = false; SearchIsActive = true}
         nextState, Cmd.none
     | SelectHeaderTerm term ->
-        let nextState = { state with HeaderSelectedTerm = term}
+        let nextState = { state with HeaderSelectedTerm = term; HeaderSearchText = if term.IsSome then term.Value.Name else state.HeaderSearchText }
+        nextState, Cmd.none
+    | UpdateBodySearchText str ->
+        let nextState = {state with BodySearchText = str}
         nextState, Cmd.none
     | GetBodySuggestions (queryString,uiSetter) ->
         let cmd = 
@@ -257,149 +263,149 @@ let addBuildingBlockFooterComponent (model:Model) (dispatch:Messages.Msg -> unit
 
 open SidebarComponents
 
-let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
-    let autocompleteParamsTerm = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState
-    let autocompleteParamsUnit = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState
+//let addBuildingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
+//    let autocompleteParamsTerm = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState
+//    let autocompleteParamsUnit = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState
 
-    mainFunctionContainer [
-        AdvancedSearch.advancedSearchModal model autocompleteParamsTerm.ModalId autocompleteParamsTerm.InputId dispatch autocompleteParamsTerm.OnAdvancedSearch
-        AdvancedSearch.advancedSearchModal model autocompleteParamsUnit.ModalId autocompleteParamsUnit.InputId dispatch autocompleteParamsUnit.OnAdvancedSearch
-        Field.div [] [
-            let autocompleteParams = (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState)
-            Field.div [Field.HasAddons] [
-                // Choose building block type dropdown element
-                Control.p [] [
-                    Dropdown.dropdown [
-                        Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection
-                    ] [
-                        Dropdown.trigger [] [
-                            Button.a [Button.OnClick (fun e -> e.stopPropagation(); ToggleSelectionDropdown |> BuildingBlockMsg |> dispatch)] [
-                                span [Style [MarginRight "5px"]] [str model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString]
-                                Fa.i [Fa.Solid.AngleDown] []
-                            ]
-                        ]
-                        Dropdown.menu [ ] [
-                            match model.AddBuildingBlockState.DropdownPage with
-                            | Model.BuildingBlock.DropdownPage.Main ->
-                                Helper.DropdownElements.dropdownContentMain model dispatch
-                            | Model.BuildingBlock.DropdownPage.ProtocolTypes ->
-                                Helper.DropdownElements.dropdownContentProtocolTypeColumns model dispatch
-                            | Model.BuildingBlock.DropdownPage.Output ->
-                                Helper.DropdownElements.dropdownContentOutputColumns model dispatch
-                            |> fun content -> Dropdown.content [Props [Style [yield! colorControlInArray model.SiteStyleState.ColorMode]] ] content
-                        ]
-                    ]
-                ]
-                // Ontology Term search field
-                if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn && model.AddBuildingBlockState.CurrentBuildingBlock.Type.isFeaturedColumn |> not then
-                    AutocompleteSearch.autocompleteTermSearchComponentInputComponent
-                        dispatch
-                        false // isDisabled
-                        "Start typing to search"
-                        None // No input size specified
-                        autocompleteParams
+//    mainFunctionContainer [
+//        AdvancedSearch.advancedSearchModal model autocompleteParamsTerm.ModalId autocompleteParamsTerm.InputId dispatch autocompleteParamsTerm.OnAdvancedSearch
+//        AdvancedSearch.advancedSearchModal model autocompleteParamsUnit.ModalId autocompleteParamsUnit.InputId dispatch autocompleteParamsUnit.OnAdvancedSearch
+//        Field.div [] [
+//            let autocompleteParams = (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState)
+//            Field.div [Field.HasAddons] [
+//                 Choose building block type dropdown element
+//                Control.p [] [
+//                    Dropdown.dropdown [
+//                        Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection
+//                    ] [
+//                        Dropdown.trigger [] [
+//                            Button.a [Button.OnClick (fun e -> e.stopPropagation(); ToggleSelectionDropdown |> BuildingBlockMsg |> dispatch)] [
+//                                span [Style [MarginRight "5px"]] [str model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString]
+//                                Fa.i [Fa.Solid.AngleDown] []
+//                            ]
+//                        ]
+//                        Dropdown.menu [ ] [
+//                            match model.AddBuildingBlockState.DropdownPage with
+//                            | Model.BuildingBlock.DropdownPage.Main ->
+//                                Helper.DropdownElements.dropdownContentMain model dispatch
+//                            | Model.BuildingBlock.DropdownPage.ProtocolTypes ->
+//                                Helper.DropdownElements.dropdownContentProtocolTypeColumns model dispatch
+//                            | Model.BuildingBlock.DropdownPage.Output ->
+//                                Helper.DropdownElements.dropdownContentOutputColumns model dispatch
+//                            |> fun content -> Dropdown.content [Props [Style [yield! colorControlInArray model.SiteStyleState.ColorMode]] ] content
+//                        ]
+//                    ]
+//                ]
+//                 Ontology Term search field
+//                if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn && model.AddBuildingBlockState.CurrentBuildingBlock.Type.isFeaturedColumn |> not then
+//                    AutocompleteSearch.autocompleteTermSearchComponentInputComponent
+//                        dispatch
+//                        false // isDisabled
+//                        "Start typing to search"
+//                        None // No input size specified
+//                        autocompleteParams
 
-            ]
-            // Ontology Term search preview
-            AutocompleteSearch.autocompleteDropdownComponent
-                dispatch
-                model.SiteStyleState.ColorMode
-                autocompleteParams.DropDownIsVisible
-                autocompleteParams.DropDownIsLoading
-                (AutocompleteSearch.createAutocompleteSuggestions dispatch autocompleteParams model)
-        ]
-        // Ontology Unit Term search field
-        if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn && model.AddBuildingBlockState.CurrentBuildingBlock.Type.isFeaturedColumn |> not then
-            let unitAutoCompleteParams = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState
-            Field.div [] [
-                Field.div [Field.HasAddons] [
-                    Control.p [] [
-                        Button.a [
-                            Button.Props [Style [
-                                if model.AddBuildingBlockState.BuildingBlockHasUnit then Color NFDIColors.Mint.Base else Color NFDIColors.Red.Base
-                            ]]
-                            Button.OnClick (fun _ ->
-                                let inputId = (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).InputId
-                                if model.AddBuildingBlockState.BuildingBlockHasUnit = true then
-                                    let e = Browser.Dom.document.getElementById inputId
-                                    e?value <- null
-                                ToggleBuildingBlockHasUnit |> BuildingBlockMsg |> dispatch
-                            )
-                        ] [
-                            Fa.i [
-                                Fa.Size Fa.FaLarge;
-                                Fa.Props [Style [AlignSelf AlignSelfOptions.Center; Transform "translateY(1px)"]]
-                                if model.AddBuildingBlockState.BuildingBlockHasUnit then
-                                    Fa.Solid.Check
-                                else
-                                    Fa.Solid.Ban
-                            ] [ ]
-                        ]
-                    ]
-                    Control.p [] [
-                        Button.button [Button.IsStatic true; Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]] [
-                            str (sprintf "This %s has a unit:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString))
-                        ]
-                    ]
-                    AutocompleteSearch.autocompleteTermSearchComponentInputComponent
-                        dispatch
-                        // if BuildingBlockHasUnit = false then disabled = true
-                        (model.AddBuildingBlockState.BuildingBlockHasUnit |> not) 
-                        "Start typing to search"
-                        None // No input size specified
-                        unitAutoCompleteParams
-                ]
-                // Ontology Unit Term search preview
-                AutocompleteSearch.autocompleteDropdownComponent
-                    dispatch
-                    model.SiteStyleState.ColorMode
-                    unitAutoCompleteParams.DropDownIsVisible
-                    unitAutoCompleteParams.DropDownIsLoading
-                    (AutocompleteSearch.createAutocompleteSuggestions dispatch unitAutoCompleteParams model)
-            ]
+//            ]
+//             Ontology Term search preview
+//            AutocompleteSearch.autocompleteDropdownComponent
+//                dispatch
+//                model.SiteStyleState.ColorMode
+//                autocompleteParams.DropDownIsVisible
+//                autocompleteParams.DropDownIsLoading
+//                (AutocompleteSearch.createAutocompleteSuggestions dispatch autocompleteParams model)
+//        ]
+//         Ontology Unit Term search field
+//        if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn && model.AddBuildingBlockState.CurrentBuildingBlock.Type.isFeaturedColumn |> not then
+//            let unitAutoCompleteParams = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState
+//            Field.div [] [
+//                Field.div [Field.HasAddons] [
+//                    Control.p [] [
+//                        Button.a [
+//                            Button.Props [Style [
+//                                if model.AddBuildingBlockState.BuildingBlockHasUnit then Color NFDIColors.Mint.Base else Color NFDIColors.Red.Base
+//                            ]]
+//                            Button.OnClick (fun _ ->
+//                                let inputId = (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).InputId
+//                                if model.AddBuildingBlockState.BuildingBlockHasUnit = true then
+//                                    let e = Browser.Dom.document.getElementById inputId
+//                                    e?value <- null
+//                                ToggleBuildingBlockHasUnit |> BuildingBlockMsg |> dispatch
+//                            )
+//                        ] [
+//                            Fa.i [
+//                                Fa.Size Fa.FaLarge;
+//                                Fa.Props [Style [AlignSelf AlignSelfOptions.Center; Transform "translateY(1px)"]]
+//                                if model.AddBuildingBlockState.BuildingBlockHasUnit then
+//                                    Fa.Solid.Check
+//                                else
+//                                    Fa.Solid.Ban
+//                            ] [ ]
+//                        ]
+//                    ]
+//                    Control.p [] [
+//                        Button.button [Button.IsStatic true; Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]] [
+//                            str (sprintf "This %s has a unit:" (model.AddBuildingBlockState.CurrentBuildingBlock.Type.toString))
+//                        ]
+//                    ]
+//                    AutocompleteSearch.autocompleteTermSearchComponentInputComponent
+//                        dispatch
+//                         if BuildingBlockHasUnit = false then disabled = true
+//                        (model.AddBuildingBlockState.BuildingBlockHasUnit |> not) 
+//                        "Start typing to search"
+//                        None // No input size specified
+//                        unitAutoCompleteParams
+//                ]
+//                 Ontology Unit Term search preview
+//                AutocompleteSearch.autocompleteDropdownComponent
+//                    dispatch
+//                    model.SiteStyleState.ColorMode
+//                    unitAutoCompleteParams.DropDownIsVisible
+//                    unitAutoCompleteParams.DropDownIsLoading
+//                    (AutocompleteSearch.createAutocompleteSuggestions dispatch unitAutoCompleteParams model)
+//            ]
 
-            div [] [
-                Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
-                    a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
-                        str "Use advanced search building block"
-                    ]
-                ]
-                if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn then
-                    Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
-                        a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
-                            str "Use advanced search unit"
-                        ]
-                    ]
-            ]
+//            div [] [
+//                Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
+//                    a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
+//                        str "Use advanced search building block"
+//                    ]
+//                ]
+//                if model.AddBuildingBlockState.CurrentBuildingBlock.Type.isTermColumn then
+//                    Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
+//                        a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnitState model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
+//                            str "Use advanced search unit"
+//                        ]
+//                    ]
+//            ]
 
-        Field.div [] [
-            Button.button   [
-                let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> Helper.isValidBuildingBlock
-                if isValid then
-                    Button.Color Color.IsSuccess
-                    Button.IsActive true
-                else
-                    Button.Color Color.IsDanger
-                    Button.Props [Disabled true]
-                Button.IsFullWidth
-                Button.OnClick (fun e ->
-                    let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
-                    let colTerm     =
-                        if colName.isFeaturedColumn then
-                            TermMinimal.create colName.Type.toString colName.Type.getFeaturedColumnAccession |> Some
-                        elif model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then
-                            TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some
-                        else
-                            None
-                    let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && colName.isTermColumn && not colName.isFeaturedColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
-                    let newBuildingBlock = InsertBuildingBlock.create colName colTerm unitTerm Array.empty
-                    SpreadsheetInterface.AddAnnotationBlock newBuildingBlock |> InterfaceMsg |> dispatch
-                )
-            ] [
-                str "Add building block"
-            ]
-        ]
-    ]
+//        Field.div [] [
+//            Button.button   [
+//                let isValid = model.AddBuildingBlockState.CurrentBuildingBlock |> Helper.isValidBuildingBlock
+//                if isValid then
+//                    Button.Color Color.IsSuccess
+//                    Button.IsActive true
+//                else
+//                    Button.Color Color.IsDanger
+//                    Button.Props [Disabled true]
+//                Button.IsFullWidth
+//                Button.OnClick (fun e ->
+//                    let colName     = model.AddBuildingBlockState.CurrentBuildingBlock
+//                    let colTerm     =
+//                        if colName.isFeaturedColumn then
+//                            TermMinimal.create colName.Type.toString colName.Type.getFeaturedColumnAccession |> Some
+//                        elif model.AddBuildingBlockState.BuildingBlockSelectedTerm.IsSome && not colName.isSingleColumn then
+//                            TermMinimal.ofTerm model.AddBuildingBlockState.BuildingBlockSelectedTerm.Value |> Some
+//                        else
+//                            None
+//                    let unitTerm    = if model.AddBuildingBlockState.UnitSelectedTerm.IsSome && colName.isTermColumn && not colName.isFeaturedColumn then TermMinimal.ofTerm model.AddBuildingBlockState.UnitSelectedTerm.Value |> Some else None
+//                    let newBuildingBlock = InsertBuildingBlock.create colName colTerm unitTerm Array.empty
+//                    SpreadsheetInterface.AddAnnotationBlock newBuildingBlock |> InterfaceMsg |> dispatch
+//                )
+//            ] [
+//                str "Add building block"
+//            ]
+//        ]
+//    ]
 
 let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
     /// advanced unit term search 2
@@ -454,7 +460,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
                     Button.Color Color.IsDanger
                     Button.Props [Disabled true]
                 Button.IsFullWidth
-                Button.OnClick (fun e ->
+                Button.OnClick (fun _ ->
                     let unitTerm =
                         if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
                     match model.AddBuildingBlockState.Unit2TermSearchText with
@@ -479,16 +485,14 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
     ] [
         Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Building Blocks"]
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks (columns) to the annotation table."]
         // Input forms, etc related to add building block.
-        match model.PersistentStorageState.Host with
-        | Swatehost.Excel _ ->
-            addBuildingBlockElements model dispatch
-        | _ ->
-            SearchComponent.Main model dispatch
-            
-        
-        addBuildingBlockElements model dispatch
+        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks (columns) to the annotation table."]
+        //match model.PersistentStorageState.Host with
+        //| Swatehost.Excel _ ->
+        //    addBuildingBlockElements model dispatch
+        //| _ ->
+        //    ()
+        SearchComponent.Main model dispatch
 
         match model.PersistentStorageState.Host with
         | Swatehost.Excel _ ->

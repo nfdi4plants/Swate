@@ -634,7 +634,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | AdvancedSearchMsg advancedSearchMsg ->
         let nextAdvancedSearchState,nextCmd =
             currentModel.AdvancedSearchState
-            |> AdvancedSearch.update advancedSearchMsg
+            |> SidebarComponents.AdvancedSearch.update advancedSearchMsg
 
         let nextModel = {
             currentModel with

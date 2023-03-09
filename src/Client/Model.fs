@@ -100,25 +100,13 @@ type LogItem =
         | "Warning" | "warning" -> Warning(System.DateTime.UtcNow,message)
         | others -> Error(System.DateTime.UtcNow,sprintf "Swate found an unexpected log identifier: %s" others)
 
-type TermSearchMode =
-    | Simple
-    | Advanced
-
 module TermSearch =
 
     type TermSearchUIState = {
-        /// This always referrs to the string typed into the input field.
-        SearchText              : string
         SearchIsActive          : bool
         SearchIsLoading         : bool
     } with
         static member init() = {
-            SearchText              = ""
-            SearchIsActive          = false
-            SearchIsLoading         = false
-        }
-        static member init(term: Term option) = {
-            SearchText              = term |> Option.map (fun x -> x.Name) |> Option.defaultValue ""
             SearchIsActive          = false
             SearchIsLoading         = false
         }
@@ -178,6 +166,9 @@ module AdvancedSearch =
             HasAdvancedSearchResultsLoading     = false
             AdvancedTermSearchSubpage           = InputFormSubpage
         }
+        static member BuildingBlockHeaderId = "BuildingBlockHeader_ATS_Id"
+        static member BuildingBlockBodyId = "BuildingBlockBody_ATS_Id"
+
  
 
 type SiteStyleState = {
@@ -297,10 +288,12 @@ module BuildingBlock =
 
     type Model = {
 
+        HeaderSearchText                        : string
         /// This always referrs to any term applied to the header.
         HeaderSearchResults                     : Term []
         /// This always referrs to any term applied to the header.
         HeaderSelectedTerm                      : Term option
+        BodySearchText                          : string
         /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
         BodySearchResults                       : Term []
         /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
@@ -335,8 +328,10 @@ module BuildingBlock =
     } with
         static member init () = {
 
+            HeaderSearchText                        = ""
             HeaderSearchResults                     = [||]
             HeaderSelectedTerm                      = None
+            BodySearchText                          = ""
             BodySearchResults                       = [||]
             BodySelectedTerm                        = None
 

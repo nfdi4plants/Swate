@@ -44,7 +44,7 @@ module private DropdownElements =
             span [] [str block.toString]
         ]
 
-    let createBuildingBlockDropdownItem_FeaturedColumns (state: BuildingBlockUIState) setState (state_search: TermSearchUIState) setState_search (model:Model) dispatch (block: BuildingBlockType )  =
+    let createBuildingBlockDropdownItem_FeaturedColumns (state: BuildingBlockUIState) setState (model:Model) dispatch (block: BuildingBlockType )  =
         Dropdown.Item.a [
             Dropdown.Item.Props [
                 OnClick (fun e ->
@@ -52,7 +52,6 @@ module private DropdownElements =
                     if block.isFeaturedColumn then
                         let t = block.getFeaturedColumnTermMinimal.toTerm
                         BuildingBlock.SelectHeaderTerm (Some t) |> BuildingBlockMsg |> dispatch
-                        {state_search with SearchText = t.Name} |> setState_search
                     selectBuildingBlockType state block |> setState
                 )
                 OnKeyDown (fun k -> if (int k.which) = 13 then setState {state with BuildingBlockType = block})
@@ -150,7 +149,7 @@ module private DropdownElements =
                 Heading.h6 [Heading.IsSubtitle; Heading.Modifiers [Modifier.TextWeight TextWeight.Option.Bold]] [str BuildingBlock.DropdownPage.ProtocolTypes.toString]
             ]
             Dropdown.divider []
-            BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem_FeaturedColumns state setState state_search setState_search model dispatch
+            BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem_FeaturedColumns state setState model dispatch
             BuildingBlockType.ProtocolREF       |> createBuildingBlockDropdownItem state setState model
             // Navigation element back to main page
             backToMainDropdownButton state setState model
@@ -227,7 +226,7 @@ module private AutocompleteComponents =
                     Html.td [
                         prop.onClick ( fun e -> e.stopPropagation())
                         prop.style [style.fontWeight.lighter]
-                        prop.children [AdvancedSearch.createLinkOfAccession term.Accession]  
+                        prop.children [SidebarComponents.AdvancedSearch.createLinkOfAccession term.Accession]  
                     ]
                     // Cytoscape graph tree view
                     Html.td [
@@ -299,14 +298,14 @@ module private AutocompleteComponents =
             ]
         [|main; hidden|]
 
-    let createAutocompleteSuggestions (termSuggestions: Term []) (selectMsg: Term -> Msg) state setState (dispatch: Msg -> unit) =
+    let createAutocompleteSuggestions (termSuggestions: Term []) (selectMsg: Term -> Msg) (state: TermSearchUIState) setState (dispatch: Msg -> unit) =
         let suggestions = 
             if termSuggestions.Length > 0 then
                 termSuggestions
                 |> Array.distinctBy (fun t -> t.Accession)
                 |> Array.collect (fun t ->
-                    let msg = fun e -> 
-                        {state with SearchIsActive = false; SearchText = t.Name} |> setState
+                    let msg = fun e ->
+                        setState {state with SearchIsActive = false}
                         selectMsg t |> dispatch
                     createTermElement_Main t msg dispatch
                 )
@@ -417,14 +416,15 @@ module private AutocompleteComponents =
             ]
         ]
 
-let private termSearch_element (inputId: string) (onChangeMsg: string -> unit) (onDoubleClickMsg: string -> unit) (state: TermSearchUIState) setState dispatch =
+/// if inputId ends with Main we apply autofocus to the element
+let private termSearch_element (inputId: string) (valueOrDefault:string) (onChangeMsg: string -> unit) (onDoubleClickMsg: string -> unit) (state: TermSearchUIState) setState =
     Bulma.input.text [
         prop.id inputId
         prop.key inputId
         prop.autoFocus (inputId.EndsWith "Main")
         prop.placeholder "Start typing to search"
-        prop.valueOrDefault state.SearchText
-        prop.onDoubleClick (fun _ -> state.SearchText |> onDoubleClickMsg)
+        prop.valueOrDefault valueOrDefault
+        prop.onDoubleClick (fun _ -> valueOrDefault |> onDoubleClickMsg)
         prop.onKeyDown(fun (e: Browser.Types.KeyboardEvent) ->
             match e.which with
             | 27. -> // Escape
@@ -446,19 +446,18 @@ let private chooseBuildingBlock_element (state_bb: BuildingBlockUIState) setStat
                 // Term search field
                 if state_bb.BuildingBlockType.isTermColumn && state_bb.BuildingBlockType.isFeaturedColumn |> not then
                     let onChangeMsg = fun (v:string) ->
-                        BuildingBlock.Msg.SelectHeaderTerm None |> BuildingBlockMsg |> dispatch
+                        BuildingBlock.SelectHeaderTerm None |> BuildingBlockMsg |> dispatch
+                        BuildingBlock.UpdateHeaderSearchText v |> BuildingBlockMsg |> dispatch
                         let triggerNewSearch = v.Length > 2
-                        let mutable state = {state with SearchText = v}
                         if triggerNewSearch then
-                            state <- {state with SearchIsActive = true; SearchIsLoading = true}
+                            setState {state with SearchIsActive = true; SearchIsLoading = true}
                             let msg = BuildingBlock.Msg.GetHeaderSuggestions (v, {state = state; setState = setState}) |> BuildingBlockMsg
                             let bounce_msg = Bounce (System.TimeSpan.FromSeconds 0.5,nameof(msg), msg)
                             bounce_msg |> dispatch
-                        setState state
                     Bulma.control.div [
                         Bulma.control.isExpanded
                         prop.children [
-                            termSearch_element inputId onChangeMsg onChangeMsg state setState dispatch
+                            termSearch_element inputId model.AddBuildingBlockState.HeaderSearchText onChangeMsg onChangeMsg state setState
                         ]
                     ]
             ]
@@ -510,12 +509,12 @@ module private BodyTerm =
         let state_isDirectedSearchMode, setState_isDirectedSearchMode = React.useState(true)
         let onChangeMsg = fun (isClicked: bool) (v:string) -> 
             BuildingBlock.Msg.SelectBodyTerm None |> BuildingBlockMsg |> dispatch
-            let mutable state = {state with SearchText = v}
-            let updateState (msg) =
-                state <- {state with SearchIsActive = true; SearchIsLoading = true}
+            BuildingBlock.UpdateBodySearchText v |> BuildingBlockMsg |> dispatch
+            let updateState msg =
+                setState {state with SearchIsActive = true; SearchIsLoading = true}
                 let bounce_msg = Bounce (System.TimeSpan.FromSeconds 0.5,nameof(msg), msg)
                 bounce_msg |> dispatch
-            match isClicked, state_isDirectedSearchMode, model.AddBuildingBlockState.HeaderSelectedTerm, state.SearchText with
+            match isClicked, state_isDirectedSearchMode, model.AddBuildingBlockState.HeaderSelectedTerm, model.AddBuildingBlockState.BodySearchText with
             // only execute this on onDoubleClick event. If executed on onChange event it will trigger when deleting term.
             | true, true, Some parent, "" -> // Search all children 
                 BuildingBlock.Msg.GetBodyTermsByParent (TermMinimal.ofTerm parent,{state = state; setState = setState}) |> BuildingBlockMsg
@@ -527,7 +526,6 @@ module private BodyTerm =
                 BuildingBlock.Msg.GetBodySuggestions (v, {state = state; setState = setState}) |> BuildingBlockMsg
                 |> updateState
             | _ -> ()
-            setState state
         Bulma.field.div [
             Bulma.field.hasAddons
             prop.style [style.flexGrow 1 ]
@@ -538,12 +536,13 @@ module private BodyTerm =
                 // Term search field
                 Bulma.control.div [
                     Bulma.control.isExpanded
+                    if state_isDirectedSearchMode && model.AddBuildingBlockState.HeaderSelectedTerm.IsNone then prop.title "No parent term selected"
                     prop.style [
                         // display box-shadow if term search is fully activated
                         if state_isDirectedSearchMode && model.AddBuildingBlockState.HeaderSelectedTerm.IsSome then style.boxShadow(2,2,NFDIColors.Mint.Lighter20)
                     ]
                     prop.children [
-                        termSearch_element inputId (onChangeMsg false) (onChangeMsg true) state setState dispatch
+                        termSearch_element inputId model.AddBuildingBlockState.BodySearchText (onChangeMsg false) (onChangeMsg true) state setState
                     ]
                 ]
             ]
@@ -568,7 +567,7 @@ module private BodyTerm =
 let private add_button (state_bb: BuildingBlockUIState) (state_searchHeader:TermSearchUIState) (state_searchBody:TermSearchUIState) (state_searchForUnit: bool) (model: Model) dispatch =
     Bulma.field.div [
         Bulma.button.button  [
-            let colName = BuildingBlockNamePrePrint.create state_bb.BuildingBlockType state_searchHeader.SearchText
+            let colName = BuildingBlockNamePrePrint.create state_bb.BuildingBlockType model.AddBuildingBlockState.HeaderSearchText
             let isValid = colName |> Helper.isValidBuildingBlock
             if isValid then
                 Bulma.color.isSuccess
@@ -586,29 +585,20 @@ let private add_button (state_bb: BuildingBlockUIState) (state_searchHeader:Term
                     else
                         None
                 let newBuildingBlock_HeaderOnly = InsertBuildingBlock.create colName colTerm None Array.empty
+                let bodyTerm =
+                    if model.AddBuildingBlockState.BodySelectedTerm.IsSome then
+                        TermMinimal.ofTerm model.AddBuildingBlockState.BodySelectedTerm.Value
+                    else
+                        TermMinimal.create model.AddBuildingBlockState.BodySearchText ""
                 let newBuildingBlock =
-                    match colName.isTermColumn, state_searchForUnit, model.AddBuildingBlockState.BodySelectedTerm with
+                    match colName.isTermColumn, state_searchForUnit with
                     // term column, unit not toggled and term selected
-                    | true, false, Some term ->
-                        {newBuildingBlock_HeaderOnly with Rows = [|TermMinimal.ofTerm term|]}
-                    // term column, unit not toggled and no term selected.
-                    // Body cells are user-specific we only add name
-                    | true, false, None ->
-                        if state_searchHeader.SearchText <> "" then
-                            {newBuildingBlock_HeaderOnly with Rows = [|TermMinimal.create state_searchBody.SearchText ""|]}
-                        else
-                            newBuildingBlock_HeaderOnly
+                    | true, false when bodyTerm.Name <> "" ->
+                        {newBuildingBlock_HeaderOnly with Rows = [|bodyTerm|]}
                     // Term column, unit is toggled and term selected.
                     // We add body term selected as unit to all rows
-                    | true, true, Some term ->
-                        {newBuildingBlock_HeaderOnly with UnitTerm = Some <| TermMinimal.ofTerm term}
-                    // Term column, unit is toggled and no term selected.
-                    // We add user specifc term with name only as unit to all rows
-                    | true, true, None ->
-                        if state_searchHeader.SearchText <> "" then
-                            {newBuildingBlock_HeaderOnly with UnitTerm = Some <| TermMinimal.create state_searchBody.SearchText ""}
-                        else
-                            newBuildingBlock_HeaderOnly
+                    | true, true when bodyTerm.Name <> "" ->
+                        {newBuildingBlock_HeaderOnly with UnitTerm = Some bodyTerm}
                     | _ -> newBuildingBlock_HeaderOnly
                 SpreadsheetInterface.AddAnnotationBlock newBuildingBlock |> InterfaceMsg |> dispatch
             )
@@ -616,15 +606,59 @@ let private add_button (state_bb: BuildingBlockUIState) (state_searchHeader:Term
         ]
     ]
 
+module AdvancedSearch =
+
+    let modal_container (model:Model) dispatch =
+        Html.span [
+            let selectHeader = fun (term:Term) ->
+                Msg.Batch [
+                    BuildingBlock.UpdateHeaderSearchText term.Name |> BuildingBlockMsg
+                    BuildingBlock.SelectHeaderTerm (Some term) |> BuildingBlockMsg
+                ]
+            let selectBody = fun (term:Term) ->
+                Msg.Batch [
+                    BuildingBlock.UpdateBodySearchText term.Name |> BuildingBlockMsg
+                    BuildingBlock.SelectBodyTerm (Some term) |> BuildingBlockMsg
+                ]
+            // added edge case to modal, where relatedInputId = "" is ignored
+            SidebarComponents.AdvancedSearch.advancedSearchModal model AdvancedSearch.Model.BuildingBlockHeaderId "" dispatch selectHeader
+            SidebarComponents.AdvancedSearch.advancedSearchModal model AdvancedSearch.Model.BuildingBlockBodyId "" dispatch selectBody
+        ]
+
+    let links_container (bb_type: BuildingBlockType) dispatch =
+        Html.div [
+            if not bb_type.isFeaturedColumn then
+                Bulma.help [
+                    prop.style [style.display.inlineElement]
+                    prop.children [
+                        Html.a [
+                            prop.onClick (fun _ -> AdvancedSearch.ToggleModal AdvancedSearch.Model.BuildingBlockHeaderId |> AdvancedSearchMsg |> dispatch)
+                            prop.text "Use advanced search header"
+                        ]
+                    ]
+                ]
+            Bulma.help [
+                prop.style [style.display.inlineElement; style.float'.right]
+                prop.children [
+                    Html.a [
+                        prop.onClick (fun _ -> AdvancedSearch.ToggleModal AdvancedSearch.Model.BuildingBlockBodyId |> AdvancedSearchMsg |> dispatch)
+                        prop.text "Use advanced search body"
+                    ]
+                ]
+            ]
+        ]
+
 [<ReactComponent>]
 let Main (model: Model) dispatch =
     let state_bb, setState_bb = React.useState(BuildingBlockUIState.init)
-    let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init(model.AddBuildingBlockState.HeaderSelectedTerm))
-    let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init(model.AddBuildingBlockState.BodySelectedTerm))
+    let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
+    let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
     let state_searchForUnit, setState_searchForUnit = React.useState(false)
     mainFunctionContainer [
         chooseBuildingBlock_element state_bb setState_bb state_searchHeader setState_searchHeader model dispatch
         if state_bb.BuildingBlockType.isTermColumn then
             BodyTerm.Main state_searchBody setState_searchBody state_searchForUnit setState_searchForUnit model dispatch
+            AdvancedSearch.modal_container model dispatch
+            AdvancedSearch.links_container state_bb.BuildingBlockType dispatch
         add_button state_bb state_searchHeader state_searchBody state_searchForUnit model dispatch
     ]

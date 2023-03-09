@@ -1,4 +1,4 @@
-module AdvancedSearch
+module SidebarComponents.AdvancedSearch
 
 open Fable.React
 open Fable.React.Props
@@ -117,7 +117,7 @@ let private ontologyDropdownItem (model:Model) (dispatch:Msg -> unit) (ontOpt: O
 
 open Fable.Core.JsInterop
 
-module ResultsTable =
+module private ResultsTable =
     open Feliz
 
     open Shared.TermTypes
@@ -164,11 +164,12 @@ module ResultsTable =
                             // dont close modal on click
                             e.stopPropagation()
                             e.preventDefault()
-                            let relInput = Browser.Dom.document.getElementById(state.RelatedInputId)
+                            if state.RelatedInputId <> "" then
+                                let relInput = Browser.Dom.document.getElementById(state.RelatedInputId)
+                                // propagate wanted term name to related input on main page
+                                relInput?value <- sugg.Name
                             // select wanted term
                             sugg |> state.ResultHandler |> state.Dispatch
-                            // propagate wanted term name to related input on main page
-                            relInput?value <- sugg.Name
                             // reset advanced term search state
                             ResetAdvancedSearchState |> AdvancedSearchMsg |> state.Dispatch
                         )
