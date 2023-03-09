@@ -1,8 +1,8 @@
 ---
-name: Bug report
+name: Alpha-Bug report
 about: Create a report to help us improve
 title: "[Alpha Bug] placeholder"
-labels: 'Type: Bug'
+labels: ['Type: Bug :bug:', Standalone ]
 assignees: ''
 
 ---
