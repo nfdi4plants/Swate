@@ -4,7 +4,6 @@ module TemplateTypes =
 
     open System
 
-
     module Metadata =
 
         [<Literal>]
@@ -104,8 +103,8 @@ module TemplateTypes =
         Tags                    : string []
         TemplateBuildingBlocks  : OfficeInteropTypes.InsertBuildingBlock list
         LastUpdated             : System.DateTime
-        Used                    : int
         // WIP
+        Used                    : int
         Rating                  : int  
     } with
         static member create id name describtion organisation version lastUpdated author ertags tags templateBuildingBlocks used rating  = {
@@ -122,4 +121,33 @@ module TemplateTypes =
             Used                    = used
             // WIP                  
             Rating                  = rating
+    }
+
+    type Organisation =
+    | DataPLANT
+    | Other of string
+
+    type Author = {
+        LastName: string
+        FirstName: string
+        MidInitials: string
+        Email: string
+        Phone: string
+        Fax: string
+        Adress: string
+        Affiliation: string
+        ORCID: string
+        Role: TermTypes.TermMinimal
+    }
+
+    type TemplateForm = {
+        Id              : System.Guid
+        Name            : string
+        Version         : string
+        Description     : string
+        Organisation    : Organisation
+        Table           : string
+        ER_List         : TermTypes.TermMinimal []
+        Tags            : TermTypes.TermMinimal []
+        Authors         : Author []
     }
