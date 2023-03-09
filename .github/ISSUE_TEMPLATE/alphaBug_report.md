@@ -1,7 +1,7 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-title: "[BUG] placeholder"
+title: "[Alpha Bug] placeholder"
 labels: 'Type: Bug'
 assignees: ''
 
@@ -9,7 +9,7 @@ assignees: ''
 
 **OS and framework information (please complete the following information):**
  - OS: [e.g. Windows 10]
- - MS Excel: [e.g. Excel Desktop, Excel Online; Standalone]
+ - Browser [e.g. Chrome, Safari, Opera ..]
 
 **Describe the bug**
 - [ ] A clear and concise description of what the bug is
@@ -17,7 +17,3 @@ assignees: ''
 - [ ] Screenshots
 - [ ] Expected behavior
 - [ ] Ideas for solution
-
-
-
-
