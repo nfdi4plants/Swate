@@ -1,7 +1,7 @@
 ---
-name: Alpha-Bug report
+name: swate-alpha
 about: Create a report to help us improve
-title: "[Alpha Bug] placeholder"
+title: "[swate-alpha] placeholder"
 labels: ['Type: Bug :bug:', Standalone ]
 assignees: ''
 
