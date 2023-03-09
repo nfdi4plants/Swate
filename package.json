@@ -25,7 +25,7 @@
         "remotedev": "^0.2.9",
         "sass": "^1.43.4",
         "sass-loader": "^12.3.0",
-        "selfsigned": "^1.10.11",
+        "selfsigned": "^2.1.1",
         "source-map-loader": "^3.0.0",
         "style-loader": "^3.3.1",
         "webpack": "^5.8.0",
