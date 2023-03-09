@@ -31,9 +31,9 @@ type private SearchFields =
     static member private ofFieldString (str:string) =
         let str = str.ToLower()
         match str with
-        | "/o" | "/org"     -> Some Organisation
-        | "/a" | "/authors" -> Some Authors
-        | "/n" | "/reset"   -> Some Name
+        | "/o" | "/org"             -> Some Organisation
+        | "/a" | "/authors"         -> Some Authors
+        | "/n" | "/reset" | "/e"    -> Some Name
         | _ -> None
 
     member this.toStr =
@@ -41,6 +41,12 @@ type private SearchFields =
         | Name          -> "/name"
         | Organisation  -> "/org"
         | Authors       -> "/auth"
+
+    member this.toNameRdb =
+        match this with
+        | Name          -> "template name"
+        | Organisation  -> "organisation"
+        | Authors       -> "authors"
 
     static member GetOfQuery(query:string) =
         SearchFields.ofFieldString query
@@ -71,7 +77,7 @@ let private SearchFieldId = "template_searchfield_main"
 
 let private queryField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
     Column.column [ ] [
-        Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text; MinWidth "91px"; WhiteSpace WhiteSpaceOptions.Nowrap]]] [str "Search by protocol name"]
+        Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text; MinWidth "91px"; WhiteSpace WhiteSpaceOptions.Nowrap]]] [str $"Search by {state.Searchfield.toNameRdb}"]
         let hasSearchAddon = state.Searchfield <> SearchFields.Name
         Field.div [if hasSearchAddon then Field.HasAddons] [
             Control.div [
@@ -85,7 +91,7 @@ let private queryField (model:Model) (state: ProtocolViewState) (setState: Proto
                 Control.HasIconRight
             ] [
                 Input.text [
-                    Input.Placeholder ".. protocol name"
+                    Input.Placeholder $".. {state.Searchfield.toNameRdb}"
                     Input.Id SearchFieldId
                     Input.Color IsPrimary
                     Input.ValueOrDefault state.ProtocolSearchQuery
@@ -348,7 +354,7 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
             ]
             //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt] []] ]
             td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str template.Version ]
-            td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string template.Used) ]
+            //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string template.Used) ]
             td [] [
                 Icon.icon [] [
                     Fa.i [Fa.Solid.ChevronDown] []
@@ -365,7 +371,7 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
                     if not isActive then
                         Display DisplayOptions.None
                 ]
-                ColSpan 5
+                ColSpan 4
             ] [
                 Box.box' [Props [Style [BorderRadius "0px"; yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode]]] [
                     Columns.columns [] [
@@ -517,12 +523,22 @@ let ProtocolContainer (model:Model) dispatch =
     mainFunctionContainer [
         Field.div [] [
             Help.help [] [
-                b [] [str "Search for protocol templates."]
+                b [] [str "Search for templates."]
                 str " For more information you can look "
                 a [ Href Shared.URLs.SwateWiki; Target "_Blank" ] [str "here"]
                 str ". If you find any problems with a template or have other suggestions you can contact us "
                 a [ Href URLs.Helpdesk.UrlTemplateTopic; Target "_Blank" ] [str "here"]
                 str "."
+            ]
+            Help.help [] [
+                str "You can search by template name, organisation and authors. Just type:"
+                Content.content [] [
+                    Html.ul [
+                        Html.li [Html.code "/a"; Html.span " to search authors."]
+                        Html.li [Html.code "/o"; Html.span " to search organisations."]
+                        Html.li [Html.code "/n"; Html.span " to search template names."]
+                    ]
+                ]
             ]
         ]
         fileSortElements model state setState
@@ -533,11 +549,11 @@ let ProtocolContainer (model:Model) dispatch =
         ] [
             thead [] [
                 tr [] [
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ] [ str "Protocol Name"      ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ] [ str "Template Name"      ]
                     //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Documentation"      ]
                     th [] [curatedCommunityFilterElement state setState]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Protocol Version"   ]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Uses"               ]
+                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Template Version"   ]
+                    //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Uses"               ]
                     th [ Style [ Color model.SiteStyleState.ColorMode.Text] ] []
                 ]
             ]
