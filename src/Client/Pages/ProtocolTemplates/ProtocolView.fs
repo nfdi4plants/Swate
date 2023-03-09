@@ -230,7 +230,7 @@ module TemplateFromDB =
 
 
 let fileUploadViewComponent (model:Messages.Model) dispatch =
-    form [ 
+    div [ 
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())

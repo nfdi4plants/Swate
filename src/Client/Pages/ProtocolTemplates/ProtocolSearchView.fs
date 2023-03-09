@@ -31,7 +31,7 @@ let breadcrumbEle (model:Model) dispatch =
 let protocolSearchView (model:Model) dispatch =
     let isEmpty = model.ProtocolState.ProtocolsAll |> isNull || model.ProtocolState.ProtocolsAll |> Array.isEmpty
     let isLoading = model.ProtocolState.Loading
-    form [
+    div [
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())

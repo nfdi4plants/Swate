@@ -350,7 +350,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
     ]
 
 let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
-    form [
+    div [
         OnSubmit (fun e -> e.preventDefault())
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())

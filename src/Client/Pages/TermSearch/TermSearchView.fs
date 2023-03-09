@@ -227,7 +227,7 @@ let simpleSearchComponent model dispatch =
     ]
 
 let termSearchComponent (model:Messages.Model) dispatch =
-    form [
+    div [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [

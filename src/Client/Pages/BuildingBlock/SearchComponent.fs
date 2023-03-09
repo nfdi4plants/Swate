@@ -536,7 +536,10 @@ module private BodyTerm =
                 // Term search field
                 Bulma.control.div [
                     Bulma.control.isExpanded
-                    if state_isDirectedSearchMode && model.AddBuildingBlockState.HeaderSelectedTerm.IsNone then prop.title "No parent term selected"
+                    if state_isDirectedSearchMode && model.AddBuildingBlockState.HeaderSelectedTerm.IsNone then
+                        prop.title "No parent term selected"
+                    elif state_isDirectedSearchMode && model.AddBuildingBlockState.HeaderSelectedTerm.IsSome && model.AddBuildingBlockState.BodySearchText = "" then
+                        prop.title "Double click to show all children"
                     prop.style [
                         // display box-shadow if term search is fully activated
                         if state_isDirectedSearchMode && model.AddBuildingBlockState.HeaderSelectedTerm.IsSome then style.boxShadow(2,2,NFDIColors.Mint.Lighter20)

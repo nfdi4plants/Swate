@@ -190,10 +190,8 @@ module private Content =
         | Routing.Route.ActivityLog ->
             ActivityLog.activityLogComponent model dispatch
 
-
         | Routing.Route.Settings ->
             SettingsView.settingsViewComponent model dispatch
-
 
         | Routing.Route.SettingsXml ->
             SettingsXml.settingsXmlViewComponent model dispatch
@@ -203,7 +201,6 @@ module private Content =
 
         | Routing.Route.Info ->
             InfoView.infoComponent model dispatch
-
 
         | Routing.Route.NotFound ->
             NotFoundView.notFoundComponent model dispatch
