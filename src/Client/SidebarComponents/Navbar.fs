@@ -25,7 +25,7 @@ open Components.QuickAccessButton
 let private shortCutIconList model dispatch =
     [
         QuickAccessButton.create(
-            "Add Annotation Table",
+            "Create Annotation Table",
             [
                 Fa.span [Fa.Solid.Plus] []
                 Fa.span [Fa.Solid.Table] []
