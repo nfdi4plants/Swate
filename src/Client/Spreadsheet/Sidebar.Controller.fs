@@ -68,7 +68,14 @@ let createAnnotationTable_new (usePrevOutput:bool) (state: Spreadsheet.Model) : 
     let sample = SwateBuildingBlock.create(1,HeaderCell.create(BuildingBlockType.Sample),rows)
     // parse to SwateBuildingBlocks
     let bbs = [|source; sample|]
-    let name = HumanReadableIds.tableName()
+    let names = state.Tables.Values |> Seq.map (fun t -> t.Name)
+    let rec findName (ind) =
+        let name = "NewTable" + string ind
+        if Seq.contains name names then
+            findName(ind+1)
+        else
+            name
+    let name = findName 1
     createAnnotationTable (Some name) bbs state
 
 ///<summary>If n.isOutputColumn and existing contains output column, return Some Existing-Output-Column-Index.</summary>
