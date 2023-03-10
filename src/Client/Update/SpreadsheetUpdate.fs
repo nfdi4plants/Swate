@@ -173,6 +173,19 @@ module Spreadsheet =
                     (JsonExporter.State.ParseTablesServerRequest >> Messages.JsonExporterMsg)
                     (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
             state, nextModel, cmd
+        | ParseTablesToDag ->
+            let dagState = {model.DagModel with Loading = true}
+            let nextModel = model.updateByDagModel dagState
+            let func() = promise {
+                return Controller.getTables state
+            }
+            let cmd =
+                Cmd.OfPromise.either
+                    func
+                    ()
+                    (Dag.ParseTablesDagServerRequest >> Messages.DagMsg)
+                    (Messages.curry Messages.GenericError (Dag.UpdateLoading false |> Messages.DagMsg |> Cmd.ofMsg) >> Messages.DevMsg)
+            state, nextModel, cmd
         | ExportXlsx ->
             // we highjack this loading function
             let exportJsonState = {model.JsonExporterModel with Loading = true}

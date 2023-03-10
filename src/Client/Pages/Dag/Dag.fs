@@ -74,7 +74,7 @@ let defaultMessageEle (model:Model) dispatch =
             Button.a [
                 Button.IsFullWidth
                 Button.Color Color.IsInfo
-                Button.OnClick(fun e -> ParseTablesOfficeInteropRequest |> DagMsg |> dispatch)
+                Button.OnClick(fun _ -> SpreadsheetInterface.ParseTablesToDag |> InterfaceMsg |> dispatch)
             ] [
                 str "Display dag"
             ]

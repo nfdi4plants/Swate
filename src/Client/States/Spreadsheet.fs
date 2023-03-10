@@ -73,6 +73,8 @@ type Msg =
 | ExportJsonTables
 /// Starts chain to export all tables to xlsx swate tables.
 | ExportXlsx
+/// Starts chain to parse all tables to DAG
+| ParseTablesToDag
 | ExportXlsxServerRequest of (string*BuildingBlock []) []
 | ExportXlsxServerResponse of byte []
 // <--> Result Messages <-->

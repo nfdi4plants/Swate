@@ -21,5 +21,7 @@ type Msg =
 | ExportJsonTable
 /// Starts chain to export all tables to isa json
 | ExportJsonTables
+/// Starts chain to parse all tables to DAG
+| ParseTablesToDag
 | UpdateTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []
