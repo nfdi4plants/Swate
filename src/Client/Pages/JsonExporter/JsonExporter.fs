@@ -387,8 +387,9 @@ let xlsxUploadAndParsingMainElement (model:Model) (dispatch: Msg -> unit) =
                         Button.Color Color.IsDanger
                         Button.Props [Disabled true]
                     Button.IsFullWidth
-                    Button.OnClick(fun e ->
-                        ParseXLSXToJsonRequest model.JsonExporterModel.XLSXByteArray |> JsonExporterMsg |> dispatch
+                    Button.OnClick(fun _ ->
+                        if hasContent then
+                            ParseXLSXToJsonRequest model.JsonExporterModel.XLSXByteArray |> JsonExporterMsg |> dispatch
                     )
                 ] [
                     str "Download as isa json"
