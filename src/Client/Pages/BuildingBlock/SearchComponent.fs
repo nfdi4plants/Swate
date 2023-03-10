@@ -290,7 +290,7 @@ module private AutocompleteComponents =
                         prop.children [
                             Bulma.content [
                                 Html.b "Definition: "
-                                Html.p term.Description
+                                Html.p (if term.Description = "" then "No definition found" else term.Description)
                             ]
                         ]
                     ]

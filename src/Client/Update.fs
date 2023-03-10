@@ -768,9 +768,9 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
 
     let logg (msg:Msg) (model: Model) : Model =
         if matchMsgToLog msg then
-
+            let l = 62
             let txt = $"{msg.ToString()}"
-            let txt = if txt.Length > 62 then txt.Substring(0, 62) +  ".." else txt
+            let txt = if txt.Length > l then txt.Substring(0, l) +  ".." else txt
             let nextState = {
                 model.DevState with
                     Log = (LogItem.ofStringNow "Info" txt)::model.DevState.Log

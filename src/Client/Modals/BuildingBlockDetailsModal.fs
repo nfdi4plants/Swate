@@ -52,15 +52,18 @@ let private rowIndicesToReadable (rowIndices:int []) =
         $"{rowIndices.[0]}"
 
 let private infoIcon (txt:string) =
-    span [
-        Style [Color NFDIColors.Yellow.Base; (*OverflowY OverflowOptions.Visible*)]
-        Class ("has-tooltip-right has-tooltip-multiline")
-        Props.Custom ("data-tooltip", txt)
-    ] [
-        Fa.i [
-            Fa.Solid.InfoCircle
-        ] []
-    ]
+    if txt = "" then
+        str "No defintion found"
+    else
+        span [
+            Style [Color NFDIColors.Yellow.Base; (*OverflowY OverflowOptions.Visible*)]
+            Class ("has-tooltip-right has-tooltip-multiline")
+            Props.Custom ("data-tooltip", txt)
+        ] [
+            Fa.i [
+                Fa.Solid.InfoCircle
+            ] []
+        ]
 
 [<Literal>]
 let private userSpecificTermMsg = "This Term was not found in the database."

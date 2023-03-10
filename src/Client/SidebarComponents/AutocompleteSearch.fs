@@ -225,7 +225,7 @@ let createAutocompleteSuggestions
                         td [ColSpan 4] [
                             Content.content [] [
                                 b [] [ str "Definition: " ]
-                                str sugg.TooltipText
+                                str (if sugg.TooltipText = "" then "No definition found" else sugg.TooltipText)
                             ]
                         ]
                     ]
