@@ -30,7 +30,11 @@ let private shortCutIconList model dispatch =
                 Fa.span [Fa.Solid.Plus] []
                 Fa.span [Fa.Solid.Table] []
             ],
-            (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> InterfaceMsg |> dispatch)
+            (fun e ->
+                e.preventDefault()
+                let ctrl = e.metaKey || e.ctrlKey
+                SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
+            )
         )
         match model.PersistentStorageState.Host with
         | Swatehost.Excel _ ->
@@ -39,7 +43,11 @@ let private shortCutIconList model dispatch =
                 [
                     Fa.i [Fa.Solid.SyncAlt] []
                 ],
-                (fun e -> OfficeInterop.AutoFitTable (not e.ctrlKey) |> OfficeInteropMsg |> dispatch)
+                (fun e ->
+                    e.preventDefault()
+                    let ctrl = not e.metaKey || not e.ctrlKey
+                    OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
+                )
             )
         | _ ->
             ()
