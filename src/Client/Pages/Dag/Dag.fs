@@ -68,6 +68,9 @@ let defaultMessageEle (model:Model) dispatch =
                 b [] [str "G"]
                 str "raph represents the chain of applied protocols to samples. Within are all intermediate products as well as protocols displayed."
             ]
+            Help.help [] [
+                str "This only works if your input and output columns have values."
+            ]
         ]
         
         Field.div [] [
