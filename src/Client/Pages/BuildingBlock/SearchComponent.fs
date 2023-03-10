@@ -259,12 +259,12 @@ module private AutocompleteComponents =
                                         e.stopPropagation()
                                         let ele = Browser.Dom.document.getElementById(hiddenId)
                                         let isCollapsed =
-                                            let vis = string ele?style?visibility
-                                            vis = "collapse" || vis = ""
+                                            let vis = string ele?style?display
+                                            vis = "none" || vis = ""
                                         if isCollapsed then 
-                                            ele?style?visibility <- "visible"
+                                            ele?style?display <- "table-row"
                                         else
-                                            ele?style?visibility <- "collapse"
+                                            ele?style?display <- "none"
                                         ()
                                     )
                                     prop.children [

@@ -371,7 +371,8 @@ tr.suggestion :hover {
 }
 
 tr.suggestion-details {
-    visibility: collapse;
+    /*visibility: collapse;*/
+    display: none;
     box-shadow: 1px 2px 2px darkgrey
 }
 
