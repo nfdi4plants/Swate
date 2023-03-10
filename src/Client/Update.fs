@@ -499,261 +499,284 @@ let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * 
         }
         nextModel, Cmd.none
 
-let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
-    match msg with
-    | DoNothing -> currentModel,Cmd.none
-    | TestMyAPI ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.testAPIv1.test
-                    ()
-                    (curry GenericLog Cmd.none)
-                    (curry GenericError Cmd.none)
-        currentModel, Cmd.map DevMsg cmd
-    | TestMyPostAPI ->
-        let cmd =
-            Cmd.OfAsync.either
-                Api.testAPIv1.postTest
-                    ("instrument Mod")
-                    (curry GenericLog Cmd.none)
-                    (curry GenericError Cmd.none)
-        currentModel, Cmd.map DevMsg cmd
-    | Batch msgSeq ->
-        let cmd =
-            Cmd.batch [
-                yield!
-                    msgSeq |> Seq.map Cmd.ofMsg
-            ]
-        currentModel, cmd
-    | UpdatePageState (pageOpt:Route option) ->
-        let nextCmd =
-            match pageOpt with
-            | Some Routing.Route.Validation ->
-                Cmd.OfPromise.perform
-                    OfficeInterop.Core.getTableRepresentation
-                    ()
-                    (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
-            | Some Routing.Route.ProtocolSearch ->
-                Protocol.GetAllProtocolsRequest |> ProtocolMsg |> Cmd.ofMsg
-            | _ ->
-                Cmd.none
-        let nextPageState =
-            match pageOpt with
-            | Some page -> {
+let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
+    let innerUpdate (msg: Msg) (currentModel: Model) =
+        match msg with
+        | DoNothing -> currentModel,Cmd.none
+        | TestMyAPI ->
+            let cmd =
+                Cmd.OfAsync.either
+                    Api.testAPIv1.test
+                        ()
+                        (curry GenericLog Cmd.none)
+                        (curry GenericError Cmd.none)
+            currentModel, Cmd.map DevMsg cmd
+        | TestMyPostAPI ->
+            let cmd =
+                Cmd.OfAsync.either
+                    Api.testAPIv1.postTest
+                        ("instrument Mod")
+                        (curry GenericLog Cmd.none)
+                        (curry GenericError Cmd.none)
+            currentModel, Cmd.map DevMsg cmd
+        | Batch msgSeq ->
+            let cmd =
+                Cmd.batch [
+                    yield!
+                        msgSeq |> Seq.map Cmd.ofMsg
+                ]
+            currentModel, cmd
+        | UpdatePageState (pageOpt:Route option) ->
+            let nextCmd =
+                match pageOpt with
+                | Some Routing.Route.Validation ->
+                    Cmd.OfPromise.perform
+                        OfficeInterop.Core.getTableRepresentation
+                        ()
+                        (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
+                | Some Routing.Route.ProtocolSearch ->
+                    Protocol.GetAllProtocolsRequest |> ProtocolMsg |> Cmd.ofMsg
+                | _ ->
+                    Cmd.none
+            let nextPageState =
+                match pageOpt with
+                | Some page -> {
+                    currentModel.PageState with
+                        CurrentPage = page
+                        CurrentUrl = Route.toRouteUrl page
+                    }
+                | None -> {
+                    currentModel.PageState with
+                        CurrentPage = Route.TermSearch
+                        CurrentUrl = ""
+                    }
+            let nextModel = {
+                currentModel with
+                    PageState = nextPageState
+            }
+            nextModel, nextCmd
+        | UpdateIsExpert b ->
+            let nextPageState = {
                 currentModel.PageState with
-                    CurrentPage = page
-                    CurrentUrl = Route.toRouteUrl page
-                }
-            | None -> {
-                currentModel.PageState with
-                    CurrentPage = Route.TermSearch
-                    CurrentUrl = ""
-                }
-        let nextModel = {
-            currentModel with
-                PageState = nextPageState
-        }
-        nextModel, nextCmd
-    | UpdateIsExpert b ->
-        let nextPageState = {
-            currentModel.PageState with
-                IsExpert = b
-        }
-        let nextModel = {
-            currentModel with
-                PageState = nextPageState
-        }
-        nextModel, Cmd.none        
-    // does not work due to office.js ->
-    // https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
-    //| Navigate route ->
-    //    currentModel, Navigation.newUrl (Routing.Route.toRouteUrl route)
-    | Bounce (delay, bounceId, msgToBounce) ->
+                    IsExpert = b
+            }
+            let nextModel = {
+                currentModel with
+                    PageState = nextPageState
+            }
+            nextModel, Cmd.none        
+        // does not work due to office.js ->
+        // https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
+        //| Navigate route ->
+        //    currentModel, Navigation.newUrl (Routing.Route.toRouteUrl route)
+        | Bounce (delay, bounceId, msgToBounce) ->
 
-        let (debouncerModel, debouncerCmd) =
-            currentModel.DebouncerState
-            |> Debouncer.bounce delay bounceId msgToBounce
+            let (debouncerModel, debouncerCmd) =
+                currentModel.DebouncerState
+                |> Debouncer.bounce delay bounceId msgToBounce
 
-        let nextModel = {
-            currentModel with
-                DebouncerState = debouncerModel
-        }
+            let nextModel = {
+                currentModel with
+                    DebouncerState = debouncerModel
+            }
 
-        nextModel,Cmd.map DebouncerSelfMsg debouncerCmd
+            nextModel,Cmd.map DebouncerSelfMsg debouncerCmd
 
-    | DebouncerSelfMsg debouncerMsg ->
-        let nextDebouncerState, debouncerCmd =
-            Debouncer.update debouncerMsg currentModel.DebouncerState
+        | DebouncerSelfMsg debouncerMsg ->
+            let nextDebouncerState, debouncerCmd =
+                Debouncer.update debouncerMsg currentModel.DebouncerState
 
-        let nextModel = {
-            currentModel with
-                DebouncerState = nextDebouncerState
-        }
-        nextModel, debouncerCmd
+            let nextModel = {
+                currentModel with
+                    DebouncerState = nextDebouncerState
+            }
+            nextModel, debouncerCmd
 
-    | OfficeInteropMsg excelMsg ->
-        let nextModel,nextCmd = Update.OfficeInterop.update currentModel excelMsg
-        nextModel,nextCmd
+        | OfficeInteropMsg excelMsg ->
+            let nextModel,nextCmd = Update.OfficeInterop.update currentModel excelMsg
+            nextModel,nextCmd
 
-    | SpreadsheetMsg msg ->
-        let nextState, nextModel, nextCmd = Update.Spreadsheet.update currentModel.SpreadsheetModel currentModel msg
-        let nextModel' = {nextModel with SpreadsheetModel = nextState}
-        nextModel', nextCmd
+        | SpreadsheetMsg msg ->
+            let nextState, nextModel, nextCmd = Update.Spreadsheet.update currentModel.SpreadsheetModel currentModel msg
+            let nextModel' = {nextModel with SpreadsheetModel = nextState}
+            nextModel', nextCmd
 
-    | InterfaceMsg msg ->
-        Update.Interface.update currentModel msg
+        | InterfaceMsg msg ->
+            Update.Interface.update currentModel msg
 
-    | TermSearchMsg termSearchMsg ->
-        let nextTermSearchState,nextCmd =
-            currentModel.TermSearchState
-            |> TermSearch.update termSearchMsg
+        | TermSearchMsg termSearchMsg ->
+            let nextTermSearchState,nextCmd =
+                currentModel.TermSearchState
+                |> TermSearch.update termSearchMsg
 
-        let nextModel = {
-            currentModel with
-                TermSearchState = nextTermSearchState
-        }
-        nextModel,nextCmd
+            let nextModel = {
+                currentModel with
+                    TermSearchState = nextTermSearchState
+            }
+            nextModel,nextCmd
 
-    | AdvancedSearchMsg advancedSearchMsg ->
-        let nextAdvancedSearchState,nextCmd =
-            currentModel.AdvancedSearchState
-            |> SidebarComponents.AdvancedSearch.update advancedSearchMsg
+        | AdvancedSearchMsg advancedSearchMsg ->
+            let nextAdvancedSearchState,nextCmd =
+                currentModel.AdvancedSearchState
+                |> SidebarComponents.AdvancedSearch.update advancedSearchMsg
 
-        let nextModel = {
-            currentModel with
-                AdvancedSearchState = nextAdvancedSearchState
-        }
-        nextModel,nextCmd
-    | DevMsg msg ->
-        let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
+            let nextModel = {
+                currentModel with
+                    AdvancedSearchState = nextAdvancedSearchState
+            }
+            nextModel,nextCmd
+        | DevMsg msg ->
+            let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
         
-        let nextModel = {
-            currentModel with
-                DevState = nextDevState
-        }
-        nextModel,nextCmd
-
-    | Api apiMsg ->
-        let nextApiState,nextCmd = currentModel.ApiState |> handleApiMsg apiMsg
-
-        let nextModel = {
-            currentModel with
-                ApiState = nextApiState
-        }
-        nextModel,nextCmd
-
-    | PersistentStorage persistentStorageMsg ->
-        let nextPersistentStorageState,nextCmd =
-            currentModel.PersistentStorageState
-            |> handlePersistenStorageMsg persistentStorageMsg
-
-        let nextModel = {
-            currentModel with
-                PersistentStorageState = nextPersistentStorageState
-        }
-
-        nextModel,nextCmd
-
-    | StyleChange styleChangeMsg ->
-        let nextSiteStyleState,nextCmd =
-            currentModel.SiteStyleState
-            |> handleStyleChangeMsg styleChangeMsg
-
-        let nextModel = {
-            currentModel with
-                SiteStyleState = nextSiteStyleState
-        }
-
-        nextModel,nextCmd
-
-    | FilePickerMsg filePickerMsg ->
-        let nextFilePickerState,nextCmd =
-            currentModel.FilePickerState
-            |> FilePicker.update filePickerMsg
-
-        let nextModel = {
-            currentModel with
-                FilePickerState = nextFilePickerState
-        }
-
-        nextModel,nextCmd
-
-    | BuildingBlockMsg addBuildingBlockMsg ->
-        let nextAddBuildingBlockState,nextCmd = 
-            currentModel.AddBuildingBlockState
-            |> BuildingBlock.Core.update addBuildingBlockMsg
-
-        let nextModel = {
-            currentModel with
-                AddBuildingBlockState = nextAddBuildingBlockState
+            let nextModel = {
+                currentModel with
+                    DevState = nextDevState
             }
-        nextModel, nextCmd
+            nextModel,nextCmd
 
-    | ValidationMsg validationMsg ->
-        let nextValidationState, nextCmd =
-            currentModel.ValidationState
-            |> Validation.update validationMsg
+        | Api apiMsg ->
+            let nextApiState,nextCmd = currentModel.ApiState |> handleApiMsg apiMsg
 
-        let nextModel = {
-            currentModel with
-                ValidationState = nextValidationState
+            let nextModel = {
+                currentModel with
+                    ApiState = nextApiState
             }
-        nextModel, nextCmd
+            nextModel,nextCmd
 
-    | ProtocolMsg fileUploadJsonMsg ->
-        let nextFileUploadJsonState, nextCmd =
-            currentModel.ProtocolState
-            |> Protocol.update fileUploadJsonMsg
+        | PersistentStorage persistentStorageMsg ->
+            let nextPersistentStorageState,nextCmd =
+                currentModel.PersistentStorageState
+                |> handlePersistenStorageMsg persistentStorageMsg
 
-        let nextModel = {
-            currentModel with
-                ProtocolState = nextFileUploadJsonState
+            let nextModel = {
+                currentModel with
+                    PersistentStorageState = nextPersistentStorageState
             }
-        nextModel, nextCmd
 
-    | BuildingBlockDetails buildingBlockDetailsMsg ->
-        let nextState, nextCmd =
-            currentModel.BuildingBlockDetailsState
-            |> handleBuildingBlockDetailsMsg buildingBlockDetailsMsg
+            nextModel,nextCmd
 
-        let nextModel = {
-            currentModel with
-                BuildingBlockDetailsState = nextState
+        | StyleChange styleChangeMsg ->
+            let nextSiteStyleState,nextCmd =
+                currentModel.SiteStyleState
+                |> handleStyleChangeMsg styleChangeMsg
+
+            let nextModel = {
+                currentModel with
+                    SiteStyleState = nextSiteStyleState
             }
-        nextModel, nextCmd
 
-    | SettingsXmlMsg msg ->
-        let nextState, nextCmd =
-            currentModel.SettingsXmlState
-            |> SettingsXml.update msg
-        let nextModel = {
-            currentModel with
-                SettingsXmlState = nextState
+            nextModel,nextCmd
+
+        | FilePickerMsg filePickerMsg ->
+            let nextFilePickerState,nextCmd =
+                currentModel.FilePickerState
+                |> FilePicker.update filePickerMsg
+
+            let nextModel = {
+                currentModel with
+                    FilePickerState = nextFilePickerState
+            }
+
+            nextModel,nextCmd
+
+        | BuildingBlockMsg addBuildingBlockMsg ->
+            let nextAddBuildingBlockState,nextCmd = 
+                currentModel.AddBuildingBlockState
+                |> BuildingBlock.Core.update addBuildingBlockMsg
+
+            let nextModel = {
+                currentModel with
+                    AddBuildingBlockState = nextAddBuildingBlockState
+                }
+            nextModel, nextCmd
+
+        | ValidationMsg validationMsg ->
+            let nextValidationState, nextCmd =
+                currentModel.ValidationState
+                |> Validation.update validationMsg
+
+            let nextModel = {
+                currentModel with
+                    ValidationState = nextValidationState
+                }
+            nextModel, nextCmd
+
+        | ProtocolMsg fileUploadJsonMsg ->
+            let nextFileUploadJsonState, nextCmd =
+                currentModel.ProtocolState
+                |> Protocol.update fileUploadJsonMsg
+
+            let nextModel = {
+                currentModel with
+                    ProtocolState = nextFileUploadJsonState
+                }
+            nextModel, nextCmd
+
+        | BuildingBlockDetails buildingBlockDetailsMsg ->
+            let nextState, nextCmd =
+                currentModel.BuildingBlockDetailsState
+                |> handleBuildingBlockDetailsMsg buildingBlockDetailsMsg
+
+            let nextModel = {
+                currentModel with
+                    BuildingBlockDetailsState = nextState
+                }
+            nextModel, nextCmd
+
+        | SettingsXmlMsg msg ->
+            let nextState, nextCmd =
+                currentModel.SettingsXmlState
+                |> SettingsXml.update msg
+            let nextModel = {
+                currentModel with
+                    SettingsXmlState = nextState
+            }
+            nextModel, nextCmd
+
+        | CytoscapeMsg msg ->
+            let nextState, nextModel0, nextCmd =
+                Cytoscape.Update.update msg currentModel.CytoscapeModel currentModel 
+            let nextModel =
+                {nextModel0 with
+                    CytoscapeModel = nextState}
+            nextModel, nextCmd
+
+        | JsonExporterMsg msg ->
+            let nextModel, nextCmd = currentModel |> JsonExporter.Core.update msg
+            nextModel, nextCmd
+
+        | TemplateMetadataMsg msg ->
+            let nextModel, nextCmd = currentModel |> TemplateMetadata.Core.update msg
+            nextModel, nextCmd
+
+        | DagMsg msg ->
+            let nextModel, nextCmd = currentModel |> Dag.Core.update msg
+            nextModel, nextCmd
+
+        | TopLevelMsg msg ->
+            let nextModel, nextCmd =
+                handleTopLevelMsg msg currentModel
+
+            nextModel, nextCmd
+
+    /// This function is used to determine which msg should be logged to activity log.
+    /// The function is exception based, so msg which should not be logged needs to be added here.
+    let matchMsgToLog (msg: Msg) =
+        match msg with
+        | Bounce _ | DevMsg _ | UpdatePageState _ -> false
+        | _ -> true
+
+    let logg (msg:Msg) (model: Model) : Model =
+        
+        let txt = $"{msg.ToString()}"
+        let txt = if txt.Length > 50 then txt.Substring(0, 62) +  ".." else txt
+        let nextState = {
+            model.DevState with
+                Log = (LogItem.ofStringNow "Info" txt)::model.DevState.Log
         }
-        nextModel, nextCmd
-
-    | CytoscapeMsg msg ->
-        let nextState, nextModel0, nextCmd =
-            Cytoscape.Update.update msg currentModel.CytoscapeModel currentModel 
-        let nextModel =
-            {nextModel0 with
-                CytoscapeModel = nextState}
-        nextModel, nextCmd
-
-    | JsonExporterMsg msg ->
-        let nextModel, nextCmd = currentModel |> JsonExporter.Core.update msg
-        nextModel, nextCmd
-
-    | TemplateMetadataMsg msg ->
-        let nextModel, nextCmd = currentModel |> TemplateMetadata.Core.update msg
-        nextModel, nextCmd
-
-    | DagMsg msg ->
-        let nextModel, nextCmd = currentModel |> Dag.Core.update msg
-        nextModel, nextCmd
-
-    | TopLevelMsg topLevelMsg ->
-        let nextModel, nextCmd =
-            handleTopLevelMsg topLevelMsg currentModel
-
-        nextModel, nextCmd
+        let nextModel = {
+            model with DevState = nextState
+        }
+        nextModel
+    logg msg model
+    |> innerUpdate msg 
