@@ -277,7 +277,13 @@ let Cell(index: (int*int), state_extend: Set<int>, setState_extend, model: Model
     cell_element [
         prop.key $"Cell_{state.ActiveTableIndex}-{columnIndex}-{rowIndex}"
         cellStyle [
-            if isHeader then
+            if isHeader && cell.Header.isInputColumn then
+                style.color(NFDIColors.white)
+                style.backgroundColor(NFDIColors.LightBlue.Base)
+            elif isHeader && cell.Header.isOutputColumn then
+                style.color(NFDIColors.white)
+                style.backgroundColor(NFDIColors.Red.Lighter30)
+            elif isHeader then
                 style.color(NFDIColors.white)
                 style.backgroundColor(NFDIColors.DarkBlue.Base)
             if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
