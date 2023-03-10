@@ -1,10 +1,12 @@
-### 0.8.0+1ac8965 (Released 2023-3-9)
+### 0.8.0+4485728 (Released 2023-3-10)
 * Additions:
+    * [[#21843de](https://github.com/nfdi4plants/Swate/commit/21843de1fb1217fc30cffa067908fdb81da804a4)] Update activity logging
+    * [[#1ad927f](https://github.com/nfdi4plants/Swate/commit/1ad927fca4818c2ae1597cc2379c4ea383437bc5)] Add placeholders for empty definitions #277
+    * [[#5d5a1dd](https://github.com/nfdi4plants/Swate/commit/5d5a1ddede80a6e0558166ac7e120ddef0e8863d)] Disable msg trigger on "Download as Xlsx" when empty #264
     * [[#11a5688](https://github.com/nfdi4plants/Swate/commit/11a568808a300d2e90d6dc0d0402d6f45b6142bf)] Redesign add building block function :sparkles:#268
     * [[#f7c67ad](https://github.com/nfdi4plants/Swate/commit/f7c67ad7ed5c2a62398736efceb1c7017a1d142d)] Improve search speed in specific ontologies :racehorse: and search units in DPBO (#239, #240)
-    * [[#04ff21b](https://github.com/nfdi4plants/Swate/commit/04ff21b10b58acdba7029776a89f6f385917145e)] Add keyboard shortcuts and option to copy/cut/paste :sparkles:#267
-    * [[#43f804b](https://github.com/nfdi4plants/Swate/commit/43f804bf30aea8cdff4782cebd0246ba4485644b)] Add multi row delete :sparkles:
 * Bugfixes:
+    * [[#aba0a53](https://github.com/nfdi4plants/Swate/commit/aba0a536cdf97731b225bb894d0917a2e65684d0)] Fix ctrl + click on quick access buttons on mac #273
     * [[#752a631](https://github.com/nfdi4plants/Swate/commit/752a631a9d4cd0bd4f465f3330ed56213b5dd6dc)] Fix strange search result order (#247)
 
 ### 0.7.1+a5a7d62 (Released 2022-12-14)
