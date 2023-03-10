@@ -48,13 +48,11 @@ module Assay =
 /// Only use this function for protocol templates from db
 let rowMajorOfTemplateJson jsonString =
     let assay = Assay.fromString jsonString
-    let rowMajorFormat =
-        //AssayCommonAPI.RowWiseAssay.fromAssay assay
-        QueryModel.QAssay.fromAssay assay
-    if rowMajorFormat.Sheets.Length <> 1 then
+    let qAssay = QueryModel.QAssay.fromAssay assay
+    if qAssay.Sheets.Length <> 1 then
         failwith "Swate was unable to identify the information from the requested template (<Found more than one process in template>). Please open an issue for the developers."
-    let template = rowMajorFormat.Sheets.Head
-    template
+    let template = qAssay.Sheets.Head
+    template //QAssay
 
 let private ColumnPositionCommentName = "ValueIndex"
 
@@ -119,21 +117,53 @@ type IOType with
         | ProcessedData -> BuildingBlockType.DerivedDataFile
         | anyElse -> failwith $"Cannot parse {anyElse} IsaDotNet IOType to BuildingBlockType."
 
+let createBuildingBlock_fromProtocolType (protocol: Protocol) =
+    let header = OfficeInteropTypes.BuildingBlockNamePrePrint.create BuildingBlockType.ProtocolType ""
+    let columnTerm = Some BuildingBlockType.ProtocolType.getFeaturedColumnTermMinimal 
+    let rows =
+        protocol
+        |> fun protType ->
+            // row range information is saved in comments and can be accessed + parsed by isadotnet function
+            let rowStart, rowEnd = protType.GetRowRange()
+            let tmEmpty = TermMinimal.create "" ""
+            [| for _ in rowStart .. rowEnd do
+                let hasValue = protType.ProtocolType.IsSome
+                yield
+                    if hasValue then protType.ProtocolType.Value.toTermMinimal |> Option.defaultValue tmEmpty else tmEmpty
+            |]
+    let columnPosition = protocol.ProtocolType |> Option.map getColumnPosition |> Option.defaultValue 0
+    columnPosition, InsertBuildingBlock.create header columnTerm None rows
+
 /// extend existing ISADotNet.Json.AssayCommonAPI.RowWiseSheet from ISADotNet library with
 /// static member to map it to the Swate InsertBuildingBlock type used as input for addBuildingBlock functions
 //type AssayCommonAPI.RowWiseSheet with
 type QueryModel.QSheet with
 
-    /// Map ISADotNet type to Swate OfficerInterop type. Only done for first row.
+    /// <summary>This function is only used for Swate templates.
+    /// This function looses values, input and output columns as well as Protocol REF</summary>
     member this.headerToInsertBuildingBlockList : InsertBuildingBlock list =
         let headerRow = this.Rows.Head
+        if this.Protocols.Length <> 1 then failwith "Protocol template must contain exactly one template"
+
+        let protocolType =
+            let protocol = this.Protocols.Head
+            let hasProtocolType = protocol.ProtocolType.IsSome
+            if hasProtocolType then
+                createBuildingBlock_fromProtocolType protocol |> Some
+            else
+                None
+
         let rawCols = headerRow.Values().Values
-        let cols = rawCols |> List.map (fun fv -> fv.toInsertBuildingBlock)
+        let mutable cols = rawCols |> List.map (fun fv -> fv.toInsertBuildingBlock)
+        match protocolType with
+        | Some (pbb) ->
+            cols <- pbb::cols
+        | None -> ()
         cols
         |> List.sortBy fst
         |> List.map snd
 
-    /// This function looses input and output names + Component [instrument model]
+    /// This function is the basic parser for all json/xlsx input, with values, input, output and all supported column types.
     member this.toInsertBuildingBlockList : InsertBuildingBlock list =
         let insertBuildingBlockRowList =
             this.Rows |> List.collect (fun r ->
