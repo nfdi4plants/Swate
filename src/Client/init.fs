@@ -9,6 +9,7 @@ open Thoth.Elmish
 open Spreadsheet.LocalStorage
 
 let initializeModel (pageOpt: Routing.Route option) =
+    /// Should propably put cookie logic into separate file. As this is prone to grow in the future
     let isDarkMode =
         let cookies = Browser.Dom.document.cookie
         let cookiesSplit = cookies.Split([|";"|], System.StringSplitOptions.RemoveEmptyEntries)
