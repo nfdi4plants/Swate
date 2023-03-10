@@ -45,7 +45,7 @@ let private shortCutIconList model dispatch =
                 ],
                 (fun e ->
                     e.preventDefault()
-                    let ctrl = not e.metaKey || not e.ctrlKey
+                    let ctrl = not (e.metaKey || e.ctrlKey)
                     OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
                 )
             )
