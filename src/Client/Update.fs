@@ -767,16 +767,20 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
         | _ -> true
 
     let logg (msg:Msg) (model: Model) : Model =
-        
-        let txt = $"{msg.ToString()}"
-        let txt = if txt.Length > 50 then txt.Substring(0, 62) +  ".." else txt
-        let nextState = {
-            model.DevState with
-                Log = (LogItem.ofStringNow "Info" txt)::model.DevState.Log
-        }
-        let nextModel = {
-            model with DevState = nextState
-        }
-        nextModel
+        if matchMsgToLog msg then
+
+            let txt = $"{msg.ToString()}"
+            let txt = if txt.Length > 62 then txt.Substring(0, 62) +  ".." else txt
+            let nextState = {
+                model.DevState with
+                    Log = (LogItem.ofStringNow "Info" txt)::model.DevState.Log
+            }
+            let nextModel = {
+                model with DevState = nextState
+            }
+            nextModel
+        else
+            model
+
     logg msg model
     |> innerUpdate msg 
