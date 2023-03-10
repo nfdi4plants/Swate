@@ -1,11 +1,14 @@
-### 0.8.0+4485728 (Released 2023-3-10)
+### 0.8.0+6aeb417 (Released 2023-3-10)
 * Additions:
+    * [[#ffed6aa](https://github.com/nfdi4plants/Swate/commit/ffed6aa3c4a88a1cc9767c9fba69381e11ee7d63)] Add colors to input & output columns #297
     * [[#21843de](https://github.com/nfdi4plants/Swate/commit/21843de1fb1217fc30cffa067908fdb81da804a4)] Update activity logging
     * [[#1ad927f](https://github.com/nfdi4plants/Swate/commit/1ad927fca4818c2ae1597cc2379c4ea383437bc5)] Add placeholders for empty definitions #277
     * [[#5d5a1dd](https://github.com/nfdi4plants/Swate/commit/5d5a1ddede80a6e0558166ac7e120ddef0e8863d)] Disable msg trigger on "Download as Xlsx" when empty #264
     * [[#11a5688](https://github.com/nfdi4plants/Swate/commit/11a568808a300d2e90d6dc0d0402d6f45b6142bf)] Redesign add building block function :sparkles:#268
     * [[#f7c67ad](https://github.com/nfdi4plants/Swate/commit/f7c67ad7ed5c2a62398736efceb1c7017a1d142d)] Improve search speed in specific ontologies :racehorse: and search units in DPBO (#239, #240)
 * Bugfixes:
+    * [[#83e45cf](https://github.com/nfdi4plants/Swate/commit/83e45cf0572d4382b07cceff181df13c93bb87c9)] Change css from visibility to display :bug:#270
+    * [[#6aeb417](https://github.com/nfdi4plants/Swate/commit/6aeb4171240c63c86ec55fd17a60d1f24d50c366)] Enable import of protocol type column in templates. :bug:#263
     * [[#aba0a53](https://github.com/nfdi4plants/Swate/commit/aba0a536cdf97731b225bb894d0917a2e65684d0)] Fix ctrl + click on quick access buttons on mac #273
     * [[#752a631](https://github.com/nfdi4plants/Swate/commit/752a631a9d4cd0bd4f465f3330ed56213b5dd6dc)] Fix strange search result order (#247)
 

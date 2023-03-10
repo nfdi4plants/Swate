@@ -136,7 +136,6 @@ let createBuildingBlock_fromProtocolType (protocol: Protocol) =
 
 /// extend existing ISADotNet.Json.AssayCommonAPI.RowWiseSheet from ISADotNet library with
 /// static member to map it to the Swate InsertBuildingBlock type used as input for addBuildingBlock functions
-//type AssayCommonAPI.RowWiseSheet with
 type QueryModel.QSheet with
 
     /// <summary>This function is only used for Swate templates.
