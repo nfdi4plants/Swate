@@ -92,6 +92,14 @@ let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatc
         prop.onMouseDown <| mouseDown_event (mouseMove_event model setModel)
     ]
 
+let exampleTerm =
+    Shared.TermTypes.createTerm
+        "MS:1023810"
+        "instrument model"
+        "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."
+        false
+        "MS"
+
 // https://jsfiddle.net/gaby/Bek9L/
 // https://stackoverflow.com/questions/6219031/how-can-i-resize-a-div-by-dragging-just-one-side-of-it
 /// Splits screen into two parts. Left and right, with a dragbar in between to change size of right side.

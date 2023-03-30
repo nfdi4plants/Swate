@@ -42,6 +42,7 @@
         <Compile Include="Modals\WarningModal.fs" />
         <Compile Include="Modals\InteropLoggingModal.fs" />
         <Compile Include="Modals\ErrorModal.fs" />
+        <Compile Include="Modals\TermModal.fs" />
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
         <Compile Include="Spreadsheet\LocalStorage.fs" />

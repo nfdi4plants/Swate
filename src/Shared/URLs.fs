@@ -55,4 +55,9 @@ module URLs =
     [<LiteralAttribute>]
     let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
 
+    [<LiteralAttribute>]
     let NfdiWebsite = @"https://nfdi4plants.org"
+
+    [<LiteralAttribute>]
+    let OntobeeOntologyPrefix = @"https://ontobee.org/ontology/"
+
