@@ -7,9 +7,15 @@ module Graph =
 
     let updateLayout() =
         let layout = cy.Value.layout({|
-            directed = true
-            name = "breadthfirst"
-            padding = 20
+            name = "cose"
+            nodeOverlap = 20
+            nodeDimensionsIncludeLabels = true
+            boundingBox = {|
+                x1  = 0
+                y1  = 0
+                w   = 600 // set the width
+                h   = 300 // set the height
+            |}
         |})
         layout.run()
 
