@@ -30,7 +30,7 @@ For a full in-depth view of all Swate features check the [documentation](https:/
 
 ## Install/Use
 
-[Swate installation](https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/SwateManual/Docs01-Installing-Swate.html)
+[Swate installation](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/SwateManual/Docs01-Installing-Swate.html)
 
 ## Contact
 
