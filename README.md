@@ -24,9 +24,9 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
 - ISA conform output
 - Minimal information standards
 
-Try our [quickstart](https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/QuickStart_swate.html) or a more in-depth [walkthrough](https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/QuickStart_swate_walkthrough.html).
+Try our [quickstart](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/guides/swate_QuickStart.html) or a more in-depth [walkthrough](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/guides/swate_walkthrough.html).
 
-For a full in-depth view of all Swate features check the [documentation](https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/SwateManual/index.html).
+For a full in-depth view of all Swate features check the [documentation]([https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/SwateManual/index.html](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/SwateManual/index.html)).
 
 ## Install/Use
 
