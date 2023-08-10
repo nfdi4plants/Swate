@@ -68,43 +68,46 @@ module Proc =
             |> Array.Parallel.map Proc.run
 
 let createProcess exe arg dir =
-    CreateProcess.fromRawCommandLine exe arg
+    // Use `fromRawCommand` rather than `fromRawCommandLine`, as its behaviour is less likely to be misunderstood.
+    // See https://github.com/SAFE-Stack/SAFE-template/issues/551.
+    CreateProcess.fromRawCommand exe arg
     |> CreateProcess.withWorkingDirectory dir
     |> CreateProcess.ensureExitCode
 
-let dotnet = createProcess "dotnet"
+let dotnet args dir = createProcess "dotnet" args dir
 
-let docker = createProcess "docker"
+let docker args dir = createProcess "docker" args dir
 
-let npm =
+let dockerCompose args dir = createProcess "docker-compose" args dir
+
+let npm args dir =
     let npmPath =
         match ProcessUtils.tryFindFileOnPath "npm" with
         | Some path -> path
         | None ->
-            "npm was not found in path. Please install it and make sure it's available from your path. " +
-            "See https://safe-stack.github.io/docs/quickstart/#install-pre-requisites for more info"
+            "npm was not found in path. Please install it and make sure it's available from your path. "
+            + "See https://safe-stack.github.io/docs/quickstart/#install-pre-requisites for more info"
             |> failwith
 
-    createProcess npmPath
-let npx =
+    createProcess npmPath args dir
+
+let npx args dir =
     let npxPath =
         match ProcessUtils.tryFindFileOnPath "npx" with
         | Some path -> path
         | None ->
             "npx was not found in path. Please install it and make sure it's available from your path."
             |> failwith
-    createProcess npxPath
-let node =
+    createProcess npxPath args dir
+
+let node args dir =
     let nodePath =
         match ProcessUtils.tryFindFileOnPath "node" with
         | Some path -> path
         | None ->
             "node was not found in path. Please install it and make sure it's available from your path."
             |> failwith
-    createProcess nodePath
-
-    
-let dockerCompose = createProcess "docker-compose"
+    createProcess nodePath args dir
 
 ///Choose process to open plots with depending on OS. Thanks to @zyzhu for hinting at a solution (https://github.com/plotly/Plotly.NET/issues/31)
 let openBrowser url =
@@ -117,15 +120,9 @@ let openBrowser url =
     else
         failwith "Cannot open Browser. OS not supported."
 
-let run proc arg dir =
-    proc arg dir
-    |> Proc.run
-    |> ignore
+let run proc arg dir = proc arg dir |> Proc.run |> ignore
 
-let runParallel processes =
-    processes
-    |> Proc.Parallel.run
-    |> ignore
+let runParallel processes = processes |> Proc.Parallel.run |> ignore
 
 let runOrDefault args =
     Trace.trace (sprintf "%A" args)

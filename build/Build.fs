@@ -143,14 +143,14 @@ module Docker =
         let newRelease = ReleaseNotes.load releaseNotesPath
         let check = Fake.Core.UserInput.getUserInput($"Is version {newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch} correct? (y/n/true/false)" )
 
-        let dockerCreateImage() = run docker $"build -t {dockerContainerName} -f build/Dockerfile.publish . " ""
-        let dockerTestImage() = run docker $"run -it -p {port}:{port} {dockerContainerName}" ""
+        let dockerCreateImage() = run docker ["build"; "-t"; dockerContainerName; "-f"; "build/Dockerfile.publish"; "."] ""
+        let dockerTestImage() = run docker ["run"; "-it"; "-p"; $"{port}:{port}"; dockerContainerName] ""
         let dockerTagImage() =
-            run docker $"tag {dockerContainerName}:latest {dockerImageName}:{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}" ""
-            run docker $"tag {dockerContainerName}:latest {dockerImageName}:latest" ""
+            run docker ["tag"; sprintf "%s:latest" dockerContainerName; sprintf "%s:%i.%i.%i" dockerContainerName newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch] ""
+            run docker ["tag"; sprintf "%s:latest" dockerContainerName; sprintf "%s:latest" dockerImageName] ""
         let dockerPushImage() =
-            run docker $"push {dockerImageName}:{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}" ""
-            run docker $"push {dockerImageName}:latest" ""
+            run docker ["push"; sprintf "%s:%i.%i.%i" dockerImageName newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch] ""
+            run docker ["push"; sprintf "%s:latest" dockerImageName] ""
         let dockerPublish() =
             Trace.trace $"Tagging image with :latest and :{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}"
             dockerTagImage()
@@ -186,21 +186,9 @@ Target.create "InstallOfficeAddinTooling" (fun _ ->
 
     printfn "Installing office addin tooling"
 
-    run npm "install -g office-addin-dev-certs" __SOURCE_DIRECTORY__
-    run npm "install -g office-addin-debugging" __SOURCE_DIRECTORY__
-    run npm "install -g office-addin-manifest" __SOURCE_DIRECTORY__
-)
-
-Target.create "WebpackConfigSetup" (fun _ ->
-    let userPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-
-    Shell.replaceInFiles
-        [
-            "{USERFOLDER}",userPath.Replace("\\","/")
-        ]
-        [
-            (Path.getFullName("webpack.config.js"))
-        ]
+    run npm [|"install"; "-g"; "office-addin-dev-certs"|] __SOURCE_DIRECTORY__
+    run npm [|"install"; "-g"; "office-addin-debugging"|] __SOURCE_DIRECTORY__
+    run npm [|"install"; "-g"; "office-addin-manifest"|] __SOURCE_DIRECTORY__
 )
 
 Target.create "SetLoopbackExempt" (fun _ ->
@@ -215,7 +203,7 @@ Target.create "SetLoopbackExempt" (fun _ ->
 )
 
 Target.create "CreateDevCerts" (fun _ ->
-    run npx "office-addin-dev-certs install --days 365" ""
+    run npx [|"office-addin-dev-certs"; "install"; "--days"; "365"|] ""
 
     let certPath =
         Path.combine
@@ -229,64 +217,53 @@ Target.create "CreateDevCerts" (fun _ ->
 
 Target.create "Clean" (fun _ ->
     Shell.cleanDir deployPath
-    run dotnet "fable clean --yes" clientPath // Delete *.fs.js files created by Fable
+    run dotnet [ "fable"; "clean"; "--yes" ] clientPath // Delete *.fs.js files created by Fable
 )
 
-Target.create "InstallClient" (fun _ ->
-    Trace.trace "Node version:"
-    run node "--version" "."
-    Trace.trace "Npm version:"
-    run npm "--version"  "."
-    run npm "install" "."
-)
+Target.create "InstallClient" (fun _ -> run npm [ "install" ] ".")
 
 Target.create "bundle" (fun _ ->
-    [ "server", dotnet $"publish -c Release -o \"{deployPath}\"" serverPath
-      "client", dotnet "fable src/Client -o src/Client/output -e .fs.js -s --run npm run build" "" ]
-    |> runParallel
-)
-
-Target.create "bundle-linux" (fun _ ->
-    [ "server", dotnet $"publish -c Release -r linux-x64 -o \"{deployPath}\"" serverPath
-      "client", dotnet "fable src/Client -s --run npm run build" "" ]
+    [ "server", dotnet [ "publish"; "-c"; "Release"; "-o"; $"\"{deployPath}\"" ] serverPath
+      "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "vite"; "build" ] clientPath ]
     |> runParallel
 )
 
 Target.create "Run" (fun _ ->
-    run dotnet "build" sharedPath
-    [ "server", dotnet "watch run" serverPath
-      "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" "" ]
-    |> runParallel
+    run dotnet [ "build" ] sharedPath
+    [ "server", dotnet [ "watch"; "run" ] serverPath
+      "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientPath
+      //"database", dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
+    ] |> runParallel
 )
 
-Target.create "officedebug" (fun config ->
-    let args = config.Context.Arguments
-    run dotnet "build" sharedPath
-    if args |> List.contains "--open" then openBrowser developmentUrl
-    [ "server", dotnet "watch run" serverPath
-      "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" ""
-      // start up db + Swobup from docker-compose
-      "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
-      // sideload webapp in excel
-      if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start build/manifest.xml desktop --debug-method web" ""
-      ]
-    |> runParallel
+//Target.create "officedebug" (fun config ->
+//    let args = config.Context.Arguments
+//    run dotnet [ "build" ] sharedPath
+//    if args |> List.contains "--open" then openBrowser developmentUrl
+//    [ "server", dotnet "watch run" serverPath
+//      "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" ""
+//      // start up db + Swobup from docker-compose
+//      "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
+//      // sideload webapp in excel
+//      if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start build/manifest.xml desktop --debug-method web" ""
+//      ]
+//    |> runParallel
+//)
+
+Target.create "RunDB" (fun _ ->
+    run dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
 )
 
 Target.create "RunTests" (fun _ ->
-    run dotnet "build" sharedTestsPath
+    run dotnet [ "build" ] sharedTestsPath
     [
-        "server", dotnet "watch run --project tests/Server" ""
-        "client", dotnet "fable watch tests/Client -o tests/Client/output -e .fs.js -s --run npm run test:live" "" ]
+        "server", dotnet [ "watch"; "run" ] serverTestsPath
+        "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath ]
     |> runParallel
 )
 
-Target.create "run-db" (fun _ ->
-    run dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
-)
-
 Target.create "Format" (fun _ ->
-    run dotnet "fantomas . -r" "src"
+    run dotnet [ "fantomas"; "."; "-r" ] "src"
 )
 
 Target.create "Setup" ignore 
@@ -312,20 +289,19 @@ let dependencies = [
         ==> "InstallClient"
         ==> "Run"
 
-    "Clean"
-        ==> "InstallClient"
-        ==> "officedebug"
+    //"Clean"
+    //    ==> "InstallClient"
+    //    ==> "officedebug"
 
     "InstallClient"
         ==> "RunTests"
 
     "InstallOfficeAddinTooling"
-        ==> "WebpackConfigSetup"
         ==> "CreateDevCerts"
         ==> "SetLoopbackExempt"
         ==> "Setup"
 
-    "run-db"
+    "RunDB"
 
     "release"
 

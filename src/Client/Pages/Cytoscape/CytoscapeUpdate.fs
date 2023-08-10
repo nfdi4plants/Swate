@@ -1,6 +1,7 @@
 namespace Cytoscape
 
 open Elmish
+open Fable.Core
 open Messages
 
 module Update =  
@@ -16,7 +17,7 @@ module Update =
                     (curry GenericError Cmd.none >> DevMsg)
             let nextState = Cytoscape.Model.init(accession)
             let batch = Cmd.batch [
-                Cmd.ofSub (fun _ -> Modals.Controller.renderModal("CytoscapeView", Modals.Cytoscape.view))
+                Cmd.ofEffect (fun _ -> Modals.Controller.renderModal("CytoscapeView", Modals.Cytoscape.view))
                 cmd
             ]
             nextState, currentModel, batch

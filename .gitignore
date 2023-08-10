@@ -24,3 +24,4 @@ release.sh
 .vscode/
 /.db/cache
 /.db/neo4j
+/src/Client/output

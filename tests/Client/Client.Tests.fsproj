@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="index.html" />
+    <None Include="vite.config.ts" />
     <Compile Include="Spreadsheet\Controller.Tests.fs" />
     <Compile Include="OfficeInterop.Indexing.Tests.fs" />
     <Compile Include="FilePickerView.Tests.fs" />
@@ -13,6 +15,8 @@
     <Compile Include="BuildingBlockFunctions.Tests.fs" />
     <Compile Include="Client.Tests.fs" />
   </ItemGroup>
+
+  <ItemGroup />
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Client\Client.fsproj" />

@@ -6,6 +6,9 @@ $family-primary: 'Open Sans';
 
 /*
 // Bulma*/
+@import "../../node_modules/bulma/sass/utilities/initial-variables.sass";
+@import "../../node_modules/bulma/sass/utilities/functions.sass";
+
 
 $excelPrimary: #217346;
 $excelPrimary30: #639d7d;
@@ -25,12 +28,7 @@ $warning: $yellow;
 
 $switch-background-active: $excelPrimary;
 
-@import "~bulma/bulma";
-@import '@creativebulma/bulma-tooltip';
-@import "~bulma-switch";
-@import "~bulma-checkradio";
-@import "~bulma-slider";
-
+@import "../../node_modules/bulma/bulma.sass";
 
 /*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/
 .fixed_headers {

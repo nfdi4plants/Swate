@@ -7,9 +7,12 @@ open Elmish.React
 open Fable.React
 open Messages
 open Update
+open Fable.Core.JsInterop
+let _ = importSideEffects "./style.scss"
 
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
+
 
 open Feliz
 
@@ -32,7 +35,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
-
 #endif
 
 Program.mkProgram Init.init Update.update view

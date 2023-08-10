@@ -344,7 +344,7 @@ let config (app:IApplicationBuilder) =
     ) 
 
 let app = application {
-    url "http://0.0.0.0:5000" //"http://localhost:5000/"
+    url "http://localhost:5000" //"http://localhost:5000/"
     app_config config
     use_router topLevelRouter
     use_cors "CORS_CONFIG" cors_config

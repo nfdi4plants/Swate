@@ -11,7 +11,7 @@ services:
     networks:
       - swobup_network
   neo4j:
-    image: neo4j:latest
+    image: neo4j:5
     container_name: neo4j
     ports:
       - "0.0.0.0:7474:7474"
@@ -20,14 +20,15 @@ services:
       - swobup_network
     environment:
       - NEO4J_AUTH=neo4j/test
-      - NEO4J_server_memory_pagecache_size=2G
+      - NEO4J_server_memory_pagecache_size=7G
       - NEO4J_server_memory_heap_initial__size=5G
-      - NEO4J_server_memory_heap_max__size=8G
+      - NEO4J_server_memory_heap_max__size=5G
       - NEO4J_server_default__listen__address=0.0.0.0
       - NEO4J_server_default__advertised__address=10.20.51.223
       - NEO4J_dbms.connector.bolt.address=0.0.0.0:7687
       - NEO4J_PLUGINS=["graph-data-science", "apoc"]
       - NEO4J_dbms_security_procedures_unrestricted=algo.*, apoc.*
+      - NEO4J_server_jvm_additional='-XX:+ExitOnOutOfMemoryError'
       - NEO4J_dbms_security_auth__minimum__password__length=4
     volumes:
       - ./neo4j/data:/data

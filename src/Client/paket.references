@@ -1,9 +1,9 @@
 Fable.Core
-Fable.Elmish
 Fable.React
 Fable.Elmish.React
 Fable.Elmish.Debugger
 Fable.Elmish.HMR
+Fable.Elmish
 Fable.FontAwesome.Free
 Fable.Remoting.Client
 Fulma
@@ -18,3 +18,4 @@ Feliz.Bulma
 Feliz.UseElmish
 ExcelJS.Fable
 Feliz.ElmishComponents
+Fable.Elmish.Browser

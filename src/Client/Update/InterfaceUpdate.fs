@@ -59,7 +59,7 @@ module Interface =
                     | Swatehost.Browser | Swatehost.Electron ->
                         Spreadsheet.LocalStorage.onInit()
                         Cmd.batch [
-                            Cmd.ofSub (fun dispatch -> Spreadsheet.KeyboardShortcuts.addOnKeydownEvent dispatch)
+                            Cmd.ofEffect (fun dispatch -> Spreadsheet.KeyboardShortcuts.addOnKeydownEvent dispatch)
                         ]
                     | _ -> ()
                 ]
@@ -176,7 +176,7 @@ module Interface =
                     model, cmd
                 | Swatehost.Browser ->
                     let selectedIndex = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
-                    let cmd = Cmd.ofSub (fun dispatch -> Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main selectedIndex model dispatch))
+                    let cmd = Cmd.ofEffect (fun dispatch -> Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main selectedIndex model dispatch))
                     model, cmd
                 | _ -> failwith "not implemented"
             | UpdateTermColumns ->

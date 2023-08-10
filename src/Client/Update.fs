@@ -58,7 +58,7 @@ module Dev =
             }
             let batch = Cmd.batch [
                 let modalName = "GenericInteropLogs"
-                if List.isEmpty parsedDisplayLogs |> not then Cmd.ofSub(fun dispatch -> Modals.Controller.renderModal(modalName, Modals.InteropLoggingModal.interopLoggingModal(nextState, dispatch)))
+                if List.isEmpty parsedDisplayLogs |> not then Cmd.ofEffect(fun dispatch -> Modals.Controller.renderModal(modalName, Modals.InteropLoggingModal.interopLoggingModal(nextState, dispatch)))
                 nextCmd
             ]
             nextState, batch
@@ -70,7 +70,7 @@ module Dev =
                 }
             let batch = Cmd.batch [
                 let modalName = "GenericError"
-                Cmd.ofSub(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
+                Cmd.ofEffect(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
                 nextCmd
             ]
             nextState, batch
@@ -397,7 +397,7 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messag
         }
         let batch = Cmd.batch [
             let modalName = "GenericError"
-            Cmd.ofSub(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
+            Cmd.ofEffect(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
             curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName (e.GetPropagatedError())) |> DevMsg |> Cmd.ofMsg
         ]
 
@@ -477,7 +477,7 @@ let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (current
                 BuildingBlockValues = searchTermResults
                 CurrentRequestState = Inactive
         }
-        let cmd = Cmd.ofSub(fun dispatch ->
+        let cmd = Cmd.ofEffect(fun dispatch ->
             Modals.Controller.renderModal("BuildingBlockDetails", Modals.BuildingBlockDetailsModal.buildingBlockDetailModal(nextState, dispatch))
         )
         nextState, cmd
