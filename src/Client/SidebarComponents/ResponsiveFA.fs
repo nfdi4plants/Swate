@@ -1,50 +1,50 @@
 module CustomComponents.ResponsiveFA
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fable.FontAwesome
-open Fulma.Extensions.Wikiki
 open Fable.Core.JsInterop
 
 open ExcelColors
 open Model
 open Messages
 
+open Feliz
+open Feliz.Bulma
+
 let responsiveFaElement toggle fa faToggled = 
     div [Style [
         Position PositionOptions.Relative
     ]] [
-        Fa.i [
-            Fa.Props [Style [
-                Position PositionOptions.Absolute
-                Top "0"
-                Left "0"
-                Display DisplayOptions.Block
-                Transition "opacity 0.25s, transform 0.25s"
-                if toggle then Opacity "0" else Opacity "1"
-            ]]
+        Bulma.icon [ Html.i [
+            prop.style [
+                style.position.absolute
+                style.top 0
+                style.left 0
+                style.display.block
+                style.transitionProperty "opacity 0.25s, transform 0.25s"
+                if toggle then style.opacity 0 else style.opacity 1
+            ]
             fa
-        ] []
-        Fa.i [
-            Fa.Props [Style [
-                Position PositionOptions.Absolute
-                Top "0"
-                Left "0"
-                Display DisplayOptions.Block
-                Transition "opacity 0.25s, transform 0.25s"
-                if toggle then Opacity "1" else Opacity "0"
-                if toggle then Transform "rotate(-180deg)" else Transform "rotate(0deg)"
-            ]]
+        ]]
+        Bulma.icon [ Html.i [
+            prop.style [
+                style.position.absolute
+                style.top 0
+                style.left 0
+                style.display.block
+                style.transitionProperty "opacity 0.25s, transform 0.25s"
+                if toggle then style.opacity 1 else style.opacity 0
+                if toggle then style.transform [transform.rotate -180] else style.transform [transform.rotate 0]
+            ]
             faToggled
-        ] []
+        ]]
         // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
-        Fa.i [
-            Fa.Props [Style [
-                Display DisplayOptions.Block
-                Opacity "0" 
-            ]]
+        Bulma.icon [ Html.i [
+            prop.style [
+                style.display.block
+                style.opacity 0 
+            ]
             fa
-        ] []
+        ]]
     ]
 
 let private createTriggeredId id =

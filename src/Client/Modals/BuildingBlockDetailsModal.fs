@@ -2,14 +2,13 @@ module Modals.BuildingBlockDetailsModal
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
 open ExcelColors
 open Model
 open Messages
 open Shared
 open TermTypes
+open Feliz
+open Feliz.Bulma
 
 
 let private getBuildingBlockHeader (terms:TermSearchable []) =
@@ -60,9 +59,9 @@ let private infoIcon (txt:string) =
             Class ("has-tooltip-right has-tooltip-multiline")
             Props.Custom ("data-tooltip", txt)
         ] [
-            Fa.i [
-                Fa.Solid.InfoCircle
-            ] []
+            Bulma.icon [
+                Html.i [prop.className "fa-solid fa-circle-info"]
+            ]
         ]
 
 [<Literal>]
@@ -72,28 +71,28 @@ let private userSpecificTermMsg = "This Term was not found in the database."
 let private searchResultTermToTableHeaderElement (term:TermSearchable option) =
     match term with
     | Some isEmpty when isEmpty.Term.Name = "" && isEmpty.Term.TermAccession = "" ->
-        tr [] [
+        Html.tr [
             th [] [str "-"]
             th [] [str "-"]
             th [Style [TextAlign TextAlignOptions.Center]] [str "-"]
             th [] [str (rowIndicesToReadable isEmpty.RowIndices)]
         ]
     | Some hasResult when hasResult.SearchResultTerm.IsSome ->
-        tr [ ] [
+        Html.tr [
             th [] [str hasResult.SearchResultTerm.Value.Name]
             th [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon hasResult.SearchResultTerm.Value.Description]
             th [] [str hasResult.SearchResultTerm.Value.Accession]
             th [] [str (rowIndicesToReadable hasResult.RowIndices)]
         ]
     | Some hasNoResult when hasNoResult.SearchResultTerm.IsNone ->
-        tr [ ] [
+        Html.tr [
             th [ Style [Color NFDIColors.Red.Lighter20] ] [str hasNoResult.Term.Name]
             th [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon userSpecificTermMsg]
             th [] [str hasNoResult.Term.TermAccession]
             th [] [str (rowIndicesToReadable hasNoResult.RowIndices)]
         ]
     | None ->
-        tr [ ] [
+        Html.tr [
             th [] [str "-"]
             th [] [str "-"]
             th [] [str "-"]
@@ -106,21 +105,21 @@ let private searchResultTermToTableHeaderElement (term:TermSearchable option) =
 let private searchResultTermToTableElement (term:TermSearchable) =
     match term with
     | isEmpty when term.Term.Name = "" && term.Term.TermAccession = "" ->
-        tr [] [
+        Html.tr [
             td [] [str "-"]
             td [ Style [TextAlign TextAlignOptions.Center] ] [str "-"]
             td [] [str "-"]
             td [] [str (rowIndicesToReadable isEmpty.RowIndices)]
         ]
     | hasResult when term.SearchResultTerm.IsSome ->
-        tr [ ] [
+        Html.tr [
             td [] [str hasResult.SearchResultTerm.Value.Name]
             td [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon hasResult.SearchResultTerm.Value.Description]
             td [] [str hasResult.SearchResultTerm.Value.Accession]
             td [] [str (rowIndicesToReadable hasResult.RowIndices)]
         ]
     | hasNoResult when term.SearchResultTerm.IsNone ->
-        tr [ ] [
+        Html.tr [
             td [ Style [Color NFDIColors.Red.Lighter20] ] [str hasNoResult.Term.Name]
             td [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon userSpecificTermMsg]
             td [] [str hasNoResult.Term.TermAccession]
@@ -132,25 +131,26 @@ let private searchResultTermToTableElement (term:TermSearchable) =
 let private tableElement (terms:TermSearchable []) =
     let rowHeader = getBuildingBlockHeader terms
     let bodyRows = getBodyRows terms
-    Table.table [
-        Table.IsFullWidth
-        Table.IsStriped
-    ] [
-        thead [] [
-            tr [] [
-                th [Class "toExcelColor"] [str "Name"]
-                th [Class "toExcelColor"; Style [TextAlign TextAlignOptions.Center] ] [str "Desc."]
-                th [Class "toExcelColor"] [str "TAN"]
-                th [Class "toExcelColor"] [str "Row"]
+    Bulma.table [
+        Bulma.table.isFullWidth
+        Bulma.table.isStriped
+        prop.children [
+            thead [] [
+                Html.tr [
+                    th [Class "toExcelColor"] [str "Name"]
+                    th [Class "toExcelColor"; Style [TextAlign TextAlignOptions.Center] ] [str "Desc."]
+                    th [Class "toExcelColor"] [str "TAN"]
+                    th [Class "toExcelColor"] [str "Row"]
+                ]
             ]
-        ]
-        thead [] [
-            searchResultTermToTableHeaderElement rowHeader
-        ]
-        tbody [] [
-            for term in bodyRows do 
-                yield
-                    searchResultTermToTableElement term
+            thead [] [
+                searchResultTermToTableHeaderElement rowHeader
+            ]
+            tbody [] [
+                for term in bodyRows do 
+                    yield
+                        searchResultTermToTableElement term
+            ]
         ]
     ]
 
@@ -161,12 +161,18 @@ let buildingBlockDetailModal (model:BuildingBlockDetailsState, dispatch) (rmv: _
 
     let baseArr = model.BuildingBlockValues |> Array.sortBy (fun x -> x.RowIndices |> Array.min)
 
-    Modal.modal [ Modal.IsActive true ] [
-        Modal.background [ Props [ OnClick closeMsg]] [ ]
-        Notification.notification [
-            Notification.Props [Style [Width "90%"; MaxHeight "80%"]]
-        ] [
-            Notification.delete [Props [OnClick closeMsg]] []
-            tableElement baseArr
+    Bulma.modal [
+        Bulma.modal.isActive
+        prop.children [
+            Bulma.modalBackground [
+                prop.onClick closeMsg
+            ]
+            Bulma.notification [
+                prop.style [style.width(length.percent 90); style.maxHeight (length.percent 80)]
+                prop.children [
+                    Bulma.delete [prop.onClick closeMsg]
+                    tableElement baseArr
+                ]
+            ]
         ]
     ]

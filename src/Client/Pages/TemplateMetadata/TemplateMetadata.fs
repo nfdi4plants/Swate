@@ -2,9 +2,6 @@ module TemplateMetadata.Core
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
 open Fable.Core.JsInterop
 open Elmish
 
@@ -30,32 +27,33 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
         currentModel, cmd
 
 open Messages
+open Feliz
+open Feliz.Bulma
 
 let defaultMessageEle (model:Model) dispatch =
     
     mainFunctionContainer [
-        Field.div [] [
-            Help.help [] [
+        Bulma.field.div [
+            Bulma.help [
                 str "Use this function to create a prewritten template metadata worksheet."
             ]
         ]
-        Field.div [] [
-            Button.a [
-                Button.OnClick(fun e -> CreateTemplateMetadataWorksheet Metadata.root |> TemplateMetadataMsg |> dispatch)
-                Button.IsFullWidth
-                Button.Color IsInfo
-            ] [
-                str "Create metadata"
+        Bulma.field.div [
+            Bulma.button.a [
+                prop.onClick(fun e -> CreateTemplateMetadataWorksheet Metadata.root |> TemplateMetadataMsg |> dispatch)
+                Bulma.button.isFullWidth
+                Bulma.color.isInfo
+                prop.text "Create metadata"
             ]
         ]
     ]
 
 let newNameMainElement (model:Messages.Model) dispatch =
-    Content.content [] [
+    Bulma.content [
 
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Template Metadata"]
+        Bulma.label "Template Metadata"
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Create template metadata worksheet"]
+        Bulma.label "Create template metadata worksheet"
 
         defaultMessageEle model dispatch
     ]

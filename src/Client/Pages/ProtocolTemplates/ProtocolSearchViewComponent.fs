@@ -1,20 +1,13 @@
 module Protocol.Component
 
-open System
-
-open Fulma
-open Fable
-open Fable.React
-open Fable.React.Props
-open Fable.FontAwesome
-
 open Shared
 open TemplateTypes
-
 open Model
 open Messages.Protocol
 open Messages
-open Fulma.Extensions.Wikiki
+
+open Feliz
+open Feliz.Bulma
 
 let private curatedOrganisationNames = [
     "dataplant"
@@ -76,46 +69,45 @@ type private ProtocolViewState = {
 let private SearchFieldId = "template_searchfield_main"
 
 let private queryField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
-    Column.column [ ] [
-        Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text; MinWidth "91px"; WhiteSpace WhiteSpaceOptions.Nowrap]]] [str $"Search by {state.Searchfield.toNameRdb}"]
+    Bulma.column  [
+        Bulma.label $"Search by {state.Searchfield.toNameRdb}"
         let hasSearchAddon = state.Searchfield <> SearchFields.Name
-        Field.div [if hasSearchAddon then Field.HasAddons] [
-            Control.div [
-                Control.Props [Style [if not hasSearchAddon then Display DisplayOptions.None]]
-            ] [
-                Button.a [
-                    Button.IsStatic true
-                ] [ str state.Searchfield.toStr]
-            ]
-            Control.div [
-                Control.HasIconRight
-            ] [
-                Input.text [
-                    Input.Placeholder $".. {state.Searchfield.toNameRdb}"
-                    Input.Id SearchFieldId
-                    Input.Color IsPrimary
-                    Input.ValueOrDefault state.ProtocolSearchQuery
-                    Input.OnChange (fun e ->
-                        let query = e.Value
-                        // if query starts with "/" expect intend to search by different field
-                        if query.StartsWith "/" then
-                            let searchField = SearchFields.GetOfQuery query
-                            if searchField.IsSome then
-                                {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
-                                //let inp = Browser.Dom.document.getElementById SearchFieldId
-                        // if query starts NOT with "/" update query
-                        else
-                            {
-                                state with
-                                    ProtocolSearchQuery = query
-                                    DisplayedProtDetailsId = None
-                            }
-                            |> setState
-                    )
+        Bulma.field.div [
+            if hasSearchAddon then Bulma.field.hasAddons
+            prop.children [
+                if hasSearchAddon then
+                    Bulma.control.div [
+                        Bulma.button.a [ Bulma.button.isStatic; prop.text state.Searchfield.toStr]
+                    ]
+                Bulma.control.div [
+                    Bulma.control.hasIconsRight
+                    Bulma.input.text [
+                        prop.placeholder $".. {state.Searchfield.toNameRdb}"
+                        prop.id SearchFieldId
+                        Bulma.color.isPrimary
+                        prop.valueOrDefault state.ProtocolSearchQuery
+                        prop.onChange (fun (e: string) ->
+                            let query = e
+                            // if query starts with "/" expect intend to search by different field
+                            if query.StartsWith "/" then
+                                let searchField = SearchFields.GetOfQuery query
+                                if searchField.IsSome then
+                                    {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
+                                    //let inp = Browser.Dom.document.getElementById SearchFieldId
+                            // if query starts NOT with "/" update query
+                            else
+                                {
+                                    state with
+                                        ProtocolSearchQuery = query
+                                        DisplayedProtDetailsId = None
+                                }
+                                |> setState
+                        )
+                        prop.children (
+                            Bulma.icon [Bulma.icon.isSmall; Bulma.icon.isRight; prop.children (Html.i [prop.className "fa-solid fa-search"])]
+                        )
+                    ] |> prop.children
                 ]
-                Icon.icon [ Icon.Size IsSmall; Icon.IsRight ]
-                    [ Fa.i [ Fa.Solid.Search ]
-                        [ ] ]
             ]
         ]
     ]
@@ -153,164 +145,174 @@ let private tagQueryField (model:Model) (state: ProtocolViewState) (setState: Pr
             sortedTags, sortedErTags
         else
             [||], [||]
-    Column.column [ ] [
-        Label.label [Label.Size IsSmall; Label.Props [Style [Color model.SiteStyleState.ColorMode.Text; MinWidth "91px"; WhiteSpace WhiteSpaceOptions.Nowrap]]] [str "Search for tags"]
-        Control.div [
-            Control.HasIconRight
-        ] [
-            Input.text [
-                Input.Placeholder ".. protocol tag"
-                Input.Color IsPrimary
-                Input.ValueOrDefault state.ProtocolTagSearchQuery
-                Input.OnChange (fun e ->
-                    {state with ProtocolTagSearchQuery = e.Value} |> setState
-                    //UpdateProtocolTagSearchQuery e.Value |> ProtocolMsg |> dispatch
-                )
-            ]
-            Icon.icon [ Icon.Size IsSmall; Icon.IsRight ]
-                [ Fa.i [ Fa.Solid.Search ]
-                    [ ] ]
-            // Pseudo dropdown
-            Box.box' [Props [Style [
-                yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode
-                Position PositionOptions.Absolute
-                Width "100%"
-                ZIndex 10
-                if hitTagList |> Array.isEmpty && hitErTagList |> Array.isEmpty then Display DisplayOptions.None
-            ]]] [
-                if hitErTagList <> [||] then
-                    Label.label [] [str "Endpoint Repositories"]
-                    Tag.list [] [
-                        for tagSuggestion in hitErTagList do
-                            yield
-                                Tag.tag [
-                                    Tag.CustomClass "clickableTag"
-                                    Tag.Color IsLink
-                                    Tag.Props [ OnClick (fun _ ->
-                                        let nextState = {
-                                            state with
-                                                ProtocolFilterErTags = tagSuggestion::state.ProtocolFilterErTags
-                                                ProtocolTagSearchQuery = ""
-                                                DisplayedProtDetailsId = None
-                                        }
-                                        setState nextState
-                                        //AddProtocolErTag tagSuggestion |> ProtocolMsg |> dispatch
-                                    )
-                                    ]
-                                ] [
-                                    str tagSuggestion
-                                ]
+    Bulma.column [
+        Bulma.label "Search for tags"
+        Bulma.control.div [
+            Bulma.control.hasIconsRight
+            prop.children [
+                Bulma.input.text [
+                    prop.placeholder ".. protocol tag"
+                    Bulma.color.isPrimary
+                    prop.valueOrDefault state.ProtocolTagSearchQuery
+                    prop.onChange (fun (e:string) ->
+                        {state with ProtocolTagSearchQuery = e} |> setState
+                    )
+                ]
+                Bulma.icon [
+                    Bulma.icon.isSmall; Bulma.icon.isRight
+                    Html.i [prop.className "fa-solid fa-search"] |> prop.children
+                ]
+                // Pseudo dropdown
+                Bulma.box [
+                    prop.style [
+                        yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode
+                        style.position.absolute
+                        style.width(length.perc 100)
+                        style.zIndex 10
+                        if hitTagList |> Array.isEmpty && hitErTagList |> Array.isEmpty then style.display.none
                     ]
-                if hitTagList <> [||] then
-                    Label.label [] [str "Tags"]
-                    Tag.list [] [
-                        for tagSuggestion in hitTagList do
-                            yield
-                                Tag.tag [
-                                    Tag.CustomClass "clickableTag"
-                                    Tag.Color IsInfo
-                                    Tag.Props [ OnClick (fun _ ->
-                                        let nextState = {
-                                                state with
-                                                    ProtocolFilterTags = tagSuggestion::state.ProtocolFilterTags
-                                                    ProtocolTagSearchQuery = ""
-                                                    DisplayedProtDetailsId = None
-                                            }
-                                        setState nextState
-                                        //AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch
-                                    )]
-                                ] [
-                                    str tagSuggestion
-                                ]
+                    prop.children [
+                        if hitErTagList <> [||] then
+                            Bulma.label "Endpoint Repositories"
+                            Bulma.tags [
+                                for tagSuggestion in hitErTagList do
+                                    yield
+                                        Bulma.tag [
+                                            prop.className "clickableTag"
+                                            Bulma.color.isLink
+                                            prop.onClick (fun _ ->
+                                                let nextState = {
+                                                    state with
+                                                        ProtocolFilterErTags = tagSuggestion::state.ProtocolFilterErTags
+                                                        ProtocolTagSearchQuery = ""
+                                                        DisplayedProtDetailsId = None
+                                                }
+                                                setState nextState
+                                                //AddProtocolErTag tagSuggestion |> ProtocolMsg |> dispatch
+                                            )
+                                            prop.text tagSuggestion
+                                        ]
+                            ]
+                        if hitTagList <> [||] then
+                            Bulma.label "Tags"
+                            Bulma.tags [
+                                for tagSuggestion in hitTagList do
+                                    yield
+                                        Bulma.tag [
+                                            prop.className "clickableTag"
+                                            Bulma.color.isInfo
+                                            prop.onClick (fun _ ->
+                                                let nextState = {
+                                                        state with
+                                                            ProtocolFilterTags = tagSuggestion::state.ProtocolFilterTags
+                                                            ProtocolTagSearchQuery = ""
+                                                            DisplayedProtDetailsId = None
+                                                    }
+                                                setState nextState
+                                                //AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch
+                                            )
+                                            prop.text tagSuggestion
+                                        ]
+                            ]
                     ]
+                ]
             ]
         ]
     ]
 
 let private tagDisplayField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
-    Columns.columns [Columns.IsMobile] [
-        Column.column [] [
-            Field.div [Field.IsGroupedMultiline] [
-                for selectedTag in state.ProtocolFilterErTags do
-                    yield
-                        Control.div [ ] [
-                            Tag.list [Tag.List.HasAddons] [
-                                Tag.tag [Tag.Color IsLink; Tag.Props [Style [Border "0px"]]] [str selectedTag]
-                                Tag.delete [
-                                    Tag.CustomClass "clickableTagDelete"
-                                    //Tag.Color IsWarning;
-                                    Tag.Props [
-                                        OnClick (fun _ ->
-                                            {state with ProtocolFilterErTags = state.ProtocolFilterErTags |> List.except [selectedTag]} |> setState
-                                            //RemoveProtocolErTag selectedTag |> ProtocolMsg |> dispatch
-                                        )
+    Bulma.columns [
+        Bulma.columns.isMobile
+        prop.children [
+            Bulma.column [
+                Bulma.field.div [
+                    Bulma.field.isGroupedMultiline
+                    prop.children [
+                        for selectedTag in state.ProtocolFilterErTags do
+                            yield Bulma.control.div [
+                                Bulma.tags [
+                                    Bulma.tags.hasAddons
+                                    prop.children [
+                                        Bulma.tag [Bulma.color.isLink; prop.style [style.borderWidth 0]; prop.text selectedTag]
+                                        Bulma.delete [
+                                            prop.className "clickableTagDelete"
+                                            prop.onClick (fun _ ->
+                                                {state with ProtocolFilterErTags = state.ProtocolFilterErTags |> List.except [selectedTag]} |> setState
+                                                //RemoveProtocolErTag selectedTag |> ProtocolMsg |> dispatch
+                                            )
+                                        ]
                                     ]
-                                ] []
+                                ]
                             ]
-                        ]
-                for selectedTag in state.ProtocolFilterTags do
-                    yield
-                        Control.div [ ] [
-                            Tag.list [Tag.List.HasAddons] [
-                                Tag.tag [Tag.Color IsInfo; Tag.Props [Style [Border "0px"]]] [str selectedTag]
-                                Tag.delete [
-                                    Tag.CustomClass "clickableTagDelete"
-                                    //Tag.Color IsWarning;
-                                    Tag.Props [
-                                        OnClick (fun _ ->
-                                            {state with ProtocolFilterTags = state.ProtocolFilterTags |> List.except [selectedTag]} |> setState
-                                            //RemoveProtocolTag selectedTag |> ProtocolMsg |> dispatch
-                                        )
+                        for selectedTag in state.ProtocolFilterTags do
+                            yield Bulma.control.div [
+                                Bulma.tags [
+                                    Bulma.tags.hasAddons
+                                    prop.children [
+                                        Bulma.tag [Bulma.color.isInfo; prop.style [style.borderWidth 0]; prop.text selectedTag]
+                                        Bulma.delete [
+                                            prop.className "clickableTagDelete"
+                                            //Tag.Color IsWarning;
+                                            prop.onClick (fun _ ->
+                                                    {state with ProtocolFilterTags = state.ProtocolFilterTags |> List.except [selectedTag]} |> setState
+                                                    //RemoveProtocolTag selectedTag |> ProtocolMsg |> dispatch
+                                            )
+                                        ]
                                     ]
-                                ] []
+                                ]
                             ]
-                        ]
+                    ]
                 ]
-        ]
-        // tag filter (AND or OR) 
-        Column.column [
-            Column.Width (Screen.All, Column.IsNarrow)
-            Column.Props [Title (if state.TagFilterIsAnd then "Templates contain all tags." else "Templates contain at least one tag.")]
-        ] [
-            Switch.switchInline [
-                Switch.Color Color.IsDark
-                Switch.LabelProps [Style [UserSelect UserSelectOptions.None]]
-                Switch.IsOutlined
-                Switch.Size IsSmall
-                Switch.Id "switch-2"
-                Switch.Checked state.TagFilterIsAnd
-                Switch.OnChange (fun _ ->
-                    {state with TagFilterIsAnd = not state.TagFilterIsAnd} |> setState
-                    //UpdateTagFilterIsAnd (not state.TagFilterIsAnd) |> ProtocolMsg |> dispatch
-                )
-            ] [
-                if state.TagFilterIsAnd then b [] [str "And"] else b [] [str "Or"]
+            ]
+            // tag filter (AND or OR) 
+            Bulma.column [
+                Bulma.column.isNarrow
+                prop.title (if state.TagFilterIsAnd then "Templates contain all tags." else "Templates contain at least one tag.")
+                Switch.checkbox [
+                    Bulma.color.isDark
+                    prop.style [style.userSelect.none]
+                    switch.isOutlined
+                    switch.isSmall
+                    prop.id "switch-2"
+                    prop.isChecked state.TagFilterIsAnd
+                    prop.onChange (fun (e:bool) ->
+                        {state with TagFilterIsAnd = not state.TagFilterIsAnd} |> setState
+                        //UpdateTagFilterIsAnd (not state.TagFilterIsAnd) |> ProtocolMsg |> dispatch
+                    )
+                    prop.children (if state.TagFilterIsAnd then Html.b "And" else Html.b "Or")
+                ] |> prop.children
             ]
         ]
     ]
 
 let private fileSortElements (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
 
-    div [ Style [MarginBottom "0.75rem"] ] [
-        Columns.columns [Columns.IsMobile; Columns.Props [Style [MarginBottom "0";]]] [
-            
-            queryField model state setState
-            tagQueryField model state setState
+    Html.div [
+        prop.style [style.marginBottom(length.rem 0.75)]
+        prop.children [
+            Bulma.columns [
+                Bulma.columns.isMobile; prop.style [style.marginBottom 0]
+                prop.children [
+                    queryField model state setState
+                    tagQueryField model state setState
+                ]
+            ]
+            // Only show the tag list and tag filter (AND or OR) if any tag exists
+            if state.ProtocolFilterErTags <> [] || state.ProtocolFilterTags <> [] then
+                tagDisplayField model state setState
         ]
-        // Only show the tag list and tag filter (AND or OR) if any tag exists
-        if state.ProtocolFilterErTags <> [] || state.ProtocolFilterTags <> [] then
-            tagDisplayField model state setState
     ]
 
-let private curatedTag = Tag.tag [Tag.Color IsSuccess] [str "curated"]
-let private communitytag = Tag.tag [Tag.Color IsWarning] [str "community"]
+let private curatedTag = Bulma.tag [prop.text "curated"; Bulma.color.isSuccess]
+let private communitytag = Bulma.tag [prop.text "community"; Bulma.color.isWarning]
 let private curatedCommunityTag =
-    Tag.tag [
-        Tag.Props [Style [Background "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)"]]
-        Tag.Color IsSuccess
-    ] [
-        span [Style [MarginRight "0.75em"]] [str "cur"]
-        span [Style [MarginLeft "0.75em"; Color "rgba(0, 0, 0, 0.7)"]] [str "com"]  
+    Bulma.tag [
+        prop.style [style.custom("background", "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)")]
+        Bulma.color.isSuccess
+        prop.children [
+            Html.span [prop.style [style.marginRight (length.em 0.75)]; prop.text "cur"]
+            Html.span [prop.style [style.marginLeft (length.em 0.75); style.color "rgba(0, 0, 0, 0.7)"]; prop.text "com"]  
+        ]
     ]
 
 let private protocolElement i (template:Template) (model:Model) (state:ProtocolViewState) dispatch (setState: ProtocolViewState -> unit) =
@@ -321,19 +323,14 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
         | _ ->
             false
     [
-        tr [
-            if isActive then
-                Class "nonSelectText"
-            else
-                Class "nonSelectText hoverTableEle"
-            Style [
-                Cursor "pointer"
-                UserSelect UserSelectOptions.None
-                if isActive then
-                    BackgroundColor model.SiteStyleState.ColorMode.ElementBackground
-                    Color "white"
+        Html.tr [
+            prop.classes [ "nonSelectText"; if isActive then "hoverTableEle"]
+            prop.style [
+                style.cursor.pointer; style.userSelect.none;
+                if isActive then style.backgroundColor model.SiteStyleState.ColorMode.ElementBackground;
+                style.color "white"
             ]
-            OnClick (fun e ->
+            prop.onClick (fun e ->
                 e.preventDefault()
                 { state with
                     DisplayedProtDetailsId = if isActive then None else Some i }
@@ -343,114 +340,106 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
                 //else
                 //    UpdateDisplayedProtDetailsId (Some i) |> ProtocolMsg |> dispatch
             )
-
-        ] [
-            td [ ] [ str template.Name ]
-            td [ ] [
-                if curatedOrganisationNames |> List.contains (template.Organisation.ToLower()) then
-                    curatedTag
-                else
-                    communitytag
+            prop.children [
+                Html.td template.Name
+                Html.td (
+                    if curatedOrganisationNames |> List.contains (template.Organisation.ToLower()) then
+                        curatedTag
+                    else
+                        communitytag
+                )
+                //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt] []] ]
+                Html.td [ prop.style [style.textAlign.center; style.verticalAlign.middle]; prop.text template.Version ]
+                //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string template.Used) ]
+                Html.td (
+                    Bulma.icon [Html.i [prop.className "fa-solid fa-chevron-down"]]
+                )
             ]
-            //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt] []] ]
-            td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str template.Version ]
-            //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string template.Used) ]
-            td [] [
-                Icon.icon [] [
-                    Fa.i [Fa.Solid.ChevronDown] []
-                ]
-            ]
-
         ]
-        tr [ ] [
-            td [
-                Style [
-                    Padding "0"
+        Html.tr [
+            Html.td [
+                prop.style [
+                    style.padding 0
                     if isActive then
-                        BorderBottom (sprintf "2px solid %s" model.SiteStyleState.ColorMode.Accent)
-                    if not isActive then
-                        Display DisplayOptions.None
+                        style.borderBottom (2, borderStyle.solid, model.SiteStyleState.ColorMode.Accent)
+                    else
+                        style.display.none
                 ]
-                ColSpan 4
-            ] [
-                Box.box' [Props [Style [BorderRadius "0px"; yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode]]] [
-                    Columns.columns [] [
-                        Column.column [] [
-                            Text.div [] [
-                                str template.Description
-                                div [] [
-                                    Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
-                                        b [] [str "Author: "]
-                                        str (template.Authors.Replace(",",", "))
-                                    ]
-                                    Help.help [Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]]] [
-                                        b [] [str "Created: "]
-                                        str (template.LastUpdated.ToString("yyyy/MM/dd"))
-                                    ]
+                prop.colSpan 4
+                prop.children [
+                    Bulma.box [
+                        prop.style [style.borderRadius 0; yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode]
+                        prop.children [
+                            Html.div [
+                                Html.div template.Description
+                                Html.div [
+                                    Html.div [ Html.b "Author: "; Html.span (template.Authors.Replace(",",", ")) ]
+                                    Html.div [ Html.b "Created: "; Html.span (template.LastUpdated.ToString("yyyy/MM/dd")) ]
                                 ]
-                                div [] [
-                                    Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
-                                        b [] [str "Organisation: "]
-                                        str template.Organisation
-                                    ]
+                                Html.div [
+                                    Html.div [ Html.b "Organisation: "; Html.span template.Organisation ]
                                 ]
+                            ]
+                            Bulma.tags [
+                                for tag in template.Er_Tags do
+                                    yield
+                                        Bulma.tag [Bulma.color.isLink; prop.text tag]
+                            ]
+                            Bulma.tags [
+                                for tag in template.Tags do
+                                    yield
+                                        Bulma.tag [Bulma.color.isInfo; prop.text tag]
+                            ]
+                            Bulma.button.a [
+                                prop.onClick (fun _ -> GetProtocolByIdRequest template.Id |> ProtocolMsg |> dispatch)
+                                Bulma.button.isFullWidth; Bulma.color.isSuccess
+                                prop.text "select"
                             ]
                         ]
                     ]
-                    Tag.list [] [
-                        for tag in template.Er_Tags do
-                            yield
-                                Tag.tag [Tag.Color IsLink] [
-                                    str tag
-                                ]
-                    ]
-                    Tag.list [] [
-                        for tag in template.Tags do
-                            yield
-                                Tag.tag [Tag.Color IsInfo] [
-                                    str tag
-                                ]
-                    ]
-                    Button.a [
-                        Button.OnClick (fun _ -> GetProtocolByIdRequest template.Id |> ProtocolMsg |> dispatch)
-                        Button.IsFullWidth; Button.Color IsSuccess
-                    ] [str "select"]
                 ]
             ]
         ]
     ]
 
-let private curatedCommunityFilterDropdownItem (filter:Protocol.CuratedCommunityFilter) child (state:ProtocolViewState) (setState: ProtocolViewState -> unit) =
-    Dropdown.Item.a [
-        Dropdown.Item.Props [
-            OnClick(fun e ->
+let private curatedCommunityFilterDropdownItem (filter:Protocol.CuratedCommunityFilter) (child: ReactElement) (state:ProtocolViewState) (setState: ProtocolViewState -> unit) =
+    Bulma.dropdownItem.a [
+        prop.onClick(fun e ->
                 e.preventDefault();
                 {state with CuratedCommunityFilter = filter} |> setState
                 //UpdateCuratedCommunityFilter filter |> ProtocolMsg |> dispatch
             )
-        ]
-    ] [ child ]
+        prop.children child
+    ]
 
 let private curatedCommunityFilterElement (state:ProtocolViewState) (setState: ProtocolViewState -> unit) =
-    Dropdown.dropdown [ Dropdown.IsHoverable ] [
-        Dropdown.trigger [ ] [
-            Button.button [ Button.Size IsSmall; Button.IsOutlined; Button.Color IsWhite; Button.Props [Style [Padding "0px"]] ] [
-                match state.CuratedCommunityFilter with
-                | Protocol.CuratedCommunityFilter.Both -> curatedCommunityTag
-                | Protocol.CuratedCommunityFilter.OnlyCommunity -> communitytag
-                | Protocol.CuratedCommunityFilter.OnlyCurated -> curatedTag
+    Bulma.dropdown [
+        Bulma.dropdown.isHoverable
+        prop.children [
+            Bulma.dropdownTrigger [
+                Bulma.button.button [
+                    Bulma.button.isSmall; Bulma.button.isOutlined; Bulma.color.isWhite;
+                    prop.style [style.padding 0]
+                    match state.CuratedCommunityFilter with
+                    | Protocol.CuratedCommunityFilter.Both -> curatedCommunityTag
+                    | Protocol.CuratedCommunityFilter.OnlyCommunity -> communitytag
+                    | Protocol.CuratedCommunityFilter.OnlyCurated -> curatedTag
+                    |> prop.children
+                ]
             ]
-        ]
-        Dropdown.menu [ Props [Style [MinWidth "unset"; CSSProp.FontWeight "normal"]] ] [
-            Dropdown.content [ ] [
-                curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.Both curatedCommunityTag state setState
-                curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.OnlyCurated curatedTag state setState
-                curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.OnlyCommunity communitytag state setState
+            Bulma.dropdownMenu [
+                prop.style [style.minWidth.unset; style.fontWeight.normal]
+                Bulma.dropdownContent [
+                    curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.Both curatedCommunityTag state setState
+                    curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.OnlyCurated curatedTag state setState
+                    curatedCommunityFilterDropdownItem Protocol.CuratedCommunityFilter.OnlyCommunity communitytag state setState
+                ] |> prop.children
             ]
         ]
     ]
 
 open Feliz
+open System
 
 [<ReactComponent>]
 let ProtocolContainer (model:Model) dispatch =
@@ -521,18 +510,18 @@ let ProtocolContainer (model:Model) dispatch =
         |> Array.sortBy (fun template -> template.Name, template.Organisation)
 
     mainFunctionContainer [
-        Field.div [] [
-            Help.help [] [
-                b [] [str "Search for templates."]
-                str " For more information you can look "
-                a [ Href Shared.URLs.SwateWiki; Target "_Blank" ] [str "here"]
-                str ". If you find any problems with a template or have other suggestions you can contact us "
-                a [ Href URLs.Helpdesk.UrlTemplateTopic; Target "_Blank" ] [str "here"]
-                str "."
+        Bulma.field.div [
+            Bulma.help [
+                Html.b "Search for templates."
+                Html.span " For more information you can look "
+                Html.a [ prop.href Shared.URLs.SwateWiki; prop.target "_Blank"; prop.text "here"]
+                Html.span ". If you find any problems with a template or have other suggestions you can contact us "
+                Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.text "here"]
+                Html.span "."
             ]
-            Help.help [] [
-                str "You can search by template name, organisation and authors. Just type:"
-                Content.content [] [
+            Bulma.help [
+                Html.span "You can search by template name, organisation and authors. Just type:"
+                Bulma.content [
                     Html.ul [
                         Html.li [Html.code "/a"; Html.span " to search authors."]
                         Html.li [Html.code "/o"; Html.span " to search organisations."]
@@ -542,25 +531,25 @@ let ProtocolContainer (model:Model) dispatch =
             ]
         ]
         fileSortElements model state setState
-        Table.table [
-            Table.IsFullWidth
-            Table.IsStriped
-            Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text]]
-        ] [
-            thead [] [
-                tr [] [
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ] [ str "Template Name"      ]
-                    //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Documentation"      ]
-                    th [] [curatedCommunityFilterElement state setState]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Template Version"   ]
-                    //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Uses"               ]
-                    th [ Style [ Color model.SiteStyleState.ColorMode.Text] ] []
+        Bulma.table [
+            Bulma.table.isFullWidth
+            Bulma.table.isStriped
+            prop.children [
+                Html.thead [
+                    Html.tr [
+                        Html.th "Template Name"
+                        //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Documentation"      ]
+                        Html.th [curatedCommunityFilterElement state setState]
+                        Html.th "Template Version"
+                        //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Uses"               ]
+                        Html.th Html.none
+                    ]
                 ]
-            ]
-            tbody [] [
-                for i in 0 .. sortedTable.Length-1 do
-                    yield!
-                        protocolElement i sortedTable.[i] model state dispatch setState
+                Html.tbody [
+                    for i in 0 .. sortedTable.Length-1 do
+                        yield!
+                            protocolElement i sortedTable.[i] model state dispatch setState
+                ]
             ]
         ]
     ]

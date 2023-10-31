@@ -2,8 +2,6 @@ module BuildingBlock.Core
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fable.FontAwesome
 open Fable.Core.JsInterop
 
 open ExcelColors
@@ -279,24 +277,32 @@ open SidebarComponents
 //        ]
 //    ]
 
+open Feliz
+open Feliz.Bulma
+
 let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
     /// advanced unit term search 2
     let autocompleteParamsUnit2 = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState
     mainFunctionContainer [
         // advanced unit term search 2
         AdvancedSearch.advancedSearchModal model autocompleteParamsUnit2.ModalId autocompleteParamsUnit2.InputId dispatch autocompleteParamsUnit2.OnAdvancedSearch
-        Field.div [] [
-            Help.help [] [
+        Bulma.field.div [
+            Bulma.help [
                 b [] [str "Adds a unit to a complete building block." ]
                 str " If the building block already has a unit assigned, the new unit is only applied to selected rows of the selected column."
             ]
         ]
-        Field.div [] [
+        Bulma.field.div [
             let changeUnitAutoCompleteParams = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState
-            Field.div [Field.HasAddons] [
-                Control.p [] [
-                    Button.button [Button.IsStatic true; Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]] [
-                        str "Add unit"
+            Bulma.field.div [
+                Bulma.field.hasAddons
+                prop.children [
+                    Bulma.control.p [
+                        Bulma.button.button [
+                            Bulma.button.isStatic
+                            Bulma.color.hasBackgroundWhite
+                            prop.text "Add unit"
+                        ]
                     ]
                 ]
                 // Add/Update unit ontology term search field
@@ -316,23 +322,34 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
                 (AutocompleteSearch.createAutocompleteSuggestions dispatch changeUnitAutoCompleteParams model)
 
         ]
-        Help.help [Help.Props [Style [Display DisplayOptions.Inline]]] [
-            a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState).ModalId |> AdvancedSearchMsg |> dispatch)] [
-                str "Use advanced search"
+        Bulma.help [
+            prop.style [style.display.inlineElement]
+            prop.children [
+                Html.a [
+                    prop.onClick(fun e ->
+                        e.preventDefault()
+                        AdvancedSearch.ToggleModal (
+                            AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState).ModalId
+                            |> AdvancedSearchMsg
+                            |> dispatch
+                    )
+                    prop.text "Use advanced search"
+                ]
             ]
         ]
 
-        Field.div [] [
-            Button.button   [
+        Bulma.field.div [
+            Bulma.button.button [
+                
                 let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
-                Button.Color Color.IsSuccess
+                Bulma.color.isSuccess
                 if isValid then
-                    Button.IsActive true
+                    Bulma.button.isActive
                 else
-                    Button.Color Color.IsDanger
-                    Button.Props [Disabled true]
-                Button.IsFullWidth
-                Button.OnClick (fun _ ->
+                    Bulma.color.isDanger
+                    prop.disabled true
+                Bulma.button.isFullWidth
+                prop.onClick (fun _ ->
                     let unitTerm =
                         if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
                     match model.AddBuildingBlockState.Unit2TermSearchText with
@@ -343,8 +360,7 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
                     | freeText ->
                         OfficeInterop.UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> OfficeInteropMsg |> dispatch
                 )
-            ] [
-                str "Update unit for cells"
+                prop.text "Update unit for cells"
             ]
         ]
     ]
@@ -355,10 +371,16 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Building Blocks"]
+        Bulma.label [
+            prop.style [style.color model.SiteStyleState.ColorMode.Accent]
+            prop.text "Building Blocks"
+        ]
 
         // Input forms, etc related to add building block.
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add annotation building blocks (columns) to the annotation table."]
+        Bulma.label [
+            prop.style [style.color model.SiteStyleState.ColorMode.Accent]
+            prop.text "Add annotation building blocks (columns) to the annotation table."
+        ]
         //match model.PersistentStorageState.Host with
         //| Swatehost.Excel _ ->
         //    addBuildingBlockElements model dispatch
@@ -368,7 +390,10 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
 
         match model.PersistentStorageState.Host with
         | Swatehost.Excel _ ->
-            Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Add/Update unit reference to existing building block."]
+            Bulma.label [
+                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
+                prop.text "Add/Update unit reference to existing building block."
+            ]
             // Input forms, etc related to add unit to existing building block.
             addUnitToExistingBlockElements model dispatch
         | _ -> ()

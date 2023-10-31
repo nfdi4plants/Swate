@@ -14,141 +14,145 @@ open Messages
 
 module private DropdownElements =
 
-    open Fable.React
-    open Fable.React.Props
-    open Fulma
-    open Fable.FontAwesome
+    let private itemTooltipStyle = [style.fontSize (length.rem 1.1); style.paddingRight (length.px 10); style.textAlign.center; style.color NFDIColors.Yellow.Darker20]
+    let private annotationsPrinciplesUrl = Html.a [prop.href Shared.URLs.AnnotationPrinciplesUrl; prop.target "_Blank"; prop.text "info"]
 
     let selectBuildingBlockType (state: BuildingBlockUIState) bb_type = {state with BuildingBlockType = bb_type; DropdownIsActive = false}
 
     let createBuildingBlockDropdownItem (state: BuildingBlockUIState) setState (model:Model) (block: BuildingBlockType)  =
-        Dropdown.Item.a [
-            Dropdown.Item.Props [
-                OnClick (fun e ->
-                    e.stopPropagation()
-                    selectBuildingBlockType state block |> setState
-                )
-                OnKeyDown (fun k -> if (int k.which) = 13 then setState {state with BuildingBlockType = block})
-                ExcelColors.colorControl model.SiteStyleState.ColorMode
+        Bulma.dropdownItem.a [
+            prop.onClick (fun e ->
+                e.stopPropagation()
+                selectBuildingBlockType state block |> setState
+            )
+            prop.onKeyDown(fun k -> if (int k.which) = 13 then setState {state with BuildingBlockType = block})
+            prop.style <| ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode
+            prop.children [
+                Html.span [
+                    prop.style itemTooltipStyle
+                    prop.className "has-tooltip-multiline"
+                    prop.custom("data-tooltip", block.toShortExplanation)
+                    prop.children (Bulma.icon [
+                        Html.i [prop.className "fa-solid fa-circle-info"]
+                    ])
+                ]
+                Html.span block.toString
             ]
-
-        ] [
-            span [
-                Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
-                Class "has-tooltip-multiline"
-                Props.Custom ("data-tooltip", block.toShortExplanation)
-            ] [
-                Fa.i [Fa.Solid.InfoCircle] []
-            ]
-
-            span [] [str block.toString]
         ]
 
     let createBuildingBlockDropdownItem_FeaturedColumns (state: BuildingBlockUIState) setState (model:Model) dispatch (block: BuildingBlockType )  =
-        Dropdown.Item.a [
-            Dropdown.Item.Props [
-                OnClick (fun e ->
-                    e.stopPropagation()
-                    if block.isFeaturedColumn then
-                        let t = block.getFeaturedColumnTermMinimal.toTerm
-                        BuildingBlock.SelectHeaderTerm (Some t) |> BuildingBlockMsg |> dispatch
-                    selectBuildingBlockType state block |> setState
-                )
-                OnKeyDown (fun k -> if (int k.which) = 13 then setState {state with BuildingBlockType = block})
-                ExcelColors.colorControl model.SiteStyleState.ColorMode
+        Bulma.dropdownItem.a [
+            prop.onClick(fun e ->
+                e.stopPropagation()
+                if block.isFeaturedColumn then
+                    let t = block.getFeaturedColumnTermMinimal.toTerm
+                    BuildingBlock.SelectHeaderTerm (Some t) |> BuildingBlockMsg |> dispatch
+                selectBuildingBlockType state block |> setState
+            )
+            prop.onKeyDown(fun k -> if (int k.which) = 13 then setState {state with BuildingBlockType = block})
+            prop.style <| ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode
+            prop.children [
+                Html.span [
+                    prop.style itemTooltipStyle
+                    prop.className "has-tooltip-multiline"
+                    prop.custom("data-tooltip", block.toShortExplanation)
+                    prop.children (Bulma.icon [
+                        Html.i [prop.className "fa-solid fa-circle-info"]
+                    ])
+                ]
+                Html.span block.toString
             ]
-
-        ] [
-            span [
-                Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
-                Class "has-tooltip-multiline"
-                Props.Custom ("data-tooltip", block.toShortExplanation)
-            ] [
-                Fa.i [Fa.Solid.InfoCircle] []
-            ]
-
-            span [] [str block.toString]
         ]
 
     let createSubBuildingBlockDropdownLink (state:BuildingBlockUIState) setState (model:Model) (subpage: Model.BuildingBlock.DropdownPage) =
-        Dropdown.Item.a [
-            Dropdown.Item.Props [
-                TabIndex 0
-                OnClick (fun e ->
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setState {state with DropdownPage = subpage}
-                )
-                Style [
-                    yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode;
-                    PaddingRight "0.5rem"
+        Bulma.dropdownItem.a [
+            prop.tabIndex 0
+            prop.onClick(fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                setState {state with DropdownPage = subpage}
+            )
+            prop.style [
+                yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode
+                style.paddingRight(length.rem 0.5)
+            ]
+            prop.children [
+                Html.span [
+                    prop.style itemTooltipStyle
+                    prop.className "has-tooltip-multiline"
+                    prop.custom("data-tooltip", subpage.toTooltip)
+                    prop.children (Bulma.icon [
+                        Html.i [prop.className "fa-solid fa-circle-info"]
+                    ])
                 ]
-            ]
 
-        ] [
-            span [
-                Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
-                Class "has-tooltip-multiline"
-                Props.Custom ("data-tooltip", subpage.toTooltip)
-            ] [
-                Fa.i [Fa.Solid.InfoCircle] []
-            ]
+                Html.span subpage.toString
 
-            span [] [
-                str <| subpage.toString
-            ]
-
-            span [
-                Style [ Width "20px"; Float FloatOptions.Right; LineHeight "1.5"; FontSize "1.1rem"]
-            ] [
-                Fa.i [Fa.Solid.ArrowRight] [] 
+                Html.span [
+                    prop.style [style.width(length.px 20); style.float'.right; style.lineHeight 1.5; style.fontSize(length.rem 1.1)]
+                    prop.children (Bulma.icon (Html.i [prop.className "fa-solid fa-arrow-right"]))
+                ]
             ]
         ]
 
     /// Navigation element back to main page
     let backToMainDropdownButton (state: BuildingBlockUIState) setState (model:Model) =
-        Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
-            Button.button [
-                Button.Modifiers [Modifier.IsPulledLeft]
-                Button.OnClick (fun e ->
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setState {state with DropdownPage = BuildingBlock.DropdownPage.Main}
-                )
-                Button.IsInverted
-                if model.SiteStyleState.IsDarkMode then Button.IsOutlined
-                Button.Color IsBlack
-                Button.Props [Style [ Width "20px"; Height "20px"; BorderRadius "4px"; Border "unset"]]
-            ] [
-                Fa.i [Fa.Solid.ArrowLeft] [] 
+        Bulma.dropdownItem.div [
+            prop.style [style.textAlign.right]
+            prop.children [
+                Bulma.button.button [
+                    prop.style [style.float'.left; style.width(length.px 20); style.height(length.px 20); style.borderRadius(length.px 4); style.custom("border", "unset")]
+                    prop.onClick(fun e ->
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setState {state with DropdownPage = BuildingBlock.DropdownPage.Main}
+                    )
+                    Bulma.button.isInverted
+                    if model.SiteStyleState.IsDarkMode then Bulma.button.isOutlined
+                    Bulma.color.isBlack
+                    prop.children [
+                        Bulma.icon [Html.i [
+                            prop.className "fa-solid fa-arrow-left"
+                        ]]
+                    ]
+                ]
+                annotationsPrinciplesUrl
             ]
-            a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank"] [ str "info" ]
         ]
 
     /// Main column types subpage for dropdown
     let dropdownContentMain state setState (model:Model) =
         [
             BuildingBlockType.Source            |> createBuildingBlockDropdownItem state setState model
-            Dropdown.divider []
+            Bulma.dropdownDivider []
             BuildingBlockType.Parameter         |> createBuildingBlockDropdownItem state setState model
             BuildingBlockType.Factor            |> createBuildingBlockDropdownItem state setState model
             BuildingBlockType.Characteristic    |> createBuildingBlockDropdownItem state setState model
             BuildingBlockType.Component         |> createBuildingBlockDropdownItem state setState model
             Model.BuildingBlock.DropdownPage.ProtocolTypes |> createSubBuildingBlockDropdownLink state setState model
-            Dropdown.divider []
+            Bulma.dropdownDivider []
             Model.BuildingBlock.DropdownPage.Output |>  createSubBuildingBlockDropdownLink state setState model
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Right)] ] [
-                a [ Href Shared.URLs.AnnotationPrinciplesUrl; Target "_Blank"] [ str "info" ]
+            Bulma.dropdownItem.div [
+                prop.style [style.textAlign.right]
+                prop.children annotationsPrinciplesUrl
             ]
         ]
+
     /// Protocol Type subpage for dropdown
     let dropdownContentProtocolTypeColumns state setState state_search setState_search (model:Model) dispatch =
         [
             // Heading
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Centered)] ] [
-                Heading.h6 [Heading.IsSubtitle; Heading.Modifiers [Modifier.TextWeight TextWeight.Option.Bold]] [str BuildingBlock.DropdownPage.ProtocolTypes.toString]
+            Bulma.dropdownItem.div [
+                prop.style [style.textAlign.center]
+                prop.children [
+                    Html.h6 [
+                        prop.className "subtitle"
+                        prop.style [style.fontWeight.bold]
+                        prop.text BuildingBlock.DropdownPage.ProtocolTypes.toString
+                    ]
+                ]
             ]
-            Dropdown.divider []
+            Bulma.dropdownDivider []
             BuildingBlockType.ProtocolType      |> createBuildingBlockDropdownItem_FeaturedColumns state setState model dispatch
             BuildingBlockType.ProtocolREF       |> createBuildingBlockDropdownItem state setState model
             // Navigation element back to main page
@@ -159,10 +163,17 @@ module private DropdownElements =
     let dropdownContentOutputColumns state setState (model:Model) =
         [
             // Heading
-            Dropdown.Item.div [Dropdown.Item.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Centered)] ] [
-                Heading.h6 [Heading.IsSubtitle; Heading.Modifiers [Modifier.TextWeight TextWeight.Option.Bold]] [str BuildingBlock.DropdownPage.Output.toString]
+            Bulma.dropdownItem.div [
+                prop.style [style.textAlign.center]
+                prop.children [
+                    Html.h6 [
+                        prop.className "subtitle"
+                        prop.style [style.fontWeight.bold]
+                        prop.text BuildingBlock.DropdownPage.Output.toString
+                    ]
+                ]
             ]
-            Dropdown.divider []
+            Bulma.dropdownDivider []
             BuildingBlockType.Sample            |> createBuildingBlockDropdownItem state setState model
             BuildingBlockType.RawDataFile       |> createBuildingBlockDropdownItem state setState model
             BuildingBlockType.DerivedDataFile   |> createBuildingBlockDropdownItem state setState model

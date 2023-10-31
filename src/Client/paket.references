@@ -1,15 +1,11 @@
+FSharp.Core
 Fable.Core
 Fable.React
 Fable.Elmish.React
 Fable.Elmish.Debugger
 Fable.Elmish.HMR
 Fable.Elmish
-Fable.FontAwesome.Free
 Fable.Remoting.Client
-Fulma
-Fulma.Extensions.Wikiki.Switch
-Fulma.Extensions.Wikiki.Checkradio
-Fulma.Extensions.Wikiki.Slider
 Thoth.Elmish.Debouncer
 Fable.Browser.MediaQueryList
 Fable.SimpleJson
@@ -19,3 +15,6 @@ Feliz.UseElmish
 ExcelJS.Fable
 Feliz.ElmishComponents
 Fable.Elmish.Browser
+ARCtrl
+Feliz.Bulma.Checkradio
+Feliz.Bulma.Switch

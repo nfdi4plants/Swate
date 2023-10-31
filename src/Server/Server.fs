@@ -22,46 +22,52 @@ open Microsoft.AspNetCore.Http
 
 let dagApiv1 = {
     parseAnnotationTablesToDagHtml = fun worksheetBuildingBlocks -> async {
-        let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-        let processSequence = Option.defaultValue [] assay.ProcessSequence
-        let dag = Viz.DAG.fromProcessSequence (processSequence,Viz.Schema.NFDIBlue) |> CyjsAdaption.MyHTML.toEmbeddedHTML
-        return dag
+        //let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        //let processSequence = Option.defaultValue [] assay.ProcessSequence
+        //let dag = Viz.DAG.fromProcessSequence (processSequence,Viz.Schema.NFDIBlue) |> CyjsAdaption.MyHTML.toEmbeddedHTML
+        //return dag
+        return failwith "Not implemented yet"
     }
 }
 
 let swateJsonAPIv1 = {
     parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
-        let assay = Export.parseBuildingBlockToAssay worksheetName buildingblocks
-        let parsedJsonStr = ISADotNet.Json.Assay.toString assay
-        return parsedJsonStr
+        //let assay = Export.parseBuildingBlockToAssay worksheetName buildingblocks
+        //let parsedJsonStr = ISADotNet.Json.Assay.toString assay
+        //return parsedJsonStr
+        return failwith "Not implemented yet"
     }
     parseAnnotationTableToProcessSeqJson = fun (worksheetName,buildingblocks) -> async {
-        let assay = Export.parseBuildingBlockToAssay worksheetName buildingblocks
-        let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
-        return parsedJsonStr
+        //let assay = Export.parseBuildingBlockToAssay worksheetName buildingblocks
+        //let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
+        //return parsedJsonStr
+        return failwith "Not implemented yet"
     }
     parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
-        let assay = Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-        let parsedJsonStr = ISADotNet.Json.Assay.toString assay
-        return parsedJsonStr
+        //let assay = Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        //let parsedJsonStr = ISADotNet.Json.Assay.toString assay
+        //return parsedJsonStr
+        return failwith "Not implemented yet"
     }
     parseAnnotationTablesToProcessSeqJson = fun worksheetBuildingBlocks -> async {
-        let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-        let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
-        return parsedJsonStr
+        //let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
+        //let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
+        //return parsedJsonStr
+        return failwith "Not implemented yet"
     }
     parseAssayJsonToBuildingBlocks = fun jsonString -> async {
-        let table = Import.Json.fromAssay jsonString
-        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-        let buildingBlocks =
-            table.Sheets
-            |> Array.ofList
-            |> Array.map(fun s ->
-                let ibb = s.toInsertBuildingBlockList |> Array.ofList
-                //printfn "%A" ibb
-                s.SheetName, ibb
-        )
-        return buildingBlocks
+        //let table = Import.Json.fromAssay jsonString
+        //if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        //let buildingBlocks =
+        //    table.Sheets
+        //    |> Array.ofList
+        //    |> Array.map(fun s ->
+        //        let ibb = s.toInsertBuildingBlockList |> Array.ofList
+        //        //printfn "%A" ibb
+        //        s.SheetName, ibb
+        //)
+        //return buildingBlocks
+        return failwith "Not implemented yet"
     }
     // [<System.ObsoleteAttribute>]
     //parseTableJsonToBuildingBlocks = fun jsonString -> async {
@@ -71,77 +77,86 @@ let swateJsonAPIv1 = {
     //    return buildingBlocks
     //}
     parseProcessSeqToBuildingBlocks = fun jsonString -> async {
-        let table = Import.Json.fromProcessSeq jsonString
-        if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
-        return buildingBlocks
+        //let table = Import.Json.fromProcessSeq jsonString
+        //if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
+        //let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        //return buildingBlocks
+        return failwith "Not implemented yet"
     }
 }
 
 let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
-    let assayFromByteArray (byteArray: byte []) =
-        let ms = new MemoryStream(byteArray)
-        let jsonStr = ISADotNet.XLSX.AssayFile.Assay.fromStream ms
-        jsonStr
-    let investigationFromByteArray (byteArray: byte []) =
-        let ms = new MemoryStream(byteArray)
-        let jsonStr =
-            ISADotNet.XLSX.Investigation.fromStream ms
-        jsonStr
+    //let assayFromByteArray (byteArray: byte []) =
+    //    let ms = new MemoryStream(byteArray)
+    //    let jsonStr = ISADotNet.XLSX.AssayFile.Assay.fromStream ms
+    //    jsonStr
+    //let investigationFromByteArray (byteArray: byte []) =
+    //    let ms = new MemoryStream(byteArray)
+    //    let jsonStr =
+    //        ISADotNet.XLSX.Investigation.fromStream ms
+    //    jsonStr
     {
         // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJson = fun byteArray -> async {
-            let assay = assayFromByteArray byteArray |> fun (_,assay) -> assay
-            return box assay
+            //let assay = assayFromByteArray byteArray |> fun (_,assay) -> assay
+            //return box assay
+            return failwith "Not implemented yet"
         }
         // This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
         // This is the main interop function for SWOBUP.
         toSwateTemplateJson = fun byteArray -> async {
-            let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
-            let ms = new MemoryStream(byteArray)
-            let doc = FsSpreadsheet.ExcelIO.Spreadsheet.fromStream ms false
-            let tableName = metadata.TryGetValue "Table"
-            let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
-            let assayJson = ISADotNet.Json.Assay.toString assay.Value
-            metadata.SetValue("TemplateJson",assayJson)
-            return metadata |> box
+            //let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
+            //let ms = new MemoryStream(byteArray)
+            //let doc = FsSpreadsheet.ExcelIO.Spreadsheet.fromStream ms false
+            //let tableName = metadata.TryGetValue "Table"
+            //let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
+            //let assayJson = ISADotNet.Json.Assay.toString assay.Value
+            //metadata.SetValue("TemplateJson",assayJson)
+            //return metadata |> box
+            return failwith "Not implemented yet"
         }
         // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
         toInvestigationJson = fun byteArray -> async {
-            let investigation = investigationFromByteArray byteArray
-            return box investigation
+            //let investigation = investigationFromByteArray byteArray
+            //return box investigation
+            return failwith "Not implemented yet"
         }
         toProcessSeqJson = fun byteArray -> async {
-            let assay = assayFromByteArray byteArray 
-            let processList = assay |> fun (_,assay) -> Option.defaultValue [] assay.ProcessSequence
-            return box processList
+            //let assay = assayFromByteArray byteArray 
+            //let processList = assay |> fun (_,assay) -> Option.defaultValue [] assay.ProcessSequence
+            //return box processList
+            return failwith "Not implemented yet"
         }
         // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
         toAssayJsonStr = fun byteArray -> async {
-            let assayJsonString = assayFromByteArray byteArray |> fun (_,assay) -> ISADotNet.Json.Assay.toString assay
-            return assayJsonString
+            //let assayJsonString = assayFromByteArray byteArray |> fun (_,assay) -> ISADotNet.Json.Assay.toString assay
+            //return assayJsonString
+            return failwith "Not implemented yet"
         }
         // This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
         toSwateTemplateJsonStr = fun byteArray -> async {
-            let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
-            let ms = new MemoryStream(byteArray)
-            let doc = FsSpreadsheet.ExcelIO.Spreadsheet.fromStream ms false
-            let tableName = metadata.TryGetValue "Table"
-            let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
-            let assayJson = ISADotNet.Json.Assay.toString assay.Value
-            metadata.SetValue("TemplateJson",assayJson)
-            let jsonExp = metadata.toJson()
-            return jsonExp
+            //let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
+            //let ms = new MemoryStream(byteArray)
+            //let doc = FsSpreadsheet.ExcelIO.Spreadsheet.fromStream ms false
+            //let tableName = metadata.TryGetValue "Table"
+            //let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
+            //let assayJson = ISADotNet.Json.Assay.toString assay.Value
+            //metadata.SetValue("TemplateJson",assayJson)
+            //let jsonExp = metadata.toJson()
+            //return jsonExp
+            return failwith "Not implemented yet"
         }
         // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
         toInvestigationJsonStr = fun byteArray -> async {
-            let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
-            return investigationJson
+            //let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
+            //return investigationJson
+            return failwith "Not implemented yet"
         }
         toProcessSeqJsonStr = fun byteArray -> async {
-            let assay = assayFromByteArray byteArray 
-            let processJSon = assay |> fun (_,assay) -> Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence |> Option.defaultValue "" 
-            return processJSon
+            //let assay = assayFromByteArray byteArray 
+            //let processJSon = assay |> fun (_,assay) -> Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence |> Option.defaultValue "" 
+            //return processJSon
+            return failwith "Not implemented yet"
         }
         testPostNumber = fun num -> async {
             let res = $"Hey you just sent us a number. Is this your number {num}?"
@@ -156,22 +171,29 @@ open Database
 
 let templateApi credentials = {
     getAllTemplatesWithoutXml = fun () -> async {
-        let protocols = Template.Queries.Template(credentials).getAll() |> Array.ofSeq
-        return protocols
+        //let protocols = Template.Queries.Template(credentials).getAll() |> Array.ofSeq
+        //return protocols
+        return failwith "Not implemented yet"
     }
 
-    getTemplateById = fun templateId -> async { return Template.Queries.Template(credentials).getById(templateId) }
+    getTemplateById = fun templateId -> async {
+        //printfn "HIT!"
+        //return Template.Queries.Template(credentials).getById(templateId)
+        return failwith "Not implemented yet"
+    }
 
     increaseTimesUsedById = fun templateId -> async {
-        let _ = Template.Queries.Template(credentials).increaseTimesUsed(templateId)
-        return ()
+        //let _ = Template.Queries.Template(credentials).increaseTimesUsed(templateId)
+        //return ()
+        return failwith "Not implemented yet"
     }
 
     tryParseToBuildingBlocks = fun jsonString -> async {
-        let table = Import.tryToTable jsonString
-        if table.Sheets.Length = 0 then failwith "Unable to identitfy supported file formats! We currently support assay.json and seq<process.json>, as well as Swate .xlsx files."
-        let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
-        return buildingBlocks
+        //let table = Import.tryToTable jsonString
+        //if table.Sheets.Length = 0 then failwith "Unable to identitfy supported file formats! We currently support assay.json and seq<process.json>, as well as Swate .xlsx files."
+        //let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
+        //return buildingBlocks
+        return failwith "Not implemented yet"
     }
 }
 

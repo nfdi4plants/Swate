@@ -1,15 +1,6 @@
 module BuildingBlock.Helper
 
 open Shared
-open Messages
-open TermTypes
-open Fulma
-open Fable.React
-open Fable.React.Props
-open Fable.FontAwesome
-open ExcelColors
-open Model
-open Messages.BuildingBlock
 open OfficeInteropTypes
 
 let isValidBuildingBlock (block : BuildingBlockNamePrePrint) =

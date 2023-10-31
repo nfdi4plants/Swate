@@ -2,13 +2,12 @@ module Modals.InteropLoggingModal
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
 open ExcelColors
 open Model
 open Messages
 open Shared
+open Feliz
+open Feliz.Bulma
 
 let interopLoggingModal(model:DevState, dispatch) (rmv: _ -> unit) =
     let closeMsg =
@@ -16,37 +15,30 @@ let interopLoggingModal(model:DevState, dispatch) (rmv: _ -> unit) =
             rmv e
             UpdateDisplayLogList [] |> DevMsg |> dispatch
     let logs = model.DisplayLogList
-    Modal.modal [ Modal.IsActive true] [
-        Modal.background [
-            Props [ OnClick closeMsg ]
-        ] [ ]
-        Notification.notification [
-            Notification.Props [Style [
-                MaxWidth "80%"; MaxHeight "80%"; OverflowX OverflowOptions.Auto;
-                //yield! colorControlInArray model.SiteStyleState.ColorMode
-            ]]
-        ] [
-            Notification.delete [
-                Props [OnClick closeMsg]
-            ] []
-            Field.div [] [
-                Table.table [
-                Table.IsFullWidth
-                //Table.Props [ExcelColors.colorBackground model.SiteStyleState.ColorMode]
-            ] [
-                tbody [] (
-                    logs
-                    |> List.map LogItem.toTableRow
-                )
-            ]
-            ]
-            Field.div [] [
-                Button.a [
-                    Button.Color IsWarning
-                    Button.Props [Style [Float FloatOptions.Right]]
-                    Button.OnClick closeMsg
-                ] [
-                    str "Continue"
+    Bulma.modal [
+        Bulma.modal.isActive
+        prop.children [
+            Bulma.modalBackground [ prop.onClick closeMsg ]
+            Bulma.notification [
+                prop.style [style.width(length.percent 80); style.maxHeight (length.percent 80)]
+                prop.children [
+                    Bulma.delete [ prop.onClick closeMsg ]
+                    Bulma.field.div [
+                        Bulma.table [
+                            Bulma.table.isFullWidth
+                            prop.children [
+                                Html.tbody (logs |> List.map LogItem.toTableRow)
+                            ]
+                        ]
+                    ]
+                    Bulma.field.div [
+                        Bulma.button.a [
+                            Bulma.color.isWarning
+                            prop.style [style.float'.right]
+                            prop.onClick closeMsg
+                            prop.text "Continue"
+                        ]
+                    ]
                 ]
             ]
         ]

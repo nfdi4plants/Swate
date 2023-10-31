@@ -2,7 +2,7 @@ module Modals.Controller
 
 open Fable.React
 open Fable.React.Props
-open Fulma
+
 
 [<Literal>]
 let private ModalContainerId_inner = "modal_inner_"

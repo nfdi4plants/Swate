@@ -2,9 +2,6 @@ module TermSearch
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
 open ExcelColors
 open Model
 open Messages
@@ -113,30 +110,32 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 open Fable.Core
 open Fable.Core.JsInterop
 open SidebarComponents
+open Feliz
+open Feliz.Bulma
 
 let simpleSearchComponent model dispatch =
     mainFunctionContainer [
 
         // main container //
 
-        Field.div [] [
+        Bulma.field.div [
             AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
                 dispatch
                 model.SiteStyleState.ColorMode
                 model
                 "Start typing to search for terms"
-                (Some Size.IsLarge)
+                (Some Bulma.button.isLarge)
                 (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState)
         ]
 
         // relationship directed search switch //
 
         div [] [
-            Switch.switchInline [
-                Switch.Color IsPrimary
-                Switch.Id "switch-1"
-                Switch.Checked model.TermSearchState.SearchByParentOntology
-                Switch.OnChange (fun e ->
+            Switch.checkbox [
+                Bulma.color.isPrimary
+                prop.id "switch-1"
+                prop.isChecked model.TermSearchState.SearchByParentOntology
+                prop.onChange (fun (e:bool) ->
                     TermSearch.ToggleSearchByParentOntology |> TermSearchMsg |> dispatch
                     let _ =
                         let inpId = (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).InputId
@@ -146,12 +145,13 @@ let simpleSearchComponent model dispatch =
                     // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
                     //((AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
                 )
-            ] [ str "Use related term directed search." ]
+                prop.text "Use related term directed search." ]
 
-            Help.help [ Help.Props [Style [Display DisplayOptions.Inline; Float FloatOptions.Right]] ] [
+            Bulma.help [
+                prop.style [style.display.inlineElement; style.float'.right] 
                 a [OnClick (fun _ -> AdvancedSearch.ToggleModal (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).ModalId |> AdvancedSearchMsg |> dispatch)] [
                     str "Use advanced search"
-                ] 
+                ] |> prop.children
             ]
         ]
 
@@ -159,70 +159,70 @@ let simpleSearchComponent model dispatch =
 
         // For some reason columns seem to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
         // It would not be full width. This results in the need to remove padding left/right for Column.column childs.
-        Columns.columns [
-            Columns.IsMobile;
-            Columns.Props [Style [Width "100%"; MarginRight "0px"; MarginLeft "0px"]]
-        ] [
-            Column.column [Column.Props [Style [PaddingLeft "0"; if model.TermSearchState.SelectedTerm.IsNone then PaddingRight "0"]]] [
-            // Fill selection confirmation
-                Field.div [] [
-                    Control.div [] [
-                        Button.a [
-                            let hasText = model.TermSearchState.TermSearchText.Length > 0
-                            if hasText then
-                                Button.CustomClass "is-success"
-                                //Button.IsActive true
-                            else
-                                Button.CustomClass "is-danger"
-                            Button.Props [
-                                Disabled (not hasText)
-                            ]
-                            Button.IsFullWidth
-                            Button.OnClick (fun _ ->
+        Bulma.columns [
+            Bulma.columns.isMobile;
+            prop.style [style.width(length.perc 100); style.marginRight 0; style.marginLeft 0]
+            prop.children [
+                Bulma.column [
+                    prop.style [style.paddingLeft 0; if model.TermSearchState.SelectedTerm.IsNone then style.paddingRight 0]
+                    // Fill selection confirmation
+                    Bulma.field.div [
+                        Bulma.control.div [
+                            Bulma.button.a [
+                                let hasText = model.TermSearchState.TermSearchText.Length > 0
                                 if hasText then
-                                    let term = if model.TermSearchState.SelectedTerm.IsSome then TermMinimal.ofTerm model.TermSearchState.SelectedTerm.Value else TermMinimal.create model.TermSearchState.TermSearchText ""
-                                    SpreadsheetInterface.InsertOntologyTerm term |> InterfaceMsg |> dispatch
-                            )
-                        ] [
-                            str "Fill selected cells with this term"
+                                   prop.className "is-success"
+                                    //Button.IsActive true
+                                else
+                                    prop.className "is-danger"
+                                    prop.disabled true
+                                Bulma.button.isFullWidth
+                                prop.onClick (fun _ ->
+                                    if hasText then
+                                        let term = if model.TermSearchState.SelectedTerm.IsSome then TermMinimal.ofTerm model.TermSearchState.SelectedTerm.Value else TermMinimal.create model.TermSearchState.TermSearchText ""
+                                        SpreadsheetInterface.InsertOntologyTerm term |> InterfaceMsg |> dispatch
+                                )
+                                prop.text "Fill selected cells with this term"
+                            ]
                         ]
                     ]
+                    |> prop.children
                 ]
-            ]
-            if model.TermSearchState.SelectedTerm.IsSome then
-                Column.column [
-                    Column.Props [Style [PaddingRight "0"]]
-                    Column.Width (Screen.All, Column.IsNarrow)
-                ] [
-                    Button.a [
-                        Button.Props [Title "Copy to Clipboard"]
-                        Button.Color IsInfo
-                        Button.OnClick (fun e ->
-                            // trigger icon response
-                            CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_termsearch"
-                            //
-                            let t = model.TermSearchState.SelectedTerm.Value
-                            let txt = [t.Name; t.Accession |> Shared.URLs.termAccessionUrlOfAccessionStr; t.Accession.Split(@":").[0] ] |> String.concat System.Environment.NewLine
-                            let textArea = Browser.Dom.document.createElement "textarea"
-                            textArea?value <- txt
-                            textArea?style?top <- "0"
-                            textArea?style?left <- "0"
-                            textArea?style?position <- "fixed"
+                if model.TermSearchState.SelectedTerm.IsSome then
+                    Bulma.column [
+                        prop.className "pr-0"
+                        Bulma.column.isNarrow
+                        Bulma.button.a [
+                            prop.title "Copy to Clipboard"
+                            Bulma.color.isInfo
+                            prop.onClick (fun e ->
+                                // trigger icon response
+                                CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_termsearch"
+                                //
+                                let t = model.TermSearchState.SelectedTerm.Value
+                                let txt = [t.Name; t.Accession |> Shared.URLs.termAccessionUrlOfAccessionStr; t.Accession.Split(@":").[0] ] |> String.concat System.Environment.NewLine
+                                let textArea = Browser.Dom.document.createElement "textarea"
+                                textArea?value <- txt
+                                textArea?style?top <- "0"
+                                textArea?style?left <- "0"
+                                textArea?style?position <- "fixed"
 
-                            Browser.Dom.document.body.appendChild textArea |> ignore
+                                Browser.Dom.document.body.appendChild textArea |> ignore
 
-                            textArea.focus()
-                            // Can't belive this actually worked
-                            textArea?select()
+                                textArea.focus()
+                                // Can't belive this actually worked
+                                textArea?select()
 
-                            let t = Browser.Dom.document.execCommand("copy")
-                            Browser.Dom.document.body.removeChild(textArea) |> ignore
-                            ()
-                        )
-                    ] [
-                        CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_termsearch" Fa.Regular.Clipboard Fa.Solid.Check
+                                let t = Browser.Dom.document.execCommand("copy")
+                                Browser.Dom.document.body.removeChild(textArea) |> ignore
+                                ()
+                            )
+                            CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_termsearch" "fa-regular fa-clipboard" "fa-solid fa-check"
+                            |> prop.children
+                        ]
+                        |> prop.children
                     ]
-                ]
+            ]
         ]
     ]
 
@@ -232,9 +232,9 @@ let termSearchComponent (model:Messages.Model) dispatch =
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [
 
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Ontology term search"]
+        Bulma.label "Ontology term search"
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search for an ontology term to fill into the selected field(s)"]
+        Bulma.label "Search for an ontology term to fill into the selected field(s)"
 
         simpleSearchComponent model dispatch
 

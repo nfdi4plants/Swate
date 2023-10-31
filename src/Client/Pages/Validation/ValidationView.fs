@@ -1,10 +1,5 @@
 module Validation
 
-open Fable.React
-open Fable.React.Props
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
 open Fable.Core.JsInterop
 open Elmish
 
@@ -47,6 +42,12 @@ let update (validationMsg:Validation.Msg) (currentState: Validation.Model) : Val
 
 open Messages
 
+open Fable
+open Fable.React
+open Fable.React.Props
+open Feliz
+open Feliz.Bulma
+
 let columnListElement ind (columnValidation:ColumnValidation) (model:Model) dispatch =
     let isActive =
         match model.ValidationState.DisplayedOptionsId with
@@ -54,7 +55,7 @@ let columnListElement ind (columnValidation:ColumnValidation) (model:Model) disp
             true
         | _ ->
             false
-    tr [
+    Standard.tr [
         // Remove validationTableEle when active to remove on-hover color change to really light grey.
         if isActive then
             Class "nonSelectText"
@@ -92,8 +93,8 @@ let columnListElement ind (columnValidation:ColumnValidation) (model:Model) disp
                 str "-"
         ]
         td [] [
-            Icon.icon [] [
-                Fa.i [Fa.Solid.ChevronDown] []
+            Bulma.icon [
+                Html.i [prop.className "fa-solid fa-chevron-down"]
             ]
         ]
     ]
@@ -112,7 +113,7 @@ let checkradioElement (id:int) (contentTypeOpt:ContentType option) (columnValida
     let contentType = if contentTypeOpt.IsSome then contentTypeOpt.Value.toReadableString else "None"
     let isDisabled = (contentType = "Ontology [None]" || contentType = "Unit [None]")
     div [Style [Position PositionOptions.Relative]] [
-        input [
+        Standard.input [
             Type "checkbox";
             Class "checkbox-input"
             Id (sprintf "checkradio%i%s" id contentType)
@@ -168,54 +169,52 @@ let checkradioList (ind:int) colVal model dispatch =
 
 let sliderElements id columnValidation model dispatch =
     div [] [
-        Field.div [Field.HasAddons] [
-            for i in 1 .. 5 do
-                yield
-                    Control.div [] [
-                        Button.a [
-                            Button.Color IsWarning
-                            Button.IsOutlined
-                            Button.Props [Style [Padding "0rem"; BorderColor model.SiteStyleState.ColorMode.BodyForeground]]
-                            Button.OnClick (fun e ->
-                                let nextColumnValidation = {
-                                    columnValidation with
-                                        Importance = i |> Some
-                                }
-                                let nextTableValidation =
-                                    updateTableValidationByColValidation model nextColumnValidation
-                                UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
-                                )
-                        ] [
-                            Fa.span [
-                                Fa.Size Fa.FaLarge
-                                if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
-                                    Fa.Solid.Star
-                                else
-                                    Fa.Regular.Star
-                                //Fa.Props [Style [Color NFDIColors.Yellow.Base]]
-                            ] []
+        Bulma.field.div [
+            Bulma.field.hasAddons
+            prop.children [
+                for i in 1 .. 5 do
+                    yield
+                        Bulma.control.div [
+                            Bulma.button.a [
+                                Bulma.color.isWarning
+                                Bulma.button.isOutlined
+                                prop.style [style.padding 0; style.borderColor model.SiteStyleState.ColorMode.BodyForeground]
+                                prop.onClick (fun e ->
+                                    let nextColumnValidation = {
+                                        columnValidation with
+                                            Importance = i |> Some
+                                    }
+                                    let nextTableValidation =
+                                        updateTableValidationByColValidation model nextColumnValidation
+                                    UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
+                                    )
+                                Html.span [
+                                    //Fa.Size Fa.FaLarge
+                                    if columnValidation.Importance.IsSome && columnValidation.Importance.Value >= i then
+                                        prop.className "fa-solid fa-star"
+                                    else
+                                        prop.className "fa-regular fa-star"
+                                    //Fa.Props [Style [Color NFDIColors.Yellow.Base]]
+                                ] |> prop.children
+                            ]
                         ]
+                yield
+                    Bulma.button.a [
+                        Bulma.color.isDanger
+                        Bulma.button.isOutlined
+                        prop.onClick (fun _ ->
+                            let nextColumnValidation = {
+                                columnValidation with
+                                    Importance = None
+                            }
+                            let nextTableValidation =
+                                updateTableValidationByColValidation model nextColumnValidation
+                            UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
+                            )
+                        Html.span [ prop.className "fa-solid fa-delete-left" ]
+                        |> prop.children
                     ]
-            yield
-                Button.a [
-                    Button.Color IsDanger
-                    Button.Props [Style [BorderColor model.SiteStyleState.ColorMode.BodyForeground]]
-                    Button.IsOutlined
-                    Button.OnClick (fun e ->
-                        let nextColumnValidation = {
-                            columnValidation with
-                                Importance = None
-                        }
-                        let nextTableValidation =
-                            updateTableValidationByColValidation model nextColumnValidation
-                        UpdateTableValidationScheme nextTableValidation |> ValidationMsg |> dispatch
-                        )
-                ] [
-                    Fa.span [
-                        Fa.Size Fa.FaLarge
-                        Fa.Solid.Backspace
-                    ] []
-                ]
+            ]
         ]
     ]
 
@@ -226,7 +225,7 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
             true
         | _ ->
             false
-    tr [] [
+    Standard.tr [] [
         td [
             ColSpan 4
             Style [
@@ -234,34 +233,32 @@ let optionsElement ind (columnValidation:ColumnValidation) (model:Model) dispatc
                 if isVisible then BorderBottom (sprintf "2px solid %s" NFDIColors.Mint.Base)
             ]
         ] [
-            Box.box' [
-                Props [
-                    Style [
-                        Display (if isVisible then DisplayOptions.Block else DisplayOptions.None)
-                        Width "100%"
-                        BorderRadius "0px"
-                        BackgroundColor model.SiteStyleState.ColorMode.BodyForeground
-                        Color model.SiteStyleState.ColorMode.Text
+            Bulma.box [
+                prop.style [
+                        if isVisible then style.display.block else style.display.none
+                        style.width (length.perc 100)
+                        style.borderRadius 0
+                        style.backgroundColor model.SiteStyleState.ColorMode.BodyForeground
+                        style.color model.SiteStyleState.ColorMode.Text
                     ]
-                ]
-            ] [
-                Columns.columns [] [
-                    Column.column [] [
+                Bulma.columns [
+                    Bulma.column [
                         b [] [str "Content Type"]
 
-                        Help.help [Help.Props [Style [MarginBottom "1rem"]]] [str "Select the specific type of content for the selected column."]
+                        Bulma.help [prop.className "mb-1"; prop.text "Select the specific type of content for the selected column."]
                     
                         yield! checkradioList ind columnValidation model dispatch
 
                     ]
-                    Column.column [] [
+                    Bulma.column [
                         b [] [str "Importance"]
 
-                        Help.help [] [str "Define how important it is to fill in the column correctly."]
+                        Bulma.help [str "Define how important it is to fill in the column correctly."]
 
                         sliderElements ind columnValidation model dispatch
                     ]
                 ]
+                |> prop.children
             ]
         ]
     ]
@@ -275,73 +272,72 @@ let validationElements (model:Model) dispatch =
             MarginBottom "1rem"
         ]
     ] [
-        Field.div [Field.Props [Style [
-            Width "100%"
-        ]]] [
+        Bulma.field.div [
+            prop.style [style.width(length.perc 100)]
             // annotationTable name - DateTime of saving
-            div [
-                Id "TableRepresentationInfoHeader"
-                OnTransitionEnd (fun e ->
-                    let header = Browser.Dom.document.getElementById("TableRepresentationInfoHeader")
-                    header?style?opacity <- 1
-                    header?style?transition <- "unset"
-                )
-            ] [
-                str model.ValidationState.TableValidationScheme.AnnotationTable
-                str " - "
-                str ( model.ValidationState.TableValidationScheme.DateTime.ToString("yyyy-MM-dd HH:mm") )
-                str " - "
-                str (
-                    sprintf "Swate %s" (
-                        if model.ValidationState.TableValidationScheme.SwateVersion = "" then
-                            model.PersistentStorageState.AppVersion
-                        else
-                            model.ValidationState.TableValidationScheme.SwateVersion
+            prop.children [
+                div [
+                    Id "TableRepresentationInfoHeader"
+                    OnTransitionEnd (fun e ->
+                        let header = Browser.Dom.document.getElementById("TableRepresentationInfoHeader")
+                        header?style?opacity <- 1
+                        header?style?transition <- "unset"
                     )
-                )
-            ]
-            Table.table [
-                Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground]]
-                Table.IsHoverable; Table.IsFullWidth
-            ] [
-                thead [ ] [
-                    tr [ ] [
-                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Column Header" ]
-                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Importance" ]
-                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Content Type" ]
-                        th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ ]
+                ] [
+                    str model.ValidationState.TableValidationScheme.AnnotationTable
+                    str " - "
+                    str ( model.ValidationState.TableValidationScheme.DateTime.ToString("yyyy-MM-dd HH:mm") )
+                    str " - "
+                    str (
+                        sprintf "Swate %s" (
+                            if model.ValidationState.TableValidationScheme.SwateVersion = "" then
+                                model.PersistentStorageState.AppVersion
+                            else
+                                model.ValidationState.TableValidationScheme.SwateVersion
+                        )
+                    )
+                ]
+                Bulma.table [
+                    Bulma.table.isHoverable
+                    Bulma.table.isFullWidth
+                    prop.children [
+                        thead [ ] [
+                            Standard.tr [ ] [
+                                th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Column Header" ]
+                                th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Importance" ]
+                                th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ str "Content Type" ]
+                                th [ Style [Color model.SiteStyleState.ColorMode.Text] ] [ ]
+                            ]
+                        ]
+                        tbody [ ] [
+                            for i in 0 .. model.ValidationState.TableValidationScheme.ColumnValidations.Length-1 do
+                                let colVal = model.ValidationState.TableValidationScheme.ColumnValidations.[i]
+                                yield! [
+                                    columnListElement i colVal model dispatch
+                                    optionsElement i colVal model dispatch
+                                ]
+                        ]
                     ]
                 ]
-                tbody [ ] [
-                    for i in 0 .. model.ValidationState.TableValidationScheme.ColumnValidations.Length-1 do
-                        let colVal = model.ValidationState.TableValidationScheme.ColumnValidations.[i]
-                        yield! [
-                            columnListElement i colVal model dispatch
-                            optionsElement i colVal model dispatch
-                        ]
-                ]
-            ]
 
-            // Show warning if no validation format was found
-            if model.ValidationState.TableValidationScheme.SwateVersion = "" then
-                Label.label [Label.Size Size.IsSmall; Label.Props [Style [Color NFDIColors.Red.Lighter10]]] [
-                    str """No checklist for this table found! Hit "Add checklist to workbook" to add a checklist for the active annotation table."""
-                ]
+                // Show warning if no validation format was found
+                if model.ValidationState.TableValidationScheme.SwateVersion = "" then
+                    Bulma.label """No checklist for this table found! Hit "Add checklist to workbook" to add a checklist for the active annotation table."""
 
-            // Submit new checklist scheme. This will write custom xml into the workbook.
-            Button.a [
-                Button.Color Color.IsSuccess
-                Button.IsFullWidth
-                Button.OnClick (fun e ->
-                    let header = Browser.Dom.document.getElementById("TableRepresentationInfoHeader")
-                    header?style?transition <- "0.3s ease"
-                    header?style?opacity <- 0
-                    OfficeInterop.WriteTableValidationToXml (model.ValidationState.TableValidationScheme, model.PersistentStorageState.AppVersion) |> OfficeInteropMsg |> dispatch
-                )
-                Button.Props [Props.Custom ("data-tooltip","Write checklist info to excel worksheet.")]
-                Button.CustomClass "has-tooltip-right has-tooltip-multiline"
-            ] [
-                str "Add checklist to workbook"
+                // Submit new checklist scheme. This will write custom xml into the workbook.
+                Bulma.button.a [
+                    Bulma.color.isSuccess
+                    Bulma.button.isFullWidth
+                    prop.onClick (fun e ->
+                        let header = Browser.Dom.document.getElementById("TableRepresentationInfoHeader")
+                        header?style?transition <- "0.3s ease"
+                        header?style?opacity <- 0
+                        OfficeInterop.WriteTableValidationToXml (model.ValidationState.TableValidationScheme, model.PersistentStorageState.AppVersion) |> OfficeInteropMsg |> dispatch
+                    )
+                    prop.custom ("data-tooltip","Write checklist info to excel worksheet.")
+                    prop.className "has-tooltip-right has-tooltip-multiline"
+                    prop.text "Add checklist to workbook"
+                ]
             ]
         ]
     ]
@@ -352,30 +348,28 @@ let validationComponent model dispatch =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Checklist Editor"]
+        Bulma.label "Checklist Editor"
 
-        Help.help [] [
-            str "Display a table representation and add information to later validate values in the table according to their respective column."
+        Bulma.help "Display a table representation and add information to later validate values in the table according to their respective column."
+
+        Bulma.button.a [
+            Bulma.color.isInfo
+            Bulma.button.isFullWidth
+            prop.onClick (fun e -> OfficeInterop.GetTableValidationXml |> OfficeInteropMsg |> dispatch )
+            prop.className "has-tooltip-right has-tooltip-multiline"
+            prop.style [style.margin(length.rem 1; length.px 0)]
+            prop.custom ("data-tooltip","Get checklist info for currently shown annotation table.")
+            prop.text "Update table representation"
         ]
 
-        Button.a [
-            Button.Color Color.IsInfo
-            Button.IsFullWidth
-            Button.OnClick (fun e -> OfficeInterop.GetTableValidationXml |> OfficeInteropMsg |> dispatch )
-            Button.CustomClass "has-tooltip-right has-tooltip-multiline"
-            Button.Props [Style [Margin "1rem 0"]; Props.Custom ("data-tooltip","Get checklist info for currently shown annotation table.")]
-        ] [
-            str "Update table representation"
-        ]
-
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
-            str """Adjust current Swate table checklist. """
+        Bulma.label [
+            Html.span """Adjust current Swate table checklist. """
             span [
                 Class "has-tooltip-right has-tooltip-multiline"
                 Props.Custom ("data-tooltip", """When hitting "Add checklist to workbook" this information will be saved as part of the workbook.""")
                 Style [Color NFDIColors.LightBlue.Base; MarginLeft ".5rem"]
             ] [
-                Fa.i [ Fa.Solid.InfoCircle ] []
+                Html.i [ prop.className "fa-solid fa-info-circle" ]
             ]
         ]
 

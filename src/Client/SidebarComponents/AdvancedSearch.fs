@@ -2,9 +2,6 @@ module SidebarComponents.AdvancedSearch
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
 open Elmish
 
 open Shared
@@ -13,6 +10,9 @@ open ExcelColors
 open Model
 open Messages
 open CustomComponents
+
+open Feliz
+open Feliz.Bulma
 
 open AdvancedSearchTypes
 open AdvancedSearch
@@ -134,16 +134,15 @@ module private ResultsTable =
 
     let createPaginationLinkFromIndex (updatePageIndex: int ->unit) (pageIndex:int) (currentPageinationIndex: int)=
         let isActve = pageIndex = currentPageinationIndex
-        Pagination.Link.a [
-            Pagination.Link.Current isActve
-            Pagination.Link.Props [
-                Style [
-                    if isActve then Color "white"; BackgroundColor NFDIColors.Mint.Base; BorderColor NFDIColors.Mint.Base;
-                ]
-                OnClick (fun _ -> pageIndex |> updatePageIndex)
+        Bulma.paginationLink.a [
+            if isActve then Bulma.paginationLink.isCurrent
+            prop.style [
+                if isActve then style.color "white";
+                style.backgroundColor NFDIColors.Mint.Base
+                style.borderColor NFDIColors.Mint.Base
             ]
-        ] [
-            span [] [str (string (pageIndex+1))]
+            prop.onClick(fun _ -> pageIndex |> updatePageIndex)
+            prop.text (string (pageIndex+1))
         ]
 
     let pageinateDynamic (updatePageIndex:int->unit) (currentPageinationIndex: int) (pageCount:int)  = 
@@ -159,8 +158,8 @@ module private ResultsTable =
             |> Array.collect (fun sugg ->
                 let id = sprintf "isHidden_advanced_%s" sugg.Accession 
                 [|
-                    tr [
-                        OnClick (fun e ->
+                    Html.tr [
+                        prop.onClick (fun e ->
                             // dont close modal on click
                             e.stopPropagation()
                             e.preventDefault()
@@ -173,78 +172,81 @@ module private ResultsTable =
                             // reset advanced term search state
                             ResetAdvancedSearchState |> AdvancedSearchMsg |> state.Dispatch
                         )
-                        TabIndex 0
-                        Class "suggestion"
-                    ] [
-                        td [] [
-                            b [] [ str sugg.Name ]
-                        ]
-                        if sugg.IsObsolete then
-                            td [Style [Color "red"]] [str "obsolete"]
-                        else
-                            td [] []
-                        td [
-                            OnClick (
-                                fun e ->
-                                    e.stopPropagation()
-                            )
-                            Style [FontWeight "light"]
-                        ] [
-                            small [] [
-                                createLinkOfAccession sugg.Accession
-                        ] ]
-                        td [] [
-                            Button.list [Button.List.IsRight] [
-                                //Button.a [
-                                //    Button.Props [Title "Show Term Tree"]
-                                //    Button.Size IsSmall
-                                //    Button.Color IsSuccess
-                                //    Button.IsInverted
-                                //    Button.OnClick(fun e ->
-                                //        e.preventDefault()
-                                //        e.stopPropagation()
-                                //        Cytoscape.Msg.GetTermTree sugg.Accession |> CytoscapeMsg |> dispatch
-                                //    )
-                                //] [
-                                //    Icon.icon [] [
-                                //        Fa.i [Fa.Solid.Tree] []
-                                //    ]
-                                //]
-                                Button.a [
-                                    Button.Size IsSmall
-                                    Button.Color IsBlack
-                                    Button.IsInverted
-                                    Button.OnClick(fun e ->
-                                        e.preventDefault()
+                        prop.tabIndex 0
+                        prop.className "suggestion"
+                        prop.children [
+                            td [] [
+                                b [] [ str sugg.Name ]
+                            ]
+                            if sugg.IsObsolete then
+                                td [Style [Color "red"]] [str "obsolete"]
+                            else
+                                td [] []
+                            td [
+                                OnClick (
+                                    fun e ->
                                         e.stopPropagation()
-                                        if List.contains id state.ActiveDropdowns then
-                                            let nextState = { state with ActiveDropdowns = List.except [id] state.ActiveDropdowns}
-                                            setState nextState
-                                        else
-                                            let nextState = { state with ActiveDropdowns = id::state.ActiveDropdowns}
-                                            setState nextState
-                                    )
-                                ] [
-                                    Icon.icon [] [
-                                        Fa.i [Fa.Solid.ChevronDown] []
+                                )
+                                Style [FontWeight "light"]
+                            ] [
+                                small [] [
+                                    createLinkOfAccession sugg.Accession
+                            ] ]
+                            td [] [
+                                Bulma.buttons [
+                                    Bulma.buttons.isRight
+                                    prop.children [
+                                        //Button.a [
+                                        //    Button.Props [Title "Show Term Tree"]
+                                        //    Button.Size IsSmall
+                                        //    Button.Color IsSuccess
+                                        //    Button.IsInverted
+                                        //    Button.OnClick(fun e ->
+                                        //        e.preventDefault()
+                                        //        e.stopPropagation()
+                                        //        Cytoscape.Msg.GetTermTree sugg.Accession |> CytoscapeMsg |> dispatch
+                                        //    )
+                                        //] [
+                                        //    Icon.icon [] [
+                                        //        Fa.i [Fa.Solid.Tree] []
+                                        //    ]
+                                        //]
+                                        Bulma.button.a [
+                                            Bulma.button.isSmall
+                                            Bulma.color.isBlack
+                                            Bulma.button.isInverted
+                                            prop.onClick(fun e ->
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                if List.contains id state.ActiveDropdowns then
+                                                    let nextState = { state with ActiveDropdowns = List.except [id] state.ActiveDropdowns}
+                                                    setState nextState
+                                                else
+                                                    let nextState = { state with ActiveDropdowns = id::state.ActiveDropdowns}
+                                                    setState nextState
+                                            )
+                                            prop.children [
+                                                Bulma.icon [
+                                                    Html.i [prop.className "fa-solid fa-chevron-down"]
+                                                ]
+                                            ]
+                                        ]
                                     ]
                                 ]
                             ]
                         ]
                     ]
-                    tr [
-                        OnClick (fun e -> e.stopPropagation())
-                        Id id
-                        Class "suggestion-details"
-                        if List.contains id state.ActiveDropdowns then
-                            Style [Visibility "visible"]
-                        else
-                            Style [Visibility "collapse"]
-                    ] [
-                        td [ColSpan 4] [
-                            Content.content [] [
-                                b [] [ str "Definition: " ]
-                                str sugg.Description
+                    Html.tr [
+                        prop.onClick(fun e -> e.stopPropagation())
+                        prop.id id
+                        prop.className "suggestion-details"
+                        prop.style [if List.contains id state.ActiveDropdowns then style.visibility.visible else style.visibility.collapse]
+                        prop.children [
+                            td [ColSpan 4] [
+                                Bulma.content [
+                                    b [] [ str "Definition: " ]
+                                    str sugg.Description
+                                ]
                             ]
                         ]
                     ]
@@ -252,7 +254,7 @@ module private ResultsTable =
             )
         else
             [|
-                tr [] [
+                Html.tr [
                     td [] [str "No terms found matching your input."]
                 ]
             |]
@@ -276,58 +278,58 @@ module private ResultsTable =
             let chunked = tableRows |> Array.chunkBySize data.ElementsPerPage
             let len = chunked.Length 
     
-            Container.container [] [
-                Table.table [
-                    Table.IsFullWidth
-                    Table.Props [Style [BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text]]
-                ] [
-                    thead [] []
-                    tbody [] (
-                        chunked.[currentPageinationIndex] |> List.ofArray
-                    )
+            Bulma.container [
+                Bulma.table [
+                    Bulma.table.isFullWidth
+                    prop.style [style.backgroundColor model.SiteStyleState.ColorMode.BodyBackground; style.color model.SiteStyleState.ColorMode.Text]
+                    prop.children [
+                        thead [] []
+                        tbody [] (
+                            chunked.[currentPageinationIndex] |> List.ofArray
+                        )
+                    ]
                 ]
-                Pagination.pagination [Pagination.IsCentered] [
-                    Pagination.previous [
-                        Props [
-                            Style [Cursor "pointer"]
-                            OnClick (fun _ ->
+                Bulma.pagination [
+                    Bulma.pagination.isCentered
+                    prop.children [
+                        Bulma.paginationPrevious.button [
+                            prop.style [style.cursor.pointer]
+                            prop.onClick (fun _ ->
                                 max (currentPageinationIndex - 1) 0 |> updatePageIndex handlerState 
                             )
-                            Disabled (currentPageinationIndex = 0)
+                            prop.disabled <| (currentPageinationIndex = 0)
+                            prop.text "Prev"
                         ]
-                    ] [
-                        str "Prev"
-                    ]
-                    Pagination.list [] [
-                        yield createPaginationLinkFromIndex (updatePageIndex handlerState) 0 currentPageinationIndex
-                        if len > 5 && currentPageinationIndex > 3 then yield Pagination.ellipsis []
-                        yield! pageinateDynamic (updatePageIndex handlerState) currentPageinationIndex (len - 1)
-                        if len > 5 && currentPageinationIndex < len-4 then yield Pagination.ellipsis []
-                        if len > 1 then yield createPaginationLinkFromIndex (updatePageIndex handlerState) (len-1) currentPageinationIndex
-                    ]
-                    Pagination.next [
-                        Props [
-                            Style [Cursor "pointer"]
-                            OnClick (fun _ ->
+                        Bulma.paginationList [
+                            yield createPaginationLinkFromIndex (updatePageIndex handlerState) 0 currentPageinationIndex
+                            if len > 5 && currentPageinationIndex > 3 then yield Bulma.paginationEllipsis []
+                            yield! pageinateDynamic (updatePageIndex handlerState) currentPageinationIndex (len - 1)
+                            if len > 5 && currentPageinationIndex < len-4 then yield Bulma.paginationEllipsis []
+                            if len > 1 then yield createPaginationLinkFromIndex (updatePageIndex handlerState) (len-1) currentPageinationIndex
+                        ]
+                        Bulma.paginationNext.button [
+                            prop.style [style.cursor.pointer]
+                            prop.onClick (fun _ ->
                                 let next = min (currentPageinationIndex + 1) (len - 1)
                                 next |> updatePageIndex handlerState
                             )
-                            Disabled (currentPageinationIndex = len - 1)
+                            prop.disabled <| (currentPageinationIndex = len - 1)
+                            prop.text "Next"
                         ]
-                    ] [str "Next"]
+                    ]
                 ]
             ]
         else
-            div [] []
+            Html.div []
 
 let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:bool) modalId =
     let checkradioName = "keepObsolete_checkradio"
-    Checkradio.checkboxInline [
-        Checkradio.Name checkradioName;
-        Checkradio.Id (sprintf "%s_%A_%A"checkradioName keepObsolete modalId);
-        Checkradio.Checked (model.AdvancedSearchState.AdvancedSearchOptions.KeepObsolete = keepObsolete)
-        Checkradio.Color (if model.SiteStyleState.IsDarkMode then IsWhite else IsBlack)
-        Checkradio.OnChange (fun _ ->
+    Bulma.Checkradio.checkbox [
+        prop.name checkradioName
+        prop.id (sprintf "%s_%A_%A"checkradioName keepObsolete modalId)
+        prop.isChecked (model.AdvancedSearchState.AdvancedSearchOptions.KeepObsolete = keepObsolete)
+        (if model.SiteStyleState.IsDarkMode then Bulma.color.isWhite else Bulma.color.isBlack)
+        prop.onChange (fun (e:bool) ->
             {model.AdvancedSearchState.AdvancedSearchOptions
                 with KeepObsolete = keepObsolete
             }
@@ -335,107 +337,114 @@ let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:b
             |> AdvancedSearchMsg
             |> dispatch
         )
-    ] [
-        str (if keepObsolete then "yes" else "no")
+        prop.text (if keepObsolete then "yes" else "no")
     ]
 
 let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
     div [] [
-        Field.div [] [
-            Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Term name keywords:"]
-            Field.div [] [
-                Control.div [] [
-                    Input.input [
-                        Input.Placeholder "... search term name"
-                        Input.Size IsSmall
+        Bulma.field.div [
+            Bulma.label [
+                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
+                prop.text "Term name keywords:"
+            ]
+            Bulma.field.div [
+                Bulma.control.div [
+                    Bulma.input.text [
+                        prop.placeholder "... search term name"
+                        Bulma.input.isSmall
                         //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
-                        Input.OnChange (fun e ->
+                        prop.onChange (fun (e:string) ->
                             {model.AdvancedSearchState.AdvancedSearchOptions
-                                with TermName = e.Value
+                                with TermName = e
                             }
                             |> UpdateAdvancedTermSearchOptions
                             |> AdvancedSearchMsg
                             |> dispatch)
-                        Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermName
-                        Input.Props [
-                            OnKeyDown (fun e ->
-                                match e.which with
-                                | 13. ->
-                                    e.preventDefault()
-                                    e.stopPropagation();
-                                    let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
-                                    if isValid then
-                                        StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
-                                | _ -> ()
-                            )
-                        ]
-                    ] 
-                ]
+                        prop.valueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermName
+                        prop.onKeyDown (fun e ->
+                            match e.which with
+                            | 13. ->
+                                e.preventDefault()
+                                e.stopPropagation();
+                                let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                if isValid then
+                                    StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                            | _ -> ()
+                        )
+                    ]
+                ] 
             ]
         ]
-        Field.div [] [
-            Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Term definition keywords:"]
-            Field.div [] [
-                Control.div [] [
-                    Input.input [
-                        Input.Placeholder "... search term definition"
-                        Input.Size IsSmall
+        Bulma.field.div [
+            Bulma.label [
+                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
+                prop.text "Term definition keywords:"
+            ]
+            Bulma.field.div [
+                Bulma.control.div [
+                    Bulma.input.text [
+                        prop.placeholder "... search term definition"
+                        Bulma.input.isSmall
                         //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
-                        Input.OnChange (fun e ->
+                        prop.onChange (fun (e: string) ->
                             {model.AdvancedSearchState.AdvancedSearchOptions
-                                with TermDefinition = e.Value
+                                with TermDefinition = e
                             }
                             |> UpdateAdvancedTermSearchOptions
                             |> AdvancedSearchMsg
                             |> dispatch)
-                        Input.ValueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermDefinition
-                        Input.Props [
-                            OnKeyDown (fun e ->
-                                match e.which with
-                                | 13. ->
-                                    e.preventDefault()
-                                    e.stopPropagation();
-                                    let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
-                                    if isValid then
-                                        StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
-                                | _ -> ()
-                            )
-                        ]
-                    ] 
-                ]
-            ] 
-        ]
-        Field.div [] [
-            Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Ontology"]
-            Control.div [] [
-                Select.select [ ] [
-                    select [
-                        DefaultValue "All Ontologies";
-                        if model.AdvancedSearchState.AdvancedSearchOptions.OntologyName.IsSome then Value model.AdvancedSearchState.AdvancedSearchOptions.OntologyName.Value
-                        OnChange (fun e ->
-                            let v = e.Value
+                        prop.onKeyDown (fun e ->
+                            match e.which with
+                            | 13. ->
+                                e.preventDefault()
+                                e.stopPropagation();
+                                let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                if isValid then
+                                    StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                            | _ -> ()
+                        )
+                        prop.valueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermDefinition
+                    ]
+                ] 
+            ]
+        ] 
+        Bulma.field.div [
+            Bulma.label [
+                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
+                prop.text "Ontology"
+            ]
+            Bulma.control.div [
+                Bulma.select [
+                    Html.select [
+                        prop.placeholder "All Ontologies";
+                        if model.AdvancedSearchState.AdvancedSearchOptions.OntologyName.IsSome then prop.value model.AdvancedSearchState.AdvancedSearchOptions.OntologyName.Value
+                        prop.onChange (fun (e:string) ->
                             let nextSearchOptions = {
                                 model.AdvancedSearchState.AdvancedSearchOptions
-                                    with OntologyName = if v = "All Ontologies" then None else Some v
+                                    with OntologyName = if e = "All Ontologies" then None else Some e
                             }
                             nextSearchOptions |> UpdateAdvancedTermSearchOptions |> AdvancedSearchMsg |> dispatch
                         )
-                    ] [
-                        yield ontologyDropdownItem model dispatch None
-                        yield! (
-                            model.PersistentStorageState.SearchableOntologies
-                            |> Array.map snd
-                            |> Array.toList
-                            |> List.sortBy (fun o -> o.Name)
-                            |> List.map (fun ont -> ontologyDropdownItem model dispatch (Some ont))
-                        )
+                        prop.children [
+                            ontologyDropdownItem model dispatch None
+                            yield! (
+                                model.PersistentStorageState.SearchableOntologies
+                                |> Array.map snd
+                                |> Array.toList
+                                |> List.sortBy (fun o -> o.Name)
+                                |> List.map (fun ont -> ontologyDropdownItem model dispatch (Some ont))
+                            )
+                        ]
                     ]
                 ]
             ]
         ]
-        Field.div [] [
-            Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Keep obsolete terms" ]
-            div [] [
+        Bulma.field.div [
+            Bulma.label [
+                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
+                prop.text "Keep obsolete terms"
+            ]
+            Html.div [
                 keepObsoleteCheckradioElement model dispatch true modalId
                 keepObsoleteCheckradioElement model dispatch false modalId
             ]
@@ -443,14 +452,16 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
     ]
 
 let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Msg -> unit) =
-    Field.div [Field.Props [] ] [
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Results:"]
+    Bulma.field.div [
+        Bulma.label [
+            prop.style [style.color model.SiteStyleState.ColorMode.Accent]
+            prop.text "Results:"
+        ]
         if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.ResultsSubpage then
             if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
-                div [
-                    Style [Width "100%"; Display DisplayOptions.Flex; JustifyContent "center"]
-                ] [
-                    Modals.Loading.loadingComponent
+                Html.div [
+                    prop.style [style.width(length.perc 100); style.display.flex; style.justifyContent.center]
+                    prop.children Modals.Loading.loadingComponent
                 ]
             else
                 let init: ResultsTable.TableModel = {
@@ -468,69 +479,73 @@ let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Ms
     ]
 
 let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) (dispatch: Msg -> unit) (resultHandler: Term -> Msg) =
-    Modal.modal [
-        Modal.IsActive (
-            model.AdvancedSearchState.HasModalVisible
-            && model.AdvancedSearchState.ModalId = modalId
-        )
-        Modal.Props [Id modalId]
-    ] [
-        // Close modal on click on background
-        Modal.background [Props [OnClick (fun e -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)]] []
-        Modal.Card.card [Props [Style [Width "90%"; MaxWidth "600px"; Height "80%"; MaxHeight "600px"]]] [
-            Modal.Card.head [Props [colorBackground model.SiteStyleState.ColorMode]] [
-                // Close modal on click on x-button
-                Modal.Card.title [Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
-                    str "Advanced Search"
-                ]
-                Fulma.Delete.delete [Delete.OnClick(fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)] []
-            ]
-            Modal.Card.body [Props [colorBackground model.SiteStyleState.ColorMode]] [
-                Field.div [] [
-                    Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All, TextAlignment.Justified)]] [str "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."]
-                ]
-                match model.AdvancedSearchState.AdvancedTermSearchSubpage with
-                | AdvancedSearchSubpages.InputFormSubpage ->
-                    // we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
-                    inputFormPage modalId model dispatch
-                | AdvancedSearchSubpages.ResultsSubpage ->
-                    resultsPage relatedInputId resultHandler model dispatch
-            ]
-            Modal.Card.foot [Props [colorBackground model.SiteStyleState.ColorMode]] [
-                form [
-                    OnSubmit    (fun e -> e.preventDefault())
-                    OnKeyDown   (fun k -> if k.key = "Enter" then k.preventDefault())
-                    Style [Width "100%"]
-                ] [
-                    // Show "Back" button NOT on first subpage
-                    if model.AdvancedSearchState.AdvancedTermSearchSubpage <> AdvancedSearchSubpages.InputFormSubpage then
-                        Level.item [] [
-                            Button.button   [   
-                                Button.CustomClass "is-danger"
-                                Button.IsFullWidth
-                                Button.OnClick (fun e -> e.stopPropagation(); e.preventDefault(); UpdateAdvancedTermSearchSubpage InputFormSubpage |> AdvancedSearchMsg |> dispatch)
-                            ] [
-                                str "Back"
+    Bulma.modal [
+        if (model.AdvancedSearchState.HasModalVisible
+            && model.AdvancedSearchState.ModalId = modalId) then Bulma.modal.isActive
+        prop.id modalId
+        prop.children [
+            // Close modal on click on background
+            Bulma.modalBackground [ prop.onClick (fun e -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)]
+            Bulma.modalCard [
+                prop.style [style.width(length.perc 90); style.maxWidth(length.px 600); style.height(length.perc 80); style.maxHeight(length.px 600)]
+                prop.children [
+                    Bulma.modalCardHead [
+                        prop.children [
+                            Bulma.modalCardTitle "Advanced Search"
+                            Bulma.delete [prop.onClick(fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)]
+                        ]
+                    ]
+                    Bulma.modalCardBody [
+                        prop.children [
+                            Bulma.field.div [ Bulma.help [
+                                    prop.style [style.textAlign.justify]
+                                    prop.text "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."
+                            ]]
+                            match model.AdvancedSearchState.AdvancedTermSearchSubpage with
+                            | AdvancedSearchSubpages.InputFormSubpage ->
+                                // we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
+                                inputFormPage modalId model dispatch
+                            | AdvancedSearchSubpages.ResultsSubpage ->
+                                resultsPage relatedInputId resultHandler model dispatch
+                        ]
+                    ]
+                    Bulma.modalCardFoot [
+                        Html.form [
+                            prop.onSubmit (fun e -> e.preventDefault())
+                            prop.onKeyDown(key.enter, fun k -> k.preventDefault())
+                            prop.style [style.width(length.perc 100)]
+                            prop.children [
+                                if model.AdvancedSearchState.AdvancedTermSearchSubpage <> AdvancedSearchSubpages.InputFormSubpage then
+                                    Bulma.levelItem [
+                                        Bulma.button.button [   
+                                            Bulma.color.isDanger
+                                            Bulma.button.isFullWidth
+                                            prop.onClick (fun e -> e.stopPropagation(); e.preventDefault(); UpdateAdvancedTermSearchSubpage InputFormSubpage |> AdvancedSearchMsg |> dispatch)
+                                            prop.text "Back"
+                                        ]
+                                    ]
+                                // Show "Start advanced search" button ONLY on first subpage
+                                if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage then
+                                    Bulma.levelItem [
+                                        Bulma.button.button [
+                                            let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                            if isValid then
+                                                Bulma.color.isSuccess
+                                                Bulma.button.isActive
+                                            else
+                                                Bulma.color.isDanger
+                                                prop.disabled true
+                                            Bulma.button.isFullWidth
+                                            prop.onClick (fun e ->
+                                                e.preventDefault()
+                                                e.stopPropagation();
+                                                StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                                            )
+                                            prop.text "Start advanced search"
+                                        ]
+                                    ]
                             ]
                         ]
-                    // Show "Start advanced search" button ONLY on first subpage
-                    if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage then
-                        Level.item [] [
-                            Button.button   [
-                                let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
-                                if isValid then
-                                    Button.CustomClass "is-success"
-                                    Button.IsActive true
-                                else
-                                    Button.CustomClass "is-danger"
-                                    Button.Props [Disabled (not isValid)]
-                                Button.IsFullWidth
-                                Button.OnClick (fun e ->
-                                    e.preventDefault()
-                                    e.stopPropagation();
-                                    StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
-                                )
-                            ] [ str "Start advanced search"]
                     ]
                 ]
             ]

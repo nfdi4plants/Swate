@@ -49,7 +49,8 @@ services:
       - DB_PASSWORD=test
       - ONTOLOGY_REPOSITORY=nfdi4plants/nfdi4plants_ontology
       - TEMPLATE_REPOSITORY=nfdi4plants/SWATE_templates
-      - SWATE_API=https://192.168.65.2:3000
+      - SWATE_API=https://swate-alpha.nfdi4plants.org
+      #- SWATE_API=https://host.docker.internal:3000
       - TURN_OFF_SSL_VERIFY=True
       - MAIL_NOTIFICATION=off
     image: ghcr.io/nfdi4plants/swobup:main

@@ -232,7 +232,7 @@ Target.create "Run" (fun _ ->
     run dotnet [ "build" ] sharedPath
     [ "server", dotnet [ "watch"; "run" ] serverPath
       "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientPath
-      //"database", dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
+      "database", dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
     ] |> runParallel
 )
 

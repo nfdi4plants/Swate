@@ -3,9 +3,6 @@ module FilePicker
 open Fable.React
 open Fable.React.Props
 open Fable.Core.JsInterop
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
 open Thoth.Json
 open Thoth.Elmish
 open ExcelColors
@@ -16,6 +13,8 @@ open Browser.Types
 open Elmish
 open Messages.FilePicker
 open Messages
+open Feliz
+open Feliz.Bulma
 
 let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : FilePicker.Model * Cmd<Messages.Msg> =
     match filePickerMsg with
@@ -68,21 +67,18 @@ module PathRerooting =
                 path.Replace(rootPath + string sep, "")
             relativePath
 
-let uploadButton (model:Messages.Model) dispatch inputId =
-    Field.div [] [
-        input [
-            Style [Display DisplayOptions.None]
-            Id inputId
-            Multiple true
-            Type "file"
-            OnChange (fun ev ->
-                let files : FileList = ev.target?files
+let uploadButton (model:Messages.Model) dispatch (inputId: string) =
+    Bulma.field.div [
+        Html.input [
+            prop.style [style.display.none]
+            prop.id inputId
+            prop.multiple true
+            prop.type' "file"
+            prop.onChange (fun (ev: File list) ->
+                let files = ev //ev.target?files
 
                 let fileNames =
-                    [ for i=0 to (files.length - 1) do yield files.item i ]
-                    |> List.map (fun f ->
-                        f.name
-                    )
+                    files |> List.map (fun f -> f.name)
 
                 Browser.Dom.console.log fileNames
 
@@ -93,45 +89,44 @@ let uploadButton (model:Messages.Model) dispatch inputId =
                 //picker?value <- null
             )
         ]
-        Button.button [
-            Button.Color IsInfo
-            Button.IsFullWidth
-            Button.OnClick(fun e ->
+        Bulma.button.button [
+            Bulma.color.isInfo
+            Bulma.button.isFullWidth
+            prop.onClick(fun e ->
                 let getUploadElement = Browser.Dom.document.getElementById inputId
                 getUploadElement.click()
             )
-        ] [
-            str "Pick file names"
+            prop.text "Pick file names"
         ]
     ]
 
 let insertButton (model:Messages.Model) dispatch =
-    Field.div [] [
-        Button.button [
-            Button.Color IsSuccess
-            Button.IsFullWidth
-            Button.OnClick (fun e ->
+    Bulma.field.div [
+        Bulma.button.button [
+            Bulma.color.isSuccess
+            Bulma.button.isFullWidth
+            prop.onClick (fun _ ->
                 let fileNames = model.FilePickerState.FileNames |> List.map snd
                 SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch
             )
-        ] [
-            str "Insert file names"
+            prop.text "Insert file names"
         ]
     ]
 
 let sortButton icon msg =
-    Button.a [
-        Button.OnClick msg
-    ] [
-        Fa.i [ Fa.Size Fa.FaLarge; icon ] [ ] 
+    Bulma.button.a [
+        prop.onClick msg
+        prop.children [
+            Bulma.icon [Html.i [prop.classes ["fa-lg"; icon]]]
+        ]
     ]
 
 let fileSortElements (model:Messages.Model) dispatch =
-    Field.div [] [
-        Button.list [] [
-            Button.a [
-                Button.Props [Title "Copy to Clipboard"]
-                Button.OnClick (fun e ->
+    Bulma.field.div [
+        Bulma.buttons [
+            Bulma.button.a [
+                prop.title "Copy to Clipboard"
+                prop.onClick(fun e ->
                     CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
                     let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
                     let textArea = Browser.Dom.document.createElement "textarea"
@@ -150,22 +145,24 @@ let fileSortElements (model:Messages.Model) dispatch =
                     Browser.Dom.document.body.removeChild(textArea) |> ignore
                     ()
                 )
-            ] [
-                CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" Fa.Regular.Clipboard Fa.Solid.Check
+                prop.children [
+                    CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" "fa-regular fa-clipboard" "fa-solid fa-check"
+                ]
             ]
 
-            Button.list [
-                Button.List.HasAddons
-                Button.List.Props [Style [MarginLeft "auto"]]
-            ] [
-                sortButton Fa.Solid.SortAlphaDown (fun e ->
-                    let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
-                    UpdateFileNames sortedList |> FilePickerMsg |> dispatch
-                )
-                sortButton Fa.Solid.SortAlphaDownAlt (fun e ->
-                    let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i+1,snd x)
-                    UpdateFileNames sortedList |> FilePickerMsg |> dispatch
-                )
+            Bulma.buttons [
+                Bulma.buttons.hasAddons
+                prop.style [style.custom("marginLeft", "auto")]
+                prop.children [
+                    sortButton "fa-solid fa-arrow-down-a-z" (fun e ->
+                        let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
+                        UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+                    )
+                    sortButton "fa-solid fa-arrow-down-z-a" (fun e ->
+                        let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i+1,snd x)
+                        UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+                    )
+                ]
             ]
         ]
     ]
@@ -173,23 +170,23 @@ let fileSortElements (model:Messages.Model) dispatch =
 module FileNameTable =
 
     let deleteFromTable (id,fileName) (model:Model) dispatch =
-        Delete.delete [
-            Delete.OnClick (fun _ ->
+        Bulma.delete [
+            prop.onClick (fun _ ->
                 let newList =
                     model.FilePickerState.FileNames
                     |> List.except [id,fileName]
                     |> List.mapi (fun i (_,name) -> i+1, name)
                 newList |> UpdateFileNames |> FilePickerMsg |> dispatch
             )
-            Delete.Props [ Style [
-                MarginRight "2rem"
-            ]]
-        ] []
+            prop.style [
+                style.marginRight(length.rem 2)
+            ]
+        ]
 
     let moveUpButton (id,fileName) (model:Model) dispatch =
-        Button.a [
-            Button.Size IsSmall
-            Button.OnClick (fun _ ->
+        Bulma.button.a [
+            Bulma.button.isSmall
+            prop.onClick (fun _ ->
                 let sortedList =
                     model.FilePickerState.FileNames
                     |> List.map (fun (iterInd,iterFileName) ->
@@ -205,14 +202,15 @@ module FileNameTable =
                     |> List.mapi (fun i v -> i+1, snd v)
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
-        ] [
-            Fa.i [Fa.Solid.ArrowUp] []
+            prop.children [
+                Bulma.icon [Html.i [prop.className "fa-solid fa-arrow-up"]]
+            ]
         ]
 
     let moveDownButton (id,fileName) (model:Model) dispatch =
-        Button.a [
-            Button.Size IsSmall
-            Button.OnClick (fun _ ->
+        Bulma.button.a [
+            Bulma.button.isSmall
+            prop.onClick (fun _ ->
                 let sortedList =
                     model.FilePickerState.FileNames
                     |> List.map (fun (iterInd,iterFileName) ->
@@ -228,30 +226,33 @@ module FileNameTable =
                     |> List.mapi (fun i v -> i+1, snd v)
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
-        ] [
-            Fa.i [Fa.Solid.ArrowDown] []
+            prop.children [
+                Bulma.icon [Html.i [prop.className "fa-solid fa-arrow-down"]]
+            ]
         ]
 
     let moveButtonList (id,fileName) (model:Model) dispatch =
-        Button.list [] [
+        Bulma.buttons [
             moveUpButton (id,fileName) model dispatch
             moveDownButton (id,fileName) model dispatch
         ]
         
 
     let table (model:Messages.Model) dispatch =
-        Table.table [
-            Table.IsHoverable
-            Table.IsStriped
-        ] [
-            tbody [] [
-                for index,fileName in model.FilePickerState.FileNames do
-                    tr [] [
-                        td [] [b [] [str $"{index}"]]
-                        td [] [str fileName]
-                        td [] [moveButtonList (index,fileName) model dispatch]
-                        td [Style [TextAlign TextAlignOptions.Right]] [deleteFromTable (index,fileName) model dispatch]
-                    ]
+        Bulma.table [
+            Bulma.table.isHoverable
+            Bulma.table.isStriped
+            Bulma.table.isHoverable
+            prop.children [
+                tbody [] [
+                    for index,fileName in model.FilePickerState.FileNames do
+                        Html.tr [
+                            td [] [b [] [str $"{index}"]]
+                            td [] [str fileName]
+                            td [] [moveButtonList (index,fileName) model dispatch]
+                            td [Style [TextAlign TextAlignOptions.Right]] [deleteFromTable (index,fileName) model dispatch]
+                        ]
+                ]
             ]
         ]
         
@@ -259,12 +260,7 @@ module FileNameTable =
 let fileContainer (model:Messages.Model) dispatch inputId=
     mainFunctionContainer [
 
-        Help.help [] [
-            str "Choose one or multiple files, rearrange them and add their names to the Excel sheet."
-            //str " You can use "
-            //u [] [str "drag'n'drop"]
-            //str " to change the file order or remove files selected by accident."
-        ]
+        Bulma.help  "Choose one or multiple files, rearrange them and add their names to the Excel sheet."
 
         uploadButton model dispatch inputId
 
@@ -278,11 +274,15 @@ let fileContainer (model:Messages.Model) dispatch inputId=
 
 let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
     let inputId = "filePicker_OnFilePickerMainFunc"
-    Content.content [ ] [
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "File Picker"]
+    Bulma.content [
+        Bulma.label [
+            Bulma.color.hasTextPrimary
+            prop.text "File Picker"
+        ]
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [
-            str "Select files from your computer and insert their names into Excel."
+        Bulma.label [
+            Bulma.color.hasTextPrimary
+            prop.text "Select files from your computer and insert their names into Excel"
         ]
 
         // Colored container element for all uploaded file names and sort elements

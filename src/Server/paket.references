@@ -1,8 +1,6 @@
+FSharp.Core
 Saturn
 Fable.Remoting.Giraffe
 Microsoft.Extensions.Configuration.UserSecrets
-ISADotNet.XLSX
-ISADotNet.Viz
-ISADotNet
-DynamicObj
+ARCtrl
 Neo4j.Driver

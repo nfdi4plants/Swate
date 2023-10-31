@@ -2,13 +2,17 @@ source https://api.nuget.org/v3/index.json
 framework: net6.0
 storage: none
 
-nuget Fsharp.Core ~> 6
+nuget ARCtrl 1.0.0-beta.2
+nuget Feliz.Bulma.Checkradio
+nuget Feliz.Bulma.Switch
+nuget Fsharp.Core
 nuget Fable.Remoting.Giraffe ~> 5
+nuget FsSpreadsheet.Exceljs
 nuget Saturn ~> 0
 
-nuget Fable.Core ~> 4
+nuget Fable.Core
 nuget Fable.Elmish ~> 4
-nuget Fable.Elmish.React ~> 4
+nuget Fable.Elmish.React
 nuget Fable.Elmish.Debugger ~> 4
 nuget Fable.Elmish.HMR ~> 7
 nuget Fable.Remoting.Client ~> 7
@@ -22,13 +26,9 @@ nuget Fable.React ~> 9
 
 nuget Feliz.ElmishComponents
 nuget ExcelJS.Fable
-nuget ISADotNet 0.6.0
-nuget ISADotNet.XLSX 0.6.0
-nuget ISADotNet.Viz 0.6.0
-nuget DynamicObj 0.2.1
 nuget Neo4j.Driver ~> 5
-nuget FSharp.Data
 nuget Microsoft.Extensions.Configuration.UserSecrets
+nuget Microsoft.AspNetCore.Authentication.JwtBearer ~> 6
 nuget System.Text.Encodings.Web
 
 nuget Fable.Mocha ~> 2
@@ -37,9 +37,3 @@ nuget Thoth.Elmish.Debouncer
 
 nuget Fable.SimpleJson
 nuget Fable.SimpleXml
-
-nuget Fulma
-nuget Fable.FontAwesome.Free
-nuget Fulma.Extensions.Wikiki.Switch
-nuget Fulma.Extensions.Wikiki.Checkradio
-nuget Fulma.Extensions.Wikiki.Slider

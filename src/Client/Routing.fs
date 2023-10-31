@@ -1,8 +1,8 @@
 module Routing
 
 open Elmish.UrlParser
-open Fable.FontAwesome
-open Fulma.Extensions.Wikiki
+open Feliz
+open Feliz.Bulma
 
 /// The different pages of the application. If you add a new page, then add an entry here.
 [<RequireQualifiedAccess>]
@@ -69,26 +69,36 @@ type Route =
         Array.contains currentRoute activeArr
 
     static member toIcon (p: Route)=
-        let createElem icons name =
-            Fable.React.Standard.span [ Fable.React.Props.HTMLAttr.Title name
-            ] (
-                icons
-                |> List.map ( fun icon -> Fa.span [icon] [] )
-            )
+        let createElem (icons: ReactElement list) name =
+            Bulma.icon [
+                prop.title name
+                prop.children icons
+            ] 
 
         match p with
-        | Route.TermSearch          -> createElem [Fa.Solid.SearchPlus                      ]   (p.toStringRdbl)
-        | Route.BuildingBlock       -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Columns    ]   (p.toStringRdbl)
-        | Route.Protocol            -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Table      ]   (p.toStringRdbl)
-        | Route.ProtocolSearch      -> createElem [Fa.Solid.Table; Fa.Solid.Search          ]   (p.toStringRdbl)
-        | Route.Dag                 -> createElem [Fa.Solid.ProjectDiagram                  ]   (p.toStringRdbl)
-        | Route.Validation          -> createElem [Fa.Solid.ClipboardCheck                  ]   (p.toStringRdbl)
-        | Route.JsonExport          -> createElem [Fa.Solid.FileExport                      ]   (p.toStringRdbl)
-        | Route.TemplateMetadata    -> createElem [Fa.Solid.PlusCircle; Fa.Solid.Table;     ]   (p.toStringRdbl)     
-        | Route.FilePicker          -> createElem [Fa.Solid.Upload                          ]   (p.toStringRdbl)
-        | Route.ActivityLog         -> createElem [Fa.Solid.History                         ]   (p.toStringRdbl)
-        | Route.Info                -> createElem [Fa.Solid.Question                        ]   (p.toStringRdbl)  
-        | _                         -> Fa.i [Fa.Solid.QuestionCircle]   []
+        | Route.TermSearch          ->
+            createElem [Html.i [prop.className "fa-solid fa-magnifying-glass-plus" ]] p.toStringRdbl
+        | Route.BuildingBlock       ->
+            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ]; Html.i [prop.className "fa-solid fa-table-column" ]]  p.toStringRdbl
+        | Route.Protocol            ->
+            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]] p.toStringRdbl
+        | Route.ProtocolSearch      ->
+            createElem [ Html.i [prop.className "fa-solid fa-table" ]; Html.i [prop.className "fa-solid fa-magnifying-glass" ]] p.toStringRdbl
+        | Route.Dag                 ->
+            createElem [ Html.i [prop.className "fa-solid fa-diagram-project" ]] p.toStringRdbl
+        | Route.Validation          ->
+            createElem [ Html.i [prop.className "fa-solid fa-clipboard-check" ]] p.toStringRdbl
+        | Route.JsonExport          ->
+            createElem [ Html.i [prop.className "fa-solid fa-file-export" ]] p.toStringRdbl
+        | Route.TemplateMetadata    ->
+            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]] p.toStringRdbl
+        | Route.FilePicker          ->
+            createElem [ Html.i [prop.className "fa-solid fa-upload" ]] p.toStringRdbl
+        | Route.ActivityLog         ->
+            createElem [ Html.i [prop.className "fa-solid fa-timeline" ]] p.toStringRdbl
+        | Route.Info                ->
+            createElem [ Html.i [prop.className "fa-solid fa-question" ]] p.toStringRdbl
+        | _                         -> Html.i [prop.className "fa-question"]
 
 ///explained here: https://elmish.github.io/browser/routing.html
 //let curry f x y = f (x,y)

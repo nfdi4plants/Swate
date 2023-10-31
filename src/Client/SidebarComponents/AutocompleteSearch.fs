@@ -2,9 +2,8 @@ module SidebarComponents.AutocompleteSearch
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
+open Feliz
+open Feliz.Bulma
 open ExcelColors
 open Api
 open Model
@@ -338,7 +337,7 @@ let autocompleteTermSearchComponentOfParentOntology
     (colorMode:ColorMode)
     (model:Model)
     (inputPlaceholderText   : string)
-    (inputSize              : ISize option)
+    (inputSize              : IReactProperty option)
     (autocompleteParams     : AutocompleteParameters<Term>)
 
     =

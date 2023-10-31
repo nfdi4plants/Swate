@@ -13,7 +13,6 @@ let _ = importSideEffects "./style.scss"
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
 
-
 open Feliz
 
 let split_container model dispatch = 

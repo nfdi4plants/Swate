@@ -1,28 +1,28 @@
 module Protocol.Search
 
-open Fulma
 open Fable.React
 open Fable.React.Props
 open Model
 open Messages
+open Feliz
+open Feliz.Bulma
 
 let breadcrumbEle (model:Model) dispatch =
-    Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator] [
-        Breadcrumb.item [] [
-            a [
-                OnClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
-            ] [
-                str (Routing.Route.Protocol.toStringRdbl)
-            ]
-        ];
-        Breadcrumb.item [
-            Breadcrumb.Item.IsActive true
-        ] [
-            a [
-                Style [Color model.SiteStyleState.ColorMode.Text]
-                OnClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
-            ] [
-                str Routing.Route.ProtocolSearch.toStringRdbl
+    Bulma.breadcrumb [
+        Bulma.breadcrumb.hasArrowSeparator
+        prop.children [
+            Html.ul [
+                Html.li [Html.a [
+                    prop.onClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
+                    prop.text (Routing.Route.Protocol.toStringRdbl)
+                ]]
+                Html.li [
+                    prop.className "is-active"
+                    prop.children (Html.a [
+                        prop.onClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
+                        prop.text (Routing.Route.ProtocolSearch.toStringRdbl)
+                    ])
+                ]    
             ]
         ]
     ]
@@ -39,12 +39,12 @@ let protocolSearchView (model:Model) dispatch =
         breadcrumbEle model dispatch
 
         if isEmpty && not isLoading then
-            Help.help [Help.Color IsDanger] [str "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
+            Bulma.help [Bulma.color.isDanger; prop.text "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
 
         if isLoading then
             Modals.Loading.loadingModal
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Search the database for protocol templates."]
+        Bulma.label "Search the database for protocol templates."
 
         if not isEmpty then
             Protocol.Component.ProtocolContainer model dispatch

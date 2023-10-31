@@ -4,6 +4,20 @@ module Regex =
 
     module Pattern =
 
+        module MatchGroups =
+        
+            [<Literal>]
+            let numberFormat = "numberFormat"
+
+            [<Literal>]
+            let localID = "localid"
+
+            [<Literal>]
+            let idspace = "idspace"
+
+            [<Literal>]
+            let iotype = "iotype"
+
         // Checks
 
         //Source Name
@@ -40,14 +54,12 @@ module Regex =
         //[<LiteralAttribute>]
         //let TermAccessionPattern = @"(?<=\()\S+[:_][^;)#]*(?=[\)\#])" //"[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
 
-        // Hits term accession, without id: ENVO:01001831
-        [<LiteralAttribute>]
-        let TermAccessionPattern = @"[\w]+?:[\d]+"
+        /// Hits term accession, without id: ENVO:01001831
+        let TermAnnotationShortPattern = $@"(?<{MatchGroups.idspace}>\w+?):(?<{MatchGroups.localID}>\w+)" //prev: @"[\w]+?:[\d]+"
 
         // https://obofoundry.org/id-policy.html#mapping-of-owl-ids-to-obo-format-ids
-        // <summary>Regex pattern is designed to hit only Foundry-compliant URIs.</summary>
-        [<LiteralAttribute>]
-        let TermAccessionPatternURI = @"http://purl.obolibrary.org/obo/(?<idspace>[\w]+?)_(?<localid>[\d]+)"
+        /// <summary>Regex pattern is designed to hit only Foundry-compliant URIs.</summary>
+        let TermAnnotationURIPattern = $@".*\/(?<{MatchGroups.idspace}>\w+?)[:_](?<{MatchGroups.localID}>\w+)"
 
     module Aux =
     
@@ -95,10 +107,10 @@ module Regex =
     /// <summary>This function can be used to extract `IDSPACE:LOCALID` (or: `Term Accession` from Swate header strings or obofoundry conform URI strings.</summary>
     let parseTermAccession (headerStr:string) =
         match headerStr.Trim() with
-        | Regex TermAccessionPattern value ->
+        | Regex TermAnnotationShortPattern value ->
             value.Value.Trim()
             |> Some
-        | Regex TermAccessionPatternURI value ->
+        | Regex TermAnnotationURIPattern value ->
             let idspace = value.Groups.["idspace"].Value
             let localid = value.Groups.["localid"].Value
             idspace + ":" + localid

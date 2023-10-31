@@ -2,7 +2,6 @@ module ExcelColors
 
 open Fable.React
 open Fable.React.Props
-open Fulma
 
 //https://developer.microsoft.com/en-us/fluentui#/styles/web/colors/products
 module Excel =
@@ -146,11 +145,4 @@ let colorControlInArray_Feliz (mode:ColorMode) =
         style.backgroundColor mode.ControlBackground
         style.borderColor     mode.ControlForeground
         style.color           mode.Text
-    ]
-
-let colorBackground (mode:ColorMode) =
-    Style [
-        BackgroundColor mode.BodyBackground
-        BorderColor     mode.BodyForeground
-        Color           mode.Text
     ]

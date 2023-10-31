@@ -2,23 +2,24 @@ module Modals.Loading
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fable.FontAwesome
-
+open Feliz
+open Feliz.Bulma
 
 let loadingComponent =
-    Fa.i [
-        Fa.Solid.Spinner
-        Fa.Pulse
-        Fa.Size Fa.Fa4x
-    ] []
+    Html.i [
+        prop.classes ["fa-solid"; "fa-spinner"; "fa-spin-pulse"; "fa-xl"]
+    ]
 
 let loadingModal =
-    Modal.modal [ Modal.IsActive true ] [
-        Modal.background [] []
-        Modal.content [Props [Style [Width "auto"]]] [
-            Box.box' [ ] [
-                loadingComponent
+    Bulma.modal [
+        Bulma.modal.isActive
+        prop.children [
+            Bulma.modalBackground []
+            Bulma.modalContent [
+                prop.style [style.custom("width","auto")]
+                prop.children [
+                    Bulma.box loadingComponent
+                ]
             ]
         ]
     ]

@@ -2,7 +2,6 @@ module Model
 
 open Fable.React
 open Fable.React.Props
-open Fulma
 open Shared
 open TermTypes
 open TemplateTypes

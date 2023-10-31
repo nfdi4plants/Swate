@@ -40,6 +40,7 @@ type Neo4j =
     
     static member establishConnection(c: Neo4JCredentials) =
         let driver = Neo4j.Driver.GraphDatabase.Driver(c.BoltUrl, Neo4j.Driver.AuthTokens.Basic(c.User,c.Pw))
+        printfn "established connection"
         driver.AsyncSession(SessionConfigBuilder.ForDatabase c.DatabaseName)
 
     /// <summary>Standardized function to easily execute neo4j cypher query.</summary>
@@ -69,7 +70,10 @@ type Neo4j =
             let! dbValues = 
                 executeReadQuery.ToListAsync()
                 |> Async.AwaitTask
+            printfn "INNER LENGTH: %i" (dbValues |> Seq.length)
+            printfn "RESULT: %A" (dbValues.Item 0)
             let parsedDbValues = dbValues |> Seq.map resultAs
+            printfn "INNER LENGTH PARSED: %i" (dbValues |> Seq.length)
             if session.IsNone then currentSession.Dispose()
             return parsedDbValues
         } |> Async.RunSynchronously

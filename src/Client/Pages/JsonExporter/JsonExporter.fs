@@ -2,8 +2,6 @@ module JsonExporter.Core
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fable.FontAwesome
 open Fable.Core.JsInterop
 open Elmish
 
@@ -202,66 +200,68 @@ let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messa
         currentModel.updateByJsonExporterModel nextModel, Cmd.none
 
 open Messages
+open Feliz
+open Feliz.Bulma
 
 let dropdownItem (exportType:JsonExportType) (model:Model) msg (isActive:bool) =
-    Dropdown.Item.a [
-        Dropdown.Item.Props [
-            TabIndex 0
-            OnClick (fun e ->
+    Bulma.dropdownItem.a [
+        prop.tabIndex 0
+        prop.onClick (fun e ->
                 e.stopPropagation()
                 exportType |> msg
             )
-            OnKeyDown (fun k -> if (int k.which) = 13 then exportType |> msg)
-            Style [if isActive then BackgroundColor model.SiteStyleState.ColorMode.ControlForeground]
-        ]
-
-    ] [
-        Text.span [
-            CustomClass "has-tooltip-right has-tooltip-multiline"
-            Props [
-                Props.Custom ("data-tooltip", exportType.toExplanation)
-                Style [FontSize "1.1rem"; PaddingRight "10px"; TextAlign TextAlignOptions.Center; Color NFDIColors.Yellow.Darker20]
+        prop.onKeyDown (fun k -> if (int k.which) = 13 then exportType |> msg)
+        prop.style [if isActive then style.backgroundColor model.SiteStyleState.ColorMode.ControlForeground]
+        prop.children [
+            Html.span [
+                prop.className "has-tooltip-right has-tooltip-multiline"
+                prop.custom ("data-tooltip", exportType.toExplanation)
+                prop.style [style.fontSize(length.rem 1.1); style.paddingRight 10; style.textAlign.center; style.color NFDIColors.Yellow.Darker20]
+                Html.i [prop.className "fa-solid fa-circle-info"] |> prop.children
             ]
-        ] [
-            Fa.i [Fa.Solid.InfoCircle] []
-        ]
 
-        Text.span [] [str (exportType.ToString())]
+            Html.span (exportType.ToString())
+        ]
     ]
 
 let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
     mainFunctionContainer [
-        Field.div [Field.HasAddons] [
-            Control.div [] [
-                Dropdown.dropdown [
-                    Dropdown.IsActive model.JsonExporterModel.ShowTableExportTypeDropdown
-                ] [
-                    Dropdown.trigger [] [
-                        Button.a [
-                            Button.OnClick (fun e -> e.stopPropagation(); UpdateShowTableExportTypeDropdown (not model.JsonExporterModel.ShowTableExportTypeDropdown) |> JsonExporterMsg |> dispatch )
-                        ] [
-                            span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.TableJsonExportType.ToString())]
-                            Fa.i [Fa.Solid.AngleDown] []
-                        ]
-                    ]
-                    Dropdown.menu [] [
-                        Dropdown.content [] [
-                            let msg = (UpdateTableJsonExportType >> JsonExporterMsg >> dispatch)
-                            dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.Assay)
-                            dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.ProcessSeq)
+        Bulma.field.div [
+            Bulma.field.hasAddons
+            prop.children [
+                Bulma.control.div [
+                    Bulma.dropdown [
+                        if model.JsonExporterModel.ShowTableExportTypeDropdown then Bulma.dropdown.isActive
+                        prop.children [
+                            Bulma.dropdownTrigger [
+                                Bulma.button.a [
+                                    prop.onClick(fun e -> e.stopPropagation(); UpdateShowTableExportTypeDropdown (not model.JsonExporterModel.ShowTableExportTypeDropdown) |> JsonExporterMsg |> dispatch )
+                                    prop.children [
+                                        span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.TableJsonExportType.ToString())]
+                                        Html.i [prop.className "fa-solid fa-angle-down"]
+                                    ]
+                                ]
+                            ]
+                            Bulma.dropdownMenu [
+                                Bulma.dropdownContent [
+                                    let msg = (UpdateTableJsonExportType >> JsonExporterMsg >> dispatch)
+                                    dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.Assay)
+                                    dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.TableJsonExportType = JsonExportType.ProcessSeq)
+                                ]
+                            ]
                         ]
                     ]
                 ]
-            ]
-            Control.div [Control.IsExpanded] [
-                Button.a [
-                    Button.Color IsInfo
-                    Button.IsFullWidth
-                    Button.OnClick(fun _ ->
-                        InterfaceMsg SpreadsheetInterface.ExportJsonTable |> dispatch
-                    )
-                ] [
-                    str "Download as isa json"
+                Bulma.control.div [
+                    Bulma.control.isExpanded
+                    Bulma.button.a [
+                        Bulma.color.isInfo
+                        Bulma.button.isFullWidth
+                        prop.onClick(fun _ ->
+                            InterfaceMsg SpreadsheetInterface.ExportJsonTable |> dispatch
+                        )
+                        prop.text "Download as isa json"
+                    ] |> prop.children
                 ]
             ]
         ]
@@ -269,55 +269,64 @@ let parseTableToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
 
 let parseTablesToISAJsonEle (model:Model) (dispatch:Messages.Msg -> unit) =
     mainFunctionContainer [
-        Field.div [Field.HasAddons] [
-            Control.div [] [
-                Dropdown.dropdown [
-                    Dropdown.IsActive model.JsonExporterModel.ShowWorkbookExportTypeDropdown
-                ] [
-                    Dropdown.trigger [] [
-                        Button.a [
-                            Button.OnClick (fun e -> e.stopPropagation(); UpdateShowWorkbookExportTypeDropdown (not model.JsonExporterModel.ShowWorkbookExportTypeDropdown) |> JsonExporterMsg |> dispatch )
-                        ] [
-                            span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.WorkbookJsonExportType.ToString())]
-                            Fa.i [Fa.Solid.AngleDown] []
-                        ]
-                    ]
-                    Dropdown.menu [] [
-                        Dropdown.content [] [
-                            let msg = (UpdateWorkbookJsonExportType >> JsonExporterMsg >> dispatch)
-                            dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.Assay)
-                            dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.ProcessSeq)
+        Bulma.field.div [
+            Bulma.field.hasAddons
+            prop.children [
+                Bulma.control.div [
+                    Bulma.dropdown [
+                        if model.JsonExporterModel.ShowWorkbookExportTypeDropdown then Bulma.dropdown.isActive 
+                        prop.children [
+                            Bulma.dropdownTrigger [
+                                Bulma.button.a [
+                                    prop.onClick (fun e -> e.stopPropagation(); UpdateShowWorkbookExportTypeDropdown (not model.JsonExporterModel.ShowWorkbookExportTypeDropdown) |> JsonExporterMsg |> dispatch )
+                                    prop.children [
+                                        span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.WorkbookJsonExportType.ToString())]
+                                        Html.i [prop.className "fa-solid fa-angle-down"]
+                                    ]
+                                ]
+                            ]
+                            Bulma.dropdownMenu [
+                                Bulma.dropdownContent [
+                                    let msg = (UpdateWorkbookJsonExportType >> JsonExporterMsg >> dispatch)
+                                    dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.Assay)
+                                    dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.WorkbookJsonExportType = JsonExportType.ProcessSeq)
+                                ]
+                            ]
                         ]
                     ]
                 ]
-            ]
-            Control.div [Control.IsExpanded] [
-                Button.a [
-                    Button.Color IsInfo
-                    Button.IsFullWidth
-                    Button.OnClick(fun _ ->
-                        InterfaceMsg SpreadsheetInterface.ExportJsonTables |> dispatch
-                    )
-                ] [
-                    str "Download as isa json"
+                Bulma.control.div [
+                    Bulma.control.isExpanded
+                    Bulma.button.a [
+                        Bulma.color.isInfo
+                        Bulma.button.isFullWidth
+                        prop.onClick(fun _ ->
+                            InterfaceMsg SpreadsheetInterface.ExportJsonTables |> dispatch
+                        )
+                        prop.text "Download as isa json"
+                    ]
+                    |> prop.children
                 ]
             ]
         ]
     ]
 
 // SND ELEMENT
+open Browser.Types
 
-let fileUploadButton (model:Model) dispatch id =
-    Label.label [Label.Props [Style [FontWeight "normal";MarginBottom "0.5rem"]]] [
-        Input.input [
-            Input.Props [
-                Id id
-                Props.Type "file"; Style [Display DisplayOptions.None]
-                OnChange (fun ev ->
-                    let files : Browser.Types.FileList = ev.target?files
+let fileUploadButton (model:Model) dispatch (id: string) =
+    Bulma.label [
+        prop.className "mb-2 has-text-weight-normal"
+        prop.children [
+            Bulma.fileInput [
+                prop.id id
+                prop.type' "file";
+                prop.style [style.display.none]
+                prop.onChange (fun (ev: File list) ->
+                    let files = ev//: Browser.Types.FileList = ev.target?files
 
                     let blobs =
-                        [ for i=0 to (files.length - 1) do yield files.item i ]
+                        files
                         |> List.map (fun f -> f.slice() )
 
                     let reader = Browser.Dom.FileReader.Create()
@@ -341,9 +350,11 @@ let fileUploadButton (model:Model) dispatch id =
                     picker?value <- null
                 )
             ]
-        ]
-        Button.a [Button.Color Color.IsInfo; Button.IsFullWidth] [
-            str "Upload Excel file"
+            Bulma.button.a [
+                Bulma.color.isInfo;
+                Bulma.button.isFullWidth
+                prop.text "Upload Excel file"
+            ]
         ]
     ]
 
@@ -354,45 +365,51 @@ let xlsxUploadAndParsingMainElement (model:Model) (dispatch: Msg -> unit) =
         // Upload xlsx file to byte []
         fileUploadButton model dispatch inputId
         // Request parsing
-        Field.div [Field.HasAddons] [
-            Control.div [] [
-                Dropdown.dropdown [
-                    Dropdown.IsActive model.JsonExporterModel.ShowXLSXExportTypeDropdown
-                ] [
-                    Dropdown.trigger [] [
-                        Button.a [
-                            Button.OnClick (fun e -> e.stopPropagation(); UpdateShowXLSXExportTypeDropdown (not model.JsonExporterModel.ShowXLSXExportTypeDropdown) |> JsonExporterMsg |> dispatch )
-                        ] [
-                            span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.XLSXParsingExportType.ToString())]
-                            Fa.i [Fa.Solid.AngleDown] []
-                        ]
-                    ]
-                    Dropdown.menu [] [
-                        Dropdown.content [] [
-                            let msg = (UpdateXLSXParsingExportType >> JsonExporterMsg >> dispatch)
-                            dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.Assay)
-                            dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.ProcessSeq)
-                            dropdownItem JsonExportType.ProtocolTemplate model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.ProtocolTemplate)
+        Bulma.field.div [
+            Bulma.field.hasAddons
+            prop.children [
+                Bulma.control.div [
+                    Bulma.dropdown [
+                        if model.JsonExporterModel.ShowXLSXExportTypeDropdown then Bulma.dropdown.isActive 
+                        prop.children [
+                            Bulma.dropdownTrigger [
+                                Bulma.button.a [
+                                    prop.onClick (fun e -> e.stopPropagation(); UpdateShowXLSXExportTypeDropdown (not model.JsonExporterModel.ShowXLSXExportTypeDropdown) |> JsonExporterMsg |> dispatch )
+                                    prop.children [
+                                        span [Style [MarginRight "5px"]] [str (model.JsonExporterModel.XLSXParsingExportType.ToString())]
+                                        Html.i [prop.className "fa-solid fa-angle-down"]
+                                    ]
+                                ]
+                            ]
+                            Bulma.dropdownMenu [
+                                Bulma.dropdownContent [
+                                    let msg = (UpdateXLSXParsingExportType >> JsonExporterMsg >> dispatch)
+                                    dropdownItem JsonExportType.Assay model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.Assay)
+                                    dropdownItem JsonExportType.ProcessSeq model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.ProcessSeq)
+                                    dropdownItem JsonExportType.ProtocolTemplate model msg (model.JsonExporterModel.XLSXParsingExportType = JsonExportType.ProtocolTemplate)
+                                ]
+                            ]
                         ]
                     ]
                 ]
-            ]
-            Control.div [Control.IsExpanded] [
-                Button.a [
-                    let hasContent = model.JsonExporterModel.XLSXByteArray <> Array.empty
-                    Button.Color IsInfo
-                    if hasContent then
-                        Button.IsActive true
-                    else
-                        Button.Color Color.IsDanger
-                        Button.Props [Disabled true]
-                    Button.IsFullWidth
-                    Button.OnClick(fun _ ->
+                Bulma.control.div [
+                    Bulma.control.isExpanded
+                    Bulma.button.a [
+                        let hasContent = model.JsonExporterModel.XLSXByteArray <> Array.empty
+                        Bulma.color.isInfo
                         if hasContent then
-                            ParseXLSXToJsonRequest model.JsonExporterModel.XLSXByteArray |> JsonExporterMsg |> dispatch
-                    )
-                ] [
-                    str "Download as isa json"
+                            Bulma.button.isActive 
+                        else
+                            Bulma.color.isDanger
+                            prop.disabled true
+                        Bulma.button.isFullWidth
+                        prop.onClick(fun _ ->
+                            if hasContent then
+                                ParseXLSXToJsonRequest model.JsonExporterModel.XLSXByteArray |> JsonExporterMsg |> dispatch
+                        )
+                        prop.text "Download as isa json"
+                    ]
+                    |> prop.children
                 ]
             ]
         ]
@@ -401,32 +418,33 @@ let xlsxUploadAndParsingMainElement (model:Model) (dispatch: Msg -> unit) =
 
 let jsonExporterMainElement (model:Messages.Model) (dispatch: Messages.Msg -> unit) =
     
-    Content.content [ Content.Props [
-        OnSubmit    (fun e -> e.preventDefault())
-        OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
-        OnClick     (fun e -> CloseAllDropdowns |> JsonExporterMsg |> dispatch)
-        Style [MinHeight "100vh"]
-    ]] [
-
-        Label.label [Label.Size Size.IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [ str "Json Exporter"]
-
-        Help.help [] [
-            str "Export swate annotation tables to "
-            a [Href @"https://en.wikipedia.org/wiki/JSON"] [str "JSON"]
-            str " format. Official ISA-JSON types can be found "
-            a [Href @"https://isa-specs.readthedocs.io/en/latest/isajson.html#"] [str "here"]
-            str "."
-        ]
-
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Export active table"]
-
-        parseTableToISAJsonEle model dispatch
-
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Export workbook"]
+    Bulma.content [
         
-        parseTablesToISAJsonEle model dispatch
+        prop.onSubmit    (fun e -> e.preventDefault())
+        prop.onKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
+        prop.onClick     (fun e -> CloseAllDropdowns |> JsonExporterMsg |> dispatch)
+        prop.style [style.minHeight(length.vh 100)]
+        prop.children [
+            Bulma.label "Json Exporter"
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Export Swate conform xlsx file."]
+            Bulma.help [
+                str "Export swate annotation tables to "
+                a [Href @"https://en.wikipedia.org/wiki/JSON"] [str "JSON"]
+                str " format. Official ISA-JSON types can be found "
+                a [Href @"https://isa-specs.readthedocs.io/en/latest/isajson.html#"] [str "here"]
+                str "."
+            ]
 
-        xlsxUploadAndParsingMainElement model dispatch
+            Bulma.label "Export active table"
+
+            parseTableToISAJsonEle model dispatch
+
+            Bulma.label "Export workbook"
+        
+            parseTablesToISAJsonEle model dispatch
+
+            Bulma.label "Export Swate conform xlsx file."
+
+            xlsxUploadAndParsingMainElement model dispatch
+        ]
     ]

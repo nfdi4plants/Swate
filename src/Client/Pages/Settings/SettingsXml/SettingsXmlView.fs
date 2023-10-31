@@ -1,20 +1,20 @@
 module SettingsXml
 
-open Fulma
-open Fable
-open Fable.React
-open Fable.React.Props
-open Fable.FontAwesome
-//open Fable.Core.JS
-open Fable.Core.JsInterop
-open Elmish
+//open Fulma
+//open Fable
+//open Fable.React
+//open Fable.React.Props
+//open Fable.FontAwesome
+////open Fable.Core.JS
+//open Fable.Core.JsInterop
+//open Elmish
 
-open Shared
+//open Shared
 
-open Model
-open Messages.SettingsXml
+//open Model
+//open Messages.SettingsXml
 
-let update (msg:Msg) (currentState: SettingsXml.Model) : SettingsXml.Model * Cmd<Messages.Msg> =
+//let update (msg:Msg) (currentState: SettingsXml.Model) : SettingsXml.Model * Cmd<Messages.Msg> =
 
         //let matchXmlTypeToUpdateMsg msg (xmlType:OfficeInterop.Types.Xml.XmlTypes) =
         //    match xmlType with
@@ -30,7 +30,7 @@ let update (msg:Msg) (currentState: SettingsXml.Model) : SettingsXml.Model * Cmd
         //            UpdateProtocolGroupHeader |> ExcelInterop
         //        ]
         
-        match msg with
+        //match msg with
     //    // // Client // //
     //    // Validation Xml
     //    | UpdateActiveSwateValidation nextActiveTableValid ->
@@ -93,19 +93,19 @@ let update (msg:Msg) (currentState: SettingsXml.Model) : SettingsXml.Model * Cmd
     //        }
     //        nextState, Cmd.none
         //
-        | UpdateRawCustomXml rawXmlStr ->
-            let nextState = {
-                currentState with
-                    RawXml      = rawXmlStr
-                    NextRawXml  = rawXmlStr
-            }
-            nextState, Cmd.none
-        | UpdateNextRawCustomXml nextRawCustomXml ->
-            let nextState = {
-                currentState with
-                    NextRawXml = nextRawCustomXml
-            }
-            nextState, Cmd.none
+        //| UpdateRawCustomXml rawXmlStr ->
+        //    let nextState = {
+        //        currentState with
+        //            RawXml      = rawXmlStr
+        //            NextRawXml  = rawXmlStr
+        //    }
+        //    nextState, Cmd.none
+        //| UpdateNextRawCustomXml nextRawCustomXml ->
+        //    let nextState = {
+        //        currentState with
+        //            NextRawXml = nextRawCustomXml
+        //    }
+        //    nextState, Cmd.none
     //    // OfficeInterop
     //    | GetAllValidationXmlParsedRequest ->
     //        let nextState = {
@@ -171,173 +171,173 @@ let update (msg:Msg) (currentState: SettingsXml.Model) : SettingsXml.Model * Cmd
     //                (GenericError >> Dev)
     //        currentState, cmd
 
-open Messages
+//open Messages
 
-let dangerZone (model:Model) dispatch =
-    div [] [
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]] [str "Dangerzone"]
-        Container.container [
-            Container.Props [Style [
-                Padding "1rem"
-                Border (sprintf "2.5px solid %s" NFDIColors.Red.Base)
-                BorderRadius "10px"
-            ]]
-        ] [
-            Button.a [
-                Button.Color Color.IsDanger
-                Button.IsFullWidth
-                Button.OnClick (fun e -> OfficeInterop.DeleteAllCustomXml |> OfficeInteropMsg |> dispatch )
-                Button.Props [Style []; Title "Be sure you know what you do. This cannot be undone!"]
-            ] [
-                Icon.icon [ ] [
-                    Fa.i [Fa.Solid.ExclamationTriangle] []
-                ]
-                span [] [str "Delete All Custom Xml!"]
-                Icon.icon [ ] [
-                    Fa.i [Fa.Solid.ExclamationTriangle] []
-                ]
-            ]
-        ]
-    ]
+//let dangerZone (model:Model) dispatch =
+//    div [] [
+//        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Text]]] [str "Dangerzone"]
+//        Container.container [
+//            Container.Props [Style [
+//                Padding "1rem"
+//                Border (sprintf "2.5px solid %s" NFDIColors.Red.Base)
+//                BorderRadius "10px"
+//            ]]
+//        ] [
+//            Button.a [
+//                Button.Color Color.IsDanger
+//                Button.IsFullWidth
+//                Button.OnClick (fun e -> OfficeInterop.DeleteAllCustomXml |> OfficeInteropMsg |> dispatch )
+//                Button.Props [Style []; Title "Be sure you know what you do. This cannot be undone!"]
+//            ] [
+//                Icon.icon [ ] [
+//                    Fa.i [Fa.Solid.ExclamationTriangle] []
+//                ]
+//                span [] [str "Delete All Custom Xml!"]
+//                Icon.icon [ ] [
+//                    Fa.i [Fa.Solid.ExclamationTriangle] []
+//                ]
+//            ]
+//        ]
+//    ]
 
-let breadcrumbEle model dispatch =
-    Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator] [
-        Breadcrumb.item [] [
-            a [
-                OnClick (fun e -> UpdatePageState (Some Routing.Route.Settings) |> dispatch)
-            ] [
-                str (Routing.Route.Settings.toStringRdbl)
-            ]
-        ]
-        Breadcrumb.item [ Breadcrumb.Item.IsActive true ] [
-            a [
-                Style [Color model.SiteStyleState.ColorMode.Text]
-                OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch)
-            ] [
-                str Routing.Route.SettingsXml.toStringRdbl
-            ]
-        ]
-    ]
+//let breadcrumbEle model dispatch =
+//    Breadcrumb.breadcrumb [Breadcrumb.HasArrowSeparator] [
+//        Breadcrumb.item [] [
+//            a [
+//                OnClick (fun e -> UpdatePageState (Some Routing.Route.Settings) |> dispatch)
+//            ] [
+//                str (Routing.Route.Settings.toStringRdbl)
+//            ]
+//        ]
+//        Breadcrumb.item [ Breadcrumb.Item.IsActive true ] [
+//            a [
+//                Style [Color model.SiteStyleState.ColorMode.Text]
+//                OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch)
+//            ] [
+//                str Routing.Route.SettingsXml.toStringRdbl
+//            ]
+//        ]
+//    ]
 
-let showRawCustomXmlButton model dispatch =
-    Field.div [] [
-        Button.a [
-            Button.Color Color.IsInfo
-            Button.IsFullWidth
-            Button.OnClick (fun e -> OfficeInterop.GetSwateCustomXml |> OfficeInteropMsg |> dispatch )
-            Button.Props [Title "Show Swate custom Xml"]
-        ] [
-            span [] [str "Load raw custom xml"]
-        ]
-    ]
+//let showRawCustomXmlButton model dispatch =
+//    Field.div [] [
+//        Button.a [
+//            Button.Color Color.IsInfo
+//            Button.IsFullWidth
+//            Button.OnClick (fun e -> OfficeInterop.GetSwateCustomXml |> OfficeInteropMsg |> dispatch )
+//            Button.Props [Title "Show Swate custom Xml"]
+//        ] [
+//            span [] [str "Load raw custom xml"]
+//        ]
+//    ]
 
-let textAreaEle (model:Model) dispatch = 
-    Columns.columns [Columns.IsMobile] [
-        Column.column [] [
-            Control.div [] [
-                Textarea.textarea [
-                    Textarea.OnChange (fun e ->
-                        SettingsXml.UpdateNextRawCustomXml (Some e.Value) |> SettingsXmlMsg |> dispatch
-                    )
-                    Textarea.DefaultValue (if model.SettingsXmlState.RawXml.IsSome then model.SettingsXmlState.RawXml.Value else "")
-                    Textarea.ValueOrDefault model.SettingsXmlState.NextRawXml.Value
-                ] [ ]
-            ]
-        ]
-        Column.column [
-            Column.Width (Screen.All,Column.IsNarrow)
-        ] [
-            Field.div [] [
-                Button.a [
-                    Button.Props [
-                        Style [Width "40.5px"]
-                        Title "Copy to Clipboard"
-                    ]
-                    Button.Color IsInfo
-                    Button.OnClick (fun e ->
-                        CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_customxmlSettings_rawXml"
-                        let txt = model.SettingsXmlState.RawXml
-                        let textArea = Browser.Dom.document.createElement "textarea"
-                        textArea?value <- txt
-                        textArea?style?top <- "0"
-                        textArea?style?left <- "0"
-                        textArea?style?position <- "fixed"
+//let textAreaEle (model:Model) dispatch = 
+//    Columns.columns [Columns.IsMobile] [
+//        Column.column [] [
+//            Control.div [] [
+//                Textarea.textarea [
+//                    Textarea.OnChange (fun e ->
+//                        SettingsXml.UpdateNextRawCustomXml (Some e.Value) |> SettingsXmlMsg |> dispatch
+//                    )
+//                    Textarea.DefaultValue (if model.SettingsXmlState.RawXml.IsSome then model.SettingsXmlState.RawXml.Value else "")
+//                    Textarea.ValueOrDefault model.SettingsXmlState.NextRawXml.Value
+//                ] [ ]
+//            ]
+//        ]
+//        Column.column [
+//            Column.Width (Screen.All,Column.IsNarrow)
+//        ] [
+//            Field.div [] [
+//                Button.a [
+//                    Button.Props [
+//                        Style [Width "40.5px"]
+//                        Title "Copy to Clipboard"
+//                    ]
+//                    Button.Color IsInfo
+//                    Button.OnClick (fun e ->
+//                        CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_customxmlSettings_rawXml"
+//                        let txt = model.SettingsXmlState.RawXml
+//                        let textArea = Browser.Dom.document.createElement "textarea"
+//                        textArea?value <- txt
+//                        textArea?style?top <- "0"
+//                        textArea?style?left <- "0"
+//                        textArea?style?position <- "fixed"
 
-                        Browser.Dom.document.body.appendChild textArea |> ignore
+//                        Browser.Dom.document.body.appendChild textArea |> ignore
 
-                        textArea.focus()
-                        // Can't belive this actually worked
-                        textArea?select()
+//                        textArea.focus()
+//                        // Can't belive this actually worked
+//                        textArea?select()
 
-                        let t = Browser.Dom.document.execCommand("copy")
-                        Browser.Dom.document.body.removeChild(textArea) |> ignore
-                        ()
-                    )
-                ] [
-                    CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_customxmlSettings_rawXml" Fa.Regular.Clipboard Fa.Solid.Check
-                ]
-            ]
-            Field.div [] [
-                Button.a [
-                    Button.IsStatic (model.SettingsXmlState.NextRawXml = model.SettingsXmlState.RawXml)
-                    Button.Props [
-                        Style [Width "40.5px"]
-                        Title "Apply Changes"
-                    ]
-                    Button.Color IsWarning
-                    Button.OnClick (fun e ->
-                        let xmlEle = model.SettingsXmlState.NextRawXml.Value |> Fable.SimpleXml.SimpleXml.tryParseElementNonStrict
-                        if xmlEle.IsSome then
-                            let rmvWhiteSpace =
-                                xmlEle.Value |> Fable.SimpleXml.Generator.ofXmlElement |> Fable.SimpleXml.Generator.serializeXml
-                            let msg = OfficeInterop.Msg.UpdateSwateCustomXml rmvWhiteSpace |> OfficeInteropMsg
-                            let modalBody = "Changes in this field could potentially invalidate your checklist and protocol xml. Please safe a copy before clicking 'Continue'."
-                            let nM = {|ModalMessage = modalBody; NextMsg = msg|}
-                            Modals.Controller.renderModal("Warning", Modals.WarningModal.warningModal(nM, model, dispatch))
-                        else
-                            curry DevMsg.GenericError Cmd.none (System.Exception("Could not parse element to valid xml.")) |> DevMsg |> dispatch
+//                        let t = Browser.Dom.document.execCommand("copy")
+//                        Browser.Dom.document.body.removeChild(textArea) |> ignore
+//                        ()
+//                    )
+//                ] [
+//                    CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_customxmlSettings_rawXml" Fa.Regular.Clipboard Fa.Solid.Check
+//                ]
+//            ]
+//            Field.div [] [
+//                Button.a [
+//                    Button.IsStatic (model.SettingsXmlState.NextRawXml = model.SettingsXmlState.RawXml)
+//                    Button.Props [
+//                        Style [Width "40.5px"]
+//                        Title "Apply Changes"
+//                    ]
+//                    Button.Color IsWarning
+//                    Button.OnClick (fun e ->
+//                        let xmlEle = model.SettingsXmlState.NextRawXml.Value |> Fable.SimpleXml.SimpleXml.tryParseElementNonStrict
+//                        if xmlEle.IsSome then
+//                            let rmvWhiteSpace =
+//                                xmlEle.Value |> Fable.SimpleXml.Generator.ofXmlElement |> Fable.SimpleXml.Generator.serializeXml
+//                            let msg = OfficeInterop.Msg.UpdateSwateCustomXml rmvWhiteSpace |> OfficeInteropMsg
+//                            let modalBody = "Changes in this field could potentially invalidate your checklist and protocol xml. Please safe a copy before clicking 'Continue'."
+//                            let nM = {|ModalMessage = modalBody; NextMsg = msg|}
+//                            Modals.Controller.renderModal("Warning", Modals.WarningModal.warningModal(nM, model, dispatch))
+//                        else
+//                            curry DevMsg.GenericError Cmd.none (System.Exception("Could not parse element to valid xml.")) |> DevMsg |> dispatch
                             
-                    )
-                ] [
-                    Fa.i [
-                        Fa.Solid.Pen
-                    ] [] 
-                ]
-            ]
-        ]
-    ]
+//                    )
+//                ] [
+//                    Fa.i [
+//                        Fa.Solid.Pen
+//                    ] [] 
+//                ]
+//            ]
+//        ]
+//    ]
 
-let showRawCustomXmlEle (model:Model) dispatch =
-    mainFunctionContainer [
-        Field.div [] [
-            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]] [
-                str "Here you can display all custom xml of your Swate table. This can help debug your Swate table and/or fix any problems occuring."
-            ]
-        ]
+//let showRawCustomXmlEle (model:Model) dispatch =
+//    mainFunctionContainer [
+//        Field.div [] [
+//            Help.help [Help.Modifiers [Modifier.TextAlignment (Screen.All,TextAlignment.Justified)]] [
+//                str "Here you can display all custom xml of your Swate table. This can help debug your Swate table and/or fix any problems occuring."
+//            ]
+//        ]
 
-        Field.div [] [
-            Columns.columns [Columns.IsMobile] [
-                Column.column [] [
-                    showRawCustomXmlButton model dispatch
-                ]
-                if model.SettingsXmlState.RawXml.IsSome then
-                    Column.column [Column.Width (Screen.All,Column.IsNarrow)] [
-                        Button.a [
-                            Button.OnClick (fun e -> SettingsXml.UpdateRawCustomXml None |> SettingsXmlMsg |> dispatch)
-                            Button.Color IsDanger
-                            Button.Props [Title "Remove custom xml from the text area"]
-                        ] [
-                            Fa.i [Fa.Solid.Times] []
-                        ]
-                    ]
-            ]
-        ]
+//        Field.div [] [
+//            Columns.columns [Columns.IsMobile] [
+//                Column.column [] [
+//                    showRawCustomXmlButton model dispatch
+//                ]
+//                if model.SettingsXmlState.RawXml.IsSome then
+//                    Column.column [Column.Width (Screen.All,Column.IsNarrow)] [
+//                        Button.a [
+//                            Button.OnClick (fun e -> SettingsXml.UpdateRawCustomXml None |> SettingsXmlMsg |> dispatch)
+//                            Button.Color IsDanger
+//                            Button.Props [Title "Remove custom xml from the text area"]
+//                        ] [
+//                            Fa.i [Fa.Solid.Times] []
+//                        ]
+//                    ]
+//            ]
+//        ]
 
-        if model.SettingsXmlState.RawXml.IsSome then
-            Field.div [] [
-                textAreaEle model dispatch
-            ]
-    ]
+//        if model.SettingsXmlState.RawXml.IsSome then
+//            Field.div [] [
+//                textAreaEle model dispatch
+//            ]
+//    ]
 
 
 //// UP: Elements used to display raw custom xml
@@ -578,21 +578,21 @@ let showRawCustomXmlEle (model:Model) dispatch =
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-let settingsXmlViewComponent (model:Model) dispatch =
-    form [
-        OnSubmit (fun e -> e.preventDefault())
-        // https://keycode.info/
-        OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-    ] [
-        breadcrumbEle model dispatch
+//let settingsXmlViewComponent (model:Model) dispatch =
+//    form [
+//        OnSubmit (fun e -> e.preventDefault())
+//        // https://keycode.info/
+//        OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
+//    ] [
+//        breadcrumbEle model dispatch
 
-        Help.help [] [str "The functions on this page allow direct manipulation of the Xml used to save additional information about your Swate table. Please use them with care."]
+//        Help.help [] [str "The functions on this page allow direct manipulation of the Xml used to save additional information about your Swate table. Please use them with care."]
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display raw custom xml."]
-        showRawCustomXmlEle model dispatch
+//        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display raw custom xml."]
+//        showRawCustomXmlEle model dispatch
 
-        //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Handle checklist xml."]
-        //showValidationXmlEle model dispatch
+//        //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Handle checklist xml."]
+//        //showValidationXmlEle model dispatch
 
-        dangerZone model dispatch
-    ]
+//        dangerZone model dispatch
+//    ]

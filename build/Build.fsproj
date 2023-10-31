@@ -14,4 +14,5 @@
     <PackageReference Include="Fake.Extensions.Release" Version="0.3.1" />
     <PackageReference Include="Fake.Core.UserInput" Version="5.23.0-alpha002" />
   </ItemGroup>
+  <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>

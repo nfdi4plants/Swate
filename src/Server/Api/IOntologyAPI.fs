@@ -35,7 +35,7 @@ module V1 =
                 async {
                     let dbSearchRes =
                         match typedSoFar with
-                        | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         // This suggests we search for a term name
                         | notAnAccession ->
@@ -51,7 +51,7 @@ module V1 =
                 async {
                     let dbSearchRes =
                         match typedSoFar with
-                        | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Database.Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
                             let searchmode = if typedSoFar.Length < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
@@ -76,7 +76,7 @@ module V1 =
 
                     let dbSearchRes =
                         match typedSoFar with
-                        | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
                             if childTerm.TermAccession = ""
@@ -111,7 +111,7 @@ module V1 =
                 async {
                     let dbSearchRes =
                         match typedSoFar with
-                        | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | notAnAccession ->
                             Term.Term(credentials).getByName(notAnAccession,sourceOntologyName= Term.AnyOfSource.String "uo")
@@ -207,7 +207,7 @@ module V2 =
                 async {
                     let dbSearchRes =
                         match inp.query with
-                        | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         // This suggests we search for a term name
                         | notAnAccession ->
@@ -222,17 +222,22 @@ module V2 =
                 }
 
             getTermSuggestionsByParentTerm = fun inp ->
+                printfn "[getTermSuggestionsByParentTerm] start"
                 async {
                     let dbSearchRes =
                         match inp.query with
-                        | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Database.Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
+                            printfn "[getTermSuggestionsByParentTerm] Hit default search"
                             let searchmode = if inp.query.Length < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+                            printfn "[getTermSuggestionsByParentTerm] searchmode: %A" searchmode
                             if inp.parent_term.TermAccession = ""
                             then
+                                printfn "[getTermSuggestionsByParentTerm] 1"
                                 Term.Term(credentials).getByNameAndParent_Name(inp.query, inp.parent_term.Name, searchmode)
                             else
+                                printfn "[getTermSuggestionsByParentTerm] 2"
                                 Term.Term(credentials).getByNameAndParent(inp.query, inp.parent_term, searchmode)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms inp.query
@@ -252,7 +257,7 @@ module V2 =
 
                     let dbSearchRes =
                         match inp.query with
-                        | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
                             let searchmode = if inp.query.Length < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
@@ -289,7 +294,7 @@ module V2 =
                 async {
                     let dbSearchRes =
                         match inp.query with
-                        | Regex.Aux.Regex Regex.Pattern.TermAccessionPattern foundAccession ->
+                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | notAnAccession ->
                             Term.Term(credentials).getByName(notAnAccession, sourceOntologyName = Term.AnyOfSource.StringList ["uo"; "dpbo"])

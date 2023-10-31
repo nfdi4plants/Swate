@@ -1,20 +1,18 @@
 module ActivityLog
 
-open Fulma
 open Fable
-open Fable.React
-open Fable.React.Props
-open Fable.FontAwesome
 open Fable.Core.JsInterop
 
 open Model
 open Messages
 open Browser.Types
 
+open Feliz
+open Feliz.Bulma
 //TO-DO: Save log as tab seperated file
 
 let debugBox model dispatch =
-    Box.box' [] [
+    Bulma.box [
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth
@@ -23,12 +21,12 @@ let debugBox model dispatch =
         //] [
         //    str "Try Excel"
         //]
-        Button.button [
-            Button.OnClick(fun e -> TestMyAPI |> dispatch)
-        ] [str "Test api"]
-        Button.button [
-            Button.OnClick(fun e -> TestMyPostAPI |> dispatch)
-        ] [str "Test post api"]
+        Bulma.button.button [
+            prop.onClick(fun e -> TestMyAPI |> dispatch)
+            prop.text "Test api"]
+        Bulma.button.button [
+            prop.onClick(fun e -> TestMyPostAPI |> dispatch)
+            prop.text "Test post api"]
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth
@@ -48,63 +46,48 @@ let debugBox model dispatch =
         //] [
         //    str "Test"
         //]
-        Label.label [] [str "Dangerzone"]
-        Container.container [
-            Container.Props [Style [
-                Padding "1rem"
-                Border (sprintf "2.5px solid %s" NFDIColors.Red.Base)
-                BorderRadius "10px"
-            ]]
-        ] [
-            Button.a [
-                Button.Color Color.IsWarning
-                Button.IsFullWidth
-                Button.OnClick (fun e -> OfficeInterop.GetSwateCustomXml |> OfficeInteropMsg |> dispatch )
-                Button.Props [Style [MarginBottom "1rem"]; Title "Show record type data of Swate custom Xml"]
-            ] [
-                span [] [str "Show Custom Xml!"]
-            ]
-            Button.a [
-                Button.Color Color.IsDanger
-                Button.IsFullWidth
-                Button.OnClick (fun e -> OfficeInterop.DeleteAllCustomXml |> OfficeInteropMsg |> dispatch )
-                Button.Props [Style []; Title "Be sure you know what you do. This cannot be undone!"]
-            ] [
-                Icon.icon [ ] [
-                    Fa.i [Fa.Solid.ExclamationTriangle] []
+        Bulma.label "Dangerzone"
+        Bulma.container [
+            prop.style [style.padding (length.rem 1); style.border(length.px 2.5, borderStyle.solid, NFDIColors.Red.Base); style.borderRadius 10]
+            prop.children [
+                Bulma.button.a [
+                    Bulma.color.isWarning
+                    Bulma.button.isFullWidth
+                    prop.onClick (fun e -> OfficeInterop.GetSwateCustomXml |> OfficeInteropMsg |> dispatch )
+                    prop.style [style.marginBottom(length.rem 1)];
+                    prop.title "Show record type data of Swate custom Xml"
+                    prop.text "Show Custom Xml!"
                 ]
-                span [] [str "Delete All Custom Xml!"]
-                Icon.icon [ ] [
-                    Fa.i [Fa.Solid.ExclamationTriangle] []
+                Bulma.button.a [
+                    Bulma.color.isDanger
+                    Bulma.button.isFullWidth
+                    prop.onClick (fun e -> OfficeInterop.DeleteAllCustomXml |> OfficeInteropMsg |> dispatch )
+                    prop.title "Be sure you know what you do. This cannot be undone!"
+                    prop.text "Delete All Custom Xml!"
                 ]
             ]
         ]
     ]
 
 let activityLogComponent (model:Model) dispatch =
-    div [] [
+    Html.div [
 
-        Label.label [Label.Size IsLarge; Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Activity Log"]
+        Bulma.label "Activity Log"
 
         //debugBox model dispatch
 
-        Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Display all recorded activities of this session."]
-        div [
-            Style [
-                BorderLeft (sprintf "5px solid %s" NFDIColors.Mint.Base)
-                //BorderRadius "15px 15px 0 0"
-                Padding "0.25rem 1rem"
-                MarginBottom "1rem"
-            ]
-        ] [
-            Table.table [
-                Table.IsFullWidth
-                Table.Props [ExcelColors.colorBackground model.SiteStyleState.ColorMode]
-            ] [
-                tbody [] (
-                    model.DevState.Log
-                    |> List.map LogItem.toTableRow
-                )
+        Bulma.label "Display all recorded activities of this session."
+        Html.div [
+            prop.style [style.borderLeft(5, borderStyle.solid, NFDIColors.Mint.Base); style.padding(length.rem 0.25, length.rem 1); style.marginBottom(length.rem 1) ]
+            prop.children [
+                Bulma.table [
+                    Bulma.table.isFullWidth
+                    Html.tbody (
+                        model.DevState.Log
+                        |> List.map LogItem.toTableRow
+                    )
+                    |> prop.children
+                ]
             ]
         ]
     ]

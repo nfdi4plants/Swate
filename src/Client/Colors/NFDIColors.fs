@@ -12,7 +12,6 @@ module Mint =
 
     [<Literal>]
     let Base =          "#1FC2A7"
-
     [<Literal>]
     let Lighter10 =     "#35c8b0"
     [<Literal>]
