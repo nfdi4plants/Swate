@@ -29,17 +29,13 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
     let isActive = pageLink.isActive(model.PageState.CurrentPage)
     Bulma.tab [
         if isActive then Bulma.tab.isActive
-        a [ //Href (Routing.Route.toRouteUrl pageLink)
-            OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
-        ] [
-            span [] [
-                match sidebarsize with
-                | Mini | MobileMini -> 
-                    span [] [pageLink |> Routing.Route.toIcon]
-                | _ -> 
-                    span [] [str pageLink.toStringRdbl]
-            ]
-
+        Html.a [
+            prop.onClick (fun e -> e.preventDefault(); UpdatePageState (Some pageLink) |> dispatch)
+            match sidebarsize with
+            | Mini | MobileMini -> 
+                prop.children (pageLink |> Routing.Route.toIcon)
+            | _ -> 
+                prop.text pageLink.toStringRdbl
         ]
         |> prop.children
     ]
@@ -51,7 +47,8 @@ let private tabRow (model:Model) (tabs: seq<ReactElement>) =
             //style.custom ("overflow","visible")
             style.paddingTop(length.rem 1)
         ]
-        prop.children tabs
+        tabs
+        |> prop.children
     ]
 
 let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
@@ -62,9 +59,9 @@ let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
             createNavigationTab Routing.Route.TermSearch            model dispatch sidebarsize
             createNavigationTab Routing.Route.Protocol              model dispatch sidebarsize
             createNavigationTab Routing.Route.FilePicker            model dispatch sidebarsize
-            if not isIEBrowser then
+            //if not isIEBrowser then
                 // docsrc attribute not supported in iframe in IE
-                createNavigationTab Routing.Route.Dag               model dispatch sidebarsize
+                //createNavigationTab Routing.Route.Dag               model dispatch sidebarsize
             createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
         else
             createNavigationTab Routing.Route.JsonExport            model dispatch sidebarsize

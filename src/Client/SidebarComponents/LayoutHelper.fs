@@ -1,5 +1,5 @@
 [<AutoOpen>]
-module FunctionContainer
+module LayoutHelper
 
 open Fable.React
 open Fable.React.Props
@@ -32,4 +32,7 @@ let mainFunctionContainer children =
             order <- not order
     ] ] children
 
+open Feliz
+open Feliz.Bulma
 
+let pageHeader (header: string) = Bulma.title [Bulma.title.is5; prop.text header]

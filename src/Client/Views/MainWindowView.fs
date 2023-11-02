@@ -9,7 +9,6 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
         prop.style [
             style.position.sticky;
             style.bottom 0
-            style.backgroundColor "whitesmoke"
         ]
         prop.children [
             Html.div [
@@ -70,6 +69,6 @@ let Main (model: Messages.Model) dispatch =
                         MainComponents.AddRows.Main init_RowsToAdd state_rows setState_rows dispatch
                 ]
             ]
-            match activeTableIsEmpty with | true -> () | false -> spreadsheetSelectionFooter model dispatch
+            match activeTableIsEmpty with | true -> Html.none | false -> spreadsheetSelectionFooter model dispatch
         ]
     ]

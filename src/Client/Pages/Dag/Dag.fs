@@ -92,7 +92,7 @@ let mainElement (model:Messages.Model) dispatch =
         prop.onSubmit    (fun e -> e.preventDefault())
         prop.onKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
         prop.children [
-            Bulma.label "DAG"
+            pageHeader "Visualize Protocol Flow"
 
             Bulma.label "Display directed acyclic graph"
 

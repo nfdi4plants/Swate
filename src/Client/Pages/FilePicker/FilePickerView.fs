@@ -275,15 +275,9 @@ let fileContainer (model:Messages.Model) dispatch inputId=
 let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
     let inputId = "filePicker_OnFilePickerMainFunc"
     Bulma.content [
-        Bulma.label [
-            Bulma.color.hasTextPrimary
-            prop.text "File Picker"
-        ]
+        pageHeader "File Picker"
 
-        Bulma.label [
-            Bulma.color.hasTextPrimary
-            prop.text "Select files from your computer and insert their names into Excel"
-        ]
+        Bulma.label "Select files from your computer and insert their names into Excel"
 
         // Colored container element for all uploaded file names and sort elements
         fileContainer model dispatch inputId

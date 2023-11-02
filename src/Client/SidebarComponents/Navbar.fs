@@ -164,6 +164,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                         prop.children [
                             // Logo
                             Bulma.navbarItem.div [
+                                prop.id "logo"
                                 prop.onClick (fun _ -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
                                 prop.style [style.width 100; style.cursor.pointer; style.padding (0,length.rem 0.4)]
                                 let path = if model.PageState.IsExpert then "_e" else ""
@@ -206,9 +207,11 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                             prop.children [
                                 Bulma.navbarItem.a [
                                     prop.href Shared.URLs.NFDITwitterUrl ;
-                                    prop.target "_Blank"; 
-                                    
-                                    Bulma.icon [Html.i [prop.className "fa-brand fa-twitter"; Bulma.icon.isLarge; prop.style [style.color "#1DA1F2"]] |> prop.children; prop.text "News "] |> prop.children
+                                    prop.target "_Blank";
+                                    prop.children [
+                                        Html.span "News "
+                                        Html.i [prop.className "fa-brands fa-twitter"; prop.style [style.color "#1DA1F2"; style.marginLeft 2]] 
+                                    ]
                                 ]
                                 Bulma.navbarItem.a [
                                     prop.href Shared.URLs.SwateWiki ;

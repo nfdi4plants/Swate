@@ -73,7 +73,7 @@ type Route =
         | Route.TermSearch          ->
             createElem [Html.i [prop.className "fa-solid fa-magnifying-glass-plus" ]] p.toStringRdbl
         | Route.BuildingBlock       ->
-            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ]; Html.i [prop.className "fa-solid fa-table-column" ]]  p.toStringRdbl
+            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ]; Html.i [prop.className "fa-solid fa-table-columns" ]]  p.toStringRdbl
         | Route.Protocol            ->
             createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]] p.toStringRdbl
         | Route.ProtocolSearch      ->

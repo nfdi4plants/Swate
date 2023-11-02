@@ -241,7 +241,7 @@ let termSearchComponent (model:Messages.Model) dispatch =
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [
 
-        Bulma.label "Ontology term search"
+        pageHeader "Ontology term search"
 
         Bulma.label "Search for an ontology term to fill into the selected field(s)"
 

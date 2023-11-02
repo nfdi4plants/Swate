@@ -668,5 +668,4 @@ let Main (model: Model) dispatch =
             AdvancedSearch.modal_container model dispatch
             AdvancedSearch.links_container state_bb.BuildingBlockType dispatch
         add_button state_bb state_searchHeader state_searchBody state_searchForUnit model dispatch
-        Html.div []
     ]

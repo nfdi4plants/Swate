@@ -370,7 +370,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        Bulma.label "Building Blocks"
+        pageHeader "Building Blocks"
 
         // Input forms, etc related to add building block.
         Bulma.label "Add annotation building blocks (columns) to the annotation table."
@@ -386,5 +386,5 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
             Bulma.label "Add/Update unit reference to existing building block."
             // Input forms, etc related to add unit to existing building block.
             addUnitToExistingBlockElements model dispatch
-        | _ -> ()
+        | _ -> Html.none
     ]

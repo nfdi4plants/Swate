@@ -241,7 +241,7 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
         
-        Bulma.label "Templates"
+        pageHeader "Templates"
 
         // Box 1
         Bulma.label "Add template from database."

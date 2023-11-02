@@ -36,6 +36,7 @@ html[data-theme="light"] {
 $excel-primary: #217346;
 $excel-primary30: #639d7d;
 
+$nfdi-blue-dark: #2D3E50 ;
 $nfdi-mint: #1FC2A7;
 $nfdi-blue-light: #4fb3d9;
 $nfdi-blue-lighter-20: #72c2e1;
@@ -43,7 +44,7 @@ $nfdi-red: #c21f3a;//#e83151;//#E32746;
 $nfdi-yellow: #FFC000;
 
 // global bulma overrides
-$primary: $excel-primary;
+$primary: $nfdi-blue-dark;
 $success: $nfdi-mint;
 $info: $nfdi-blue-light;
 $danger: $nfdi-red;
@@ -64,10 +65,10 @@ $primarye-invert: findColorInvert($excel-primary);
 
 // 5. Add new color variables to the color map.
 @import "../../node_modules/bulma/sass/utilities/derived-variables";
-$addColors: ( "primarye":($primarye, $primarye-invert));
+$addColors: ( "primarye":($primarye, $primarye-invert) );
 $colors: map-merge($colors, $addColors);
 
-/*$switch-background-active: $excel-primary;*/
+$tabs-boxed-link-hover-background-color: var(--fs-background);
 
 @import "../../node_modules/bulma/bulma.sass";
 /*@import "../../node_modules/bulma-checkradio/src/sass/index.sass";*/
@@ -165,7 +166,22 @@ a:hover {
     position: sticky;
     position: -webkit-sticky;
     min-height: min-content;
-    top: 0
+    top: 0;
+    background-color: $primary
+}
+
+.myNavbarSticky .navbar-item#logo {
+    position: relative;
+    overflow:hidden;
+    &::before {
+        content: "";
+        border-radius: 90px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        box-shadow: 0 0 15px 5px #fff, /* inner white */
+        0 0 30px 15px $success;
+    }
 }
 
 .myNavbarButton {
@@ -188,6 +204,7 @@ a:hover {
 
 .myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within, .myNavbarButton:not([disabled]):hover {
     background-color: transparent;
+    color: $success
 }
 
 .myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within {
@@ -209,10 +226,6 @@ a:hover {
     box-shadow: unset
 }
 
-/*.myNavbarButton[disabled]:hover {
-    color: white
-}
-*/
 .help {
     @extend .help;
     font-size: 0.85rem;
@@ -304,7 +317,6 @@ a.navbar-item:hover {
 .toExcelColor {
     color: $primarye !important
 }
-
 /////////// Custom simple checkbox, due to issue #54 ///////////////////
 .checkbox-label {
     display: inline-block;
@@ -319,7 +331,6 @@ a.navbar-item:hover {
     user-select: none;
     width: auto;
 }
-
 /* Hide the browser's default checkbox */
 .checkbox-input {
     position: absolute;
@@ -328,7 +339,6 @@ a.navbar-item:hover {
     height: 0;
     width: 0;
 }
-
 /* Create a custom checkbox */
 .checkbox-checkmark {
     position: absolute;
@@ -346,35 +356,29 @@ a.navbar-item:hover {
     color: lightgrey;
     cursor: not-allowed;
 }
-
 /* On mouse-over, add a grey background color */
 .checkbox-label:hover ~ .checkbox-checkmark, .checkbox-checkmark:hover {
     background-color: #ccc;
 }
-
 /* On mouse-over on a disabled input, add a grey background color */
 .checkbox-input[disabled] ~ .checkbox-checkmark:hover, .checkbox-input[disabled] ~ .checkbox-label:hover ~ .checkbox-checkmark {
     background-color: unset;
 }
-
 /* When the checkbox is checked, add a green background */
 .checkbox-input:checked ~ .checkbox-checkmark {
     background-color: $success;
     border: none;
 }
-
 /* Create the checkmark/indicator (hidden when not checked) */
 .checkbox-checkmark:after {
     content: "";
     position: absolute;
     display: none;
 }
-
 /* Show the indicator when checked */
 .checkbox-input:checked ~ .checkbox-checkmark:after {
     display: block;
 }
-
 /* Style the checkmark/indicator */
 .checkbox-checkmark:after {
     top: 6px;
@@ -456,7 +460,6 @@ input::-ms-clear {
     text-align: justify;
     font-size: 1.2rem;
 }
-
 /// Brands
 
 .nfdiIcon {
@@ -467,12 +470,10 @@ input::-ms-clear {
     opacity: 0.7
 }
 
-.myFaBrand  {
-    padding: 13px;
-    text-align: center;
-    text-decoration: none;
-    margin: 2px 1px;
-    transition: 0.2s opacity
+.myFaBrand {
+    transition: 0.2s opacity;
+    padding: 10px;
+    cursor: pointer
 }
 
 .myFaBrand:hover {

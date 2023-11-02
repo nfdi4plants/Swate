@@ -64,7 +64,7 @@
         <Compile Include="MainComponents\Navbar.fs" />
         <Compile Include="MainComponents\FooterTabs.fs" />
         <Compile Include="SidebarComponents\DarkmodeButton.fs" />
-        <Compile Include="SidebarComponents\FunctionContainer.fs" />
+        <Compile Include="SidebarComponents\LayoutHelper.fs" />
         <Compile Include="SidebarComponents\ResponsiveFA.fs" />
         <Compile Include="SidebarComponents\AnnotationTableMissingWarning.fs" />
         <Compile Include="SidebarComponents\Navbar.fs" />

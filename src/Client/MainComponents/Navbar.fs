@@ -50,7 +50,6 @@ let quickAccessButtonListStart (model: Model) dispatch =
         ]
     ]
 
-
 let quickAccessButtonListEnd (model: Model) dispatch =
     Html.div [
         prop.style [
