@@ -529,11 +529,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
         | UpdatePageState (pageOpt:Route option) ->
             let nextCmd =
                 match pageOpt with
-                | Some Routing.Route.Validation ->
-                    Cmd.OfPromise.perform
-                        OfficeInterop.Core.getTableRepresentation
-                        ()
-                        (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
                 | Some Routing.Route.ProtocolSearch ->
                     Protocol.GetAllProtocolsRequest |> ProtocolMsg |> Cmd.ofMsg
                 | _ ->
@@ -690,17 +685,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                 }
             nextModel, nextCmd
 
-        | ValidationMsg validationMsg ->
-            let nextValidationState, nextCmd =
-                currentModel.ValidationState
-                |> Validation.update validationMsg
-
-            let nextModel = {
-                currentModel with
-                    ValidationState = nextValidationState
-                }
-            nextModel, nextCmd
-
         | ProtocolMsg fileUploadJsonMsg ->
             let nextFileUploadJsonState, nextCmd =
                 currentModel.ProtocolState
@@ -723,15 +707,15 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                 }
             nextModel, nextCmd
 
-        | SettingsXmlMsg msg ->
-            let nextState, nextCmd =
-                currentModel.SettingsXmlState
-                |> SettingsXml.update msg
-            let nextModel = {
-                currentModel with
-                    SettingsXmlState = nextState
-            }
-            nextModel, nextCmd
+        //| SettingsXmlMsg msg ->
+        //    let nextState, nextCmd =
+        //        currentModel.SettingsXmlState
+        //        |> SettingsXml.update msg
+        //    let nextModel = {
+        //        currentModel with
+        //            SettingsXmlState = nextState
+        //    }
+        //    nextModel, nextCmd
 
         | CytoscapeMsg msg ->
             let nextState, nextModel0, nextCmd =

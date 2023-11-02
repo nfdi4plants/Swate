@@ -18,7 +18,7 @@ let removeModal(name:string) =
 ///<param name="name">The name of the modal, this is used for generate an Id for the modal by which it is later identified.</param>
 ///<param name="reactElement">The modal itself with a open parameter which will be the correct remove function for the modal.</param>
 let renderModal(name: string, reactElement: (_ -> unit) -> Fable.React.ReactElement) =
-    let body = Browser.Dom.document.body
+    let parent = Browser.Dom.document.getElementById("modal-container")
     let id = createId name
     /// check if existing and if so remove
     let _ =
@@ -26,7 +26,7 @@ let renderModal(name: string, reactElement: (_ -> unit) -> Fable.React.ReactElem
         if not <| isNull ele then ele.remove()
     let child = Browser.Dom.document.createElement "div"
     child.id <- id
-    body.appendChild(child) |> ignore
+    parent.appendChild(child) |> ignore
     let rmv = fun _ -> removeModal(name)
-    Feliz.ReactDOM.render(reactElement rmv, Browser.Dom.document.getElementById id)
+    Feliz.ReactDOM.createPortal(reactElement rmv, Browser.Dom.document.getElementById id)
     ()

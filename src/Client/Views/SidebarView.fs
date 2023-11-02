@@ -2,7 +2,6 @@ module SidebarView
 
 open Fable.React
 open Fable.React.Props
-open Fulma
 open ExcelColors
 open Model
 open Messages
@@ -13,6 +12,7 @@ open Browser.MediaQueryListExtensions
 open CustomComponents
 open Fable.Core.JsInterop
 open Feliz
+open Feliz.Bulma
 
 [<Literal>]
 let private Sidebar_Id = "SidebarContainer-ID"
@@ -27,7 +27,8 @@ type private SidebarStyle = {
 
 let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) (sidebarsize: Model.WindowSize) = 
     let isActive = pageLink.isActive(model.PageState.CurrentPage)
-    Tabs.tab [Tabs.Tab.IsActive isActive] [
+    Bulma.tab [
+        if isActive then Bulma.tab.isActive
         a [ //Href (Routing.Route.toRouteUrl pageLink)
             Style [
                 if isActive then
@@ -40,7 +41,7 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
             ]
             OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
         ] [
-            Text.span [] [
+            span [] [
                 match sidebarsize with
                 | Mini | MobileMini -> 
                     span [] [pageLink |> Routing.Route.toIcon]
@@ -49,20 +50,17 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
             ]
 
         ]
+        |> prop.children
     ]
 
 let private tabRow (model:Model) (tabs: seq<ReactElement>) =
-    Tabs.tabs [
-        Tabs.IsCentered; Tabs.IsFullWidth; Tabs.IsBoxed
-        Tabs.Props [
-            Style [
-                BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
-                CSSProp.Custom ("overflow","visible")
-                PaddingTop "1rem"
-            ]
+    Bulma.tabs [
+        Bulma.tabs.isCentered; Bulma.tabs.isFullWidth; Bulma.tabs.isBoxed
+        prop.style [
+            //style.custom ("overflow","visible")
+            style.paddingTop(length.rem 1)
         ]
-    ] [
-        yield! tabs
+        prop.children tabs
     ]
 
 let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
@@ -156,6 +154,7 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
             FlexGrow "1"
             FlexDirection "column"
             Position PositionOptions.Relative
+            MaxWidth "100%"
         ]
     ] children
 
@@ -168,9 +167,6 @@ module private Content =
 
         | Routing.Route.TermSearch ->
             TermSearch.termSearchComponent model dispatch
-
-        | Routing.Route.Validation ->
-            Validation.validationComponent model dispatch
 
         | Routing.Route.FilePicker ->
             FilePicker.filePickerComponent model dispatch
@@ -193,8 +189,8 @@ module private Content =
         | Routing.Route.Settings ->
             SettingsView.settingsViewComponent model dispatch
 
-        | Routing.Route.SettingsXml ->
-            SettingsXml.settingsXmlViewComponent model dispatch
+        //| Routing.Route.SettingsXml ->
+        //    SettingsXml.settingsXmlViewComponent model dispatch
 
         | Routing.Route.Dag ->
             Dag.Core.mainElement model dispatch
@@ -212,26 +208,29 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
     viewContainer model dispatch state setState [
         SidebarComponents.Navbar.NavbarComponent model dispatch state.Size
 
-        Container.container [ Container.IsFluid ] [
-            tabs model dispatch state.Size
+        Bulma.container [
+            Bulma.container.isFluid
+            prop.children [
+                tabs model dispatch state.Size
 
-            //str <| state.Size.ToString()
+                //str <| state.Size.ToString()
 
-            //Button.button [
-            //    Button.OnClick (fun _ ->
-            //        //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
-            //        //()
-            //        //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
-            //        ()
-            //    )
-            //] [ str "Test button" ]
+                //Button.button [
+                //    Button.OnClick (fun _ ->
+                //        //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
+                //        //()
+                //        //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
+                //        ()
+                //    )
+                //] [ str "Test button" ]
 
-            match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
-            | Swatehost.Excel _, true ->
-                SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
-            | _ -> ()
+                match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
+                | Swatehost.Excel _, true ->
+                    SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
+                | _ -> ()
 
-            Content.main model dispatch
+                Content.main model dispatch
+            ]
         ]
         footer model
     ]

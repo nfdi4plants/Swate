@@ -145,7 +145,7 @@ let createAutocompleteSuggestions
             |> Array.collect (fun sugg ->
                 let id = sprintf "isHidden_%s" sugg.ID 
                 [|
-                    tr [
+                    Standard.tr [
                         OnClick (fun _ ->
                             let e = Browser.Dom.document.getElementById(autocompleteParams.InputId)
                             e?value <- sugg.Name
@@ -175,54 +175,55 @@ let createAutocompleteSuggestions
                                 AdvancedSearch.createLinkOfAccession sugg.ID
                         ] ]
                         td [] [
-                            Button.list [Button.List.IsRight] [
-                                Button.a [
-                                    Button.Props [Title "Show Term Tree"]
-                                    Button.Size IsSmall
-                                    Button.Color IsSuccess
-                                    Button.IsInverted
-                                    Button.OnClick(fun e ->
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        Cytoscape.Msg.GetTermTree sugg.ID |> CytoscapeMsg |> dispatch
-                                    )
-                                ] [
-                                    Icon.icon [] [
-                                        Fa.i [Fa.Solid.Tree] []
+                            Bulma.buttons [
+                                Bulma.buttons.isRight
+                                prop.children [
+                                    Bulma.button.a [
+                                        prop.title "Show Term Tree"
+                                        Bulma.button.isSmall
+                                        Bulma.color.isSuccess
+                                        Bulma.button.isInverted
+                                        prop.onClick(fun e ->
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            Cytoscape.Msg.GetTermTree sugg.ID |> CytoscapeMsg |> dispatch
+                                        )
+                                        Bulma.icon [
+                                            Html.i [prop.className "fa-solid fa-tree"] 
+                                        ] |> prop.children
                                     ]
-                                ]
-                                Button.a [
-                                    Button.Size IsSmall
-                                    Button.Color IsBlack
-                                    Button.IsInverted
-                                    Button.OnClick(fun e ->
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        let ele = Browser.Dom.document.getElementById(id)
-                                        let isCollapsed =
-                                            let vis = string ele?style?visibility
-                                            vis = "collapse" || vis = ""
-                                        if isCollapsed then 
-                                            ele?style?visibility <- "visible"
-                                        else
-                                            ele?style?visibility <- "collapse"
-                                        ()
-                                    )
-                                ] [
-                                    Icon.icon [] [
-                                        Fa.i [Fa.Solid.ChevronDown] []
+                                    Bulma.button.a [
+                                        Bulma.button.isSmall
+                                        Bulma.color.isBlack
+                                        Bulma.button.isInverted
+                                        prop.onClick(fun e ->
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            let ele = Browser.Dom.document.getElementById(id)
+                                            let isCollapsed =
+                                                let vis = string ele?style?visibility
+                                                vis = "collapse" || vis = ""
+                                            if isCollapsed then 
+                                                ele?style?visibility <- "visible"
+                                            else
+                                                ele?style?visibility <- "collapse"
+                                            ()
+                                        )
+                                        Bulma.icon [
+                                            Html.i [prop.className "fa-solid fa-chevron-down"]
+                                        ] |> prop.children
                                     ]
                                 ]
                             ]
                         ]
                     ]
-                    tr [
+                    Standard.tr [
                         OnClick (fun e -> e.stopPropagation())
                         Id id
                         Class "suggestion-details"
                     ] [
                         td [ColSpan 4] [
-                            Content.content [] [
+                            Bulma.content [
                                 b [] [ str "Definition: " ]
                                 str (if sugg.TooltipText = "" then "No definition found" else sugg.TooltipText)
                             ]
@@ -233,13 +234,13 @@ let createAutocompleteSuggestions
             |> List.ofArray
         else
             [
-                tr [] [
+                Standard.tr [] [
                     td [] [str "No terms found matching your input."]
                 ]
             ]
 
     let alternative =
-        tr [
+        Standard.tr [
             Class "suggestion"
         ] [
             td [ColSpan 4] [
@@ -253,7 +254,7 @@ let createAutocompleteSuggestions
         ]
 
     let alternative2 =
-        tr [
+        Standard.tr [
             Class "suggestion"
         ] [
             td [ColSpan 4] [
@@ -286,18 +287,21 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
                 BorderStyle "solid"
             ]
         ] [
-            Table.table [Table.IsFullWidth; Table.Props [ colorControl colorMode ]] [
+            Bulma.table [
+                Bulma.table.isFullWidth
                 if isLoading then
                     tbody [Style [Height "75px"]] [
-                        tr [] [
+                        Standard.tr [] [
                             td [Style [TextAlign TextAlignOptions.Center]] [
                                 Modals.Loading.loadingComponent
                                 br []
                             ]
                         ]
                     ]
+                    |> prop.children
                 else
                     tbody [] suggestions
+                    |> prop.children
             ]
 
             
@@ -307,29 +311,29 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
 open Fable.Core.JsInterop
 
 let autocompleteTermSearchComponentInputComponent (dispatch: Msg -> unit) isDisabled inputPlaceholderText inputSize (autocompleteParams : AutocompleteParameters<Term>) =
-    Control.p [Control.IsExpanded] [
-        Input.input [
-            Input.Props [Style [
-                if isDisabled then BorderColor ExcelColors.Colorfull.gray40
-            ]]
-            Input.Disabled isDisabled
-            Input.Placeholder inputPlaceholderText
-            Input.ValueOrDefault autocompleteParams.StateBinding
+    Bulma.control.p [
+        Bulma.control.isExpanded
+        Bulma.input.text [
+            prop.style [
+                if isDisabled then style.borderColor ExcelColors.Colorfull.gray40
+            ]
+            prop.disabled isDisabled
+            prop.placeholder inputPlaceholderText
+            prop.valueOrDefault autocompleteParams.StateBinding
             match inputSize with
-            | Some size -> Input.Size size
+            | Some size -> size
             | _ -> ()
-            Input.Props [
-                OnDoubleClick (fun e ->
-                    let v = Browser.Dom.document.getElementById autocompleteParams.InputId
-                    v?value |> autocompleteParams.OnInputChangeMsg |> dispatch
-                )
-            ]      
-            Input.OnChange (
+            prop.onDoubleClick (fun e ->
+                let v = Browser.Dom.document.getElementById autocompleteParams.InputId
+                v?value |> autocompleteParams.OnInputChangeMsg |> dispatch
+            ) 
+            prop.onChange (
                 // ignore this "None". AutocompleteParameters is pure spagetthi and needs to be removed. Absolute dumpster fire. 
-                fun e -> (e.Value, None) |> autocompleteParams.OnInputChangeMsg |> dispatch
+                fun (e: string) -> (e, None) |> autocompleteParams.OnInputChangeMsg |> dispatch
             )
-            Input.Id autocompleteParams.InputId  
+            prop.id autocompleteParams.InputId  
         ]
+        |> prop.children
     ]
 
 let autocompleteTermSearchComponentOfParentOntology
@@ -343,14 +347,18 @@ let autocompleteTermSearchComponentOfParentOntology
     =
     let parentOntologyNotificationElement (parentTerm: TermMinimal) =
         let parenTermText = parentTerm.Name
-        Control.p [ Control.Props [Title parenTermText; Style [MaxWidth "40%"]]] [
-            Button.button [
-                Button.Props [Style [BackgroundColor ExcelColors.Colorfull.white]]
-                Button.IsStatic true
+        Bulma.control.p [
+            prop.style [style.maxWidth (length.perc 40)]
+            prop.title parenTermText
+            Bulma.button.button [
+                prop.style [style.backgroundColor ExcelColors.Colorfull.white]
+                Bulma.button.isStatic
                 match inputSize with
-                | Some size -> Button.Size size
+                | Some size -> size
                 | _ -> ()
-            ] [str parenTermText ]
+                prop.text parenTermText 
+            ]
+            |> prop.children
         ]
 
     let useParentTerm =
@@ -385,20 +393,22 @@ let autocompleteTermSearchComponentOfParentOntology
     // `useParentTerm` is used to show if parent term should be used for search. `useParentTerm` can be false, altough `parentTerm`.IsSome.
     // Therefore we need to doublecheck `useParentTerm` to pass option.
 
-    Control.div [] [
+    Bulma.control.div [
         AdvancedSearch.advancedSearchModal model autocompleteParams.ModalId autocompleteParams.InputId dispatch autocompleteParams.OnAdvancedSearch
-        Field.div [Field.HasAddons] [
-            if useParentTerm && model.TermSearchState.SearchByParentOntology then parentOntologyNotificationElement parentTerm.Value
-            Control.p [Control.IsExpanded] [
-                Input.input [
-                    Input.Props [Id autocompleteParams.InputId]
-                    Input.Placeholder inputPlaceholderText
-                    Input.ValueOrDefault autocompleteParams.StateBinding
-                    match inputSize with
-                    | Some size -> Input.Size size
-                    | _ -> ()
-                    Input.Props [
-                        OnFocus (fun e ->
+        Bulma.field.div [
+            Bulma.field.hasAddons
+            prop.children [
+                if useParentTerm && model.TermSearchState.SearchByParentOntology then parentOntologyNotificationElement parentTerm.Value
+                Bulma.control.p [
+                    Bulma.control.isExpanded
+                    Bulma.input.text [
+                        prop.id autocompleteParams.InputId
+                        prop.placeholder inputPlaceholderText
+                        prop.valueOrDefault autocompleteParams.StateBinding
+                        match inputSize with
+                        | Some size -> size
+                        | _ -> ()
+                        prop.onFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
                             match model.PersistentStorageState.Host with
                             | Swatehost.Excel _ ->
@@ -407,7 +417,7 @@ let autocompleteTermSearchComponentOfParentOntology
                                 el.focus()
                             | _ -> ()
                         )
-                        OnDoubleClick (fun e ->
+                        prop.onDoubleClick (fun e ->
                             if useParentTerm && model.TermSearchState.TermSearchText = "" then
                                 TermSearch.GetAllTermsByParentTermRequest parentTerm.Value |> TermSearchMsg |> dispatch
                             else
@@ -415,17 +425,18 @@ let autocompleteTermSearchComponentOfParentOntology
                                 let parenTerm = if useParentTerm then parentTerm else None
                                 let v = Browser.Dom.document.getElementById autocompleteParams.InputId
                                 (v?value, parenTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
+                        )      
+                        prop.onChange (fun (e:string) ->
+                            let x = "01101110 01101001 01100011 01100101 01011111 01110010 01100111 01100010".Split(" ") |> Array.map (fun x -> System.Convert.ToInt32(x, 2) |> char |> string) |> String.concat ""
+                            if e = x then
+                                let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
+                                UpdateColorMode c |> Messages.StyleChange |> dispatch
+                            /// REF-Parent-Term
+                            let parenTerm = if useParentTerm then parentTerm else None
+                            (e, parenTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
                         )
-                    ]           
-                    Input.OnChange (fun e ->
-                        let x = "01101110 01101001 01100011 01100101 01011111 01110010 01100111 01100010".Split(" ") |> Array.map (fun x -> System.Convert.ToInt32(x, 2) |> char |> string) |> String.concat ""
-                        if e.Value = x then
-                            let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
-                            UpdateColorMode c |> Messages.StyleChange |> dispatch
-                        /// REF-Parent-Term
-                        let parenTerm = if useParentTerm then parentTerm else None
-                        (e.Value, parenTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
-                    )
+                    ]
+                    |> prop.children
                 ]
             ]
         ]

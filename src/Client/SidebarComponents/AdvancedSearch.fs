@@ -324,20 +324,26 @@ module private ResultsTable =
 
 let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:bool) modalId =
     let checkradioName = "keepObsolete_checkradio"
-    Bulma.Checkradio.checkbox [
-        prop.name checkradioName
-        prop.id (sprintf "%s_%A_%A"checkradioName keepObsolete modalId)
-        prop.isChecked (model.AdvancedSearchState.AdvancedSearchOptions.KeepObsolete = keepObsolete)
-        (if model.SiteStyleState.IsDarkMode then Bulma.color.isWhite else Bulma.color.isBlack)
-        prop.onChange (fun (e:bool) ->
-            {model.AdvancedSearchState.AdvancedSearchOptions
-                with KeepObsolete = keepObsolete
-            }
-            |> UpdateAdvancedTermSearchOptions
-            |> AdvancedSearchMsg
-            |> dispatch
-        )
-        prop.text (if keepObsolete then "yes" else "no")
+    let id = sprintf "%s_%A_%A"checkradioName keepObsolete modalId
+    Bulma.field.div [
+        Bulma.Checkradio.checkbox [
+            prop.name checkradioName
+            prop.id id
+            prop.isChecked (model.AdvancedSearchState.AdvancedSearchOptions.KeepObsolete = keepObsolete)
+            (if model.SiteStyleState.IsDarkMode then Bulma.color.isWhite else Bulma.color.isBlack)
+            prop.onChange (fun (e:bool) ->
+                {model.AdvancedSearchState.AdvancedSearchOptions
+                    with KeepObsolete = keepObsolete
+                }
+                |> UpdateAdvancedTermSearchOptions
+                |> AdvancedSearchMsg
+                |> dispatch
+            )
+        ]
+        Html.label [
+            prop.htmlFor id
+            prop.text (if keepObsolete then "yes" else "no")
+        ]
     ]
 
 let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
@@ -498,8 +504,8 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                     Bulma.modalCardBody [
                         prop.children [
                             Bulma.field.div [ Bulma.help [
-                                    prop.style [style.textAlign.justify]
-                                    prop.text "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."
+                                prop.style [style.textAlign.justify]
+                                prop.text "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."
                             ]]
                             match model.AdvancedSearchState.AdvancedTermSearchSubpage with
                             | AdvancedSearchSubpages.InputFormSubpage ->

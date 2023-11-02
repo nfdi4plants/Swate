@@ -304,14 +304,14 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
                             prop.text "Add unit"
                         ]
                     ]
+                    // Add/Update unit ontology term search field
+                    AutocompleteSearch.autocompleteTermSearchComponentInputComponent
+                        dispatch
+                        false // isDisabled
+                        "Start typing to search"
+                        None // No input size specified
+                        changeUnitAutoCompleteParams
                 ]
-                // Add/Update unit ontology term search field
-                AutocompleteSearch.autocompleteTermSearchComponentInputComponent
-                    dispatch
-                    false // isDisabled
-                    "Start typing to search"
-                    None // No input size specified
-                    changeUnitAutoCompleteParams
             ]
             // Add/Update Ontology Unit Term search preview
             AutocompleteSearch.autocompleteDropdownComponent

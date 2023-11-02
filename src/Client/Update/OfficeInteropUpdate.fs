@@ -115,49 +115,6 @@ module OfficeInterop =
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel, cmd
         //
-        | GetTableValidationXml ->
-            let cmd =
-                Cmd.OfPromise.either
-                    OfficeInterop.Core.getTableRepresentation
-                    ()
-                    (Validation.StoreTableRepresentationFromOfficeInterop >> ValidationMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
-        | WriteTableValidationToXml (newTableValidation,currentSwateVersion) ->
-            let cmd =
-                Cmd.OfPromise.either
-                    OfficeInterop.Core.writeTableValidationToXml
-                    (newTableValidation, currentSwateVersion)
-                    (curry GenericLog (GetTableValidationXml |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
-
-            currentModel, cmd
-
-        | DeleteAllCustomXml ->
-            let cmd =
-                Cmd.OfPromise.either
-                    OfficeInterop.Core.deleteAllCustomXml
-                    ()
-                    (curry GenericLog Cmd.none >> DevMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
-        | GetSwateCustomXml ->
-            let cmd =
-                Cmd.OfPromise.either
-                    OfficeInterop.Core.getSwateCustomXml
-                    ()
-                    (Some >> SettingsXml.UpdateRawCustomXml >> SettingsXmlMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
-        | UpdateSwateCustomXml newCustomXml ->
-            let cmd =
-                Cmd.OfPromise.either
-                    OfficeInterop.Core.updateSwateCustomXml
-                    newCustomXml
-                    (curry GenericLog (OfficeInteropMsg GetSwateCustomXml |> Cmd.ofMsg) >> DevMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
-        //
         | FillHiddenColsRequest ->
             let cmd =
                 Cmd.OfPromise.either

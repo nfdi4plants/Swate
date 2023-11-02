@@ -123,15 +123,6 @@ module BuildingBlock =
     | UnitTermSuggestionUsed    of unitTerm:Term
     | NewUnitTermSuggestions    of Term []
 
-module Validation =
-
-    type Msg =
-        // Client
-        | UpdateDisplayedOptionsId of int option
-        | UpdateTableValidationScheme of CustomXmlTypes.Validation.TableValidation
-        // OfficeInterop
-        | StoreTableRepresentationFromOfficeInterop of OfficeInterop.CustomXmlTypes.Validation.TableValidation * buildingBlocks:BuildingBlock []
-
 module Protocol =
 
     type Msg =
@@ -155,12 +146,6 @@ type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockTermsResponse     of TermSearchable []
     | UpdateBuildingBlockValues                 of TermSearchable []
     | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
-
-module SettingsXml =
-    type Msg =
-    //    // // Client // //
-    | UpdateRawCustomXml                            of string option
-    | UpdateNextRawCustomXml                        of string option
 
 type SettingsDataStewardMsg =
     // Client
@@ -227,12 +212,10 @@ type Msg =
 | PersistentStorage     of PersistentStorageMsg
 | FilePickerMsg         of FilePicker.Msg
 | BuildingBlockMsg      of BuildingBlock.Msg
-| ValidationMsg         of Validation.Msg
 | ProtocolMsg           of Protocol.Msg
 | JsonExporterMsg       of JsonExporter.State.Msg
 | TemplateMetadataMsg   of TemplateMetadata.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
-| SettingsXmlMsg        of SettingsXml.Msg
 | CytoscapeMsg          of Cytoscape.Msg
 | SpreadsheetMsg        of Spreadsheet.Msg
 | DagMsg                of Dag.Msg

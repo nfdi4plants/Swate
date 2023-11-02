@@ -79,10 +79,8 @@
         <Compile Include="Pages\ProtocolTemplates\ProtocolSearchView.fs" />
         <Compile Include="Pages\ProtocolTemplates\ProtocolView.fs" />
         <Compile Include="Pages\FilePicker\FilePickerView.fs" />
-        <Compile Include="Pages\Validation\ValidationView.fs" />
         <Compile Include="Pages\Info\InfoView.fs" />
         <Compile Include="Pages\ActivityLog\ActivityLogView.fs" />
-        <Compile Include="Pages\Settings\SettingsXml\SettingsXmlView.fs" />
         <Compile Include="Pages\Settings\SettingsView.fs" />
         <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
         <Compile Include="Pages\TemplateMetadata\TemplateMetadata.fs" />

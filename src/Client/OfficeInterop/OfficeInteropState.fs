@@ -39,12 +39,6 @@ type Msg =
     | AutoFitTable                          of hideRefCols:bool
     // Term search functions
     | GetParentTerm
-    // custom xml functions
-    | GetTableValidationXml
-    | WriteTableValidationToXml             of newTableValidation:CustomXmlTypes.Validation.TableValidation * currentSwateVersion:string
-    | DeleteAllCustomXml
-    | GetSwateCustomXml
-    | UpdateSwateCustomXml                  of string
     // table+database interconnected functions
     /// 
     | FillHiddenColsRequest

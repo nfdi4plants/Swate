@@ -3,9 +3,6 @@ module FunctionContainer
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fulma.Extensions.Wikiki
-open Fable.FontAwesome
 open Fable.Core
 open Fable.Core.JsInterop
 

@@ -46,27 +46,6 @@ let debugBox model dispatch =
         //] [
         //    str "Test"
         //]
-        Bulma.label "Dangerzone"
-        Bulma.container [
-            prop.style [style.padding (length.rem 1); style.border(length.px 2.5, borderStyle.solid, NFDIColors.Red.Base); style.borderRadius 10]
-            prop.children [
-                Bulma.button.a [
-                    Bulma.color.isWarning
-                    Bulma.button.isFullWidth
-                    prop.onClick (fun e -> OfficeInterop.GetSwateCustomXml |> OfficeInteropMsg |> dispatch )
-                    prop.style [style.marginBottom(length.rem 1)];
-                    prop.title "Show record type data of Swate custom Xml"
-                    prop.text "Show Custom Xml!"
-                ]
-                Bulma.button.a [
-                    Bulma.color.isDanger
-                    Bulma.button.isFullWidth
-                    prop.onClick (fun e -> OfficeInterop.DeleteAllCustomXml |> OfficeInteropMsg |> dispatch )
-                    prop.title "Be sure you know what you do. This cannot be undone!"
-                    prop.text "Delete All Custom Xml!"
-                ]
-            ]
-        ]
     ]
 
 let activityLogComponent (model:Model) dispatch =

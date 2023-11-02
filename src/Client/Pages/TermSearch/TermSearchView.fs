@@ -131,21 +131,31 @@ let simpleSearchComponent model dispatch =
         // relationship directed search switch //
 
         div [] [
-            Switch.checkbox [
-                Bulma.color.isPrimary
-                prop.id "switch-1"
-                prop.isChecked model.TermSearchState.SearchByParentOntology
-                prop.onChange (fun (e:bool) ->
-                    TermSearch.ToggleSearchByParentOntology |> TermSearchMsg |> dispatch
-                    let _ =
-                        let inpId = (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).InputId
-                        let e = Browser.Dom.document.getElementById inpId
-                        e.focus()
-                    ()
-                    // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
-                    //((AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
-                )
-                prop.text "Use related term directed search." ]
+            Html.div [
+                prop.style [style.display.inlineElement; style.float'.left] 
+                prop.children [
+                    let id = "switch-1"
+                    Switch.checkbox [
+                        Bulma.color.isPrimary
+                        prop.id id
+                        prop.isChecked model.TermSearchState.SearchByParentOntology
+                        prop.onChange (fun (e:bool) ->
+                            TermSearch.ToggleSearchByParentOntology |> TermSearchMsg |> dispatch
+                            let _ =
+                                let inpId = (AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).InputId
+                                let e = Browser.Dom.document.getElementById inpId
+                                e.focus()
+                            ()
+                            // this one is ugly, what it does is: Do the related search after toggling directed search (by parent ontology) of/on.
+                            //((AutocompleteSearch.AutocompleteParameters<Term>.ofTermSearchState model.TermSearchState).OnInputChangeMsg model.TermSearchState.TermSearchText) |> dispatch
+                        )
+                    ]
+                    Html.label [
+                        prop.htmlFor id
+                        prop.text "Use related term directed search."
+                    ]
+                ]
+            ]
 
             Bulma.help [
                 prop.style [style.display.inlineElement; style.float'.right] 

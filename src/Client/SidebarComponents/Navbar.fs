@@ -2,13 +2,13 @@ module SidebarComponents.Navbar
 
 open Fable.React
 open Fable.React.Props
-open Fulma
-open Fable.FontAwesome
-open Fulma.Extensions.Wikiki
 
 open ExcelColors
 open Model
 open Messages
+
+open Feliz
+open Feliz.Bulma
 
 type private NavbarState = {
     BurgerActive: bool
@@ -27,8 +27,8 @@ let private shortCutIconList model dispatch =
         QuickAccessButton.create(
             "Create Annotation Table",
             [
-                Fa.span [Fa.Solid.Plus] []
-                Fa.span [Fa.Solid.Table] []
+                Html.i [prop.className "fa-solid fa-plus"]
+                Html.i [prop.className "fa-solid fa-table"]
             ],
             (fun e ->
                 e.preventDefault()
@@ -41,7 +41,7 @@ let private shortCutIconList model dispatch =
             QuickAccessButton.create(
                 "Autoformat Table",
                 [
-                    Fa.i [Fa.Solid.SyncAlt] []
+                    Html.i [prop.className "fa-solid fa-rotate"]
                 ],
                 (fun e ->
                     e.preventDefault()
@@ -54,26 +54,26 @@ let private shortCutIconList model dispatch =
         QuickAccessButton.create(
             "Update Ontology Terms",
             [
-                Fa.span [Fa.Solid.SpellCheck] []
+                Html.i [prop.className "fa-solid fa-spell-check"]
                 span [] [str model.ExcelState.FillHiddenColsStateStore.toReadableString]
-                Fa.span [Fa.Solid.Pen] []
+                Html.i [prop.className "fa-solid fa-pen"]
             ],
             (fun _ -> SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.create(
             "Remove Building Block",
             [ 
-                Fa.span [Fa.Solid.Minus; Fa.Props [Style [PaddingRight "0.15rem"]]] []
-                Fa.span [Fa.Solid.Columns] []
+                Html.i [prop.className "fa-solid fa-minus pr-1"]
+                Html.i [prop.className "fa-solid fa-table-columns"]
             ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.create(
             "Get Building Block Information",
             [ 
-                Fa.span [Fa.Solid.Question; Fa.Props [Style [PaddingRight "0.15rem"]]] []
+                Html.i [prop.className "fa-solid fa-question pr-1"]
                 span [] [str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
-                Fa.span [Fa.Solid.Columns] []
+                Html.i [prop.className "fa-solid fa-table-columns"]
             ],
             (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
         )
@@ -87,63 +87,58 @@ let private navbarShortCutIconList model dispatch =
     ]
 
 let private quickAccessDropdownElement model dispatch (state: NavbarState) (setState: NavbarState -> unit) (isSndNavbar:bool) =
-    Navbar.Item.div [
-        Navbar.Item.Props [
-            OnClick (fun _ -> setState {state with QuickAccessActive = not state.QuickAccessActive})
-            Style [
-                Padding "0px";
-                if isSndNavbar then
-                    MarginLeft "auto"
-            ]
-            Title (if state.QuickAccessActive then "Close quick access" else "Open quick access")
-        ]
-    ] [
-        div [Style [
-            Width "100%"
-            Height "100%"
-            Position PositionOptions.Relative
-            if model.SiteStyleState.IsDarkMode then
-                BorderColor model.SiteStyleState.ColorMode.ControlForeground
-            else
-                BorderColor model.SiteStyleState.ColorMode.Fade
-        ]] [
-            Button.a [
-                Button.Props [Style [ BackgroundColor "transparent"; Height "100%"; if state.QuickAccessActive then Color NFDIColors.Yellow.Base]]
-                Button.Color Color.IsWhite
-                Button.IsInverted
-            ] [
-                div [Style [
-                    Display DisplayOptions.InlineFlex
-                    Position PositionOptions.Relative
-                    JustifyContent "center"
-                ]] [
-                    Fa.i [
-                        Fa.Props [Style [
-                            Position PositionOptions.Absolute
-                            Display DisplayOptions.Block
-                            Transition "opacity 0.25s, transform 0.25s"
-                            if state.QuickAccessActive then Opacity "1" else Opacity "0"
-                            if state.QuickAccessActive then Transform "rotate(-180deg)" else Transform "rotate(0deg)"
-                        ]]
-                        Fa.Solid.Times
-                    ] []
-                    Fa.i [
-                        Fa.Props [Style [
-                            Position PositionOptions.Absolute
-                            Display DisplayOptions.Block
-                            Transition "opacity 0.25s, transform 0.25s"
-                            if state.QuickAccessActive then Opacity "0" else Opacity "1"
-                        ]]
-                        Fa.Solid.EllipsisH
-                    ] []
-                    // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
-                    Fa.i [
-                        Fa.Props [Style [
-                            Display DisplayOptions.Block
-                            Opacity "0" 
-                        ]]
-                        Fa.Solid.EllipsisH
-                    ] []
+    Bulma.navbarItem.div [
+        prop.onClick (fun _ -> setState {state with QuickAccessActive = not state.QuickAccessActive})
+        prop.style [ style.padding 0; if isSndNavbar then style.custom("marginLeft", "auto")]
+        prop.title (if state.QuickAccessActive then "Close quick access" else "Open quick access")
+        prop.children [
+            div [Style [
+                Width "100%"
+                Height "100%"
+                Position PositionOptions.Relative
+                if model.SiteStyleState.IsDarkMode then
+                    BorderColor model.SiteStyleState.ColorMode.ControlForeground
+                else
+                    BorderColor model.SiteStyleState.ColorMode.Fade
+            ]] [
+                Bulma.button.a [
+                    prop.style [style.backgroundColor "transparent"; style.height(length.perc 100); if state.QuickAccessActive then style.color NFDIColors.Yellow.Base]
+                    Bulma.color.isWhite
+                    Bulma.button.isInverted
+                    div [Style [
+                        Display DisplayOptions.InlineFlex
+                        Position PositionOptions.Relative
+                        JustifyContent "center"
+                    ]] [
+                        Html.i [
+                            prop.style [
+                                style.position.absolute
+                                style.display.block
+                                style.custom("transition","opacity 0.25s, transform 0.25s")
+                                style.opacity (if state.QuickAccessActive then 1 else 0)
+                                style.transform (if state.QuickAccessActive then [transform.rotate -180] else [transform.rotate 0])
+                            ]
+                            prop.className "fa-solid fa-times"
+                        ]
+                        Html.i [
+                            prop.style [
+                                style.position.absolute
+                                style.display.block
+                                style.custom("transition","opacity 0.25s, transform 0.25s")
+                                style.opacity (if state.QuickAccessActive then 0 else 1)
+                            ]
+                            prop.className "fa-solid fa-ellipsis"
+                        ]
+                        // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
+                        Html.i [
+                            prop.style [
+                                style.display.block
+                                style.opacity 0
+                            ]
+                            prop.className "fa-solid fa-ellipsis"
+                        ]
+                    ]
+                    |> prop.children
                 ]
             ]
         ]
@@ -160,93 +155,99 @@ open Feliz
 [<ReactComponent>]
 let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model.WindowSize) =
     let state, setState = React.useState(NavbarState.init)
-    Navbar.navbar [
-        Navbar.CustomClass "myNavbarSticky"
-        Navbar.Props [
-            Id "swate-mainNavbar"; Props.Role "navigation"; AriaLabel "main navigation" ;
-            Style [yield! ExcelColors.colorElementInArray model.SiteStyleState.ColorMode; FlexWrap "wrap"]
-        ]
-    ] [
-        Html.div [
-            prop.style [style.flexBasis (length.percent 100)]
-            prop.children [
-                Navbar.Brand.div [Props [Style [Width "100%"; ]]] [
-                    // Logo
-                    Navbar.Item.div [
-                        Navbar.Item.Props [
-                            OnClick (fun _ -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
-                            Style [Width "100px"; Cursor "pointer"; Padding "0 0.4rem"]
-                        ]
-                    ] [
-                        let path = if model.PageState.IsExpert then "_e" else ""
-                        Image.image [] [ img [
-                            Style [MaxHeight "100%"]
-                            Props.Src @$"assets\Swate_logo_for_excel{path}.svg"
-                        ] ]
-                    ]
+    Bulma.navbar [
+        prop.className "myNavbarSticky"
+        prop.id "swate-mainNavbar"; prop.role "navigation"; prop.ariaLabel "main navigation" ;
+        prop.style [yield! ExcelColors.colorElementInArray_Feliz model.SiteStyleState.ColorMode; style.flexWrap.wrap]
+        prop.children [
+            Html.div [
+                prop.style [style.flexBasis (length.percent 100)]
+                prop.children [
+                    Bulma.navbarBrand.div [
+                        prop.style [style.width(length.perc 100)]
+                        prop.children [
+                            // Logo
+                            Bulma.navbarItem.div [
+                                prop.onClick (fun _ -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
+                                prop.style [style.width 100; style.cursor.pointer; style.padding (0,length.rem 0.4)]
+                                let path = if model.PageState.IsExpert then "_e" else ""
+                                Bulma.image [ Html.img [
+                                    prop.style [style.maxHeight(length.perc 100)]
+                                    prop.src @$"assets\Swate_logo_for_excel{path}.svg"
+                                ] ]
+                                |> prop.children
+                            ]
 
-                    // Quick access buttons
-                    match sidebarsize with
-                    | WindowSize.Mini ->
-                        quickAccessDropdownElement model dispatch state setState false
-                    | _ ->
-                        quickAccessListElement model dispatch
+                            // Quick access buttons
+                            match sidebarsize with
+                            | WindowSize.Mini ->
+                                quickAccessDropdownElement model dispatch state setState false
+                            | _ ->
+                                quickAccessListElement model dispatch
 
-                    Navbar.burger [
-                        Navbar.Burger.IsActive state.BurgerActive
-                        Navbar.Burger.OnClick (fun _ -> setState {state with BurgerActive = not state.BurgerActive})
-                        Navbar.Burger.Modifiers [Modifier.TextColor IsWhite]
-                        Navbar.Burger.Props [
-                            Role "button"
-                            AriaLabel "menu"
-                            Props.AriaExpanded false
-                            Style [Display DisplayOptions.Block]
-                    ]] [
-                        span [AriaHidden true] [ ]
-                        span [AriaHidden true] [ ]
-                        span [AriaHidden true] [ ]
+                            Bulma.navbarBurger [
+                                if state.BurgerActive then Bulma.navbarBurger.isActive 
+                                prop.onClick (fun _ -> setState {state with BurgerActive = not state.BurgerActive})
+                                Bulma.color.hasTextWhite
+                                prop.role "button"
+                                prop.ariaLabel "menu"
+                                prop.ariaExpanded false
+                                prop.style [style.display.block]
+                                prop.children [
+                                    span [AriaHidden true] [ ]
+                                    span [AriaHidden true] [ ]
+                                    span [AriaHidden true] [ ]
+                                ]
+                            ]
+                        ]
                     ]
-                ]
-                Navbar.menu [ Navbar.Menu.Props [
-                    Style [yield! ExcelColors.colorControlInArray model.SiteStyleState.ColorMode; if state.BurgerActive then Display DisplayOptions.Block];
-                    Id "navbarMenu";
-                    Class (if state.BurgerActive then "navbar-menu is-active" else "navbar-menu");
-                ]] [
-                    Navbar.Dropdown.div [ Navbar.Dropdown.Props [Style [if state.BurgerActive then Display DisplayOptions.Block]] ] [
-                        Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.NFDITwitterUrl ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                            str "News "
-                            Fa.i [Fa.Brand.Twitter; Fa.Size Fa.FaLarge; Fa.Props [Style [Color "#1DA1F2"]]] []
+                    Bulma.navbarMenu [ 
+                        prop.style [yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode; if state.BurgerActive then style.display.block]
+                        prop.id "navbarMenu"
+                        prop.className (if state.BurgerActive then "navbar-menu is-active" else "navbar-menu")
+                        Bulma.navbarDropdown.div [
+                            prop.style [if state.BurgerActive then style.display.block]
+                            prop.children [
+                                Bulma.navbarItem.a [
+                                    prop.href Shared.URLs.NFDITwitterUrl ;
+                                    prop.target "_Blank"; 
+                                    
+                                    Bulma.icon [Html.i [prop.className "fa-brand fa-twitter"; Bulma.icon.isLarge; prop.style [style.color "#1DA1F2"]] |> prop.children; prop.text "News "] |> prop.children
+                                ]
+                                Bulma.navbarItem.a [
+                                    prop.href Shared.URLs.SwateWiki ;
+                                    prop.target "_Blank";
+                                    prop.text "How to use"
+                                ]
+                                Bulma.navbarItem.a [
+                                    prop.href Shared.URLs.Helpdesk.Url;
+                                    prop.target "_Blank"; 
+                                    prop.text "Contact us!"
+                                ]
+                                Bulma.navbarItem.a [
+                                    prop.onClick (fun _ ->
+                                        setState {state with BurgerActive = not state.BurgerActive}
+                                        UpdatePageState (Some Routing.Route.Settings) |> dispatch
+                                    )
+                                    prop.text "Settings"
+                                ]
+                                Bulma.navbarItem.a [
+                                    prop.onClick (fun e ->
+                                        setState {state with BurgerActive = not state.BurgerActive}
+                                        UpdatePageState (Some Routing.Route.ActivityLog) |> dispatch
+                                    )
+                                    prop.text "Activity Log"
+                                ]
+                            ]
                         ]
-                        Navbar.Item.a [Navbar.Item.Props [ Href Shared.URLs.SwateWiki ; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                            str "How to use"
-                        ]
-                        Navbar.Item.a [Navbar.Item.Props [Href Shared.URLs.Helpdesk.Url; Target "_Blank"; Style [ Color model.SiteStyleState.ColorMode.Text]]] [
-                            str "Contact us!"
-                        ]
-                        Navbar.Item.a [Navbar.Item.Props [
-                            OnClick (fun _ ->
-                                setState {state with BurgerActive = not state.BurgerActive}
-                                UpdatePageState (Some Routing.Route.Settings) |> dispatch
-                            )
-                            Style [ Color model.SiteStyleState.ColorMode.Text]
-                        ]] [
-                            str "Settings"
-                        ]
-                        Navbar.Item.a [Navbar.Item.Props [
-                            Style [ Color model.SiteStyleState.ColorMode.Text];
-                            OnClick (fun e ->
-                                setState {state with BurgerActive = not state.BurgerActive}
-                                UpdatePageState (Some Routing.Route.ActivityLog) |> dispatch
-                            )
-                        ]] [
-                            str "Activity Log"
-                        ]
+                        |> prop.children
                     ]
                 ]
             ]
+            if state.QuickAccessActive && sidebarsize = WindowSize.Mini then
+                Bulma.navbarBrand.div [
+                    prop.style [style.flexGrow 1; style.display.flex]
+                    navbarShortCutIconList model dispatch |> prop.children
+                ]
         ]
-        if state.QuickAccessActive && sidebarsize = WindowSize.Mini then
-            Navbar.Brand.div [Props [Style [FlexGrow "1"; Display DisplayOptions.Flex]]] [
-                yield! navbarShortCutIconList model dispatch
-            ]
     ]

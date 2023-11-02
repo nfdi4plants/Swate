@@ -29,6 +29,7 @@ $warning: $yellow;
 $switch-background-active: $excelPrimary;
 
 @import "../../node_modules/bulma/bulma.sass";
+/*@import "../../node_modules/bulma-checkradio/src/sass/index.sass";*/
 
 /*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/
 .fixed_headers {
