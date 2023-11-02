@@ -188,10 +188,10 @@ module TemplateFromDB =
                     prop.children [
                         thead [] [
                             Html.tr [
-                                th [Style [Color model.SiteStyleState.ColorMode.Text]] [str "Column"]
-                                th [Style [Color model.SiteStyleState.ColorMode.Text]] [str "Column TAN"]
-                                th [Style [Color model.SiteStyleState.ColorMode.Text]] [str "Unit"]
-                                th [Style [Color model.SiteStyleState.ColorMode.Text]] [str "Unit TAN"]
+                                Html.th "Column"
+                                Html.th "Column TAN"
+                                Html.th "Unit"
+                                Html.th "Unit TAN"
                             ]
                         ]
                         tbody [] [

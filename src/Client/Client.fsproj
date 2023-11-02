@@ -5,6 +5,7 @@
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <Compile Include="LocalStorage\Darkmode.fs" />
         <None Include="vite.config.ts" />
         <None Include="paket.references" />
         <None Include="docs\IOntologyAPIv2.yaml" />
@@ -62,6 +63,7 @@
         <Compile Include="MainComponents\SpreadsheetView.fs" />
         <Compile Include="MainComponents\Navbar.fs" />
         <Compile Include="MainComponents\FooterTabs.fs" />
+        <Compile Include="SidebarComponents\DarkmodeButton.fs" />
         <Compile Include="SidebarComponents\FunctionContainer.fs" />
         <Compile Include="SidebarComponents\ResponsiveFA.fs" />
         <Compile Include="SidebarComponents\AnnotationTableMissingWarning.fs" />

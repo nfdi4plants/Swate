@@ -9,28 +9,13 @@ open Thoth.Elmish
 open Spreadsheet.LocalStorage
 
 let initializeModel (pageOpt: Routing.Route option) =
-    /// Should propably put cookie logic into separate file. As this is prone to grow in the future
-    let isDarkMode =
-        let cookies = Browser.Dom.document.cookie
-        let cookiesSplit = cookies.Split([|";"|], System.StringSplitOptions.RemoveEmptyEntries)
-        cookiesSplit
-        |> Array.tryFind (fun x -> x.StartsWith (Model.Cookies.IsDarkMode.toCookieString + "="))
-        |> fun cookieOpt ->
-            if cookieOpt.IsSome then
-                cookieOpt.Value.Replace(Model.Cookies.IsDarkMode.toCookieString + "=","")
-                |> fun cookie ->
-                    match cookie with
-                    | "false"| "False"  -> false
-                    | "true" | "True"   -> true
-                    | anyElse -> false
-            else
-                false
+    let dt = LocalStorage.Darkmode.DataTheme.GET()
+    LocalStorage.Darkmode.DataTheme.SET dt
     {
         DebouncerState              = Debouncer                 .create ()
         PageState                   = PageState                 .init pageOpt
         PersistentStorageState      = PersistentStorageState    .init ()
         DevState                    = DevState                  .init ()
-        SiteStyleState              = SiteStyleState            .init (darkMode=isDarkMode)
         TermSearchState             = TermSearch.Model          .init ()
         AdvancedSearchState         = AdvancedSearch.Model      .init ()
         ExcelState                  = OfficeInterop.Model       .init ()

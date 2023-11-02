@@ -121,7 +121,6 @@ let simpleSearchComponent model dispatch =
         Bulma.field.div [
             AutocompleteSearch.autocompleteTermSearchComponentOfParentOntology
                 dispatch
-                model.SiteStyleState.ColorMode
                 model
                 "Start typing to search for terms"
                 (Some Bulma.button.isLarge)

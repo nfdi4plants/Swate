@@ -211,7 +211,6 @@ let dropdownItem (exportType:JsonExportType) (model:Model) msg (isActive:bool) =
                 exportType |> msg
             )
         prop.onKeyDown (fun k -> if (int k.which) = 13 then exportType |> msg)
-        prop.style [if isActive then style.backgroundColor model.SiteStyleState.ColorMode.ControlForeground]
         prop.children [
             Html.span [
                 prop.className "has-tooltip-right has-tooltip-multiline"

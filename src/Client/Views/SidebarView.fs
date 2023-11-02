@@ -30,15 +30,6 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
     Bulma.tab [
         if isActive then Bulma.tab.isActive
         a [ //Href (Routing.Route.toRouteUrl pageLink)
-            Style [
-                if isActive then
-                    BorderColor model.SiteStyleState.ColorMode.Accent
-                    BackgroundColor model.SiteStyleState.ColorMode.BodyBackground
-                    Color model.SiteStyleState.ColorMode.Accent
-                    BorderBottomColor model.SiteStyleState.ColorMode.BodyBackground
-                else
-                    BorderBottomColor model.SiteStyleState.ColorMode.Accent
-            ]
             OnClick (fun e -> UpdatePageState (Some pageLink) |> dispatch)
         ] [
             span [] [
@@ -84,7 +75,7 @@ let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
 
 
 let private footer (model:Model) =
-    div [Style [Color "grey"; BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Position PositionOptions.Sticky; Width "inherit"; Bottom "0"; TextAlign TextAlignOptions.Center ]] [
+    div [Style [Color "grey"; Position PositionOptions.Sticky; Width "inherit"; Bottom "0"; TextAlign TextAlignOptions.Center ]] [
         div [] [
             str "Swate Release Version "
             a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
@@ -149,7 +140,6 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
                 TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
         )
         Style [
-            BackgroundColor model.SiteStyleState.ColorMode.BodyBackground; Color model.SiteStyleState.ColorMode.Text;
             Display DisplayOptions.Flex
             FlexGrow "1"
             FlexDirection "column"

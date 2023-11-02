@@ -15,7 +15,7 @@ let sayHello name = $"Hello {name}"
 
 open Feliz
 
-let split_container model dispatch = 
+let private split_container model dispatch = 
     let mainWindow = Seq.singleton <| MainWindowView.Main model dispatch
     let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
     SplitWindowView.Main
@@ -23,12 +23,17 @@ let split_container model dispatch =
         sideWindow
         dispatch
 
-let view (model : Model) (dispatch : Msg -> unit) =
-    match model.PersistentStorageState.Host with
-    | Swatehost.Excel (h,p) ->
-        SidebarView.SidebarView model dispatch
-    | _ ->
-        split_container model dispatch
+[<ReactComponent>]
+let View (model : Model) (dispatch : Msg -> unit) =
+    let (colorstate, setColorstate) = React.useState(LocalStorage.Darkmode.State.init)
+    let v = {colorstate with SetTheme = setColorstate}
+    React.contextProvider(LocalStorage.Darkmode.themeContext, v,
+        match model.PersistentStorageState.Host with
+        | Swatehost.Excel (h,p) ->
+            SidebarView.SidebarView model dispatch
+        | _ ->
+            split_container model dispatch
+    )
             
     
 #if DEBUG
@@ -36,7 +41,7 @@ open Elmish.Debug
 open Elmish.HMR
 #endif
 
-Program.mkProgram Init.init Update.update view
+Program.mkProgram Init.init Update.update View
 #if DEBUG
 |> Program.withConsoleTrace
 #endif

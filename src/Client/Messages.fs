@@ -163,8 +163,6 @@ type Model = {
     DebouncerState              : Debouncer.State
     ///Error handling, Logging, etc.
     DevState                    : DevState
-    ///Site Meta Options (Styling etc)
-    SiteStyleState              : SiteStyleState
     ///States regarding term search
     TermSearchState             : TermSearch.Model
     AdvancedSearchState         : AdvancedSearch.Model

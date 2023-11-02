@@ -26,7 +26,6 @@ module private DropdownElements =
                 selectBuildingBlockType state block |> setState
             )
             prop.onKeyDown(fun k -> if (int k.which) = 13 then setState {state with BuildingBlockType = block})
-            prop.style <| ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode
             prop.children [
                 Html.span [
                     prop.style itemTooltipStyle
@@ -50,7 +49,6 @@ module private DropdownElements =
                 selectBuildingBlockType state block |> setState
             )
             prop.onKeyDown(fun k -> if (int k.which) = 13 then setState {state with BuildingBlockType = block})
-            prop.style <| ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode
             prop.children [
                 Html.span [
                     prop.style itemTooltipStyle
@@ -73,7 +71,6 @@ module private DropdownElements =
                 setState {state with DropdownPage = subpage}
             )
             prop.style [
-                yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode
                 style.paddingRight(length.rem 0.5)
             ]
             prop.children [
@@ -108,7 +105,6 @@ module private DropdownElements =
                         setState {state with DropdownPage = BuildingBlock.DropdownPage.Main}
                     )
                     Bulma.button.isInverted
-                    if model.SiteStyleState.IsDarkMode then Bulma.button.isOutlined
                     Bulma.color.isBlack
                     prop.children [
                         Bulma.icon [Html.i [
@@ -208,7 +204,7 @@ let private dropdownChoice_element state setState state_search setState_search (
                         DropdownElements.dropdownContentProtocolTypeColumns state setState state_search setState_search model dispatch
                     | Model.BuildingBlock.DropdownPage.Output ->
                         DropdownElements.dropdownContentOutputColumns state setState model
-                    |> fun content -> Bulma.dropdownContent [ prop.style [yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode]; prop.children content ] 
+                    |> fun content -> Bulma.dropdownContent [ prop.children content ] 
                 ]
             ]
         ] 
@@ -391,8 +387,6 @@ module private AutocompleteComponents =
                         style.width(length.percent 100)
                         style.maxHeight 400
                         style.position.absolute
-                        style.backgroundColor model.SiteStyleState.ColorMode.ControlBackground
-                        style.borderColor model.SiteStyleState.ColorMode.ControlForeground
                         style.marginTop(length.rem -0.5)
                         style.overflowY.auto
                         style.custom("borderWidth", "0 0.5px 0.5px 0.5px")
@@ -401,7 +395,6 @@ module private AutocompleteComponents =
                     prop.children [
                         Bulma.table [
                             Bulma.table.isFullWidth
-                            prop.style [yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode]
                             prop.children [
                                 if state.SearchIsLoading then
                                     Html.tbody [

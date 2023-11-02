@@ -281,7 +281,6 @@ module private ResultsTable =
             Bulma.container [
                 Bulma.table [
                     Bulma.table.isFullWidth
-                    prop.style [style.backgroundColor model.SiteStyleState.ColorMode.BodyBackground; style.color model.SiteStyleState.ColorMode.Text]
                     prop.children [
                         thead [] []
                         tbody [] (
@@ -330,7 +329,6 @@ let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:b
             prop.name checkradioName
             prop.id id
             prop.isChecked (model.AdvancedSearchState.AdvancedSearchOptions.KeepObsolete = keepObsolete)
-            (if model.SiteStyleState.IsDarkMode then Bulma.color.isWhite else Bulma.color.isBlack)
             prop.onChange (fun (e:bool) ->
                 {model.AdvancedSearchState.AdvancedSearchOptions
                     with KeepObsolete = keepObsolete
@@ -347,12 +345,9 @@ let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:b
     ]
 
 let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
-    div [] [
+    Html.div [
         Bulma.field.div [
-            Bulma.label [
-                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
-                prop.text "Term name keywords:"
-            ]
+            Bulma.label  "Term name keywords:"
             Bulma.field.div [
                 Bulma.control.div [
                     Bulma.input.text [
@@ -382,10 +377,7 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
             ]
         ]
         Bulma.field.div [
-            Bulma.label [
-                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
-                prop.text "Term definition keywords:"
-            ]
+            Bulma.label "Term definition keywords:"
             Bulma.field.div [
                 Bulma.control.div [
                     Bulma.input.text [
@@ -415,10 +407,7 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
             ]
         ] 
         Bulma.field.div [
-            Bulma.label [
-                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
-                prop.text "Ontology"
-            ]
+            Bulma.label "Ontology"
             Bulma.control.div [
                 Bulma.select [
                     Html.select [
@@ -446,10 +435,7 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
             ]
         ]
         Bulma.field.div [
-            Bulma.label [
-                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
-                prop.text "Keep obsolete terms"
-            ]
+            Bulma.label "Keep obsolete terms"
             Html.div [
                 keepObsoleteCheckradioElement model dispatch true modalId
                 keepObsoleteCheckradioElement model dispatch false modalId
@@ -459,10 +445,7 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
 
 let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Msg -> unit) =
     Bulma.field.div [
-        Bulma.label [
-            prop.style [style.color model.SiteStyleState.ColorMode.Accent]
-            prop.text "Results:"
-        ]
+        Bulma.label "Results:"
         if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.ResultsSubpage then
             if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
                 Html.div [

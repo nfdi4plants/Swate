@@ -40,18 +40,6 @@ with
         | _ when width >= Widescreen.threshold -> Widescreen
         | anyElse -> failwithf "'%A' triggered an unexpected error when calculating screen size from width." anyElse        
 
-type Cookies =
-| IsDarkMode
-
-    member this.toCookieString =
-        match this with
-        | IsDarkMode    -> "isDarkmode"
-
-    static member ofString str =
-        match str with
-        | "isDarkmode"  -> IsDarkMode
-        | anyElse       -> failwith (sprintf "Cookie-Parser encountered unknown cookie name: %s" anyElse)
-
 type LogItem =
     | Debug of (System.DateTime*string)
     | Info  of (System.DateTime*string)
@@ -167,17 +155,6 @@ module AdvancedSearch =
         }
         static member BuildingBlockHeaderId = "BuildingBlockHeader_ATS_Id"
         static member BuildingBlockBodyId = "BuildingBlockBody_ATS_Id"
-
- 
-
-type SiteStyleState = {
-    IsDarkMode      : bool
-    ColorMode       : ExcelColors.ColorMode
-} with
-    static member init (?darkMode) = {
-        IsDarkMode              = if darkMode.IsSome then darkMode.Value else false
-        ColorMode               = if darkMode.IsSome && darkMode.Value = true then ExcelColors.darkMode else ExcelColors.colorfullMode
-    }
 
 type DevState = {
     Log                                 : LogItem list

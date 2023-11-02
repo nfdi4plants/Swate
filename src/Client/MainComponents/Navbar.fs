@@ -82,7 +82,6 @@ let Main (model: Messages.Model) dispatch =
         prop.role "navigation"
         prop.ariaLabel "main navigation"
         prop.style [
-            yield! ExcelColors.colorElementInArray_Feliz model.SiteStyleState.ColorMode;
             style.flexWrap.wrap; style.alignItems.stretch; style.display.flex;
             style.minHeight(length.rem 3.25)
         ]

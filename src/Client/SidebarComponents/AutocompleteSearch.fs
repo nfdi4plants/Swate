@@ -270,7 +270,7 @@ let createAutocompleteSuggestions
 
 
 
-let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (isVisible: bool) (isLoading:bool) (suggestions: ReactElement list)  =
+let autocompleteDropdownComponent (dispatch:Msg -> unit) (isVisible: bool) (isLoading:bool) (suggestions: ReactElement list)  =
     div [ Style [Position PositionOptions.Relative ]] [
         div [
             Style [
@@ -279,8 +279,6 @@ let autocompleteDropdownComponent (dispatch:Msg -> unit) (colorMode:ColorMode) (
                 Width "100%"
                 MaxHeight "400px"
                 Position PositionOptions.Absolute
-                BackgroundColor colorMode.ControlBackground
-                BorderColor     colorMode.ControlForeground
                 MarginTop "-0.5rem"
                 OverflowY OverflowOptions.Auto
                 BorderWidth "0 0.5px 0.5px 0.5px"
@@ -338,7 +336,6 @@ let autocompleteTermSearchComponentInputComponent (dispatch: Msg -> unit) isDisa
 
 let autocompleteTermSearchComponentOfParentOntology
     (dispatch: Msg -> unit)
-    (colorMode:ColorMode)
     (model:Model)
     (inputPlaceholderText   : string)
     (inputSize              : IReactProperty option)
@@ -427,10 +424,6 @@ let autocompleteTermSearchComponentOfParentOntology
                                 (v?value, parenTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
                         )      
                         prop.onChange (fun (e:string) ->
-                            let x = "01101110 01101001 01100011 01100101 01011111 01110010 01100111 01100010".Split(" ") |> Array.map (fun x -> System.Convert.ToInt32(x, 2) |> char |> string) |> String.concat ""
-                            if e = x then
-                                let c = { model.SiteStyleState.ColorMode with Name = model.SiteStyleState.ColorMode.Name + "_rgb"}
-                                UpdateColorMode c |> Messages.StyleChange |> dispatch
                             /// REF-Parent-Term
                             let parenTerm = if useParentTerm then parentTerm else None
                             (e, parenTerm) |> autocompleteParams.OnInputChangeMsg |> dispatch
@@ -442,7 +435,6 @@ let autocompleteTermSearchComponentOfParentOntology
         ]
         autocompleteDropdownComponent
             dispatch
-            colorMode
             autocompleteParams.DropDownIsVisible
             autocompleteParams.DropDownIsLoading
             (createAutocompleteSuggestions dispatch autocompleteParams model)

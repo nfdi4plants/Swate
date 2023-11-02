@@ -428,16 +428,6 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorageMsg) (curr
         }
         nextState,Cmd.none
 
-let handleStyleChangeMsg (styleChangeMsg:StyleChangeMsg) (currentState:SiteStyleState) : SiteStyleState * Cmd<Msg> =
-    match styleChangeMsg with
-    | UpdateColorMode nextColors -> 
-        let nextState = {
-            currentState with
-                IsDarkMode = nextColors.Name.StartsWith ExcelColors.darkMode.Name;
-                ColorMode = nextColors
-        }
-        nextState, Cmd.none
-
 let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
     match topLevelMsg with
     // Client
@@ -646,18 +636,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             let nextModel = {
                 currentModel with
                     PersistentStorageState = nextPersistentStorageState
-            }
-
-            nextModel,nextCmd
-
-        | StyleChange styleChangeMsg ->
-            let nextSiteStyleState,nextCmd =
-                currentModel.SiteStyleState
-                |> handleStyleChangeMsg styleChangeMsg
-
-            let nextModel = {
-                currentModel with
-                    SiteStyleState = nextSiteStyleState
             }
 
             nextModel,nextCmd

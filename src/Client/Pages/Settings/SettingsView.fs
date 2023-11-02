@@ -19,55 +19,40 @@ let toggleDarkModeElement (model:Model) dispatch =
         prop.children [
             Bulma.levelLeft "Darkmode" 
             Bulma.levelRight [
-                prop.style [if model.SiteStyleState.IsDarkMode then style.color model.SiteStyleState.ColorMode.Text else style.color model.SiteStyleState.ColorMode.Fade]
-                Switch.checkbox [
-                    prop.id "DarkModeSwitch"
-                    prop.isChecked model.SiteStyleState.IsDarkMode
-                    switch.isOutlined
-                    Bulma.color.isPrimary
-                    prop.onChange (fun (_:bool) ->
-                        let isCurrentlyDarkMode = model.SiteStyleState.IsDarkMode
-                        Browser.Dom.document.cookie <-
-                            let expire = System.DateTime.Now.AddYears 100
-                            $"{Cookies.IsDarkMode.toCookieString}={(not isCurrentlyDarkMode).ToString()}; expires={expire.ToUniversalTime()}; path=/"
-                        let nextColor = if isCurrentlyDarkMode then ExcelColors.colorfullMode else ExcelColors.darkMode
-                        UpdateColorMode nextColor |> StyleChange |> dispatch
-                    )
-                ] |> prop.children
+                SidebarComponents.DarkmodeButton.Main() |> prop.children
             ]
         ]
     ]
 
-let toggleRgbModeElement (model:Model) dispatch =
-    Bulma.level [
-        Bulma.level.isMobile
-        prop.children [
-            Bulma.levelLeft "RGB"
-            Bulma.levelRight [
-                prop.style [if model.SiteStyleState.IsDarkMode then style.color model.SiteStyleState.ColorMode.Text else style.color model.SiteStyleState.ColorMode.Fade]
-                Switch.checkbox [
-                    let isActive = model.SiteStyleState.ColorMode = ExcelColors.transparentMode
-                    prop.id "RgbModeSwitch"
-                    prop.isChecked isActive
-                    switch.isOutlined
-                    Bulma.color.isPrimary
-                    prop.onChange (fun (_:bool) ->
-                        if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
-                            let nextColor =
-                                if isActive then
-                                    let b = Browser.Dom.document.body
-                                    b.classList.remove("niceBkgrnd")
-                                    ExcelColors.darkMode
-                                else
-                                    let b = Browser.Dom.document.body
-                                    b.classList.add("niceBkgrnd")
-                                    ExcelColors.transparentMode
-                            UpdateColorMode nextColor |> StyleChange |> dispatch
-                    )
-                ] |> prop.children
-            ]
-        ]
-    ]
+//let toggleRgbModeElement (model:Model) dispatch =
+//    Bulma.level [
+//        Bulma.level.isMobile
+//        prop.children [
+//            Bulma.levelLeft "RGB"
+//            Bulma.levelRight [
+//                Switch.checkbox [
+//                    let isActive = model.SiteStyleState.ColorMode = ExcelColors.transparentMode
+//                    prop.id "RgbModeSwitch"
+//                    prop.isChecked isActive
+//                    switch.isOutlined
+//                    Bulma.color.isPrimary
+//                    prop.onChange (fun (_:bool) ->
+//                        if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
+//                            let nextColor =
+//                                if isActive then
+//                                    let b = Browser.Dom.document.body
+//                                    b.classList.remove("niceBkgrnd")
+//                                    ExcelColors.darkMode
+//                                else
+//                                    let b = Browser.Dom.document.body
+//                                    b.classList.add("niceBkgrnd")
+//                                    ExcelColors.transparentMode
+//                            UpdateColorMode nextColor |> StyleChange |> dispatch
+//                    )
+//                ] |> prop.children
+//            ]
+//        ]
+//    ]
 
 //let customXmlSettings (model:Model) dispatch =
 //    Bulma.level [
@@ -92,7 +77,6 @@ let swateExperts (model:Model) dispatch =
         prop.children [
             Bulma.levelLeft "Swate.Experts"
             Bulma.levelRight [
-                prop.style [if model.SiteStyleState.IsDarkMode then style.color model.SiteStyleState.ColorMode.Text else style.color model.SiteStyleState.ColorMode.Fade]
                 Bulma.button.a [
                     Bulma.color.isInfo
                     Bulma.button.isOutlined
@@ -109,7 +93,6 @@ let swateCore (model:Model) dispatch =
         prop.children [
             Bulma.levelLeft "Swate.Core"
             Bulma.levelRight [
-                prop.style [if model.SiteStyleState.IsDarkMode then style.color model.SiteStyleState.ColorMode.Text else style.color model.SiteStyleState.ColorMode.Fade]
                 Bulma.button.a [
                     Bulma.color.isInfo
                     Bulma.button.isOutlined
@@ -130,8 +113,8 @@ let settingsViewComponent (model:Model) dispatch =
         Bulma.label "Customize Swate"
         toggleDarkModeElement model dispatch
 
-        if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
-            toggleRgbModeElement model dispatch
+        //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
+        //    toggleRgbModeElement model dispatch
 
         //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Advanced Settings"]
         //customXmlSettings model dispatch

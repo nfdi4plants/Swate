@@ -96,10 +96,6 @@ let private quickAccessDropdownElement model dispatch (state: NavbarState) (setS
                 Width "100%"
                 Height "100%"
                 Position PositionOptions.Relative
-                if model.SiteStyleState.IsDarkMode then
-                    BorderColor model.SiteStyleState.ColorMode.ControlForeground
-                else
-                    BorderColor model.SiteStyleState.ColorMode.Fade
             ]] [
                 Bulma.button.a [
                     prop.style [style.backgroundColor "transparent"; style.height(length.perc 100); if state.QuickAccessActive then style.color NFDIColors.Yellow.Base]
@@ -158,7 +154,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
     Bulma.navbar [
         prop.className "myNavbarSticky"
         prop.id "swate-mainNavbar"; prop.role "navigation"; prop.ariaLabel "main navigation" ;
-        prop.style [yield! ExcelColors.colorElementInArray_Feliz model.SiteStyleState.ColorMode; style.flexWrap.wrap]
+        prop.style [style.flexWrap.wrap]
         prop.children [
             Html.div [
                 prop.style [style.flexBasis (length.percent 100)]
@@ -202,7 +198,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                         ]
                     ]
                     Bulma.navbarMenu [ 
-                        prop.style [yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode; if state.BurgerActive then style.display.block]
+                        prop.style [if state.BurgerActive then style.display.block]
                         prop.id "navbarMenu"
                         prop.className (if state.BurgerActive then "navbar-menu is-active" else "navbar-menu")
                         Bulma.navbarDropdown.div [

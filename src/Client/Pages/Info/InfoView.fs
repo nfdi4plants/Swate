@@ -20,7 +20,7 @@ let swateHeader model dispatch =
     Html.h3 "SWATE"
 
 let introductionElement model dispatch =
-    p [Style [Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Justify]] [
+    p [Style [TextAlign TextAlignOptions.Justify]] [
         b [] [str "SWATE"]
         str " is a "
         b [] [str "S"]

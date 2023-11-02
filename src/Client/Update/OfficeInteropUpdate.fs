@@ -89,11 +89,10 @@ module OfficeInterop =
             currentModel, cmd
 
         | CreateAnnotationTable(tryUsePrevOutput) ->
-            let isDark = currentModel.SiteStyleState.IsDarkMode
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.createAnnotationTable  
-                    (isDark,tryUsePrevOutput)
+                    (false,tryUsePrevOutput)
                     (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel,cmd

@@ -165,7 +165,6 @@ let private tagQueryField (model:Model) (state: ProtocolViewState) (setState: Pr
                 // Pseudo dropdown
                 Bulma.box [
                     prop.style [
-                        yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode
                         style.position.absolute
                         style.width(length.perc 100)
                         style.zIndex 10
@@ -327,7 +326,6 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
             prop.classes [ "nonSelectText"; if isActive then "hoverTableEle"]
             prop.style [
                 style.cursor.pointer; style.userSelect.none;
-                if isActive then style.backgroundColor model.SiteStyleState.ColorMode.ElementBackground;
                 style.color "white"
             ]
             prop.onClick (fun e ->
@@ -361,14 +359,14 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
                 prop.style [
                     style.padding 0
                     if isActive then
-                        style.borderBottom (2, borderStyle.solid, model.SiteStyleState.ColorMode.Accent)
+                        style.borderBottom (2, borderStyle.solid, "black")
                     else
                         style.display.none
                 ]
                 prop.colSpan 4
                 prop.children [
                     Bulma.box [
-                        prop.style [style.borderRadius 0; yield! ExcelColors.colorControlInArray_Feliz model.SiteStyleState.ColorMode]
+                        prop.style [style.borderRadius 0]
                         prop.children [
                             Html.div [
                                 Html.div template.Description

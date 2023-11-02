@@ -316,7 +316,6 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
             // Add/Update Ontology Unit Term search preview
             AutocompleteSearch.autocompleteDropdownComponent
                 dispatch
-                model.SiteStyleState.ColorMode
                 changeUnitAutoCompleteParams.DropDownIsVisible
                 changeUnitAutoCompleteParams.DropDownIsLoading
                 (AutocompleteSearch.createAutocompleteSuggestions dispatch changeUnitAutoCompleteParams model)
@@ -371,16 +370,10 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         // https://keycode.info/
         OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
     ] [
-        Bulma.label [
-            prop.style [style.color model.SiteStyleState.ColorMode.Accent]
-            prop.text "Building Blocks"
-        ]
+        Bulma.label "Building Blocks"
 
         // Input forms, etc related to add building block.
-        Bulma.label [
-            prop.style [style.color model.SiteStyleState.ColorMode.Accent]
-            prop.text "Add annotation building blocks (columns) to the annotation table."
-        ]
+        Bulma.label "Add annotation building blocks (columns) to the annotation table."
         //match model.PersistentStorageState.Host with
         //| Swatehost.Excel _ ->
         //    addBuildingBlockElements model dispatch
@@ -390,10 +383,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
 
         match model.PersistentStorageState.Host with
         | Swatehost.Excel _ ->
-            Bulma.label [
-                prop.style [style.color model.SiteStyleState.ColorMode.Accent]
-                prop.text "Add/Update unit reference to existing building block."
-            ]
+            Bulma.label "Add/Update unit reference to existing building block."
             // Input forms, etc related to add unit to existing building block.
             addUnitToExistingBlockElements model dispatch
         | _ -> ()

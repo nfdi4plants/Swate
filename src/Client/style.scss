@@ -4,29 +4,70 @@
 $FontPathOpenSans: "~open-sans-fonts/open-sans";
 $family-primary: 'Open Sans';
 
-/*
-// Bulma*/
+
+// 1. Import the initial variables
 @import "../../node_modules/bulma/sass/utilities/initial-variables.sass";
 @import "../../node_modules/bulma/sass/utilities/functions.sass";
 
+// 2. Set your own initial variables
+html[data-theme="dark"] {
+    --scheme-main: black;
+    --scheme-invert: white;
+    --text: white;
+    --text-light: hsl(0, 0%, 96%);
+    --text-strong: white;
+    --code-background: black;
+    --fs-background: #252529;
+    --fs-foreground: #1e1e20;
+}
 
-$excelPrimary: #217346;
-$excelPrimary30: #639d7d;
+html[data-theme="light"] {
+    --scheme-main: white;
+    --scheme-invert: black;
+    --text: black;
+    --text-light: hsl(0, 0%, 14%);
+    --text-strong: black;
+    --code-background: white;
+    --fs-background: #f6f6f7;
+    --fs-foreground: #e3e3e5;
+}
 
-$mint: #1FC2A7;
-$lightBlue: #4fb3d9;
-$lightBlueLighter20: #72c2e1;
-$red: #c21f3a;//#e83151;//#E32746;
-$yellow: #FFC000;
+
+$excel-primary: #217346;
+$excel-primary30: #639d7d;
+
+$nfdi-mint: #1FC2A7;
+$nfdi-blue-light: #4fb3d9;
+$nfdi-blue-lighter-20: #72c2e1;
+$nfdi-red: #c21f3a;//#e83151;//#E32746;
+$nfdi-yellow: #FFC000;
 
 // global bulma overrides
-$primary: $excelPrimary;
-$success: $mint;
-$info: $lightBlue;
-$danger: $red;
-$warning: $yellow;
+$primary: $excel-primary;
+$success: $nfdi-mint;
+$info: $nfdi-blue-light;
+$danger: $nfdi-red;
+$warning: $nfdi-yellow;
 
-$switch-background-active: $excelPrimary;
+// 3. Set the derived variables
+$scheme-main: var(--scheme-main);
+$scheme-invert: var(--scheme-invert);
+$text: var(--text);
+$text-light: var(--text-light);
+$text-strong: var(--text-strong);
+$code-background: var(--code-background);
+$content-blockquote-background-color: var(--fs-background);
+
+// 4. set up custom color
+$primarye: $excel-primary;
+$primarye-invert: findColorInvert($excel-primary);
+
+// 5. Add new color variables to the color map.
+@import "../../node_modules/bulma/sass/utilities/derived-variables";
+$addColors: ( "primarye":($primarye, $primarye-invert));
+$colors: map-merge($colors, $addColors);
+
+/*$switch-background-active: $excel-primary;*/
 
 @import "../../node_modules/bulma/bulma.sass";
 /*@import "../../node_modules/bulma-checkradio/src/sass/index.sass";*/
@@ -68,11 +109,11 @@ html, body {
 }
 
 a {
-    color: $lightBlue
+    color: $nfdi-blue-light
 }
 
 a:hover {
-    color: $lightBlueLighter20
+    color: $nfdi-blue-lighter-20
 }
 
 .dragover-footertab {
@@ -92,7 +133,7 @@ a:hover {
 }
 
 [type=checkbox]:checked.switch.is-primary + label::before, [type=checkbox]:checked.switch.is-primary + label::before {
-    background: $mint
+    background: $nfdi-mint
 }
 
 [data-tooltip]:not(.is-loading)::before, [data-tooltip]:not(.is-loading)::after, [data-tooltip]:not(.is-disabled)::before, [data-tooltip]:not(.is-disabled)::after, [data-tooltip]:not([disabled])::before, [data-tooltip]:not([disabled])::after {
@@ -203,7 +244,7 @@ a:hover {
 }
 
 .textarea:focus {
-    border-color: $mint
+    border-color: $nfdi-mint
 }
 
 .button:disabled, .button[disabled] {
@@ -261,7 +302,7 @@ a.navbar-item:hover {
 }
 
 .toExcelColor {
-    color: $excelPrimary !important
+    color: $primarye !important
 }
 
 /////////// Custom simple checkbox, due to issue #54 ///////////////////
@@ -496,7 +537,7 @@ input::-ms-clear {
 }
 
 .danger_important {
-    color: $red !important
+    color: $danger !important
 }
 
 kbd {
