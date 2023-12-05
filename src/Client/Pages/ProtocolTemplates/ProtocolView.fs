@@ -105,7 +105,8 @@ module TemplateFromJsonFile =
                         prop.disabled true
                     Bulma.button.isFullWidth
                     prop.onClick(fun _ ->
-                        SpreadsheetInterface.ImportFile model.ProtocolState.UploadedFileParsed |> InterfaceMsg |> dispatch
+                        Browser.Dom.window.alert("'SpreadsheetInterface.ImportFile' is not implemented")
+                        //SpreadsheetInterface.ImportFile model.ProtocolState.UploadedFileParsed |> InterfaceMsg |> dispatch
                     )
                     prop.text "Insert json"
                 ] |> prop.children
@@ -159,8 +160,9 @@ module TemplateFromDB =
                                     // Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
                                     //let validation =
                                     //    model.ProtocolInsertState.ValidationXml.Value |> Some
-                                    ProtocolIncreaseTimesUsed p.Id |> ProtocolMsg |> dispatch
-                                    SpreadsheetInterface.AddAnnotationBlocks (Array.ofList p.TemplateBuildingBlocks) |> InterfaceMsg |> dispatch
+                                    //ProtocolIncreaseTimesUsed p.Id |> ProtocolMsg |> dispatch
+                                    //SpreadsheetInterface.AddAnnotationBlocks (Array.ofList p.TemplateBuildingBlocks) |> InterfaceMsg |> dispatch
+                                    Browser.Dom.window.alert("Protocol AddAnnotationBlocks is not implemented. Replace template logic first")
                                 )
                                 prop.text "Add template"
                             ]

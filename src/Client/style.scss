@@ -11,31 +11,29 @@ $family-primary: 'Open Sans';
 
 // 2. Set your own initial variables
 html[data-theme="dark"] {
-    --scheme-main: black;
-    --scheme-invert: white;
-    --text: white;
+    --scheme-main: hsl(0, 0%, 4%);
+    --scheme-invert: hsl(0, 0%, 100%);
+    --text: hsl(0, 0%, 100%);
     --text-light: hsl(0, 0%, 96%);
-    --text-strong: white;
-    --code-background: black;
+    --text-strong: hsl(0, 0%, 100%);
     --fs-background: #252529;
     --fs-foreground: #1e1e20;
+    --scheme-invert-rgb: 255,255,255
 }
 
 html[data-theme="light"] {
-    --scheme-main: white;
-    --scheme-invert: black;
-    --text: black;
+    --scheme-main: hsl(0, 0%, 100%);
+    --scheme-invert: hsl(0, 0%, 4%);
+    --text: hsl(0, 0%, 4%);
     --text-light: hsl(0, 0%, 14%);
-    --text-strong: black;
-    --code-background: white;
+    --text-strong: hsl(0, 0%, 4%);
     --fs-background: #f6f6f7;
     --fs-foreground: #e3e3e5;
+    --scheme-invert-rgb: 0,0,0
 }
-
 
 $excel-primary: #217346;
 $excel-primary30: #639d7d;
-
 $nfdi-blue-dark: #2D3E50 ;
 $nfdi-mint: #1FC2A7;
 $nfdi-blue-light: #4fb3d9;
@@ -51,13 +49,17 @@ $danger: $nfdi-red;
 $warning: $nfdi-yellow;
 
 // 3. Set the derived variables
-$scheme-main: var(--scheme-main);
-$scheme-invert: var(--scheme-invert);
+$scheme-main: var(--scheme-main, hsl(0, 0%, 100%));
+$scheme-invert: var(--scheme-invert, hsl(0, 0%, 4%));
 $text: var(--text);
 $text-light: var(--text-light);
 $text-strong: var(--text-strong);
-$code-background: var(--code-background);
+$modal-background-background-color: var(--fs-background, #FF0000);
 $content-blockquote-background-color: var(--fs-background);
+$modal-card-head-background-color: var(--fs-foreground);
+$tabs-boxed-link-hover-background-color: var(--fs-background);
+$dropdown-item-hover-background-color: var(--fs-background);
+$shadow: 0 0.5em 1em -0.125em rgba(var(--scheme-invert-rgb), 0.1), 0 0px 0 1px rgba(var(--scheme-invert-rgb), 0.02);
 
 // 4. set up custom color
 $primarye: $excel-primary;
@@ -68,10 +70,17 @@ $primarye-invert: findColorInvert($excel-primary);
 $addColors: ( "primarye":($primarye, $primarye-invert) );
 $colors: map-merge($colors, $addColors);
 
-$tabs-boxed-link-hover-background-color: var(--fs-background);
-
 @import "../../node_modules/bulma/bulma.sass";
 /*@import "../../node_modules/bulma-checkradio/src/sass/index.sass";*/
+
+.modal-background {
+    opacity: 0.5
+}
+
+.modal-card {
+    box-shadow: 2px 2px black;
+    border-radius: $radius
+}
 
 /*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/
 .fixed_headers {
@@ -167,12 +176,13 @@ a:hover {
     position: -webkit-sticky;
     min-height: min-content;
     top: 0;
-    background-color: $primary
+    background-color: $primary;
 }
 
 .myNavbarSticky .navbar-item#logo {
     position: relative;
     overflow:hidden;
+
     &::before {
         content: "";
         border-radius: 90px;

@@ -1,5 +1,7 @@
 namespace Shared
 
+open ARCtrl.ISA
+
 module TermTypes =
 
     open Shared.Regex
@@ -60,6 +62,9 @@ module TermTypes =
             Name            = ""
             TermAccession   = ""
         }
+
+        static member fromOntologyAnnotation (oa: OntologyAnnotation) =
+            TermMinimal.create oa.NameText oa.TermAccessionShort
 
         /// The numberFormat attribute in Excel allows to create automatic unit extensions.
         /// It uses a special input format which is created by this function and should be used for unit terms.

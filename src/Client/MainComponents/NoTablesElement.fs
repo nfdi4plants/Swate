@@ -7,10 +7,12 @@ open Spreadsheet
 open Messages
 open Browser.Types
 open Fable.Core.JsInterop
+open ARCtrl.ISA
+open Shared
 
 open Elmish
 
-let private buttonStyle = prop.style [style.flexDirection.column; style.height.unset; style.width(length.px 140); style.margin(length.rem 1.5)]
+let private buttonStyle = prop.style [style.margin(length.rem 1.5)]
 
 module private UploadHandler =
 
@@ -20,7 +22,7 @@ module private UploadHandler =
 
     [<Literal>]
     let id = "droparea"
-    let updateMsg = fun r -> r |> ParseFileUpload |> SpreadsheetMsg
+    let updateMsg = fun r -> r |> SetArcFileFromBytes |> SpreadsheetMsg
 
     let setActive_DropArea() =
         styleCounter <- styleCounter + 1
@@ -67,7 +69,7 @@ let private uploadNewTable dispatch =
 
                         reader.onload <- fun evt ->
                             let (r: byte []) = evt.target?result
-                            r |> ParseFileUpload |> SpreadsheetMsg |> dispatch
+                            r |> SetArcFileFromBytes |> SpreadsheetMsg |> dispatch
                                    
                         reader.onerror <- fun evt ->
                             curry GenericLog Cmd.none ("Error", evt?Value) |> DevMsg |> dispatch
@@ -92,34 +94,75 @@ let private uploadNewTable dispatch =
                     ()
                 )
                 prop.children [
-                    Html.div [
-                        Html.i [prop.className "fas fa-plus"]
-                        Html.i [prop.className "fas fa-table"]
-                    ]
                     Html.div "Import File"
                 ]
             ]
         ]
     ]
 
-let createNewTable dispatch =
-    Bulma.button.span [
-        //prop.onDragEnter <| UploadHandler.dontBubble
-        //prop.onDragLeave <| UploadHandler.dontBubble
-        Bulma.button.isLarge
+
+let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
+    
+    Bulma.dropdown [
+        if isActive then 
+            Bulma.dropdown.isActive
         buttonStyle
-        Bulma.color.isPrimary
-        prop.onClick(fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
         prop.children [
-            Html.div [
-                Html.i [prop.className "fas fa-plus"]
-                Html.i [prop.className "fas fa-table"]
+            Bulma.dropdownTrigger [
+                Bulma.button.span [
+                    Bulma.button.isLarge
+                    Bulma.color.isLink
+                    prop.onClick toggle
+                    //prop.onClick(fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
+                    prop.children [
+                        Html.div "New File"
+                    ]
+                ]
             ]
-            Html.div "New Table"
+            Bulma.dropdownMenu [
+                Bulma.dropdownContent [
+                    Bulma.dropdownItem.a [
+                        prop.onClick(fun _ ->
+                            let i = ArcInvestigation.init("New Investigation")
+                            ArcFiles.Investigation i
+                            |> SetArcFile
+                            |> Messages.SpreadsheetMsg
+                            |> dispatch
+                        )
+                        prop.text "Investigation"
+                    ]
+                    Bulma.dropdownDivider []
+                    Bulma.dropdownItem.a [
+                        prop.onClick(fun _ ->
+                            let s = ArcStudy.init("New Study")
+                            let newTable = s.InitTable("New Study Table")
+                            ArcFiles.Study (s, [])
+                            |> SetArcFile
+                            |> Messages.SpreadsheetMsg
+                            |> dispatch
+                        )
+                        prop.text "Study"
+                    ]
+                    Bulma.dropdownDivider []
+                    Bulma.dropdownItem.a [
+                        prop.onClick(fun _ ->
+                            let a = ArcAssay.init("New Assay")
+                            let newTable = a.InitTable("New Assay Table")
+                            ArcFiles.Assay a
+                            |> SetArcFile
+                            |> Messages.SpreadsheetMsg
+                            |> dispatch
+                        )
+                        prop.text "Assay"
+                    ]
+                ]
+            ]
         ]
     ]
 
-let Main (dispatch: Messages.Msg -> unit) =
+[<ReactComponent>]
+let Main (args: {|dispatch: Messages.Msg -> unit|}) =
+    let isActive, setIsActive = React.useState(true)
     Html.div [
         prop.id UploadHandler.id
         prop.onDragEnter (fun e ->
@@ -134,7 +177,7 @@ let Main (dispatch: Messages.Msg -> unit) =
             UploadHandler.setInActive_DropArea()
         )
         prop.onDragOver(fun e -> e.preventDefault())
-        prop.onDrop <| UploadHandler.ondrop dispatch
+        prop.onDrop <| UploadHandler.ondrop args.dispatch
         prop.style [
             style.height.inheritFromParent
             style.width.inheritFromParent
@@ -144,10 +187,11 @@ let Main (dispatch: Messages.Msg -> unit) =
         ]
         prop.children [
             Html.div [
-                prop.style [style.height.minContent; style.display.inheritFromParent; style.justifyContent.spaceBetween]
+                //prop.style [style.height.minContent; style.display.inheritFromParent; style.justifyContent.spaceBetween]
+                prop.style [style.display.flex; style.justifyContent.spaceBetween]
                 prop.children [
-                    createNewTable dispatch
-                    uploadNewTable dispatch
+                    createNewTable isActive (fun _ -> not isActive |> setIsActive) args.dispatch
+                    uploadNewTable args.dispatch
                 ]
             ]
         ]

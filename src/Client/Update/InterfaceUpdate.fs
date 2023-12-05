@@ -81,18 +81,18 @@ module Interface =
                 | _ -> failwith "not implemented"
             | AddAnnotationBlock minBuildingBlockInfo ->
                 match host with
-                | Swatehost.Excel _ ->
-                    let cmd = OfficeInterop.AddAnnotationBlock minBuildingBlockInfo |> OfficeInteropMsg |> Cmd.ofMsg
-                    model, cmd
+                //| Swatehost.Excel _ ->
+                //    let cmd = OfficeInterop.AddAnnotationBlock minBuildingBlockInfo |> OfficeInteropMsg |> Cmd.ofMsg
+                //    model, cmd
                 | Swatehost.Browser ->
                     let cmd = Spreadsheet.AddAnnotationBlock minBuildingBlockInfo |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | AddAnnotationBlocks minBuildingBlockInfos ->
                 match host with
-                | Swatehost.Excel _ ->
-                    let cmd = OfficeInterop.AddAnnotationBlocks minBuildingBlockInfos |> OfficeInteropMsg |> Cmd.ofMsg
-                    model, cmd
+                //| Swatehost.Excel _ ->
+                //    let cmd = OfficeInterop.AddAnnotationBlocks minBuildingBlockInfos |> OfficeInteropMsg |> Cmd.ofMsg
+                //    model, cmd
                 | Swatehost.Browser ->
                     let cmd = Spreadsheet.AddAnnotationBlocks minBuildingBlockInfos |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
@@ -100,17 +100,18 @@ module Interface =
             | ImportFile tables ->
                 match host with
                 | Swatehost.Excel _ ->
-                    let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
-                    model, cmd
+                    //let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
+                    Browser.Dom.window.alert "Not implemented"
+                    model, Cmd.none
                 | Swatehost.Browser ->
-                    let cmd = Spreadsheet.ImportFile tables |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.SetArcFile tables |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | InsertOntologyTerm termMinimal ->
                 match host with
-                | Swatehost.Excel _ ->
-                    let cmd = OfficeInterop.InsertOntologyTerm termMinimal |> OfficeInteropMsg |> Cmd.ofMsg
-                    model, cmd
+                //| Swatehost.Excel _ ->
+                //    let cmd = OfficeInterop.InsertOntologyTerm termMinimal |> OfficeInteropMsg |> Cmd.ofMsg
+                //    model, cmd
                 | Swatehost.Browser ->
                     let cmd = Spreadsheet.InsertOntologyTerm termMinimal |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
@@ -120,10 +121,10 @@ module Interface =
                 | Swatehost.Excel _ ->
                     let cmd = OfficeInterop.InsertFileNames fileNames |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
-                | Swatehost.Browser ->
-                    let arr = fileNames |> List.toArray |> Array.map (fun x -> TermTypes.TermMinimal.create x "")
-                    let cmd = Spreadsheet.InsertOntologyTerms arr |> SpreadsheetMsg |> Cmd.ofMsg
-                    model, cmd
+                //| Swatehost.Browser ->
+                //    let arr = fileNames |> List.toArray |> Array.map (fun x -> TermTypes.TermMinimal.create x "")
+                //    let cmd = Spreadsheet.InsertOntologyTerms arr |> SpreadsheetMsg |> Cmd.ofMsg
+                //    model, cmd
                 | _ -> failwith "not implemented"
             | RemoveBuildingBlock ->
                 match host with
@@ -174,10 +175,10 @@ module Interface =
                 | Swatehost.Excel _ ->
                     let cmd = OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
-                | Swatehost.Browser ->
-                    let selectedIndex = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
-                    let cmd = Cmd.ofEffect (fun dispatch -> Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main selectedIndex model dispatch))
-                    model, cmd
+                //| Swatehost.Browser ->
+                //    let selectedIndex = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
+                //    let cmd = Cmd.ofEffect (fun dispatch -> Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main selectedIndex model dispatch))
+                //    model, cmd
                 | _ -> failwith "not implemented"
             | UpdateTermColumns ->
                 match host with

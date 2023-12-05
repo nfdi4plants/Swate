@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="LocalStorage\Darkmode.fs" />
-        <None Include="vite.config.ts" />
+        <None Include="..\..\.editorconfig" Link=".editorconfig" />
+        <None Include="vite.config.mts" />
         <None Include="paket.references" />
         <None Include="docs\IOntologyAPIv2.yaml" />
         <Content Include="docs\IOntologyAPIv2.html" />
         <None Include="index.html" />
         <None Include="style.scss" />
+        <Compile Include="LocalStorage\Darkmode.fs" />
         <Compile Include="Colors\NFDIColors.fs" />
         <Compile Include="Colors\ExcelColors.fs" />
         <Compile Include="JsBindings\Cytoscape.fs" />
@@ -29,7 +30,6 @@
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
         <Compile Include="States\SpreadsheetInterface.fs" />
-        <Compile Include="States\SpreadsheetUITypes.fs" />
         <Compile Include="States\Spreadsheet.fs" />
         <Compile Include="States\CytoscapeState.fs" />
         <Compile Include="States\DagState.fs" />
@@ -47,12 +47,11 @@
         <Compile Include="Modals\TermModal.fs" />
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
+        <Compile Include="Spreadsheet\IO.fs" />
         <Compile Include="Spreadsheet\LocalStorage.fs" />
         <Compile Include="Spreadsheet\Types.fs" />
-        <Compile Include="Spreadsheet\TypeConverter.fs" />
-        <Compile Include="Spreadsheet\Helper.fs" />
+        <Compile Include="Spreadsheet\Clipboard.Controller.fs" />
         <Compile Include="Spreadsheet\Table.Controller.fs" />
-        <Compile Include="Spreadsheet\Export.Controller.fs" />
         <Compile Include="Spreadsheet\Sidebar.Controller.fs" />
         <Compile Include="SharedComponents\QuickAccessButton.fs" />
         <Compile Include="MainComponents\NoTablesElement.fs" />

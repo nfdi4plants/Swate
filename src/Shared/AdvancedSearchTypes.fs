@@ -7,10 +7,10 @@ module AdvancedSearchTypes =
         TermName                : string
         TermDefinition          : string
         KeepObsolete            : bool
-        } with
-            static member init() = {
-                OntologyName            = None
-                TermName                = ""
-                TermDefinition          = ""
-                KeepObsolete            = false
-            }
+    } with
+        static member init() = {
+            OntologyName            = None
+            TermName                = ""
+            TermDefinition          = ""
+            KeepObsolete            = false
+        }

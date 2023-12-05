@@ -607,7 +607,8 @@ let private add_button (state_bb: BuildingBlockUIState) (state_searchHeader:Term
                     | true, true when bodyTerm.Name <> "" ->
                         {newBuildingBlock_HeaderOnly with UnitTerm = Some bodyTerm}
                     | _ -> newBuildingBlock_HeaderOnly
-                SpreadsheetInterface.AddAnnotationBlock newBuildingBlock |> InterfaceMsg |> dispatch
+                //SpreadsheetInterface.AddAnnotationBlock newBuildingBlock |> InterfaceMsg |> dispatch
+                Browser.Dom.window.alert("AddAnnotationBlock is not implemented")
             )
             prop.text "Add building block"
         ]

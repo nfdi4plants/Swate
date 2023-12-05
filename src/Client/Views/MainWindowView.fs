@@ -21,9 +21,9 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                                 yield Bulma.tab  [
                                     prop.style [style.width (length.px 20)]
                                 ]
-                                for KeyValue (index,table) in model.SpreadsheetModel.Tables do
+                                for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
                                     yield
-                                        MainComponents.FooterTabs.Main {| i = index; table = table; model = model; dispatch = dispatch |}
+                                        MainComponents.FooterTabs.Main {| index = index; tables = model.SpreadsheetModel.Tables; model = model; dispatch = dispatch |}
                                 yield
                                     MainComponents.FooterTabs.MainPlus {| dispatch = dispatch |}
                             ]
@@ -34,10 +34,11 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
         ]
     ]
 
+open Shared
+
 [<ReactComponent>]
 let Main (model: Messages.Model) dispatch =
     let state = model.SpreadsheetModel
-    let activeTableIsEmpty = Map.isEmpty state.ActiveTable
     let init_RowsToAdd = 1
     let state_rows, setState_rows = React.useState(init_RowsToAdd)
     Html.div [
@@ -61,14 +62,19 @@ let Main (model: Messages.Model) dispatch =
                 ]
                 prop.children [
                     //
-                    match activeTableIsEmpty with
-                    | true ->
-                        MainComponents.NoTablesElement.Main dispatch
-                    | false ->
+                    match state.ArcFile with
+                    | None ->
+                        MainComponents.NoTablesElement.Main {|dispatch = dispatch|}
+                    | Some (ArcFiles.Assay a) ->
                         MainComponents.SpreadsheetView.Main model dispatch
+                    | Some (ArcFiles.Study (s,a)) ->
+                        MainComponents.SpreadsheetView.Main model dispatch
+                    | Some (ArcFiles.Investigation i) ->
+                        Html.div "Investigation"
+                    if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 then
                         MainComponents.AddRows.Main init_RowsToAdd state_rows setState_rows dispatch
                 ]
             ]
-            match activeTableIsEmpty with | true -> Html.none | false -> spreadsheetSelectionFooter model dispatch
+            match state.Tables.TableCount = 0 with | true -> Html.none | false -> spreadsheetSelectionFooter model dispatch
         ]
     ]

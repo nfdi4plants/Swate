@@ -1,6 +1,7 @@
 namespace Shared
 
 open System
+open ARCtrl.ISA
 
 module OfficeInteropTypes =
 
@@ -431,3 +432,6 @@ module OfficeInteropTypes =
         member this.HasExistingTerm = this.ColumnTerm.IsSome
         member this.HasCompleteTerm = this.ColumnTerm.IsSome && this.ColumnTerm.Value.Name <> "" && this.ColumnTerm.Value.TermAccession <> ""
         member this.HasValues       = this.Rows <> Array.empty
+        //member this.ToCompositeColumn() =
+        //    let h = this.ColumnHeader.ToString
+        //    CompositeColumn.create()

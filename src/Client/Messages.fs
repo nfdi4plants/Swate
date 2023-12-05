@@ -206,7 +206,6 @@ type Msg =
 | TermSearchMsg         of TermSearch.Msg
 | AdvancedSearchMsg     of AdvancedSearch.Msg
 | OfficeInteropMsg      of OfficeInterop.Msg
-| StyleChange           of StyleChangeMsg
 | PersistentStorage     of PersistentStorageMsg
 | FilePickerMsg         of FilePicker.Msg
 | BuildingBlockMsg      of BuildingBlock.Msg

@@ -13,6 +13,7 @@ type FooterReorderData = {
     member this.toJson() = Json.serialize this
     static member ofJson (json:string) = Json.tryParseAs<FooterReorderData>(json)
 
+[<System.Obsolete("Not sure, just marked for now")>]
 module Map =
     let maxKey (m:Map<'Key,'Value>) =
         m.Keys |> Seq.max

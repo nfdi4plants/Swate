@@ -28,5 +28,5 @@ let renderModal(name: string, reactElement: (_ -> unit) -> Fable.React.ReactElem
     child.id <- id
     parent.appendChild(child) |> ignore
     let rmv = fun _ -> removeModal(name)
-    Feliz.ReactDOM.createPortal(reactElement rmv, Browser.Dom.document.getElementById id)
-    ()
+    let r = Feliz.ReactDOM.createRoot(Browser.Dom.document.getElementById id)
+    r.render (reactElement rmv)

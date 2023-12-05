@@ -112,6 +112,7 @@ open Fable.Core.JsInterop
 open SidebarComponents
 open Feliz
 open Feliz.Bulma
+open ARCtrl.ISA
 
 let simpleSearchComponent model dispatch =
     mainFunctionContainer [
@@ -188,7 +189,12 @@ let simpleSearchComponent model dispatch =
                                 Bulma.button.isFullWidth
                                 prop.onClick (fun _ ->
                                     if hasText then
-                                        let term = if model.TermSearchState.SelectedTerm.IsSome then TermMinimal.ofTerm model.TermSearchState.SelectedTerm.Value else TermMinimal.create model.TermSearchState.TermSearchText ""
+                                        let term =
+                                            if model.TermSearchState.SelectedTerm.IsSome then
+                                                let t = model.TermSearchState.SelectedTerm.Value
+                                                OntologyAnnotation.fromString(t.Name, t.FK_Ontology, t.Accession)
+                                            else
+                                                OntologyAnnotation.fromString(model.TermSearchState.TermSearchText)
                                         SpreadsheetInterface.InsertOntologyTerm term |> InterfaceMsg |> dispatch
                                 )
                                 prop.text "Fill selected cells with this term"

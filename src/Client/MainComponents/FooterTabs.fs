@@ -2,6 +2,7 @@ module MainComponents.FooterTabs
 
 open Feliz
 open Feliz.Bulma
+open ARCtrl.ISA
 
 type private FooterTab = {
     IsEditable: bool
@@ -94,19 +95,20 @@ let private dragleave_handler(state, setState) = fun (e: Browser.Types.DragEvent
     setState {state with IsDraggedOver = false}
 
 [<ReactComponent>]
-let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model; dispatch: Messages.Msg -> unit|}) = // (i: int) (table: Spreadsheet.SwateTable) (model: Messages.Model) dispatch =
-    let state, setState = React.useState(FooterTab.init(input.table.Name))
+let Main (input: {|index: int; tables: ArcTables; model: Messages.Model; dispatch: Messages.Msg -> unit|}) =
+    let index = input.index
+    let table = input.tables.GetTableAt(index)
+    let state, setState = React.useState(FooterTab.init(table.Name))
     let dispatch = input.dispatch
-    let id = $"ReorderMe_{input.table.Id}_{input.table.Name}"
-    let order = input.model.SpreadsheetModel.TableOrder.[input.i]
+    let id = $"ReorderMe_{index}_{table.Name}"
     Bulma.tab [
         if state.IsDraggedOver then prop.className "dragover-footertab"
         prop.draggable true
-        prop.onDrop <| drop_handler (order, state, setState, dispatch)
+        prop.onDrop <| drop_handler (index, state, setState, dispatch)
         prop.onDragLeave <| dragleave_handler (state, setState)
         prop.onDragStart(fun e ->
             e.dataTransfer.clearData() |> ignore
-            let data = FooterReorderData.create order id
+            let data = FooterReorderData.create index id
             let dataJson = data.toJson()
             e.dataTransfer.setData("text", dataJson) |> ignore
             ()
@@ -114,17 +116,17 @@ let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model;
         prop.onDragEnter <| dragenter_handler(state, setState)
         prop.onDragOver drag_preventdefault
         // This will determine the position of the tab
-        prop.style [style.custom ("order", order)]
+        prop.style [style.custom ("order", index)]
         // Use this to ensure updating reactelement correctly
         prop.key id
         prop.id id
-        if input.model.SpreadsheetModel.ActiveTableIndex = input.i then Bulma.tab.isActive
-        prop.onClick (fun _ -> Spreadsheet.UpdateActiveTable input.i |> Messages.SpreadsheetMsg |> dispatch)
+        if input.model.SpreadsheetModel.ActiveTableIndex = index then Bulma.tab.isActive
+        prop.onClick (fun _ -> Spreadsheet.UpdateActiveTable index |> Messages.SpreadsheetMsg |> dispatch)
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
             let mousePosition = int e.pageX, int e.pageY
-            let deleteMsg rmv = fun e -> rmv e; Spreadsheet.RemoveTable input.i |> Messages.SpreadsheetMsg |> dispatch
+            let deleteMsg rmv = fun e -> rmv e; Spreadsheet.RemoveTable index |> Messages.SpreadsheetMsg |> dispatch
             let renameMsg rmv = fun e -> rmv e; {state with IsEditable = true} |> setState
             let child = popup mousePosition renameMsg deleteMsg
             let name = $"popup_{mousePosition}"
@@ -134,7 +136,7 @@ let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model;
         prop.children [
             if state.IsEditable then
                 let updateName = fun e ->
-                    Spreadsheet.RenameTable (input.i, state.Name) |> Messages.SpreadsheetMsg |> dispatch
+                    Spreadsheet.RenameTable (index, state.Name) |> Messages.SpreadsheetMsg |> dispatch
                     setState {state with IsEditable = false}
                 Bulma.input.text [
                     prop.autoFocus(true)
@@ -149,13 +151,13 @@ let Main (input: {|i: int; table: Spreadsheet.SwateTable; model: Messages.Model;
                         | 13. -> //enter
                             updateName e
                         | 27. -> //escape
-                            setState {state with IsEditable = false; Name = input.table.Name}
+                            setState {state with IsEditable = false; Name = table.Name}
                         | _ -> ()
                     )
-                    prop.defaultValue input.table.Name
+                    prop.defaultValue table.Name
                 ]
             else
-                Html.a [prop.text (input.table.Name)]
+                Html.a [prop.text (table.Name)]
         ]
     ]
 

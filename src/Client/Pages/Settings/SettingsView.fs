@@ -108,7 +108,7 @@ let settingsViewComponent (model:Model) dispatch =
     div [
         //Style [MaxWidth "500px"]
     ] [
-        Bulma.label "Swate Settings"
+        pageHeader "Swate Settings"
 
         Bulma.label "Customize Swate"
         toggleDarkModeElement model dispatch

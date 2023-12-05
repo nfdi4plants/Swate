@@ -365,7 +365,7 @@ let autocompleteTermSearchComponentOfParentOntology
             let header = model.SpreadsheetModel.getSelectedColumnHeader
             match header with
             | Some h ->
-                let termSelected = h.isTermColumn && h.Term.IsSome
+                let termSelected = h.IsTermColumn
                 termSelected
             | None -> false
         | _ -> false
@@ -377,10 +377,10 @@ let autocompleteTermSearchComponentOfParentOntology
             let header = model.SpreadsheetModel.getSelectedColumnHeader
             header
             |> Option.bind (fun header ->
-                if header.isTermColumn then
-                    header.Term
-                elif header.isFeaturedColumn then
-                    Some header.getFeaturedTerm
+                if header.IsTermColumn then
+                    header.ToTerm()
+                    |> TermMinimal.fromOntologyAnnotation
+                    |> Some
                 else
                     None
             )

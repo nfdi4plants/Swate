@@ -2,8 +2,8 @@ module MainComponents.ContextMenu
 
 open Feliz
 open Feliz.Bulma
-
 open Spreadsheet
+open ARCtrl.ISA
 open Messages
 
 type private ContextFunctions = {
@@ -13,12 +13,12 @@ type private ContextFunctions = {
     Cut             : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     Paste           : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     FillColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
-    EditColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    //EditColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     RowIndex        : int
     ColumnIndex     : int
 }
 
-let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
+let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (selectedCell: CompositeCell option ) (rmv: _ -> unit) =
     /// This element will remove the contextmenu when clicking anywhere else
     let rmv_element = Html.div [
         prop.onClick rmv
@@ -53,12 +53,12 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv
     ]
     let isHeaderRow = funcs.RowIndex = 0
     let buttonList = [
-        button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
+        //button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
         button ("Fill Column", "fa-solid fa-file-signature", funcs.FillColumn rmv, [prop.disabled isHeaderRow])
         divider
         button ("Copy", "fa-solid fa-copy", funcs.Copy rmv, [])
         button ("Cut", "fa-solid fa-scissors", funcs.Cut rmv, [])
-        button ("Paste", "fa-solid fa-paste",  funcs.Paste rmv, [prop.disabled Spreadsheet.Table.Controller.clipboardCell.IsNone])
+        button ("Paste", "fa-solid fa-paste",  funcs.Paste rmv, [prop.disabled selectedCell.IsNone])
         divider
         button ("Delete Row", "fa-solid fa-delete-left", funcs.DeleteRow rmv, [prop.disabled isHeaderRow])
         button ("Delete Column", "fa-solid fa-delete-left fa-rotate-270", funcs.DeleteColumn rmv, [])
@@ -91,7 +91,7 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
             Spreadsheet.DeleteRows indexArr |> Messages.SpreadsheetMsg |> dispatch
         else
             Spreadsheet.DeleteRow (snd index) |> Messages.SpreadsheetMsg |> dispatch
-    let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
+    //let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
     let funcs = {
         DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
         DeleteColumn    = fun rmv e -> rmv e; Spreadsheet.DeleteColumn (fst index) |> Messages.SpreadsheetMsg |> dispatch
@@ -99,10 +99,10 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
         Cut             = fun rmv e -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
         Paste           = fun rmv e -> rmv e; Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
         FillColumn      = fun rmv e -> rmv e; Spreadsheet.FillColumnWithTerm index |> Messages.SpreadsheetMsg |> dispatch
-        EditColumn      = fun rmv e -> rmv e; editColumnEvent e
+        //EditColumn      = fun rmv e -> rmv e; editColumnEvent e
         RowIndex        = snd index
         ColumnIndex     = fst index
     }
-    let child = contextmenu mousePosition funcs
+    let child = contextmenu mousePosition funcs model.SpreadsheetModel.Clipboard.Cell
     let name = $"context_{mousePosition}"
     Modals.Controller.renderModal(name, child)

@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="URLs.fs" />
     <None Include="paket.references" />
+    <Compile Include="ARCtrl.Helper.fs" />
+    <Compile Include="URLs.fs" />
     <Compile Include="Regex.fs" />
     <Compile Include="TermTypes.fs" />
     <Compile Include="AdvancedSearchTypes.fs" />

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="index.html" />
-    <None Include="vite.config.ts" />
+    <None Include="vite.config.mts" />
     <Compile Include="Spreadsheet\Controller.Tests.fs" />
     <Compile Include="OfficeInterop.Indexing.Tests.fs" />
     <Compile Include="FilePickerView.Tests.fs" />

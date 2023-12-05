@@ -1,18 +1,18 @@
 source https://api.nuget.org/v3/index.json
-framework: net6.0
+framework: net8.0
 storage: none
 
-nuget ARCtrl 1.0.0-beta.2
+nuget ARCtrl 1.0.0-beta.9
 nuget Feliz.Bulma.Checkradio
 nuget Feliz.Bulma.Switch
-nuget Fsharp.Core
+nuget Fsharp.Core ~> 8
 nuget Fable.Remoting.Giraffe ~> 5
-nuget FsSpreadsheet.Exceljs
+nuget FsSpreadsheet.Exceljs ~> 5.0.2
 nuget Saturn ~> 0
 
-nuget Fable.Core
+nuget Fable.Core ~> 4
 nuget Fable.Elmish ~> 4
-nuget Fable.Elmish.React
+nuget Fable.Elmish.React ~> 4
 nuget Fable.Elmish.Debugger ~> 4
 nuget Fable.Elmish.HMR ~> 7
 nuget Fable.Remoting.Client ~> 7
