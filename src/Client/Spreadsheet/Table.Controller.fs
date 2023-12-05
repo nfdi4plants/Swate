@@ -38,26 +38,32 @@ let renameTable (tableIndex:int) (newName: string) (state: Spreadsheet.Model) : 
     {state with ArcFile = state.ArcFile}
 
 let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    state.Tables.RemoveTableAt removeIndex
-    // If the only existing table was removed init model from beginning
-    if state.Tables.TableCount = 0 then
-        Spreadsheet.Model.init()
+    if state.Tables.TableCount = 0 then 
+        state
     else
-        // if active table is removed get the next closest table and set it active
-        if state.ActiveTableIndex = removeIndex then
-            let nextTable_Index =
-                let neighbors = findNeighborTables removeIndex state.Tables
-                match neighbors with
-                | Some (i, _), _ -> i
-                | None, Some (i, _) -> i
-                // This is a fallback option, which should never be hit
-                | _ -> 0
-            { state with
-                ArcFile = state.ArcFile
-                ActiveTableIndex = nextTable_Index }
-        // Tables still exist and an inactive one was removed. Just remove it.
+        state.Tables.RemoveTableAt removeIndex
+        // If the only existing table was removed init model from beginning
+        if state.Tables.TableCount = 0 then
+            Spreadsheet.Model.init()
         else
-            {state with ArcFile = state.ArcFile}
+            // if active table is removed get the next closest table and set it active
+            if state.ActiveTableIndex = removeIndex then
+                let nextTable_Index =
+                    let neighbors = findNeighborTables removeIndex state.Tables
+                    match neighbors with
+                    | Some (i, _), _ -> i
+                    | None, Some (i, _) -> i
+                    // This is a fallback option, which should never be hit
+                    | _ -> 0
+                { state with
+                    ArcFile = state.ArcFile
+                    ActiveTableIndex = nextTable_Index }
+            // Tables still exist and an inactive one was removed. Just remove it.
+            else
+                let nextTable_Index = if state.ActiveTableIndex > removeIndex then state.ActiveTableIndex - 1 else state.ActiveTableIndex
+                { state with
+                    ArcFile = state.ArcFile
+                    ActiveTableIndex = nextTable_Index }
 
 ///<summary>Add `n` rows to active table.</summary>
 let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =

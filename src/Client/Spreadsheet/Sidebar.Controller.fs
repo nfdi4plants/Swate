@@ -69,7 +69,6 @@ let createTable (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Mo
     let tables = state.ArcFile.Value.Tables()
     let newName = createNewTableName 0 tables.TableNames
     let newTable = ArcTable.init(newName)
-    printfn "hit!"
     if usePrevOutput && (tables.TableCount-1) >= state.ActiveTableIndex then
         let table = tables.GetTableAt(state.ActiveTableIndex)
         let output = table.GetOutputColumn()

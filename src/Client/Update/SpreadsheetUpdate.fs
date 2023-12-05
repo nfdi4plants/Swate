@@ -81,6 +81,7 @@ module Spreadsheet =
                     ActiveTableIndex = nextIndex }
             state, model, cmd
         | RemoveTable removeIndex ->
+            logf "RemoveTable: %i" removeIndex
             let cmd = createPromiseCmd <| fun _ -> Controller.removeTable removeIndex state
             state, model, cmd
         | RenameTable (index, name) ->
