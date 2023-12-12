@@ -93,11 +93,17 @@ module private DropdownElements =
 
     let createBuildingBlockDropdownItem dispatch uiState setUiState (header: CompositeHeader) =
         Bulma.dropdownItem.a [
-            prop.onClick (fun e ->
-                e.stopPropagation()
-                selectHeader uiState setUiState header |> dispatch
-            )
-            prop.onKeyDown(fun k -> if (int k.which) = 13 then selectHeader uiState setUiState header |> dispatch)
+            match header with
+            | CompositeHeader.FreeText _ 
+            | CompositeHeader.Input (IOType.FreeText _) 
+            | CompositeHeader.Output (IOType.FreeText _) -> 
+                ()
+            | _ ->
+                prop.onClick (fun e ->
+                    e.stopPropagation()
+                    selectHeader uiState setUiState header |> dispatch
+                )
+                prop.onKeyDown(fun k -> if (int k.which) = 13 then selectHeader uiState setUiState header |> dispatch)
             prop.children [
                 //Html.span [
                 //    prop.style itemTooltipStyle
@@ -495,7 +501,7 @@ let private chooseBuildingBlock_element (ui: BuildingBlockUIState) setUi (ui_sea
                     Bulma.control.div [
                         Bulma.control.isExpanded
                         prop.children [
-                            let valueOrDefault = model.AddBuildingBlockState.Header.GetOA().NameText
+                            let valueOrDefault = model.AddBuildingBlockState.Header.ToTerm().NameText
                             termSearch_element inputId onChangeMsg onChangeMsg (hasVerifiedTermHeader state.Header) ui_search setUi_search valueOrDefault
                         ]
                     ]
@@ -577,11 +583,11 @@ module private BodyTerm =
             match isClicked, state_isDirectedSearchMode, model.AddBuildingBlockState.Header.IsTermColumn, model.AddBuildingBlockState.BodySearchText with
             // only execute this on onDoubleClick event. If executed on onChange event it will trigger when deleting term.
             | true, true, true, "" -> // Search all children 
-                let parent = model.AddBuildingBlockState.Header.GetOA().ToTermMinimal()
+                let parent = model.AddBuildingBlockState.Header.ToTerm().ToTermMinimal()
                 BuildingBlock.Msg.GetBodyTermsByParent (parent, {state = state; setState = setState}) |> BuildingBlockMsg
                 |> updateState
             | _, true, true, any when any.Length > 2 ->
-                let parent = model.AddBuildingBlockState.Header.GetOA().ToTermMinimal()
+                let parent = model.AddBuildingBlockState.Header.ToTerm().ToTermMinimal()
                 BuildingBlock.Msg.GetBodySuggestionsByParent (v,parent,{state = state; setState = setState}) |> BuildingBlockMsg
                 |> updateState
             | _,_,_, any when any.Length > 2 ->
@@ -607,7 +613,7 @@ module private BodyTerm =
                         if state_isDirectedSearchMode && hasVerifiedTermHeader model.AddBuildingBlockState.Header then style.boxShadow(2,2,NFDIColors.Mint.Lighter20)
                     ]
                     prop.children [
-                        let valueOrDefault = model.AddBuildingBlockState.BodyCell.GetOA().NameText
+                        let valueOrDefault = model.AddBuildingBlockState.BodyCell.ToTerm().NameText
                         termSearch_element inputId (onChangeMsg false) (onChangeMsg true) (hasVerifiedCell model.AddBuildingBlockState.BodyCell) state setState valueOrDefault
                     ]
                 ]

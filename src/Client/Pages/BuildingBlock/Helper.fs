@@ -22,11 +22,11 @@ let selectHeader (uiState: BuildingBlockUIState) (setUiState: BuildingBlockUISta
     setUiState bodyType
     BuildingBlock.Msg.SelectHeader header |> BuildingBlockMsg
 
-let hasVerifiedTermHeader (header: CompositeHeader) = header.IsTermColumn && header.GetOA().TermAccessionShort <> ""
+let hasVerifiedTermHeader (header: CompositeHeader) = header.IsTermColumn && header.ToTerm().TermAccessionShort <> ""
 
-let hasVerifiedCell (cell: CompositeCell) = (cell.isTerm || cell.isUnitized) && cell.GetOA().TermAccessionShort <> ""
+let hasVerifiedCell (cell: CompositeCell) = (cell.isTerm || cell.isUnitized) && cell.ToTerm().TermAccessionShort <> ""
 
 let isValidColumn (header : CompositeHeader) =
     header.IsFeaturedColumn 
-    || (header.IsTermColumn && header.GetOA().NameText.Length > 0)
+    || (header.IsTermColumn && header.ToTerm().NameText.Length > 0)
     || header.IsSingleColumn 

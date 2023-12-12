@@ -41,14 +41,6 @@ module Extensions =
             | CompositeHeader.Factor _ -> CompositeHeader.Factor oa
             | _ ->  failwithf "Cannot update OntologyAnnotation on CompositeHeader without OntologyAnnotation: '%A'" this
 
-        member this.GetOA() =
-            match this with
-            | CompositeHeader.Component oa
-            | CompositeHeader.Parameter oa
-            | CompositeHeader.Characteristic oa
-            | CompositeHeader.Factor oa -> oa
-            | _ -> failwithf "Cannot get OntologyAnnotation from CompositeHeader without OntologyAnnotation: '%A'" this
-
         static member ParameterEmpty = CompositeHeader.Parameter OntologyAnnotation.empty
         static member CharacteristicEmpty = CompositeHeader.Characteristic OntologyAnnotation.empty
         static member ComponentEmpty = CompositeHeader.Component OntologyAnnotation.empty
@@ -63,7 +55,7 @@ module Extensions =
             | CompositeCell.Unitized (v,_) -> CompositeCell.createUnitized (v,oa)
             | CompositeCell.FreeText _ -> CompositeCell.createFreeText oa.NameText
 
-        member this.GetOA() =
+        member this.ToTerm() =
             match this with
             | CompositeCell.Term oa -> oa
             | CompositeCell.Unitized (v, oa) -> oa
