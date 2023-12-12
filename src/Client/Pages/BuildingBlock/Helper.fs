@@ -13,14 +13,23 @@ let createCellFromUiStateAndOA (uiState: BuildingBlockUIState) (oa:OntologyAnnot
     | BodyCellType.Term -> CompositeCell.createTerm oa
     | BodyCellType.Unitized -> CompositeCell.createUnitized("", oa)
 
-let selectHeader (uiState: BuildingBlockUIState) (setUiState: BuildingBlockUIState -> unit) (header: CompositeHeader) = 
-    let bodyType =
-        match header.IsTermColumn, uiState.BodyCellType with
-        | true, BodyCellType.Term | true, BodyCellType.Unitized -> { uiState with DropdownPage = DropdownPage.Main; DropdownIsActive = false }
-        | true, BodyCellType.Text -> { BodyCellType = BodyCellType.Term; DropdownPage = DropdownPage.Main; DropdownIsActive = false }
-        | false, _ -> { BodyCellType = BodyCellType.Text; DropdownPage = DropdownPage.Main; DropdownIsActive = false }
-    setUiState bodyType
-    BuildingBlock.Msg.SelectHeader header |> BuildingBlockMsg
+let selectHeader (uiState: BuildingBlockUIState) (setUiState: BuildingBlockUIState -> unit) (nextHeader: CompositeHeader) = 
+    let nextState, updateBodyCellMsg =
+        match nextHeader.IsTermColumn, uiState.BodyCellType with
+        | true, BodyCellType.Term | true, BodyCellType.Unitized -> 
+            { uiState with DropdownPage = DropdownPage.Main; DropdownIsActive = false },
+            Msg.DoNothing
+        | true, BodyCellType.Text -> 
+            { BodyCellType = BodyCellType.Term; DropdownPage = DropdownPage.Main; DropdownIsActive = false },
+            BuildingBlock.Msg.SelectBodyCell (CompositeCell.emptyTerm) |> BuildingBlockMsg
+        | false, _ -> 
+            { BodyCellType = BodyCellType.Text; DropdownPage = DropdownPage.Main; DropdownIsActive = false },
+            BuildingBlock.Msg.SelectBodyCell (CompositeCell.emptyFreeText) |> BuildingBlockMsg
+    setUiState nextState
+    Msg.Batch [
+        BuildingBlock.Msg.SelectHeader nextHeader |> BuildingBlockMsg
+        updateBodyCellMsg
+    ]
 
 let selectBody (body: CompositeCell) =
     BuildingBlock.Msg.SelectBodyCell body |> BuildingBlockMsg

@@ -359,8 +359,6 @@ module private BodyTerm =
     let private body_searchElement inputId state setState (model: Model) dispatch =
         let state_isDirectedSearchMode, setState_isDirectedSearchMode = React.useState(true)
         let onChangeMsg = fun (isClicked: bool) (v:string) -> 
-            //BuildingBlock.Msg.SelectBodyCell None |> BuildingBlockMsg |> dispatch
-            //BuildingBlock.UpdateBodySearchText v |> BuildingBlockMsg |> dispatch
             let updateSearchState msg =
                 setState {SearchIsActive = true; SearchIsLoading = true}
                 let bounce_msg = Bounce (System.TimeSpan.FromSeconds 0.5,nameof(msg), msg)
@@ -442,14 +440,8 @@ let private add_button (ui: BuildingBlockUIState) (model: Model) dispatch =
                 prop.disabled true
             Bulma.button.isFullWidth
             prop.onClick (fun _ ->
-                let updateBodyCell =
-                    match ui.BodyCellType with
-                    | BodyCellType.Text -> body.ToFreeTextCell()
-                    | BodyCellType.Term -> body.ToTermCell()
-                    | BodyCellType.Unitized -> body.ToUnitizedCell()
-                let column = CompositeColumn.create(header, [|updateBodyCell|])
+                let column = CompositeColumn.create(header, [|body|])
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
-                BuildingBlock.Msg.SelectBodyCell (updateBodyCell.GetEmptyCell()) |> BuildingBlockMsg |> dispatch
             )
             prop.text "Add Column"
         ]

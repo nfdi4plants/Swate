@@ -90,19 +90,29 @@ module private DropdownElements =
             ]
         ]
 
-    let createBuildingBlockDropdownItem dispatch uiState setUiState (header: CompositeHeader) =
-        Bulma.dropdownItem.a [
+    let createBuildingBlockDropdownItem (model: Model) dispatch uiState setUiState (header: CompositeHeader) =
+        let isDeepFreeText = 
             match header with
             | CompositeHeader.FreeText _ 
             | CompositeHeader.Input (IOType.FreeText _) 
             | CompositeHeader.Output (IOType.FreeText _) -> 
-                ()
+                true
             | _ ->
+                false
+        Bulma.dropdownItem.a [
+            if not isDeepFreeText then //disable clicking on freetext elements
+                let nextHeader = 
+                    if header.IsTermColumn && not header.IsFeaturedColumn then
+                        header.UpdateDeepWith model.AddBuildingBlockState.Header
+                    else 
+                        header
                 prop.onClick (fun e ->
                     e.stopPropagation()
-                    selectHeader uiState setUiState header |> dispatch
+                    selectHeader uiState setUiState nextHeader |> dispatch
                 )
-                prop.onKeyDown(fun k -> if (int k.which) = 13 then selectHeader uiState setUiState header |> dispatch)
+                prop.onKeyDown(fun k ->
+                    if (int k.which) = 13 then selectHeader uiState setUiState nextHeader |> dispatch
+                )
             prop.children [
                 //Html.span [
                 //    prop.style itemTooltipStyle
@@ -134,10 +144,10 @@ module private DropdownElements =
         [
             DropdownPage.IOTypes (CompositeHeader.Input, CompositeHeader.InputEmpty.AsButtonName) |> createSubBuildingBlockDropdownLink state setState
             Bulma.dropdownDivider []
-            CompositeHeader.ParameterEmpty      |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.FactorEmpty         |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.CharacteristicEmpty |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.ComponentEmpty      |> createBuildingBlockDropdownItem dispatch state setState
+            CompositeHeader.ParameterEmpty      |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.FactorEmpty         |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.CharacteristicEmpty |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.ComponentEmpty      |> createBuildingBlockDropdownItem model dispatch state setState
             Model.BuildingBlock.DropdownPage.More  |> createSubBuildingBlockDropdownLink state setState
             Bulma.dropdownDivider []
             DropdownPage.IOTypes (CompositeHeader.Output, CompositeHeader.OutputEmpty.AsButtonName) |> createSubBuildingBlockDropdownLink state setState
@@ -162,13 +172,13 @@ module private DropdownElements =
             //    ]
             //]
             //Bulma.dropdownDivider []
-            CompositeHeader.Date                |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.Performer           |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.ProtocolDescription |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.ProtocolREF         |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.ProtocolType        |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.ProtocolUri         |> createBuildingBlockDropdownItem dispatch state setState
-            CompositeHeader.ProtocolVersion     |> createBuildingBlockDropdownItem dispatch state setState
+            CompositeHeader.Date                |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.Performer           |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.ProtocolREF         |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.ProtocolType        |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.ProtocolUri         |> createBuildingBlockDropdownItem model dispatch state setState
+            CompositeHeader.ProtocolVersion     |> createBuildingBlockDropdownItem model dispatch state setState
             // Navigation element back to main page
             backToMainDropdownButton state setState
         ]
@@ -188,13 +198,13 @@ module private DropdownElements =
             //    ]
             //]
             //Bulma.dropdownDivider []
-            createHeaderFunc IOType.Source            |> createBuildingBlockDropdownItem dispatch state setState
-            createHeaderFunc IOType.Sample            |> createBuildingBlockDropdownItem dispatch state setState
-            createHeaderFunc IOType.Material          |> createBuildingBlockDropdownItem dispatch state setState
-            createHeaderFunc IOType.RawDataFile       |> createBuildingBlockDropdownItem dispatch state setState
-            createHeaderFunc IOType.DerivedDataFile   |> createBuildingBlockDropdownItem dispatch state setState
-            createHeaderFunc IOType.ImageFile         |> createBuildingBlockDropdownItem dispatch state setState
-            createHeaderFunc (IOType.FreeText "")     |> createBuildingBlockDropdownItem dispatch state setState
+            createHeaderFunc IOType.Source            |> createBuildingBlockDropdownItem model dispatch state setState
+            createHeaderFunc IOType.Sample            |> createBuildingBlockDropdownItem model dispatch state setState
+            createHeaderFunc IOType.Material          |> createBuildingBlockDropdownItem model dispatch state setState
+            createHeaderFunc IOType.RawDataFile       |> createBuildingBlockDropdownItem model dispatch state setState
+            createHeaderFunc IOType.DerivedDataFile   |> createBuildingBlockDropdownItem model dispatch state setState
+            createHeaderFunc IOType.ImageFile         |> createBuildingBlockDropdownItem model dispatch state setState
+            createHeaderFunc (IOType.FreeText "")     |> createBuildingBlockDropdownItem model dispatch state setState
             // Navigation element back to main page
             backToMainDropdownButton state setState
         ]

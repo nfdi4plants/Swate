@@ -48,6 +48,25 @@ module Extensions =
         static member InputEmpty = CompositeHeader.Input <| IOType.FreeText ""
         static member OutputEmpty = CompositeHeader.Output <| IOType.FreeText ""
 
+        /// <summary>
+        /// Keep the outer `CompositeHeader` information (e.g.: Parameter, Factor, Input, Output..) and update the inner "of" value with the value from `other.`
+        /// This will only run successfully if the inner values are of the same type
+        /// </summary>
+        /// <param name="other">The header from which the inner value will be taken.</param>
+        member this.UpdateDeepWith(other:CompositeHeader) = 
+            match this, other with
+            | h1, h2 when this.IsIOType && other.IsIOType ->
+                let io1 = h2.TryIOType().Value
+                match h1 with 
+                | CompositeHeader.Input _ -> CompositeHeader.Input io1 
+                | CompositeHeader.Output _ -> CompositeHeader.Output io1
+                | _ -> failwith "Error 1 in UpdateSurfaceTo. This should never hit."
+            | h1, h2 when this.IsTermColumn && other.IsTermColumn && not this.IsFeaturedColumn && not other.IsFeaturedColumn ->
+                let oa1 = h2.ToTerm()
+                h1.UpdateWithOA oa1
+            | _ -> 
+                this
+
     type CompositeCell with
         member this.UpdateWithOA(oa:OntologyAnnotation) =
             match this with
