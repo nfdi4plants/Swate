@@ -73,6 +73,11 @@ module Spreadsheet =
                 state.ActiveTable.UpdateCellAt(fst index,snd index, cell)
                 {state with ArcFile = state.ArcFile}
             state, model, cmd
+        | UpdateHeader (index, header) ->
+            let cmd = createPromiseCmd <| fun _ ->
+                state.ActiveTable.UpdateHeader(index, header)
+                {state with ArcFile = state.ArcFile}
+            state, model, cmd
         | UpdateActiveTable nextIndex ->
             let cmd = createPromiseCmd <| fun _ ->
                 if nextIndex < 0 || nextIndex >= state.Tables.TableCount then

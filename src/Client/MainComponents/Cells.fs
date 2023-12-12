@@ -55,8 +55,8 @@ let private cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit
             style.backgroundColor.transparent
             style.margin (0)
             style.padding(length.em 0.5,length.em 0.75)
-            if isHeader then
-                style.color(NFDIColors.white)
+            //if isHeader then
+            //    style.color(NFDIColors.white)
         ]
         // Update main spreadsheet state when leaving focus or...
         prop.onBlur(fun _ ->
@@ -78,6 +78,14 @@ let private cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit
         prop.defaultValue cell_value
     ]
 
+let private basicValueDisplayCell (v: string) =
+    Html.span [
+        prop.style [
+            style.flexGrow 1
+            style.padding(length.em 0.5,length.em 0.75)
+        ]
+        prop.text v
+    ]
 
 module private EventPresets =
 
@@ -264,72 +272,56 @@ module private EventPresets =
 //        prop.children [Html.i [prop.classes ["fa-sharp"; "fa-solid"; "fa-angles-up"; if isExtended then "fa-rotate-270" else "fa-rotate-90"]; prop.style [style.fontSize(length.em 1)]]]
 //    ]
 
-//[<ReactComponent>]
-//let HeaderCell(index: (int*int), state_extend: Set<int>, setState_extend, model: Model, dispatch) =
-//    let columnIndex = fst index
-//    let rowIndex = snd index
-//    let state = model.SpreadsheetModel
-//    let cell = state.ActiveTable.GetCellAt
-//    let isHeader = cell.isHeader
-//    let cellValue = cell.displayValue
-//    let state_cell, setState_cell = React.useState(CellState.init(cellValue))
-//    let isSelected = state.SelectedCells.Contains index
-//    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
-//    cell_element [
-//        prop.key $"Cell_{state.ActiveTableIndex}-{columnIndex}-{rowIndex}"
-//        cellStyle [
-//            if isHeader && cell.Header.isInputColumn then
-//                style.color(NFDIColors.white)
-//                style.backgroundColor(NFDIColors.LightBlue.Base)
-//            elif isHeader && cell.Header.isOutputColumn then
-//                style.color(NFDIColors.white)
-//                style.backgroundColor(NFDIColors.Red.Lighter30)
-//            elif isHeader then
-//                style.color(NFDIColors.white)
-//                style.backgroundColor(NFDIColors.DarkBlue.Base)
-//            if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
-//        ]
-//        prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
-//        prop.children [
-//            Html.div [
-//                cellInnerContainerStyle []
-//                prop.onDoubleClick(fun e ->
-//                    e.preventDefault()
-//                    e.stopPropagation()
-//                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-//                    if not state_cell.Active then setState_cell {state_cell with Active = true}
-//                )
-//                prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
-//                prop.children [
-//                    if state_cell.Active then
-//                        /// TODO! Try get from db?
-//                        /// Update change to mainState and exit active input.
-//                        let updateMainStateTable() =
-//                            // Only update if changed
-//                            if state_cell.Value <> cellValue then
-//                                let nextTerm = cell.updateDisplayValue state_cell.Value
-//                                Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
-//                            setState_cell {state_cell with Active = false}
-//                        cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
-//                    else
-//                        let displayName =
-//                            if cell.isUnit then
-//                                let name = if cellValue = "" then None else Some cellValue
-//                                name |> Option.map (fun x -> x + " " + cell.Unit.Unit.Name) |> Option.defaultValue ""
-//                            else
-//                                cellValue
-//                        Html.span [
-//                            prop.style [
-//                                style.flexGrow 1
-//                            ]
-//                            prop.text displayName
-//                        ]
-//                    if isHeader && cell.Header.isTermColumn then
-//                        extendHeaderButton(state_extend, columnIndex, setState_extend)
-//                ]
-//            ]
-//        ]
-//    ]
+[<ReactComponent>]
+let HeaderCell(columnIndex: int, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    let state = model.SpreadsheetModel
+    let header = state.ActiveTable.Headers.[columnIndex]
+    let cellValue = header.ToString()
+    let state_cell, setState_cell = React.useState(CellState.init(cellValue))
+    Html.th [
+        prop.key $"Header_{state.ActiveTableIndex}-{columnIndex}"
+        cellStyle [
+            //if isHeader && cell.Header.isInputColumn then
+            //    style.color(NFDIColors.white)
+            //    style.backgroundColor(NFDIColors.LightBlue.Base)
+            //elif isHeader && cell.Header.isOutputColumn then
+            //    style.color(NFDIColors.white)
+            //    style.backgroundColor(NFDIColors.Red.Lighter30)
+            //elif isHeader then
+            //    style.color(NFDIColors.white)
+            //    style.backgroundColor(NFDIColors.DarkBlue.Base)
+            //if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
+        ]
+        //prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
+        prop.children [
+            Html.div [
+                cellInnerContainerStyle []
+                prop.onDoubleClick(fun e ->
+                    e.preventDefault()
+                    e.stopPropagation()
+                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                    if not state_cell.Active then setState_cell {state_cell with Active = true}
+                )
+                //prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
+                prop.children [
+                    if state_cell.Active then
+                        /// TODO! Try get from db?
+                        /// Update change to mainState and exit active input.
+                        let updateMainStateTable() =
+                            // Only update if changed
+                            if state_cell.Value <> cellValue then
+                                let nextHeader = CompositeHeader.OfHeaderString state_cell.Value
+                                Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch
+                            setState_cell {state_cell with Active = false}
+                        cellInputElement(true, updateMainStateTable, setState_cell, state_cell, cellValue)
+                    else
+                        basicValueDisplayCell cellValue
+                    //if isHeader && cell.Header.isTermColumn then
+                    //    extendHeaderButton(state_extend, columnIndex, setState_extend)
+                ]
+            ]
+        ]
+    ]
 
 [<ReactComponent>]
 let BodyCell(index: (int*int), state_extend: Set<int>, setState_extend, model: Model, dispatch) =
@@ -382,13 +374,7 @@ let BodyCell(index: (int*int), state_extend: Set<int>, setState_extend, model: M
                                 unitizedValue
                             else
                                 cellValue
-                        Html.span [
-                            prop.style [
-                                style.flexGrow 1
-                                style.padding(length.em 0.5,length.em 0.75)
-                            ]
-                            prop.text displayName
-                        ]
+                        basicValueDisplayCell displayName
                     //if isHeader && cell.Header.isTermColumn then
                     //    extendHeaderButton(state_extend, columnIndex, setState_extend)
                 ]

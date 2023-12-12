@@ -59,14 +59,10 @@ let private bodyRows (state:Set<int>) setState (model:Model) (dispatch: Msg -> u
 
 let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
     let table = model.SpreadsheetModel.ActiveTable
-    let rowIndex = 0
     Html.tr [
         for columnIndex in 0 .. (table.ColumnCount-1) do
             yield
-                //Cell((columnIndex, rowIndex), state, setState, model, dispatch)
-                Html.th [
-                    prop.text (table.Headers.[columnIndex].ToString())
-                ]
+                Cells.HeaderCell(columnIndex, state, setState, model, dispatch)
             //yield! referenceColumns(state, cell, (column,row), model, dispatch)
     ]
 
