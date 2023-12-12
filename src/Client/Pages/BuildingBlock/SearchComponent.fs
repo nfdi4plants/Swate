@@ -544,7 +544,7 @@ module private BodyTerm =
                 Bulma.button.a [
                     let isActive = uiState.BodyCellType = BodyCellType.Term
                     if isActive then Bulma.color.isSuccess
-                    prop.onClick (fun _ -> {uiState with BodyCellType = BodyCellType.Text } |> setUiState)
+                    prop.onClick (fun _ -> {uiState with BodyCellType = BodyCellType.Term } |> setUiState)
                     prop.classes ["pr-2 pl-2 mb-0"; if isActive then "is-selected"]
                     prop.text "Term"
                 ]
