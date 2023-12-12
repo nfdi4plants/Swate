@@ -22,6 +22,9 @@ let selectHeader (uiState: BuildingBlockUIState) (setUiState: BuildingBlockUISta
     setUiState bodyType
     BuildingBlock.Msg.SelectHeader header |> BuildingBlockMsg
 
+let selectBody (body: CompositeCell) =
+    BuildingBlock.Msg.SelectBodyCell body |> BuildingBlockMsg
+
 let hasVerifiedTermHeader (header: CompositeHeader) = header.IsTermColumn && header.ToTerm().TermAccessionShort <> ""
 
 let hasVerifiedCell (cell: CompositeCell) = (cell.isTerm || cell.isUnitized) && cell.ToTerm().TermAccessionShort <> ""
