@@ -80,6 +80,34 @@ module Extensions =
             | CompositeCell.Unitized (v, oa) -> oa
             | CompositeCell.FreeText t -> OntologyAnnotation.fromString t
 
+        member this.UpdateMainField(s: string) =
+            match this with
+            | CompositeCell.Term oa -> CompositeCell.Term ({oa with Name = AnnotationValue.Text s |> Some})
+            | CompositeCell.Unitized (_, oa) -> CompositeCell.Unitized (s, oa)
+            | CompositeCell.FreeText _ -> CompositeCell.FreeText s
+
+        /// <summary>
+        /// Will return `this` if executed on Freetext cell.
+        /// </summary>
+        /// <param name="tsr"></param>
+        member this.UpdateTSR(tsr: string) =
+            let updateTSR (oa: OntologyAnnotation) = {oa with TermSourceREF = tsr |> Some}
+            match this with
+            | CompositeCell.Term oa -> CompositeCell.Term (updateTSR oa)
+            | CompositeCell.Unitized (v, oa) -> CompositeCell.Unitized (v, updateTSR oa)
+            | _ -> this
+
+        /// <summary>
+        /// Will return `this` if executed on Freetext cell.
+        /// </summary>
+        /// <param name="tsr"></param>
+        member this.UpdateTAN(tan: string) =
+            let updateTAN (oa: OntologyAnnotation) = {oa with TermAccessionNumber = tan |> Some}
+            match this with
+            | CompositeCell.Term oa -> CompositeCell.Term (updateTAN oa)
+            | CompositeCell.Unitized (v, oa) -> CompositeCell.Unitized (v, updateTAN oa)
+            | _ -> this
+
     type OntologyAnnotation with
         static member fromTerm (term:Term) = OntologyAnnotation.fromString(term.Name, term.FK_Ontology, term.Accession)
         member this.ToTermMinimal() = TermMinimal.create this.NameText this.TermAccessionShort

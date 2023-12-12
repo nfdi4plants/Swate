@@ -51,16 +51,15 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (sel
     let divider = Html.li [
         Html.div [ prop.style [style.border(2, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0)] ]
     ]
-    let isHeaderRow = funcs.RowIndex = 0
     let buttonList = [
         //button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
-        button ("Fill Column", "fa-solid fa-file-signature", funcs.FillColumn rmv, [prop.disabled isHeaderRow])
+        button ("Fill Column", "fa-solid fa-file-signature", funcs.FillColumn rmv, [])
         divider
         button ("Copy", "fa-solid fa-copy", funcs.Copy rmv, [])
         button ("Cut", "fa-solid fa-scissors", funcs.Cut rmv, [])
         button ("Paste", "fa-solid fa-paste",  funcs.Paste rmv, [prop.disabled selectedCell.IsNone])
         divider
-        button ("Delete Row", "fa-solid fa-delete-left", funcs.DeleteRow rmv, [prop.disabled isHeaderRow])
+        button ("Delete Row", "fa-solid fa-delete-left", funcs.DeleteRow rmv, [])
         button ("Delete Column", "fa-solid fa-delete-left fa-rotate-270", funcs.DeleteColumn rmv, [])
     ]
     Html.div [

@@ -44,8 +44,8 @@ let private tabRow (model:Model) (tabs: seq<ReactElement>) =
     Bulma.tabs [
         Bulma.tabs.isCentered; Bulma.tabs.isFullWidth; Bulma.tabs.isBoxed
         prop.style [
-            //style.custom ("overflow","visible")
-            style.paddingTop(length.rem 1)
+            //style.custom ("overflow","visible
+            style.paddingTop(length.rem 1); style.borderBottom (2, borderStyle.solid, NFDIColors.Mint.Base)
         ]
         tabs
         |> prop.children

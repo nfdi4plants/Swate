@@ -71,7 +71,7 @@ module Spreadsheet =
         | UpdateCell (index, cell) ->
             let cmd = createPromiseCmd <| fun _ ->
                 state.ActiveTable.UpdateCellAt(fst index,snd index, cell)
-                state
+                {state with ArcFile = state.ArcFile}
             state, model, cmd
         | UpdateActiveTable nextIndex ->
             let cmd = createPromiseCmd <| fun _ ->

@@ -78,7 +78,6 @@ let createTable (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Mo
     addTable newTable nextState
 
 let addBuildingBlock(newColumn: CompositeColumn) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    log "HIT!"
     let table = state.ActiveTable
     // add one to last column index OR to selected column index to append one to the right.
     let mutable nextIndex = getNextColumnIndex state
@@ -97,10 +96,6 @@ let addBuildingBlock(newColumn: CompositeColumn) (state: Spreadsheet.Model) : Sp
             let modal = Modals.WarningModal.warningModalSimple(msg)
             Modals.Controller.renderModal("ColumnReplaced", modal)
             newColumn <- {newColumn with Cells = hasInput.Value.Cells}
-    printfn "PRE ADD"
-    printfn "HEADER: %A" <| newColumn.Header
-    printfn "CELLS: %A" <| newColumn.Cells[0].isFreeText
-    printfn "CELL-COUNT: %A" <| newColumn.Cells.Length
     table.AddColumn(newColumn.Header, newColumn.Cells, nextIndex, true)
     {state with ArcFile = state.ArcFile}
 

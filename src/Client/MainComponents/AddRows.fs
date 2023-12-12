@@ -6,7 +6,10 @@ open Fable.Core.JsInterop
 
 open Messages
 
-let Main (init_RowsToAdd: int) (state_rows: int) (setState_rows: int -> unit) (dispatch: Messages.Msg -> unit) =
+[<ReactComponent>]
+let Main (dispatch: Messages.Msg -> unit) =
+    let init_RowsToAdd = 1
+    let state_rows, setState_rows = React.useState(init_RowsToAdd)
     Html.div [
         prop.id "ExpandTable"
         prop.title "Add rows"

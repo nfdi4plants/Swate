@@ -39,8 +39,6 @@ open Shared
 [<ReactComponent>]
 let Main (model: Messages.Model) dispatch =
     let state = model.SpreadsheetModel
-    let init_RowsToAdd = 1
-    let state_rows, setState_rows = React.useState(init_RowsToAdd)
     Html.div [
         prop.id "MainWindow"
         prop.style [
@@ -65,14 +63,13 @@ let Main (model: Messages.Model) dispatch =
                     match state.ArcFile with
                     | None ->
                         MainComponents.NoTablesElement.Main {|dispatch = dispatch|}
-                    | Some (ArcFiles.Assay a) ->
-                        MainComponents.SpreadsheetView.Main model dispatch
-                    | Some (ArcFiles.Study (s,a)) ->
+                    | Some (ArcFiles.Assay _) 
+                    | Some (ArcFiles.Study _) ->
                         MainComponents.SpreadsheetView.Main model dispatch
                     | Some (ArcFiles.Investigation i) ->
                         Html.div "Investigation"
                     if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 then
-                        MainComponents.AddRows.Main init_RowsToAdd state_rows setState_rows dispatch
+                        MainComponents.AddRows.Main dispatch
                 ]
             ]
             match state.Tables.TableCount = 0 with | true -> Html.none | false -> spreadsheetSelectionFooter model dispatch
