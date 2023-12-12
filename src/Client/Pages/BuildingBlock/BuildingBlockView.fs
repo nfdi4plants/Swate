@@ -31,10 +31,10 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
     | GetHeaderSuggestionsResponse (termSuggestions, uiSetter) ->
         let nextState = { state with HeaderSearchResults = termSuggestions }
         let state, setState = uiSetter.state, uiSetter.setState
-        setState {state with SearchIsLoading = false; SearchIsActive = true}
+        setState {SearchIsLoading = false; SearchIsActive = true}
         nextState, Cmd.none
-    | SelectHeaderTerm term ->
-        let nextState = { state with HeaderSelectedTerm = term; HeaderSearchText = if term.IsSome then term.Value.Name else state.HeaderSearchText }
+    | SelectHeader header ->
+        let nextState = { state with Header = header }
         nextState, Cmd.none
     | UpdateBodySearchText str ->
         let nextState = {state with BodySearchText = str}
@@ -66,10 +66,10 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
     | GetBodySuggestionsResponse (termSuggestions, uiSetter) ->
         let nextState = { state with BodySearchResults = termSuggestions }
         let state, setState = uiSetter.state, uiSetter.setState
-        setState {state with SearchIsLoading = false; SearchIsActive = true}
+        setState {SearchIsLoading = false; SearchIsActive = true}
         nextState, Cmd.none
-    | SelectBodyTerm term ->
-        let nextState = { state with BodySelectedTerm = term}
+    | SelectBodyCell (cell) ->
+        let nextState = { state with BodyCell = cell}
         nextState, Cmd.none
 
     | SearchUnitTermTextChange (newTerm) ->

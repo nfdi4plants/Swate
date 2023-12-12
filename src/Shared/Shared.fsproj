@@ -5,10 +5,10 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="paket.references" />
-    <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="URLs.fs" />
     <Compile Include="Regex.fs" />
     <Compile Include="TermTypes.fs" />
+    <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="AdvancedSearchTypes.fs" />
     <Compile Include="OfficeInteropTypes.fs" />
     <Compile Include="TemplateTypes.fs" />

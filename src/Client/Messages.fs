@@ -14,6 +14,7 @@ open OfficeInterop
 open OfficeInteropTypes
 open Model
 open Routing
+open ARCtrl.ISA
 
 type System.Exception with
     member this.GetPropagatedError() =
@@ -109,14 +110,14 @@ module BuildingBlock =
     | UpdateHeaderSearchText of string
     | GetHeaderSuggestions of string*TermSearchUIController
     | GetHeaderSuggestionsResponse of Term []*TermSearchUIController
-    | SelectHeaderTerm of Term option
+    | SelectHeader of CompositeHeader
     | UpdateBodySearchText of string
     | GetBodySuggestions of string*TermSearchUIController
     | GetBodySuggestionsByParent of string*TermMinimal*TermSearchUIController
     /// Returns all child terms
     | GetBodyTermsByParent of TermMinimal*TermSearchUIController
     | GetBodySuggestionsResponse of Term []*TermSearchUIController
-    | SelectBodyTerm of Term option
+    | SelectBodyCell of CompositeCell
     // Below everything is more or less deprecated
     // Is still used for unit update in office
     | SearchUnitTermTextChange  of searchString:string

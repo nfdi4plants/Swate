@@ -1,6 +1,7 @@
 namespace Shared
 
 open ARCtrl.ISA
+open TermTypes
 
 /// This module contains helper functions which might be useful for ARCtrl
 [<AutoOpen>]
@@ -21,6 +22,40 @@ module ARCtrlHelper =
 [<AutoOpen>]
 module Extensions =
 
+    type CompositeHeader with
+        member this.AsButtonName =
+            match this with
+            | CompositeHeader.Parameter _ -> "Parameter"
+            | CompositeHeader.Characteristic _ -> "Characteristic"
+            | CompositeHeader.Component _ -> "Component"
+            | CompositeHeader.Factor _ -> "Factor"
+            | CompositeHeader.Input _ -> "Input"
+            | CompositeHeader.Output _ -> "Output"
+            | anyElse -> anyElse.ToString()
+
+        member this.UpdateWithOA (oa: OntologyAnnotation) =
+            match this with
+            | CompositeHeader.Component _ -> CompositeHeader.Component oa
+            | CompositeHeader.Parameter _ -> CompositeHeader.Parameter oa
+            | CompositeHeader.Characteristic _ -> CompositeHeader.Characteristic oa
+            | CompositeHeader.Factor _ -> CompositeHeader.Factor oa
+            | _ ->  failwithf "Cannot update OntologyAnnotation on CompositeHeader without OntologyAnnotation: '%A'" this
+
+        member this.GetOA() =
+            match this with
+            | CompositeHeader.Component oa
+            | CompositeHeader.Parameter oa
+            | CompositeHeader.Characteristic oa
+            | CompositeHeader.Factor oa -> oa
+            | _ -> failwithf "Cannot get OntologyAnnotation from CompositeHeader without OntologyAnnotation: '%A'" this
+
+        static member ParameterEmpty = CompositeHeader.Parameter OntologyAnnotation.empty
+        static member CharacteristicEmpty = CompositeHeader.Characteristic OntologyAnnotation.empty
+        static member ComponentEmpty = CompositeHeader.Component OntologyAnnotation.empty
+        static member FactorEmpty = CompositeHeader.Factor OntologyAnnotation.empty
+        static member InputEmpty = CompositeHeader.Input <| IOType.FreeText ""
+        static member OutputEmpty = CompositeHeader.Output <| IOType.FreeText ""
+
     type CompositeCell with
         member this.UpdateWithOA(oa:OntologyAnnotation) =
             match this with
@@ -28,45 +63,12 @@ module Extensions =
             | CompositeCell.Unitized (v,_) -> CompositeCell.createUnitized (v,oa)
             | CompositeCell.FreeText _ -> CompositeCell.createFreeText oa.NameText
 
-        member this.ToEmptyCell() =
+        member this.GetOA() =
             match this with
-            | CompositeCell.Term _ -> CompositeCell.emptyTerm
-            | CompositeCell.Unitized (v,_) -> CompositeCell.emptyUnitized
-            | CompositeCell.FreeText _ -> CompositeCell.emptyFreeText
+            | CompositeCell.Term oa -> oa
+            | CompositeCell.Unitized (v, oa) -> oa
+            | CompositeCell.FreeText t -> OntologyAnnotation.fromString t
 
-    type CompositeColumn with
-
-        member this.PredictNewColumnCell() =
-            if not this.Header.IsTermColumn then
-                CompositeCell.emptyFreeText
-            else
-                let unitCellCount, termCellCount =
-                    this.Cells
-                    |> Seq.fold (fun (units,terms) cell ->
-                        if cell.isUnitized then (units+1,terms) else (units,terms+1)
-                    ) (0,0)
-                if termCellCount >= unitCellCount then
-                    CompositeCell.emptyTerm
-                else
-                    CompositeCell.emptyUnitized
-
-    type ArcTable with
-        member this.GetCellAt(columnIndex: int, rowIndex: int) =
-            match this.TryGetCellAt(columnIndex,rowIndex) with
-            | Some c -> c
-            | None -> failwith $"Error. Unable to get cell at position '{columnIndex},{rowIndex}' in table '{this.Name}'."
-        member this.MapColumns(mapping: CompositeColumn -> unit) =
-            for columnIndex in 0 .. (this.ColumnCount-1) do
-                let column = this.GetColumn columnIndex
-                mapping column
-        member this.MapiColumns(mapping: int -> CompositeColumn -> unit) =
-            for columnIndex in 0 .. (this.ColumnCount-1) do
-                let column = this.GetColumn columnIndex
-                mapping columnIndex column
-                    
-    type ArcTables with
-        member this.MoveTable(oldIndex: int, newIndex: int) =
-            let table = this.Tables.[oldIndex]
-            this.Tables.Insert(newIndex, table)
-            let updatedOldIndex = if newIndex <= oldIndex then oldIndex + 1 else oldIndex
-            this.Tables.RemoveAt(updatedOldIndex)
+    type OntologyAnnotation with
+        static member fromTerm (term:Term) = OntologyAnnotation.fromString(term.Name, term.FK_Ontology, term.Accession)
+        member this.ToTermMinimal() = TermMinimal.create this.NameText this.TermAccessionShort

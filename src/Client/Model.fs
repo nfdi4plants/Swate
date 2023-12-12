@@ -233,65 +233,72 @@ open OfficeInteropTypes
 
 module BuildingBlock =
 
+    open ARCtrl.ISA
+
     [<RequireQualifiedAccess>]
     type DropdownPage =
     | Main
-    | ProtocolTypes
-    | Output
+    | More
+    | IOTypes of ((IOType -> CompositeHeader)*string)
 
         member this.toString =
             match this with
             | Main -> "Main Page"
-            | ProtocolTypes -> "Protocol Columns"
-            | Output -> "Output Columns"
+            | More -> "More"
+            | IOTypes (_,name) -> name
 
         member this.toTooltip =
             match this with
-            | ProtocolTypes -> "Protocol columns extend control for protocol parsing."
-            | Output -> "Output columns allow to specify the exact output for your table. Per table only one output column is allowed. The value of this column must be a unique identifier."
+            | More -> "More"
+            | IOTypes (_,name) -> $"Per table only one {name} is allowed. The value of this column must be a unique identifier."
             | _ -> ""
 
+    type [<RequireQualifiedAccess>] BodyCellType =
+    | Term
+    | Unitized
+    | Text
+
     type BuildingBlockUIState = {
-        DropdownIsActive        : bool
-        DropdownPage            : DropdownPage
-        BuildingBlockType       : BuildingBlockType
+        DropdownIsActive    : bool
+        DropdownPage        : DropdownPage
+        BodyCellType        : BodyCellType
     } with
         static member init() = {
-            DropdownIsActive        = false
-            DropdownPage            = DropdownPage.Main
-            BuildingBlockType       = BuildingBlockType.Parameter
+            DropdownIsActive    = false
+            DropdownPage        = DropdownPage.Main
+            BodyCellType        = BodyCellType.Term
         }
 
     type Model = {
 
-        HeaderSearchText                        : string
-        /// This always referrs to any term applied to the header.
-        HeaderSearchResults                     : Term []
-        /// This always referrs to any term applied to the header.
-        HeaderSelectedTerm                      : Term option
-        BodySearchText                          : string
+        Header                          : CompositeHeader
+        BodyCell                        : CompositeCell
         /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
-        BodySearchResults                       : Term []
+        HeaderSearchText                : string
+        /// This always referrs to any term applied to the header.
+        HeaderSearchResults             : Term []
+        /// This always referrs to any term applied to the header.
+        BodySearchText                  : string
         /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
-        BodySelectedTerm                        : Term option
+        BodySearchResults               : Term []
 
         // Below everything is more or less deprecated
         // This section is used to add a unit directly to an already existing building block
-        Unit2TermSearchText                     : string
-        Unit2SelectedTerm                       : Term option
-        Unit2TermSuggestions                    : Term []
-        HasUnit2TermSuggestionsLoading          : bool
-        ShowUnit2TermSuggestions                : bool
+        Unit2TermSearchText             : string
+        Unit2SelectedTerm               : Term option
+        Unit2TermSuggestions            : Term []
+        HasUnit2TermSuggestionsLoading  : bool
+        ShowUnit2TermSuggestions        : bool
 
     } with
         static member init () = {
 
             HeaderSearchText                        = ""
             HeaderSearchResults                     = [||]
-            HeaderSelectedTerm                      = None
+            Header                                  = CompositeHeader.ParameterEmpty
             BodySearchText                          = ""
             BodySearchResults                       = [||]
-            BodySelectedTerm                        = None
+            BodyCell                                = CompositeCell.emptyTerm
 
             // Below everything is more or less deprecated
             // This section is used to add a unit directly to an already existing building block

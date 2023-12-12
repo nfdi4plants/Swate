@@ -71,7 +71,8 @@ type Neo4j =
                 executeReadQuery.ToListAsync()
                 |> Async.AwaitTask
             printfn "INNER LENGTH: %i" (dbValues |> Seq.length)
-            printfn "RESULT: %A" (dbValues.Item 0)
+            if dbValues |> Seq.length > 0 then
+                printfn "RESULT: %A" (dbValues.Item 0)
             let parsedDbValues = dbValues |> Seq.map resultAs
             printfn "INNER LENGTH PARSED: %i" (dbValues |> Seq.length)
             if session.IsNone then currentSession.Dispose()

@@ -90,9 +90,10 @@ let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
         SelectedCells = Set.empty}
 
 let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let cell = state.ActiveTable.GetCellAt index 
+    let cell = state.ActiveTable.TryGetCellAt index
     let columnIndex = fst index
-    state.ActiveTable.MapiColumns(fun i column ->
+    state.ActiveTable.IteriColumns(fun i column ->
+        let cell = cell|> Option.defaultValue (column.GetDefaultEmptyCell())
         if i = columnIndex then
             for cellRowIndex in 0 .. column.Cells.Length-1 do
                 state.ActiveTable.UpdateCellAt(columnIndex, cellRowIndex, cell)

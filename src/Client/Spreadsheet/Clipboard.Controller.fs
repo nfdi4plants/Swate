@@ -23,7 +23,8 @@ let copySelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
 let cutCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = state.ActiveTable.TryGetCellAt(index)
     // Remove selected cell value
-    let emptyCell = if cell.IsSome then cell.Value.ToEmptyCell() else state.ActiveTable.GetColumn(fst index).PredictNewColumnCell()
+    
+    let emptyCell = if cell.IsSome then cell.Value.GetEmptyCell() else state.ActiveTable.GetColumn(fst index).GetDefaultEmptyCell()
     state.ActiveTable.UpdateCellAt(fst index,snd index, emptyCell)
     let nextState = setClipboardCell state cell
     nextState
