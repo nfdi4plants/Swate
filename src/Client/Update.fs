@@ -52,9 +52,8 @@ module Dev =
             let parsedLogs = logs |> List.map LogItem.ofInteropLogginMsg
             let parsedDisplayLogs = parsedLogs |> List.filter (fun x -> match x with | Error _ | Warning _ -> true; | _ -> false)
             let nextState = {
-                currentState with
-                    Log = parsedLogs@currentState.Log
-                    DisplayLogList = parsedDisplayLogs@currentState.DisplayLogList
+                Log = parsedLogs@currentState.Log
+                DisplayLogList = parsedDisplayLogs@currentState.DisplayLogList
             }
             let batch = Cmd.batch [
                 let modalName = "GenericInteropLogs"
@@ -260,9 +259,8 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentState with
-                currentCall = noCall
-                callHistory = finishedCall::currentState.callHistory
+            currentCall = noCall
+            callHistory = finishedCall::currentState.callHistory
         }
 
         let cmds = Cmd.batch [
@@ -279,9 +277,8 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentState with
-                currentCall = noCall
-                callHistory = finishedCall::currentState.callHistory
+            currentCall = noCall
+            callHistory = finishedCall::currentState.callHistory
         }
 
         let cmds = Cmd.batch [
@@ -311,9 +308,8 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentState with
-                currentCall = noCall
-                callHistory = finishedCall::currentState.callHistory
+            currentCall = noCall
+            callHistory = finishedCall::currentState.callHistory
         }
 
         let cmds = Cmd.batch [
@@ -330,9 +326,8 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentState with
-                currentCall = noCall
-                callHistory = finishedCall::currentState.callHistory
+            currentCall = noCall
+            callHistory = finishedCall::currentState.callHistory
         }
 
         let cmds = Cmd.batch [
@@ -348,9 +343,8 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
                 Status = Successfull
         }
         let nextState = {
-            currentState with
-                currentCall = noCall
-                callHistory = finishedCall::currentState.callHistory
+            currentCall = noCall
+            callHistory = finishedCall::currentState.callHistory
         }
         let cmd =
             SpreadsheetInterface.UpdateTermColumnsResponse termsWithSearchResult |> InterfaceMsg |> Cmd.ofMsg
@@ -366,9 +360,8 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentState with
-                currentCall = noCall
-                callHistory = finishedCall::currentState.callHistory
+            currentCall = noCall
+            callHistory = finishedCall::currentState.callHistory
         }
 
         let cmds = Cmd.batch [
@@ -391,9 +384,8 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messag
         }
 
         let nextState = {
-            currentState with
-                currentCall = noCall
-                callHistory = failedCall::currentState.callHistory
+            currentCall = noCall
+            callHistory = failedCall::currentState.callHistory
         }
         let batch = Cmd.batch [
             let modalName = "GenericError"
@@ -463,9 +455,8 @@ let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (current
         nextState, cmd
     | GetSelectedBuildingBlockTermsResponse searchTermResults ->
         let nextState = {
-            currentState with
-                BuildingBlockValues = searchTermResults
-                CurrentRequestState = Inactive
+            BuildingBlockValues = searchTermResults
+            CurrentRequestState = Inactive
         }
         let cmd = Cmd.ofEffect(fun dispatch ->
             Modals.Controller.renderModal("BuildingBlockDetails", Modals.BuildingBlockDetailsModal.buildingBlockDetailModal(nextState, dispatch))
@@ -493,6 +484,7 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
         match msg with
         | DoNothing -> currentModel,Cmd.none
+        | UpdateHistory next -> {model with History = next}, Cmd.none
         | TestMyAPI ->
             let cmd =
                 Cmd.OfAsync.either

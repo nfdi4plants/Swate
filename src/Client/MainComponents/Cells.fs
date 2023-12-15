@@ -305,7 +305,6 @@ let HeaderCell(columnIndex: int, state_extend: Set<int>, setState_extend, model:
                 //prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
                 prop.children [
                     if state_cell.Active then
-                        /// TODO! Try get from db?
                         /// Update change to mainState and exit active input.
                         let updateMainStateTable() =
                             // Only update if changed

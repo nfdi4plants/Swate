@@ -57,7 +57,6 @@ module Interface =
                             (OfficeInterop.AnnotationTableExists >> OfficeInteropMsg)
                             (curry GenericError Cmd.none >> DevMsg)
                     | Swatehost.Browser | Swatehost.Electron ->
-                        Spreadsheet.LocalStorage.onInit()
                         Cmd.batch [
                             Cmd.ofEffect (fun dispatch -> Spreadsheet.KeyboardShortcuts.addOnKeydownEvent dispatch)
                         ]

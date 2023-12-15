@@ -189,6 +189,7 @@ type Model = {
     CytoscapeModel              : Cytoscape.Model
     /// Contains all information about spreadsheet view
     SpreadsheetModel            : Spreadsheet.Model
+    History                     : LocalHistory.Model
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
@@ -224,6 +225,7 @@ type Msg =
 | UpdatePageState       of Routing.Route option
 | UpdateIsExpert        of bool
 | Batch                 of seq<Messages.Msg>
+| UpdateHistory         of LocalHistory.Model
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI

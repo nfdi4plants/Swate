@@ -3,6 +3,7 @@ namespace Update
 open Messages
 open Elmish
 open Spreadsheet
+open LocalHistory
 open Model
 open Shared
 open Spreadsheet.Table
@@ -96,14 +97,27 @@ module Spreadsheet =
             let cmd = createPromiseCmd <| fun _ -> Controller.updateTableOrder (prev_index, new_index) state
             state, model, cmd
         | UpdateHistoryPosition (newPosition) ->
-            let cmd = createPromiseCmd <| fun _ -> Spreadsheet.LocalStorage.updateHistoryPosition newPosition state
-            state, model, cmd
+            let nextState, nextModel =
+                match newPosition with
+                | _ when model.History.NextPositionIsValid(newPosition) |> not ->
+                    state, model
+                | _ ->
+                    /// Run this first so an error breaks the function before any mutables are changed
+                    let nextState = 
+                        Spreadsheet.Model.fromSessionStorage(newPosition)
+                    Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, string newPosition)
+                    let nextModel = {model with History.HistoryCurrentPosition = newPosition}
+                    nextState, nextModel
+            let cmd = createPromiseCmd <| fun _ -> nextState
+            state, nextModel, cmd
         | AddRows (n) ->
             let cmd = createPromiseCmd <| fun _ -> Controller.addRows n state
             state, model, cmd
         | Reset ->
-            let cmd = createPromiseCmd <| fun _ -> Controller.resetTableState()
-            state, model, cmd
+            let nextHistory, nextState = Controller.resetTableState()
+            let cmd = createPromiseCmd <| fun _ -> nextState
+            let nextModel = {model with History = nextHistory}
+            state, nextModel, cmd
         | DeleteRow index ->
             let cmd = createPromiseCmd <| fun _ -> Controller.deleteRow index state
             state, model, cmd
@@ -274,9 +288,9 @@ module Spreadsheet =
             failwith "UpdateTermColumnsResponse is not implemented yet"
             state,model,Cmd.none
         | Success nextState ->
-            Spreadsheet.LocalStorage.tablesToLocalStorage nextState // This will cache the most up to date table state to local storage.
-            Spreadsheet.LocalStorage.tablesToSessionStorage nextState // this will cache the table state for certain operations in session storage.
-            nextState, model, Cmd.none
+            nextState.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
+            let nextHistory = model.History.SaveSessionSnapshot nextState // this will cache the table state for certain operations in session storage.
+            nextState, {model with History = nextHistory}, Cmd.none
         | SuccessNoHistory nextState ->
-            Spreadsheet.LocalStorage.tablesToLocalStorage nextState // This will cache the most up to date table state to local storage.
+            nextState.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
             nextState, model, Cmd.none

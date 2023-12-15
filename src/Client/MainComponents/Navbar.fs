@@ -3,11 +3,13 @@ module MainComponents.Navbar
 open Feliz
 open Feliz.Bulma
 
-open Messages
 
+open LocalHistory
+open Messages
 open Components.QuickAccessButton
 
-let quickAccessButtonListStart (model: Model) dispatch =
+
+let quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
@@ -20,17 +22,15 @@ let quickAccessButtonListStart (model: Model) dispatch =
                     Bulma.icon [Html.i [prop.className "fa-solid fa-rotate-left"]]
                 ],
                 (fun _ ->
-                    let newPosition = Spreadsheet.LocalStorage.CurrentHistoryPosition + 1
-                    let newPosition_clamped = System.Math.Min(newPosition, Spreadsheet.LocalStorage.AvailableHistoryItems)
-                    let noChange = newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition
-                    let overMax = newPosition_clamped = Spreadsheet.LocalStorage.MaxHistory
-                    let notEnoughHistory = Spreadsheet.LocalStorage.AvailableHistoryItems - (Spreadsheet.LocalStorage.CurrentHistoryPosition + 1) <= 0
-                    if noChange || overMax || notEnoughHistory then
-                        ()
-                    else
-                        Spreadsheet.UpdateHistoryPosition newPosition_clamped |> Msg.SpreadsheetMsg |> dispatch
+                    let newPosition = state.HistoryCurrentPosition + 1 
+                    //let newPosition_clamped = System.Math.Min(newPosition, state.HistoryExistingItemCount)
+                    //let noChange = newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition
+                    //let overMax = newPosition_clamped = Spreadsheet.LocalStorage.MaxHistory
+                    //let notEnoughHistory = Spreadsheet.LocalStorage.AvailableHistoryItems - (Spreadsheet.LocalStorage.CurrentHistoryPosition + 1) <= 0
+                    if state.NextPositionIsValid(newPosition) then
+                        Spreadsheet.UpdateHistoryPosition newPosition |> Msg.SpreadsheetMsg |> dispatch
                 ),
-                isActive = (Spreadsheet.LocalStorage.AvailableHistoryItems - (Spreadsheet.LocalStorage.CurrentHistoryPosition + 1) > 0)
+                isActive = (state.NextPositionIsValid(state.HistoryCurrentPosition + 1))
             ).toReactElement()
             QuickAccessButton.create(
                 "Forward",
@@ -38,14 +38,11 @@ let quickAccessButtonListStart (model: Model) dispatch =
                     Bulma.icon [Html.i [prop.className "fa-solid fa-rotate-right"]]
                 ],
                 (fun _ ->
-                    let newPosition = Spreadsheet.LocalStorage.CurrentHistoryPosition - 1
-                    let newPosition_clamped = System.Math.Max(newPosition, 0)
-                    if newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition then
-                        ()
-                    else
-                        Spreadsheet.UpdateHistoryPosition newPosition_clamped |> Msg.SpreadsheetMsg |> dispatch
+                    let newPosition = state.HistoryCurrentPosition - 1
+                    if state.NextPositionIsValid(newPosition) then
+                        Spreadsheet.UpdateHistoryPosition newPosition |> Msg.SpreadsheetMsg |> dispatch
                 ),
-                isActive = (Spreadsheet.LocalStorage.CurrentHistoryPosition > 0)
+                isActive = (state.NextPositionIsValid(state.HistoryCurrentPosition - 1))
             ).toReactElement()
         ]
     ]
@@ -68,12 +65,14 @@ let quickAccessButtonListEnd (model: Model) dispatch =
                 [
                     Bulma.icon [Html.i [prop.className "fa-sharp fa-solid fa-trash";]]
                 ],
-                (fun _ -> Modals.Controller.renderModal("R esetTableWarning", Modals.ResetTable.Main dispatch) ),
+                (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch) ),
                 buttonProps = [Bulma.color.isDanger; Bulma.button.isInverted; Bulma.button.isOutlined]
             ).toReactElement()
         ]
     ]
 
+
+[<ReactComponent>]
 let Main (model: Messages.Model) dispatch =
     Bulma.navbar [
         prop.className "myNavbarSticky"
@@ -98,7 +97,7 @@ let Main (model: Messages.Model) dispatch =
                     Bulma.navbarStart.div [
                         prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                         prop.children [
-                            quickAccessButtonListStart model dispatch
+                            quickAccessButtonListStart model.History dispatch
                         ]
                     ]
                     Bulma.navbarEnd.div [

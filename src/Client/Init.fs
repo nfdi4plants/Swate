@@ -2,11 +2,11 @@ module Init
 
 open Elmish.UrlParser
 open Elmish
+open LocalHistory
 open Model
 open Messages
 open Update
 open Thoth.Elmish
-open Spreadsheet.LocalStorage
 
 let initializeModel (pageOpt: Routing.Route option) =
     let dt = LocalStorage.Darkmode.DataTheme.GET()
@@ -30,7 +30,8 @@ let initializeModel (pageOpt: Routing.Route option) =
         TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         DagModel                    = Dag.Model                 .init ()
         CytoscapeModel              = Cytoscape.Model           .init ()
-        SpreadsheetModel            = Spreadsheet.Model         .tryInitFromLocalStorage()
+        SpreadsheetModel            = Spreadsheet.Model         .fromLocalStorage()
+        History                     = LocalHistory.Model        .init().UpdateFromSessionStorage()
     }
 
 // defines the initial state and initial command (= side-effect) of the application

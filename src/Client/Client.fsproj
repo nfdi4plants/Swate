@@ -32,6 +32,7 @@
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
         <Compile Include="States\SpreadsheetInterface.fs" />
         <Compile Include="States\Spreadsheet.fs" />
+        <Compile Include="States\LocalHistory.fs" />
         <Compile Include="States\CytoscapeState.fs" />
         <Compile Include="States\DagState.fs" />
         <Compile Include="States\TemplateMetadataState.fs" />
@@ -49,7 +50,6 @@
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
         <Compile Include="Spreadsheet\IO.fs" />
-        <Compile Include="Spreadsheet\LocalStorage.fs" />
         <Compile Include="Spreadsheet\Types.fs" />
         <Compile Include="Spreadsheet\Clipboard.Controller.fs" />
         <Compile Include="Spreadsheet\Table.Controller.fs" />
