@@ -3,34 +3,11 @@ module SplitWindowView
 open Feliz
 open Elmish
 open Browser.Types
+open LocalStorage.SplitWindow
 
 [<Literal>]
 let private sidebarId = "sidebar_window"
 let private minWidth = 400
-    
-type private SplitWindow = {
-    ScrollbarWidth      : float
-    RightWindowWidth    : float
-} with
-    static member init() =
-        let initSidebarWidth = 400
-        /// Without this the scrollbar will offset the splitWindowElement
-        let mutable InitScrollbarWidth = 0.0
-        /// If you change anything here. Make sure it is only added ONCE and then removed ONCE!
-        /// Note: Add the commented console.logs to ensure.
-        let setInitWidth =
-            let scrollDiv = Browser.Dom.document.createElement "div"
-            scrollDiv.className <- "scrollbar-measure"
-            //Browser.Dom.console.log("add")
-            ignore <| Browser.Dom.document.body.appendChild(scrollDiv)
-            let sw = scrollDiv.offsetWidth - scrollDiv.clientWidth
-            InitScrollbarWidth <- sw
-            //Browser.Dom.console.log("remove")
-            scrollDiv.remove()
-        {
-            ScrollbarWidth      = InitScrollbarWidth
-            RightWindowWidth    = initSidebarWidth
-        }
 
 let private calculateNewSideBarSize (model:SplitWindow) (pos:float) =
     let windowWidth = Browser.Dom.window.innerWidth
@@ -102,6 +79,7 @@ let exampleTerm =
 [<ReactComponent>]
 let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) (dispatch: Messages.Msg -> unit) =
     let (model, setModel) = React.useState(SplitWindow.init)
+    React.useEffect(model.WriteToLocalStorage, [|box model|])
     React.useEffectOnce(fun _ -> Browser.Dom.window.addEventListener("resize", onResize_event model setModel))
     Html.div [
         prop.style [
