@@ -27,6 +27,8 @@ let renderModal(name: string, reactElement: (_ -> unit) -> Fable.React.ReactElem
     let child = Browser.Dom.document.createElement "div"
     child.id <- id
     parent.appendChild(child) |> ignore
-    let rmv = fun _ -> removeModal(name)
     let r = Feliz.ReactDOM.createRoot(Browser.Dom.document.getElementById id)
+    let rmv = fun _ -> 
+        r.unmount()
+        removeModal(name)
     r.render (reactElement rmv)

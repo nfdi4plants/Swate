@@ -60,6 +60,7 @@ module ConversionTypes =
     | Investigation
     | Study
     | Assay
+    | None
 
     type SessionStorage = {
         JsonArcFiles: JsonArcFiles
@@ -72,7 +73,7 @@ module ConversionTypes =
                 | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toJsonString i
                 | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, ArcStudy.toJsonString s (ResizeArray(al))
                 | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString a
-                | None -> failwith "Should not try to set session storage without existing ArcFile."
+                | None -> JsonArcFiles.None, ""
             {
                 JsonArcFiles = jsonArcFile 
                 JsonString = jsonString
@@ -82,13 +83,14 @@ module ConversionTypes =
             let init = Spreadsheet.Model.init()
             let arcFile = 
                 match this.JsonArcFiles with
-                | JsonArcFiles.Investigation -> ArcInvestigation.fromJsonString this.JsonString |> ArcFiles.Investigation
-                | JsonArcFiles.Study -> ArcStudy.fromJsonString this.JsonString |> fun (x,y) -> ArcFiles.Study(x, List.ofSeq y)
-                | JsonArcFiles.Assay -> ArcAssay.fromJsonString this.JsonString |> ArcFiles.Assay
+                | JsonArcFiles.Investigation -> ArcInvestigation.fromJsonString this.JsonString |> ArcFiles.Investigation |> Some
+                | JsonArcFiles.Study -> ArcStudy.fromJsonString this.JsonString |> fun (x,y) -> ArcFiles.Study(x, List.ofSeq y) |> Some
+                | JsonArcFiles.Assay -> ArcAssay.fromJsonString this.JsonString |> ArcFiles.Assay |> Some
+                | JsonArcFiles.None -> None
             {
                 init with
                     ActiveTableIndex = this.ActiveTableIndex
-                    ArcFile = Some arcFile
+                    ArcFile = arcFile
             }
         static member toSpreadsheetModel (sessionStorage: SessionStorage) =
             sessionStorage.ToSpreadsheetModel()
