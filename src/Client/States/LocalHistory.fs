@@ -65,7 +65,7 @@ module ConversionTypes =
     type SessionStorage = {
         JsonArcFiles: JsonArcFiles
         JsonString: string
-        ActiveTableIndex: int
+        ActiveView: Spreadsheet.ActiveView
     } with
         static member fromSpreadsheetModel (model: Spreadsheet.Model) =
             let jsonArcFile, jsonString =
@@ -77,7 +77,7 @@ module ConversionTypes =
             {
                 JsonArcFiles = jsonArcFile 
                 JsonString = jsonString
-                ActiveTableIndex = model.ActiveTableIndex
+                ActiveView = model.ActiveView
             }
         member this.ToSpreadsheetModel() = 
             let init = Spreadsheet.Model.init()
@@ -89,7 +89,7 @@ module ConversionTypes =
                 | JsonArcFiles.None -> None
             {
                 init with
-                    ActiveTableIndex = this.ActiveTableIndex
+                    ActiveView = this.ActiveView
                     ArcFile = arcFile
             }
         static member toSpreadsheetModel (sessionStorage: SessionStorage) =
@@ -97,8 +97,12 @@ module ConversionTypes =
 
 type Spreadsheet.Model with
     static member fromJsonString (json: string) = 
-        let conversionModel = Json.parseAs<ConversionTypes.SessionStorage>(json)
-        conversionModel.ToSpreadsheetModel()
+        let conversionModel = Json.tryParseAs<ConversionTypes.SessionStorage>(json)
+        match conversionModel with
+        | Ok m -> m.ToSpreadsheetModel()
+        | Error e -> 
+            log ("Error trying to read Spreadsheet.Model from local storage: ", e)
+            Spreadsheet.Model.init()
         
     member this.ToJsonString() =
         let conversionModel = ConversionTypes.SessionStorage.fromSpreadsheetModel this

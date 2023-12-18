@@ -47,7 +47,8 @@ let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Mode
             Spreadsheet.Model.init()
         else
             // if active table is removed get the next closest table and set it active
-            if state.ActiveTableIndex = removeIndex then
+            match state.ActiveView with
+            | ActiveView.Table i when i = removeIndex ->
                 let nextTable_Index =
                     let neighbors = findNeighborTables removeIndex state.Tables
                     match neighbors with
@@ -57,13 +58,13 @@ let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Mode
                     | _ -> 0
                 { state with
                     ArcFile = state.ArcFile
-                    ActiveTableIndex = nextTable_Index }
-            // Tables still exist and an inactive one was removed. Just remove it.
-            else
-                let nextTable_Index = if state.ActiveTableIndex > removeIndex then state.ActiveTableIndex - 1 else state.ActiveTableIndex
+                    ActiveView = ActiveView.Table nextTable_Index }
+            | ActiveView.Table i -> // Tables still exist and an inactive one was removed. Just remove it.
+                let nextTable_Index = if i > removeIndex then i - 1 else i
                 { state with
                     ArcFile = state.ArcFile
-                    ActiveTableIndex = nextTable_Index }
+                    ActiveView = ActiveView.Table nextTable_Index }
+            | _ -> state
 
 ///<summary>Add `n` rows to active table.</summary>
 let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =

@@ -8,6 +8,7 @@ open TermTypes
 module ARCtrlHelper =
 
     type ArcFiles =
+    | Template      of ARCtrl.Template.Template
     | Investigation of ArcInvestigation
     | Study         of ArcStudy * ArcAssay list
     | Assay         of ArcAssay
@@ -15,6 +16,7 @@ module ARCtrlHelper =
     with
         member this.Tables() : ArcTables =
             match this with
+            | Template t -> ResizeArray([t.Table]) |> ArcTables
             | Investigation _ -> ArcTables(ResizeArray[])
             | Study (s,_) -> s
             | Assay a -> a

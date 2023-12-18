@@ -21,6 +21,8 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                                 yield Bulma.tab  [
                                     prop.style [style.width (length.px 20)]
                                 ]
+                                yield 
+                                    MainComponents.FooterTabs.MainMetadata {| model=model; dispatch = dispatch |}
                                 for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
                                     yield
                                         MainComponents.FooterTabs.Main {| index = index; tables = model.SpreadsheetModel.Tables; model = model; dispatch = dispatch |}
@@ -64,11 +66,10 @@ let Main (model: Messages.Model) dispatch =
                     | None ->
                         MainComponents.NoTablesElement.Main {|dispatch = dispatch|}
                     | Some (ArcFiles.Assay _) 
-                    | Some (ArcFiles.Study _) ->
-                        MainComponents.SpreadsheetView.Main model dispatch
-                    | Some (ArcFiles.Investigation i) ->
-                        Html.div "Investigation"
-                    if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 then
+                    | Some (ArcFiles.Study _)
+                    | Some (ArcFiles.Investigation _) ->
+                        XlsxFileView.Main {|model = model; dispatch = dispatch|}
+                    if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 && state.ActiveView <> Spreadsheet.ActiveView.Metadata then
                         MainComponents.AddRows.Main dispatch
                 ]
             ]

@@ -103,7 +103,7 @@ module Interface =
                     Browser.Dom.window.alert "Not implemented"
                     model, Cmd.none
                 | Swatehost.Browser ->
-                    let cmd = Spreadsheet.SetArcFile tables |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.UpdateArcFile tables |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | InsertOntologyTerm termMinimal ->

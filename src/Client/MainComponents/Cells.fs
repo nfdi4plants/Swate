@@ -279,7 +279,7 @@ let HeaderCell(columnIndex: int, state_extend: Set<int>, setState_extend, model:
     let cellValue = header.ToString()
     let state_cell, setState_cell = React.useState(CellState.init(cellValue))
     Html.th [
-        prop.key $"Header_{state.ActiveTableIndex}-{columnIndex}"
+        prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}"
         cellStyle [
             //if isHeader && cell.Header.isInputColumn then
             //    style.color(NFDIColors.white)
@@ -331,7 +331,7 @@ let BodyCell(index: (int*int), state_extend: Set<int>, setState_extend, model: M
     let state_cell, setState_cell = React.useState(CellState.init(cellValue))
     let isSelected = state.SelectedCells.Contains index
     Html.td [
-        prop.key $"Cell_{state.ActiveTableIndex}-{columnIndex}-{rowIndex}"
+        prop.key $"Cell_{state.ActiveView.TableIndex}-{columnIndex}-{rowIndex}"
         cellStyle [
             //if isHeader && cell.Header.isInputColumn then
             //    style.color(NFDIColors.white)

@@ -34,7 +34,7 @@ module Spreadsheet =
         /// </summary>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Messages.Model, cmd) =
             match msg with
-            | UpdateActiveTable _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | CopySelectedCell | CopyCell _ -> 
+            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | CopySelectedCell | CopyCell _ -> 
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 state, model, cmd
             | _ -> 
@@ -68,7 +68,7 @@ module Spreadsheet =
             | AddAnnotationBlocks columns ->
                 let nextState = Controller.addBuildingBlocks columns state
                 nextState, model, Cmd.none
-            | SetArcFile arcFile ->
+            | UpdateArcFile arcFile ->
                 let nextState = { state with ArcFile = Some arcFile }
                 nextState, model, Cmd.none
             | InsertOntologyTerm oa ->
@@ -89,12 +89,8 @@ module Spreadsheet =
                     state.ActiveTable.UpdateHeader(index, header)
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
-            | UpdateActiveTable nextIndex ->
-                let nextState = 
-                    if nextIndex < 0 || nextIndex >= state.Tables.TableCount then
-                        failwith $"Error. Cannot navigate to table: '{nextIndex + 1}'. Only '{state.Tables.TableCount}' tables found!"
-                    { state with
-                        ActiveTableIndex = nextIndex }
+            | UpdateActiveView nextView ->
+                let nextState = { state with ActiveView = nextView }
                 nextState, model, Cmd.none
             | RemoveTable removeIndex ->
                 let nextState = Controller.removeTable removeIndex state
@@ -172,7 +168,7 @@ module Spreadsheet =
                     Cmd.OfPromise.either
                         Spreadsheet.IO.readFromBytes
                         bytes
-                        (SetArcFile >> Messages.SpreadsheetMsg)
+                        (UpdateArcFile >> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
                 state, model, cmd
             | ExportJsonTable ->

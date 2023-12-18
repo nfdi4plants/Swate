@@ -120,8 +120,8 @@ let Main (input: {|index: int; tables: ArcTables; model: Messages.Model; dispatc
         // Use this to ensure updating reactelement correctly
         prop.key id
         prop.id id
-        if input.model.SpreadsheetModel.ActiveTableIndex = index then Bulma.tab.isActive
-        prop.onClick (fun _ -> Spreadsheet.UpdateActiveTable index |> Messages.SpreadsheetMsg |> dispatch)
+        if input.model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then Bulma.tab.isActive
+        prop.onClick (fun _ -> Spreadsheet.UpdateActiveView (Spreadsheet.ActiveView.Table index) |> Messages.SpreadsheetMsg |> dispatch)
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
@@ -157,7 +157,24 @@ let Main (input: {|index: int; tables: ArcTables; model: Messages.Model; dispatc
                     prop.defaultValue table.Name
                 ]
             else
-                Html.a [prop.text (table.Name)]
+                Html.a [prop.text table.Name]
+        ]
+    ]
+
+[<ReactComponent>]
+let MainMetadata(input:{|model: Messages.Model; dispatch: Messages.Msg -> unit|}) =
+    let dispatch = input.dispatch
+    let order = 0
+    let id = "Metadata-Tab"
+    let nav = Spreadsheet.ActiveView.Metadata
+    Bulma.tab [
+        if input.model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
+        prop.key id
+        prop.id id
+        prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
+        prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
+        prop.children [
+            Html.a [prop.text "Metadata"]
         ]
     ]
 

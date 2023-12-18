@@ -20,7 +20,7 @@ module SidebarControllerAux =
     /// Uses current `ActiveTableIndex` to return next `ActiveTableIndex` whenever a new table is added and we want to
     /// switch to the new table.
     let getNextActiveTableIndex (state: Spreadsheet.Model) =
-        if state.Tables.TableCount = 0 then 0 else state.ActiveTableIndex + 1
+        if state.Tables.TableCount = 0 then 0 else state.ActiveView.TableIndex + 1
 
     /// <summary>
     /// Uses the first selected columnIndex from `state.SelectedCells` to determine if new column should be inserted or appended.
@@ -53,7 +53,7 @@ let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model
     tables.AddTable(newTable, newIndex)
     { state with
         ArcFile = state.ArcFile
-        ActiveTableIndex = newIndex }
+        ActiveView = ActiveView.Table newIndex }
 
 /// <summary>This function is used to create multiple tables at once.</summary>
 let addTables (tables: ArcTable []) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -61,7 +61,7 @@ let addTables (tables: ArcTable []) (state: Spreadsheet.Model) : Spreadsheet.Mod
     state.Tables.AddTables(tables, newIndex)
     { state with
         ArcFile = state.ArcFile
-        ActiveTableIndex = newIndex + tables.Length }
+        ActiveView = ActiveView.Table (newIndex + tables.Length) }
 
 
 /// <summary>Adds the most basic empty Swate table with auto generated name.</summary>
@@ -69,8 +69,8 @@ let createTable (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Mo
     let tables = state.ArcFile.Value.Tables()
     let newName = createNewTableName 0 tables.TableNames
     let newTable = ArcTable.init(newName)
-    if usePrevOutput && (tables.TableCount-1) >= state.ActiveTableIndex then
-        let table = tables.GetTableAt(state.ActiveTableIndex)
+    if usePrevOutput && (tables.TableCount-1) >= state.ActiveView.TableIndex then
+        let table = tables.GetTableAt(state.ActiveView.TableIndex)
         let output = table.GetOutputColumn()
         let newInput = output.Header.TryOutput().Value |> CompositeHeader.Input
         newTable.AddColumn(newInput,output.Cells,forceReplace=true)

@@ -125,7 +125,7 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                         prop.onClick(fun _ ->
                             let i = ArcInvestigation.init("New Investigation")
                             ArcFiles.Investigation i
-                            |> SetArcFile
+                            |> UpdateArcFile
                             |> Messages.SpreadsheetMsg
                             |> dispatch
                         )
@@ -137,7 +137,7 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                             let s = ArcStudy.init("New Study")
                             let newTable = s.InitTable("New Study Table")
                             ArcFiles.Study (s, [])
-                            |> SetArcFile
+                            |> UpdateArcFile
                             |> Messages.SpreadsheetMsg
                             |> dispatch
                         )
@@ -147,9 +147,12 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                     Bulma.dropdownItem.a [
                         prop.onClick(fun _ ->
                             let a = ArcAssay.init("New Assay")
+                            a.Performers <- [|
+                                Person.create("", "0000-0002-8510-6810", "Frey", "Kevin", Email="Freymauer@gmx.de",Affiliation="DataPLANT", Roles = [|OntologyAnnotation.fromString("Developer")|])
+                            |]
                             let newTable = a.InitTable("New Assay Table")
                             ArcFiles.Assay a
-                            |> SetArcFile
+                            |> UpdateArcFile
                             |> Messages.SpreadsheetMsg
                             |> dispatch
                         )
