@@ -4,24 +4,9 @@ open Feliz
 open Elmish
 open Browser.Types
 
-/// Without this the scrollbar will offset the splitWindowElement
-let mutable private InitScrollbarWidth = 0.0
-let mutable addListener = false
 [<Literal>]
 let private sidebarId = "sidebar_window"
 let private minWidth = 400
-
-/// If you change anything here. Make sure it is only added ONCE and then removed ONCE!
-/// Note: Add the commented console.logs to ensure.
-let private setInitWidth =
-    let scrollDiv = Browser.Dom.document.createElement "div"
-    scrollDiv.className <- "scrollbar-measure"
-    //Browser.Dom.console.log("add")
-    ignore <| Browser.Dom.document.body.appendChild(scrollDiv)
-    let sw = scrollDiv.offsetWidth - scrollDiv.clientWidth
-    InitScrollbarWidth <- sw
-    //Browser.Dom.console.log("remove")
-    scrollDiv.remove()
     
 type private SplitWindow = {
     ScrollbarWidth      : float
@@ -29,6 +14,19 @@ type private SplitWindow = {
 } with
     static member init() =
         let initSidebarWidth = 400
+        /// Without this the scrollbar will offset the splitWindowElement
+        let mutable InitScrollbarWidth = 0.0
+        /// If you change anything here. Make sure it is only added ONCE and then removed ONCE!
+        /// Note: Add the commented console.logs to ensure.
+        let setInitWidth =
+            let scrollDiv = Browser.Dom.document.createElement "div"
+            scrollDiv.className <- "scrollbar-measure"
+            //Browser.Dom.console.log("add")
+            ignore <| Browser.Dom.document.body.appendChild(scrollDiv)
+            let sw = scrollDiv.offsetWidth - scrollDiv.clientWidth
+            InitScrollbarWidth <- sw
+            //Browser.Dom.console.log("remove")
+            scrollDiv.remove()
         {
             ScrollbarWidth      = InitScrollbarWidth
             RightWindowWidth    = initSidebarWidth
@@ -81,10 +79,8 @@ let private mouseDown_event (mouseMove : Event -> unit) : Event -> unit = (fun e
 let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.style [
-            style.position.absolute
             style.width (length.px 5)
             style.height (length.perc 100)
-            style.float'.left
             style.backgroundColor.darkGray
             style.cursor.columnResize
             style.zIndex 39
@@ -106,9 +102,7 @@ let exampleTerm =
 [<ReactComponent>]
 let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) (dispatch: Messages.Msg -> unit) =
     let (model, setModel) = React.useState(SplitWindow.init)
-    if not addListener then
-        addListener <- true
-        Browser.Dom.window.addEventListener("resize", onResize_event model setModel)
+    React.useEffectOnce(fun _ -> Browser.Dom.window.addEventListener("resize", onResize_event model setModel))
     Html.div [
         prop.style [
             style.display.flex
@@ -128,7 +122,6 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
                 prop.id sidebarId
                 prop.style [
                     style.float'.right;
-                    //style.width (length.px model.RightWindowWidth); // might not be necessary
                     style.minWidth(minWidth);
                     style.flexBasis(length.px model.RightWindowWidth); style.flexShrink 0; style.flexGrow 0
                     style.height(length.vh 100)
