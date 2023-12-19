@@ -52,6 +52,18 @@ module Helper =
                 ?Roles=this.Roles
             )
 
+    type OntologyAnnotationMutable(?name,?tsr,?tan) =
+        member val Name : string option = name with get, set
+        member val TSR : string option = tsr with get, set
+        member val TAN : string option = tan with get, set
+
+        static member fromOntologyAnnotation(oa: OntologyAnnotation) =
+            let name = if oa.NameText = "" then None else Some oa.NameText
+            OntologyAnnotationMutable(?name=name, ?tsr=oa.TermSourceREF, ?tan=oa.TermAccessionNumber)
+
+        member this.ToOntologyAnnotation() =
+            OntologyAnnotation.fromString(?termName=this.Name,?tsr=this.TSR,?tan=this.TAN)
+
     let addButton (clickEvent: MouseEvent -> unit) =
         Html.div [
             prop.classes ["is-flex"; "is-justify-content-center"]
@@ -110,31 +122,37 @@ type FormComponents =
     [<ReactComponent>]
     static member OntologyAnnotationInput (oa: OntologyAnnotation, label: string, setter: OntologyAnnotation -> unit, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
         let showTextLabels = defaultArg showTextLabels true
+        let oa = React.useRef(Helper.OntologyAnnotationMutable.fromOntologyAnnotation oa) 
         Bulma.field.div [ 
             if label <> "" then Bulma.label label
             Html.div [
                 prop.classes ["form-container"]
                 prop.children [
                     FormComponents.TextInput(
-                        oa.NameText,
+                        Option.defaultValue "" oa.current.Name,
                         (if showTextLabels then $"Term Name" else ""),
-                        (fun s -> { oa with Name = AnnotationValue.Text s |> Some } |> setter),
+                        (fun s -> 
+                            let s = if s = "" then None else Some s
+                            oa.current.Name <- s 
+                            oa.current.ToOntologyAnnotation() |> setter),
                         fullwidth = true
                     )
                     FormComponents.TextInput(
-                        oa.TermSourceREFString,
+                        Option.defaultValue "" oa.current.TSR,
                         (if showTextLabels then $"TSR" else ""),
                         (fun s -> 
-                            let s2 = s |> fun s -> if s = "" then None else Some s
-                            { oa with TermSourceREF = s2 } |> setter),
+                            let s = if s = "" then None else Some s
+                            oa.current.TSR <- s 
+                            oa.current.ToOntologyAnnotation() |> setter),
                         fullwidth = true
                     )
                     FormComponents.TextInput(
-                        oa.TermAccessionShort,
+                        Option.defaultValue "" oa.current.TAN,
                         (if showTextLabels then $"TAN" else ""),
                         (fun s -> 
-                            let s2 = s |> fun s -> if s = "" then None else Some s
-                            { oa with TermAccessionNumber = s2 } |> setter),
+                            let s = if s = "" then None else Some s
+                            oa.current.TAN <- s 
+                            oa.current.ToOntologyAnnotation() |> setter),
                         fullwidth = true
                     )
                     if removebutton.IsSome then
@@ -149,13 +167,14 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member PersonInput(person: Person, setter: Person -> unit, ?deletebutton: MouseEvent -> unit) =
+    static member PersonInput(person': Person, setter: Person -> unit, ?deletebutton: MouseEvent -> unit) =
         let isExtended, setIsExtended = React.useState(false)
-        let fn = Option.defaultValue "" person.FirstName 
-        let ln = Option.defaultValue "" person.LastName
-        let mi = Option.defaultValue "" person.MidInitials
         // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
-        let person = React.useRef(Helper.PersonMutable.fromPerson person) 
+        let person = React.useRef(Helper.PersonMutable.fromPerson person') 
+        React.useEffect((fun _ -> person.current <- Helper.PersonMutable.fromPerson person'), [|box person|])
+        let fn = Option.defaultValue "" person.current.FirstName 
+        let ln = Option.defaultValue "" person.current.LastName
+        let mi = Option.defaultValue "" person.current.MidInitials
         let nameStr = 
             let x = $"{fn} {mi} {ln}".Trim()
             if x = "" then "<name>" else x
@@ -263,17 +282,20 @@ type FormComponents =
                                             setter {person.current.ToPerson() with Roles = Some nextRoles}
                                         ), 
                                         showTextLabels = false, 
-                                        removebutton=(fun e ->  
-                                            let nextRoles = person.current.Roles.Value |> Array.removeAt i
-                                            setter {person.current.ToPerson() with Roles = if nextRoles.Length = 0 then None else Some nextRoles}
+                                        removebutton=(fun _ ->  
+                                            person.current.Roles <- (
+                                                let a = Array.removeAt i person.current.Roles.Value 
+                                                if a = Array.empty then None else Some a
+                                            )
+                                            person.current.ToPerson() |> setter
                                         ))
                                 ]
                             )
                         ]
                         Helper.addButton (fun _ ->
                             let roles = Option.defaultValue [||] person.current.Roles
-                            let newRoles = Array.append roles [|OntologyAnnotation.empty|]
-                            setter {person.current.ToPerson() with Roles = Some newRoles}
+                            person.current.Roles <- Array.append roles [|OntologyAnnotation.empty|] |> Some
+                            person.current.ToPerson() |> setter
                         )
                     ]
                     if deletebutton.IsSome then
