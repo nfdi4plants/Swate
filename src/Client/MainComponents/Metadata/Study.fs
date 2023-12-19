@@ -23,6 +23,36 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
                 study.Description <- s
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
+        FormComponents.DateTimeInput (
+            Option.defaultValue "" study.PublicReleaseDate,
+            "Public ReleaseDate", 
+            fun s -> 
+                let s = if s = "" then None else Some s
+                study.PublicReleaseDate <- s
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+        )
+        FormComponents.DateTimeInput(
+            Option.defaultValue "" study.SubmissionDate,
+            "Submission Date", 
+            fun s -> 
+                let s = if s = "" then None else Some s
+                study.SubmissionDate <- s
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+        )
+        FormComponents.OntologyAnnotationsInput(
+            study.StudyDesignDescriptors,
+            "Study Design Descriptors",
+            fun oas ->
+                study.StudyDesignDescriptors <- oas
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+        )
+        FormComponents.TextInputs(
+            Array.ofSeq study.RegisteredAssayIdentifiers,
+            "Registered Assay Identifiers",
+            fun rais ->
+                study.RegisteredAssayIdentifiers <- ResizeArray(rais)
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+        )
         FormComponents.PersonsInput(
             study.Contacts,
             "Contacts",
