@@ -2,11 +2,7 @@
 
 open Feliz
 open Feliz.Bulma
-
-open Spreadsheet
 open Messages
-open Browser.Types
-open Fable.Core.JsInterop
 open ARCtrl.ISA
 open Shared
 
@@ -43,11 +39,18 @@ let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) =
                 assay.TechnologyPlatform <- oa
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
-        FormComponents.PersonInput(
+        FormComponents.PersonsInput(
             assay.Performers,
             "Performers",
             fun persons ->
                 assay.Performers <- persons
+                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
+        )
+        FormComponents.CommentsInput(
+            assay.Comments,
+            "Comments",
+            fun comments ->
+                assay.Comments <- comments
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
     ]

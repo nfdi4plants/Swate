@@ -16,8 +16,8 @@ let Main(x: {| model: Messages.Model; dispatch: Messages.Msg -> unit |}) =
         match model.SpreadsheetModel.ArcFile with
         | Some (ArcFiles.Assay a) ->
             MainComponents.Metadata.Assay.Main(a, model, dispatch)
-        | Some (ArcFiles.Study _) ->
-            MainComponents.Metadata.Study.Main()
+        | Some (ArcFiles.Study (s,aArr)) ->
+            MainComponents.Metadata.Study.Main(s, aArr, model, dispatch)
         | Some (ArcFiles.Investigation _) ->
             MainComponents.Metadata.Investigation.Main()
         | Some (ArcFiles.Template _) ->
