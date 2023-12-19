@@ -93,7 +93,7 @@ module Helper =
 type FormComponents =
 
     [<ReactComponent>]
-    static member TextInput (input: string, label: string, setter: string -> unit, ?placeholder: string, ?fullwidth: bool, ?removebutton: MouseEvent -> unit) =
+    static member TextInput (input: string, label: string, setter: string -> unit, ?fullwidth: bool, ?removebutton: MouseEvent -> unit) =
         let fullwidth = defaultArg fullwidth false
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
@@ -103,57 +103,77 @@ type FormComponents =
             prop.style [if fullwidth then style.flexGrow 1]
             prop.children [
                 if label <> "" then Bulma.label label
-                Bulma.control.div [
-                    if loading then Bulma.control.isLoading
+                Bulma.field.div [
+                    Bulma.field.hasAddons
                     prop.children [
-                        Bulma.input.text [
-                            if placeholder.IsSome then prop.placeholder placeholder.Value
-                            prop.valueOrDefault state
-                            prop.onChange(fun (e: string) ->
-                                setState e
-                                debouncel debounceStorage label 1000 setLoading setter e
-                            )
+                        Bulma.control.div [
+                            if loading then Bulma.control.isLoading
+                            prop.style [if fullwidth then style.flexGrow 1]
+                            prop.children [
+                                Bulma.input.text [
+                                    prop.valueOrDefault state
+                                    prop.onChange(fun (e: string) ->
+                                        setState e
+                                        debouncel debounceStorage label 1000 setLoading setter e
+                                    )
+                                ]
+                            ]
                         ]
+                        if removebutton.IsSome then
+                            Bulma.control.div [
+                                Bulma.button.span [
+                                    prop.text "X"
+                                    prop.onClick removebutton.Value
+                                    Bulma.color.isDanger
+                                    Bulma.button.isOutlined
+                                ]
+                            ]
                     ]
                 ]
-                if removebutton.IsSome then
-                    Bulma.button.button [
-                        prop.text "X"
-                        prop.onClick removebutton.Value
-                        Bulma.color.isDanger
-                        Bulma.button.isOutlined
-                    ]
             ]
         ]
 
     [<ReactComponent>]
-    static member TextInputs (texts: string [], label: string, setter: string [] -> unit, ?placeholder: string, ?fullwidth: bool) =
-        let texts = React.useRef (texts)
+    static member InputSequence<'A>(inputs: 'A [], empty: 'A, label: string, setter: 'A [] -> unit, inputComponent: 'A * string * ('A -> unit) * (MouseEvent -> unit) -> ReactElement) =
+        let texts = React.useRef (inputs)
+        React.useEffect((fun _ -> texts.current <- inputs), [|box inputs|])
         Bulma.field.div [
             Bulma.label label
-            Html.orderedList [
-                yield! texts.current
-                |> Array.mapi (fun i x ->
-                    Html.li [
-                        FormComponents.TextInput(
-                            x, "",
-                            (fun oa -> 
-                                texts.current.[i] <- oa
-                                texts.current |> setter 
-                            ), 
-                            removebutton=(fun _ ->  
-                                texts.current <- Array.removeAt i texts.current 
-                                texts.current |> setter
+            Bulma.field.div [
+                Html.orderedList [
+                    yield! texts.current
+                    |> Array.mapi (fun i x ->
+                        Html.li [
+                            inputComponent(
+                                x, "",
+                                (fun oa -> 
+                                    texts.current.[i] <- oa
+                                    texts.current |> setter 
+                                ),
+                                (fun _ ->  
+                                    texts.current <- Array.removeAt i texts.current 
+                                    texts.current |> setter
+                                )
                             )
-                        )
-                    ]
-                )
+                        ]
+                    )
+                ]
             ]
             Helper.addButton (fun _ ->
-                texts.current <- Array.append texts.current [|""|] 
+                texts.current <- Array.append texts.current [|empty|] 
                 texts.current |> setter
             )
         ]
+
+    [<ReactComponent>]
+    static member TextInputs (texts: string [], label: string, setter: string [] -> unit, ?placeholder: string, ?fullwidth: bool) =
+        FormComponents.InputSequence<string>(
+            texts,
+            "",
+            label,
+            setter,
+            fun (a,b,c,d) -> FormComponents.TextInput(a,b,c,fullwidth=true,removebutton=d)
+        )
 
     [<ReactComponent>]
     static member DateTimeInput (input: string, label: string, setter: string -> unit, ?placeholder: string, ?fullwidth: bool) =
@@ -186,44 +206,53 @@ type FormComponents =
     static member OntologyAnnotationInput (oa: OntologyAnnotation, label: string, setter: OntologyAnnotation -> unit, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
         let showTextLabels = defaultArg showTextLabels true
         let oa = React.useRef(Helper.OntologyAnnotationMutable.fromOntologyAnnotation oa) 
+        let hasLabel = label <> ""
         Bulma.field.div [ 
-            if label <> "" then Bulma.label label
-            Html.div [
-                prop.classes ["form-container"]
+            if hasLabel then Bulma.label label
+            Bulma.field.div [
+                prop.classes ["is-flex"; "is-flex-direction-row"; "is-justify-content-space-between"]
                 prop.children [
-                    FormComponents.TextInput(
-                        Option.defaultValue "" oa.current.Name,
-                        (if showTextLabels then $"Term Name" else ""),
-                        (fun s -> 
-                            let s = if s = "" then None else Some s
-                            oa.current.Name <- s 
-                            oa.current.ToOntologyAnnotation() |> setter),
-                        fullwidth = true
-                    )
-                    FormComponents.TextInput(
-                        Option.defaultValue "" oa.current.TSR,
-                        (if showTextLabels then $"TSR" else ""),
-                        (fun s -> 
-                            let s = if s = "" then None else Some s
-                            oa.current.TSR <- s 
-                            oa.current.ToOntologyAnnotation() |> setter),
-                        fullwidth = true
-                    )
-                    FormComponents.TextInput(
-                        Option.defaultValue "" oa.current.TAN,
-                        (if showTextLabels then $"TAN" else ""),
-                        (fun s -> 
-                            let s = if s = "" then None else Some s
-                            oa.current.TAN <- s 
-                            oa.current.ToOntologyAnnotation() |> setter),
-                        fullwidth = true
-                    )
+                    Html.div [
+                        prop.classes ["form-container"; if removebutton.IsSome then "pr-2"]
+                        prop.children [
+                            FormComponents.TextInput(
+                                Option.defaultValue "" oa.current.Name,
+                                (if showTextLabels then $"Term Name" else ""),
+                                (fun s -> 
+                                    let s = if s = "" then None else Some s
+                                    oa.current.Name <- s 
+                                    oa.current.ToOntologyAnnotation() |> setter),
+                                fullwidth = true
+                            )
+                            FormComponents.TextInput(
+                                Option.defaultValue "" oa.current.TSR,
+                                (if showTextLabels then $"TSR" else ""),
+                                (fun s -> 
+                                    let s = if s = "" then None else Some s
+                                    oa.current.TSR <- s 
+                                    oa.current.ToOntologyAnnotation() |> setter),
+                                fullwidth = true
+                            )
+                            FormComponents.TextInput(
+                                Option.defaultValue "" oa.current.TAN,
+                                (if showTextLabels then $"TAN" else ""),
+                                (fun s -> 
+                                    let s = if s = "" then None else Some s
+                                    oa.current.TAN <- s 
+                                    oa.current.ToOntologyAnnotation() |> setter),
+                                fullwidth = true
+                            )
+                        ]
+                    ]
                     if removebutton.IsSome then
-                        Bulma.button.button [
-                            prop.text "X"
-                            prop.onClick removebutton.Value
-                            Bulma.color.isDanger
-                            Bulma.button.isOutlined
+                        Html.div [
+                            if showTextLabels then Bulma.label [prop.style [style.color("transparent")]; prop.text "rmv"]
+                            Bulma.button.button [
+                                prop.text "X"
+                                prop.onClick removebutton.Value
+                                Bulma.color.isDanger
+                                Bulma.button.isOutlined
+                            ]
                         ]
                 ]
             ]
@@ -231,33 +260,37 @@ type FormComponents =
 
     [<ReactComponent>]
     static member OntologyAnnotationsInput (oas: OntologyAnnotation [], label: string, setter: OntologyAnnotation [] -> unit, ?showTextLabels: bool) =
-        let oas = React.useRef (oas)
-        Bulma.field.div [
-            Bulma.label label
-            Html.orderedList [
-                yield! oas.current
-                |> Array.mapi (fun i role ->
-                    Html.li [
-                        FormComponents.OntologyAnnotationInput(
-                            role, "",
-                            (fun oa -> 
-                                oas.current.[i] <- oa
-                                oas.current |> setter 
-                            ), 
-                            showTextLabels = false, 
-                            removebutton=(fun _ ->  
-                                oas.current <- Array.removeAt i oas.current 
-                                oas.current |> setter
-                            )
-                        )
-                    ]
-                )
-            ]
-            Helper.addButton (fun _ ->
-                oas.current <- Array.append oas.current [|OntologyAnnotation.empty|] 
-                oas.current |> setter
-            )
-        ]
+        FormComponents.InputSequence(
+            oas, OntologyAnnotation.empty, label, setter, 
+            (fun (a,b,c,d) -> FormComponents.OntologyAnnotationInput(a,b,c,removebutton=d,?showTextLabels=showTextLabels))
+        )
+        //let oas = React.useRef (oas)
+        //Bulma.field.div [
+        //    Bulma.label label
+        //    Html.orderedList [
+        //        yield! oas.current
+        //        |> Array.mapi (fun i role ->
+        //            Html.li [
+        //                FormComponents.OntologyAnnotationInput(
+        //                    role, "",
+        //                    (fun oa -> 
+        //                        oas.current.[i] <- oa
+        //                        oas.current |> setter 
+        //                    ), 
+        //                    showTextLabels = false, 
+        //                    removebutton=(fun _ ->  
+        //                        oas.current <- Array.removeAt i oas.current 
+        //                        oas.current |> setter
+        //                    )
+        //                )
+        //            ]
+        //        )
+        //    ]
+        //    Helper.addButton (fun _ ->
+        //        oas.current <- Array.append oas.current [|OntologyAnnotation.empty|] 
+        //        oas.current |> setter
+        //    )
+        //]
 
 
     [<ReactComponent>]

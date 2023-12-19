@@ -79,6 +79,7 @@ $colors: map-merge($colors, $addColors);
     justify-content: space-between;
     flex-wrap: wrap;
     column-gap: 10px;
+    flex-grow: 1;
 }
 
 .modal-background {
