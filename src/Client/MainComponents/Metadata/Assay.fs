@@ -11,9 +11,10 @@ let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) =
         FormComponents.TextInput (
             assay.Identifier,
             "Identifier", 
-            fun s -> 
+            (fun s -> 
                 let nextAssay = IdentifierSetters.setAssayIdentifier s assay
-                nextAssay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                nextAssay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            fullwidth=true
         )
         FormComponents.OntologyAnnotationInput(
             assay.MeasurementType |> Option.defaultValue OntologyAnnotation.empty,

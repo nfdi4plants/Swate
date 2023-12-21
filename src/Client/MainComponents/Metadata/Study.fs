@@ -11,16 +11,27 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
         FormComponents.TextInput (
             study.Identifier,
             "Identifier", 
-            fun s -> 
+            (fun s -> 
                 let nextAssay = IdentifierSetters.setStudyIdentifier s study
-                (nextAssay, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                (nextAssay, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            fullwidth=true
         )
         FormComponents.TextInput (
             Option.defaultValue "" study.Description,
             "Description", 
-            fun s -> 
+            (fun s -> 
                 let s = if s = "" then None else Some s
                 study.Description <- s
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            fullwidth=true,
+            isarea=true
+        )
+        FormComponents.DateTimeInput(
+            Option.defaultValue "" study.SubmissionDate,
+            "Submission Date", 
+            fun s -> 
+                let s = if s = "" then None else Some s
+                study.SubmissionDate <- s
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
         FormComponents.DateTimeInput (
@@ -31,13 +42,19 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
                 study.PublicReleaseDate <- s
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
-        FormComponents.DateTimeInput(
-            Option.defaultValue "" study.SubmissionDate,
-            "Submission Date", 
-            fun s -> 
-                let s = if s = "" then None else Some s
-                study.SubmissionDate <- s
+        FormComponents.PublicationsInput (
+            study.Publications,
+            "Publications",
+            fun pubs -> 
+                study.Publications <- pubs
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+        )
+        FormComponents.PersonsInput(
+            study.Contacts,
+            "Contacts",
+            fun persons ->
+                study.Contacts <- persons
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
         FormComponents.OntologyAnnotationsInput(
             study.StudyDesignDescriptors,
@@ -53,12 +70,12 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
                 study.RegisteredAssayIdentifiers <- ResizeArray(rais)
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
-        FormComponents.PersonsInput(
-            study.Contacts,
-            "Contacts",
-            fun persons ->
-                study.Contacts <- persons
-                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
+        FormComponents.FactorsInput(
+            study.Factors,
+            "Factors",
+            fun factors ->
+                study.Factors <- factors
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
         FormComponents.CommentsInput(
             study.Comments,

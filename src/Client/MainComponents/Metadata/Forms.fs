@@ -64,6 +64,76 @@ module Helper =
         member this.ToOntologyAnnotation() =
             OntologyAnnotation.fromString(?termName=this.Name,?tsr=this.TSR,?tan=this.TAN)
 
+    type PublicationMutable(?pubmedid: string, ?doi: string, ?authors: string, ?title: string, ?status: OntologyAnnotation, ?comments: Comment []) =
+        member val PubmedId = pubmedid with get, set
+        member val Doi = doi with get, set
+        member val Authors = authors with get, set
+        member val Title = title with get, set
+        member val Status = status with get, set
+        member val Comments = comments with get, set
+
+        static member fromPublication(pub:Publication) =
+            PublicationMutable(
+                ?pubmedid=pub.PubMedID,
+                ?doi=pub.DOI,
+                ?authors=pub.Authors,
+                ?title=pub.Title,
+                ?status=pub.Status,
+                ?comments=pub.Comments
+            )
+
+        member this.ToPublication() =
+            Publication.create(
+                ?PubMedID=this.PubmedId,
+                ?Doi=this.Doi,
+                ?Authors=this.Authors,
+                ?Title=this.Title,
+                ?Status=this.Status,
+                ?Comments=this.Comments
+            )
+
+    type FactorMutable(?name,?factortype,?comments) =
+        member val Name = name with get, set
+        member val FactorType = factortype with get, set
+        member val Comments = comments with get, set
+
+        static member fromFactor(f:Factor) =
+            FactorMutable(
+                ?name=f.Name,
+                ?factortype=f.FactorType,
+                ?comments=f.Comments
+            )
+        member this.ToFactor() =
+            Factor.create(
+                ?Name=this.Name,
+                ?FactorType=this.FactorType,
+                ?Comments=this.Comments
+            )
+
+    type OntologySourceReferenceMutable(?name,?description,?file,?version,?comments) =
+        member val Name = name with get, set
+        member val Description = description with get, set
+        member val File = file with get, set
+        member val Version = version with get, set
+        member val Comments = comments with get, set
+
+        static member fromOntologySourceReference(o:OntologySourceReference) =
+            OntologySourceReferenceMutable(
+                ?name=o.Name,
+                ?description= o.Description,
+                ?file=o.File,
+                ?version=o.Version,
+                ?comments=o.Comments
+            )
+        member this.ToOntologySourceReference() =
+            OntologySourceReference.create(
+                ?Name=this.Name,
+                ?Description=this.Description,
+                ?File=this.File,
+                ?Version=this.Version,
+                ?Comments=this.Comments
+            )
+
     let addButton (clickEvent: MouseEvent -> unit) =
         Html.div [
             prop.classes ["is-flex"; "is-justify-content-center"]
@@ -89,10 +159,20 @@ module Helper =
             ]
         ]
 
+    let cardFormGroup (formComponents: ReactElement list) = 
+        Bulma.field.div [
+            Html.div [
+                prop.classes ["form-container"]
+                prop.children formComponents
+            ]
+        ]
+
 type FormComponents =
 
     [<ReactComponent>]
-    static member TextInput (input: string, label: string, setter: string -> unit, ?fullwidth: bool, ?removebutton: MouseEvent -> unit) =
+    static member TextInput (input: string, label: string, setter: string -> unit, ?fullwidth: bool, ?removebutton: MouseEvent -> unit, ?isarea) =
+        let isarea = defaultArg isarea false
+        let inputFormElement : (IReactProperty list -> ReactElement) = if isarea then Bulma.textarea else Bulma.input.text
         let fullwidth = defaultArg fullwidth false
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
@@ -109,7 +189,7 @@ type FormComponents =
                             if loading then Bulma.control.isLoading
                             prop.style [if fullwidth then style.flexGrow 1]
                             prop.children [
-                                Bulma.input.text [
+                                inputFormElement [
                                     prop.valueOrDefault state
                                     prop.onChange(fun (e: string) ->
                                         setState e
@@ -134,32 +214,32 @@ type FormComponents =
 
     [<ReactComponent>]
     static member InputSequence<'A>(inputs': 'A [], empty: 'A, label: string, setter: 'A [] -> unit, inputComponent: 'A * string * ('A -> unit) * (MouseEvent -> unit) -> ReactElement) =
-        let inputs : Fable.React.IRefValue<ResizeArray<'A>> = React.useRef (ResizeArray(collection=inputs'))
-        React.useEffect((fun _ -> inputs.current <- ResizeArray(inputs')), [|box inputs'|])
+        let state, setState = React.useState (ResizeArray(collection=inputs'))
+        React.useEffect((fun _ -> setState <| ResizeArray(inputs')), [|box inputs'|])
         Bulma.field.div [
             Bulma.label label
             Bulma.field.div [
                 Html.orderedList [
-                    for i in 0 .. inputs.current.Count - 1 do
-                        let input = inputs.current.[i]
+                    for i in 0 .. state.Count - 1 do
+                        let input = state.[i]
                         Html.li [
                             inputComponent(
                                 input, "",
                                 (fun oa -> 
-                                    inputs.current.[i] <- oa
-                                    inputs.current |> Array.ofSeq |> setter 
+                                    state.[i] <- oa
+                                    state |> Array.ofSeq |> setter 
                                 ),
                                 (fun _ ->  
-                                    inputs.current.RemoveAt i
-                                    inputs.current |> Array.ofSeq |> setter
+                                    state.RemoveAt i
+                                    state |> Array.ofSeq |> setter
                                 )
                             )
                         ]
                 ]
             ]
             Helper.addButton (fun _ ->
-                inputs.current.Add empty 
-                inputs.current |> Array.ofSeq |> setter
+                state.Add empty 
+                state |> Array.ofSeq |> setter
             )
         ]
 
@@ -203,8 +283,8 @@ type FormComponents =
     [<ReactComponent>]
     static member OntologyAnnotationInput (input: OntologyAnnotation, label: string, setter: OntologyAnnotation -> unit, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
         let showTextLabels = defaultArg showTextLabels true
-        let oa = React.useRef(Helper.OntologyAnnotationMutable.fromOntologyAnnotation input) 
-        React.useEffect((fun _ -> oa.current <- Helper.OntologyAnnotationMutable.fromOntologyAnnotation input), [|box input|])
+        let state, setState = React.useState(Helper.OntologyAnnotationMutable.fromOntologyAnnotation input)
+        React.useEffect((fun () -> setState <| Helper.OntologyAnnotationMutable.fromOntologyAnnotation input), dependencies=[|box input|])
         let hasLabel = label <> ""
         Bulma.field.div [ 
             if hasLabel then Bulma.label label
@@ -215,30 +295,31 @@ type FormComponents =
                         prop.classes ["form-container"; if removebutton.IsSome then "pr-2"]
                         prop.children [
                             FormComponents.TextInput(
-                                Option.defaultValue "" oa.current.Name,
+                                Option.defaultValue "" state.Name,
                                 (if showTextLabels then $"Term Name" else ""),
                                 (fun s -> 
                                     let s = if s = "" then None else Some s
-                                    oa.current.Name <- s 
-                                    oa.current.ToOntologyAnnotation() |> setter),
+                                    printfn "INNER SET"
+                                    state.Name <- s 
+                                    state.ToOntologyAnnotation() |> setter),
                                 fullwidth = true
                             )
                             FormComponents.TextInput(
-                                Option.defaultValue "" oa.current.TSR,
+                                Option.defaultValue "" state.TSR,
                                 (if showTextLabels then $"TSR" else ""),
                                 (fun s -> 
                                     let s = if s = "" then None else Some s
-                                    oa.current.TSR <- s 
-                                    oa.current.ToOntologyAnnotation() |> setter),
+                                    state.TSR <- s 
+                                    state.ToOntologyAnnotation() |> setter),
                                 fullwidth = true
                             )
                             FormComponents.TextInput(
-                                Option.defaultValue "" oa.current.TAN,
+                                Option.defaultValue "" state.TAN,
                                 (if showTextLabels then $"TAN" else ""),
                                 (fun s -> 
                                     let s = if s = "" then None else Some s
-                                    oa.current.TAN <- s 
-                                    oa.current.ToOntologyAnnotation() |> setter),
+                                    state.TAN <- s 
+                                    state.ToOntologyAnnotation() |> setter),
                                 fullwidth = true
                             )
                         ]
@@ -263,48 +344,20 @@ type FormComponents =
             oas, OntologyAnnotation.empty, label, setter, 
             (fun (a,b,c,d) -> FormComponents.OntologyAnnotationInput(a,b,c,removebutton=d,?showTextLabels=showTextLabels))
         )
-        //let oas = React.useRef (oas)
-        //Bulma.field.div [
-        //    Bulma.label label
-        //    Html.orderedList [
-        //        yield! oas.current
-        //        |> Array.mapi (fun i role ->
-        //            Html.li [
-        //                FormComponents.OntologyAnnotationInput(
-        //                    role, "",
-        //                    (fun oa -> 
-        //                        oas.current.[i] <- oa
-        //                        oas.current |> setter 
-        //                    ), 
-        //                    showTextLabels = false, 
-        //                    removebutton=(fun _ ->  
-        //                        oas.current <- Array.removeAt i oas.current 
-        //                        oas.current |> setter
-        //                    )
-        //                )
-        //            ]
-        //        )
-        //    ]
-        //    Helper.addButton (fun _ ->
-        //        oas.current <- Array.append oas.current [|OntologyAnnotation.empty|] 
-        //        oas.current |> setter
-        //    )
-        //]
-
 
     [<ReactComponent>]
-    static member PersonInput(person': Person, setter: Person -> unit, ?deletebutton: MouseEvent -> unit) =
+    static member PersonInput(input: Person, setter: Person -> unit, ?deletebutton: MouseEvent -> unit) =
         let isExtended, setIsExtended = React.useState(false)
         // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
-        let person = React.useRef(Helper.PersonMutable.fromPerson person') 
-        React.useEffect((fun _ -> person.current <- Helper.PersonMutable.fromPerson person'), [|box person|])
-        let fn = Option.defaultValue "" person.current.FirstName 
-        let ln = Option.defaultValue "" person.current.LastName
-        let mi = Option.defaultValue "" person.current.MidInitials
+        let state, setState = React.useState(Helper.PersonMutable.fromPerson input) 
+        React.useEffect((fun _ -> setState <| Helper.PersonMutable.fromPerson input), [|box input|])
+        let fn = Option.defaultValue "" state.FirstName 
+        let ln = Option.defaultValue "" state.LastName
+        let mi = Option.defaultValue "" state.MidInitials
         let nameStr = 
             let x = $"{fn} {mi} {ln}".Trim()
             if x = "" then "<name>" else x
-        let orcid = Option.defaultValue "<orcid>" person.current.ORCID
+        let orcid = Option.defaultValue "<orcid>" state.ORCID
         let createPersonFieldTextInput(field: string option, label, personSetter: string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
@@ -312,21 +365,21 @@ type FormComponents =
                 (fun s -> 
                     let s = if s = "" then None else Some s
                     personSetter s 
-                    person.current.ToPerson() |> setter),
+                    state.ToPerson() |> setter),
                 fullwidth=true
             )
-        let countFilledFieldsString (person:Fable.React.IRefValue<Helper.PersonMutable>) =
+        let countFilledFieldsString (person: Helper.PersonMutable) =
             let fields = [
-                person.current.FirstName
-                person.current.LastName
-                person.current.MidInitials
-                person.current.ORCID
-                person.current.Address
-                person.current.Affiliation
-                person.current.EMail
-                person.current.Phone
-                person.current.Fax
-                person.current.Roles |> Option.map (fun _ -> "")
+                state.FirstName
+                state.LastName
+                state.MidInitials
+                state.ORCID
+                state.Address
+                state.Affiliation
+                state.EMail
+                state.Phone
+                state.Fax
+                state.Roles |> Option.map (fun _ -> "")
             ]
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
@@ -342,7 +395,7 @@ type FormComponents =
                         ]
                         Html.div [
                             prop.style [style.custom("marginLeft", "auto")]
-                            prop.text (countFilledFieldsString person)
+                            prop.text (countFilledFieldsString state)
                         ]
                     ]
                 ]
@@ -356,50 +409,30 @@ type FormComponents =
             Bulma.cardContent [
                 prop.classes [if not isExtended then "is-hidden"]
                 prop.children [
-                    Bulma.field.div [
-                        Html.div [
-                            prop.classes ["form-container"]
-                            prop.children [
-                                createPersonFieldTextInput(person.current.FirstName, "First Name", fun s -> person.current.FirstName <- s)
-                                createPersonFieldTextInput(person.current.LastName, "Last Name", fun s -> person.current.LastName <- s)
-                            ]
-                        ]
+                    Helper.cardFormGroup [
+                        createPersonFieldTextInput(state.FirstName, "First Name", fun s -> state.FirstName <- s)
+                        createPersonFieldTextInput(state.LastName, "Last Name", fun s -> state.LastName <- s)
                     ]
-                    Bulma.field.div [
-                        Html.div [
-                            prop.classes ["form-container"]
-                            prop.children [
-                                createPersonFieldTextInput(person.current.MidInitials, "Mid Initials", fun s -> person.current.MidInitials <- s)
-                                createPersonFieldTextInput(person.current.ORCID, "ORCID", fun s -> person.current.ORCID <- s)
-                            ]
-                        ]
+                    Helper.cardFormGroup [
+                        createPersonFieldTextInput(state.MidInitials, "Mid Initials", fun s -> state.MidInitials <- s)
+                        createPersonFieldTextInput(state.ORCID, "ORCID", fun s -> state.ORCID <- s)
                     ]
-                    Bulma.field.div [
-                        Html.div [
-                            prop.classes ["form-container"]
-                            prop.children [
-                                createPersonFieldTextInput(person.current.Affiliation, "Affiliation", fun s -> person.current.Affiliation <- s)
-                                createPersonFieldTextInput(person.current.Address, "Address", fun s -> person.current.Address <- s)
-                            ]
-                        ]
+                    Helper.cardFormGroup [
+                        createPersonFieldTextInput(state.Affiliation, "Affiliation", fun s -> state.Affiliation <- s)
+                        createPersonFieldTextInput(state.Address, "Address", fun s -> state.Address <- s)
                     ]
-                    Bulma.field.div [
-                        Html.div [
-                            prop.classes ["form-container"]
-                            prop.children [
-                                createPersonFieldTextInput(person.current.EMail, "Email", fun s -> person.current.EMail <- s)
-                                createPersonFieldTextInput(person.current.Phone, "Phone", fun s -> person.current.Phone <- s)
-                                createPersonFieldTextInput(person.current.Fax, "Fax", fun s -> person.current.Fax <- s)
-                            ]
-                        ]
+                    Helper.cardFormGroup [
+                        createPersonFieldTextInput(state.EMail, "Email", fun s -> state.EMail <- s)
+                        createPersonFieldTextInput(state.Phone, "Phone", fun s -> state.Phone <- s)
+                        createPersonFieldTextInput(state.Fax, "Fax", fun s -> state.Fax <- s)
                     ]
                     FormComponents.OntologyAnnotationsInput(
-                        Option.defaultValue [||] person.current.Roles,
+                        Option.defaultValue [||] state.Roles,
                         "Roles",
                         (fun oas -> 
                             let oas = if oas = [||] then None else Some oas
-                            person.current.Roles <- oas
-                            person.current.ToPerson() |> setter
+                            state.Roles <- oas
+                            state.ToPerson() |> setter
                         ),
                         showTextLabels = false
                     )
@@ -477,3 +510,271 @@ type FormComponents =
                 setter newComment
             )
         ]
+
+    [<ReactComponent>]
+    static member PublicationInput(input: Publication, setter: Publication -> unit, ?deletebutton: MouseEvent -> unit) =
+        let isExtended, setIsExtended = React.useState(false)
+        // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
+        let state, setState = React.useState(Helper.PublicationMutable.fromPublication input) 
+        React.useEffect((fun _ -> setState <| Helper.PublicationMutable.fromPublication input), [|box input|])
+        let title = Option.defaultValue "<title>" state.Title
+        let doi = Option.defaultValue "<doi>" state.Doi
+        let createPersonFieldTextInput(field: string option, label, personSetter: string option -> unit) =
+            FormComponents.TextInput(
+                field |> Option.defaultValue "",
+                label,
+                (fun s -> 
+                    let s = if s = "" then None else Some s
+                    personSetter s 
+                    state.ToPublication() |> setter),
+                fullwidth=true
+            )
+        let countFilledFieldsString () =
+            let fields = [
+                state.PubmedId
+                state.Doi
+                state.Title
+                state.Authors
+                state.Comments |> Option.map (fun _ -> "")
+                state.Status |> Option.map (fun _ -> "")
+            ]
+            let all = fields.Length
+            let filled = fields |> List.choose id |> _.Length
+            $"{filled}/{all}"
+        Bulma.card [
+            Bulma.cardHeader [
+                Bulma.cardHeaderTitle.div [
+                    //prop.classes ["is-align-items-flex-start"]
+                    prop.children [
+                        Html.div [
+                            Bulma.title.h5 title
+                            Bulma.subtitle.h6 doi
+                        ]
+                        Html.div [
+                            prop.style [style.custom("marginLeft", "auto")]
+                            prop.text (countFilledFieldsString ())
+                        ]
+                    ]
+                ]
+                Bulma.cardHeaderIcon.a [
+                    prop.onClick (fun _ -> not isExtended |> setIsExtended)
+                    prop.children [
+                        Bulma.icon [Html.i [prop.classes ["fas"; "fa-angle-down"]]]
+                    ]
+                ]
+            ]
+            Bulma.cardContent [
+                prop.classes [if not isExtended then "is-hidden"]
+                prop.children [
+                    createPersonFieldTextInput(state.Title, "Title", fun s -> state.Title <- s)
+                    Helper.cardFormGroup [
+                        createPersonFieldTextInput(state.PubmedId, "PubMed Id", fun s -> state.PubmedId <- s)
+                        createPersonFieldTextInput(state.Doi, "DOI", fun s -> state.Doi <- s)
+                    ]
+                    createPersonFieldTextInput(state.Authors, "Authors", fun s -> state.Authors <- s)
+                    FormComponents.OntologyAnnotationInput(
+                        Option.defaultValue OntologyAnnotation.empty state.Status, 
+                        "Status", 
+                        (fun s -> 
+                            state.Status <- if s = OntologyAnnotation.empty then None else Some s
+                            state.ToPublication() |> setter
+                        )
+                    )
+                    FormComponents.CommentsInput(
+                        Option.defaultValue [||] state.Comments, 
+                        "Comments", 
+                        (fun c -> 
+                            state.Comments <- if c = [||] then None else Some c
+                            state.ToPublication() |> setter
+                        )
+                    )
+                    if deletebutton.IsSome then
+                        Helper.deleteButton deletebutton.Value
+                ]
+            ]
+        ]
+
+    static member PublicationsInput(input: Publication [], label: string, setter: Publication [] -> unit) =
+        FormComponents.InputSequence(
+            input,
+            Publication.create(),
+            label,
+            setter,
+            (fun (a,b,c,d) -> FormComponents.PublicationInput(a,c,deletebutton=d))
+        )
+
+    [<ReactComponent>]
+    static member FactorInput(input: Factor, setter: Factor -> unit, ?deletebutton: MouseEvent -> unit) =
+        let isExtended, setIsExtended = React.useState(false)
+        // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
+        let state, setState = React.useState(Helper.FactorMutable.fromFactor input) 
+        React.useEffect((fun _ -> setState <| Helper.FactorMutable.fromFactor input), [|box input|])
+        let name = Option.defaultValue "<name>" state.Name
+        let type' = Option.defaultValue "<type>" (state.FactorType |> Option.map (fun x -> x.NameText))
+        let createFieldTextInput(field: string option, label, personSetter: string option -> unit) =
+            FormComponents.TextInput(
+                field |> Option.defaultValue "",
+                label,
+                (fun s -> 
+                    let s = if s = "" then None else Some s
+                    personSetter s 
+                    state.ToFactor() |> setter),
+                fullwidth=true
+            )
+        let countFilledFieldsString () =
+            let fields = [
+                state.Name
+                state.FactorType |> Option.map (fun _ -> "")
+                state.Comments |> Option.map (fun _ -> "")
+            ]
+            let all = fields.Length
+            let filled = fields |> List.choose id |> _.Length
+            $"{filled}/{all}"
+        Bulma.card [
+            Bulma.cardHeader [
+                Bulma.cardHeaderTitle.div [
+                    //prop.classes ["is-align-items-flex-start"]
+                    prop.children [
+                        Html.div [
+                            Bulma.title.h5 name
+                            Bulma.subtitle.h6 type'
+                        ]
+                        Html.div [
+                            prop.style [style.custom("marginLeft", "auto")]
+                            prop.text (countFilledFieldsString ())
+                        ]
+                    ]
+                ]
+                Bulma.cardHeaderIcon.a [
+                    prop.onClick (fun _ -> not isExtended |> setIsExtended)
+                    prop.children [
+                        Bulma.icon [Html.i [prop.classes ["fas"; "fa-angle-down"]]]
+                    ]
+                ]
+            ]
+            Bulma.cardContent [
+                prop.classes [if not isExtended then "is-hidden"]
+                prop.children [
+                    createFieldTextInput(state.Name, "Name", fun s -> state.Name <- s)
+                    FormComponents.OntologyAnnotationInput(
+                        Option.defaultValue OntologyAnnotation.empty state.FactorType, 
+                        "Status", 
+                        (fun s -> 
+                            state.FactorType <- if s = OntologyAnnotation.empty then None else Some s
+                            state.ToFactor() |> setter
+                        )
+                    )
+                    FormComponents.CommentsInput(
+                        Option.defaultValue [||] state.Comments, 
+                        "Comments", 
+                        (fun c -> 
+                            state.Comments <- if c = [||] then None else Some c
+                            state.ToFactor() |> setter
+                        )
+                    )
+                    if deletebutton.IsSome then
+                        Helper.deleteButton deletebutton.Value
+                ]
+            ]
+        ]
+
+    static member FactorsInput(input: Factor [], label: string, setter: Factor [] -> unit) =
+        FormComponents.InputSequence(
+            input,
+            Factor.create(),
+            label,
+            setter,
+            (fun (a,b,c,d) -> FormComponents.FactorInput(a,c,deletebutton=d))
+        )
+
+    [<ReactComponent>]
+    static member OntologySourceReferenceInput(input: OntologySourceReference, setter: OntologySourceReference -> unit, ?deletebutton: MouseEvent -> unit) =
+        let isExtended, setIsExtended = React.useState(false)
+        // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
+        let state, setState = React.useState(Helper.OntologySourceReferenceMutable.fromOntologySourceReference input) 
+        React.useEffect((fun _ -> setState <| Helper.OntologySourceReferenceMutable.fromOntologySourceReference input), [|box input|])
+        let name = Option.defaultValue "<name>" state.Name
+        let version = Option.defaultValue "<version>" state.Version
+        let createFieldTextInput(field: string option, label, personSetter: string option -> unit) =
+            FormComponents.TextInput(
+                field |> Option.defaultValue "",
+                label,
+                (fun s -> 
+                    let s = if s = "" then None else Some s
+                    personSetter s 
+                    state.ToOntologySourceReference() |> setter),
+                fullwidth=true
+            )
+        let countFilledFieldsString () =
+            let fields = [
+                state.Name
+                state.File
+                state.Version
+                state.Description
+                state.Comments |> Option.map (fun _ -> "")
+            ]
+            let all = fields.Length
+            let filled = fields |> List.choose id |> _.Length
+            $"{filled}/{all}"
+        Bulma.card [
+            Bulma.cardHeader [
+                Bulma.cardHeaderTitle.div [
+                    //prop.classes ["is-align-items-flex-start"]
+                    prop.children [
+                        Html.div [
+                            Bulma.title.h5 name
+                            Bulma.subtitle.h6 version
+                        ]
+                        Html.div [
+                            prop.style [style.custom("marginLeft", "auto")]
+                            prop.text (countFilledFieldsString ())
+                        ]
+                    ]
+                ]
+                Bulma.cardHeaderIcon.a [
+                    prop.onClick (fun _ -> not isExtended |> setIsExtended)
+                    prop.children [
+                        Bulma.icon [Html.i [prop.classes ["fas"; "fa-angle-down"]]]
+                    ]
+                ]
+            ]
+            Bulma.cardContent [
+                prop.classes [if not isExtended then "is-hidden"]
+                prop.children [
+                    createFieldTextInput(state.Name, "Name", fun s -> state.Name <- s)
+                    Helper.cardFormGroup [ 
+                        createFieldTextInput(state.Version, "Version", fun s -> state.Version <- s)
+                        createFieldTextInput(state.File, "File", fun s -> state.File <- s)
+                    ]
+                    FormComponents.TextInput(
+                        Option.defaultValue "" state.Description,
+                        "Description",
+                        (fun s -> 
+                            let s = if s = "" then None else Some s
+                            state.Description <- s
+                            state.ToOntologySourceReference() |> setter),
+                        fullwidth=true,
+                        isarea=true
+                    )
+                    FormComponents.CommentsInput(
+                        Option.defaultValue [||] state.Comments, 
+                        "Comments", 
+                        (fun c -> 
+                            state.Comments <- if c = [||] then None else Some c
+                            state.ToOntologySourceReference() |> setter
+                        )
+                    )
+                    if deletebutton.IsSome then
+                        Helper.deleteButton deletebutton.Value
+                ]
+            ]
+        ]
+
+    static member OntologySourceReferencesInput(input: OntologySourceReference [], label: string, setter: OntologySourceReference [] -> unit) =
+        FormComponents.InputSequence(
+            input,
+            OntologySourceReference.create(),
+            label,
+            setter,
+            (fun (a,b,c,d) -> FormComponents.OntologySourceReferenceInput(a,c,deletebutton=d))
+        )
