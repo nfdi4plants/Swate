@@ -69,8 +69,7 @@ module Helper =
             prop.classes ["is-flex"; "is-justify-content-center"]
             prop.children [
                 Bulma.button.button [
-                    Bulma.button.isOutlined
-                    Bulma.color.isInfo
+                    prop.className "is-ghost"
                     prop.text "+"
                     prop.onClick clickEvent
                 ]
@@ -134,34 +133,33 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member InputSequence<'A>(inputs: 'A [], empty: 'A, label: string, setter: 'A [] -> unit, inputComponent: 'A * string * ('A -> unit) * (MouseEvent -> unit) -> ReactElement) =
-        let texts = React.useRef (inputs)
-        React.useEffect((fun _ -> texts.current <- inputs), [|box inputs|])
+    static member InputSequence<'A>(inputs': 'A [], empty: 'A, label: string, setter: 'A [] -> unit, inputComponent: 'A * string * ('A -> unit) * (MouseEvent -> unit) -> ReactElement) =
+        let inputs : Fable.React.IRefValue<ResizeArray<'A>> = React.useRef (ResizeArray(collection=inputs'))
+        React.useEffect((fun _ -> inputs.current <- ResizeArray(inputs')), [|box inputs'|])
         Bulma.field.div [
             Bulma.label label
             Bulma.field.div [
                 Html.orderedList [
-                    yield! texts.current
-                    |> Array.mapi (fun i x ->
+                    for i in 0 .. inputs.current.Count - 1 do
+                        let input = inputs.current.[i]
                         Html.li [
                             inputComponent(
-                                x, "",
+                                input, "",
                                 (fun oa -> 
-                                    texts.current.[i] <- oa
-                                    texts.current |> setter 
+                                    inputs.current.[i] <- oa
+                                    inputs.current |> Array.ofSeq |> setter 
                                 ),
                                 (fun _ ->  
-                                    texts.current <- Array.removeAt i texts.current 
-                                    texts.current |> setter
+                                    inputs.current.RemoveAt i
+                                    inputs.current |> Array.ofSeq |> setter
                                 )
                             )
                         ]
-                    )
                 ]
             ]
             Helper.addButton (fun _ ->
-                texts.current <- Array.append texts.current [|empty|] 
-                texts.current |> setter
+                inputs.current.Add empty 
+                inputs.current |> Array.ofSeq |> setter
             )
         ]
 
@@ -203,9 +201,10 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member OntologyAnnotationInput (oa: OntologyAnnotation, label: string, setter: OntologyAnnotation -> unit, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
+    static member OntologyAnnotationInput (input: OntologyAnnotation, label: string, setter: OntologyAnnotation -> unit, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
         let showTextLabels = defaultArg showTextLabels true
-        let oa = React.useRef(Helper.OntologyAnnotationMutable.fromOntologyAnnotation oa) 
+        let oa = React.useRef(Helper.OntologyAnnotationMutable.fromOntologyAnnotation input) 
+        React.useEffect((fun _ -> oa.current <- Helper.OntologyAnnotationMutable.fromOntologyAnnotation input), [|box input|])
         let hasLabel = label <> ""
         Bulma.field.div [ 
             if hasLabel then Bulma.label label

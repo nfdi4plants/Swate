@@ -52,7 +52,9 @@ module HistoryOrder =
 //    member this.toJson() = Json.serialize this
 
 module ConversionTypes =  
+    open ARCtrl.ISA
     open ARCtrl.ISA.Json
+    open ARCtrl.Template.Json
     open Shared
 
     [<RequireQualifiedAccess>]
@@ -60,6 +62,7 @@ module ConversionTypes =
     | Investigation
     | Study
     | Assay
+    | Template
     | None
 
     type SessionStorage = {
@@ -70,9 +73,10 @@ module ConversionTypes =
         static member fromSpreadsheetModel (model: Spreadsheet.Model) =
             let jsonArcFile, jsonString =
                 match model.ArcFile with
-                | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toJsonString i
-                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, ArcStudy.toJsonString s (ResizeArray(al))
-                | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString a
+                | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, i.ToArcJsonString()
+                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, s.ToArcJsonString()
+                | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, a.ToArcJsonString()
+                | Some (ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
                 | None -> JsonArcFiles.None, ""
             {
                 JsonArcFiles = jsonArcFile 
@@ -83,9 +87,10 @@ module ConversionTypes =
             let init = Spreadsheet.Model.init()
             let arcFile = 
                 match this.JsonArcFiles with
-                | JsonArcFiles.Investigation -> ArcInvestigation.fromJsonString this.JsonString |> ArcFiles.Investigation |> Some
-                | JsonArcFiles.Study -> ArcStudy.fromJsonString this.JsonString |> fun (x,y) -> ArcFiles.Study(x, List.ofSeq y) |> Some
-                | JsonArcFiles.Assay -> ArcAssay.fromJsonString this.JsonString |> ArcFiles.Assay |> Some
+                | JsonArcFiles.Investigation -> ArcInvestigation.fromArcJsonString this.JsonString |> ArcFiles.Investigation |> Some
+                | JsonArcFiles.Study -> ArcStudy.fromArcJsonString this.JsonString |> fun s -> ArcFiles.Study(s, []) |> Some
+                | JsonArcFiles.Assay -> ArcAssay.fromArcJsonString this.JsonString |> ArcFiles.Assay |> Some
+                | JsonArcFiles.Template -> Template.fromJsonString this.JsonString |> ArcFiles.Template |> Some
                 | JsonArcFiles.None -> None
             {
                 init with
