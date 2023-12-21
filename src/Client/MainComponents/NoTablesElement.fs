@@ -100,6 +100,7 @@ let private uploadNewTable dispatch =
         ]
     ]
 
+open ARCtrl.Template
 
 let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
     
@@ -131,7 +132,6 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                         )
                         prop.text "Investigation"
                     ]
-                    Bulma.dropdownDivider []
                     Bulma.dropdownItem.a [
                         prop.onClick(fun _ ->
                             let s = ArcStudy.init("New Study")
@@ -143,13 +143,9 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                         )
                         prop.text "Study"
                     ]
-                    Bulma.dropdownDivider []
                     Bulma.dropdownItem.a [
                         prop.onClick(fun _ ->
                             let a = ArcAssay.init("New Assay")
-                            a.Performers <- [|
-                                Person.create("", "0000-0002-8510-6810", "Frey", "Kevin", Email="Freymauer@gmx.de",Affiliation="DataPLANT", Roles = [|OntologyAnnotation.fromString("Developer")|])
-                            |]
                             let newTable = a.InitTable("New Assay Table")
                             ArcFiles.Assay a
                             |> UpdateArcFile
@@ -157,6 +153,22 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                             |> dispatch
                         )
                         prop.text "Assay"
+                    ]
+                    Bulma.dropdownDivider []
+                    Bulma.dropdownItem.a [
+                        prop.onClick(fun _ ->
+                            let template = Template.init("New Template")
+                            let table = ArcTable.init("New Table")
+                            template.Table <- table
+                            template.Version <- "0.0.0"
+                            template.Id <- System.Guid.NewGuid()
+                            template.LastUpdated <- System.DateTime.UtcNow
+                            ArcFiles.Template template
+                            |> UpdateArcFile
+                            |> Messages.SpreadsheetMsg
+                            |> dispatch
+                        )
+                        prop.text "Template"
                     ]
                 ]
             ]

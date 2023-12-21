@@ -228,6 +228,8 @@ module Spreadsheet =
                         ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa ->
                         ArcAssay.toFsWorkbook aa
+                    | Template t ->
+                        ARCtrl.Template.Spreadsheet.Template.toFsWorkbook t
                 let func() = promise {
                     return state.Tables
                 }
