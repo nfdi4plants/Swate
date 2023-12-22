@@ -268,15 +268,72 @@ type FormComponents =
                     if loading then Bulma.control.isLoading
                     prop.children [
                         Bulma.input.datetimeLocal [
-                            if placeholder.IsSome then prop.placeholder placeholder.Value
                             prop.valueOrDefault state
-                            prop.onChange(fun (e: string) ->
-                                setState e
-                                debouncel debounceStorage label 1000 setLoading setter e
+                            prop.onChange(fun (e: System.DateTime) ->
+                                let dtString = e.ToString("yyyy-MM-ddThh:mm")
+                                log ("LOOK AT ME", dtString)
+                                setState dtString
+                                debouncel debounceStorage label 1000 setLoading setter dtString
                             )
                         ]
                     ]
                 ]
+            ]
+        ]
+
+    static member DateTimeInput (input: System.DateTime, label: string, setter: System.DateTime -> unit, ?fullwidth: bool) =
+        FormComponents.DateTimeInput(
+            input.ToString("yyyy-MM-ddThh:mm"),
+            label,
+            (fun (s: string) ->
+                setter (System.DateTime.Parse(s))),
+            ?fullwidth=fullwidth
+        )
+
+    [<ReactComponent>]
+    static member GUIDInput (input: System.Guid, label: string, setter: string -> unit, ?placeholder: string, ?fullwidth: bool) =
+        let fullwidth = defaultArg fullwidth false
+        let loading, setLoading = React.useState(false)
+        let state, setState = React.useState(input.ToString())
+        let isValid, setIsValid = React.useState(true)
+        let debounceStorage, setdebounceStorage = React.useState(newDebounceStorage)
+        React.useEffect((fun () -> setState <| input.ToString()), dependencies=[|box input|])
+        let regex = System.Text.RegularExpressions.Regex(@"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
+        //let unmask (s:string) = s |> String.filter(fun c -> c <> '_' && c <> '-')
+        //let mask (s:string) = 
+        //    s.PadRight(32,'_').[0..31]
+        //    |> fun padded -> sprintf "%s-%s-%s-%s-%s" padded.[0..7] padded.[8..11] padded.[12..15] padded.[16..19] padded.[20..31]
+        Bulma.field.div [
+            prop.style [if fullwidth then style.flexGrow 1]
+            prop.children [
+                if label <> "" then Bulma.label label
+                Bulma.control.div [
+                    Bulma.control.hasIconsRight
+                    if loading then Bulma.control.isLoading
+                    prop.children [
+                        Bulma.input.text [
+                            prop.pattern (regex)
+                            prop.required true
+                            if not isValid then Bulma.color.isDanger
+                            if placeholder.IsSome then prop.placeholder placeholder.Value
+                            prop.valueOrDefault state
+                            prop.onChange(fun (s: string) ->
+                                let nextValid = regex.IsMatch(s.Trim())
+                                setIsValid nextValid
+                                setState s
+                                if nextValid then
+                                    debouncel debounceStorage label 200 setLoading setter s
+                            )
+                        ]
+                        if isValid then Bulma.icon [
+                            Bulma.icon.isRight
+                            Bulma.icon.isSmall
+                            Bulma.color.isSuccess
+                            prop.children [Html.i [prop.className "fas fa-check"]]
+                        ]
+                    ]
+                ]
+                Html.small "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Allowed are a-f, A-F and numbers."
             ]
         ]
 

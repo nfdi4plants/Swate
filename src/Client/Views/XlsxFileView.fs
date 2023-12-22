@@ -20,7 +20,7 @@ let Main(x: {| model: Messages.Model; dispatch: Messages.Msg -> unit |}) =
             MainComponents.Metadata.Study.Main(s, aArr, model, dispatch)
         | Some (ArcFiles.Investigation inv) ->
             MainComponents.Metadata.Investigation.Main(inv, model, dispatch)
-        | Some (ArcFiles.Template _) ->
-            MainComponents.Metadata.Template.Main()
+        | Some (ArcFiles.Template t) ->
+            MainComponents.Metadata.Template.Main(t, model, dispatch)
         | None ->
             Html.none

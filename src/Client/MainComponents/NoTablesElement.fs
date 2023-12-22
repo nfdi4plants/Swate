@@ -162,7 +162,7 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                             template.Table <- table
                             template.Version <- "0.0.0"
                             template.Id <- System.Guid.NewGuid()
-                            template.LastUpdated <- System.DateTime.UtcNow
+                            template.LastUpdated <- System.DateTime.Now
                             ArcFiles.Template template
                             |> UpdateArcFile
                             |> Messages.SpreadsheetMsg
