@@ -3,6 +3,7 @@ module MainWindowView
 open Feliz
 open Feliz.Bulma
 open Messages
+open Shared
 
 let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
     Html.div [
@@ -26,8 +27,11 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                                 for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
                                     yield
                                         MainComponents.FooterTabs.Main {| index = index; tables = model.SpreadsheetModel.Tables; model = model; dispatch = dispatch |}
-                                yield
-                                    MainComponents.FooterTabs.MainPlus {| dispatch = dispatch |}
+                                match model.SpreadsheetModel.ArcFile with
+                                | Some (ArcFiles.Template _) ->
+                                    yield Html.none
+                                | _ ->
+                                    yield MainComponents.FooterTabs.MainPlus {| dispatch = dispatch |}
                             ]
                         ]
                     ]

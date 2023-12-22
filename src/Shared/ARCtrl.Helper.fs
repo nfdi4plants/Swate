@@ -24,6 +24,12 @@ module ARCtrlHelper =
 [<AutoOpen>]
 module Extensions =
 
+    open ARCtrl.Template
+
+    type Template with
+        member this.FileName 
+            with get() = this.Name.Replace(" ","_") + ".xlsx"
+
     type CompositeHeader with
         member this.AsButtonName =
             match this with

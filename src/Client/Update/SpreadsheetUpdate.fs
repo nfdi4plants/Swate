@@ -220,29 +220,26 @@ module Spreadsheet =
                 // we highjack this loading function
                 let exportJsonState = {model.JsonExporterModel with Loading = true}
                 let nextModel = model.updateByJsonExporterModel exportJsonState
-                let fswb =
+                let name, fswb =
+                    let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
                     match arcfile with
                     | Investigation ai ->
-                        ArcInvestigation.toFsWorkbook ai
+                        n + "_" + ArcInvestigation.FileName, ArcInvestigation.toFsWorkbook ai
                     | Study (as',aaList) ->
-                        ArcStudy.toFsWorkbook (as', aaList)
+                        n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa ->
-                        ArcAssay.toFsWorkbook aa
+                        n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t ->
-                        ARCtrl.Template.Spreadsheet.Template.toFsWorkbook t
-                let func() = promise {
-                    return state.Tables
-                }
+                        n + "_" + t.FileName, ARCtrl.Template.Spreadsheet.Template.toFsWorkbook t
                 let cmd =
                     Cmd.OfPromise.either
                         FsSpreadsheet.Exceljs.Xlsx.toBytes
                         fswb
-                        (ExportXlsxDownload >> Messages.SpreadsheetMsg)
+                        (fun bytes -> ExportXlsxDownload (name,bytes) |> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
                 state, nextModel, cmd
-            | ExportXlsxDownload xlsxBytes ->
-                let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
-                let _ = Helper.download ($"{n}_assay.xlsx",xlsxBytes)
+            | ExportXlsxDownload (name,xlsxBytes) ->
+                let _ = Helper.download (name ,xlsxBytes)
                 let nextJsonExporter = {
                     model.JsonExporterModel with
                         Loading             = false
@@ -300,5 +297,10 @@ module Spreadsheet =
             //    nextState.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
             //    nextState, model, Cmd.none
 
-        innerUpdate state model msg
-        |> Helper.updateHistoryStorageMsg msg
+        try
+            innerUpdate state model msg
+            |> Helper.updateHistoryStorageMsg msg
+        with
+            | e -> 
+                let cmd = GenericError (Cmd.none, e) |> DevMsg |> Cmd.ofMsg
+                state, model, cmd

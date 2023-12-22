@@ -105,7 +105,7 @@ type Msg =
 | ExportJsonTables
 /// Starts chain to export all tables to xlsx swate tables.
 | ExportXlsx of ArcFiles
-| ExportXlsxDownload of byte []
+| ExportXlsxDownload of filename: string * byte []
 /// Starts chain to parse all tables to DAG
 | ParseTablesToDag
 // <--> Result Messages <-->
