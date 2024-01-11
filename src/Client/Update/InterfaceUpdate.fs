@@ -49,7 +49,7 @@ module Interface =
             | Some Swatehost.Excel ->
                 let cmd = OfficeInterop.CreateAnnotationTable usePrevOutput |> OfficeInteropMsg |> Cmd.ofMsg
                 model, cmd
-            | Some Swatehost.Browser ->
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = Spreadsheet.CreateAnnotationTable usePrevOutput |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
@@ -58,7 +58,7 @@ module Interface =
             //| Swatehost.Excel _ ->
             //    let cmd = OfficeInterop.AddAnnotationBlock minBuildingBlockInfo |> OfficeInteropMsg |> Cmd.ofMsg
             //    model, cmd
-            | Some Swatehost.Browser ->
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = Spreadsheet.AddAnnotationBlock minBuildingBlockInfo |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
@@ -67,7 +67,7 @@ module Interface =
             //| Swatehost.Excel _ ->
             //    let cmd = OfficeInterop.AddAnnotationBlocks minBuildingBlockInfos |> OfficeInteropMsg |> Cmd.ofMsg
             //    model, cmd
-            | Some Swatehost.Browser ->
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = Spreadsheet.AddAnnotationBlocks minBuildingBlockInfos |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
@@ -86,13 +86,13 @@ module Interface =
             //| Swatehost.Excel _ ->
             //    let cmd = OfficeInterop.InsertOntologyTerm termMinimal |> OfficeInteropMsg |> Cmd.ofMsg
             //    model, cmd
-            | Some Swatehost.Browser ->
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = Spreadsheet.InsertOntologyTerm termMinimal |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | InsertFileNames fileNames ->
             match host with
-            | Some Swatehost.Excel ->
+            | Some Swatehost.Excel | Some Swatehost.ARCitect ->
                 let cmd = OfficeInterop.InsertFileNames fileNames |> OfficeInteropMsg |> Cmd.ofMsg
                 model, cmd
             //| Swatehost.Browser ->
@@ -105,7 +105,7 @@ module Interface =
             | Some Swatehost.Excel ->
                 let cmd = OfficeInterop.RemoveBuildingBlock |> OfficeInteropMsg |> Cmd.ofMsg
                 model, cmd
-            | Some Swatehost.Browser ->
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 if Set.isEmpty model.SpreadsheetModel.SelectedCells then failwith "No column selected"
                 let selectedColumns, _ = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.unzip
                 let distinct = selectedColumns |> Array.distinct
@@ -140,7 +140,7 @@ module Interface =
             | Some Swatehost.Excel ->
                 let cmd = DagMsg Dag.ParseTablesOfficeInteropRequest |> Cmd.ofMsg
                 model, cmd
-            | Some Swatehost.Browser ->
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = SpreadsheetMsg Spreadsheet.ParseTablesToDag |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
@@ -159,7 +159,7 @@ module Interface =
             | Some Swatehost.Excel ->
                 let cmd = OfficeInterop.FillHiddenColsRequest |> OfficeInteropMsg |> Cmd.ofMsg
                 model, cmd
-            | Some Swatehost.Browser ->
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = Spreadsheet.UpdateTermColumns |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ ->
@@ -169,7 +169,7 @@ module Interface =
             | Some Swatehost.Excel ->
                 let cmd = OfficeInterop.FillHiddenColumns terms |> OfficeInteropMsg |> Cmd.ofMsg
                 model, cmd
-            | Some Swatehost.Browser ->
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = Spreadsheet.UpdateTermColumnsResponse terms |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ ->
