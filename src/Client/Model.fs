@@ -205,21 +205,13 @@ type ApiState = {
 
 type PageState = {
     CurrentPage : Routing.Route
-    CurrentUrl  : string
     IsExpert    : bool
 } with
-    static member init (pageOpt:Route option) = 
-        match pageOpt with
-        | Some page -> {
-            CurrentPage = page
-            CurrentUrl = Route.toRouteUrl page
-            IsExpert = page.isExpert
-            }
-        | None -> {
-            CurrentPage = Route.TermSearch
-            CurrentUrl = ""
+    static member init () = 
+        {
+            CurrentPage = Route.BuildingBlock
             IsExpert = false
-            }
+        }
 
 module FilePicker =
     type Model = {
@@ -338,9 +330,8 @@ module Protocol =
         // // ------ Process from file ------
         UploadedFileParsed      : (string*InsertBuildingBlock []) []
         // ------ Protocol from Database ------
-        ProtocolSelected        : Template option
-        ValidationXml           : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-        ProtocolsAll            : Template []
+        ProtocolSelected        : ARCtrl.Template.Template option
+        ProtocolsAll            : ARCtrl.Template.Template []
     } with
         static member init () = {
             // Client
@@ -350,7 +341,6 @@ module Protocol =
             UploadedFileParsed      = [||]
             // ------ Protocol from Database ------
             ProtocolsAll            = [||]
-            ValidationXml           = None
         }
 
 type RequestBuildingBlockInfoStates =

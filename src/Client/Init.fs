@@ -8,12 +8,12 @@ open Messages
 open Update
 open Thoth.Elmish
 
-let initializeModel (pageOpt: Routing.Route option) =
+let initializeModel () =
     let dt = LocalStorage.Darkmode.DataTheme.GET()
     LocalStorage.Darkmode.DataTheme.SET dt
     {
         DebouncerState              = Debouncer                 .create ()
-        PageState                   = PageState                 .init pageOpt
+        PageState                   = PageState                 .init ()
         PersistentStorageState      = PersistentStorageState    .init ()
         DevState                    = DevState                  .init ()
         TermSearchState             = TermSearch.Model          .init ()
@@ -34,11 +34,10 @@ let initializeModel (pageOpt: Routing.Route option) =
         History                     = LocalHistory.Model        .init().UpdateFromSessionStorage()
     }
 
+
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
-    let route = (parseHash Routing.Routing.route) Browser.Dom.document.location
-    let initialModel = initializeModel (pageOpt)
-    // The initial command from urlUpdate is not needed yet. As we use a reduced variant of subModels with no own Msg system.
-    let model, _ = urlUpdate route initialModel
+    let initialModel, pageCmd = initializeModel () |> urlUpdate pageOpt
     let cmd = Cmd.ofMsg <| InterfaceMsg SpreadsheetInterface.Initialize 
-    model, cmd
+    let batch = Cmd.batch [|pageCmd; cmd|]
+    initialModel, batch

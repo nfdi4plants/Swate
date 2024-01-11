@@ -192,18 +192,19 @@ module TemplateFromDB =
                             Html.tr [
                                 Html.th "Column"
                                 Html.th "Column TAN"
-                                Html.th "Unit"
-                                Html.th "Unit TAN"
+                                //Html.th "Unit"
+                                //Html.th "Unit TAN"
                             ]
                         ]
                         tbody [] [
-                            for insertBB in model.ProtocolState.ProtocolSelected.Value.TemplateBuildingBlocks do
+                            for column in model.ProtocolState.ProtocolSelected.Value.Table.Columns do
+                                //let unitOption = column.TryGetColumnUnits()
                                 yield
                                     Html.tr [
-                                        td [] [str (insertBB.ColumnHeader.toAnnotationTableHeader())]
-                                        td [] [str (if insertBB.HasExistingTerm then insertBB.ColumnTerm.Value.TermAccession else "-")]
-                                        td [] [str (if insertBB.HasUnit then insertBB.UnitTerm.Value.Name else "-")]
-                                        td [] [str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
+                                        td [] [str (column.Header.ToString())]
+                                        td [] [str (if column.Header.IsTermColumn then column.Header.ToTerm().TermAccessionShort else "-")]
+                                        //td [] [str (if unitOption.IsSome then insertBB.UnitTerm.Value.Name else "-")]
+                                        //td [] [str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
                                     ]
                         ]
                     ]

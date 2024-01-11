@@ -11,12 +11,14 @@ open SpreadsheetInterface
 open Elmish
 open Model
 open Shared
-
+open Fable.Core.JsInterop
 
 module private Helper =
     open ExcelJS.Fable.GlobalBindings
 
     let initializeAddIn () = Office.onReady()
+
+//open Fable.Core.JS
 
 module Interface =
 
@@ -24,25 +26,28 @@ module Interface =
         let host = model.PersistentStorageState.Host
         match msg with
         | Initialize ->
-            let initExcel() = promise {
-                let! tryExcel = Helper.initializeAddIn()
-                let host =
-                    if (isNull >> not) tryExcel.host then
-                        Swatehost.Excel (tryExcel.host.ToString(), tryExcel.platform.ToString())
-                    else
-                        Swatehost.Browser
-                return host
+            let init() = promise {
+                if model.PersistentStorageState.Host = Swatehost.Electron
+                then 
+                    return Swatehost.Electron
+                else
+                    let! tryExcel = Helper.initializeAddIn()
+                    let host =
+                        if (isNull >> not) tryExcel.host then
+                            Swatehost.Excel (tryExcel.host.ToString(), tryExcel.platform.ToString())
+                        else
+                            Swatehost.Browser
+                    return host
             }
             let cmd =
                 Cmd.OfPromise.perform
-                    initExcel
+                    init
                     ()
                     InitializeResponse
             model, Cmd.map InterfaceMsg cmd
         // This is very bloated, might be good to reduce
         | InitializeResponse host ->
-            let nextState = {model.PersistentStorageState with Host = host}
-            let nextModel = {model with PersistentStorageState = nextState}
+            let nextModel = {model with Messages.Model.PersistentStorageState.Host = host}
             let cmd =
                 Cmd.batch [
                     Cmd.ofMsg (GetAppVersion |> Request |> Api)

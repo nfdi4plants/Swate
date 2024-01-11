@@ -90,7 +90,7 @@ module Extensions =
 
         member this.UpdateMainField(s: string) =
             match this with
-            | CompositeCell.Term oa -> CompositeCell.Term ({oa with Name = AnnotationValue.Text s |> Some})
+            | CompositeCell.Term oa -> CompositeCell.Term ({oa with Name = Some s})
             | CompositeCell.Unitized (_, oa) -> CompositeCell.Unitized (s, oa)
             | CompositeCell.FreeText _ -> CompositeCell.FreeText s
 

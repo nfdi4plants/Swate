@@ -27,8 +27,13 @@ let breadcrumbEle (model:Model) dispatch =
         ]
     ]
 
+open Fable.Core
 
-let protocolSearchView (model:Model) dispatch =
+[<ReactComponent>]
+let ProtocolSearchView (model:Model) dispatch =
+    React.useEffectOnce(fun () ->
+        Messages.Protocol.GetAllProtocolsRequest |> ProtocolMsg |> dispatch
+    )
     let isEmpty = model.ProtocolState.ProtocolsAll |> isNull || model.ProtocolState.ProtocolsAll |> Array.isEmpty
     let isLoading = model.ProtocolState.Loading
     div [

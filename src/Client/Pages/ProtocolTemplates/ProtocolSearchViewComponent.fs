@@ -44,12 +44,14 @@ type private SearchFields =
     static member GetOfQuery(query:string) =
         SearchFields.ofFieldString query
 
+open ARCtrl.ISA
+
 type private ProtocolViewState = {
         DisplayedProtDetailsId  : int option
         ProtocolSearchQuery     : string
         ProtocolTagSearchQuery  : string
-        ProtocolFilterTags      : string list
-        ProtocolFilterErTags    : string list
+        ProtocolFilterTags      : OntologyAnnotation list
+        ProtocolFilterErTags    : OntologyAnnotation list
         CuratedCommunityFilter  : Model.Protocol.CuratedCommunityFilter
         TagFilterIsAnd          : bool
         Searchfield             : SearchFields
@@ -81,32 +83,32 @@ let private queryField (model:Model) (state: ProtocolViewState) (setState: Proto
                     ]
                 Bulma.control.div [
                     Bulma.control.hasIconsRight
-                    Bulma.input.text [
-                        prop.placeholder $".. {state.Searchfield.toNameRdb}"
-                        prop.id SearchFieldId
-                        Bulma.color.isPrimary
-                        prop.valueOrDefault state.ProtocolSearchQuery
-                        prop.onChange (fun (e: string) ->
-                            let query = e
-                            // if query starts with "/" expect intend to search by different field
-                            if query.StartsWith "/" then
-                                let searchField = SearchFields.GetOfQuery query
-                                if searchField.IsSome then
-                                    {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
-                                    //let inp = Browser.Dom.document.getElementById SearchFieldId
-                            // if query starts NOT with "/" update query
-                            else
-                                {
-                                    state with
-                                        ProtocolSearchQuery = query
-                                        DisplayedProtDetailsId = None
-                                }
-                                |> setState
-                        )
-                        prop.children (
-                            Bulma.icon [Bulma.icon.isSmall; Bulma.icon.isRight; prop.children (Html.i [prop.className "fa-solid fa-search"])]
-                        )
-                    ] |> prop.children
+                    prop.children [
+                        Bulma.input.text [
+                            prop.placeholder $".. {state.Searchfield.toNameRdb}"
+                            prop.id SearchFieldId
+                            Bulma.color.isPrimary
+                            prop.valueOrDefault state.ProtocolSearchQuery
+                            prop.onChange (fun (e: string) ->
+                                let query = e
+                                // if query starts with "/" expect intend to search by different field
+                                if query.StartsWith "/" then
+                                    let searchField = SearchFields.GetOfQuery query
+                                    if searchField.IsSome then
+                                        {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
+                                        //let inp = Browser.Dom.document.getElementById SearchFieldId
+                                // if query starts NOT with "/" update query
+                                else
+                                    {
+                                        state with
+                                            ProtocolSearchQuery = query
+                                            DisplayedProtDetailsId = None
+                                    }
+                                    |> setState
+                            )
+                        ]
+                        Bulma.icon [Bulma.icon.isSmall; Bulma.icon.isRight; prop.children (Html.i [prop.className "fa-solid fa-search"])]
+                    ]
                 ]
             ]
         ]
@@ -114,34 +116,24 @@ let private queryField (model:Model) (state: ProtocolViewState) (setState: Proto
 
 let private tagQueryField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
     let allTags = model.ProtocolState.ProtocolsAll |> Array.collect (fun x -> x.Tags) |> Array.distinct |> Array.filter (fun x -> state.ProtocolFilterTags |> List.contains x |> not )
-    let allErTags = model.ProtocolState.ProtocolsAll |> Array.collect (fun x -> x.Er_Tags) |> Array.distinct |> Array.filter (fun x -> state.ProtocolFilterErTags |> List.contains x |> not )
+    let allErTags = model.ProtocolState.ProtocolsAll |> Array.collect (fun x -> x.EndpointRepositories) |> Array.distinct |> Array.filter (fun x -> state.ProtocolFilterErTags |> List.contains x |> not )
     let hitTagList, hitErTagList =
         if state.ProtocolTagSearchQuery <> ""
         then
             let queryBigram = state.ProtocolTagSearchQuery |> Shared.SorensenDice.createBigrams 
-            let sortedTags =
+            let getMatchingTags (allTags: OntologyAnnotation []) =
                 allTags
                 |> Array.map (fun x ->
-                    x
+                    x.NameText
                     |> Shared.SorensenDice.createBigrams
                     |> Shared.SorensenDice.calculateDistance queryBigram
                     , x
                 )
-                |> Array.filter (fun x -> fst x >= 0.3)
+                |> Array.filter (fun x -> fst x >= 0.3 || (snd x).TermAccessionShort = state.ProtocolTagSearchQuery)
                 |> Array.sortByDescending fst
                 |> Array.map snd
-            let sortedErTags =
-                allErTags
-                |> Array.map (fun x ->
-                    let dist = 
-                        x
-                        |> Shared.SorensenDice.createBigrams
-                        |> Shared.SorensenDice.calculateDistance queryBigram
-                    dist , x
-                )
-                |> Array.filter (fun x -> fst x >= 0.3)
-                |> Array.sortByDescending fst
-                |> Array.map snd
+            let sortedTags = getMatchingTags allTags
+            let sortedErTags = getMatchingTags allErTags
             sortedTags, sortedErTags
         else
             [||], [||]
@@ -187,9 +179,9 @@ let private tagQueryField (model:Model) (state: ProtocolViewState) (setState: Pr
                                                         DisplayedProtDetailsId = None
                                                 }
                                                 setState nextState
-                                                //AddProtocolErTag tagSuggestion |> ProtocolMsg |> dispatch
                                             )
-                                            prop.text tagSuggestion
+                                            prop.title tagSuggestion.TermAccessionShort
+                                            prop.text tagSuggestion.NameText
                                         ]
                             ]
                         if hitTagList <> [||] then
@@ -210,7 +202,8 @@ let private tagQueryField (model:Model) (state: ProtocolViewState) (setState: Pr
                                                 setState nextState
                                                 //AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch
                                             )
-                                            prop.text tagSuggestion
+                                            prop.title tagSuggestion.TermAccessionShort
+                                            prop.text tagSuggestion.NameText
                                         ]
                             ]
                     ]
@@ -232,7 +225,7 @@ let private tagDisplayField (model:Model) (state: ProtocolViewState) (setState: 
                                 Bulma.tags [
                                     Bulma.tags.hasAddons
                                     prop.children [
-                                        Bulma.tag [Bulma.color.isLink; prop.style [style.borderWidth 0]; prop.text selectedTag]
+                                        Bulma.tag [Bulma.color.isLink; prop.style [style.borderWidth 0]; prop.text selectedTag.NameText]
                                         Bulma.delete [
                                             prop.className "clickableTagDelete"
                                             prop.onClick (fun _ ->
@@ -248,7 +241,7 @@ let private tagDisplayField (model:Model) (state: ProtocolViewState) (setState: 
                                 Bulma.tags [
                                     Bulma.tags.hasAddons
                                     prop.children [
-                                        Bulma.tag [Bulma.color.isInfo; prop.style [style.borderWidth 0]; prop.text selectedTag]
+                                        Bulma.tag [Bulma.color.isInfo; prop.style [style.borderWidth 0]; prop.text selectedTag.NameText]
                                         Bulma.delete [
                                             prop.className "clickableTagDelete"
                                             //Tag.Color IsWarning;
@@ -314,7 +307,12 @@ let private curatedCommunityTag =
         ]
     ]
 
-let private protocolElement i (template:Template) (model:Model) (state:ProtocolViewState) dispatch (setState: ProtocolViewState -> unit) =
+let createAuthorStringHelper (author: Person) = 
+    let mi = if author.MidInitials.IsSome then author.MidInitials.Value else ""
+    $"{author.FirstName} {mi} {author.LastName}"
+let createAuthorsStringHelper (authors: Person []) = authors |> Array.map createAuthorStringHelper |> String.concat ", "
+
+let private protocolElement i (template:ARCtrl.Template.Template) (model:Model) (state:ProtocolViewState) dispatch (setState: ProtocolViewState -> unit) =
     let isActive =
         match state.DisplayedProtDetailsId with
         | Some id when id = i ->
@@ -323,6 +321,7 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
             false
     [
         Html.tr [
+            prop.key $"{i}_{template.Id}"
             prop.classes [ "nonSelectText"; if isActive then "hoverTableEle"]
             prop.style [
                 style.cursor.pointer; style.userSelect.none;
@@ -341,7 +340,7 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
             prop.children [
                 Html.td template.Name
                 Html.td (
-                    if curatedOrganisationNames |> List.contains (template.Organisation.ToLower()) then
+                    if curatedOrganisationNames |> List.contains (template.Organisation.ToString().ToLower()) then
                         curatedTag
                     else
                         communitytag
@@ -371,25 +370,25 @@ let private protocolElement i (template:Template) (model:Model) (state:ProtocolV
                             Html.div [
                                 Html.div template.Description
                                 Html.div [
-                                    Html.div [ Html.b "Author: "; Html.span (template.Authors.Replace(",",", ")) ]
+                                    Html.div [ Html.b "Author: "; Html.span (createAuthorsStringHelper template.Authors) ]
                                     Html.div [ Html.b "Created: "; Html.span (template.LastUpdated.ToString("yyyy/MM/dd")) ]
                                 ]
                                 Html.div [
-                                    Html.div [ Html.b "Organisation: "; Html.span template.Organisation ]
+                                    Html.div [ Html.b "Organisation: "; Html.span (template.Organisation.ToString()) ]
                                 ]
                             ]
                             Bulma.tags [
-                                for tag in template.Er_Tags do
+                                for tag in template.EndpointRepositories do
                                     yield
-                                        Bulma.tag [Bulma.color.isLink; prop.text tag]
+                                        Bulma.tag [Bulma.color.isLink; prop.text tag.NameText; prop.title tag.TermAccessionShort]
                             ]
                             Bulma.tags [
                                 for tag in template.Tags do
                                     yield
-                                        Bulma.tag [Bulma.color.isInfo; prop.text tag]
+                                        Bulma.tag [Bulma.color.isInfo; prop.text tag.NameText; prop.title tag.TermAccessionShort]
                             ]
                             Bulma.button.a [
-                                prop.onClick (fun _ -> GetProtocolByIdRequest template.Id |> ProtocolMsg |> dispatch)
+                                prop.onClick (fun _ -> SelectProtocol template |> ProtocolMsg |> dispatch)
                                 Bulma.button.isFullWidth; Bulma.color.isSuccess
                                 prop.text "select"
                             ]
@@ -444,7 +443,7 @@ let ProtocolContainer (model:Model) dispatch =
 
     let state, setState = React.useState(ProtocolViewState.init)
 
-    let sortTableBySearchQuery (protocol:Template []) =
+    let sortTableBySearchQuery (protocol: ARCtrl.Template.Template []) =
         let query = state.ProtocolSearchQuery.Trim()
         // Only search if field is not empty and does not start with "/".
         // If it starts with "/" and does not match SearchFields then it will never trigger search
@@ -464,11 +463,13 @@ let ProtocolContainer (model:Model) dispatch =
                         | SearchFields.Name          ->
                             createScore template.Name
                         | SearchFields.Organisation  ->
-                            createScore template.Organisation
+                            createScore (template.Organisation.ToString())
                         | SearchFields.Authors       ->
-                            let authors = template.Authors.Split([|','; ' '|], StringSplitOptions.TrimEntries)
-                            let query = query.ToLower()
-                            let scores = authors |> Array.filter (fun x -> x.ToLower().StartsWith query)
+                            let query' = query.ToLower()
+                            let scores = template.Authors |> Array.filter (fun author -> 
+                                (createAuthorStringHelper author).ToLower().Contains query'
+                                || (author.ORCID.IsSome && author.ORCID.Value = query)
+                            )
                             if Array.isEmpty scores then 0.0 else 1.0
                     score, template
                 )
@@ -478,27 +479,27 @@ let ProtocolContainer (model:Model) dispatch =
             scoredTemplate
         else
             protocol
-    let filterTableByTags (protocol:Template []) =
+    let filterTableByTags (protocol:ARCtrl.Template.Template []) =
         if state.ProtocolFilterTags <> [] || state.ProtocolFilterErTags <> [] then
             protocol |> Array.filter (fun x ->
-                let tagSet = Set.union (x.Tags |> Set.ofArray) (x.Er_Tags |> Set.ofArray)
-                let filterTags = Set.union (state.ProtocolFilterTags |> Set.ofList) (state.ProtocolFilterErTags |> Set.ofList)
-                Set.intersect tagSet filterTags
-                    |> fun intersectSet ->
+                let tags = Array.append x.Tags x.EndpointRepositories |> Array.distinct
+                let filterTags = state.ProtocolFilterTags@state.ProtocolFilterErTags |> List.distinct
+                Seq.except filterTags tags
+                    |> fun filteredTags ->
                         // if we want to filter by tag with AND, all tags must match
                         if state.TagFilterIsAnd then
-                            intersectSet.Count = filterTags.Count
+                            Seq.length filteredTags = tags.Length - filterTags.Length
                         // if we want to filter by tag with OR, at least one tag must match
                         else
-                            intersectSet.Count >= 1
+                            Seq.length filteredTags < tags.Length
             )
         else
             protocol
-    let filterTableByCuratedCommunityFilter (protocol:Template []) =
+    let filterTableByCuratedCommunityFilter (protocol:ARCtrl.Template.Template []) =
         match state.CuratedCommunityFilter with
         | Protocol.CuratedCommunityFilter.Both          -> protocol
-        | Protocol.CuratedCommunityFilter.OnlyCurated   -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToLower()) curatedOrganisationNames)
-        | Protocol.CuratedCommunityFilter.OnlyCommunity -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToLower()) curatedOrganisationNames |> not)
+        | Protocol.CuratedCommunityFilter.OnlyCurated   -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToString().ToLower()) curatedOrganisationNames)
+        | Protocol.CuratedCommunityFilter.OnlyCommunity -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToString().ToLower()) curatedOrganisationNames |> not)
 
     let sortedTable =
         model.ProtocolState.ProtocolsAll

@@ -13,6 +13,7 @@
         <Content Include="docs\IOntologyAPIv2.html" />
         <None Include="index.html" />
         <None Include="style.scss" />
+        <Compile Include="IPC\Binding.fs" />
         <Compile Include="LocalStorage\SplitWindow.fs" />
         <Compile Include="LocalStorage\Darkmode.fs" />
         <Compile Include="Colors\NFDIColors.fs" />

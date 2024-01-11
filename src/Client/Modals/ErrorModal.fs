@@ -17,7 +17,7 @@ let errorModal(error: exn) (rmv: _ -> unit) =
             Bulma.modalBackground [ prop.onClick closeMsg ]
             Bulma.notification [
                 Bulma.color.isDanger
-                prop.style [style.width(length.percent 90); style.maxHeight (length.percent 80)]
+                prop.style [style.width(length.percent 90); style.maxHeight (length.percent 80); style.overflow.auto]
                 prop.children [
                     Bulma.delete [prop.onClick closeMsg]
                     Html.span (error.GetPropagatedError())

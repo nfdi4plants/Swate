@@ -13,27 +13,27 @@ open Messages
 
 let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.Msg> =
     match route with
-    | Some page ->
-        let nextPageState = {
-            currentModel.PageState with
-                CurrentPage = page
-                CurrentUrl  = Route.toRouteUrl page
-        }
-
+    | Some (Route.Home isArcitectOption) ->
+        let isArcitect = match isArcitectOption with | Some 1 -> Swatehost.Electron | _ -> Swatehost.None
         let nextModel = {
-            currentModel with
-                PageState = nextPageState
+            currentModel with 
+                Messages.Model.PageState.CurrentPage = Route.BuildingBlock
+                Messages.Model.PageState.IsExpert = false
+                Messages.Model.PersistentStorageState.Host = isArcitect
+        }
+        nextModel,Cmd.none
+    | Some page ->
+        let nextModel = {
+            currentModel with 
+                Messages.Model.PageState.CurrentPage = page
+                Messages.Model.PageState.IsExpert = page.isExpert
         }
         nextModel,Cmd.none
     | None ->
-        let nextPageState = {
-            currentModel.PageState with
-                CurrentPage = Route.BuildingBlock
-        }
-
         let nextModel = {
-            currentModel with
-                PageState = nextPageState
+            currentModel with 
+                Messages.Model.PageState.CurrentPage = Route.BuildingBlock
+                Messages.Model.PageState.IsExpert = false
         }
         nextModel,Cmd.none
 
@@ -509,29 +509,21 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                 ]
             currentModel, cmd
         | UpdatePageState (pageOpt:Route option) ->
-            let nextCmd =
-                match pageOpt with
-                | Some Routing.Route.ProtocolSearch ->
-                    Protocol.GetAllProtocolsRequest |> ProtocolMsg |> Cmd.ofMsg
-                | _ ->
-                    Cmd.none
             let nextPageState =
                 match pageOpt with
                 | Some page -> {
                     currentModel.PageState with
                         CurrentPage = page
-                        CurrentUrl = Route.toRouteUrl page
                     }
                 | None -> {
                     currentModel.PageState with
-                        CurrentPage = Route.TermSearch
-                        CurrentUrl = ""
+                        CurrentPage = Route.BuildingBlock
                     }
             let nextModel = {
                 currentModel with
                     PageState = nextPageState
             }
-            nextModel, nextCmd
+            nextModel, Cmd.none
         | UpdateIsExpert b ->
             let nextPageState = {
                 currentModel.PageState with

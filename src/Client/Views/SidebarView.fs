@@ -114,8 +114,7 @@ module private ResizeObserver =
             let width = int ele.[0].contentRect?width
             //let size = ele.
             let nextState = {
-                state with
-                    Size = Model.WindowSize.ofWidth width
+                Size = Model.WindowSize.ofWidth width
             }
             //printfn "[FIRE OBSERVER]"
             setState nextState
@@ -149,7 +148,7 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
 module private Content =
     let main (model:Model) (dispatch: Msg -> unit) =
         match model.PageState.CurrentPage with
-        | Routing.Route.BuildingBlock ->
+        | Routing.Route.BuildingBlock | Routing.Route.Home _ ->
             BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
         | Routing.Route.TermSearch ->
@@ -168,7 +167,7 @@ module private Content =
             TemplateMetadata.Core.newNameMainElement model dispatch
 
         | Routing.Route.ProtocolSearch ->
-            Protocol.Search.protocolSearchView model dispatch
+            Protocol.Search.ProtocolSearchView model dispatch
 
         | Routing.Route.ActivityLog ->
             ActivityLog.activityLogComponent model dispatch

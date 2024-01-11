@@ -170,30 +170,17 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
 open Database
 
 let templateApi credentials = {
-    getAllTemplatesWithoutXml = fun () -> async {
-        //let protocols = Template.Queries.Template(credentials).getAll() |> Array.ofSeq
-        //return protocols
-        return failwith "Not implemented yet"
+    getTemplates = fun () -> async {
+        let! templates = ARCtrl.Template.Web.getTemplates None
+        let templatesJson = templates |> Array.map (ARCtrl.Template.Json.Template.toJsonString 0)
+        return templatesJson
     }
 
-    getTemplateById = fun templateId -> async {
-        //printfn "HIT!"
-        //return Template.Queries.Template(credentials).getById(templateId)
-        return failwith "Not implemented yet"
-    }
-
-    increaseTimesUsedById = fun templateId -> async {
-        //let _ = Template.Queries.Template(credentials).increaseTimesUsed(templateId)
-        //return ()
-        return failwith "Not implemented yet"
-    }
-
-    tryParseToBuildingBlocks = fun jsonString -> async {
-        //let table = Import.tryToTable jsonString
-        //if table.Sheets.Length = 0 then failwith "Unable to identitfy supported file formats! We currently support assay.json and seq<process.json>, as well as Swate .xlsx files."
-        //let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
-        //return buildingBlocks
-        return failwith "Not implemented yet"
+    getTemplateById = fun id -> async {
+        let! templates = ARCtrl.Template.Web.getTemplates None
+        let template = templates |> Array.find (fun t -> t.Id = System.Guid(id))
+        let templateJson = ARCtrl.Template.Json.Template.toJsonString 0 template
+        return templateJson
     }
 }
 
@@ -366,10 +353,10 @@ let config (app:IApplicationBuilder) =
     ) 
 
 let app = application {
-    url "http://localhost:5000" //"http://localhost:5000/"
-    app_config config
+    //url "http://localhost:5000" //"http://localhost:5000/"
+    //app_config config
     use_router topLevelRouter
-    use_cors "CORS_CONFIG" cors_config
+    //use_cors "CORS_CONFIG" cors_config
     memory_cache
     use_static "public"
     use_gzip

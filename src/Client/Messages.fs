@@ -134,9 +134,8 @@ module Protocol =
         | RemoveUploadedFileParsed
         // // ------ Protocol from Database ------
         | GetAllProtocolsRequest
-        | GetAllProtocolsResponse           of Template []
-        | GetProtocolByIdRequest            of string
-        | GetProtocolByIdResponse           of Template
+        | GetAllProtocolsResponse           of string []
+        | SelectProtocol                    of ARCtrl.Template.Template
         | ProtocolIncreaseTimesUsed         of protocolName:string
         // Client
         | RemoveSelectedProtocol

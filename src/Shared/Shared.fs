@@ -140,11 +140,9 @@ type IOntologyAPIv2 = {
 }
 
 type ITemplateAPIv1 = {
-    getAllTemplatesWithoutXml       : unit      -> Async<Template []>
-    getTemplateById                 : string    -> Async<Template>
-    increaseTimesUsedById           : string    -> Async<unit>
-    /// This endpoint tries to parse any supported import data type (at this point only assay.json and seq<process.json>).
-    tryParseToBuildingBlocks        : byte []   -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+    // must return template as string, fable remoting cannot do conversion automatically
+    getTemplates                    : unit      -> Async<string []> 
+    getTemplateById                 : string    -> Async<string>
 }
 
         

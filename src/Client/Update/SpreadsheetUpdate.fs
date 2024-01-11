@@ -289,14 +289,6 @@ module Spreadsheet =
                 //state, nextModel, cmd
                 failwith "UpdateTermColumnsResponse is not implemented yet"
                 state,model,Cmd.none
-            //| Success nextState ->
-            //    nextState.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
-            //    let nextHistory = model.History.SaveSessionSnapshot nextState // this will cache the table state for certain operations in session storage.
-            //    nextState, {model with History = nextHistory}, Cmd.none
-            //| SuccessNoHistory nextState ->
-            //    nextState.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
-            //    nextState, model, Cmd.none
-
         try
             innerUpdate state model msg
             |> Helper.updateHistoryStorageMsg msg

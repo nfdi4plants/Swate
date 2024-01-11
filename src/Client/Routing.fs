@@ -7,6 +7,7 @@ open Feliz.Bulma
 /// The different pages of the application. If you add a new page, then add an entry here.
 [<RequireQualifiedAccess>]
 type Route =
+| Home of int option
 | BuildingBlock
 | TermSearch
 | FilePicker
@@ -20,24 +21,9 @@ type Route =
 | Settings
 | NotFound
 
-    static member toRouteUrl (route:Route) =
-        match route with
-        | Route.BuildingBlock       -> "/#BuildingBlock"
-        | Route.TermSearch          -> "/#TermSearch"
-        | Route.FilePicker          -> "/#FilePicker"
-        | Route.Protocol            -> "/#ProtocolInsert"
-        | Route.ProtocolSearch      -> "/#Protocol/Search"
-        | Route.Dag                 -> "/#Dag"
-        | Route.JsonExport          -> "/#Experts/JsonExport"
-        | Route.TemplateMetadata    -> "/#Experts/TemplateMetadata"
-        | Route.Info                -> "/#Info"
-        | Route.ActivityLog         -> "/#ActivityLog"
-        | Route.Settings            -> "/#Settings"
-        | Route.NotFound            -> "/#NotFound"
-
     member this.toStringRdbl =
         match this with
-        | Route.BuildingBlock       -> "Building Blocks"
+        | Home _ | Route.BuildingBlock  -> "Building Blocks"
         | Route.TermSearch          -> "Terms"
         | Route.FilePicker          -> "File Picker"
         | Route.Protocol            -> "Templates"
@@ -103,7 +89,7 @@ module Routing =
     /// The URL is turned into a Result.
     let route : Parser<Route -> Route,_> =
         oneOf [
-            map Route.TermSearch            (s "")
+            map Route.Home                  (s "" <?> intParam "is_arcitect")
             map Route.TermSearch            (s "TermSearch")
             map Route.BuildingBlock         (s "BuildingBlock")
             map Route.FilePicker            (s "FilePicker")
@@ -121,3 +107,4 @@ module Routing =
         ]
 
 
+    let parsePath (location:Browser.Types.Location) : Route option = Elmish.UrlParser.parsePath route location

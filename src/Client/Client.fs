@@ -8,6 +8,7 @@ open Fable.React
 open Messages
 open Update
 open Fable.Core.JsInterop
+open Routing
 let _ = importSideEffects "./style.scss"
 
 ///<summary> This is a basic test case used in Client unit tests </summary>
@@ -45,7 +46,7 @@ Program.mkProgram Init.init Update.update View
 #if DEBUG
 |> Program.withConsoleTrace
 #endif
-|> Program.toNavigable (parseHash Routing.Routing.route) Update.urlUpdate
+|> Program.toNavigable (parsePath Routing.Routing.route) Update.urlUpdate
 |> Program.withReactBatched "elmish-app"
 #if DEBUG
 //|> Program.withDebuggerCoders CustomDebugger.modelEncoder CustomDebugger.modelDecoder
