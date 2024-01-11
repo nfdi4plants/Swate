@@ -56,7 +56,8 @@ let private mouseDown_event (mouseMove : Event -> unit) : Event -> unit = (fun e
 let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.style [
-            style.width (length.px 5)
+            style.minWidth (length.px 3)
+            style.width (length.px 3)
             style.height (length.perc 100)
             style.backgroundColor.darkGray
             style.cursor.columnResize
