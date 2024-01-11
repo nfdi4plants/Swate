@@ -38,6 +38,6 @@ let initializeModel () =
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
     let initialModel, pageCmd = initializeModel () |> urlUpdate pageOpt
-    let cmd = Cmd.ofMsg <| InterfaceMsg SpreadsheetInterface.Initialize 
+    let cmd = Cmd.ofMsg <| InterfaceMsg (SpreadsheetInterface.Initialize initialModel.PersistentStorageState.Host.Value)
     let batch = Cmd.batch [|pageCmd; cmd|]
     initialModel, batch

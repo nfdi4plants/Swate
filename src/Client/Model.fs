@@ -168,12 +168,12 @@ type DevState = {
 type PersistentStorageState = {
     SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
-    Host                    : Swatehost
+    Host                    : Swatehost option
     HasOntologiesLoaded     : bool
 } with
     static member init () = {
         SearchableOntologies    = [||]
-        Host                    = Swatehost.None
+        Host                    = None
         AppVersion              = ""
         HasOntologiesLoaded     = false
     }

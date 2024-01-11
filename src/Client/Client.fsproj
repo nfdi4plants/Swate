@@ -13,7 +13,6 @@
         <Content Include="docs\IOntologyAPIv2.html" />
         <None Include="index.html" />
         <None Include="style.scss" />
-        <Compile Include="IPC\Binding.fs" />
         <Compile Include="LocalStorage\SplitWindow.fs" />
         <Compile Include="LocalStorage\Darkmode.fs" />
         <Compile Include="Colors\NFDIColors.fs" />
@@ -32,6 +31,7 @@
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="OfficeInterop\OfficeInteropState.fs" />
+        <Compile Include="States\ARCitect.fs" />
         <Compile Include="States\SpreadsheetInterface.fs" />
         <Compile Include="States\Spreadsheet.fs" />
         <Compile Include="States\LocalHistory.fs" />
@@ -41,6 +41,8 @@
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
+        <Compile Include="ARCitect\Interop.fs" />
+        <Compile Include="ARCitect\ARCitect.fs" />
         <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
         <Compile Include="Modals\EditColumn.fs" />

@@ -382,7 +382,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         SearchComponent.Main model dispatch
 
         match model.PersistentStorageState.Host with
-        | Swatehost.Excel _ ->
+        | Some Swatehost.Excel ->
             Bulma.label "Add/Update unit reference to existing building block."
             // Input forms, etc related to add unit to existing building block.
             addUnitToExistingBlockElements model dispatch

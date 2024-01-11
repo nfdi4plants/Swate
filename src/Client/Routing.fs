@@ -89,7 +89,7 @@ module Routing =
     /// The URL is turned into a Result.
     let route : Parser<Route -> Route,_> =
         oneOf [
-            map Route.Home                  (s "" <?> intParam "is_arcitect")
+            map Route.Home                  (s "" <?> intParam "is_swatehost")
             map Route.TermSearch            (s "TermSearch")
             map Route.BuildingBlock         (s "BuildingBlock")
             map Route.FilePicker            (s "FilePicker")

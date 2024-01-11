@@ -360,8 +360,8 @@ let autocompleteTermSearchComponentOfParentOntology
 
     let useParentTerm =
         match model.PersistentStorageState.Host with
-        | Swatehost.Excel _ -> model.TermSearchState.ParentOntology.IsSome 
-        | Swatehost.Browser when not model.SpreadsheetModel.headerIsSelected ->
+        | Some Swatehost.Excel -> model.TermSearchState.ParentOntology.IsSome 
+        | Some Swatehost.Browser when not model.SpreadsheetModel.headerIsSelected ->
             let header = model.SpreadsheetModel.getSelectedColumnHeader
             match header with
             | Some h ->
@@ -372,8 +372,8 @@ let autocompleteTermSearchComponentOfParentOntology
 
     let parentTerm =
         match model.PersistentStorageState.Host with
-        | Swatehost.Excel _ -> model.TermSearchState.ParentOntology
-        | Swatehost.Browser ->
+        | Some Swatehost.Excel -> model.TermSearchState.ParentOntology
+        | Some Swatehost.Browser ->
             let header = model.SpreadsheetModel.getSelectedColumnHeader
             header
             |> Option.bind (fun header ->
@@ -408,7 +408,7 @@ let autocompleteTermSearchComponentOfParentOntology
                         prop.onFocus (fun e ->
                             //GenericLog ("Info","FOCUSED!") |> Dev |> dispatch
                             match model.PersistentStorageState.Host with
-                            | Swatehost.Excel _ ->
+                            | Some Swatehost.Excel ->
                                 OfficeInterop.GetParentTerm |> OfficeInteropMsg |> dispatch
                                 let el = Browser.Dom.document.getElementById autocompleteParams.InputId
                                 el.focus()

@@ -13,13 +13,13 @@ open Messages
 
 let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.Msg> =
     match route with
-    | Some (Route.Home isArcitectOption) ->
-        let isArcitect = match isArcitectOption with | Some 1 -> Swatehost.Electron | _ -> Swatehost.None
+    | Some (Route.Home queryIntegerOption) ->
+        let swatehost = Swatehost.ofQueryParam queryIntegerOption
         let nextModel = {
             currentModel with 
                 Messages.Model.PageState.CurrentPage = Route.BuildingBlock
                 Messages.Model.PageState.IsExpert = false
-                Messages.Model.PersistentStorageState.Host = isArcitect
+                Messages.Model.PersistentStorageState.Host = Some swatehost
         }
         nextModel,Cmd.none
     | Some page ->

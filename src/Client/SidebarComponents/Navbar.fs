@@ -37,7 +37,7 @@ let private shortCutIconList model dispatch =
             )
         )
         match model.PersistentStorageState.Host with
-        | Swatehost.Excel _ ->
+        | Some Swatehost.Excel ->
             QuickAccessButton.create(
                 "Autoformat Table",
                 [

@@ -76,6 +76,8 @@ let private footer (model:Model) =
         div [] [
             str "Swate Release Version "
             a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
+            str " Host "
+            Html.span [prop.style [style.color "#4fb3d9"]; prop.text (sprintf "%O" model.PersistentStorageState.Host)]
         ]
     ]
 
@@ -211,7 +213,7 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
                 //] [ str "Test button" ]
 
                 match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
-                | Swatehost.Excel _, true ->
+                | Some Swatehost.Excel, true ->
                     SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
                 | _ -> ()
 
