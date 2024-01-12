@@ -259,7 +259,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentCall = noCall
+            currentCall = ApiState.noCall
             callHistory = finishedCall::currentState.callHistory
         }
 
@@ -277,7 +277,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentCall = noCall
+            currentCall = ApiState.noCall
             callHistory = finishedCall::currentState.callHistory
         }
 
@@ -308,7 +308,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentCall = noCall
+            currentCall = ApiState.noCall
             callHistory = finishedCall::currentState.callHistory
         }
 
@@ -326,7 +326,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentCall = noCall
+            currentCall = ApiState.noCall
             callHistory = finishedCall::currentState.callHistory
         }
 
@@ -343,7 +343,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
                 Status = Successfull
         }
         let nextState = {
-            currentCall = noCall
+            currentCall = ApiState.noCall
             callHistory = finishedCall::currentState.callHistory
         }
         let cmd =
@@ -360,7 +360,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         }
 
         let nextState = {
-            currentCall = noCall
+            currentCall = ApiState.noCall
             callHistory = finishedCall::currentState.callHistory
         }
 
@@ -384,7 +384,7 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messag
         }
 
         let nextState = {
-            currentCall = noCall
+            currentCall = ApiState.noCall
             callHistory = failedCall::currentState.callHistory
         }
         let batch = Cmd.batch [

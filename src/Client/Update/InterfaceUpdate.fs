@@ -38,9 +38,14 @@ module Interface =
                             ()
                             (OfficeInterop.AnnotationTableExists >> OfficeInteropMsg)
                             (curry GenericError Cmd.none >> DevMsg)
-                    | Swatehost.Browser | Swatehost.ARCitect ->
+                    | Swatehost.Browser ->
                         Cmd.batch [
                             Cmd.ofEffect (fun dispatch -> Spreadsheet.KeyboardShortcuts.addOnKeydownEvent dispatch)
+                        ]
+                    | Swatehost.ARCitect ->
+                        Cmd.batch [
+                            Cmd.ofEffect (fun dispatch -> Spreadsheet.KeyboardShortcuts.addOnKeydownEvent dispatch)
+                            Cmd.ofEffect (fun _ -> ARCitect.ARCitect.send ARCitect.Init)
                         ]
                 ]
             model, cmd

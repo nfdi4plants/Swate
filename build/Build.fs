@@ -228,11 +228,13 @@ Target.create "bundle" (fun _ ->
     |> runParallel
 )
 
-Target.create "Run" (fun _ ->
+Target.create "Run" (fun config ->
+    let args = config.Context.Arguments
     run dotnet [ "build" ] sharedPath
     [ "server", dotnet [ "watch"; "run" ] serverPath
       "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "-e"; "fs.js"; "--run"; "npx"; "vite" ] clientPath
-      "database", dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
+      if args |> List.contains "--nodb" |> not then
+        "database", dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
     ] |> runParallel
 )
 

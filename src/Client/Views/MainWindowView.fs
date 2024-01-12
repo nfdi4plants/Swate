@@ -28,7 +28,7 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                                     yield
                                         MainComponents.FooterTabs.Main {| index = index; tables = model.SpreadsheetModel.Tables; model = model; dispatch = dispatch |}
                                 match model.SpreadsheetModel.ArcFile with
-                                | Some (ArcFiles.Template _) ->
+                                | Some (ArcFiles.Template _) | Some (ArcFiles.Investigation _) ->
                                     yield Html.none
                                 | _ ->
                                     yield MainComponents.FooterTabs.MainPlus {| dispatch = dispatch |}
@@ -78,6 +78,6 @@ let Main (model: Messages.Model) dispatch =
                         MainComponents.AddRows.Main dispatch
                 ]
             ]
-            match state.Tables.TableCount = 0 with | true -> Html.none | false -> spreadsheetSelectionFooter model dispatch
+            spreadsheetSelectionFooter model dispatch
         ]
     ]

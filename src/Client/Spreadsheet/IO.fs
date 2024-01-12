@@ -36,12 +36,12 @@ let private converters = [tryToConvertAssay; tryToConvertStudy; tryToConvertInve
 // TODO: Can this be done better? If we want to allow upload of any isa.xlsx file?
 let readFromBytes (bytes: byte []) =
     // Try each conversion function and return the first successful result
-    let rec tryConvert (converters: ('a -> 'b option) list) (json: 'a) =
+    let rec tryConvert (converters: ('a -> 'b option) list) (json: 'a) : 'b =
         match converters with
-        | [] -> None
+        | [] -> failwith "Unable to parse json to supported isa file."
         | convert :: rest ->
             match convert json with
-            | Some result -> Some result
+            | Some result -> result
             | None -> tryConvert rest json
     promise {
         let! fswb = FsSpreadsheet.Exceljs.Xlsx.fromBytes bytes

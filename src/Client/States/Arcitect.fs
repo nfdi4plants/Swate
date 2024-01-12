@@ -1,10 +1,15 @@
-﻿namespace ARCitect
+﻿module Model.ARCitect
+
+open ARCtrl.ISA
 
 type Msg =
     | Init
     | Error of exn
+    | AssayToARCitect of ArcAssay
+    | StudyToARCitect of ArcStudy
 
 type IEventHandler = {
-    InitResponse: string -> unit
     Error: exn -> unit
+    AssayToSwate: {| ArcAssayJsonString: string |} -> unit
+    StudyToSwate: {| ArcStudyJsonString: string |} -> unit
 }

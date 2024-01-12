@@ -1,6 +1,7 @@
 ﻿module ARCitect.Interop
 
 open Fable.Core.JsInterop
+open Model.ARCitect
 
 let inline getUnionCaseName (x:'a) = 
     match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(x, typeof<'a>) with

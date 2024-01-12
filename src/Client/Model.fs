@@ -1,4 +1,4 @@
-module Model
+namespace Model
 
 open Fable.React
 open Fable.React.Props
@@ -189,18 +189,17 @@ type ApiCallHistoryItem = {
     Status         : ApiCallStatus
 }
 
-let noCall = {
-    FunctionName = "None"
-    Status = IsNone
-}
-
 type ApiState = {
     currentCall : ApiCallHistoryItem
     callHistory : ApiCallHistoryItem list
 } with
     static member init() = {
-        currentCall = noCall
+        currentCall = ApiState.noCall
         callHistory = []
+    }
+    static member noCall = {
+        FunctionName = "None"
+        Status = IsNone
     }
 
 type PageState = {
