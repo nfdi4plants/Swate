@@ -24,10 +24,10 @@ let EventHandler (dispatch: Messages.Msg -> unit) : IEventHandler =
         AssayToSwate = fun data ->
             let assay = ARCtrl.ISA.Json.ArcAssay.fromJsonString data.ArcAssayJsonString
             log($"Received Assay {assay.Identifier} from ARCitect!")
-            Spreadsheet.UpdateArcFile (ArcFiles.Assay assay) |> SpreadsheetMsg |> dispatch
+            Spreadsheet.InitFromArcFile (ArcFiles.Assay assay) |> SpreadsheetMsg |> dispatch
         StudyToSwate = fun data ->
             let study, assays = ARCtrl.ISA.Json.ArcStudy.fromJsonString data.ArcStudyJsonString
-            Spreadsheet.UpdateArcFile (ArcFiles.Study (study,List.ofSeq assays)) |> SpreadsheetMsg |> dispatch
+            Spreadsheet.InitFromArcFile (ArcFiles.Study (study,List.ofSeq assays)) |> SpreadsheetMsg |> dispatch
             log($"Received Study {study.Identifier} from ARCitect!")
             Browser.Dom.console.log(study)
         Error = fun exn ->

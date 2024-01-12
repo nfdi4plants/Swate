@@ -95,6 +95,7 @@ type Msg =
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
 | UpdateArcFile of ArcFiles
+| InitFromArcFile of ArcFiles
 | InsertOntologyTerm of OntologyAnnotation
 | InsertOntologyTerms of OntologyAnnotation []
 | UpdateTermColumns
