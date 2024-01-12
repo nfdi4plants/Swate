@@ -94,18 +94,49 @@ let Main (model: Messages.Model) dispatch =
                 ]
                 prop.ariaLabel "menu"
                 prop.children [
-                    Bulma.navbarStart.div [
-                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
-                        prop.children [
-                            quickAccessButtonListStart model.History dispatch
+                    match model.PersistentStorageState.Host with
+                    | Some Swatehost.ARCitect ->
+                        Bulma.navbarStart.div [
+                            prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
+                            prop.children [
+                                Html.div [
+                                    prop.style [
+                                        style.display.flex; style.flexDirection.row
+                                    ]
+                                    prop.children [ 
+                                        QuickAccessButton.create(
+                                            "Return to ARCitect", 
+                                            [
+                                                Bulma.icon [Html.i [prop.className "fa-solid fa-circle-left";]]
+                                            ],
+                                            (fun _ -> ARCitect.ARCitect.send Model.ARCitect.TriggerSwateClose)
+                                        ).toReactElement()
+                                        QuickAccessButton.create(
+                                            "Alpha State", 
+                                            [
+                                                Html.span "ALPHA STATE"
+                                            ],
+                                            (fun e -> ()),
+                                            false
+                                        ).toReactElement()
+                                    ]
+                                ]
+                            ]
                         ]
-                    ]
-                    Bulma.navbarEnd.div [
-                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("marginLeft", "auto")]
-                        prop.children [
-                            quickAccessButtonListEnd model dispatch
+                    | Some _ ->
+                        Bulma.navbarStart.div [
+                            prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
+                            prop.children [
+                                quickAccessButtonListStart model.History dispatch
+                            ]
                         ]
-                    ]
+                        Bulma.navbarEnd.div [
+                            prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("marginLeft", "auto")]
+                            prop.children [
+                                quickAccessButtonListEnd model dispatch
+                            ]
+                        ]
+                    | _ -> Html.none
                 ]
             ]
         ]

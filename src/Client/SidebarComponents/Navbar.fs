@@ -176,11 +176,12 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                             ]
 
                             // Quick access buttons
-                            match sidebarsize with
-                            | WindowSize.Mini ->
+                            match sidebarsize, model.PersistentStorageState.Host with
+                            | WindowSize.Mini, Some Swatehost.Excel ->
                                 quickAccessDropdownElement model dispatch state setState false
-                            | _ ->
+                            | _, Some Swatehost.Excel ->
                                 quickAccessListElement model dispatch
+                            | _,_ -> Html.none
 
                             Bulma.navbarBurger [
                                 if state.BurgerActive then Bulma.navbarBurger.isActive 

@@ -5,16 +5,21 @@ open Model
 open Model.ARCitect
 open Shared
 open Messages
+open Elmish
 
 let send (msg:ARCitect.Msg) =
     let (data: obj) =
         match msg with
         | Init ->
             "Hello from Swate!"
+        | TriggerSwateClose ->
+            null
         | AssayToARCitect assay ->
-            ARCtrl.ISA.Json.ArcAssay.toJsonString assay
+            let assay = ARCtrl.ISA.Json.ArcAssay.toJsonString assay
+            assay
         | StudyToARCitect study ->
-            ARCtrl.ISA.Json.ArcStudy.toJsonString study
+            let json = ARCtrl.ISA.Json.ArcStudy.toJsonString study (ResizeArray([]))
+            json
         | Error exn ->
             exn
     postMessageToARCitect(msg, data)
@@ -31,5 +36,5 @@ let EventHandler (dispatch: Messages.Msg -> unit) : IEventHandler =
             log($"Received Study {study.Identifier} from ARCitect!")
             Browser.Dom.console.log(study)
         Error = fun exn ->
-            Browser.Dom.window.alert(exn)
+            GenericError (Cmd.none, exn) |> DevMsg |> dispatch
     }

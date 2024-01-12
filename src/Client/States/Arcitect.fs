@@ -7,6 +7,7 @@ type Msg =
     | Error of exn
     | AssayToARCitect of ArcAssay
     | StudyToARCitect of ArcStudy
+    | TriggerSwateClose
 
 type IEventHandler = {
     Error: exn -> unit
