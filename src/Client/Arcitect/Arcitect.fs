@@ -6,6 +6,8 @@ open Model.ARCitect
 open Shared
 open Messages
 open Elmish
+open ARCtrl.ISA
+open ARCtrl.ISA.Json
 
 let send (msg:ARCitect.Msg) =
     let (data: obj) =
@@ -15,10 +17,10 @@ let send (msg:ARCitect.Msg) =
         | TriggerSwateClose ->
             null
         | AssayToARCitect assay ->
-            let assay = ARCtrl.ISA.Json.ArcAssay.toJsonString assay
+            let assay = ArcAssay.toArcJsonString assay
             assay
         | StudyToARCitect study ->
-            let json = ARCtrl.ISA.Json.ArcStudy.toJsonString study (ResizeArray([]))
+            let json = ArcStudy.toArcJsonString study
             json
         | Error exn ->
             exn
@@ -27,12 +29,12 @@ let send (msg:ARCitect.Msg) =
 let EventHandler (dispatch: Messages.Msg -> unit) : IEventHandler =
     {
         AssayToSwate = fun data ->
-            let assay = ARCtrl.ISA.Json.ArcAssay.fromJsonString data.ArcAssayJsonString
+            let assay = ArcAssay.fromArcJsonString data.ArcAssayJsonString
             log($"Received Assay {assay.Identifier} from ARCitect!")
             Spreadsheet.InitFromArcFile (ArcFiles.Assay assay) |> SpreadsheetMsg |> dispatch
         StudyToSwate = fun data ->
-            let study, assays = ARCtrl.ISA.Json.ArcStudy.fromJsonString data.ArcStudyJsonString
-            Spreadsheet.InitFromArcFile (ArcFiles.Study (study,List.ofSeq assays)) |> SpreadsheetMsg |> dispatch
+            let study = ArcStudy.fromArcJsonString data.ArcStudyJsonString
+            Spreadsheet.InitFromArcFile (ArcFiles.Study (study, [])) |> SpreadsheetMsg |> dispatch
             log($"Received Study {study.Identifier} from ARCitect!")
             Browser.Dom.console.log(study)
         Error = fun exn ->
