@@ -124,6 +124,18 @@ let run proc arg dir = proc arg dir |> Proc.run |> ignore
 
 let runParallel processes = processes |> Proc.Parallel.run |> ignore
 
+let prompt (msg:string) =
+    System.Console.Write(msg)
+    System.Console.ReadLine().Trim()
+    |> function | "" -> None | s -> Some s
+    |> Option.map (fun s -> s.Replace ("\"","\\\""))
+
+let rec promptYesNo msg =
+    match prompt (sprintf "%s [Yn]: " msg) with
+    | Some "Y" | Some "y" -> true
+    | Some "N" | Some "n" -> false
+    | _ -> System.Console.WriteLine("Sorry, invalid answer"); promptYesNo msg
+
 let runOrDefault args =
     Trace.trace (sprintf "%A" args)
     try

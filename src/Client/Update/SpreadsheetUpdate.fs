@@ -246,7 +246,7 @@ module Spreadsheet =
                         FsSpreadsheet.Exceljs.Xlsx.toBytes
                         fswb
                         (fun bytes -> ExportXlsxDownload (name,bytes) |> Messages.SpreadsheetMsg)
-                        (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
+                        (Messages.curry Messages.GenericError (JsonExporter.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
                 state, nextModel, cmd
             | ExportXlsxDownload (name,xlsxBytes) ->
                 let _ = Helper.download (name ,xlsxBytes)

@@ -19,16 +19,14 @@ open Feliz.Bulma
 let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : FilePicker.Model * Cmd<Messages.Msg> =
     match filePickerMsg with
     | LoadNewFiles fileNames ->
-        let nextState = {
-            FilePicker.Model.init() with
-                FileNames = fileNames |> List.mapi (fun i x -> i+1,x)
+        let nextState : FilePicker.Model = {
+            FileNames = fileNames |> List.mapi (fun i x -> i+1,x)
         }
         let nextCmd = UpdatePageState (Some Routing.Route.FilePicker) |> Cmd.ofMsg
         nextState, nextCmd
     | UpdateFileNames newFileNames ->
-        let nextState = {
-            currentState with
-                FileNames = newFileNames
+        let nextState : FilePicker.Model = {
+            FileNames = newFileNames
         }
         nextState, Cmd.none
 

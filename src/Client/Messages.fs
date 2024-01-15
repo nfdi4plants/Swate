@@ -182,7 +182,7 @@ type Model = {
     BuildingBlockDetailsState   : BuildingBlockDetailsState
     ///Used to manage all custom xml settings
     SettingsXmlState            : SettingsXml.Model
-    JsonExporterModel           : JsonExporter.State.Model
+    JsonExporterModel           : JsonExporter.Model
     TemplateMetadataModel       : TemplateMetadata.Model
     DagModel                    : Dag.Model
     CytoscapeModel              : Cytoscape.Model
@@ -192,7 +192,7 @@ type Model = {
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
-    member this.updateByJsonExporterModel (m:JsonExporter.State.Model) =
+    member this.updateByJsonExporterModel (m:JsonExporter.Model) =
         { this with JsonExporterModel = m}
     member this.updateByTemplateMetadataModel (m:TemplateMetadata.Model) =
         { this with TemplateMetadataModel = m}
@@ -211,7 +211,7 @@ type Msg =
 | FilePickerMsg         of FilePicker.Msg
 | BuildingBlockMsg      of BuildingBlock.Msg
 | ProtocolMsg           of Protocol.Msg
-| JsonExporterMsg       of JsonExporter.State.Msg
+| JsonExporterMsg       of JsonExporter.Msg
 | TemplateMetadataMsg   of TemplateMetadata.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | CytoscapeMsg          of Cytoscape.Msg

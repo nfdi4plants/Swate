@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Helpers.fs" />
@@ -13,6 +13,7 @@
     <PackageReference Include="Fake.IO.FileSystem" Version="5.23.0-alpha002" />
     <PackageReference Include="Fake.Extensions.Release" Version="0.3.1" />
     <PackageReference Include="Fake.Core.UserInput" Version="5.23.0-alpha002" />
+    <PackageReference Include="Fake.Tools.Git" Version="5.23.0-alpha002" />
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>

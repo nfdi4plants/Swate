@@ -3,6 +3,7 @@ open Fake.IO
 
 open Helpers
 open System
+open Fake.Tools
 
 initializeContext()
 
@@ -21,8 +22,18 @@ let developmentUrl = "https://localhost:3000"
 module ProjectInfo =
     
     let gitOwner = "nfdi4plants"
-    let gitName = "Swate"
+    let project = "Swate"
+    let projectRepo = $"https://github.com/{gitOwner}/{project}"
+    let mutable prereleaseSuffix = ""
+    let mutable prereleaseTag: string = ""
+    let mutable isPrerelease = false
 
+    Fake.Extensions.Release.ReleaseNotes.ensure()
+    let releaseNotesPath = "RELEASE_NOTES.md"
+    let release = ReleaseNotes.load releaseNotesPath
+    let stableVersion = SemVer.parse release.NugetVersion
+    let stableVersionTag = (sprintf "%i.%i.%i" stableVersion.Major stableVersion.Minor stableVersion.Patch )
+    
 module ReleaseNoteTasks =
 
     open Fake.Extensions.Release
@@ -31,17 +42,18 @@ module ReleaseNoteTasks =
     //    AssemblyVersion.create ProjectInfo.gitName
     //)
 
-    let updateReleaseNotes = Target.create "release" (fun config ->
+
+    let updateReleaseNotes = Target.create "releasenotes" (fun config ->
         ReleaseNotes.ensure()
 
-        ReleaseNotes.update(ProjectInfo.gitOwner, ProjectInfo.gitName, config)
+        ReleaseNotes.update(ProjectInfo.gitOwner, ProjectInfo.project, config)
 
         let newRelease = ReleaseNotes.load "RELEASE_NOTES.md"
         
         let releaseDate =
             if newRelease.Date.IsSome then newRelease.Date.Value.ToShortDateString() else "WIP"
 
-        Fake.DotNet.AssemblyInfoFile.createFSharp  "src/Server/Version.fs"
+        Fake.DotNet.AssemblyInfoFile.createFSharp "src/Server/Version.fs"
             [   Fake.DotNet.AssemblyInfo.Title "SWATE"
                 Fake.DotNet.AssemblyInfo.Version newRelease.AssemblyVersion
                 Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
@@ -49,7 +61,7 @@ module ReleaseNoteTasks =
 
         Trace.trace "Update Version.fs done!"
         
-        /// Update maniefest.xmls
+        // Update maniefest.xmls
         Trace.trace "Update manifest.xml"
         
         let _ =
@@ -112,7 +124,7 @@ module ReleaseNoteTasks =
 
         Github.draft(
             ProjectInfo.gitOwner,
-            ProjectInfo.gitName,
+            ProjectInfo.project,
             (Some bodyText),
             (Some <| zipFolderPath),
             config
@@ -125,6 +137,30 @@ module Docker =
 
     let dockerImageName = "freymaurer/swate"
     let dockerContainerName = "swate"
+    let port = "8080"
+
+    let dockerCreateImage(tag:string option) = 
+        run 
+            docker 
+            [
+                "build"; "-t"; 
+                if tag.IsSome then $"{dockerContainerName}:{tag.Value}" else dockerContainerName; 
+                "-f"; "build/Dockerfile.publish"; "."
+            ] 
+            ""
+    let dockerTestImage(tag:string option) = 
+        run 
+            docker 
+            [
+                "run"; "-it"; "-p"; $"{port}:{port}"; 
+                if tag.IsSome then $"{dockerContainerName}:{tag.Value}" else dockerContainerName;
+            ] 
+            ""
+
+    Target.create "docker-test" (fun _ ->
+        dockerCreateImage (Some "new")
+        dockerTestImage (Some "new")
+    )
 
     // Create nightly (https://de.wikipedia.org/wiki/Nightly_Build)
     // 1: docker build -t swate -f build/Dockerfile.publish .
@@ -136,15 +172,10 @@ module Docker =
     // Change target to github-packages
     // https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
     Target.create "docker-publish" (fun _ ->
-        let releaseNotesPath = "RELEASE_NOTES.md"
-        let port = "5000"
-
-        ReleaseNotes.ensure()
-        let newRelease = ReleaseNotes.load releaseNotesPath
+        
+        let newRelease = ProjectInfo.release
         let check = Fake.Core.UserInput.getUserInput($"Is version {newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch} correct? (y/n/true/false)" )
 
-        let dockerCreateImage() = run docker ["build"; "-t"; dockerContainerName; "-f"; "build/Dockerfile.publish"; "."] ""
-        let dockerTestImage() = run docker ["run"; "-it"; "-p"; $"{port}:{port}"; dockerContainerName] ""
         let dockerTagImage() =
             run docker ["tag"; sprintf "%s:latest" dockerContainerName; sprintf "%s:%i.%i.%i" dockerContainerName newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch] ""
             run docker ["tag"; sprintf "%s:latest" dockerContainerName; sprintf "%s:latest" dockerImageName] ""
@@ -161,13 +192,13 @@ module Docker =
         | "y"|"true"|"Y" ->
             Trace.trace "Perfect! Starting with docker publish"
             Trace.trace "Creating image"
-            dockerCreateImage()
+            dockerCreateImage(None)
             /// Check if user wants to test image
             let testImage = Fake.Core.UserInput.getUserInput($"Want to test the image? (y/n/true/false)" )
             match testImage with
             | "y"|"true"|"Y" ->
                 Trace.trace $"Your app on port {port} will open on localhost:{port}."
-                dockerTestImage()
+                dockerTestImage(None)
                 /// Check if user wants the image published
                 let imageWorkingCorrectly = Fake.Core.UserInput.getUserInput($"Is the image working as intended? (y/n/true/false)" )
                 match imageWorkingCorrectly with
@@ -177,10 +208,42 @@ module Docker =
             | "n"|"false"|"N"   -> dockerPublish()
             | anythingElse      -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
         | "n"|"false"|"N" ->
-            Trace.traceErrorfn "Please update your SemVer Version in %s" releaseNotesPath
+            Trace.traceErrorfn "Please update your SemVer Version in %s" ProjectInfo.releaseNotesPath
         | anythingElse -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
-
     )
+
+module Release =
+
+    let SetPrereleaseTag() =
+        printfn "Please enter pre-release package suffix"
+        let suffix = System.Console.ReadLine()
+        ProjectInfo.prereleaseSuffix <- suffix
+        ProjectInfo.prereleaseTag <- (sprintf "%i.%i.%i-%s" ProjectInfo.release.SemVer.Major ProjectInfo.release.SemVer.Minor ProjectInfo.release.SemVer.Patch suffix)
+        ProjectInfo.isPrerelease <- true
+
+    let CreateTag() =
+        if promptYesNo (sprintf "tagging branch with %s OK?" ProjectInfo.stableVersionTag ) then
+            Git.Branches.tag "" ProjectInfo.stableVersionTag
+            Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.stableVersionTag
+        else
+            failwith "aborted"
+
+    let CreatePrereleaseTag() =
+        if promptYesNo (sprintf "tagging branch with %s OK?" ProjectInfo.prereleaseTag ) then 
+            Git.Branches.tag "" ProjectInfo.prereleaseTag
+            Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.prereleaseTag
+        else
+            failwith "aborted"
+
+    Target.create "release" <| fun config ->
+        let args = config.Context.Arguments
+        if args |> List.contains "--pre" then
+            SetPrereleaseTag()
+            //CreatePrereleaseTag()
+            ()
+        else
+            //CreateTag()
+            ()
 
 Target.create "InstallOfficeAddinTooling" (fun _ ->
 
@@ -222,21 +285,22 @@ Target.create "Clean" (fun _ ->
 
 Target.create "InstallClient" (fun _ -> run npm [ "install" ] ".")
 
-Target.create "bundle" (fun _ ->
-    [ "server", dotnet [ "publish"; "-c"; "Release"; "-o"; $"\"{deployPath}\"" ] serverPath
-      "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "vite"; "build" ] clientPath ]
-    |> runParallel
-)
+let InstallClient() =
+    run npm [ "install" ] "."
 
-Target.create "Run" (fun config ->
-    let args = config.Context.Arguments
-    run dotnet [ "build" ] sharedPath
+let Bundle() =
+    [
+        "server", dotnet [ "publish"; "-c"; "Release"; "-o"; deployPath ] serverPath
+        "client", dotnet [ "fable"; "-o"; "output"; "-s"; "-e"; "fs.js"; "--run"; "npx"; "vite"; "build" ] clientPath
+    ]
+    |> runParallel
+
+let Run(db: bool) =
     [ "server", dotnet [ "watch"; "run" ] serverPath
       "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "-e"; "fs.js"; "--run"; "npx"; "vite" ] clientPath
-      if args |> List.contains "--nodb" |> not then
+      if db then
         "database", dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
     ] |> runParallel
-)
 
 //Target.create "officedebug" (fun config ->
 //    let args = config.Context.Arguments
@@ -280,38 +344,23 @@ let testFake = Target.create "testfake" (fun config ->
     Trace.trace "Finish test"
 )
 
-open Fake.Core.TargetOperators
-
-let dependencies = [
-    "Clean"
-        ==> "InstallClient"
-        ==> "Bundle"
-
-    "Clean"
-        ==> "InstallClient"
-        ==> "Run"
-
-    //"Clean"
-    //    ==> "InstallClient"
-    //    ==> "officedebug"
-
-    "InstallClient"
-        ==> "RunTests"
-
-    "InstallOfficeAddinTooling"
-        ==> "CreateDevCerts"
-        ==> "SetLoopbackExempt"
-        ==> "Setup"
-
-    "RunDB"
-
-    "release"
-
-    "docker-publish"
-
-    "testfake"
-    "Ignore"
-]
-
 [<EntryPoint>]
-let main args = runOrDefault args
+let main args = 
+    let argv = args |> Array.map (fun x -> x.ToLower()) |> Array.toList
+
+    match argv with
+    | "bundle" :: a -> 
+        InstallClient()
+        Bundle(); 0
+    | "run" :: a ->
+        match a with
+        | "--nodb" :: a -> Run(false); 0
+        | _ -> Run(true); 0
+    | "docker" :: a ->
+        match a with
+        | "create" :: a -> Docker.dockerCreateImage(Some "new"); 0
+        | "test" :: a -> Docker.dockerTestImage(Some "new"); 0
+        | _ -> runOrDefault args
+    | _ -> runOrDefault args
+
+    

@@ -11,7 +11,7 @@ open ExcelColors
 open Model
 
 open Messages
-open JsonExporter.State
+open JsonExporter
 
 open Browser.Dom
 
@@ -27,15 +27,12 @@ let download(filename, text) =
 
   document.body.removeChild(element);
 
-let update (msg:Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
+let update (msg:JsonExporter.Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
     match msg with
     // Style
     | UpdateLoading isLoading ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                Loading = isLoading
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
+        let nextModel = { currentModel with Messages.Model.JsonExporterModel.Loading = isLoading }
+        nextModel, Cmd.none
     | UpdateShowTableExportTypeDropdown nextVal ->
         let nextModel = {
             currentModel.JsonExporterModel with

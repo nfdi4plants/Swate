@@ -1,3 +1,56 @@
+### 1.0.0+41a16f8 (Released 2024-1-15)
+* Additions:
+    * [[#33e305a](https://github.com/nfdi4plants/Swate/commit/33e305aff9ed93fb78eac8855cdcfd70abed5a3a)] Finish minimal communication. All changes made from Swate should be correctly propagated to ARCitect.
+    * [[#0694be8](https://github.com/nfdi4plants/Swate/commit/0694be8da5a68c7df6861efe3ee758738dc4305a)] Setup minimal message handler FROM arcitect :sparkles:
+    * [[#9498472](https://github.com/nfdi4plants/Swate/commit/94984720ea1551230487181e2abb167b4218e7f8)] Allow read in from template xlsx
+    * [[#bb19ae1](https://github.com/nfdi4plants/Swate/commit/bb19ae16f1075f8f2d620aea464eb863e4c67591)] Interface ARCitect host msgs to swate spreadsheet view
+    * [[#02b0f05](https://github.com/nfdi4plants/Swate/commit/02b0f05d86389594fd7d9339d386a83e580096b0)] increase split window bar stability
+    * [[#4eee5ba](https://github.com/nfdi4plants/Swate/commit/4eee5ba80a7a7c398e8a794214a4d1f118b3818b)] Add ARCitect message logic :construction:
+    * [[#2756826](https://github.com/nfdi4plants/Swate/commit/27568263a2a7211235a689c7217eff14a74ed8e0)] Add arcitect mode by query parameter :sparkles:
+    * [[#3a345ca](https://github.com/nfdi4plants/Swate/commit/3a345ca2aa38d52e804bdfa5d012d7fb651cac75)] Add default error handling to spreadsheetMsg update
+    * [[#d508dea](https://github.com/nfdi4plants/Swate/commit/d508deaef2b83c0c615be182eab18e36ab0b524f)] Finish template form :sparkles:
+    * [[#35d7091](https://github.com/nfdi4plants/Swate/commit/35d7091ef810506ee4d872c3c248128c44683a71)] start working on templates
+    * [[#8734ae4](https://github.com/nfdi4plants/Swate/commit/8734ae42405e9311fa865a04d54042fbe582c3a3)] Add investigation metadata form :sparkles:
+    * [[#9c70213](https://github.com/nfdi4plants/Swate/commit/9c70213b497bd10f730fa7c588b1177d254d5cf1)] Update dependency to newest ARCtrl and change json state to arcjson
+    * [[#4823624](https://github.com/nfdi4plants/Swate/commit/4823624012bba7bbe74e7ffa1ee1dd30bd24ebf1)] improve reactivity of form components :sparkles::art:
+    * [[#36c6aa2](https://github.com/nfdi4plants/Swate/commit/36c6aa24e969f485a613413529d1c7f6486def8c)] Further develop study metadata sheet.
+    * [[#e7b4107](https://github.com/nfdi4plants/Swate/commit/e7b4107341908626950d564f71b8774536a74eb1)] Improve oa input robustness
+    * [[#a015edf](https://github.com/nfdi4plants/Swate/commit/a015edf363b4611a28786a3a4740b32dbf600451)] Greatly improve form input robustness against sim input.
+    * [[#28b2382](https://github.com/nfdi4plants/Swate/commit/28b23821c8474562472ac80e247fe6fc489c0182)] Start working on metadata input forms :construction:
+    * [[#d356540](https://github.com/nfdi4plants/Swate/commit/d3565406c7f9392a8b4e8a731b067b9971244005)] Store resize window preference in local storage
+    * [[#a55a1fb](https://github.com/nfdi4plants/Swate/commit/a55a1fb07d392ead93890c224fe1a8636d97a666)] Reenable reset modal
+    * [[#5be91a1](https://github.com/nfdi4plants/Swate/commit/5be91a152f4b46651476f2816d9de10426b867c0)] Restore local history :sparkles:
+    * [[#27aec23](https://github.com/nfdi4plants/Swate/commit/27aec234d30c3c15333437f359f5787453cae52f)] restore basic header functionality :sparkles:
+    * [[#015de0f](https://github.com/nfdi4plants/Swate/commit/015de0f1ae1d759e46f96d63a66399cdf291a505)] Basic functionality to body cells restored :sparkles:
+    * [[#0b3543e](https://github.com/nfdi4plants/Swate/commit/0b3543e26e7fd5887966f9a86cf973d70c794074)] improve behavior for switching between column types.
+    * [[#49981cd](https://github.com/nfdi4plants/Swate/commit/49981cd74e47c572044ff4ebc6a37b215a133c37)] Finish up building block logic :sparkles:
+    * [[#fad0b26](https://github.com/nfdi4plants/Swate/commit/fad0b2624aa005ddbcfe3a36028e03022806027a)] Adjust main view footer to new model :sparkles:
+    * [[#e2b32af](https://github.com/nfdi4plants/Swate/commit/e2b32af66862d241173e0c886f3f31482076083c)] Update to .NET 8 and rmv ISADotNet
+    * [[#9e266e9](https://github.com/nfdi4plants/Swate/commit/9e266e913fb31b8bc7bdbdad21d50a0c4b3b908d)] Make styling passable :art:
+    * [[#eb8f0ef](https://github.com/nfdi4plants/Swate/commit/eb8f0eff77d388ce7f05e2df7015366268e4605b)] Set up context based styling
+    * [[#028354b](https://github.com/nfdi4plants/Swate/commit/028354bdaf098933a99a2b05a0fd79f4d64c6976)] Make Swate run again :sparkles:
+    * [[#b6ebaca](https://github.com/nfdi4plants/Swate/commit/b6ebacafc927953888aec85bc76a591b1bd01f84)] Start updating dependencies, rmv Fulma :fire: rmv ISADotNet :fire:
+    * [[#fa3d11d](https://github.com/nfdi4plants/Swate/commit/fa3d11d9deb6bc1ea00e19fd2c3830e5b79ae09d)] Update SAFE dependencies, Fable 4
+    * [[#177348a](https://github.com/nfdi4plants/Swate/commit/177348ab6b27f51e6aee43c007c7396063b9b52a)] Create term modal #296
+    * [[#6310db2](https://github.com/nfdi4plants/Swate/commit/6310db29ca2daca4059d1f03dbee23a737fa403f)] improve cytoscape term view
+    * [[#6e1beb8](https://github.com/nfdi4plants/Swate/commit/6e1beb82078a00e0aed4fd0b4e7aee31f8fdae4a)] Apply prerelease version
+    * [[#6c4ee89](https://github.com/nfdi4plants/Swate/commit/6c4ee896169ed1a6fb2368cb35933dd428c491dd)] git has issues tracking file name change. Force it
+    * [[#24aeb2e](https://github.com/nfdi4plants/Swate/commit/24aeb2e67568cdde430885846443a35307540c33)] git has issues tracking file name change. Force it
+    * [[#bebef61](https://github.com/nfdi4plants/Swate/commit/bebef6113d967657249792f01c2819b69dd2b89c)] Rename init file
+* Deletions:
+    * [[#4135549](https://github.com/nfdi4plants/Swate/commit/41355499bd4a455e38d9d776edc5e507c078ebc3)] hide sidebar shortcut icons outside excel hosting.
+* Bugfixes:
+    * [[#41a16f8](https://github.com/nfdi4plants/Swate/commit/41a16f89f521ca104cfc037579beba7695a3e63d)] fix arcitect json interop
+    * [[#1e75c76](https://github.com/nfdi4plants/Swate/commit/1e75c7644cdd8b209b5ab32e18da033d3f1e2a7c)] Fix displaying wrong preadsheet elements without active arc file :bug:
+    * [[#376d2a9](https://github.com/nfdi4plants/Swate/commit/376d2a9427ecb4560ca7deb5346278060513453a)] Fix template request json parsing bug in ARCtrl :bug:
+    * [[#b7a1141](https://github.com/nfdi4plants/Swate/commit/b7a11418c0696cd6e70da9be355e718d2b28991a)] fix split window resize handler ui :bug:
+    * [[#a3f7e30](https://github.com/nfdi4plants/Swate/commit/a3f7e30e70cb62990c16ec2f8c7c0d5b57dddf20)] Fix spreadsheet control flow :bug:
+    * [[#1b551c5](https://github.com/nfdi4plants/Swate/commit/1b551c573c0ab3e8f12ea99382b3b70bb5729a8d)] Fix body term search not triggering
+    * [[#4d2c5a1](https://github.com/nfdi4plants/Swate/commit/4d2c5a1788025dea42104452f8beab93102dfb64)] fix term-unit switch :bug:
+    * [[#2827877](https://github.com/nfdi4plants/Swate/commit/28278775f96b7c71a082dafc78d6ed6cf36a7a8a)] fix protocol type for building block :bug:
+    * [[#a8a6c93](https://github.com/nfdi4plants/Swate/commit/a8a6c932d5ebc8b9e07b8a92414a4c5500893ba1)] Fix dead links :bug:
+    * [[#d1cf1f5](https://github.com/nfdi4plants/Swate/commit/d1cf1f521dd802b456fbf5dec185af4d1455c44f)] Fix dead installation link :books:
+
 ### 0.8.0+6aeb417 (Released 2023-3-10)
 * Additions:
     * [[#ffed6aa](https://github.com/nfdi4plants/Swate/commit/ffed6aa3c4a88a1cc9767c9fba69381e11ee7d63)] Add colors to input & output columns #297

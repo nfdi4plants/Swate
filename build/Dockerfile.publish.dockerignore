@@ -12,8 +12,6 @@ bin/
 packages/
 paket-files/
 node_modules/
-release.cmd
-release.sh
 *.orig
 *.DotSettings.user
 .assets/swate.zip

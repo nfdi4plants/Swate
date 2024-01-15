@@ -125,7 +125,7 @@ module Interface =
         | ExportJsonTable ->
             match host with
             | Some Swatehost.Excel ->
-                let cmd = JsonExporterMsg JsonExporter.State.ParseTableOfficeInteropRequest |> Cmd.ofMsg
+                let cmd = JsonExporterMsg JsonExporter.ParseTableOfficeInteropRequest |> Cmd.ofMsg
                 model, cmd
             | Some Swatehost.Browser ->
                 let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTable |> Cmd.ofMsg
@@ -134,7 +134,7 @@ module Interface =
         | ExportJsonTables ->
             match host with
             | Some Swatehost.Excel ->
-                let cmd = JsonExporterMsg JsonExporter.State.ParseTablesOfficeInteropRequest |> Cmd.ofMsg
+                let cmd = JsonExporterMsg JsonExporter.ParseTablesOfficeInteropRequest |> Cmd.ofMsg
                 model, cmd
             | Some Swatehost.Browser ->
                 let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTables |> Cmd.ofMsg
