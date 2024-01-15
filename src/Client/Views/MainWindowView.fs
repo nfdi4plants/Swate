@@ -78,6 +78,7 @@ let Main (model: Messages.Model) dispatch =
                         MainComponents.AddRows.Main dispatch
                 ]
             ]
-            spreadsheetSelectionFooter model dispatch
+            if state.ArcFile.IsSome then 
+                spreadsheetSelectionFooter model dispatch
         ]
     ]

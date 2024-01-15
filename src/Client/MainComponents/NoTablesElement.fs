@@ -207,14 +207,6 @@ let Main (args: {|dispatch: Messages.Msg -> unit|}) =
                 prop.children [
                     createNewTable isActive (fun _ -> not isActive |> setIsActive) args.dispatch
                     uploadNewTable args.dispatch
-                    Bulma.button.a [
-                        prop.text """postMessage!"""
-                        prop.onClick(fun e ->
-                            log "CLICK"
-                            let d = {|swate=true; api= "init"; data = "Hello ARCitect!"|}
-                            Browser.Dom.window.top.postMessage(d, "*")
-                        )
-                    ]
                 ]
             ]
         ]

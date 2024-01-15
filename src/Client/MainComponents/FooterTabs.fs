@@ -197,7 +197,7 @@ let MainPlus(input:{|dispatch: Messages.Msg -> unit|}) =
         prop.children [
             Html.a [
                 prop.style [style.height.inheritFromParent; style.pointerEvents.none]
-                prop.children[
+                prop.children [
                     Bulma.icon [
                         Bulma.icon.isSmall
                         prop.children [
