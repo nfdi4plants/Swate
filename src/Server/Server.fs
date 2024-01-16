@@ -269,13 +269,23 @@ let getMessage() = "Hello from SAFE!"
 
 let getNeo4JCredentials (ctx: HttpContext) =
     let settings = ctx.GetService<IConfiguration>()
-    let credentials : Helper.Neo4JCredentials = {
-        User        = settings.[Helper.Neo4JCredentials.UserVarString]
-        Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
-        BoltUrl     = settings.[Helper.Neo4JCredentials.UriVarString]
-        DatabaseName= settings.[Helper.Neo4JCredentials.DBNameVarString]
-    }
-    credentials
+    try 
+        let credentials : Helper.Neo4JCredentials = {
+            User        = settings.[Helper.Neo4JCredentials.UserVarString]
+            Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
+            BoltUrl     = settings.[Helper.Neo4JCredentials.UriVarString]
+            DatabaseName= settings.[Helper.Neo4JCredentials.DBNameVarString]
+        }
+        credentials
+    with
+        | _ -> 
+            let credentials : Helper.Neo4JCredentials = {
+                User        = settings.[System.Environment.GetEnvironmentVariable(Helper.Neo4JCredentials.UserVarString)]
+                Pw          = settings.[System.Environment.GetEnvironmentVariable(Helper.Neo4JCredentials.PwVarString)]
+                BoltUrl     = settings.[System.Environment.GetEnvironmentVariable(Helper.Neo4JCredentials.UriVarString)]
+                DatabaseName= settings.[System.Environment.GetEnvironmentVariable(Helper.Neo4JCredentials.DBNameVarString)]
+            }
+            credentials
 
 //// https://cors-test.codehappy.dev/?url=https%3A%2F%2Fswate.nfdi4plants.org%2Fapi%2FIOntologyAPIv2%2FgetAllOntologies&method=get
 ///// Enable CORS. Makes external access of Swate API possible

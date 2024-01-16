@@ -157,6 +157,13 @@ module Docker =
             ] 
             ""
 
+    /// <summary>
+    /// Runs full docker compose stack with the swate:new image.
+    /// </summary>
+    let DockerTestNewStack() =
+        let dockerComposeNewPath = Path.getFullName ".db\docker.compose.new.yml"
+        run dockerCompose ["-f"; dockerComposeNewPath; "up"] __SOURCE_DIRECTORY__
+
     Target.create "docker-test" (fun _ ->
         dockerCreateImage (Some "new")
         dockerTestImage (Some "new")
@@ -359,7 +366,12 @@ let main args =
     | "docker" :: a ->
         match a with
         | "create" :: a -> Docker.dockerCreateImage(Some "new"); 0
-        | "test" :: a -> Docker.dockerTestImage(Some "new"); 0
+        | "test" :: a -> 
+            match a with
+            | "single" :: a -> Docker.dockerTestImage(Some "new"); 0
+            | _ -> Docker.DockerTestNewStack(); 0
+        | "publish" :: a ->
+            (); 1
         | _ -> runOrDefault args
     | _ -> runOrDefault args
 
