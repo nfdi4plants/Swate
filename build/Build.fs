@@ -239,7 +239,7 @@ module Release =
         output
 
     let GetLatestGitTag () : string =
-        executeCommand "describe --tags"
+        executeCommand "describe --abbrev=0 --tags"
         |> String.trim
 
     let SetPrereleaseTag() =
@@ -257,7 +257,7 @@ module Release =
             failwith "aborted"
 
     let CreatePrereleaseTag() =
-        if promptYesNo (sprintf "tagging branch with %s OK?" ProjectInfo.prereleaseTag ) then 
+        if promptYesNo (sprintf "Tagging branch with %s OK?" ProjectInfo.prereleaseTag ) then 
             Git.Branches.tag "" ProjectInfo.prereleaseTag
             Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.prereleaseTag
         else
@@ -266,7 +266,9 @@ module Release =
     let ForcePushNightly() =
         if promptYesNo "Ready to force push release to nightly branch?" then 
             Git.Commit.exec "." (sprintf "Release v%s" ProjectInfo.prereleaseTag) 
-            run git ["push"; "-f"; "origin"; "HEAD:remote_branch_name"] __SOURCE_DIRECTORY__
+            run git ["push"; "-f"; "origin"; "HEAD:nightly"] __SOURCE_DIRECTORY__
+        else
+            failwith "aborted"
 
 
 Target.create "InstallOfficeAddinTooling" (fun _ ->
@@ -399,10 +401,11 @@ let main args =
         Tests.Run()
         match a with
         | "pre" :: a -> 
-            Release.SetPrereleaseTag()
-            Release.CreatePrereleaseTag()
+            //Release.SetPrereleaseTag()
+            //Release.CreatePrereleaseTag()
             let version = Release.GetLatestGitTag()
             ReleaseNoteTasks.createVersionFile(version)
+            Release.ForcePushNightly()
             0
         | _ -> 
             Release.CreateTag()
