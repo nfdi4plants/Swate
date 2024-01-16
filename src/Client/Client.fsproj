@@ -43,7 +43,7 @@
         <Compile Include="Messages.fs" />
         <Compile Include="ARCitect\Interop.fs" />
         <Compile Include="ARCitect\ARCitect.fs" />
-        <Compile Include="Modals\Controller2.fs" />
+        <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
         <Compile Include="Modals\EditColumn.fs" />
         <Compile Include="Modals\ResetTable.fs" />
