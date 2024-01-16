@@ -1,8 +1,9 @@
 {
-    "browserslist": [
-        "ie 11"
-    ],
-    "private": true,
+  "browserslist": [
+    "ie 11"
+  ],
+  "private": true,
+    "type": "module",
     "engines": {
         "node": "~18 || ~20",
         "npm": "~9 || ~10"

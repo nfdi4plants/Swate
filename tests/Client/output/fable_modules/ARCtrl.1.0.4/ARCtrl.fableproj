@@ -1,0 +1,56 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Authors>nfdi4plants, Lukas Weil, Kevin Frey, Kevin Schneider, Oliver Maus</Authors>
+    <Description>Library for management of Annotated Research Contexts (ARCs) using an in-memory representation and runtimer agnostic contract systems.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>logo.png</PackageIcon>
+    <PackageTags>ARC F# FSharp dotnet .Net bioinformatics biology fable-library datascience dataplant nfdi metadata</PackageTags>
+    <PackageProjectUrl>https://github.com/nfdi4plants/ARCtrl</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/ARCtrl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../build/logo.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Path.fs" />
+    <Compile Include="FileSystemTree.fs" />
+    <Compile Include="SemVer.fs" />
+    <Compile Include="WebRequest\WebRequest.fs" />
+    <Compile Include="Contracts\Contracts.ArcTypes.fs" />
+    <Compile Include="Contracts\Contracts.Git.fs" />
+    <Compile Include="Contracts\Contracts.ARCtrl.fs" />
+    <Compile Include="Templates\Template.fs" />
+    <Compile Include="Templates\Templates.fs" />
+    <Compile Include="Templates\Template.Json.fs" />
+    <Compile Include="Templates\Template.Spreadsheet.fs" />
+    <Compile Include="Templates\Template.Web.fs" />
+    <Compile Include="ARC.fs" />
+    <None Include="README.md" />
+  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Fable.Fetch" Version="2.6.0" />
+		<PackageReference Include="Fable.SimpleHttp" Version="3.5.0" />
+	</ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Contract\ARCtrl.Contract.fsproj" />
+    <ProjectReference Include="..\CWL\ARCtrl.CWL.fsproj" />
+    <ProjectReference Include="..\FileSystem\ARCtrl.FileSystem.fsproj" />
+    <ProjectReference Include="..\ISA\ISA\ARCtrl.ISA.fsproj" />
+    <ProjectReference Include="..\ISA\ISA.Json\ARCtrl.ISA.Json.fsproj" />
+    <ProjectReference Include="..\ISA\ISA.Spreadsheet\ARCtrl.ISA.Spreadsheet.fsproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NpmDependencies>
+      <NpmPackage Name="isomorphic-fetch" Version="gt 3.0.0 lt 3.0.0" ResolutionStrategy="Max" />
+    </NpmDependencies>
+  </PropertyGroup>
+	<ItemGroup>
+		<Content Include="*.fsproj; **\*.fs; **\*.fsi" PackagePath="fable\" />
+	</ItemGroup>
+</Project>

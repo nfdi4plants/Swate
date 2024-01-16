@@ -14,7 +14,7 @@ open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Configuration
 
 let serviceApi = {
-    getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyVersion }
+    getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyMetadata_Version }
 }
 
 open ISADotNet

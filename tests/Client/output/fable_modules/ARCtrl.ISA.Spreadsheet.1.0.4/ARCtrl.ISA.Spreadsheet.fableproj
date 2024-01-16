@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="CollectionAux.fs" />
+    <Compile Include="Metadata\Conversions.fs" />
+    <Compile Include="Metadata\Comment.fs" />
+    <Compile Include="Metadata\SparseTable.fs" />
+    <Compile Include="Metadata\Contacts.fs" />
+    <Compile Include="Metadata\OntologyAnnotation.fs" />
+    <Compile Include="Metadata\DesignDescriptors.fs" />
+    <Compile Include="Metadata\Factors.fs" />
+    <Compile Include="Metadata\Protocols.fs" />
+    <Compile Include="Metadata\Publication.fs" />
+    <Compile Include="Metadata\Assays.fs" />
+    <Compile Include="Metadata\Study.fs" />
+    <Compile Include="Metadata\OntologySourceReference.fs" />
+    <Compile Include="AnnotationTable\CompositeHeader.fs" />
+    <Compile Include="AnnotationTable\CompositeCell.fs" />
+    <Compile Include="AnnotationTable\CompositeColumn.fs" />
+    <Compile Include="AnnotationTable\ArcTable.fs" />
+    <Compile Include="ArcAssay.fs" />
+    <Compile Include="ArcStudy.fs" />
+    <Compile Include="ArcInvestigation.fs" />
+    <None Include="../../../build/logo.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FsSpreadsheet" Version="5.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ISA\ARCtrl.ISA.fsproj" />
+    <ProjectReference Include="..\..\FileSystem\ARCtrl.FileSystem.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+  	<Content Include="*.fsproj; **\*.fs; **\*.fsi" PackagePath="fable\" />
+  </ItemGroup>
+  <PropertyGroup>
+    <Authors>nfdi4plants, Lukas Weil</Authors>
+    <Description>ARC and ISA xlsx compliant parser for experimental metadata toolkit in F#. This project is meant as an easy means to open, manipulate and save ISA (Investigation,Study,Assay) metadata files in isa-xlsx format.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>logo.png</PackageIcon>
+    <PackageTags>ARC F# FSharp dotnet .Net bioinformatics biology fable-library datascience dataplant nfdi metadata investigation study assay ISA Spreadsheet xlsx excel</PackageTags>
+    <PackageProjectUrl>https://github.com/nfdi4plants/ARCtrl/tree/main/src/ISA</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/ARCtrl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

@@ -38,10 +38,14 @@ module ReleaseNoteTasks =
 
     open Fake.Extensions.Release
 
-    //let createAssemblyVersion = Target.create "createvfs" (fun _ ->
-    //    AssemblyVersion.create ProjectInfo.gitName
-    //)
-
+    let createVersionFile(version: string) =
+        let releaseDate = System.DateTime.UtcNow.ToShortDateString()
+        Fake.DotNet.AssemblyInfoFile.createFSharp "src/Server/Version.fs"
+            [   Fake.DotNet.AssemblyInfo.Title "Swate"
+                Fake.DotNet.AssemblyInfo.Version version
+                Fake.DotNet.AssemblyInfo.Metadata ("Version",version)
+                Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
+            ]
 
     let updateReleaseNotes = Target.create "releasenotes" (fun config ->
         ReleaseNotes.ensure()
@@ -49,15 +53,7 @@ module ReleaseNoteTasks =
         ReleaseNotes.update(ProjectInfo.gitOwner, ProjectInfo.project, config)
 
         let newRelease = ReleaseNotes.load "RELEASE_NOTES.md"
-        
-        let releaseDate =
-            if newRelease.Date.IsSome then newRelease.Date.Value.ToShortDateString() else "WIP"
-
-        Fake.DotNet.AssemblyInfoFile.createFSharp "src/Server/Version.fs"
-            [   Fake.DotNet.AssemblyInfo.Title "SWATE"
-                Fake.DotNet.AssemblyInfo.Version newRelease.AssemblyVersion
-                Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
-            ]
+        createVersionFile(newRelease.AssemblyVersion)
 
         Trace.trace "Update Version.fs done!"
         
@@ -178,48 +174,73 @@ module Docker =
 
     // Change target to github-packages
     // https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
-    Target.create "docker-publish" (fun _ ->
+    //Target.create "docker-publish" (fun _ ->
         
-        let newRelease = ProjectInfo.release
-        let check = Fake.Core.UserInput.getUserInput($"Is version {newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch} correct? (y/n/true/false)" )
+    //    let newRelease = ProjectInfo.release
+    //    let check = Fake.Core.UserInput.getUserInput($"Is version {newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch} correct? (y/n/true/false)" )
 
-        let dockerTagImage() =
-            run docker ["tag"; sprintf "%s:latest" dockerContainerName; sprintf "%s:%i.%i.%i" dockerContainerName newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch] ""
-            run docker ["tag"; sprintf "%s:latest" dockerContainerName; sprintf "%s:latest" dockerImageName] ""
-        let dockerPushImage() =
-            run docker ["push"; sprintf "%s:%i.%i.%i" dockerImageName newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch] ""
-            run docker ["push"; sprintf "%s:latest" dockerImageName] ""
-        let dockerPublish() =
-            Trace.trace $"Tagging image with :latest and :{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}"
-            dockerTagImage()
-            Trace.trace $"Pushing image to dockerhub with :latest and :{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}"
-            dockerPushImage()
-        // Check if next SemVer is correct
-        match check with
-        | "y"|"true"|"Y" ->
-            Trace.trace "Perfect! Starting with docker publish"
-            Trace.trace "Creating image"
-            dockerCreateImage(None)
-            /// Check if user wants to test image
-            let testImage = Fake.Core.UserInput.getUserInput($"Want to test the image? (y/n/true/false)" )
-            match testImage with
-            | "y"|"true"|"Y" ->
-                Trace.trace $"Your app on port {port} will open on localhost:{port}."
-                dockerTestImage(None)
-                /// Check if user wants the image published
-                let imageWorkingCorrectly = Fake.Core.UserInput.getUserInput($"Is the image working as intended? (y/n/true/false)" )
-                match imageWorkingCorrectly with
-                | "y"|"true"|"Y"    -> dockerPublish()
-                | "n"|"false"|"N"   -> Trace.traceErrorfn "Cancel docker-publish"
-                | anythingElse      -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
-            | "n"|"false"|"N"   -> dockerPublish()
-            | anythingElse      -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
-        | "n"|"false"|"N" ->
-            Trace.traceErrorfn "Please update your SemVer Version in %s" ProjectInfo.releaseNotesPath
-        | anythingElse -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
-    )
+    //    let dockerTagImage() =
+    //        run docker ["tag"; sprintf "%s:latest" dockerContainerName; sprintf "%s:%i.%i.%i" dockerContainerName newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch] ""
+    //        run docker ["tag"; sprintf "%s:latest" dockerContainerName; sprintf "%s:latest" dockerImageName] ""
+    //    let dockerPushImage() =
+    //        run docker ["push"; sprintf "%s:%i.%i.%i" dockerImageName newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch] ""
+    //        run docker ["push"; sprintf "%s:latest" dockerImageName] ""
+    //    let dockerPublish() =
+    //        Trace.trace $"Tagging image with :latest and :{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}"
+    //        dockerTagImage()
+    //        Trace.trace $"Pushing image to dockerhub with :latest and :{newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch}"
+    //        dockerPushImage()
+    //    // Check if next SemVer is correct
+    //    match check with
+    //    | "y"|"true"|"Y" ->
+    //        Trace.trace "Perfect! Starting with docker publish"
+    //        Trace.trace "Creating image"
+    //        dockerCreateImage(None)
+    //        /// Check if user wants to test image
+    //        let testImage = Fake.Core.UserInput.getUserInput($"Want to test the image? (y/n/true/false)" )
+    //        match testImage with
+    //        | "y"|"true"|"Y" ->
+    //            Trace.trace $"Your app on port {port} will open on localhost:{port}."
+    //            dockerTestImage(None)
+    //            /// Check if user wants the image published
+    //            let imageWorkingCorrectly = Fake.Core.UserInput.getUserInput($"Is the image working as intended? (y/n/true/false)" )
+    //            match imageWorkingCorrectly with
+    //            | "y"|"true"|"Y"    -> dockerPublish()
+    //            | "n"|"false"|"N"   -> Trace.traceErrorfn "Cancel docker-publish"
+    //            | anythingElse      -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
+    //        | "n"|"false"|"N"   -> dockerPublish()
+    //        | anythingElse      -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
+    //    | "n"|"false"|"N" ->
+    //        Trace.traceErrorfn "Please update your SemVer Version in %s" ProjectInfo.releaseNotesPath
+    //    | anythingElse -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
+    //)
+
+module Build =
+    let SharedTests() =
+        run dotnet [ "build" ] sharedTestsPath
 
 module Release =
+
+    open System.Diagnostics
+
+    let private executeCommand (command: string) : string =
+        let p = new Process()
+        p.StartInfo.FileName <- "git"
+        p.StartInfo.Arguments <- command
+        p.StartInfo.RedirectStandardOutput <- true
+        p.StartInfo.UseShellExecute <- false
+        p.StartInfo.CreateNoWindow <- true
+
+        p.Start() |> ignore
+
+        let output = p.StandardOutput.ReadToEnd()
+        p.WaitForExit()
+
+        output
+
+    let GetLatestGitTag () : string =
+        executeCommand "describe --tags"
+        |> String.trim
 
     let SetPrereleaseTag() =
         printfn "Please enter pre-release package suffix"
@@ -242,15 +263,11 @@ module Release =
         else
             failwith "aborted"
 
-    Target.create "release" <| fun config ->
-        let args = config.Context.Arguments
-        if args |> List.contains "--pre" then
-            SetPrereleaseTag()
-            //CreatePrereleaseTag()
-            ()
-        else
-            //CreateTag()
-            ()
+    let ForcePushNightly() =
+        if promptYesNo "Ready to force push release to nightly branch?" then 
+            Git.Commit.exec "." (sprintf "Release v%s" ProjectInfo.prereleaseTag) 
+            run git ["push"; "-f"; "origin"; "HEAD:remote_branch_name"] __SOURCE_DIRECTORY__
+
 
 Target.create "InstallOfficeAddinTooling" (fun _ ->
 
@@ -327,6 +344,20 @@ Target.create "RunDB" (fun _ ->
     run dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
 )
 
+[<RequireQualifiedAccess>]
+module Tests =
+    let Watch() = 
+        [
+            "server", dotnet [ "watch"; "run" ] serverTestsPath
+            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath ]
+        |> runParallel
+
+    let Run() = 
+        [
+            "server", dotnet [ "run" ] serverTestsPath
+            //"client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath 
+        ]|> runParallel
+
 Target.create "RunTests" (fun _ ->
     run dotnet [ "build" ] sharedTestsPath
     [
@@ -363,6 +394,19 @@ let main args =
         match a with
         | "--nodb" :: a -> Run(false); 0
         | _ -> Run(true); 0
+    | "release" :: a ->
+        Build.SharedTests()
+        Tests.Run()
+        match a with
+        | "pre" :: a -> 
+            Release.SetPrereleaseTag()
+            Release.CreatePrereleaseTag()
+            let version = Release.GetLatestGitTag()
+            ReleaseNoteTasks.createVersionFile(version)
+            0
+        | _ -> 
+            Release.CreateTag()
+            0
     | "docker" :: a ->
         match a with
         | "create" :: a -> Docker.dockerCreateImage(Some "new"); 0
@@ -372,6 +416,10 @@ let main args =
             | _ -> Docker.DockerTestNewStack(); 0
         | "publish" :: a ->
             (); 1
+        | _ -> runOrDefault args
+    | "version" :: a ->
+        match a with
+        | "create-file" :: version :: a -> ReleaseNoteTasks.createVersionFile(version); 0
         | _ -> runOrDefault args
     | _ -> runOrDefault args
 

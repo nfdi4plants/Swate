@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <RootNamespace>excel_fable</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarnOn>3390;$(WarnOn)</WarnOn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="OfficeJS.fs" />
+    <Compile Include="Excel.fs" />
+    <Compile Include="GlobalBindings.fs" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <Authors>Kevin Frey, CSBiology</Authors>
+    <Description>Fable bindings for Office-js Excel</Description>
+    <Summary>Fable bindings for Office-js Excel</Summary>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Freymaurer/office-fable/</PackageProjectUrl>
+    <PackageTags>fable;fsharp;safe-stack;office-js</PackageTags>
+    <RepositoryUrl>https://github.com/Freymaurer/office-fable</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <FsDocsLicenseLink>https://github.com/Freymaurer/office-fable/blob/main/LICENSE</FsDocsLicenseLink>
+    <FsDocsReleaseNotesLink>https://github.com/Freymaurer/office-fable/blob/main/RELEASE_NOTES.md</FsDocsReleaseNotesLink>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Core" Version="3.2.8" />
+    <PackageReference Include="Fable.React" Version="7.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="*.fsproj; *.fs" Exclude="**\*.fs.js" PackagePath="fable\" />
+  </ItemGroup>
+  
+</Project>

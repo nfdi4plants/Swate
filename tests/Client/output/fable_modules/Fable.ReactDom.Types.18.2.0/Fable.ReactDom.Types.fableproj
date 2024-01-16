@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version>18.2.0</Version>
+    <PackageVersion>18.2.0</PackageVersion>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- <DefineConstants>$(DefineConstants);FABLE_COMPILER</DefineConstants> -->
+    <PackageTags>fsharp;fable;javascript;f#;js;react;fable-binding;fable-javascript</PackageTags>
+  </PropertyGroup>
+  <PropertyGroup>
+    <NpmDependencies>
+      <NpmPackage Name="react-dom" Version="gte 18.0.0 lt 19.0.0" ResolutionStrategy="Max" />
+    </NpmDependencies>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Fable.ReactDom.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="4.7.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Fable.React.Types\Fable.React.Types.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="*.fsproj; *.fs" PackagePath="fable\" />
+  </ItemGroup>
+</Project>

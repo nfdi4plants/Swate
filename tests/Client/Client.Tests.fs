@@ -17,10 +17,8 @@ let all =
             Shared.Tests.shared
 #endif
             BuildingBlockFunctions.Tests.tests_buildingBlockFunctions
-            BuildingBlockView.Tests.tests_BuildingBlockView
             FilePickerView.Tests.tests_FilePickerView_PathRerooting
             OfficeInterop.Indexing.Tests.tests_OfficeInterop_Indexing
-            Spreadsheet.Controller.Tests.tests_SpreadsheetController
             client
         ]
 

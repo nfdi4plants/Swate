@@ -1,0 +1,58 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="FsAddress.fs" />
+    <Compile Include="Cells\FsCell.fs" />
+    <Compile Include="Cells\FsCellsCollection.fs" />
+    <Compile Include="Ranges\FsRangeAddress.fs" />
+    <Compile Include="Ranges\FsRangeBase.fs" />
+    <Compile Include="Ranges\FsRangeRow.fs" />
+    <Compile Include="Ranges\FsRangeColumn.fs" />
+    <Compile Include="Ranges\FsRange.fs" />
+    <Compile Include="FsRow.fs" />
+    <Compile Include="FsColumn.fs" />
+    <Compile Include="Tables\FsTableField.fs" />
+    <Compile Include="Tables\FsTableRow.fs" />
+    <Compile Include="Tables\FsTable.fs" />
+    <Compile Include="FsWorksheet.fs" />
+    <Compile Include="FsWorkbook.fs" />
+    <Compile Include="SheetBuilder.fs" />
+    <Compile Include="DSL\Expression.fs" />
+    <Compile Include="DSL\Types.fs" />
+    <Compile Include="DSL\Transform.fs" />
+    <Compile Include="DSL\Operators.fs" />
+    <Compile Include="DSL\CellBuilder.fs" />
+    <Compile Include="DSL\RowBuilder.fs" />
+    <Compile Include="DSL\ColumnBuilder.fs" />
+    <Compile Include="DSL\TableBuilder.fs" />
+    <Compile Include="DSL\SheetBuilder.fs" />
+    <Compile Include="DSL\WorkbookBuilder.fs" />
+    <Compile Include="DSL\DSL.fs" />
+    <None Include="..\..\docs\img\logo.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <Authors>Heinrich Lukas Weil, Oliver Maus, Kevin Schneider, Kevin Frey, Timo Mühlhaus</Authors>
+    <Description>Fable compliant Spreadsheet creation and manipulation in FSharp</Description>
+    <Summary>Spreadsheet creation and manipulation in FSharp</Summary>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>logo.png</PackageIcon>
+    <PackageTags>F# FSharp spreadsheet Excel xlsx datascience fable fable-library</PackageTags>
+    <RepositoryUrl>https://github.com/CSBiology/FsSpreadsheet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<Content Include="*.fsproj; **\*.fs; **\*.fsi" PackagePath="fable\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Core" Version="4.0.0" />
+  </ItemGroup>
+
+</Project>

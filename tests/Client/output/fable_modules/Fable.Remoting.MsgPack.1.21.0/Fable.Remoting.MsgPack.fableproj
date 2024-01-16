@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>MsgPack protocol and data format implementation for Fable.Remoting</Description>
+    <PackageProjectUrl>https://github.com/Zaid-Ajaj/Fable.Remoting</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Zaid-Ajaj/Fable.Remoting.git</RepositoryUrl>
+    <PackageLicenseUrl>https://github.com/Zaid-Ajaj/Fable.Remoting/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageIconUrl></PackageIconUrl>
+    <PackageTags>fsharp;fable;remoting;msgpack</PackageTags>
+    <Authors>Zaid Ajaj</Authors>
+    <Version>1.21.0</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageReleaseNotes>Fix inferred types when consumed from dotnet 8</PackageReleaseNotes>
+    <TargetFrameworks>netstandard2.0;net462;netcoreapp3.1;net6.0</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="TypeShape.fs" />
+    <Compile Include="TypeShapeUtils.fs" />
+    <Compile Include="Format.fs" />
+    <Compile Include="Write.fs" />
+    <Compile Include="Read.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="*.fsproj; *.fs" Exclude="**\*.fs.js" PackagePath="fable\" />
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Fable.Remoting.Server</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+   <PackageReference Update="FSharp.Core" Version="4.7.2" />
+  </ItemGroup>
+</Project>

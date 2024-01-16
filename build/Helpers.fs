@@ -80,6 +80,8 @@ let docker args dir = createProcess "docker" args dir
 
 let dockerCompose args dir = createProcess "docker-compose" args dir
 
+let git args dir = createProcess "git" args dir
+
 let npm args dir =
     let npmPath =
         match ProcessUtils.tryFindFileOnPath "npm" with

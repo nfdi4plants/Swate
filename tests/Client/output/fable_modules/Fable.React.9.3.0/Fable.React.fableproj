@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version>9.3.0</Version>
+    <PackageVersion>9.3.0</PackageVersion>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- <DefineConstants>$(DefineConstants);FABLE_COMPILER</DefineConstants> -->
+    <PackageTags>fsharp;fable;javascript;f#;js;react;fable-library;fable-javascript;fable-dotnet</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Fable.React.Props.fs" />
+    <Compile Include="Fable.React.Helpers.fs" />
+    <Compile Include="Fable.React.Standard.fs" />
+    <Compile Include="Fable.React.FunctionComponent.fs" />
+    <Compile Include="Fable.React.ReactiveComponents.fs" />
+    <Compile Include="Fable.React.Isomorphic.fs" />
+    <Compile Include="Fable.ReactServer.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="*.fsproj; *.fs" PackagePath="fable\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="4.7.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Fable.React.Types\Fable.React.Types.fsproj" />
+    <ProjectReference Include="..\Fable.ReactDom.Types\Fable.ReactDom.Types.fsproj" />
+  </ItemGroup>
+</Project>

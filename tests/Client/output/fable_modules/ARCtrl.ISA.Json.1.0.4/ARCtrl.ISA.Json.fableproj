@@ -1,0 +1,64 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Validation\JsonValidation.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <Compile Include="Validation/ValidationResult.fs" />
+    <Compile Include="Validation/Fable.fs" />
+    <Compile Include="Validation/JsonSchemaValidation.fs" />
+    <Compile Include="ConverterOptions.fs" />
+    <Compile Include="Decode.fs" />
+    <Compile Include="GEncode.fs" />
+    <Compile Include="Comment.fs" />
+    <Compile Include="Ontology.fs" />
+    <Compile Include="Factor.fs" />
+    <Compile Include="Protocol.fs" />
+    <Compile Include="Material.fs" />
+    <Compile Include="Data.fs" />
+    <Compile Include="Process.fs" />
+    <Compile Include="Publication.fs" />
+    <Compile Include="Person.fs" />
+    <Compile Include="Assay.fs" />
+    <Compile Include="Study.fs" />
+    <Compile Include="Investigation.fs" />
+	<Compile Include="ArcTypes\CompositeCell.fs" />
+	<Compile Include="ArcTypes\IOType.fs" />
+	<Compile Include="ArcTypes\CompositeHeader.fs" />
+    <Compile Include="ArcTypes\ArcTable.fs" />
+    <Compile Include="ArcTypes\ArcAssay.fs" />
+    <Compile Include="ArcTypes\ArcStudy.fs" />
+    <Compile Include="ArcTypes\ArcInvestigation.fs" />
+    <None Include="../../../build/logo.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NJsonSchema" Version="10.8.0" />
+    <PackageReference Include="Thoth.Json" Version="10.1.0" />
+    <PackageReference Include="Thoth.Json.Net" Version="11.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ISA\ARCtrl.ISA.fsproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NpmDependencies>
+      <NpmPackage Name="jsonschema" Version="gte 1.1.0 lt 2.0.0" ResolutionStrategy="Max" />
+    </NpmDependencies>
+  </PropertyGroup>
+	<ItemGroup>
+		<Content Include="*.fsproj; **\*.fs; **\*.fsi" PackagePath="fable\" />
+	</ItemGroup>
+  <PropertyGroup>
+    <Authors>nfdi4plants, Lukas Weil, Florian Wetzels, Kevin Frey</Authors>
+    <Description>ARC and ISA json compliant parser for experimental metadata toolkit in F#. This project is meant as an easy means to open, manipulate and save ISA (Investigation,Study,Assay) metadata files in isa-json format.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>logo.png</PackageIcon>
+    <PackageTags>ARC F# FSharp dotnet .Net bioinformatics biology fable-library datascience dataplant nfdi metadata investigation study assay ISA Json</PackageTags>
+    <PackageProjectUrl>https://github.com/nfdi4plants/ARCtrl/tree/main/src/ISA</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/ARCtrl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Debouncer implementation for Elmish applications</Description>
+    <PackageProjectUrl>https://github.com/thoth-org/Thoth.Elmish.Debouncer</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/thoth-org/Thoth.Elmish.Debouncer/blob/master/LICENSE</PackageLicenseUrl>
+    <RepositoryUrl>https://github.com/thoth-org/Thoth.Elmish.Debouncer</RepositoryUrl>
+    <PackageTags>fable;fsharp;json</PackageTags>
+    <Authors>Maxime Mangel</Authors>
+    <Version>2.0.0</Version>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Debouncer.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="*.fsproj; **\*.fs; **\*.js" PackagePath="fable" />
+  </ItemGroup>
+  <Import Project="..\.paket\Paket.Restore.targets" />
+</Project>

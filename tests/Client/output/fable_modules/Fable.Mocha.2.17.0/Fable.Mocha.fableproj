@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Description>Fable binding for mocha, the javascript test runner</Description>
+        <PackageProjectUrl>https://github.com/Zaid-Ajaj/Fable.Mocha</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/Zaid-Ajaj/Fable.Mocha</RepositoryUrl>
+        <PackageLicenseUrl>https://github.com/Zaid-Ajaj/Fable.Mocha/blob/master/LICENSE</PackageLicenseUrl>
+        <PackageIconUrl></PackageIconUrl>
+        <PackageTags>fsharp;fable</PackageTags>
+        <Authors>Zaid Ajaj</Authors>
+        <Version>2.17.0</Version>
+        <PackageVersion>2.17.0</PackageVersion>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    <PropertyGroup>
+        <NpmDependencies>
+            <NpmPackage Name="mocha" Version="gte 8.3.2 lt 9.0.0" DevDependency="true" />
+        </NpmDependencies>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="Mocha.fs" />
+    </ItemGroup>
+    <ItemGroup>
+        <Content Include="*.fsproj; *.fs; *.js" Exclude="**\*.fs.js" PackagePath="fable\" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Update="FSharp.Core" Version="4.7.0"/>
+        <PackageReference Include="Fable.Core" Version="3.0.0" />
+    </ItemGroup>
+</Project>
