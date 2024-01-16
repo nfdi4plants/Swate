@@ -41,8 +41,8 @@
         <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
-        <Compile Include="ARCitect\Interop.fs" />
-        <Compile Include="ARCitect\ARCitect.fs" />
+        <Compile Include="ARC2itect\Interop.fs" />
+        <Compile Include="ARC2itect\ARCitect.fs" />
         <Compile Include="Modals\Controller.fs" />
         <Compile Include="Modals\Loading.fs" />
         <Compile Include="Modals\EditColumn.fs" />
