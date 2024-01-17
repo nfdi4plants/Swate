@@ -26,7 +26,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ISSUE_TEMPLATE", "ISSUE_TEM
 	ProjectSection(SolutionItems) = preProject
 		.github\ISSUE_TEMPLATE\config.yml = .github\ISSUE_TEMPLATE\config.yml
 		.github\ISSUE_TEMPLATE\bug_report.yml = .github\ISSUE_TEMPLATE\bug_report.yml
-		.github\ISSUE_TEMPLATE\feature_request.md = .github\ISSUE_TEMPLATE\feature_request.md
+		.github\ISSUE_TEMPLATE\feature_request.yml = .github\ISSUE_TEMPLATE\feature_request.yml
 	EndProjectSection
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Client", "src\Client\Client.fsproj", "{E02F8351-E49E-457D-A320-6FCF06D7772C}"

@@ -1,12 +1,12 @@
-name: Bug Report
-description: File a bug report
-title: "[Bug]: "
-labels: ["Type: Bug :bug:"]
+name: Feature Request
+description: Suggest an idea for this project
+title: "[Feature Request]: "
+labels: ["Type: Enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report!
+        Thanks for taking the time to fill out this feature request!
   - type: input
     id: contact
     attributes:
@@ -16,19 +16,25 @@ body:
     validations:
       required: false
   - type: textarea
-    id: what-happened
+    id: why
     attributes:
-      label: What happened?
-      description: Give us a step by step what you did.
-      placeholder: Tell us what happened!
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of what the problem is.
+      placeholder: Ex. I'm always frustrated when [...]
     validations:
       required: true
   - type: textarea
-    id: what-expected
+    id: suggestion
     attributes:
-      label: What did you expect?
-      description: This field might be optional depending on the bug you encountered.
-      placeholder: Tell us what you wanted to see!
+      label: Describe the solution you would like!
+      description: A clear and concise description of what you want to happen.
+    validations:
+      required: true 
+  - type: textarea
+    id: more-context
+    attributes:
+      label: Additional context!
+      description: Add any other context or screenshots about the feature request here.
   - type: dropdown
     id: swate-host
     attributes:
@@ -55,13 +61,5 @@ body:
             * OS [e.g. Windows 11]
         Standalone
             * Browser [e.g. Firefox, Chrome]
-    validations:
-      required: true
-  - type: input
-    id: swate-version
-    attributes:
-      label: Swate version
-      description: You can find it at the bottom of the sidebar.
-      placeholder: 1.0.0-alpha.01
     validations:
       required: true
