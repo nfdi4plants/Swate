@@ -417,8 +417,6 @@ let main args =
             match a with
             | "single" :: a -> Docker.dockerTestImage(Some "new"); 0
             | _ -> Docker.DockerTestNewStack(); 0
-        | "publish" :: a ->
-            (); 1
         | _ -> runOrDefault args
     | "version" :: a ->
         match a with
