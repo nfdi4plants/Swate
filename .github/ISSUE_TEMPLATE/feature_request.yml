@@ -41,6 +41,7 @@ body:
       label: Host
       description: Where did you run Swate?
       options:
+        - Applies to All
         - Standalone
         - ARCitect
         - Excel
