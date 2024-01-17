@@ -19,43 +19,49 @@ body:
     id: what-happened
     attributes:
       label: What happened?
-      description: Also tell us, what did you expect to happen?
-      placeholder: Tell us what you see!
-      value: "A bug happened!"
+      description: Give us a step by step what you did.
+      placeholder: Tell us what happened!
     validations:
       required: true
-  - type: dropdown
-    id: version
+  - type: textarea
+    id: what-expected
     attributes:
-      label: Version
-      description: What version of our software are you running?
+      label: What did you expect?
+      description: This field might be optional depending on the bug you encountered.
+      placeholder: Tell us what you wanted to see!
+  - type: dropdown
+    id: swate-host
+    attributes:
+      label: Host
+      description: Where did you run Swate?
       options:
-        - 1.0.2 (Default)
-        - 1.0.3 (Edge)
+        - Standalone
+        - ARCitect
+        - Excel
       default: 0
     validations:
       required: true
-  - type: dropdown
-    id: browsers
-    attributes:
-      label: What browsers are you seeing the problem on?
-      multiple: true
-      options:
-        - Firefox
-        - Chrome
-        - Safari
-        - Microsoft Edge
   - type: textarea
-    id: logs
+    id: swate-host-details
     attributes:
-      label: Relevant log output
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      render: shell
-  - type: checkboxes
-    id: terms
+      label: Host Details
+      description: Please give us more information.
+      placeholder: |
+        Excel
+            * Excel version
+            * OS [e.g. Windows 11]
+        ARCitect
+            * ARCitect version
+            * OS [e.g. Windows 11]
+        Standalone
+            * Browser [e.g. Firefox, Chrome]
+    validations:
+      required: true
+  - type: input
+    id: swate-version
     attributes:
-      label: Code of Conduct
-      description: By submitting this issue, you agree to follow our [Code of Conduct](https://example.com)
-      options:
-        - label: I agree to follow this project's Code of Conduct
-          required: true
+      label: Swate version
+      description: You can find it at the bottom of the sidebar.
+      placeholder: 1.0.0-alpha.01
+    validations:
+      required: true
