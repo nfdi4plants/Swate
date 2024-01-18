@@ -76,6 +76,12 @@ module Interface =
                 let cmd = Spreadsheet.AddAnnotationBlocks minBuildingBlockInfos |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
+        | JoinTable (table, index, options) ->
+            match host with
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                let cmd = Spreadsheet.JoinTable (table, index, options) |> SpreadsheetMsg |> Cmd.ofMsg
+                model, cmd
+            | _ -> failwith "not implemented"
         | ImportFile tables ->
             match host with
             | Some Swatehost.Excel ->

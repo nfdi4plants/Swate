@@ -41,7 +41,7 @@ module URLs =
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
-    let SwateWiki = @"https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/implementation/SwateManual/index.html"
+    let SwateWiki = @"https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/SwateManual/index.html"
 
     [<LiteralAttribute>]
     let SwateRepo = @"https://github.com/nfdi4plants/Swate"

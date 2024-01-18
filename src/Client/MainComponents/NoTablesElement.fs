@@ -177,7 +177,7 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
 
 [<ReactComponent>]
 let Main (args: {|dispatch: Messages.Msg -> unit|}) =
-    let isActive, setIsActive = React.useState(true)
+    let isActive, setIsActive = React.useState(false)
     Html.div [
         prop.id UploadHandler.id
         prop.onDragEnter (fun e ->

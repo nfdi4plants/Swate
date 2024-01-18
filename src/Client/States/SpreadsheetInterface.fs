@@ -12,6 +12,7 @@ type Msg =
 | RemoveBuildingBlock
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
+| JoinTable of ArcTable * index: int option * options: TableJoinOptions option
 | ImportFile of ArcFiles
 /// Open modal for selected building block, allows editing on standalone only.
 | EditBuildingBlock

@@ -326,7 +326,7 @@ let HeaderCell(columnIndex: int, state_extend: Set<int>, setState_extend, model:
 let BodyCell(index: (int*int), state_extend: Set<int>, setState_extend, model: Model, dispatch) =
     let columnIndex, rowIndex = index
     let state = model.SpreadsheetModel
-    let cell = state.ActiveTable.TryGetCellAt index |> _.Value
+    let cell = state.ActiveTable.TryGetCellAt index |> Option.defaultValue CompositeCell.emptyFreeText
     let cellValue = cell.GetContent().[0]
     let state_cell, setState_cell = React.useState(CellState.init(cellValue))
     let isSelected = state.SelectedCells.Contains index

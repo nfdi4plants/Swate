@@ -107,6 +107,11 @@ let addBuildingBlocks(newColumns: CompositeColumn []) (state: Spreadsheet.Model)
     table.AddColumns(newColumns,nextIndex)
     {state with ArcFile = state.ArcFile}
 
+let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptions option) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let table = state.ActiveTable
+    table.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)
+    {state with ArcFile = state.ArcFile}
+
 let insertTerm_IntoSelected (term:OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     let selected = state.SelectedCells |> Set.toArray

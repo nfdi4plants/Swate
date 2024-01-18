@@ -94,6 +94,7 @@ type Msg =
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
+| JoinTable of ArcTable * index: int option * options: TableJoinOptions option
 | UpdateArcFile of ArcFiles
 | InitFromArcFile of ArcFiles
 | InsertOntologyTerm of OntologyAnnotation

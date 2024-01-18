@@ -75,6 +75,9 @@ module Spreadsheet =
             | AddAnnotationBlocks columns ->
                 let nextState = Controller.addBuildingBlocks columns state
                 nextState, model, Cmd.none
+            | JoinTable (table, index, options) ->
+                let nextState = Controller.joinTable table index options state
+                nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
                 let nextState = { state with ArcFile = Some arcFile }
                 nextState, model, Cmd.none
