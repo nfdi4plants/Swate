@@ -42,29 +42,25 @@ let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Mode
         state
     else
         state.Tables.RemoveTableAt removeIndex
-        // If the only existing table was removed init model from beginning
-        if state.Tables.TableCount = 0 then
-            Spreadsheet.Model.init()
-        else
-            // if active table is removed get the next closest table and set it active
-            match state.ActiveView with
-            | ActiveView.Table i when i = removeIndex ->
-                let nextTable_Index =
-                    let neighbors = findNeighborTables removeIndex state.Tables
-                    match neighbors with
-                    | Some (i, _), _ -> i
-                    | None, Some (i, _) -> i
-                    // This is a fallback option, which should never be hit
-                    | _ -> 0
-                { state with
-                    ArcFile = state.ArcFile
-                    ActiveView = ActiveView.Table nextTable_Index }
-            | ActiveView.Table i -> // Tables still exist and an inactive one was removed. Just remove it.
-                let nextTable_Index = if i > removeIndex then i - 1 else i
-                { state with
-                    ArcFile = state.ArcFile
-                    ActiveView = ActiveView.Table nextTable_Index }
-            | _ -> state
+        // if active table is removed get the next closest table and set it active
+        match state.ActiveView with
+        | ActiveView.Table i when i = removeIndex ->
+            let nextView =
+                let neighbors = findNeighborTables removeIndex state.Tables
+                match neighbors with
+                | Some (i, _), _ -> ActiveView.Table i
+                | None, Some (i, _) -> ActiveView.Table i
+                // This is a fallback option, which should never be hit
+                | _ -> ActiveView.Metadata
+            { state with
+                ArcFile = state.ArcFile
+                ActiveView = nextView }
+        | ActiveView.Table i -> // Tables still exist and an inactive one was removed. Just remove it.
+            let nextTable_Index = if i > removeIndex then i - 1 else i
+            { state with
+                ArcFile = state.ArcFile
+                ActiveView = ActiveView.Table nextTable_Index }
+        | _ -> state
 
 ///<summary>Add `n` rows to active table.</summary>
 let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
