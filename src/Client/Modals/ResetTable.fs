@@ -24,6 +24,7 @@ let Main (dispatch) (rmv: _ -> unit) =
                 Bulma.modalCardBody [
                     Bulma.field.div [prop.innerHtml "Careful, this will delete <b>all</b> tables and <b>all</b> table history!"]
                     Bulma.field.div [prop.innerHtml "There is no option to recover any information deleted in this way."]
+                    Bulma.field.div [prop.innerHtml "If you only want to delete one sheet, right-click the sheet at the bottom and select `delete`"]
                 ]
                 Bulma.modalCardFoot [
                     Bulma.button.a [
