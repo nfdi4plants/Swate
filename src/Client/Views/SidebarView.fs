@@ -143,6 +143,7 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
             FlexDirection "column"
             Position PositionOptions.Relative
             MaxWidth "100%"
+            OverflowY OverflowOptions.Auto
         ]
     ] children
 
@@ -198,6 +199,7 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
 
         Bulma.container [
             Bulma.container.isFluid
+            prop.className "pl-4 pr-4"
             prop.children [
                 tabs model dispatch state.Size
 

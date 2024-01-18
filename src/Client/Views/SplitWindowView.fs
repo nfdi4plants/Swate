@@ -105,7 +105,7 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
                     style.flexBasis(length.px model.RightWindowWidth); style.flexShrink 0; style.flexGrow 0
                     style.height(length.vh 100)
                     style.width(length.perc 100)
-                    style.overflow.auto
+                    style.overflow.hidden
                     style.display.flex
                 ]
                 prop.children [
