@@ -22,6 +22,7 @@ let private split_container model dispatch =
     SplitWindowView.Main
         mainWindow
         sideWindow
+        model
         dispatch
 
 [<ReactComponent>]
