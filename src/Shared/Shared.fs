@@ -139,6 +139,14 @@ type IOntologyAPIv2 = {
     getTreeByAccession                  : string                                                            -> Async<TreeTypes.Tree>
 }
 
+type IOntologyAPIv3 = {
+    // Development
+    getTestNumber : 
+        unit -> Async<int>
+    searchTerms: 
+        {| limit: int; query: string; ontologies: string list|} -> Async<Term []>
+}
+
 type ITemplateAPIv1 = {
     // must return template as string, fable remoting cannot do conversion automatically
     getTemplates                    : unit      -> Async<string []> 

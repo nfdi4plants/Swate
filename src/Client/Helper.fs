@@ -39,9 +39,13 @@ let debouncel<'T> (storage:Dictionary<string, int>) (key: string) (timeout: int)
     let timeoutId = 
         Fable.Core.JS.setTimeout 
             (fun () -> 
-                storage.Remove(key) |> ignore
-                setLoading false
-                fn value
+                match storage.TryGetValue key with
+                | true, _ ->
+                    storage.Remove(key) |> ignore
+                    setLoading false
+                    fn value
+                | false, _ ->
+                    setLoading false
             ) 
             timeout
     storage.[key] <- timeoutId

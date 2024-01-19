@@ -18,7 +18,7 @@ html[data-theme="dark"] {
     --text-strong: hsl(0, 0%, 100%);
     --fs-background: #252529;
     --fs-foreground: #1e1e20;
-    --scheme-invert-rgb: 255,255,255
+    --scheme-invert-rgb: 255,255,255;
 }
 
 html[data-theme="light"] {
@@ -29,7 +29,7 @@ html[data-theme="light"] {
     --text-strong: hsl(0, 0%, 4%);
     --fs-background: #f6f6f7;
     --fs-foreground: #e3e3e5;
-    --scheme-invert-rgb: 0,0,0
+    --scheme-invert-rgb: 0,0,0;
 }
 
 $excel-primary: #217346;
@@ -49,6 +49,7 @@ $danger: $nfdi-red;
 $warning: $nfdi-yellow;
 
 // 3. Set the derived variables
+$border-color: hsl(0, 0%, 86%);
 $scheme-main: var(--scheme-main, hsl(0, 0%, 100%));
 $scheme-invert: var(--scheme-invert, hsl(0, 0%, 4%));
 $text: var(--text);
@@ -82,13 +83,73 @@ $colors: map-merge($colors, $addColors);
     flex-grow: 1;
 }
 
+.term-select-area {
+    position: absolute;
+    width: 100%;
+    max-height: 400px;
+    overflow: auto;
+    border: 1px solid $border-color;
+    background-color: $scheme-main;
+    border-top: unset;
+    z-index: 20;
+
+    .term-select-item {
+
+        > * {
+            padding: .5rem 1rem;
+        }
+
+        .term-select-item-main {
+            cursor: pointer;
+
+            > *:not(:last-child) {
+                padding-right: .5rem;
+            }
+
+            a:hover {
+                text-decoration: underline
+            }
+        }
+
+        .term-select-item-more {
+            border-top: .5px solid $border-color;
+            box-shadow: 0px 4px 8px $border-color;
+
+            td {
+                border: unset;
+                padding: 0.15em 0.25em;
+            }
+        }
+
+        .term-select-item-toggle-button {
+            padding: calc(0.5em - 1px) .8em;
+            display: flex;
+            background-color: transparent;
+            border: unset;
+            cursor: pointer;
+            color: $scheme-invert;
+            justify-content: center;
+            align-items: center;
+            border-radius: 2px;
+            white-space: nowrap
+        }
+
+        .term-select-item-toggle-button:hover {
+            background-color: $content-blockquote-background-color
+        }
+    }
+
+    .term-select-item:not(:last-child) {
+        border-bottom: 1px solid $border-color;
+    }
+}
+
 .modal-background {
     opacity: 0.5
 }
 
 .modal-card {
     box-shadow: 2px 2px black;
-    border-radius: $radius
 }
 
 /*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/

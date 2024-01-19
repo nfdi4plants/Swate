@@ -394,8 +394,8 @@ let main args =
         Bundle(); 0
     | "run" :: a ->
         match a with
-        | "--nodb" :: a -> Run(false); 0
-        | _ -> Run(true); 0
+        | "db" :: a -> Run(true); 0
+        | _ -> Run(false); 0
     | "release" :: a ->
         Build.SharedTests()
         Tests.Run()

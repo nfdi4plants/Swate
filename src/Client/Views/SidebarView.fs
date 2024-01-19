@@ -155,7 +155,7 @@ module private Content =
             BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
         | Routing.Route.TermSearch ->
-            TermSearch.termSearchComponent model dispatch
+            TermSearch.Main model dispatch
 
         | Routing.Route.FilePicker ->
             FilePicker.filePickerComponent model dispatch

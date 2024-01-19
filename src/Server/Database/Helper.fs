@@ -39,7 +39,9 @@ type Neo4JCredentials = {
 type Neo4j =
     
     static member establishConnection(c: Neo4JCredentials) =
-        let driver = Neo4j.Driver.GraphDatabase.Driver(c.BoltUrl, Neo4j.Driver.AuthTokens.Basic(c.User,c.Pw))
+        let driver = Neo4j.Driver.GraphDatabase.Driver(c.BoltUrl, Neo4j.Driver.AuthTokens.Basic(c.User,c.Pw), fun o ->
+            o.WithMaxTransactionRetryTime(TimeSpan.FromSeconds(3))
+                .WithConnectionTimeout(TimeSpan.FromSeconds(3)) |> ignore)
         printfn "established connection"
         driver.AsyncSession(SessionConfigBuilder.ForDatabase c.DatabaseName)
 
@@ -63,9 +65,15 @@ type Neo4j =
                             kvp::s
                         ) []
                         |> fun x -> Collections.Generic.Dictionary<string,obj>(x :> Collections.Generic.IEnumerable<_>)
-                    currentSession.RunAsync(Query(query,param))
+                    currentSession.RunAsync(
+                        Query(query,param),
+                        action = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
+                    )
                 else
-                    currentSession.RunAsync(query)
+                    currentSession.RunAsync(
+                        query,
+                        action = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
+                    )
                 |> Async.AwaitTask
             let! dbValues = 
                 executeReadQuery.ToListAsync()
@@ -105,7 +113,7 @@ type Neo4j =
                 queries 
                 |> Array.map (fun query ->
                     let currentSession = Neo4j.establishConnection(credentials)
-                    let transaction = currentSession.ReadTransactionAsync(fun tx ->
+                    let transaction = currentSession.ExecuteReadAsync(fun tx ->
                         async {
                             let! result = tx.RunAsync query |> Async.AwaitTask
                             return! result.ToListAsync() |> Async.AwaitTask

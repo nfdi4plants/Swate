@@ -361,7 +361,7 @@ let autocompleteTermSearchComponentOfParentOntology
     let useParentTerm =
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel -> model.TermSearchState.ParentOntology.IsSome 
-        | Some Swatehost.Browser when not model.SpreadsheetModel.headerIsSelected ->
+        | Some _ when not model.SpreadsheetModel.headerIsSelected ->
             let header = model.SpreadsheetModel.getSelectedColumnHeader
             match header with
             | Some h ->
@@ -373,7 +373,7 @@ let autocompleteTermSearchComponentOfParentOntology
     let parentTerm =
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel -> model.TermSearchState.ParentOntology
-        | Some Swatehost.Browser ->
+        | Some _ ->
             let header = model.SpreadsheetModel.getSelectedColumnHeader
             header
             |> Option.bind (fun header ->
@@ -384,7 +384,7 @@ let autocompleteTermSearchComponentOfParentOntology
                 else
                     None
             )
-        | _ -> None
+        | None -> None
 
     // REF-Parent-Term:
     // `useParentTerm` is used to show if parent term should be used for search. `useParentTerm` can be false, altough `parentTerm`.IsSome.

@@ -241,7 +241,9 @@ let simpleSearchComponent model dispatch =
         ]
     ]
 
-let termSearchComponent (model:Messages.Model) dispatch =
+[<ReactComponent>]
+let Main (model:Messages.Model) dispatch =
+    let state, setState = React.useState(OntologyAnnotation.empty)
     div [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
@@ -251,7 +253,11 @@ let termSearchComponent (model:Messages.Model) dispatch =
 
         Bulma.label "Search for an ontology term to fill into the selected field(s)"
 
-        simpleSearchComponent model dispatch
+        Components.TermSearch.Input(setState, fullwidth=true, size=Bulma.input.isLarge)
+
+        Html.div state.NameText
+
+        //simpleSearchComponent model dispatch
 
         //if model.TermSearchState.SelectedTerm.IsNone then
         //    str "No Term Selected"

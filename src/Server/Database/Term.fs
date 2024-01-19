@@ -3,36 +3,56 @@ module Database.Term
 open Neo4j.Driver
 open Shared.TermTypes
 open Helper
+open System.Text
 
-
-module private Queries =
-    let filterNodeSourceOntology = """ WITH node
-    MATCH (node)-[:CONTAINED_IN]->(:Ontology {name: $OntologyName}) """
-    let filterNodeSourceOntologies = """ WITH node
-    MATCH (node)-[:CONTAINED_IN]->(o:Ontology WHERE o.name in $OntologyNames) """
-
-    let fullTextNameQuery (hasOntologyFilter: string) =
-        sprintf
-            """CALL db.index.fulltext.queryNodes("TermName",$Name)
-            YIELD node%s
-            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
-            hasOntologyFilter
 
 /// <summary> This type is used to allow searching through only one ontology or multiple ontologies </summary>
 [<RequireQualifiedAccess>]
-type AnyOfSource =
-| String of string
-| StringList of string list
+type AnyOfOntology =
+| Single of string
+| Multiples of string list
 with
-    member this.toFilterQuery =
-        match this with
-        | AnyOfSource.String _ -> Queries.filterNodeSourceOntology
-        | AnyOfSource.StringList _ -> Queries.filterNodeSourceOntologies
-
     member this.toParamTuple =
         match this with
-        | AnyOfSource.String str -> "OntologyName", str |> box
-        | AnyOfSource.StringList strList -> "OntologyNames", strList |> box
+        | AnyOfOntology.Single str -> "OntologyName", str |> box
+        | AnyOfOntology.Multiples strList -> "OntologyNames", strList |> box
+
+type Queries =
+
+    static member OntologyFilter (filter:AnyOfOntology, nodeName: string) = 
+        let FilterSourceOntology (nodeName: string) = $"""    WITH {nodeName}
+    MATCH ({nodeName})-[:CONTAINED_IN]->(:Ontology {{name: $OntologyName/}}) """
+        let FilterSourceOntologies (nodeName: string) = $"""  WITH {nodeName}
+    MATCH ({nodeName})-[:CONTAINED_IN]->(o:Ontology WHERE o.name in $OntologyNames) """
+        match filter with
+        | AnyOfOntology.Single _ -> FilterSourceOntology nodeName
+        | AnyOfOntology.Multiples _ -> FilterSourceOntologies nodeName
+
+    static member TermReturn (nodeName: string) = $"""RETURN {nodeName}.accession, {nodeName}.name, {nodeName}.definition, {nodeName}.is_obsolete"""
+
+    static member Limit(i:int) = $"""LIMIT {i}"""
+
+    static member NameQueryExact (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: int) =
+        let sb = new StringBuilder()
+        sb.Append $"""MATCH ({nodeName}:Term {{name: $Name}})""" |> ignore
+        if ontologyFilter.IsSome then
+            sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
+        sb.AppendLine(Queries.TermReturn nodeName) |> ignore
+        if limit.IsSome then
+            sb.AppendLine (Queries.Limit limit.Value) |> ignore
+        sb.ToString()
+
+    static member NameQueryFullText (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: int) =
+        let sb = new StringBuilder()
+        sb.AppendLine $"""CALL db.index.fulltext.queryNodes("TermName",$Name)
+YIELD {nodeName}""" |> ignore
+        if ontologyFilter.IsSome then
+            sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
+        sb.AppendLine(Queries.TermReturn nodeName) |> ignore
+        if limit.IsSome then
+            sb.AppendLine (Queries.Limit limit.Value) |> ignore
+        sb.ToString()
+            
 
 type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
@@ -53,34 +73,20 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         term
 
     /// Searchtype defaults to "get term suggestions with auto complete".
-    member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfSource) =
+    member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology, ?limit: int) =
+        let nodeName = "node"
         let fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
                 FullTextSearch.PerformanceComplete.ofQueryString termName
-        let query =
-            Queries.fullTextNameQuery
-                (if sourceOntologyName.IsSome then sourceOntologyName.Value.toFilterQuery else "")
-        let param =
+        let query = Queries.NameQueryFullText (nodeName, ?ontologyFilter=sourceOntologyName, ?limit=limit)
+        let parameters =
             Map [
                 "Name",fulltextSearchStr |> box
                 if sourceOntologyName.IsSome then sourceOntologyName.Value.toParamTuple
             ] |> Some
-        if session.IsSome then
-            Neo4j.runQuery(
-                query,
-                param,
-                (Term.asTerm("node")),
-                session = session.Value
-            )
-        else
-            Neo4j.runQuery(
-                query,
-                param,
-                (Term.asTerm("node")),
-                credentials.Value
-            )
+        Neo4j.runQuery(query,parameters,(Term.asTerm(nodeName)),?session=session,?credentials=credentials)
 
     /// This function will allow for raw apache lucene input. It is possible to search either term name or description or both.
     /// The function will error if both term name and term description are None.
@@ -160,7 +166,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 (if limit.IsSome then "LIMIT $Limit" else "")
         let param =
             Map [
-                /// need to box values, because limit.Value will error if parsed as string
+                // need to box values, because limit.Value will error if parsed as string
                 "Accession", box parentAccession
                 if limit.IsSome then "Limit", box limit.Value
             ] |> Some
@@ -424,10 +430,10 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 (Term.asTerm("node")),
                 credentials.Value
             )
-
+/// No idea what the idea behind this was
 type TermQuery = 
 
-    static member getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfSource) =
+    static member getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology) =
         let fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
@@ -436,13 +442,9 @@ type TermQuery =
         let query =
             //let sourceOntologyText = """ WHERE EXISTS((:Term {accession: node.accession})-[:CONTAINED_IN]->(:Ontology {name: $OntologyName})) """
             if searchType.IsSome && searchType.Value = FullTextSearch.Exact then
-                sprintf
-                    """MATCH (node:Term {name: $Name})%s
-                    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
-                    (if sourceOntologyName.IsSome then sourceOntologyName.Value.toFilterQuery else "")
+                Queries.NameQueryExact("node",?ontologyFilter=sourceOntologyName)
             else
-                Queries.fullTextNameQuery
-                    (if sourceOntologyName.IsSome then sourceOntologyName.Value.toFilterQuery else "")
+                Queries.NameQueryFullText("node", ?ontologyFilter=sourceOntologyName)
         let param =
             Map [
                 "Name", box fulltextSearchStr

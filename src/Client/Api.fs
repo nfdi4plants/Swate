@@ -9,6 +9,11 @@ let api : IOntologyAPIv2 =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IOntologyAPIv2>
 
+let ontology : IOntologyAPIv3 =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<IOntologyAPIv3>
+
 let templateApi : ITemplateAPIv1 =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder

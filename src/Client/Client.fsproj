@@ -58,6 +58,7 @@
         <Compile Include="Spreadsheet\Clipboard.Controller.fs" />
         <Compile Include="Spreadsheet\Table.Controller.fs" />
         <Compile Include="Spreadsheet\Sidebar.Controller.fs" />
+        <Compile Include="SharedComponents\TermSearchInput.fs" />
         <Compile Include="SharedComponents\QuickAccessButton.fs" />
         <Compile Include="MainComponents\Metadata\Forms.fs" />
         <Compile Include="MainComponents\Metadata\Template.fs" />

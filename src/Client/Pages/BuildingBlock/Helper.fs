@@ -21,10 +21,10 @@ let selectHeader (uiState: BuildingBlockUIState) (setUiState: BuildingBlockUISta
             Msg.DoNothing
         | true, BodyCellType.Text -> 
             { BodyCellType = BodyCellType.Term; DropdownPage = DropdownPage.Main; DropdownIsActive = false },
-            BuildingBlock.Msg.SelectBodyCell (CompositeCell.emptyTerm) |> BuildingBlockMsg
+            Msg.DoNothing
         | false, _ -> 
             { BodyCellType = BodyCellType.Text; DropdownPage = DropdownPage.Main; DropdownIsActive = false },
-            BuildingBlock.Msg.SelectBodyCell (CompositeCell.emptyFreeText) |> BuildingBlockMsg
+            Msg.DoNothing
     setUiState nextState
     Msg.Batch [
         BuildingBlock.Msg.SelectHeader nextHeader |> BuildingBlockMsg
@@ -32,7 +32,7 @@ let selectHeader (uiState: BuildingBlockUIState) (setUiState: BuildingBlockUISta
     ]
 
 let selectBody (body: CompositeCell) =
-    BuildingBlock.Msg.SelectBodyCell body |> BuildingBlockMsg
+    BuildingBlock.Msg.SelectBodyCell (Some body) |> BuildingBlockMsg
 
 let hasVerifiedTermHeader (header: CompositeHeader) = header.IsTermColumn && header.ToTerm().TermAccessionShort <> ""
 

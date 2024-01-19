@@ -358,13 +358,16 @@ module private BodyTerm =
     [<ReactComponent>]
     let private body_searchElement inputId state setState (model: Model) dispatch =
         let state_isDirectedSearchMode, setState_isDirectedSearchMode = React.useState(true)
+        let bodyCell = 
+            model.AddBuildingBlockState.BodyCell 
+            |> Option.defaultValue CompositeCell.emptyFreeText
         let onChangeMsg = fun (isClicked: bool) (v:string) -> 
             let updateSearchState msg =
                 setState {SearchIsActive = true; SearchIsLoading = true}
                 let bounce_msg = Bounce (System.TimeSpan.FromSeconds 0.5,nameof(msg), msg)
                 bounce_msg |> dispatch
             if not isClicked then // only trigger the body cell reset on typing. When clicking to display terms we will not want to loose TAN information
-                model.AddBuildingBlockState.BodyCell.UpdateWithOA(OntologyAnnotation.fromString(v)) |> selectBody |> dispatch
+                bodyCell.UpdateWithOA(OntologyAnnotation.fromString(v)) |> selectBody |> dispatch
             match isClicked, state_isDirectedSearchMode, model.AddBuildingBlockState.Header.IsTermColumn, v with
             // only execute this on onDoubleClick event. If executed on onChange event it will trigger when deleting term.
             | true, true, true, "" -> // Search all children 
@@ -399,8 +402,9 @@ module private BodyTerm =
                         if state_isDirectedSearchMode && hasVerifiedTermHeader model.AddBuildingBlockState.Header then style.boxShadow(2,2,NFDIColors.Mint.Lighter20)
                     ]
                     prop.children [
-                        let valueOrDefault = model.AddBuildingBlockState.BodyCell.ToTerm().NameText
-                        basicTermSearchElement inputId (onChangeMsg false) (onChangeMsg true) (hasVerifiedCell model.AddBuildingBlockState.BodyCell) state setState valueOrDefault
+                        let valueOrDefault = model.AddBuildingBlockState.BodyCell |> Option.map (fun cc -> cc.ToTerm().NameText) |> Option.defaultValue ""
+                        let hasVerified = model.AddBuildingBlockState.BodyCell |> Option.map (fun cc -> hasVerifiedCell cc) |> Option.defaultValue false
+                        basicTermSearchElement inputId (onChangeMsg false) (onChangeMsg true) hasVerified state setState valueOrDefault
                     ]
                 ]
             ]
@@ -421,7 +425,7 @@ module private BodyTerm =
                 let selectMsg = fun (term:Term) -> 
                     let oa = OntologyAnnotation.fromTerm term
                     let cell = createCellFromUiStateAndOA uiState oa
-                    BuildingBlock.SelectBodyCell cell |> BuildingBlockMsg |> dispatch
+                    BuildingBlock.SelectBodyCell (Some cell) |> BuildingBlockMsg |> dispatch
                 AutocompleteComponents.autocompleteDropdownComponent model.AddBuildingBlockState.BodySearchResults selectMsg searchState setSearchState model dispatch
         ]
 
@@ -440,7 +444,7 @@ let private add_button (ui: BuildingBlockUIState) (model: Model) dispatch =
                 prop.disabled true
             Bulma.button.isFullWidth
             prop.onClick (fun _ ->
-                let column = CompositeColumn.create(header, [|body|])
+                let column = CompositeColumn.create(header, [|if body.IsSome then body.Value|])
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
             )
             prop.text "Add Column"
@@ -462,7 +466,7 @@ module private AdvancedSearch =
                 let cell = createCellFromUiStateAndOA uiState oa
                 Msg.Batch [
                     BuildingBlock.UpdateBodySearchText term.Name |> BuildingBlockMsg
-                    BuildingBlock.SelectBodyCell cell |> BuildingBlockMsg
+                    BuildingBlock.SelectBodyCell (Some cell) |> BuildingBlockMsg
                 ]
             // added edge case to modal, where relatedInputId = "" is ignored
             SidebarComponents.AdvancedSearch.advancedSearchModal model AdvancedSearch.Model.BuildingBlockHeaderId "" dispatch selectHeader

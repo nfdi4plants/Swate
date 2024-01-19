@@ -263,7 +263,7 @@ module BuildingBlock =
     type Model = {
 
         Header                          : CompositeHeader
-        BodyCell                        : CompositeCell
+        BodyCell                        : CompositeCell option
         /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
         HeaderSearchText                : string
         /// This always referrs to any term applied to the header.
@@ -289,7 +289,7 @@ module BuildingBlock =
             Header                                  = CompositeHeader.ParameterEmpty
             BodySearchText                          = ""
             BodySearchResults                       = [||]
-            BodyCell                                = CompositeCell.emptyTerm
+            BodyCell                                = None
 
             // Below everything is more or less deprecated
             // This section is used to add a unit directly to an already existing building block

@@ -117,7 +117,7 @@ module BuildingBlock =
     /// Returns all child terms
     | GetBodyTermsByParent of TermMinimal*TermSearchUIController
     | GetBodySuggestionsResponse of Term []*TermSearchUIController
-    | SelectBodyCell of CompositeCell
+    | SelectBodyCell of CompositeCell option
     // Below everything is more or less deprecated
     // Is still used for unit update in office
     | SearchUnitTermTextChange  of searchString:string
