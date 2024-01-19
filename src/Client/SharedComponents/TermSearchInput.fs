@@ -47,6 +47,7 @@ module TermSearchAux =
                 |> Async.Parallel
                 |> Async.Ignore
                 |> Async.StartImmediate
+            setSearchNameState <| SearchState.init()
             setIsSearching true
             debouncel debounceStorage "TermSearch" debounceTimer setLoading startSearch ()
 
