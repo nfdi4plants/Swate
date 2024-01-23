@@ -4,7 +4,8 @@ open Neo4j.Driver
 open Shared.TermTypes
 open Helper
 open System.Text
-
+open System
+open System.Collections.Generic
 
 /// <summary> This type is used to allow searching through only one ontology or multiple ontologies </summary>
 [<RequireQualifiedAccess>]
@@ -44,13 +45,12 @@ type Queries =
 
     static member NameQueryFullText (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: int) =
         let sb = new StringBuilder()
-        sb.AppendLine $"""CALL db.index.fulltext.queryNodes("TermName",$Name)
+        let limit = defaultArg limit 10
+        sb.AppendLine $"""CALL db.index.fulltext.queryNodes("TermName",$Name, {{limit: $Limit}})
 YIELD {nodeName}""" |> ignore
         if ontologyFilter.IsSome then
             sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
         sb.AppendLine(Queries.TermReturn nodeName) |> ignore
-        if limit.IsSome then
-            sb.AppendLine (Queries.Limit limit.Value) |> ignore
         sb.ToString()
             
 
@@ -74,19 +74,111 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// Searchtype defaults to "get term suggestions with auto complete".
     member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology, ?limit: int) =
+        let limit = defaultArg limit 5
         let nodeName = "node"
         let fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
                 FullTextSearch.PerformanceComplete.ofQueryString termName
-        let query = Queries.NameQueryFullText (nodeName, ?ontologyFilter=sourceOntologyName, ?limit=limit)
+        let query = Queries.NameQueryFullText (nodeName, ?ontologyFilter=sourceOntologyName, limit=limit)
         let parameters =
             Map [
                 "Name",fulltextSearchStr |> box
                 if sourceOntologyName.IsSome then sourceOntologyName.Value.toParamTuple
+                "Limit", box limit
             ] |> Some
         Neo4j.runQuery(query,parameters,(Term.asTerm(nodeName)),?session=session,?credentials=credentials)
+
+    /// <summary>
+    /// This is a more complete implementation, which should be abstracted more later.
+    /// </summary>
+    member this.searchByParentStepwise(query: string, parentId: string, ?searchType:FullTextSearch, ?limit: int) =
+        let limit = defaultArg limit 5
+        let searchNameQuery =
+            """CALL db.index.fulltext.queryNodes("TermName", $Search, {limit: $Limit}) 
+        YIELD node
+        RETURN node.accession"""
+        let searchTreeQuery =
+          """MATCH (node:Term)
+    WHERE node.accession IN $AccessionList
+    MATCH (endNode:Term {accession: $Parent})
+    MATCH (node)
+    WHERE EXISTS (
+        (endNode)<-[:is_a*]-(node)
+    )
+    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
+    // These two examples can be used to check function for efficiency coming from both node directions. 
+    // Some searches are better optimized starting from child and checking for parent. For other queries it is the other way around, 
+    // it depends on the relationship complexity of the parent and/or child node.
+    // parent: "DPBO:1000161"  raw_query: "growth prot"
+    // parent: "OBI:0100026" raw_query: "arabidopsis"
+    //     (node)-[*]->(endNode)
+        let fulltextSearchStr =
+            if searchType.IsSome then
+                searchType.Value.ofQueryString query
+            else
+                FullTextSearch.PerformanceComplete.ofQueryString query
+        use session = if session.IsSome then session.Value else Neo4j.establishConnection(credentials.Value)
+        let main = 
+            task {
+            let config = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(0.5)) |> ignore)
+            let! names_query = 
+                session.RunAsync(
+                    searchNameQuery, 
+                    System.Collections.Generic.Dictionary<string,obj>([
+                        KeyValuePair("Search", box fulltextSearchStr);
+                        // KeyValuePair("Accession", box parentId);
+                        KeyValuePair("Limit", box limit)
+                    ]),
+                    config
+                )
+            let! names_records = names_query.ToListAsync()
+            let names_results =
+                [|
+                    for record in names_records do
+                        let id = record.["node.accession"].As<string>()
+                        yield id
+                |]
+            let! tree_query = 
+                let parameters = System.Collections.Generic.Dictionary<string,obj>([
+                    KeyValuePair("Parent", box parentId);
+                    KeyValuePair("AccessionList", box names_results)
+                ])
+                session.RunAsync(searchTreeQuery, parameters, config)
+            let! tree_records = tree_query.ToListAsync() 
+            // The following code was an idea to implement an alternative query in case the first one time outs. 
+            // So we switch to the other search direction (parent -> child to child -> parent)
+                // async {
+                //   let! run =
+                //     async {
+                //       let! r = session.RunAsync(searchTreeQuery, parameters, action=config) |> Async.AwaitTask
+                //       return! r.ToListAsync() |> Async.AwaitTask
+                //     } 
+                    // |> Async.Catch
+                // return 
+                //   run
+                    // match run with
+                    // | Choice1Of2 terms ->
+                    //   terms
+                    // | Choice2Of2 exn ->
+                    //   session.RunAsync(searchTreeQuery_alternative,parameters, action=config).Result
+                    //   |> _.ToListAsync()
+                    //   |> _.Result
+                // }
+            let tree_results =
+                [|
+                    for record in tree_records do
+                        yield Term.asTerm("node") record
+                |]
+            return tree_results
+            }
+        try
+            main.Result
+        with
+            | exn -> 
+            printfn "%s" exn.Message
+            [||]
 
     /// This function will allow for raw apache lucene input. It is possible to search either term name or description or both.
     /// The function will error if both term name and term description are None.
@@ -170,20 +262,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 "Accession", box parentAccession
                 if limit.IsSome then "Limit", box limit.Value
             ] |> Some
-        if session.IsSome then
-            Neo4j.runQuery(
-                query,
-                param,
-                (Term.asTerm("child")),
-                session = session.Value
-            )
-        else
-            Neo4j.runQuery(
-                query,
-                param,
-                (Term.asTerm("child")),
-                credentials.Value
-            )
+        Neo4j.runQuery(query,param,(Term.asTerm("child")),?session=session,?credentials=credentials)
 
     /// This function uses only the parent term accession
     member this.getAllByParent(parentAccession:TermMinimal, ?limit:int) =
@@ -199,20 +278,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 "Accession", box parentAccession.TermAccession
                 if limit.IsSome then "Limit", box limit.Value
             ] |> Some
-        if session.IsSome then
-            Neo4j.runQuery(
-                query,
-                param,
-                (Term.asTerm("child")),
-                session = session.Value
-            )
-        else
-            Neo4j.runQuery(
-                query,
-                param,
-                (Term.asTerm("child")),
-                credentials.Value
-            )
+        Neo4j.runQuery(query,param,(Term.asTerm("child")),?session=session,?credentials=credentials)
 
     static member private byParentQuery_Accession =
         /// 1. Search for fitting terms first (db.index.fulltext.queryNodes, TermName)
@@ -238,20 +304,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 "Accession", box parentAccession; 
                 "Search", box fulltextSearchStr
             ] |> Some
-        if session.IsSome then
-            Neo4j.runQuery(
-                Term.byParentQuery_Accession,
-                param,
-                (Term.asTerm("node")),
-                session = session.Value
-            )
-        else
-            Neo4j.runQuery(
-                Term.byParentQuery_Accession,
-                param,
-                (Term.asTerm("node")),
-                credentials.Value
-            )
+        Neo4j.runQuery(Term.byParentQuery_Accession,param,(Term.asTerm("node")),?session=session,?credentials=credentials)
 
     /// Searchtype defaults to "get child term suggestions with auto complete"
     member this.getByNameAndParent(term:TermMinimal,parent:TermMinimal,?searchType:FullTextSearch) =

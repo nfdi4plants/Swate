@@ -5,15 +5,24 @@ open Feliz.Bulma
 open Browser.Types
 open ARCtrl.ISA
 open Shared
+open Fable.Core.JsInterop
 
 module TermSearchAux =
 
+    let [<Literal>] SelectAreaID = "TermSearch_SelectArea" 
+
+    [<RequireQualifiedAccess>]
+    type SearchIs =
+    | Idle
+    | Running
+    | Done
+
     type SearchState = {
-        Done: bool
+        SearchIs: SearchIs
         Results: TermTypes.Term []
     } with
         static member init() = {
-            Done = false
+            SearchIs = SearchIs.Idle
             Results = [||]
         }
 
@@ -23,33 +32,53 @@ module TermSearchAux =
             setResults searchNameTerms
         }
 
-    let startSearch (
-        inputString: string, 
-        state: OntologyAnnotation, 
-        setState: OntologyAnnotation -> unit,
-        setIsSearching: bool -> unit, 
+    let searchAllByParent(parentTAN: string, setResults: TermTypes.Term [] -> unit) =
+        async {
+            let! terms = Api.api.getAllTermsByParentTerm <| TermTypes.TermMinimal.create "" parentTAN
+            setResults terms
+        }
+
+    let allByParentSearch (
+        parentTAN: string, 
+        setSearchTreeState: SearchState -> unit,
+        setLoading: bool -> unit,
+        stopSearch: unit -> unit,
         debounceStorage: System.Collections.Generic.Dictionary<string,int>,
+        debounceTimer: int
+    ) = 
+        let queryDB() =
+            [
+                async { 
+                    ClickOutsideHandler.AddListener(SelectAreaID, fun e -> stopSearch())
+                }
+                searchAllByParent(parentTAN,fun terms -> setSearchTreeState {Results = terms; SearchIs = SearchIs.Done})
+            ]
+            |> Async.Parallel
+            |> Async.Ignore
+            |> Async.StartImmediate
+        setSearchTreeState <| {Results = [||]; SearchIs = SearchIs.Running}
+        debouncel debounceStorage "TermSearch" debounceTimer setLoading queryDB ()
+
+    let mainSearch (
+        queryString: string, 
         setSearchNameState: SearchState -> unit,
         setLoading: bool -> unit,
+        stopSearch: unit -> unit,
+        debounceStorage: System.Collections.Generic.Dictionary<string,int>,
         debounceTimer: int
     ) =
-        let oa = OntologyAnnotation.fromString(inputString)
-        setState oa
-        if inputString = "" then 
-            setIsSearching false
-            debounceStorage.Clear()
-        else
-            let queryString = inputString.Trim()
-            let startSearch() =
-                [
-                    searchByName(queryString, fun terms -> setSearchNameState {Results = terms; Done = true})
-                ]
-                |> Async.Parallel
-                |> Async.Ignore
-                |> Async.StartImmediate
-            setSearchNameState <| SearchState.init()
-            setIsSearching true
-            debouncel debounceStorage "TermSearch" debounceTimer setLoading startSearch ()
+        let queryDB() =
+            [
+                async { 
+                    ClickOutsideHandler.AddListener(SelectAreaID, fun e -> stopSearch())
+                }
+                searchByName(queryString, fun terms -> setSearchNameState {Results = terms; SearchIs = SearchIs.Done})
+            ]
+            |> Async.Parallel
+            |> Async.Ignore
+            |> Async.StartImmediate
+        setSearchNameState <| SearchState.init()
+        debouncel debounceStorage "TermSearch" debounceTimer setLoading queryDB ()
 
     module Components =
 
@@ -184,37 +213,53 @@ type TermSearch =
             ]
         ]
 
-    static member TermSelectArea (searchNameState: SearchState, setTerm: TermTypes.Term option -> unit, ?show: bool) =
-        let show = defaultArg show true
-        Html.div [
-            prop.classes [
-                if not show then "is-hidden";
-                "term-select-area"; 
-            ]
-            prop.children [
-                match searchNameState with
-                | {Done = true; Results = [||]} ->  
-                    yield! Components.termSeachNoResults
-                | _ ->
-                    for term in searchNameState.Results do
+    static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: TermTypes.Term option -> unit, show: bool) =
+        let matchSearchState (ss: SearchState) =
+            match ss with
+            | {SearchIs = SearchIs.Done; Results = [||]} ->  
+                Components.termSeachNoResults
+            | {SearchIs = SearchIs.Done; Results = results} -> [
+                    for term in results do
                         let setTerm = fun (e: MouseEvent) -> setTerm (Some term)
                         TermSearch.TermSelectItem (term, setTerm)
+                ]
+            | {SearchIs = SearchIs.Running; Results = _ } -> [
+                    Html.div  "loading.."
+                ]
+            | _ -> [
+                    Html.none
+                ]
+        Html.div [
+            prop.id id
+            prop.classes ["term-select-area"; if not show then "is-hidden";]
+            prop.children [
+                yield! matchSearchState searchNameState
+                yield! matchSearchState searchTreeState
             ]
         ]
 
     [<ReactComponent>]
-    static member Input (setter: OntologyAnnotation -> unit, ?input: OntologyAnnotation, ?label: string, ?fullwidth: bool, ?size: IReactProperty) =
+    static member Input (setter: OntologyAnnotation -> unit, ?input: OntologyAnnotation, ?parent: string, ?label: string, ?fullwidth: bool, ?size: IReactProperty) =
         let fullwidth = defaultArg fullwidth false
         let input : OntologyAnnotation = defaultArg input OntologyAnnotation.empty
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
         let searchNameState, setSearchNameState = React.useState(SearchState.init)
+        let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
+        let debounceStorage, setdebounceStorage = React.useState(newDebounceStorage)
+        let parent, setParent = React.useState(parent)
+        let stopSearch() = 
+            debounceStorage.Clear()
+            setIsSearching false
         let selectTerm (t:TermTypes.Term option) =
             let oa = t |> Option.map OntologyAnnotation.fromTerm |> Option.defaultValue OntologyAnnotation.empty
             setState oa
             setIsSearching false
-        let debounceStorage, setdebounceStorage = React.useState(newDebounceStorage)
+        let startSearch(queryString: string) =
+            let oa = OntologyAnnotation.fromString(queryString)
+            setState oa
+            setIsSearching true
         //React.useEffect((fun () -> setState input), dependencies=[|box input|]) // careful, check console. might result in maximum dependency depth error.
         Bulma.field.div [
             prop.style [if fullwidth then style.flexGrow 1]
@@ -234,26 +279,32 @@ type TermSearch =
                                     if size.IsSome then size.Value
                                     prop.valueOrDefault state.NameText
                                     prop.onDoubleClick(fun e ->
-                                        let s : string = e.target?value
-                                        startSearch(s, state, setState, setIsSearching,debounceStorage,setSearchNameState,setLoading,0)
+                                        let sRaw : string = e.target?value
+                                        let s = sRaw.Trim()
+                                        if s = "" && parent.IsSome && parent.Value <> "" then // trigger get all by parent search
+                                            setIsSearching true
+                                            allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage, 0)
+                                        else
+                                            startSearch s
+                                            mainSearch(s, setSearchNameState, setLoading, stopSearch, debounceStorage, 0)
                                     )
                                     prop.onChange(fun (s: string) ->
-                                        startSearch(s, state, setState, setIsSearching,debounceStorage,setSearchNameState,setLoading,1000)
+                                        let s = s.Trim()
+                                        if s = "" then
+                                            stopSearch()
+                                        else
+                                            startSearch s
+                                            mainSearch(s, setSearchNameState, setLoading, stopSearch, debounceStorage, 1000)
                                     )
                                 ]
-                                TermSearch.TermSelectArea (searchNameState, selectTerm, isSearching)
-                                //TermSearch.TermSelectArea([|
-                                //    TermTypes.createTerm "MS:000001" "instrument model" "Lorem ipsum dolor sit amet, consetetur sadipscing elitr" false "ms" 
-                                //    TermTypes.createTerm "MS:000002" "Instrument Model" "Lorem ipsum dolor sit amet, consetetur sadipscing elitr" false "ms"
-                                //    TermTypes.createTerm "MS:000003" "IonSpec instrument model" "" false "ms"
-                                //    TermTypes.createTerm "MS:000004" "Hitachi instrument model Hitachi instrument model Hitachi instrument model Hitachi instrument model Hitachi instrument model" "" false "ms"
-                                //    TermTypes.createTerm "MS:000005" "LECO instrument model" "" true "ms"
-                                //|], setSelectedTerm, show=true)
+                                TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
                                 Components.searchIcon
                                 if state.Name.IsSome && state.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                             ]
                         ]
                     ]
                 ]
+                if parent.IsSome then
+                    Bulma.help [prop.text $"Parent: {parent.Value}"]
             ]
         ]

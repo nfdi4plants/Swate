@@ -8,6 +8,23 @@ open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open ARCtrl
 
+module Helper =
+
+    let getSearchModeFromQuery (query: string) =
+        let searchTextLength = query.Length
+        let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+        searchmode
+
+    let getOntologiesModeFromList (ontologiesList: string list) =
+        if ontologiesList.IsEmpty then
+            None
+        elif ontologiesList.Length = 1 then
+            Term.AnyOfOntology.Single ontologiesList.Head |> Some
+        else
+            Term.AnyOfOntology.Multiples ontologiesList |> Some
+
+open Helper
+
 [<RequireQualifiedAccess>]
 module V3 =
     open ARCtrl.ISA.Regex.ActivePatterns
@@ -17,32 +34,36 @@ module V3 =
             //Development
             getTestNumber = 
                 fun () -> async { return 42 }
-            searchTerms = 
-                fun content -> 
-                    async {
-                        let dbSearchRes =
-                            match content.query with
-                            | TermAnnotationShort taninfo ->
-                                Term.Term(credentials).getByAccession $"{taninfo.IDSpace}:{taninfo.LocalID}"
-                            // This suggests we search for a term name
-                            | notAnAccession ->
-                                let searchTextLength = content.query.Length
-                                let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
-                                let ontologies =
-                                    if content.ontologies.IsEmpty then
-                                        None
-                                    elif content.ontologies.Length = 1 then
-                                        Term.AnyOfOntology.Single content.ontologies.Head |> Some
-                                    else
-                                        Term.AnyOfOntology.Multiples content.ontologies |> Some
-                                Term.Term(credentials).getByName(notAnAccession, searchmode, ?sourceOntologyName = ontologies, limit=content.limit)
-                            |> Array.ofSeq
-                            //|> sorensenDiceSortTerms typedSoFar
-                        //let arr = if dbSearchRes.Length <= content.n then dbSearchRes else Array.take inp.n dbSearchRes
-                        //let arrSorted = sorensenDiceSortTerms inp.query arr 
-                        return dbSearchRes
-                    }
-            
+            searchTerms = fun content -> 
+                async {
+                    let dbSearchRes =
+                        match content.query with
+                        | TermAnnotationShort taninfo ->
+                            Term.Term(credentials).getByAccession $"{taninfo.IDSpace}:{taninfo.LocalID}"
+                        // This suggests we search for a term name
+                        | notAnAccession ->
+                            let searchmode = getSearchModeFromQuery content.query
+                            let ontologies = getOntologiesModeFromList content.ontologies
+                            Term.Term(credentials).getByName(notAnAccession, searchmode, ?sourceOntologyName = ontologies, limit=content.limit)
+                        |> Array.ofSeq
+                    return dbSearchRes
+                }
+            searchTermsByParent = fun content ->
+                async {
+                    let dbSearchRes =
+                        match content.query.Trim() with
+                        | TermAnnotationShort taninfo ->
+                            Term.Term(credentials).getByAccession $"{taninfo.IDSpace}:{taninfo.LocalID}"
+                        | notAnAccession ->
+                            let searchmode = getSearchModeFromQuery notAnAccession
+                            match content.parentTAN.Trim() with
+                            | "" ->
+                                Term.Term(credentials).getByName(notAnAccession, searchmode, limit=content.limit)
+                            | parentTAN ->
+                                Term.Term(credentials).searchByParentStepwise(notAnAccession, parentTAN, searchmode)
+                        |> Array.ofSeq
+                    return dbSearchRes
+                }
         }
 
     let createIOntologyApi credentials =

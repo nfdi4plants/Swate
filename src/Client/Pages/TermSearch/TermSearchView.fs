@@ -253,7 +253,7 @@ let Main (model:Messages.Model) dispatch =
 
         Bulma.label "Search for an ontology term to fill into the selected field(s)"
 
-        Components.TermSearch.Input(setState, fullwidth=true, size=Bulma.input.isLarge)
+        Components.TermSearch.Input(setState, fullwidth=true, size=Bulma.input.isLarge, parent="OBI:0100026")
 
         Html.div state.NameText
 

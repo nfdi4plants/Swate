@@ -144,7 +144,10 @@ type IOntologyAPIv3 = {
     getTestNumber : 
         unit -> Async<int>
     searchTerms: 
-        {| limit: int; query: string; ontologies: string list|} -> Async<Term []>
+        {| limit: int; query: string; ontologies: string list |} -> Async<Term []>
+    /// ontologies currently unused
+    searchTermsByParent:
+        {| limit: int; query: string; parentTAN: string |} -> Async<Term []>
 }
 
 type ITemplateAPIv1 = {
