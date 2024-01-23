@@ -57,15 +57,18 @@ open Elmish.Debug
 open Elmish.HMR
 #endif
 
+//+:cnd:noEmit
 Program.mkProgram Init.init Update.update View
+//-:cnd:noEmit
 #if DEBUG
 |> Program.withConsoleTrace
 #endif
 |> Program.withSubscription ARCitect_subscription
 |> Program.toNavigable (parsePath Routing.Routing.route) Update.urlUpdate
-|> Program.withReactBatched "elmish-app"
+|> Program.withReactSynchronous "elmish-app"
 #if DEBUG
 //|> Program.withDebuggerCoders CustomDebugger.modelEncoder CustomDebugger.modelDecoder
 |> Program.withDebugger
 #endif
+//+:cnd:noEmit
 |> Program.run
