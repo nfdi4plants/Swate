@@ -114,14 +114,15 @@ module private EventPresets =
                         let next = if selectedCells = Set([index]) then Set.empty else Set([index])
                         next
                 UpdateSelectedCells set |> SpreadsheetMsg |> dispatch
-                let oa = 
-                    let columnIndex = set |> Seq.minBy fst |> fst 
-                    let column = model.SpreadsheetModel.ActiveTable.GetColumn(columnIndex)
-                    if column.Header.IsTermColumn then
-                        column.Header.ToTerm() |> Some //ToOA
-                    else
-                        None
-                TermSearch.UpdateParentTerm oa |> TermSearchMsg |> dispatch
+                if not set.IsEmpty then
+                    let oa = 
+                        let columnIndex = set |> Seq.minBy fst |> fst 
+                        let column = model.SpreadsheetModel.ActiveTable.GetColumn(columnIndex)
+                        if column.Header.IsTermColumn then
+                            column.Header.ToTerm() |> Some //ToOA
+                        else
+                            None
+                    TermSearch.UpdateParentTerm oa |> TermSearchMsg |> dispatch
 /////<summary> Only apply this element to SwateCell if header has term. </summary>
 //[<ReactComponent>]
 //let TANCell(index: (int*int), model: Model, dispatch) =

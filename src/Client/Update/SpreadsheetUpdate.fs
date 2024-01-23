@@ -84,10 +84,10 @@ module Spreadsheet =
             | InitFromArcFile arcFile ->
                 let nextState = { Spreadsheet.Model.init() with ArcFile = Some arcFile }
                 nextState, model, Cmd.none
-            | InsertOntologyTerm oa ->
+            | InsertOntologyAnnotation oa ->
                 let nextState = Controller.insertTerm_IntoSelected oa state
                 nextState, model, Cmd.none
-            | InsertOntologyTerms termMinimals ->
+            | InsertOntologyAnnotations oas ->
                 failwith "InsertOntologyTerms not implemented in Spreadsheet.Update"
                 //let cmd = createPromiseCmd <| fun _ -> Controller.insertTerms termMinimals state
                 let cmd = Cmd.none

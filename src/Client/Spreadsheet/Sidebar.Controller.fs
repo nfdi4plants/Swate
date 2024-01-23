@@ -121,7 +121,7 @@ let insertTerm_IntoSelected (term:OntologyAnnotation) (state: Spreadsheet.Model)
         let c = table.TryGetCellAt(colIndex,rowIndex)
         let newCell = 
             match c with
-            | Some cc -> cc
+            | Some cc -> cc.UpdateWithOA term
             | None -> column.GetDefaultEmptyCell().UpdateWithOA term
         table.UpdateCellAt(colIndex,rowIndex, newCell)
     {state with ArcFile = state.ArcFile}

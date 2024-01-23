@@ -92,13 +92,13 @@ module Interface =
                 let cmd = Spreadsheet.UpdateArcFile tables |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | InsertOntologyTerm termMinimal ->
+        | InsertOntologyAnnotation termMinimal ->
             match host with
             //| Swatehost.Excel _ ->
             //    let cmd = OfficeInterop.InsertOntologyTerm termMinimal |> OfficeInteropMsg |> Cmd.ofMsg
             //    model, cmd
             | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                let cmd = Spreadsheet.InsertOntologyTerm termMinimal |> SpreadsheetMsg |> Cmd.ofMsg
+                let cmd = Spreadsheet.InsertOntologyAnnotation termMinimal |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | InsertFileNames fileNames ->

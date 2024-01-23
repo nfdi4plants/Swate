@@ -23,6 +23,78 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 open Feliz
 open Feliz.Bulma
 open ARCtrl.ISA
+open Fable.Core.JsInterop
+
+/// "Fill selected cells with this term" - button //
+let private addButton (model: Messages.Model, dispatch) =
+
+    // For some reason columns seem to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
+    // It would not be full width. This results in the need to remove padding left/right for Column.column childs.
+    Bulma.columns [
+        Bulma.columns.isMobile;
+        prop.style [style.width(length.perc 100); style.marginRight 0; style.marginLeft 0]
+        prop.children [
+            Bulma.column [
+                prop.style [style.paddingLeft 0; if model.TermSearchState.SelectedTerm.IsNone then style.paddingRight 0]
+                // Fill selection confirmation
+                Bulma.field.div [
+                    Bulma.control.div [
+                        Bulma.button.a [
+                            let hasTerm = model.TermSearchState.SelectedTerm.IsSome
+                            if hasTerm then
+                                prop.className "is-success"
+                                //Button.IsActive true
+                            else
+                                prop.className "is-danger"
+                                prop.disabled true
+                            Bulma.button.isFullWidth
+                            prop.onClick (fun _ ->
+                                if hasTerm then
+                                    let oa = model.TermSearchState.SelectedTerm.Value
+                                    SpreadsheetInterface.InsertOntologyAnnotation oa |> InterfaceMsg |> dispatch
+                            )
+                            prop.text "Fill selected cells with this term"
+                        ]
+                    ]
+                ]
+                |> prop.children
+            ]
+            //if model.TermSearchState.SelectedTerm.IsSome then
+            //    Bulma.column [
+            //        prop.className "pr-0"
+            //        Bulma.column.isNarrow
+            //        Bulma.button.a [
+            //            prop.title "Copy to Clipboard"
+            //            Bulma.color.isInfo
+            //            prop.onClick (fun e ->
+            //                // trigger icon response
+            //                CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_termsearch"
+            //                //
+            //                let t = model.TermSearchState.SelectedTerm.Value
+            //                let txt = [t.Name; t.Accession |> Shared.URLs.termAccessionUrlOfAccessionStr; t.Accession.Split(@":").[0] ] |> String.concat System.Environment.NewLine
+            //                let textArea = Browser.Dom.document.createElement "textarea"
+            //                textArea?value <- txt
+            //                textArea?style?top <- "0"
+            //                textArea?style?left <- "0"
+            //                textArea?style?position <- "fixed"
+
+            //                Browser.Dom.document.body.appendChild textArea |> ignore
+
+            //                textArea.focus()
+            //                // Can't belive this actually worked
+            //                textArea?select()
+
+            //                let t = Browser.Dom.document.execCommand("copy")
+            //                Browser.Dom.document.body.removeChild(textArea) |> ignore
+            //                ()
+            //            )
+            //            CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_termsearch" "fa-regular fa-clipboard" "fa-solid fa-check"
+            //            |> prop.children
+            //        ]
+            //        |> prop.children
+            //    ]
+        ]
+    ]
 
 [<ReactComponent>]
 let Main (model:Messages.Model, dispatch) =
@@ -37,7 +109,10 @@ let Main (model:Messages.Model, dispatch) =
 
         Bulma.label "Search for an ontology term to fill into the selected field(s)"
 
-        Components.TermSearch.Input(setTerm, fullwidth=true, size=Bulma.input.isLarge, ?parent'=model.TermSearchState.ParentTerm)
+        mainFunctionContainer [
+            Components.TermSearch.Input(setTerm, fullwidth=true, size=Bulma.input.isLarge, ?parent'=model.TermSearchState.ParentTerm)
+            addButton(model, dispatch)
+        ]
 
         Html.div state.NameText
 
