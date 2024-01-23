@@ -157,24 +157,6 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
             (UnitTermSuggestionResponse >> Response)
             queryString
 
-    | GetNewAdvancedTermSearchResults options ->
-        let currentCall = {
-                FunctionName = "getTermsForAdvancedSearch"
-                Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-
-        nextState,
-        Cmd.OfAsync.either
-            Api.api.getTermsForAdvancedSearch
-            options
-            (AdvancedTermSearchResultsResponse >> Response >> Api)
-            (ApiError >> Api)
-
     | FetchAllOntologies ->
         let currentCall = {
                 FunctionName = "getAllOntologies"
@@ -281,24 +263,6 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         handleUnitTermSuggestionResponse
             (BuildingBlock.Msg.NewUnitTermSuggestions >> BuildingBlockMsg)
             suggestions            
-
-    | AdvancedTermSearchResultsResponse results ->
-        let finishedCall = {
-            currentState.currentCall with
-                Status = Successfull
-        }
-
-        let nextState = {
-            currentCall = ApiState.noCall
-            callHistory = finishedCall::currentState.callHistory
-        }
-
-        let cmds = Cmd.batch [
-            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            results |> AdvancedSearch.NewAdvancedSearchResults |> AdvancedSearchMsg |> Cmd.ofMsg
-        ]
-
-        nextState, cmds
 
     | FetchAllOntologiesResponse onts ->
         let finishedCall = {
@@ -561,16 +525,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             }
             nextModel,nextCmd
 
-        | AdvancedSearchMsg advancedSearchMsg ->
-            let nextAdvancedSearchState,nextCmd =
-                currentModel.AdvancedSearchState
-                |> SidebarComponents.AdvancedSearch.update advancedSearchMsg
-
-            let nextModel = {
-                currentModel with
-                    AdvancedSearchState = nextAdvancedSearchState
-            }
-            nextModel,nextCmd
         | DevMsg msg ->
             let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
         

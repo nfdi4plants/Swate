@@ -98,23 +98,19 @@ let private addButton (model: Messages.Model, dispatch) =
 
 [<ReactComponent>]
 let Main (model:Messages.Model, dispatch) =
-    let state, setState = React.useState(OntologyAnnotation.empty)
     let setTerm = fun (term: OntologyAnnotation option) -> TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
     div [
         OnSubmit    (fun e -> e.preventDefault())
         OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
     ] [
-
         pageHeader "Ontology term search"
 
         Bulma.label "Search for an ontology term to fill into the selected field(s)"
 
         mainFunctionContainer [
-            Components.TermSearch.Input(setTerm, fullwidth=true, size=Bulma.input.isLarge, ?parent'=model.TermSearchState.ParentTerm)
+            Components.TermSearch.Input(setTerm, fullwidth=true, size=Bulma.input.isLarge, ?parent'=model.TermSearchState.ParentTerm, showAdvancedSearch=true)
             addButton(model, dispatch)
         ]
-
-        Html.div state.NameText
 
         //simpleSearchComponent model dispatch
 

@@ -267,9 +267,10 @@ type TermSearch =
         ]
 
     [<ReactComponent>]
-    static member Input (setter: OntologyAnnotation option -> unit, ?input: OntologyAnnotation, ?parent': OntologyAnnotation, ?label: string, ?fullwidth: bool, ?size: IReactProperty) =
+    static member Input (setter: OntologyAnnotation option -> unit, ?input: OntologyAnnotation, ?parent': OntologyAnnotation, ?label: string, ?fullwidth: bool, ?size: IReactProperty, ?showAdvancedSearch: bool) =
+        let showAdvancedSearch = defaultArg showAdvancedSearch false
+        let advancedSearchActive, setAdvancedSearchActive = React.useState(false)
         let fullwidth = defaultArg fullwidth false
-        let input : OntologyAnnotation = defaultArg input OntologyAnnotation.empty
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
         let searchNameState, setSearchNameState = React.useState(SearchState.init)
@@ -285,15 +286,13 @@ type TermSearch =
             setSearchNameState {searchNameState with SearchIs = SearchIs.Idle}
         let selectTerm (t:TermTypes.Term option) =
             let oaOpt = t |> Option.map OntologyAnnotation.fromTerm 
-            let oa = oaOpt |> Option.defaultValue OntologyAnnotation.empty
-            setState oa
+            setState oaOpt
             setter oaOpt
             setIsSearching false
         let startSearch(queryString: string option) =
             let oaOpt = queryString |> Option.map (fun s -> OntologyAnnotation.fromString(s) )
-            let oa = oaOpt |> Option.defaultValue OntologyAnnotation.empty
             setter oaOpt
-            setState oa
+            setState oaOpt
             setSearchNameState <| SearchState.init()
             setSearchTreeState <| SearchState.init()
             setIsSearching true
@@ -311,19 +310,21 @@ type TermSearch =
                     prop.children [
                         Bulma.input.text [
                             if size.IsSome then size.Value
-                            prop.valueOrDefault state.NameText
+                            if state.IsSome then prop.valueOrDefault state.Value.NameText
                             prop.onDoubleClick(fun e ->
                                 let s : string = e.target?value
                                 if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
-                                    setIsSearching true
+                                    startSearch(None)
                                     allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage, 0)
-                                else
+                                elif s.Trim() <> "" then
                                     startSearch (Some s)
                                     mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage, 0)
+                                else 
+                                    ()
                             )
                             prop.onChange(fun (s: string) ->
                                 if s.Trim() = "" then
-                                    startSearch (Some s)
+                                    startSearch(None)
                                     stopSearch()
                                 else
                                     startSearch (Some s)
@@ -332,13 +333,28 @@ type TermSearch =
                         ]
                         TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
                         Components.searchIcon
-                        if state.Name.IsSome && state.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
+                        if state.IsSome && state.Value.Name.IsSome && state.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                     ]
                 ]
                 if parent.IsSome then 
                     Bulma.help [
                         Html.span "Parent: "
                         Html.span $"{parent.Value.NameText}, {parent.Value.TermAccessionShort}"
+                    ]
+                if showAdvancedSearch then
+                    SharedComponents.AdvancedSearch.Main(advancedSearchActive, setAdvancedSearchActive, fun t -> 
+                        setAdvancedSearchActive false
+                        Some t |> selectTerm
+                    )
+                    Html.div [
+                        prop.classes ["is-flex"]
+                        prop.children [
+                            Html.a [
+                                prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); setAdvancedSearchActive true)
+                                prop.style [style.custom("marginLeft","auto")]
+                                prop.text "Use advanced search"
+                            ]   
+                        ]
                     ]
             ]
         ]

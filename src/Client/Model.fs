@@ -113,7 +113,7 @@ module AdvancedSearch =
         AdvancedSearchOptions               : AdvancedSearchTypes.AdvancedSearchOptions
         AdvancedSearchTermResults           : Term []
         // Client visual design
-        AdvancedTermSearchSubpage           : AdvancedSearchSubpages
+        Subpage           : AdvancedSearchSubpages
         HasModalVisible                     : bool
         HasOntologyDropdownVisible          : bool
         HasAdvancedSearchResultsLoading     : bool
@@ -125,7 +125,7 @@ module AdvancedSearch =
             AdvancedSearchOptions               = AdvancedSearchTypes.AdvancedSearchOptions.init ()
             AdvancedSearchTermResults           = [||]
             HasAdvancedSearchResultsLoading     = false
-            AdvancedTermSearchSubpage           = InputFormSubpage
+            Subpage                             = InputFormSubpage
         }
         static member BuildingBlockHeaderId = "BuildingBlockHeader_ATS_Id"
         static member BuildingBlockBodyId = "BuildingBlockBody_ATS_Id"

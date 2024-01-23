@@ -37,7 +37,7 @@ module private AutocompleteComponents =
                     Html.td [
                         prop.onClick ( fun e -> e.stopPropagation())
                         prop.style [style.fontWeight.lighter]
-                        prop.children [SidebarComponents.AdvancedSearch.createLinkOfAccession term.Accession]  
+                        //prop.children [SidebarComponents.AdvancedSearch.createLinkOfAccession term.Accession]  
                     ]
                     // Cytoscape graph tree view
                     Html.td [

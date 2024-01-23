@@ -36,21 +36,6 @@ module TermSearch =
         | UpdateSelectedTerm of OntologyAnnotation option 
         | UpdateParentTerm of OntologyAnnotation option
 
-module AdvancedSearch =
-
-    type Msg =
-        // Client - UI
-        | ToggleModal                       of string
-        | ToggleOntologyDropdown
-        | UpdateAdvancedTermSearchSubpage   of AdvancedSearch.AdvancedSearchSubpages
-        // Client
-        | ResetAdvancedSearchState
-        | UpdateAdvancedTermSearchOptions   of AdvancedSearchTypes.AdvancedSearchOptions
-        // Server
-        /// Main function. Forward request to Request Api -> Server.
-        | StartAdvancedSearch
-        | NewAdvancedSearchResults          of Term []
-
 type DevMsg =
     | LogTableMetadata
     | GenericLog            of Cmd<Messages.Msg> * (string*string)
@@ -60,7 +45,6 @@ type DevMsg =
     
 type ApiRequestMsg =
     | GetNewUnitTermSuggestions                 of string
-    | GetNewAdvancedTermSearchResults           of AdvancedSearchTypes.AdvancedSearchOptions
     | FetchAllOntologies
     /// TermSearchable [] is created by officeInterop and passed to server for db search.
     | SearchForInsertTermsRequest              of TermSearchable []
@@ -68,7 +52,6 @@ type ApiRequestMsg =
     | GetAppVersion
 
 type ApiResponseMsg =
-    | AdvancedTermSearchResultsResponse         of Term []
     | UnitTermSuggestionResponse                of Term []
     | FetchAllOntologiesResponse                of Ontology []
     | SearchForInsertTermsResponse              of TermSearchable []  
@@ -188,7 +171,6 @@ type Msg =
 | Api                   of ApiMsg
 | DevMsg                of DevMsg
 | TermSearchMsg         of TermSearch.Msg
-| AdvancedSearchMsg     of AdvancedSearch.Msg
 | OfficeInteropMsg      of OfficeInterop.Msg
 | PersistentStorage     of PersistentStorageMsg
 | FilePickerMsg         of FilePicker.Msg
