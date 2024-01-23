@@ -33,14 +33,8 @@ let curry f a b = f (a,b)
 module TermSearch =
 
     type Msg =
-        | ToggleSearchByParentOntology
-        | SearchTermTextChange                  of searchString:string * parentTerm: TermMinimal option
-        | TermSuggestionUsed                    of Term
-        | NewSuggestions                        of Term []
-        | StoreParentOntologyFromOfficeInterop  of TermMinimal option
-        // Server
-        | GetAllTermsByParentTermRequest        of TermMinimal 
-        | GetAllTermsByParentTermResponse       of Term []
+        | UpdateSelectedTerm of OntologyAnnotation option 
+        | UpdateParentTerm of OntologyAnnotation option
 
 module AdvancedSearch =
 
@@ -65,8 +59,6 @@ type DevMsg =
     | UpdateDisplayLogList  of LogItem list
     
 type ApiRequestMsg =
-    | GetNewTermSuggestions                     of string
-    | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
     | GetNewUnitTermSuggestions                 of string
     | GetNewAdvancedTermSearchResults           of AdvancedSearchTypes.AdvancedSearchOptions
     | FetchAllOntologies
@@ -76,7 +68,6 @@ type ApiRequestMsg =
     | GetAppVersion
 
 type ApiResponseMsg =
-    | TermSuggestionResponse                    of Term []
     | AdvancedTermSearchResultsResponse         of Term []
     | UnitTermSuggestionResponse                of Term []
     | FetchAllOntologiesResponse                of Ontology []
@@ -107,16 +98,8 @@ module BuildingBlock =
     open TermSearch
 
     type Msg =
-    | UpdateHeaderSearchText of string
-    | GetHeaderSuggestions of string*TermSearchUIController
-    | GetHeaderSuggestionsResponse of Term []*TermSearchUIController
     | SelectHeader of CompositeHeader
-    | UpdateBodySearchText of string
-    | GetBodySuggestions of string*TermSearchUIController
-    | GetBodySuggestionsByParent of string*TermMinimal*TermSearchUIController
     /// Returns all child terms
-    | GetBodyTermsByParent of TermMinimal*TermSearchUIController
-    | GetBodySuggestionsResponse of Term []*TermSearchUIController
     | SelectBodyCell of CompositeCell option
     // Below everything is more or less deprecated
     // Is still used for unit update in office

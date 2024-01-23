@@ -132,8 +132,7 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
             ResizeObserver.observer(state, setState).observe(ele)
         )
         OnClick (fun e ->
-            if model.TermSearchState.ShowSuggestions
-                || model.AddBuildingBlockState.ShowUnit2TermSuggestions
+            if model.AddBuildingBlockState.ShowUnit2TermSuggestions
             then
                 TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
         )
@@ -155,7 +154,7 @@ module private Content =
             BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
         | Routing.Route.TermSearch ->
-            TermSearch.Main model dispatch
+            TermSearch.Main (model, dispatch)
 
         | Routing.Route.FilePicker ->
             FilePicker.filePickerComponent model dispatch

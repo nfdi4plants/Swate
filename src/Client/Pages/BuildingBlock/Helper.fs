@@ -36,7 +36,7 @@ let selectBody (body: CompositeCell) =
 
 let hasVerifiedTermHeader (header: CompositeHeader) = header.IsTermColumn && header.ToTerm().TermAccessionShort <> ""
 
-let hasVerifiedCell (cell: CompositeCell) = (cell.isTerm || cell.isUnitized) && cell.ToTerm().TermAccessionShort <> ""
+let hasVerifiedCell (cell: CompositeCell) = (cell.isTerm || cell.isUnitized) && cell.ToOA().TermAccessionShort <> ""
 
 let isValidColumn (header : CompositeHeader) =
     header.IsFeaturedColumn 

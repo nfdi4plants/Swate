@@ -89,30 +89,39 @@ let private basicValueDisplayCell (v: string) =
 
 module private EventPresets =
 
-    let onClickSelect (index: int*int, state_cell, selectedCells: Set<int*int>, dispatch)=
+    open Shared
+
+    let onClickSelect (index: int*int, state_cell, selectedCells: Set<int*int>, model:Messages.Model, dispatch)=
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
             if not state_cell.Active then
-                match e.ctrlKey with
-                | true ->
-                    let createSetOfIndex (columnMin:int, columnMax, rowMin:int, rowMax: int) =
-                        [
-                            for c in columnMin .. columnMax do
-                                for r in rowMin .. rowMax do
-                                    c, r
-                        ] |> Set.ofList
-                    let source = selectedCells.MinimumElement
-                    let target = index
-                    let columnMin, columnMax = System.Math.Min(fst source, fst target), System.Math.Max(fst source, fst target)
-                    let rowMin, rowMax = System.Math.Min(snd source, snd target), System.Math.Max(snd source, snd target)
-                    let set = createSetOfIndex (columnMin,columnMax,rowMin,rowMax)
-                    UpdateSelectedCells set |> SpreadsheetMsg |> dispatch
-                | false ->
-                    let next = if selectedCells = Set([index]) then Set.empty else Set([index])
-                    UpdateSelectedCells next |> SpreadsheetMsg |> dispatch
-            else
-                ()
-            
+                let set = 
+                    match e.ctrlKey with
+                    | true ->
+                        let createSetOfIndex (columnMin:int, columnMax, rowMin:int, rowMax: int) =
+                            [
+                                for c in columnMin .. columnMax do
+                                    for r in rowMin .. rowMax do
+                                        c, r
+                            ] |> Set.ofList
+                        let source = selectedCells.MinimumElement
+                        let target = index
+                        let columnMin, columnMax = System.Math.Min(fst source, fst target), System.Math.Max(fst source, fst target)
+                        let rowMin, rowMax = System.Math.Min(snd source, snd target), System.Math.Max(snd source, snd target)
+                        let set = createSetOfIndex (columnMin,columnMax,rowMin,rowMax)
+                        set
+                    | false ->
+                        let next = if selectedCells = Set([index]) then Set.empty else Set([index])
+                        next
+                UpdateSelectedCells set |> SpreadsheetMsg |> dispatch
+                let oa = 
+                    let columnIndex = set |> Seq.minBy fst |> fst 
+                    let column = model.SpreadsheetModel.ActiveTable.GetColumn(columnIndex)
+                    if column.Header.IsTermColumn then
+                        column.Header.ToTerm() |> Some //ToOA
+                    else
+                        None
+                TermSearch.UpdateParentTerm oa |> TermSearchMsg |> dispatch
 /////<summary> Only apply this element to SwateCell if header has term. </summary>
 //[<ReactComponent>]
 //let TANCell(index: (int*int), model: Model, dispatch) =
@@ -354,7 +363,7 @@ let BodyCell(index: (int*int), state_extend: Set<int>, setState_extend, model: M
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     if not state_cell.Active then setState_cell {state_cell with Active = true}
                 )
-                prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
+                prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, model, dispatch)
                 prop.children [
                     if state_cell.Active then
                         /// Update change to mainState and exit active input.
@@ -368,7 +377,7 @@ let BodyCell(index: (int*int), state_extend: Set<int>, setState_extend, model: M
                     else
                         let displayName =
                             if cell.isUnitized then
-                                let oaName = cell.ToTerm().NameText
+                                let oaName = cell.ToOA().NameText
                                 let unitizedValue = if cellValue = "" then "" else cellValue + " " + oaName
                                 unitizedValue
                             else

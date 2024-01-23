@@ -80,7 +80,6 @@
         <Compile Include="SidebarComponents\AnnotationTableMissingWarning.fs" />
         <Compile Include="SidebarComponents\Navbar.fs" />
         <Compile Include="SidebarComponents\AdvancedSearch.fs" />
-        <Compile Include="SidebarComponents\AutocompleteSearch.fs" />
         <Compile Include="Pages\Cytoscape\CytoscapeGraph.fs" />
         <Compile Include="Pages\Cytoscape\CytoscapeUpdate.fs" />
         <Compile Include="Pages\BuildingBlock\Helper.fs" />

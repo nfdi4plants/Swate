@@ -30,11 +30,14 @@ let View (model : Model) (dispatch : Msg -> unit) =
     let (colorstate, setColorstate) = React.useState(LocalStorage.Darkmode.State.init)
     let v = {colorstate with SetTheme = setColorstate}
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
-        match model.PersistentStorageState.Host with
-        | Some Swatehost.Excel ->
-            SidebarView.SidebarView model dispatch
-        | _ ->
-            split_container model dispatch
+        Html.div [
+            Html.div [prop.id "modal-container"]
+            match model.PersistentStorageState.Host with
+            | Some Swatehost.Excel ->
+                SidebarView.SidebarView model dispatch
+            | _ ->
+                split_container model dispatch
+        ]
     )
             
 let ARCitect_subscription (initial: Messages.Model) : (SubId * Subscribe<Messages.Msg>) list =

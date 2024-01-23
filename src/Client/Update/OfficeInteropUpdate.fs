@@ -110,7 +110,7 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.getParentTerm
                     ()
-                    (TermSearch.StoreParentOntologyFromOfficeInterop >> TermSearchMsg)
+                    (fun tmin -> tmin |> Option.map (fun t -> ARCtrl.ISA.OntologyAnnotation.fromTerm t.toTerm) |> TermSearch.UpdateParentTerm |> TermSearchMsg)
                     (curry GenericError Cmd.none >> DevMsg)
             currentModel, cmd
         //

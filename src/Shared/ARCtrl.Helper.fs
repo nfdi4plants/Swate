@@ -82,7 +82,7 @@ module Extensions =
             | CompositeCell.Unitized (v,_) -> CompositeCell.createUnitized (v,oa)
             | CompositeCell.FreeText _ -> CompositeCell.createFreeText oa.NameText
 
-        member this.ToTerm() =
+        member this.ToOA() =
             match this with
             | CompositeCell.Term oa -> oa
             | CompositeCell.Unitized (v, oa) -> oa

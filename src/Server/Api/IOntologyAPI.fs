@@ -60,7 +60,7 @@ module V3 =
                             | "" ->
                                 Term.Term(credentials).getByName(notAnAccession, searchmode, limit=content.limit)
                             | parentTAN ->
-                                Term.Term(credentials).searchByParentStepwise(notAnAccession, parentTAN, searchmode)
+                                Term.Term(credentials).searchByParentStepwise(notAnAccession, parentTAN, searchmode, limit=content.limit)
                         |> Array.ofSeq
                     return dbSearchRes
                 }

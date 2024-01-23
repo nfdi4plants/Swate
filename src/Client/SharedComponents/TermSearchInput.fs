@@ -26,10 +26,16 @@ module TermSearchAux =
             Results = [||]
         }
 
-    let searchByName(name: string, setResults: TermTypes.Term [] -> unit) =
+    let searchByName(query: string, setResults: TermTypes.Term [] -> unit) =
         async {
-            let! searchNameTerms = Api.ontology.searchTerms {|limit = 5; ontologies = []; query=name|}
-            setResults searchNameTerms
+            let! terms = Api.ontology.searchTerms {|limit = 5; ontologies = []; query=query|}
+            setResults terms
+        }
+
+    let searchByParent(query: string, parentTAN: string, setResults: TermTypes.Term [] -> unit) =
+        async {
+            let! terms = Api.ontology.searchTermsByParent {|limit = 50; parentTAN = parentTAN; query = query|}
+            setResults terms
         }
 
     let searchAllByParent(parentTAN: string, setResults: TermTypes.Term [] -> unit) =
@@ -39,7 +45,7 @@ module TermSearchAux =
         }
 
     let allByParentSearch (
-        parentTAN: string, 
+        parent: OntologyAnnotation, 
         setSearchTreeState: SearchState -> unit,
         setLoading: bool -> unit,
         stopSearch: unit -> unit,
@@ -51,7 +57,7 @@ module TermSearchAux =
                 async { 
                     ClickOutsideHandler.AddListener(SelectAreaID, fun e -> stopSearch())
                 }
-                searchAllByParent(parentTAN,fun terms -> setSearchTreeState {Results = terms; SearchIs = SearchIs.Done})
+                searchAllByParent(parent.TermAccessionShort,fun terms -> setSearchTreeState {Results = terms; SearchIs = SearchIs.Done})
             ]
             |> Async.Parallel
             |> Async.Ignore
@@ -61,7 +67,9 @@ module TermSearchAux =
 
     let mainSearch (
         queryString: string, 
+        parent: OntologyAnnotation option,
         setSearchNameState: SearchState -> unit,
+        setSearchTreeState: SearchState -> unit,
         setLoading: bool -> unit,
         stopSearch: unit -> unit,
         debounceStorage: System.Collections.Generic.Dictionary<string,int>,
@@ -72,7 +80,8 @@ module TermSearchAux =
                 async { 
                     ClickOutsideHandler.AddListener(SelectAreaID, fun e -> stopSearch())
                 }
-                searchByName(queryString, fun terms -> setSearchNameState {Results = terms; SearchIs = SearchIs.Done})
+                searchByName(queryString, fun terms -> setSearchNameState {Results = terms; SearchIs = SearchIs.Done })
+                if parent.IsSome then searchByParent(queryString, parent.Value.TermAccessionShort, fun terms -> setSearchTreeState {Results = terms; SearchIs = SearchIs.Done })
             ]
             |> Async.Parallel
             |> Async.Ignore
@@ -128,11 +137,18 @@ module TermSearchAux =
                 ]
             ]
 
-        let termSelectItemMain (term: TermTypes.Term, show, setShow, setTerm) = 
+        let termSelectItemMain (term: TermTypes.Term, show, setShow, setTerm, isDirectedSearchResult: bool) = 
             Html.div [
                 prop.classes ["is-flex"; "is-flex-direction-row"; "term-select-item-main"]
                 prop.onClick setTerm
+                prop.style [style.position.relative]
                 prop.children [
+                    Html.i [
+                        prop.style [style.width (length.px 20)]
+                        if isDirectedSearchResult then 
+                            prop.classes ["fa-solid fa-share-nodes"; "is-flex"; "is-align-items-center"]
+                            prop.title "Related Term"
+                    ]
                     Html.div [
                         prop.classes ["has-text-weight-bold"]
                         prop.style [style.flexGrow 1; style.textOverflow.ellipsis; style.whitespace.nowrap; style.overflow.hidden]
@@ -202,26 +218,38 @@ open Fable.Core.JsInterop
 type TermSearch =
 
     [<ReactComponent>]
-    static member TermSelectItem (term: TermTypes.Term, setTerm) =
+    static member TermSelectItem (term: TermTypes.Term, setTerm, ?isDirectedSearchResult: bool) =
+        let isDirectedSearchResult = defaultArg isDirectedSearchResult false
         let show, setShow = React.useState(false)
         Html.div [
             prop.key $"TermSelectItem_{term.Accession}"
             prop.classes ["term-select-item"]
             prop.children [
-                Components.termSelectItemMain(term, show, setShow, setTerm)
+                Components.termSelectItemMain(term, show, setShow, setTerm, isDirectedSearchResult)
                 Components.termSelectItemMore(term, show)
             ]
         ]
 
     static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: TermTypes.Term option -> unit, show: bool) =
-        let matchSearchState (ss: SearchState) =
+        let searchesAreComplete = searchNameState.SearchIs = SearchIs.Done && searchTreeState.SearchIs = SearchIs.Done
+        let foundInBoth (term:TermTypes.Term) =
+            (searchTreeState.Results |> Array.contains term)
+            && (searchNameState.Results |> Array.contains term)
+        let matchSearchState (ss: SearchState) (isDirectedSearch: bool) =
             match ss with
-            | {SearchIs = SearchIs.Done; Results = [||]} ->  
+            | {SearchIs = SearchIs.Done; Results = [||]} when not isDirectedSearch ->  
                 Components.termSeachNoResults
             | {SearchIs = SearchIs.Done; Results = results} -> [
                     for term in results do
                         let setTerm = fun (e: MouseEvent) -> setTerm (Some term)
-                        TermSearch.TermSelectItem (term, setTerm)
+                        // Term is found in both: Do not show in real directed search, update first search hit instead
+                        if searchesAreComplete && foundInBoth term then 
+                            if isDirectedSearch then
+                                Html.none
+                            else
+                                TermSearch.TermSelectItem (term, setTerm, true)
+                        else
+                            TermSearch.TermSelectItem (term, setTerm, isDirectedSearch)
                 ]
             | {SearchIs = SearchIs.Running; Results = _ } -> [
                     Html.div  "loading.."
@@ -233,13 +261,13 @@ type TermSearch =
             prop.id id
             prop.classes ["term-select-area"; if not show then "is-hidden";]
             prop.children [
-                yield! matchSearchState searchNameState
-                yield! matchSearchState searchTreeState
+                yield! matchSearchState searchNameState false
+                yield! matchSearchState searchTreeState true
             ]
         ]
 
     [<ReactComponent>]
-    static member Input (setter: OntologyAnnotation -> unit, ?input: OntologyAnnotation, ?parent: string, ?label: string, ?fullwidth: bool, ?size: IReactProperty) =
+    static member Input (setter: OntologyAnnotation option -> unit, ?input: OntologyAnnotation, ?parent': OntologyAnnotation, ?label: string, ?fullwidth: bool, ?size: IReactProperty) =
         let fullwidth = defaultArg fullwidth false
         let input : OntologyAnnotation = defaultArg input OntologyAnnotation.empty
         let loading, setLoading = React.useState(false)
@@ -248,63 +276,69 @@ type TermSearch =
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
         let debounceStorage, setdebounceStorage = React.useState(newDebounceStorage)
-        let parent, setParent = React.useState(parent)
+        let parent, setParent = React.useState(parent')
         let stopSearch() = 
             debounceStorage.Clear()
+            setLoading false
             setIsSearching false
+            setSearchTreeState {searchTreeState with SearchIs = SearchIs.Idle}
+            setSearchNameState {searchNameState with SearchIs = SearchIs.Idle}
         let selectTerm (t:TermTypes.Term option) =
-            let oa = t |> Option.map OntologyAnnotation.fromTerm |> Option.defaultValue OntologyAnnotation.empty
+            let oaOpt = t |> Option.map OntologyAnnotation.fromTerm 
+            let oa = oaOpt |> Option.defaultValue OntologyAnnotation.empty
             setState oa
+            setter oaOpt
             setIsSearching false
-        let startSearch(queryString: string) =
-            let oa = OntologyAnnotation.fromString(queryString)
+        let startSearch(queryString: string option) =
+            let oaOpt = queryString |> Option.map (fun s -> OntologyAnnotation.fromString(s) )
+            let oa = oaOpt |> Option.defaultValue OntologyAnnotation.empty
+            setter oaOpt
             setState oa
+            setSearchNameState <| SearchState.init()
+            setSearchTreeState <| SearchState.init()
             setIsSearching true
-        //React.useEffect((fun () -> setState input), dependencies=[|box input|]) // careful, check console. might result in maximum dependency depth error.
+        React.useEffect((fun () -> setParent parent'), dependencies=[|box parent'|]) // careful, check console. might result in maximum dependency depth error.
         Bulma.field.div [
             prop.style [if fullwidth then style.flexGrow 1]
             prop.children [
                 if label.IsSome then Bulma.label label.Value
-                Bulma.field.div [
-                    Bulma.field.hasAddons
+                Bulma.control.div [
+                    if size.IsSome then size.Value
+                    Bulma.control.hasIconsLeft
+                    Bulma.control.hasIconsRight
+                    prop.style [if fullwidth then style.flexGrow 1; style.position.relative]
+                    if loading then Bulma.control.isLoading
                     prop.children [
-                        Bulma.control.div [
+                        Bulma.input.text [
                             if size.IsSome then size.Value
-                            Bulma.control.hasIconsLeft
-                            Bulma.control.hasIconsRight
-                            prop.style [if fullwidth then style.flexGrow 1; style.position.relative]
-                            if loading then Bulma.control.isLoading
-                            prop.children [
-                                Bulma.input.text [
-                                    if size.IsSome then size.Value
-                                    prop.valueOrDefault state.NameText
-                                    prop.onDoubleClick(fun e ->
-                                        let sRaw : string = e.target?value
-                                        let s = sRaw.Trim()
-                                        if s = "" && parent.IsSome && parent.Value <> "" then // trigger get all by parent search
-                                            setIsSearching true
-                                            allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage, 0)
-                                        else
-                                            startSearch s
-                                            mainSearch(s, setSearchNameState, setLoading, stopSearch, debounceStorage, 0)
-                                    )
-                                    prop.onChange(fun (s: string) ->
-                                        let s = s.Trim()
-                                        if s = "" then
-                                            stopSearch()
-                                        else
-                                            startSearch s
-                                            mainSearch(s, setSearchNameState, setLoading, stopSearch, debounceStorage, 1000)
-                                    )
-                                ]
-                                TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
-                                Components.searchIcon
-                                if state.Name.IsSome && state.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
-                            ]
+                            prop.valueOrDefault state.NameText
+                            prop.onDoubleClick(fun e ->
+                                let s : string = e.target?value
+                                if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
+                                    setIsSearching true
+                                    allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage, 0)
+                                else
+                                    startSearch (Some s)
+                                    mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage, 0)
+                            )
+                            prop.onChange(fun (s: string) ->
+                                if s.Trim() = "" then
+                                    startSearch (Some s)
+                                    stopSearch()
+                                else
+                                    startSearch (Some s)
+                                    mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage, 1000)
+                            )
                         ]
+                        TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
+                        Components.searchIcon
+                        if state.Name.IsSome && state.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                     ]
                 ]
-                if parent.IsSome then
-                    Bulma.help [prop.text $"Parent: {parent.Value}"]
+                if parent.IsSome then 
+                    Bulma.help [
+                        Html.span "Parent: "
+                        Html.span $"{parent.Value.NameText}, {parent.Value.TermAccessionShort}"
+                    ]
             ]
         ]

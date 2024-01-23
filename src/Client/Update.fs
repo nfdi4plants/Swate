@@ -151,19 +151,6 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
     match reqMsg with
 
-    | GetNewTermSuggestions queryString ->
-        handleTermSuggestionRequest
-            "getTermSuggestions"
-            (TermSuggestionResponse >> Response)
-            queryString
-
-    | GetNewTermSuggestionsByParentTerm (queryString,parentOntology) ->
-        handleTermSuggestionByParentTermRequest
-            "getTermSuggestionsByParentOntology"
-            (TermSuggestionResponse >> Response)
-            queryString
-            parentOntology
-
     | GetNewUnitTermSuggestions (queryString) ->
         handleUnitTermSuggestionRequest
             "getUnitTermSuggestions"
@@ -289,12 +276,6 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         nextState, cmds
 
     match resMsg with
-    | TermSuggestionResponse suggestions ->
-
-        handleTermSuggestionResponse
-            (TermSearch.NewSuggestions >> TermSearchMsg)
-            suggestions
-
     | UnitTermSuggestionResponse (suggestions) ->
 
         handleUnitTermSuggestionResponse
@@ -469,10 +450,6 @@ let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * 
     | CloseSuggestions ->
         let nextModel = {
             currentModel with
-                TermSearchState = {
-                    currentModel.TermSearchState with
-                        ShowSuggestions = false
-                }
                 AddBuildingBlockState = {
                     currentModel.AddBuildingBlockState with
                         ShowUnit2TermSuggestions = false

@@ -89,42 +89,16 @@ type LogItem =
 
 module TermSearch =
 
-    type TermSearchUIState = {
-        SearchIsActive          : bool
-        SearchIsLoading         : bool
-    } with
-        static member init() = {
-            SearchIsActive          = false
-            SearchIsLoading         = false
-        }
-
-    type TermSearchUIController = {
-        state: TermSearchUIState
-        setState: TermSearchUIState -> unit
-    }
+    open ARCtrl.ISA
 
     type Model = {
-
-        TermSearchText          : string
-
-        SelectedTerm            : Term option
-        TermSuggestions         : Term []
-
-        ParentOntology          : TermMinimal option
-        SearchByParentOntology  : bool
-
-        HasSuggestionsLoading   : bool
-        ShowSuggestions         : bool
+        SelectedTerm            : OntologyAnnotation option
+        ParentTerm              : OntologyAnnotation option
 
     } with
         static member init () = {
-            TermSearchText              = ""
             SelectedTerm                = None
-            TermSuggestions             = [||]
-            ParentOntology              = None
-            SearchByParentOntology      = true
-            HasSuggestionsLoading       = false
-            ShowSuggestions             = false
+            ParentTerm                  = None
         }
 
 module AdvancedSearch =
