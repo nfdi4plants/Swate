@@ -90,6 +90,5 @@ docker
     test                            Start test instance of docker compose network from swate:new image
 
 version
-
     create-file <version>           Create new `src/Server/Version.fs` with `<version>`.
 ```

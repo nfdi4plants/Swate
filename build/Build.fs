@@ -401,8 +401,8 @@ let main args =
         Tests.Run()
         match a with
         | "pre" :: a -> 
-            //Release.SetPrereleaseTag()
-            //Release.CreatePrereleaseTag()
+            Release.SetPrereleaseTag()
+            Release.CreatePrereleaseTag()
             let version = Release.GetLatestGitTag()
             ReleaseNoteTasks.createVersionFile(version)
             Release.ForcePushNightly()
