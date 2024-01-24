@@ -325,7 +325,6 @@ let private protocolElement i (template:ARCtrl.Template.Template) (model:Model) 
             prop.classes [ "nonSelectText"; if isActive then "hoverTableEle"]
             prop.style [
                 style.cursor.pointer; style.userSelect.none;
-                style.color "white"
             ]
             prop.onClick (fun e ->
                 e.preventDefault()

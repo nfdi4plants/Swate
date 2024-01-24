@@ -17,59 +17,29 @@ open Elmish
 
 let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
     match addBuildingBlockMsg with
-    | UpdateHeaderSearchText str ->
-        let nextState = {state with HeaderSearchText = str}
+    | UpdateBodyArg next ->
+        let nextState = { state with BodyArg = next }
         nextState, Cmd.none
-    | GetHeaderSuggestions (queryString,uiSetter) ->
-        let cmd = 
-            Cmd.OfAsync.either
-                Api.api.getTermSuggestions
-                {|n= 5; query = queryString; ontology = None|}
-                (fun t -> GetHeaderSuggestionsResponse (t,uiSetter) |> BuildingBlockMsg)
-                (curry GenericError Cmd.none >> DevMsg)
-        state, cmd
-    | GetHeaderSuggestionsResponse (termSuggestions, uiSetter) ->
-        let nextState = { state with HeaderSearchResults = termSuggestions }
-        let state, setState = uiSetter.state, uiSetter.setState
-        setState {SearchIsLoading = false; SearchIsActive = true}
+    | UpdateHeaderArg next ->
+        let nextState = { state with HeaderArg = next}
         nextState, Cmd.none
-    | SelectHeader header ->
-        let nextState = { state with Header = header }
+    | UpdateHeaderCellType next ->
+        let nextState = 
+            if Helper.isSameMajorHeaderCellType state.HeaderCellType next then
+                { state with 
+                    HeaderCellType = next 
+                }
+            else
+                let nextBodyCellType = if next.IsTermColumn() then BuildingBlock.BodyCellType.Term else BuildingBlock.BodyCellType.Text
+                { state with 
+                    HeaderCellType = next
+                    BodyCellType = nextBodyCellType
+                    HeaderArg = None
+                    BodyArg = None
+                }
         nextState, Cmd.none
-    | UpdateBodySearchText str ->
-        let nextState = {state with BodySearchText = str}
-        nextState, Cmd.none
-    | GetBodySuggestions (queryString,uiSetter) ->
-        let cmd = 
-            Cmd.OfAsync.either
-                Api.api.getTermSuggestions
-                {|n= 5; query = queryString; ontology = None|}
-                (fun t -> GetBodySuggestionsResponse (t,uiSetter) |> BuildingBlockMsg)
-                (curry GenericError Cmd.none >> DevMsg)
-        state, cmd
-    | GetBodySuggestionsByParent (queryString,parentTerm,uiSetter) ->
-        let cmd = 
-            Cmd.OfAsync.either
-                Api.api.getTermSuggestionsByParentTerm
-                {|n= 5; query = queryString; parent_term = parentTerm|}
-                (fun t -> GetBodySuggestionsResponse (t,uiSetter) |> BuildingBlockMsg)
-                (curry GenericError Cmd.none >> DevMsg)
-        state, cmd
-    | GetBodyTermsByParent (parentTerm,uiSetter) ->
-        let cmd = 
-            Cmd.OfAsync.either
-                Api.api.getAllTermsByParentTerm
-                parentTerm
-                (fun t -> GetBodySuggestionsResponse (t,uiSetter) |> BuildingBlockMsg)
-                (curry GenericError Cmd.none >> DevMsg)
-        state, cmd
-    | GetBodySuggestionsResponse (termSuggestions, uiSetter) ->
-        let nextState = { state with BodySearchResults = termSuggestions }
-        let state, setState = uiSetter.state, uiSetter.setState
-        setState {SearchIsLoading = false; SearchIsActive = true}
-        nextState, Cmd.none
-    | SelectBodyCell (cell) ->
-        let nextState = { state with BodyCell = cell}
+    | UpdateBodyCellType next ->
+        let nextState = { state with BodyCellType = next }
         nextState, Cmd.none
 
     | SearchUnitTermTextChange (newTerm) ->
@@ -281,61 +251,61 @@ open Feliz
 open Feliz.Bulma
 
 let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
-    /// advanced unit term search 2
-    let autocompleteParamsUnit2 = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState
+    // /// advanced unit term search 2
+    //let autocompleteParamsUnit2 = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState
     mainFunctionContainer [
         // advanced unit term search 2
-        AdvancedSearch.advancedSearchModal model autocompleteParamsUnit2.ModalId autocompleteParamsUnit2.InputId dispatch autocompleteParamsUnit2.OnAdvancedSearch
-        Bulma.field.div [
-            Bulma.help [
-                b [] [str "Adds a unit to a complete building block." ]
-                str " If the building block already has a unit assigned, the new unit is only applied to selected rows of the selected column."
-            ]
-        ]
-        Bulma.field.div [
-            let changeUnitAutoCompleteParams = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState
-            Bulma.field.div [
-                Bulma.field.hasAddons
-                prop.children [
-                    Bulma.control.p [
-                        Bulma.button.button [
-                            Bulma.button.isStatic
-                            Bulma.color.hasBackgroundWhite
-                            prop.text "Add unit"
-                        ]
-                    ]
-                    // Add/Update unit ontology term search field
-                    AutocompleteSearch.autocompleteTermSearchComponentInputComponent
-                        dispatch
-                        false // isDisabled
-                        "Start typing to search"
-                        None // No input size specified
-                        changeUnitAutoCompleteParams
-                ]
-            ]
-            // Add/Update Ontology Unit Term search preview
-            AutocompleteSearch.autocompleteDropdownComponent
-                dispatch
-                changeUnitAutoCompleteParams.DropDownIsVisible
-                changeUnitAutoCompleteParams.DropDownIsLoading
-                (AutocompleteSearch.createAutocompleteSuggestions dispatch changeUnitAutoCompleteParams model)
+        //AdvancedSearch.advancedSearchModal model autocompleteParamsUnit2.ModalId autocompleteParamsUnit2.InputId dispatch autocompleteParamsUnit2.OnAdvancedSearch
+        //Bulma.field.div [
+        //    Bulma.help [
+        //        b [] [str "Adds a unit to a complete building block." ]
+        //        str " If the building block already has a unit assigned, the new unit is only applied to selected rows of the selected column."
+        //    ]
+        //]
+        //Bulma.field.div [
+        //    let changeUnitAutoCompleteParams = AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState
+        //    Bulma.field.div [
+        //        Bulma.field.hasAddons
+        //        prop.children [
+        //            Bulma.control.p [
+        //                Bulma.button.button [
+        //                    Bulma.button.isStatic
+        //                    Bulma.color.hasBackgroundWhite
+        //                    prop.text "Add unit"
+        //                ]
+        //            ]
+        //            // Add/Update unit ontology term search field
+        //            AutocompleteSearch.autocompleteTermSearchComponentInputComponent
+        //                dispatch
+        //                false // isDisabled
+        //                "Start typing to search"
+        //                None // No input size specified
+        //                changeUnitAutoCompleteParams
+        //        ]
+        //    ]
+        //    // Add/Update Ontology Unit Term search preview
+        //    AutocompleteSearch.autocompleteDropdownComponent
+        //        dispatch
+        //        changeUnitAutoCompleteParams.DropDownIsVisible
+        //        changeUnitAutoCompleteParams.DropDownIsLoading
+        //        (AutocompleteSearch.createAutocompleteSuggestions dispatch changeUnitAutoCompleteParams model)
 
-        ]
-        Bulma.help [
-            prop.style [style.display.inlineElement]
-            prop.children [
-                Html.a [
-                    prop.onClick(fun e ->
-                        e.preventDefault()
-                        AdvancedSearch.ToggleModal (
-                            AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState).ModalId
-                            |> AdvancedSearchMsg
-                            |> dispatch
-                    )
-                    prop.text "Use advanced search"
-                ]
-            ]
-        ]
+        //]
+        //Bulma.help [
+        //    prop.style [style.display.inlineElement]
+        //    prop.children [
+        //        Html.a [
+        //            prop.onClick(fun e ->
+        //                e.preventDefault()
+        //                AdvancedSearch.ToggleModal (
+        //                    AutocompleteSearch.AutocompleteParameters<Term>.ofAddBuildingBlockUnit2State model.AddBuildingBlockState).ModalId
+        //                    |> AdvancedSearchMsg
+        //                    |> dispatch
+        //            )
+        //            prop.text "Use advanced search"
+        //        ]
+        //    ]
+        //]
 
         Bulma.field.div [
             Bulma.button.button [

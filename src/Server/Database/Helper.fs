@@ -17,11 +17,12 @@ with
         | Exact         -> queryString
         | Complete      -> queryString + "*"
         | PerformanceComplete ->
-            let s = queryString.Split(" ", StringSplitOptions.RemoveEmptyEntries)
-            s
+            let singleWordArr = queryString.Split(" ", StringSplitOptions.RemoveEmptyEntries)
+            let count = singleWordArr.Length
+            singleWordArr
             // add "+" to every word so the fulltext search must include the previous word, this highly improves search performance
             // Searchquality is further improved by $"({str}^4 OR {str}*)". So it will value perfect hits higher then autocomplete hits.
-            |> Array.mapi (fun i str -> if i <> s.Length-1 then "+" + str else $"({str}^4 OR {str}*)")
+            |> Array.mapi (fun i str -> if i <> count-1 then "+" + str else $"{str}*")
             |> String.concat " "
         | Fuzzy         -> queryString.Replace(" ","~ ") + "~"
             
@@ -39,7 +40,9 @@ type Neo4JCredentials = {
 type Neo4j =
     
     static member establishConnection(c: Neo4JCredentials) =
-        let driver = Neo4j.Driver.GraphDatabase.Driver(c.BoltUrl, Neo4j.Driver.AuthTokens.Basic(c.User,c.Pw))
+        let driver = Neo4j.Driver.GraphDatabase.Driver(c.BoltUrl, Neo4j.Driver.AuthTokens.Basic(c.User,c.Pw), fun o ->
+            o.WithMaxTransactionRetryTime(TimeSpan.FromSeconds(3))
+                .WithConnectionTimeout(TimeSpan.FromSeconds(3)) |> ignore)
         printfn "established connection"
         driver.AsyncSession(SessionConfigBuilder.ForDatabase c.DatabaseName)
 
@@ -63,18 +66,20 @@ type Neo4j =
                             kvp::s
                         ) []
                         |> fun x -> Collections.Generic.Dictionary<string,obj>(x :> Collections.Generic.IEnumerable<_>)
-                    currentSession.RunAsync(Query(query,param))
+                    currentSession.RunAsync(
+                        Query(query,param),
+                        action = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
+                    )
                 else
-                    currentSession.RunAsync(query)
+                    currentSession.RunAsync(
+                        query,
+                        action = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
+                    )
                 |> Async.AwaitTask
             let! dbValues = 
                 executeReadQuery.ToListAsync()
                 |> Async.AwaitTask
-            printfn "INNER LENGTH: %i" (dbValues |> Seq.length)
-            if dbValues |> Seq.length > 0 then
-                printfn "RESULT: %A" (dbValues.Item 0)
             let parsedDbValues = dbValues |> Seq.map resultAs
-            printfn "INNER LENGTH PARSED: %i" (dbValues |> Seq.length)
             if session.IsNone then currentSession.Dispose()
             return parsedDbValues
         } |> Async.RunSynchronously
@@ -105,7 +110,7 @@ type Neo4j =
                 queries 
                 |> Array.map (fun query ->
                     let currentSession = Neo4j.establishConnection(credentials)
-                    let transaction = currentSession.ReadTransactionAsync(fun tx ->
+                    let transaction = currentSession.ExecuteReadAsync(fun tx ->
                         async {
                             let! result = tx.RunAsync query |> Async.AwaitTask
                             return! result.ToListAsync() |> Async.AwaitTask

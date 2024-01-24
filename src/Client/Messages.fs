@@ -15,6 +15,7 @@ open OfficeInteropTypes
 open Model
 open Routing
 open ARCtrl.ISA
+open Fable.Core
 
 type System.Exception with
     member this.GetPropagatedError() =
@@ -33,29 +34,14 @@ let curry f a b = f (a,b)
 module TermSearch =
 
     type Msg =
-        | ToggleSearchByParentOntology
-        | SearchTermTextChange                  of searchString:string * parentTerm: TermMinimal option
-        | TermSuggestionUsed                    of Term
-        | NewSuggestions                        of Term []
-        | StoreParentOntologyFromOfficeInterop  of TermMinimal option
-        // Server
-        | GetAllTermsByParentTermRequest        of TermMinimal 
-        | GetAllTermsByParentTermResponse       of Term []
+        | UpdateSelectedTerm of OntologyAnnotation option 
+        | UpdateParentTerm of OntologyAnnotation option
+
 
 module AdvancedSearch =
-
+    
     type Msg =
-        // Client - UI
-        | ToggleModal                       of string
-        | ToggleOntologyDropdown
-        | UpdateAdvancedTermSearchSubpage   of AdvancedSearch.AdvancedSearchSubpages
-        // Client
-        | ResetAdvancedSearchState
-        | UpdateAdvancedTermSearchOptions   of AdvancedSearchTypes.AdvancedSearchOptions
-        // Server
-        /// Main function. Forward request to Request Api -> Server.
-        | StartAdvancedSearch
-        | NewAdvancedSearchResults          of Term []
+        | GetSearchResults of {| config:AdvancedSearchTypes.AdvancedSearchOptions; responseSetter: Term [] -> unit |}
 
 type DevMsg =
     | LogTableMetadata
@@ -65,10 +51,7 @@ type DevMsg =
     | UpdateDisplayLogList  of LogItem list
     
 type ApiRequestMsg =
-    | GetNewTermSuggestions                     of string
-    | GetNewTermSuggestionsByParentTerm         of string*TermMinimal
     | GetNewUnitTermSuggestions                 of string
-    | GetNewAdvancedTermSearchResults           of AdvancedSearchTypes.AdvancedSearchOptions
     | FetchAllOntologies
     /// TermSearchable [] is created by officeInterop and passed to server for db search.
     | SearchForInsertTermsRequest              of TermSearchable []
@@ -76,8 +59,6 @@ type ApiRequestMsg =
     | GetAppVersion
 
 type ApiResponseMsg =
-    | TermSuggestionResponse                    of Term []
-    | AdvancedTermSearchResultsResponse         of Term []
     | UnitTermSuggestionResponse                of Term []
     | FetchAllOntologiesResponse                of Ontology []
     | SearchForInsertTermsResponse              of TermSearchable []  
@@ -107,17 +88,10 @@ module BuildingBlock =
     open TermSearch
 
     type Msg =
-    | UpdateHeaderSearchText of string
-    | GetHeaderSuggestions of string*TermSearchUIController
-    | GetHeaderSuggestionsResponse of Term []*TermSearchUIController
-    | SelectHeader of CompositeHeader
-    | UpdateBodySearchText of string
-    | GetBodySuggestions of string*TermSearchUIController
-    | GetBodySuggestionsByParent of string*TermMinimal*TermSearchUIController
-    /// Returns all child terms
-    | GetBodyTermsByParent of TermMinimal*TermSearchUIController
-    | GetBodySuggestionsResponse of Term []*TermSearchUIController
-    | SelectBodyCell of CompositeCell
+    | UpdateHeaderCellType of BuildingBlock.HeaderCellType
+    | UpdateHeaderArg of U2<OntologyAnnotation,IOType> option
+    | UpdateBodyCellType of BuildingBlock.BodyCellType
+    | UpdateBodyArg of U2<string, OntologyAnnotation> option
     // Below everything is more or less deprecated
     // Is still used for unit update in office
     | SearchUnitTermTextChange  of searchString:string
@@ -165,7 +139,6 @@ type Model = {
     DevState                    : DevState
     ///States regarding term search
     TermSearchState             : TermSearch.Model
-    AdvancedSearchState         : AdvancedSearch.Model
     ///Use this in the future to model excel stuff like table data
     ExcelState                  : OfficeInterop.Model
     /// This should be removed. Overhead making maintainance more difficult
@@ -224,6 +197,7 @@ type Msg =
 | UpdatePageState       of Routing.Route option
 | UpdateIsExpert        of bool
 | Batch                 of seq<Messages.Msg>
+| Run                   of (unit -> unit)
 | UpdateHistory         of LocalHistory.Model
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI

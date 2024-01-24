@@ -1,4 +1,4 @@
-module SidebarComponents.AdvancedSearch
+module Components.AdvancedSearch
 
 open Fable.React
 open Fable.React.Props
@@ -9,7 +9,6 @@ open TermTypes
 open ExcelColors
 open Model
 open Messages
-open CustomComponents
 
 open Feliz
 open Feliz.Bulma
@@ -17,77 +16,18 @@ open Feliz.Bulma
 open AdvancedSearchTypes
 open AdvancedSearch
 
-let update (advancedTermSearchMsg: AdvancedSearch.Msg) (currentState:AdvancedSearch.Model) : AdvancedSearch.Model * Cmd<Messages.Msg> =
-    match advancedTermSearchMsg with
-    | UpdateAdvancedTermSearchSubpage subpage ->
-        let nextState = {
-            currentState with
-                AdvancedTermSearchSubpage = subpage
-        }
-        nextState, Cmd.none
-
-    | ToggleModal modalId ->
-        let nextState = {
-            currentState with
-                ModalId = modalId
-                HasModalVisible = (not currentState.HasModalVisible)
-        }
-
-        nextState,Cmd.none
-
-    | ToggleOntologyDropdown ->
-        let nextState = {
-            currentState with
-                HasOntologyDropdownVisible = (not currentState.HasOntologyDropdownVisible)
-        }
-
-        nextState,Cmd.none
-
-    | UpdateAdvancedTermSearchOptions opts ->
-
-        let nextState = {
-            currentState with
-                AdvancedSearchOptions = opts
-                HasOntologyDropdownVisible = false
-        }
-
-        nextState,Cmd.none
-
-    | StartAdvancedSearch ->
-
-        let nextState = {
-            currentState with
-                AdvancedTermSearchSubpage       = AdvancedSearchSubpages.ResultsSubpage
-                HasAdvancedSearchResultsLoading = true
-        }
-
-        let nextCmd =
-            currentState.AdvancedSearchOptions
-            |> GetNewAdvancedTermSearchResults
-            |> Request
-            |> Api
-            |> Cmd.ofMsg
-
-        nextState,nextCmd
-
-    | ResetAdvancedSearchState ->
-        let nextState = AdvancedSearch.Model.init()
-
-        nextState,Cmd.none
-
-    | NewAdvancedSearchResults results ->
-        let nextState = {
-            currentState with
-                AdvancedSearchTermResults       = results
-                AdvancedTermSearchSubpage       = AdvancedSearchSubpages.ResultsSubpage
-                HasAdvancedSearchResultsLoading = false
-        }
-
-        nextState,Cmd.none
-
 open Messages
 
-let createLinkOfAccession (accession:string) =
+let private StartAdvancedSearch (state: AdvancedSearch.Model) setState dispatch =
+    let setter (terms: Term []) = 
+        setState 
+            { state with 
+                AdvancedSearchTermResults = terms
+                Subpage = AdvancedSearch.AdvancedSearchSubpages.ResultsSubpage
+            }
+    AdvancedSearch.Msg.GetSearchResults {|config=state.AdvancedSearchOptions; responseSetter = setter|}  |> AdvancedSearchMsg |> dispatch
+
+let private createLinkOfAccession (accession:string) =
     a [
         let link = accession |> URLs.termAccessionUrlOfAccessionStr
         Href link
@@ -127,9 +67,7 @@ module private ResultsTable =
         ActiveDropdowns : string list
         ElementsPerPage : int
         PageIndex       : int
-        Dispatch        : Msg -> unit
-        RelatedInputId  : string 
-        ResultHandler   : Term -> Msg
+        ResultHandler   : Term -> unit
     }
 
     let createPaginationLinkFromIndex (updatePageIndex: int ->unit) (pageIndex:int) (currentPageinationIndex: int)=
@@ -152,7 +90,7 @@ module private ResultsTable =
             fun index -> createPaginationLinkFromIndex updatePageIndex index currentPageinationIndex
         ) 
 
-    let private createAdvancedTermSearchResultRows (state:TableModel) (setState:TableModel -> unit) =
+    let private createAdvancedTermSearchResultRows (state:TableModel) (setState:TableModel -> unit) (resetAdvancedSearchState: unit -> unit) =
         if state.Data |> Array.isEmpty |> not then
             state.Data
             |> Array.collect (fun sugg ->
@@ -163,14 +101,10 @@ module private ResultsTable =
                             // dont close modal on click
                             e.stopPropagation()
                             e.preventDefault()
-                            if state.RelatedInputId <> "" then
-                                let relInput = Browser.Dom.document.getElementById(state.RelatedInputId)
-                                // propagate wanted term name to related input on main page
-                                relInput?value <- sugg.Name
                             // select wanted term
-                            sugg |> state.ResultHandler |> state.Dispatch
+                            state.ResultHandler sugg
                             // reset advanced term search state
-                            ResetAdvancedSearchState |> AdvancedSearchMsg |> state.Dispatch
+                            resetAdvancedSearchState()
                         )
                         prop.tabIndex 0
                         prop.className "suggestion"
@@ -264,8 +198,9 @@ module private ResultsTable =
 
 
     [<ReactComponent>]
-    let paginatedTableComponent (model:Model) (data: TableModel) =
-
+    let paginatedTableComponent (state:AdvancedSearch.Model) setState (data: TableModel) =
+        
+        let resetAdvancedSearchState = fun _ -> AdvancedSearch.Model.init() |> setState
         let handlerState, setState = React.useState data
         let updatePageIndex (model:TableModel) (ind:int) =
             let nextState = {model with PageIndex = ind}
@@ -273,7 +208,7 @@ module private ResultsTable =
 
         if data.Data.Length > 0 then 
 
-            let tableRows = createAdvancedTermSearchResultRows handlerState setState
+            let tableRows = createAdvancedTermSearchResultRows handlerState setState resetAdvancedSearchState
             let currentPageinationIndex = handlerState.PageIndex
             let chunked = tableRows |> Array.chunkBySize data.ElementsPerPage
             let len = chunked.Length 
@@ -321,30 +256,27 @@ module private ResultsTable =
         else
             Html.div []
 
-let private keepObsoleteCheckradioElement (model:Model) dispatch (keepObsolete:bool) modalId =
+let private keepObsoleteCheckradioElement (state:AdvancedSearch.Model) setState =
+    let currentKeepObsolete = state.AdvancedSearchOptions.KeepObsolete
     let checkradioName = "keepObsolete_checkradio"
-    let id = sprintf "%s_%A_%A"checkradioName keepObsolete modalId
+    let id = sprintf "%s"checkradioName
     Bulma.field.div [
         Bulma.Checkradio.checkbox [
             prop.name checkradioName
             prop.id id
-            prop.isChecked (model.AdvancedSearchState.AdvancedSearchOptions.KeepObsolete = keepObsolete)
+            prop.isChecked (state.AdvancedSearchOptions.KeepObsolete)
             prop.onChange (fun (e:bool) ->
-                {model.AdvancedSearchState.AdvancedSearchOptions
-                    with KeepObsolete = keepObsolete
-                }
-                |> UpdateAdvancedTermSearchOptions
-                |> AdvancedSearchMsg
-                |> dispatch
+                {state with AdvancedSearch.Model.AdvancedSearchOptions.KeepObsolete = not currentKeepObsolete}
+                |> setState
             )
         ]
         Html.label [
             prop.htmlFor id
-            prop.text (if keepObsolete then "yes" else "no")
+            prop.text (if currentKeepObsolete then "yes" else "no")
         ]
     ]
 
-let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
+let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.Model -> unit) dispatch =
     Html.div [
         Bulma.field.div [
             Bulma.label  "Term name keywords:"
@@ -355,21 +287,22 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
                         Bulma.input.isSmall
                         //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                         prop.onChange (fun (e:string) ->
-                            {model.AdvancedSearchState.AdvancedSearchOptions
-                                with TermName = e
-                            }
-                            |> UpdateAdvancedTermSearchOptions
-                            |> AdvancedSearchMsg
-                            |> dispatch)
-                        prop.valueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermName
+                            {state with AdvancedSearch.Model.AdvancedSearchOptions.TermName = e }|> setState
+                        )
+                        prop.valueOrDefault state.AdvancedSearchOptions.TermName
                         prop.onKeyDown (fun e ->
                             match e.which with
                             | 13. ->
                                 e.preventDefault()
                                 e.stopPropagation();
-                                let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                let isValid = isValidAdancedSearchOptions state.AdvancedSearchOptions
                                 if isValid then
-                                    StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                                    setState 
+                                        { state with
+                                            Subpage                         = AdvancedSearchSubpages.ResultsSubpage
+                                            HasAdvancedSearchResultsLoading = true
+                                        }
+                                    StartAdvancedSearch state setState dispatch
                             | _ -> ()
                         )
                     ]
@@ -384,104 +317,100 @@ let private inputFormPage modalId (model:Model) (dispatch: Msg -> unit) =
                         prop.placeholder "... search term definition"
                         Bulma.input.isSmall
                         //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
-                        prop.onChange (fun (e: string) ->
-                            {model.AdvancedSearchState.AdvancedSearchOptions
-                                with TermDefinition = e
-                            }
-                            |> UpdateAdvancedTermSearchOptions
-                            |> AdvancedSearchMsg
-                            |> dispatch)
+                        prop.onChange (fun (e: string) -> {state with AdvancedSearch.Model.AdvancedSearchOptions.TermDefinition = e} |> setState)
                         prop.onKeyDown (fun e ->
                             match e.which with
                             | 13. ->
                                 e.preventDefault()
                                 e.stopPropagation();
-                                let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                let isValid = isValidAdancedSearchOptions state.AdvancedSearchOptions
                                 if isValid then
-                                    StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                                    StartAdvancedSearch state setState dispatch
                             | _ -> ()
                         )
-                        prop.valueOrDefault model.AdvancedSearchState.AdvancedSearchOptions.TermDefinition
+                        prop.valueOrDefault state.AdvancedSearchOptions.TermDefinition
                     ]
                 ] 
             ]
         ] 
-        Bulma.field.div [
-            Bulma.label "Ontology"
-            Bulma.control.div [
-                Bulma.select [
-                    Html.select [
-                        prop.placeholder "All Ontologies";
-                        if model.AdvancedSearchState.AdvancedSearchOptions.OntologyName.IsSome then prop.value model.AdvancedSearchState.AdvancedSearchOptions.OntologyName.Value
-                        prop.onChange (fun (e:string) ->
-                            let nextSearchOptions = {
-                                model.AdvancedSearchState.AdvancedSearchOptions
-                                    with OntologyName = if e = "All Ontologies" then None else Some e
-                            }
-                            nextSearchOptions |> UpdateAdvancedTermSearchOptions |> AdvancedSearchMsg |> dispatch
-                        )
-                        prop.children [
-                            ontologyDropdownItem model dispatch None
-                            yield! (
-                                model.PersistentStorageState.SearchableOntologies
-                                |> Array.map snd
-                                |> Array.toList
-                                |> List.sortBy (fun o -> o.Name)
-                                |> List.map (fun ont -> ontologyDropdownItem model dispatch (Some ont))
-                            )
-                        ]
-                    ]
-                ]
-            ]
-        ]
+        //Bulma.field.div [
+        //    Bulma.label "Ontology"
+        //    Bulma.control.div [
+        //        Bulma.select [
+        //            Html.select [
+        //                prop.placeholder "All Ontologies";
+        //                if state.AdvancedSearchOptions.OntologyName.IsSome then prop.value state.AdvancedSearchOptions.OntologyName.Value
+        //                prop.onChange (fun (e:string) ->
+        //                    { state with AdvancedSearch.Model.AdvancedSearchOptions.OntologyName = if e = "All Ontologies" then None else Some e}
+        //                    |> setState
+        //                )
+        //                prop.children [
+        //                    ontologyDropdownItem model dispatch None
+        //                    yield! (
+        //                        model.PersistentStorageState.SearchableOntologies
+        //                        |> Array.map snd
+        //                        |> Array.toList
+        //                        |> List.sortBy (fun o -> o.Name)
+        //                        |> List.map (fun ont -> ontologyDropdownItem model dispatch (Some ont))
+        //                    )
+        //                ]
+        //            ]
+        //        ]
+        //    ]
+        //]
         Bulma.field.div [
             Bulma.label "Keep obsolete terms"
             Html.div [
-                keepObsoleteCheckradioElement model dispatch true modalId
-                keepObsoleteCheckradioElement model dispatch false modalId
+                keepObsoleteCheckradioElement state setState
             ]
         ]
     ]
 
-let private resultsPage relatedInputId resultHandler (model:Model) (dispatch: Msg -> unit) =
+let private resultsPage (resultHandler: Term -> unit) (state: AdvancedSearch.Model) setState =
     Bulma.field.div [
         Bulma.label "Results:"
-        if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.ResultsSubpage then
-            if model.AdvancedSearchState.HasAdvancedSearchResultsLoading then
+        if state.Subpage = AdvancedSearchSubpages.ResultsSubpage then
+            if state.HasAdvancedSearchResultsLoading then
                 Html.div [
                     prop.style [style.width(length.perc 100); style.display.flex; style.justifyContent.center]
                     prop.children Modals.Loading.loadingComponent
                 ]
             else
                 let init: ResultsTable.TableModel = {
-                    Data            = model.AdvancedSearchState.AdvancedSearchTermResults
+                    Data            = state.AdvancedSearchTermResults
                     ActiveDropdowns = []
                     ElementsPerPage = 10
                     PageIndex       = 0
-                    Dispatch        = dispatch
                     ResultHandler   = resultHandler
-                    RelatedInputId  = relatedInputId
                 }
                 ResultsTable.paginatedTableComponent
-                    model
+                    state
+                    setState
                     init
     ]
 
-let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) (dispatch: Msg -> unit) (resultHandler: Term -> Msg) =
+[<ReactComponent>]
+let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit, dispatch) =
+    let state, setState = React.useState(AdvancedSearch.Model.init)
+    React.useEffect(
+        (fun _ -> AdvancedSearch.Model.init() |> setState), 
+        [|box isActive|]
+    )
     Bulma.modal [
-        if (model.AdvancedSearchState.HasModalVisible
-            && model.AdvancedSearchState.ModalId = modalId) then Bulma.modal.isActive
-        prop.id modalId
+        //if (model.AdvancedSearchState.HasModalVisible
+        //    && model.AdvancedSearchState.ModalId = modalId) then
+        if isActive then Bulma.modal.isActive
+        //prop.id modalId
         prop.children [
             // Close modal on click on background
-            Bulma.modalBackground [ prop.onClick (fun e -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)]
+            Bulma.modalBackground [ prop.onClick (fun e -> setIsActive false)]
             Bulma.modalCard [
                 prop.style [style.width(length.perc 90); style.maxWidth(length.px 600); style.height(length.perc 80); style.maxHeight(length.px 600)]
                 prop.children [
                     Bulma.modalCardHead [
                         prop.children [
                             Bulma.modalCardTitle "Advanced Search"
-                            Bulma.delete [prop.onClick(fun _ -> ResetAdvancedSearchState |> AdvancedSearchMsg |> dispatch)]
+                            Bulma.delete [prop.onClick(fun _ -> setIsActive false)]
                         ]
                     ]
                     Bulma.modalCardBody [
@@ -490,12 +419,12 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                 prop.style [style.textAlign.justify]
                                 prop.text "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."
                             ]]
-                            match model.AdvancedSearchState.AdvancedTermSearchSubpage with
+                            match state.Subpage with
                             | AdvancedSearchSubpages.InputFormSubpage ->
                                 // we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
-                                inputFormPage modalId model dispatch
+                                inputFormPage state setState dispatch
                             | AdvancedSearchSubpages.ResultsSubpage ->
-                                resultsPage relatedInputId resultHandler model dispatch
+                                resultsPage resultHandler state setState
                         ]
                     ]
                     Bulma.modalCardFoot [
@@ -504,20 +433,20 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                             prop.onKeyDown(key.enter, fun k -> k.preventDefault())
                             prop.style [style.width(length.perc 100)]
                             prop.children [
-                                if model.AdvancedSearchState.AdvancedTermSearchSubpage <> AdvancedSearchSubpages.InputFormSubpage then
+                                if state.Subpage <> AdvancedSearchSubpages.InputFormSubpage then
                                     Bulma.levelItem [
                                         Bulma.button.button [   
                                             Bulma.color.isDanger
                                             Bulma.button.isFullWidth
-                                            prop.onClick (fun e -> e.stopPropagation(); e.preventDefault(); UpdateAdvancedTermSearchSubpage InputFormSubpage |> AdvancedSearchMsg |> dispatch)
+                                            prop.onClick (fun e -> e.stopPropagation(); e.preventDefault(); setState {state with Subpage = InputFormSubpage })
                                             prop.text "Back"
                                         ]
                                     ]
                                 // Show "Start advanced search" button ONLY on first subpage
-                                if model.AdvancedSearchState.AdvancedTermSearchSubpage = AdvancedSearchSubpages.InputFormSubpage then
+                                if state.Subpage = AdvancedSearchSubpages.InputFormSubpage then
                                     Bulma.levelItem [
                                         Bulma.button.button [
-                                            let isValid = isValidAdancedSearchOptions model.AdvancedSearchState.AdvancedSearchOptions
+                                            let isValid = isValidAdancedSearchOptions state.AdvancedSearchOptions
                                             if isValid then
                                                 Bulma.color.isSuccess
                                                 Bulma.button.isActive
@@ -528,7 +457,7 @@ let advancedSearchModal (model:Model) (modalId: string) (relatedInputId:string) 
                                             prop.onClick (fun e ->
                                                 e.preventDefault()
                                                 e.stopPropagation();
-                                                StartAdvancedSearch |> AdvancedSearchMsg |> dispatch
+                                                StartAdvancedSearch state setState dispatch
                                             )
                                             prop.text "Start advanced search"
                                         ]

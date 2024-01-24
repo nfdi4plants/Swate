@@ -394,15 +394,15 @@ let main args =
         Bundle(); 0
     | "run" :: a ->
         match a with
-        | "--nodb" :: a -> Run(false); 0
-        | _ -> Run(true); 0
+        | "db" :: a -> Run(true); 0
+        | _ -> Run(false); 0
     | "release" :: a ->
         Build.SharedTests()
         Tests.Run()
         match a with
         | "pre" :: a -> 
-            //Release.SetPrereleaseTag()
-            //Release.CreatePrereleaseTag()
+            Release.SetPrereleaseTag()
+            Release.CreatePrereleaseTag()
             let version = Release.GetLatestGitTag()
             ReleaseNoteTasks.createVersionFile(version)
             Release.ForcePushNightly()
@@ -417,8 +417,6 @@ let main args =
             match a with
             | "single" :: a -> Docker.dockerTestImage(Some "new"); 0
             | _ -> Docker.DockerTestNewStack(); 0
-        | "publish" :: a ->
-            (); 1
         | _ -> runOrDefault args
     | "version" :: a ->
         match a with

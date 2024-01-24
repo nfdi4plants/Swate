@@ -25,3 +25,4 @@ release.sh
 /.db/cache
 /.db/neo4j
 /src/Client/output
+/.paket

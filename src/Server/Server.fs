@@ -208,7 +208,7 @@ let testApi (ctx: HttpContext): ITestAPI = {
                 DatabaseName= settings.[Helper.Neo4JCredentials.DBNameVarString]
             }
             credentials
-        let exmp = Term.Term(c).getByName(termName,sourceOntologyName=Term.AnyOfSource.String "ms")
+        let exmp = Term.Term(c).getByName(termName,sourceOntologyName=Term.AnyOfOntology.Single "ms")
         return "Info", sprintf "%A" (exmp |> Seq.length)
     }
 }
@@ -308,6 +308,11 @@ let topLevelRouter = router {
     forward @"" (fun next ctx ->
         let credentials = getNeo4JCredentials ctx
         API.IOntologyAPI.V2.createIOntologyApi credentials next ctx
+    )
+
+    forward @"" (fun next ctx ->
+        let credentials = getNeo4JCredentials ctx
+        API.IOntologyAPI.V3.createIOntologyApi credentials next ctx
     )
 
     forward @"" (fun next ctx ->

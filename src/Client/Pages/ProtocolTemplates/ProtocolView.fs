@@ -145,27 +145,31 @@ module TemplateFromDB =
             Bulma.columns.isMobile
             prop.children [
                 Bulma.column [
-                    Bulma.field.div [
-                        Bulma.control.div [
-                            Bulma.button.a [
-                                Bulma.color.isSuccess
-                                if model.ProtocolState.ProtocolSelected.IsSome (*&& model.ProtocolInsertState.ValidationXml.IsSome*) then
-                                   Bulma.button.isActive
-                                else
-                                    Bulma.color.isDanger
-                                    prop.disabled true
-                                Bulma.button.isFullWidth
-                                prop.onClick (fun e ->
-                                    let p = model.ProtocolState.ProtocolSelected.Value
-                                    // Use x.Value |> Some to force an error if isNone. Otherwise AddAnnotationBlocks would just ignore it and it might be overlooked.
-                                    //let validation =
-                                    //    model.ProtocolInsertState.ValidationXml.Value |> Some
-                                    //ProtocolIncreaseTimesUsed p.Id |> ProtocolMsg |> dispatch
-                                    //SpreadsheetInterface.AddAnnotationBlocks (Array.ofList p.TemplateBuildingBlocks) |> InterfaceMsg |> dispatch
-                                    Browser.Dom.window.alert("Protocol AddAnnotationBlocks is not implemented. Replace template logic first")
-                                )
-                                prop.text "Add template"
-                            ]
+                    prop.children [
+                        Bulma.button.a [
+                            Bulma.color.isSuccess
+                            if model.ProtocolState.ProtocolSelected.IsSome then
+                                Bulma.button.isActive
+                            else
+                                Bulma.color.isDanger
+                                prop.disabled true
+                            Bulma.button.isFullWidth
+                            prop.onClick (fun _ ->
+                                if model.ProtocolState.ProtocolSelected.IsNone then
+                                    failwith "No template selected!"
+                                // Remove existing columns
+                                let mutable columnsToRemove = []
+                                // find duplicate columns
+                                let tablecopy = model.ProtocolState.ProtocolSelected.Value.Table.Copy()
+                                for header in tablecopy.Headers do
+                                    let containsAtIndex = model.SpreadsheetModel.ActiveTable.Headers.FindIndex(fun h -> h = header)
+                                    if containsAtIndex >= 0 then
+                                        columnsToRemove <- containsAtIndex::columnsToRemove
+                                tablecopy.RemoveColumns (Array.ofList columnsToRemove)
+                                let index = Spreadsheet.Sidebar.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
+                                SpreadsheetInterface.JoinTable (tablecopy, Some index, Some ARCtrl.ISA.TableJoinOptions.WithUnit ) |> InterfaceMsg |> dispatch
+                            )
+                            prop.text "Add template"
                         ]
                     ]
                 ]
@@ -251,8 +255,8 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
 
         TemplateFromDB.showDatabaseProtocolTemplate model dispatch
 
-        // Box 2
-        Bulma.label "Add template(s) from file."
+        //// Box 2
+        //Bulma.label "Add template(s) from file."
 
-        TemplateFromJsonFile.protocolInsertElement model dispatch
+        //TemplateFromJsonFile.protocolInsertElement model dispatch
     ]

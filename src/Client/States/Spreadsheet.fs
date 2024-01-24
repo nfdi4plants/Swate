@@ -94,10 +94,11 @@ type Msg =
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
+| JoinTable of ArcTable * index: int option * options: TableJoinOptions option
 | UpdateArcFile of ArcFiles
 | InitFromArcFile of ArcFiles
-| InsertOntologyTerm of OntologyAnnotation
-| InsertOntologyTerms of OntologyAnnotation []
+| InsertOntologyAnnotation of OntologyAnnotation
+| InsertOntologyAnnotations of OntologyAnnotation []
 | UpdateTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []
 /// Starts chain to export active table to isa json

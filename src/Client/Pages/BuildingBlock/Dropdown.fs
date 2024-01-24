@@ -13,6 +13,7 @@ open Model
 open Messages
 open ARCtrl.ISA
 open BuildingBlock.Helper
+open Fable.Core
 
 
 [<ReactComponent>]
@@ -48,14 +49,6 @@ module private DropdownElements =
                 style.justifyContent.spaceBetween
             ]
             prop.children [
-                //Html.span [
-                //    prop.style itemTooltipStyle
-                //    prop.className "has-tooltip-multiline"
-                //    prop.custom("data-tooltip", subpage.toTooltip)
-                //    prop.children (Bulma.icon [
-                //        Html.i [prop.className "fa-solid fa-circle-info"]
-                //    ])
-                //]
 
                 Html.span subpage.toString
 
@@ -67,7 +60,7 @@ module private DropdownElements =
         ]
 
     /// Navigation element back to main page
-    let backToMainDropdownButton (state: BuildingBlockUIState) setState =
+    let backToMainDropdownButton setState =
         Bulma.dropdownItem.div [
             prop.style [style.textAlign.right]
             prop.children [
@@ -76,7 +69,7 @@ module private DropdownElements =
                     prop.onClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
-                        setState {state with DropdownPage = BuildingBlock.DropdownPage.Main}
+                        setState {DropdownPage = BuildingBlock.DropdownPage.Main; DropdownIsActive = true}
                     )
                     Bulma.button.isInverted
                     Bulma.color.isBlack
@@ -90,67 +83,51 @@ module private DropdownElements =
             ]
         ]
 
-    let createBuildingBlockDropdownItem (model: Model) dispatch uiState setUiState (header: CompositeHeader) =
-        let isDeepFreeText = 
-            match header with
-            | CompositeHeader.FreeText _ 
-            | CompositeHeader.Input (IOType.FreeText _) 
-            | CompositeHeader.Output (IOType.FreeText _) -> 
-                true
-            | _ ->
-                false
+    let createBuildingBlockDropdownItem (model: Model) dispatch setUiState (headerType: BuildingBlock.HeaderCellType) =
         Bulma.dropdownItem.a [
-            if not isDeepFreeText then //disable clicking on freetext elements
-                let nextHeader = 
-                    if header.IsTermColumn && not header.IsFeaturedColumn then
-                        header.UpdateDeepWith model.AddBuildingBlockState.Header
-                    else 
-                        header
-                prop.onClick (fun e ->
-                    e.stopPropagation()
-                    selectHeader uiState setUiState nextHeader |> dispatch
-                )
-                prop.onKeyDown(fun k ->
-                    if (int k.which) = 13 then selectHeader uiState setUiState nextHeader |> dispatch
-                )
+            prop.onClick (fun e ->
+                e.stopPropagation()
+                Helper.selectHeaderCellType headerType setUiState dispatch
+            )
+            prop.onKeyDown(fun k ->
+                if (int k.which) = 13 then Helper.selectHeaderCellType headerType setUiState dispatch
+            )
+            prop.text (headerType.ToString())
+        ]
+
+    let createIOTypeDropdownItem (model: Model) dispatch setUiState (headerType: BuildingBlock.HeaderCellType) (iotype: IOType) =
+        let setIO (ioType) = 
+            Helper.selectHeaderCellType headerType setUiState dispatch
+            U2.Case2 ioType |> Some |> BuildingBlock.UpdateHeaderArg |> BuildingBlockMsg |> dispatch
+        Bulma.dropdownItem.a [
             prop.children [
-                //Html.span [
-                //    prop.style itemTooltipStyle
-                //    prop.className "has-tooltip-multiline"
-                //    prop.custom("data-tooltip", header.GetUITooltip())
-                //    prop.children (Bulma.icon [
-                //        Html.i [prop.className "fa-solid fa-circle-info"]
-                //    ])
-                //]
-                match header with
-                | CompositeHeader.Output io | CompositeHeader.Input io -> 
-                    match io with
-                    | IOType.FreeText str ->
-                        let ch = if header.isOutput then CompositeHeader.Output else CompositeHeader.Input
-                        let onSubmit = fun (v: string) -> 
-                            let header = IOType.FreeText v |> ch
-                            selectHeader uiState setUiState header |> dispatch
-                        FreeTextInputElement onSubmit
-                    | otherIO -> 
-                        Html.span (string otherIO)
-                | CompositeHeader.Component _ | CompositeHeader.Parameter _ | CompositeHeader.Factor _ | CompositeHeader.Characteristic _ ->
-                        Html.span header.AsButtonName
-                | _ -> Html.span (string header)
+                match iotype with
+                | IOType.FreeText s ->
+                    let onSubmit = fun (v: string) -> 
+                        let header = IOType.FreeText v
+                        setIO header
+                    FreeTextInputElement onSubmit
+                | _ ->
+                    Html.div [
+                        prop.onClick (fun e -> e.stopPropagation(); setIO iotype)
+                        prop.onKeyDown(fun k -> if (int k.which) = 13 then setIO iotype)
+                        prop.text (iotype.ToString())
+                    ]
             ]
         ]
 
     /// Main column types subpage for dropdown
     let dropdownContentMain state setState (model:Model) dispatch =
         [
-            DropdownPage.IOTypes (CompositeHeader.Input, CompositeHeader.InputEmpty.AsButtonName) |> createSubBuildingBlockDropdownLink state setState
+            DropdownPage.IOTypes BuildingBlock.HeaderCellType.Input |> createSubBuildingBlockDropdownLink state setState
             Bulma.dropdownDivider []
-            CompositeHeader.ParameterEmpty      |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.FactorEmpty         |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.CharacteristicEmpty |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.ComponentEmpty      |> createBuildingBlockDropdownItem model dispatch state setState
-            Model.BuildingBlock.DropdownPage.More  |> createSubBuildingBlockDropdownLink state setState
+            BuildingBlock.HeaderCellType.Parameter      |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.Factor         |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.Characteristic |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.Component      |> createBuildingBlockDropdownItem model dispatch setState
+            Model.BuildingBlock.DropdownPage.More       |> createSubBuildingBlockDropdownLink state setState
             Bulma.dropdownDivider []
-            DropdownPage.IOTypes (CompositeHeader.Output, CompositeHeader.OutputEmpty.AsButtonName) |> createSubBuildingBlockDropdownLink state setState
+            DropdownPage.IOTypes BuildingBlock.HeaderCellType.Output |> createSubBuildingBlockDropdownLink state setState
             Bulma.dropdownItem.div [
                 prop.style [style.textAlign.right]
                 prop.children annotationsPrinciplesUrl
@@ -158,33 +135,21 @@ module private DropdownElements =
         ]
 
     /// Protocol Type subpage for dropdown
-    let dropdownContentProtocolTypeColumns state setState state_search setState_search (model:Model) dispatch =
+    let dropdownContentProtocolTypeColumns state setState (model:Model) dispatch =
         [
-            // Heading
-            //Bulma.dropdownItem.div [
-            //    prop.style [style.textAlign.center]
-            //    prop.children [
-            //        Html.h6 [
-            //            prop.className "subtitle"
-            //            prop.style [style.fontWeight.bold]
-            //            prop.text BuildingBlock.DropdownPage.More.toString
-            //        ]
-            //    ]
-            //]
-            //Bulma.dropdownDivider []
-            CompositeHeader.Date                |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.Performer           |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.ProtocolREF         |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.ProtocolType        |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.ProtocolUri         |> createBuildingBlockDropdownItem model dispatch state setState
-            CompositeHeader.ProtocolVersion     |> createBuildingBlockDropdownItem model dispatch state setState
+            BuildingBlock.HeaderCellType.Date                |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.Performer           |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.ProtocolREF         |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.ProtocolType        |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.ProtocolUri         |> createBuildingBlockDropdownItem model dispatch setState
+            BuildingBlock.HeaderCellType.ProtocolVersion     |> createBuildingBlockDropdownItem model dispatch setState
             // Navigation element back to main page
-            backToMainDropdownButton state setState
+            backToMainDropdownButton setState
         ]
 
     /// Output columns subpage for dropdown
-    let dropdownContentIOTypeColumns (createHeaderFunc: IOType -> CompositeHeader) state setState (model:Model) dispatch =
+    let dropdownContentIOTypeColumns header state setState (model:Model) dispatch =
         [
             // Heading
             //Bulma.dropdownItem.div [
@@ -198,19 +163,18 @@ module private DropdownElements =
             //    ]
             //]
             //Bulma.dropdownDivider []
-            createHeaderFunc IOType.Source            |> createBuildingBlockDropdownItem model dispatch state setState
-            createHeaderFunc IOType.Sample            |> createBuildingBlockDropdownItem model dispatch state setState
-            createHeaderFunc IOType.Material          |> createBuildingBlockDropdownItem model dispatch state setState
-            createHeaderFunc IOType.RawDataFile       |> createBuildingBlockDropdownItem model dispatch state setState
-            createHeaderFunc IOType.DerivedDataFile   |> createBuildingBlockDropdownItem model dispatch state setState
-            createHeaderFunc IOType.ImageFile         |> createBuildingBlockDropdownItem model dispatch state setState
-            createHeaderFunc (IOType.FreeText "")     |> createBuildingBlockDropdownItem model dispatch state setState
+            IOType.Source           |> createIOTypeDropdownItem model dispatch setState header
+            IOType.Sample           |> createIOTypeDropdownItem model dispatch setState header
+            IOType.Material         |> createIOTypeDropdownItem model dispatch setState header
+            IOType.RawDataFile      |> createIOTypeDropdownItem model dispatch setState header
+            IOType.DerivedDataFile  |> createIOTypeDropdownItem model dispatch setState header
+            IOType.ImageFile        |> createIOTypeDropdownItem model dispatch setState header
+            IOType.FreeText ""      |> createIOTypeDropdownItem model dispatch setState header
             // Navigation element back to main page
-            backToMainDropdownButton state setState
+            backToMainDropdownButton setState
         ]
 
-let Main state setState state_search setState_search (model: Model) dispatch =
-    let state_bb = model.AddBuildingBlockState
+let Main state setState (model: Model) dispatch =
     Bulma.control.div [
         Bulma.dropdown [
             if state.DropdownIsActive then Bulma.dropdown.isActive //Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection
@@ -221,7 +185,7 @@ let Main state setState state_search setState_search (model: Model) dispatch =
                         prop.children [
                             Html.span [
                                 prop.style [style.marginRight 5]
-                                prop.text (state_bb.Header.AsButtonName)
+                                prop.text (model.AddBuildingBlockState.HeaderCellType.ToString())
                             ]
                             Bulma.icon [ Html.i [
                                 prop.className "fa-solid fa-angle-down"
@@ -234,9 +198,9 @@ let Main state setState state_search setState_search (model: Model) dispatch =
                     | Model.BuildingBlock.DropdownPage.Main ->
                         DropdownElements.dropdownContentMain state setState model dispatch
                     | Model.BuildingBlock.DropdownPage.More ->
-                        DropdownElements.dropdownContentProtocolTypeColumns state setState state_search setState_search model dispatch
-                    | Model.BuildingBlock.DropdownPage.IOTypes (createHeader,_) ->
-                        DropdownElements.dropdownContentIOTypeColumns createHeader state setState model dispatch
+                        DropdownElements.dropdownContentProtocolTypeColumns state setState model dispatch
+                    | Model.BuildingBlock.DropdownPage.IOTypes iotype ->
+                        DropdownElements.dropdownContentIOTypeColumns iotype state setState model dispatch
                     |> fun content -> Bulma.dropdownContent [ prop.children content ] 
                 ]
             ]

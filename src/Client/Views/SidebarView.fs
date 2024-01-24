@@ -132,8 +132,7 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
             ResizeObserver.observer(state, setState).observe(ele)
         )
         OnClick (fun e ->
-            if model.TermSearchState.ShowSuggestions
-                || model.AddBuildingBlockState.ShowUnit2TermSuggestions
+            if model.AddBuildingBlockState.ShowUnit2TermSuggestions
             then
                 TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
         )
@@ -143,6 +142,7 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
             FlexDirection "column"
             Position PositionOptions.Relative
             MaxWidth "100%"
+            OverflowY OverflowOptions.Auto
         ]
     ] children
 
@@ -154,7 +154,7 @@ module private Content =
             BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
         | Routing.Route.TermSearch ->
-            TermSearch.termSearchComponent model dispatch
+            TermSearch.Main (model, dispatch)
 
         | Routing.Route.FilePicker ->
             FilePicker.filePickerComponent model dispatch
@@ -198,6 +198,7 @@ let SidebarView (model: Model) (dispatch: Msg -> unit) =
 
         Bulma.container [
             Bulma.container.isFluid
+            prop.className "pl-4 pr-4"
             prop.children [
                 tabs model dispatch state.Size
 

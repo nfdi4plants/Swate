@@ -89,42 +89,16 @@ type LogItem =
 
 module TermSearch =
 
-    type TermSearchUIState = {
-        SearchIsActive          : bool
-        SearchIsLoading         : bool
-    } with
-        static member init() = {
-            SearchIsActive          = false
-            SearchIsLoading         = false
-        }
-
-    type TermSearchUIController = {
-        state: TermSearchUIState
-        setState: TermSearchUIState -> unit
-    }
+    open ARCtrl.ISA
 
     type Model = {
-
-        TermSearchText          : string
-
-        SelectedTerm            : Term option
-        TermSuggestions         : Term []
-
-        ParentOntology          : TermMinimal option
-        SearchByParentOntology  : bool
-
-        HasSuggestionsLoading   : bool
-        ShowSuggestions         : bool
+        SelectedTerm            : OntologyAnnotation option
+        ParentTerm              : OntologyAnnotation option
 
     } with
         static member init () = {
-            TermSearchText              = ""
             SelectedTerm                = None
-            TermSuggestions             = [||]
-            ParentOntology              = None
-            SearchByParentOntology      = true
-            HasSuggestionsLoading       = false
-            ShowSuggestions             = false
+            ParentTerm                  = None
         }
 
 module AdvancedSearch =
@@ -139,7 +113,7 @@ module AdvancedSearch =
         AdvancedSearchOptions               : AdvancedSearchTypes.AdvancedSearchOptions
         AdvancedSearchTermResults           : Term []
         // Client visual design
-        AdvancedTermSearchSubpage           : AdvancedSearchSubpages
+        Subpage           : AdvancedSearchSubpages
         HasModalVisible                     : bool
         HasOntologyDropdownVisible          : bool
         HasAdvancedSearchResultsLoading     : bool
@@ -151,7 +125,7 @@ module AdvancedSearch =
             AdvancedSearchOptions               = AdvancedSearchTypes.AdvancedSearchOptions.init ()
             AdvancedSearchTermResults           = [||]
             HasAdvancedSearchResultsLoading     = false
-            AdvancedTermSearchSubpage           = InputFormSubpage
+            Subpage                             = InputFormSubpage
         }
         static member BuildingBlockHeaderId = "BuildingBlockHeader_ATS_Id"
         static member BuildingBlockBodyId = "BuildingBlockBody_ATS_Id"
@@ -221,57 +195,90 @@ module FilePicker =
         }
 
 open OfficeInteropTypes
+open Fable.Core
 
 module BuildingBlock =
 
     open ARCtrl.ISA
 
-    [<RequireQualifiedAccess>]
-    type DropdownPage =
-    | Main
-    | More
-    | IOTypes of ((IOType -> CompositeHeader)*string)
-
-        member this.toString =
+    type [<RequireQualifiedAccess>] HeaderCellType =
+    | Component
+    | Characteristic
+    | Factor
+    | Parameter
+    | ProtocolType
+    | ProtocolDescription
+    | ProtocolUri
+    | ProtocolVersion
+    | ProtocolREF
+    | Performer
+    | Date
+    | Input
+    | Output
+    with
+        /// <summary>
+        /// Returns true if the Building Block is a term column
+        /// </summary>
+        member this.IsTermColumn() =
             match this with
-            | Main -> "Main Page"
-            | More -> "More"
-            | IOTypes (_,name) -> name
-
-        member this.toTooltip =
+            | Component
+            | Characteristic
+            | Factor
+            | Parameter 
+            | ProtocolType -> true
+            | _ -> false
+        member this.HasOA() =
             match this with
-            | More -> "More"
-            | IOTypes (_,name) -> $"Per table only one {name} is allowed. The value of this column must be a unique identifier."
-            | _ -> ""
+            | Component
+            | Characteristic
+            | Factor
+            | Parameter -> true
+            | _ -> false
+
+        member this.HasIOType() =
+            match this with
+            | Input 
+            | Output -> true
+            | _ -> false
 
     type [<RequireQualifiedAccess>] BodyCellType =
     | Term
     | Unitized
     | Text
 
+    [<RequireQualifiedAccess>]
+    type DropdownPage =
+    | Main
+    | More
+    | IOTypes of HeaderCellType
+
+        member this.toString =
+            match this with
+            | Main -> "Main Page"
+            | More -> "More"
+            | IOTypes (t) -> t.ToString()
+
+        member this.toTooltip =
+            match this with
+            | More -> "More"
+            | IOTypes (t) -> $"Per table only one {t} is allowed. The value of this column must be a unique identifier."
+            | _ -> ""
+
     type BuildingBlockUIState = {
         DropdownIsActive    : bool
         DropdownPage        : DropdownPage
-        BodyCellType        : BodyCellType
     } with
         static member init() = {
             DropdownIsActive    = false
             DropdownPage        = DropdownPage.Main
-            BodyCellType        = BodyCellType.Term
         }
 
     type Model = {
 
-        Header                          : CompositeHeader
-        BodyCell                        : CompositeCell
-        /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
-        HeaderSearchText                : string
-        /// This always referrs to any term applied to the header.
-        HeaderSearchResults             : Term []
-        /// This always referrs to any term applied to the header.
-        BodySearchText                  : string
-        /// This can refer to directly inserted terms as values for the body or to unit terms applied to all body cells.
-        BodySearchResults               : Term []
+        HeaderCellType  : HeaderCellType
+        HeaderArg       : U2<OntologyAnnotation,IOType> option
+        BodyCellType    : BodyCellType
+        BodyArg         : U2<string, OntologyAnnotation> option
 
         // Below everything is more or less deprecated
         // This section is used to add a unit directly to an already existing building block
@@ -284,12 +291,10 @@ module BuildingBlock =
     } with
         static member init () = {
 
-            HeaderSearchText                        = ""
-            HeaderSearchResults                     = [||]
-            Header                                  = CompositeHeader.ParameterEmpty
-            BodySearchText                          = ""
-            BodySearchResults                       = [||]
-            BodyCell                                = CompositeCell.emptyTerm
+            HeaderCellType      = HeaderCellType.Parameter
+            HeaderArg           = None
+            BodyCellType        = BodyCellType.Term
+            BodyArg             = None
 
             // Below everything is more or less deprecated
             // This section is used to add a unit directly to an already existing building block
@@ -299,6 +304,26 @@ module BuildingBlock =
             ShowUnit2TermSuggestions                = false
             HasUnit2TermSuggestionsLoading          = false
         }
+
+        member this.TryHeaderOA() =
+            match this.HeaderArg with
+                | Some (U2.Case1 oa) -> Some oa
+                | _ -> None
+
+        member this.TryHeaderIO() =
+            match this.HeaderArg with
+                | Some (U2.Case2 io) -> Some io
+                | _ -> None
+
+        member this.TryBodyOA() =
+            match this.BodyArg with
+                | Some (U2.Case2 oa) -> Some oa
+                | _ -> None
+
+        member this.TryBodyString() =
+            match this.BodyArg with
+                | Some (U2.Case1 s) -> Some s
+                | _ -> None
 
 /// Validation scheme for Table
 module Validation =

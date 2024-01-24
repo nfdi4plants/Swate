@@ -29,7 +29,7 @@ module SidebarControllerAux =
     let getNextColumnIndex (state: Spreadsheet.Model) =
         // if cell is selected get column of selected cell we want to insert AFTER
         if not state.SelectedCells.IsEmpty then
-            let indexNextToSelected = state.SelectedCells |> Set.toArray |> Array.head |> fst
+            let indexNextToSelected = state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1 
             indexNextToSelected
         else
             state.ActiveTable.ColumnCount
@@ -107,6 +107,11 @@ let addBuildingBlocks(newColumns: CompositeColumn []) (state: Spreadsheet.Model)
     table.AddColumns(newColumns,nextIndex)
     {state with ArcFile = state.ArcFile}
 
+let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptions option) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let table = state.ActiveTable
+    table.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)
+    {state with ArcFile = state.ArcFile}
+
 let insertTerm_IntoSelected (term:OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     let selected = state.SelectedCells |> Set.toArray
@@ -116,7 +121,7 @@ let insertTerm_IntoSelected (term:OntologyAnnotation) (state: Spreadsheet.Model)
         let c = table.TryGetCellAt(colIndex,rowIndex)
         let newCell = 
             match c with
-            | Some cc -> cc
+            | Some cc -> cc.UpdateWithOA term
             | None -> column.GetDefaultEmptyCell().UpdateWithOA term
         table.UpdateCellAt(colIndex,rowIndex, newCell)
     {state with ArcFile = state.ArcFile}

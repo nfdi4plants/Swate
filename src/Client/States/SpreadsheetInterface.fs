@@ -12,11 +12,12 @@ type Msg =
 | RemoveBuildingBlock
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
+| JoinTable of ArcTable * index: int option * options: TableJoinOptions option
 | ImportFile of ArcFiles
 /// Open modal for selected building block, allows editing on standalone only.
 | EditBuildingBlock
 /// Inserts TermMinimal to selected fields of one column
-| InsertOntologyTerm of OntologyAnnotation
+| InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
 /// Starts chain to export active table to isa json
 | ExportJsonTable

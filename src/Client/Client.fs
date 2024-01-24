@@ -22,6 +22,7 @@ let private split_container model dispatch =
     SplitWindowView.Main
         mainWindow
         sideWindow
+        model
         dispatch
 
 [<ReactComponent>]
@@ -29,11 +30,14 @@ let View (model : Model) (dispatch : Msg -> unit) =
     let (colorstate, setColorstate) = React.useState(LocalStorage.Darkmode.State.init)
     let v = {colorstate with SetTheme = setColorstate}
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
-        match model.PersistentStorageState.Host with
-        | Some Swatehost.Excel ->
-            SidebarView.SidebarView model dispatch
-        | _ ->
-            split_container model dispatch
+        Html.div [
+            Html.div [prop.id "modal-container"]
+            match model.PersistentStorageState.Host with
+            | Some Swatehost.Excel ->
+                SidebarView.SidebarView model dispatch
+            | _ ->
+                split_container model dispatch
+        ]
     )
             
 let ARCitect_subscription (initial: Messages.Model) : (SubId * Subscribe<Messages.Msg>) list =
@@ -53,15 +57,18 @@ open Elmish.Debug
 open Elmish.HMR
 #endif
 
+//+:cnd:noEmit
 Program.mkProgram Init.init Update.update View
+//-:cnd:noEmit
 #if DEBUG
 |> Program.withConsoleTrace
 #endif
 |> Program.withSubscription ARCitect_subscription
 |> Program.toNavigable (parsePath Routing.Routing.route) Update.urlUpdate
-|> Program.withReactBatched "elmish-app"
+|> Program.withReactSynchronous "elmish-app"
 #if DEBUG
 //|> Program.withDebuggerCoders CustomDebugger.modelEncoder CustomDebugger.modelDecoder
 |> Program.withDebugger
 #endif
+//+:cnd:noEmit
 |> Program.run

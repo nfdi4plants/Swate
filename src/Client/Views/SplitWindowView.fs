@@ -78,7 +78,7 @@ let exampleTerm =
 // https://stackoverflow.com/questions/6219031/how-can-i-resize-a-div-by-dragging-just-one-side-of-it
 /// Splits screen into two parts. Left and right, with a dragbar in between to change size of right side.
 [<ReactComponent>]
-let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) (dispatch: Messages.Msg -> unit) =
+let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) (mainModel:Messages.Model) (dispatch: Messages.Msg -> unit) =
     let (model, setModel) = React.useState(SplitWindow.init)
     React.useEffect(model.WriteToLocalStorage, [|box model|])
     React.useEffectOnce(fun _ -> Browser.Dom.window.addEventListener("resize", onResize_event model setModel))
@@ -97,21 +97,22 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
                 ]
                 prop.children left
             ]
-            Html.div [
-                prop.id sidebarId
-                prop.style [
-                    style.float'.right;
-                    style.minWidth(minWidth);
-                    style.flexBasis(length.px model.RightWindowWidth); style.flexShrink 0; style.flexGrow 0
-                    style.height(length.vh 100)
-                    style.width(length.perc 100)
-                    style.overflow.auto
-                    style.display.flex
+            if not (mainModel.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Metadata) then
+                Html.div [
+                    prop.id sidebarId
+                    prop.style [
+                        style.float'.right;
+                        style.minWidth(minWidth);
+                        style.flexBasis(length.px model.RightWindowWidth); style.flexShrink 0; style.flexGrow 0
+                        style.height(length.vh 100)
+                        style.width(length.perc 100)
+                        style.overflow.hidden
+                        style.display.flex
+                    ]
+                    prop.children [
+                        dragbar model setModel dispatch
+                        yield! right 
+                    ]
                 ]
-                prop.children [
-                    dragbar model setModel dispatch
-                    yield! right 
-                ]
-            ]
         ]
     ]

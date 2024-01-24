@@ -37,6 +37,20 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.
         }
         nextModel,Cmd.none
 
+module AdvancedSearch =
+
+    let update (msg: AdvancedSearch.Msg) (model:Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
+        match msg with
+        | AdvancedSearch.GetSearchResults content -> 
+            let cmd =
+                Cmd.OfAsync.either 
+                    Api.api.getTermsForAdvancedSearch
+                    content.config
+                    (fun terms -> Run (fun _ -> content.responseSetter terms))
+                    (curry GenericError Cmd.none >> DevMsg)
+                    
+            model, cmd
+
 module Dev = 
 
     let update (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Messages.Msg> =
@@ -151,42 +165,11 @@ let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiSt
 
     match reqMsg with
 
-    | GetNewTermSuggestions queryString ->
-        handleTermSuggestionRequest
-            "getTermSuggestions"
-            (TermSuggestionResponse >> Response)
-            queryString
-
-    | GetNewTermSuggestionsByParentTerm (queryString,parentOntology) ->
-        handleTermSuggestionByParentTermRequest
-            "getTermSuggestionsByParentOntology"
-            (TermSuggestionResponse >> Response)
-            queryString
-            parentOntology
-
     | GetNewUnitTermSuggestions (queryString) ->
         handleUnitTermSuggestionRequest
             "getUnitTermSuggestions"
             (UnitTermSuggestionResponse >> Response)
             queryString
-
-    | GetNewAdvancedTermSearchResults options ->
-        let currentCall = {
-                FunctionName = "getTermsForAdvancedSearch"
-                Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-
-        nextState,
-        Cmd.OfAsync.either
-            Api.api.getTermsForAdvancedSearch
-            options
-            (AdvancedTermSearchResultsResponse >> Response >> Api)
-            (ApiError >> Api)
 
     | FetchAllOntologies ->
         let currentCall = {
@@ -289,35 +272,11 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
         nextState, cmds
 
     match resMsg with
-    | TermSuggestionResponse suggestions ->
-
-        handleTermSuggestionResponse
-            (TermSearch.NewSuggestions >> TermSearchMsg)
-            suggestions
-
     | UnitTermSuggestionResponse (suggestions) ->
 
         handleUnitTermSuggestionResponse
             (BuildingBlock.Msg.NewUnitTermSuggestions >> BuildingBlockMsg)
             suggestions            
-
-    | AdvancedTermSearchResultsResponse results ->
-        let finishedCall = {
-            currentState.currentCall with
-                Status = Successfull
-        }
-
-        let nextState = {
-            currentCall = ApiState.noCall
-            callHistory = finishedCall::currentState.callHistory
-        }
-
-        let cmds = Cmd.batch [
-            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            results |> AdvancedSearch.NewAdvancedSearchResults |> AdvancedSearchMsg |> Cmd.ofMsg
-        ]
-
-        nextState, cmds
 
     | FetchAllOntologiesResponse onts ->
         let finishedCall = {
@@ -469,10 +428,6 @@ let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * 
     | CloseSuggestions ->
         let nextModel = {
             currentModel with
-                TermSearchState = {
-                    currentModel.TermSearchState with
-                        ShowSuggestions = false
-                }
                 AddBuildingBlockState = {
                     currentModel.AddBuildingBlockState with
                         ShowUnit2TermSuggestions = false
@@ -484,6 +439,9 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
         match msg with
         | DoNothing -> currentModel,Cmd.none
+        | Run callback -> 
+            callback()
+            model, Cmd.none
         | UpdateHistory next -> {model with History = next}, Cmd.none
         | TestMyAPI ->
             let cmd =
@@ -583,17 +541,11 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                     TermSearchState = nextTermSearchState
             }
             nextModel,nextCmd
+        | AdvancedSearchMsg msg ->
+            let nextModel, cmd = AdvancedSearch.update msg model
 
-        | AdvancedSearchMsg advancedSearchMsg ->
-            let nextAdvancedSearchState,nextCmd =
-                currentModel.AdvancedSearchState
-                |> SidebarComponents.AdvancedSearch.update advancedSearchMsg
+            nextModel, cmd
 
-            let nextModel = {
-                currentModel with
-                    AdvancedSearchState = nextAdvancedSearchState
-            }
-            nextModel,nextCmd
         | DevMsg msg ->
             let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
         

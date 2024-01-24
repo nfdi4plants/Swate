@@ -75,16 +75,19 @@ module Spreadsheet =
             | AddAnnotationBlocks columns ->
                 let nextState = Controller.addBuildingBlocks columns state
                 nextState, model, Cmd.none
+            | JoinTable (table, index, options) ->
+                let nextState = Controller.joinTable table index options state
+                nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
                 let nextState = { state with ArcFile = Some arcFile }
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
                 let nextState = { Spreadsheet.Model.init() with ArcFile = Some arcFile }
                 nextState, model, Cmd.none
-            | InsertOntologyTerm oa ->
+            | InsertOntologyAnnotation oa ->
                 let nextState = Controller.insertTerm_IntoSelected oa state
                 nextState, model, Cmd.none
-            | InsertOntologyTerms termMinimals ->
+            | InsertOntologyAnnotations oas ->
                 failwith "InsertOntologyTerms not implemented in Spreadsheet.Update"
                 //let cmd = createPromiseCmd <| fun _ -> Controller.insertTerms termMinimals state
                 let cmd = Cmd.none

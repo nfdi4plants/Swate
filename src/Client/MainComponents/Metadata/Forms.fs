@@ -271,7 +271,6 @@ type FormComponents =
                             prop.valueOrDefault state
                             prop.onChange(fun (e: System.DateTime) ->
                                 let dtString = e.ToString("yyyy-MM-ddThh:mm")
-                                log ("LOOK AT ME", dtString)
                                 setState dtString
                                 debouncel debounceStorage label 1000 setLoading setter dtString
                             )
@@ -356,7 +355,6 @@ type FormComponents =
                                 (if showTextLabels then $"Term Name" else ""),
                                 (fun s -> 
                                     let s = if s = "" then None else Some s
-                                    printfn "INNER SET"
                                     state.Name <- s 
                                     state.ToOntologyAnnotation() |> setter),
                                 fullwidth = true
