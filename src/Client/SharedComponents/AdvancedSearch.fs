@@ -1,4 +1,4 @@
-module SharedComponents.AdvancedSearch
+module Components.AdvancedSearch
 
 open Fable.React
 open Fable.React.Props
@@ -18,15 +18,14 @@ open AdvancedSearch
 
 open Messages
 
-let private StartAdvancedSearch (state: AdvancedSearch.Model) setState =
-    async {
-        let! terms = Api.api.getTermsForAdvancedSearch state.AdvancedSearchOptions
+let private StartAdvancedSearch (state: AdvancedSearch.Model) setState dispatch =
+    let setter (terms: Term []) = 
         setState 
             { state with 
                 AdvancedSearchTermResults = terms
                 Subpage = AdvancedSearch.AdvancedSearchSubpages.ResultsSubpage
             }
-    }
+    AdvancedSearch.Msg.GetSearchResults {|config=state.AdvancedSearchOptions; responseSetter = setter|}  |> AdvancedSearchMsg |> dispatch
 
 let private createLinkOfAccession (accession:string) =
     a [
@@ -277,7 +276,7 @@ let private keepObsoleteCheckradioElement (state:AdvancedSearch.Model) setState 
         ]
     ]
 
-let private inputFormPage (state:AdvancedSearch.Model)  (setState:AdvancedSearch.Model -> unit) =
+let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.Model -> unit) dispatch =
     Html.div [
         Bulma.field.div [
             Bulma.label  "Term name keywords:"
@@ -303,7 +302,7 @@ let private inputFormPage (state:AdvancedSearch.Model)  (setState:AdvancedSearch
                                             Subpage                         = AdvancedSearchSubpages.ResultsSubpage
                                             HasAdvancedSearchResultsLoading = true
                                         }
-                                    StartAdvancedSearch state setState |> Async.StartImmediate
+                                    StartAdvancedSearch state setState dispatch
                             | _ -> ()
                         )
                     ]
@@ -326,7 +325,7 @@ let private inputFormPage (state:AdvancedSearch.Model)  (setState:AdvancedSearch
                                 e.stopPropagation();
                                 let isValid = isValidAdancedSearchOptions state.AdvancedSearchOptions
                                 if isValid then
-                                    StartAdvancedSearch state setState |> Async.StartImmediate
+                                    StartAdvancedSearch state setState dispatch
                             | _ -> ()
                         )
                         prop.valueOrDefault state.AdvancedSearchOptions.TermDefinition
@@ -391,7 +390,7 @@ let private resultsPage (resultHandler: Term -> unit) (state: AdvancedSearch.Mod
     ]
 
 [<ReactComponent>]
-let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit) =
+let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit, dispatch) =
     let state, setState = React.useState(AdvancedSearch.Model.init)
     React.useEffect(
         (fun _ -> AdvancedSearch.Model.init() |> setState), 
@@ -423,7 +422,7 @@ let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit
                             match state.Subpage with
                             | AdvancedSearchSubpages.InputFormSubpage ->
                                 // we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
-                                inputFormPage state setState
+                                inputFormPage state setState dispatch
                             | AdvancedSearchSubpages.ResultsSubpage ->
                                 resultsPage resultHandler state setState
                         ]
@@ -458,7 +457,7 @@ let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit
                                             prop.onClick (fun e ->
                                                 e.preventDefault()
                                                 e.stopPropagation();
-                                                StartAdvancedSearch state setState |> Async.StartImmediate
+                                                StartAdvancedSearch state setState dispatch
                                             )
                                             prop.text "Start advanced search"
                                         ]

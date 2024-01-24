@@ -108,7 +108,9 @@ let Main (model:Messages.Model, dispatch) =
         Bulma.label "Search for an ontology term to fill into the selected field(s)"
 
         mainFunctionContainer [
-            Components.TermSearch.Input(setTerm, fullwidth=true, size=Bulma.input.isLarge, ?parent'=model.TermSearchState.ParentTerm, showAdvancedSearch=true)
+            Bulma.field.div [
+                Components.TermSearch.Input(setTerm, dispatch, fullwidth=true, size=Bulma.input.isLarge, ?parent'=model.TermSearchState.ParentTerm, showAdvancedSearch=true)
+            ]
             addButton(model, dispatch)
         ]
 

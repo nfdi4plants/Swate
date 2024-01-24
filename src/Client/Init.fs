@@ -17,7 +17,6 @@ let initializeModel () =
         PersistentStorageState      = PersistentStorageState    .init ()
         DevState                    = DevState                  .init ()
         TermSearchState             = TermSearch.Model          .init ()
-        AdvancedSearchState         = AdvancedSearch.Model      .init ()
         ExcelState                  = OfficeInterop.Model       .init ()
         ApiState                    = ApiState                  .init ()
         FilePickerState             = FilePicker.Model          .init ()

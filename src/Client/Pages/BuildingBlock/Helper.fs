@@ -7,38 +7,42 @@ open Messages
 open ARCtrl.ISA
 open Model.BuildingBlock
 
-let createCellFromUiStateAndOA (uiState: BuildingBlockUIState) (oa:OntologyAnnotation) =
-    match uiState.BodyCellType with
-    | BodyCellType.Text -> CompositeCell.createFreeText oa.NameText
-    | BodyCellType.Term -> CompositeCell.createTerm oa
-    | BodyCellType.Unitized -> CompositeCell.createUnitized("", oa)
+let isSameMajorHeaderCellType (hct1: BuildingBlock.HeaderCellType) (hct2: BuildingBlock.HeaderCellType) =
+    (hct1.IsTermColumn() = hct2.IsTermColumn())
+    && (hct1.HasIOType() = hct2.HasIOType())
+    
+let selectHeaderCellType (hct: BuildingBlock.HeaderCellType) setUiState dispatch =
+    BuildingBlock.UpdateHeaderCellType hct |> BuildingBlockMsg |> dispatch
+    { DropdownPage = DropdownPage.Main; DropdownIsActive = false }|> setUiState
+    
+open Fable.Core
 
-let selectHeader (uiState: BuildingBlockUIState) (setUiState: BuildingBlockUIState -> unit) (nextHeader: CompositeHeader) = 
-    let nextState, updateBodyCellMsg =
-        match nextHeader.IsTermColumn, uiState.BodyCellType with
-        | true, BodyCellType.Term | true, BodyCellType.Unitized -> 
-            { uiState with DropdownPage = DropdownPage.Main; DropdownIsActive = false },
-            Msg.DoNothing
-        | true, BodyCellType.Text -> 
-            { BodyCellType = BodyCellType.Term; DropdownPage = DropdownPage.Main; DropdownIsActive = false },
-            Msg.DoNothing
-        | false, _ -> 
-            { BodyCellType = BodyCellType.Text; DropdownPage = DropdownPage.Main; DropdownIsActive = false },
-            Msg.DoNothing
-    setUiState nextState
-    Msg.Batch [
-        BuildingBlock.Msg.SelectHeader nextHeader |> BuildingBlockMsg
-        updateBodyCellMsg
-    ]
-
-let selectBody (body: CompositeCell) =
-    BuildingBlock.Msg.SelectBodyCell (Some body) |> BuildingBlockMsg
-
-let hasVerifiedTermHeader (header: CompositeHeader) = header.IsTermColumn && header.ToTerm().TermAccessionShort <> ""
-
-let hasVerifiedCell (cell: CompositeCell) = (cell.isTerm || cell.isUnitized) && cell.ToOA().TermAccessionShort <> ""
+let createCompositeHeaderFromState (state: BuildingBlock.Model) =
+    let getOA() = state.TryHeaderOA() |> Option.defaultValue OntologyAnnotation.empty
+    let getIOType() = state.TryHeaderIO() |> Option.defaultValue (IOType.FreeText "")
+    match state.HeaderCellType with
+    | HeaderCellType.Component -> CompositeHeader.Component <| getOA()
+    | HeaderCellType.Characteristic -> CompositeHeader.Characteristic <| getOA()
+    | HeaderCellType.Factor -> CompositeHeader.Factor <| getOA()
+    | HeaderCellType.Parameter -> CompositeHeader.Parameter <| getOA()
+    | HeaderCellType.ProtocolType -> CompositeHeader.ProtocolType
+    | HeaderCellType.ProtocolDescription -> CompositeHeader.ProtocolDescription
+    | HeaderCellType.ProtocolUri -> CompositeHeader.ProtocolUri
+    | HeaderCellType.ProtocolVersion -> CompositeHeader.ProtocolVersion
+    | HeaderCellType.ProtocolREF -> CompositeHeader.ProtocolREF
+    | HeaderCellType.Performer -> CompositeHeader.Performer
+    | HeaderCellType.Date -> CompositeHeader.Date
+    | HeaderCellType.Input -> CompositeHeader.Input <| getIOType()
+    | HeaderCellType.Output -> CompositeHeader.Output <| getIOType()
+   
+let tryCreateCompositeCellFromState (state: BuildingBlock.Model) =
+    match state.BodyCellType, state.BodyArg with 
+    | BodyCellType.Term, Some (U2.Case2 oa) -> CompositeCell.createTerm (oa) |> Some
+    | BodyCellType.Unitized, Some (U2.Case2 oa) -> CompositeCell.createUnitized ("", oa) |> Some
+    | BodyCellType.Text, Some (U2.Case1 s) -> CompositeCell.createFreeText s |> Some
+    | _ -> None
 
 let isValidColumn (header : CompositeHeader) =
     header.IsFeaturedColumn 
     || (header.IsTermColumn && header.ToTerm().NameText.Length > 0)
-    || header.IsSingleColumn 
+    || header.IsSingleColumn

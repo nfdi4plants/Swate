@@ -75,6 +75,14 @@ module Extensions =
             | _ -> 
                 this
 
+        member this.TryOA() =
+            match this with
+            | CompositeHeader.Component oa -> Some oa
+            | CompositeHeader.Parameter oa -> Some oa
+            | CompositeHeader.Characteristic oa -> Some oa
+            | CompositeHeader.Factor oa -> Some oa
+            | _ -> None
+
     type CompositeCell with
         member this.UpdateWithOA(oa:OntologyAnnotation) =
             match this with

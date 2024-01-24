@@ -29,7 +29,7 @@ module SidebarControllerAux =
     let getNextColumnIndex (state: Spreadsheet.Model) =
         // if cell is selected get column of selected cell we want to insert AFTER
         if not state.SelectedCells.IsEmpty then
-            let indexNextToSelected = state.SelectedCells |> Set.toArray |> Array.head |> fst
+            let indexNextToSelected = state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1 
             indexNextToSelected
         else
             state.ActiveTable.ColumnCount

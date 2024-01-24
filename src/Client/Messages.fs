@@ -15,6 +15,7 @@ open OfficeInteropTypes
 open Model
 open Routing
 open ARCtrl.ISA
+open Fable.Core
 
 type System.Exception with
     member this.GetPropagatedError() =
@@ -35,6 +36,12 @@ module TermSearch =
     type Msg =
         | UpdateSelectedTerm of OntologyAnnotation option 
         | UpdateParentTerm of OntologyAnnotation option
+
+
+module AdvancedSearch =
+    
+    type Msg =
+        | GetSearchResults of {| config:AdvancedSearchTypes.AdvancedSearchOptions; responseSetter: Term [] -> unit |}
 
 type DevMsg =
     | LogTableMetadata
@@ -81,9 +88,10 @@ module BuildingBlock =
     open TermSearch
 
     type Msg =
-    | SelectHeader of CompositeHeader
-    /// Returns all child terms
-    | SelectBodyCell of CompositeCell option
+    | UpdateHeaderCellType of BuildingBlock.HeaderCellType
+    | UpdateHeaderArg of U2<OntologyAnnotation,IOType> option
+    | UpdateBodyCellType of BuildingBlock.BodyCellType
+    | UpdateBodyArg of U2<string, OntologyAnnotation> option
     // Below everything is more or less deprecated
     // Is still used for unit update in office
     | SearchUnitTermTextChange  of searchString:string
@@ -131,7 +139,6 @@ type Model = {
     DevState                    : DevState
     ///States regarding term search
     TermSearchState             : TermSearch.Model
-    AdvancedSearchState         : AdvancedSearch.Model
     ///Use this in the future to model excel stuff like table data
     ExcelState                  : OfficeInterop.Model
     /// This should be removed. Overhead making maintainance more difficult
@@ -171,6 +178,7 @@ type Msg =
 | Api                   of ApiMsg
 | DevMsg                of DevMsg
 | TermSearchMsg         of TermSearch.Msg
+| AdvancedSearchMsg     of AdvancedSearch.Msg
 | OfficeInteropMsg      of OfficeInterop.Msg
 | PersistentStorage     of PersistentStorageMsg
 | FilePickerMsg         of FilePicker.Msg
@@ -189,6 +197,7 @@ type Msg =
 | UpdatePageState       of Routing.Route option
 | UpdateIsExpert        of bool
 | Batch                 of seq<Messages.Msg>
+| Run                   of (unit -> unit)
 | UpdateHistory         of LocalHistory.Model
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI

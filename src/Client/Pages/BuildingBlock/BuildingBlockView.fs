@@ -17,11 +17,29 @@ open Elmish
 
 let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
     match addBuildingBlockMsg with
-    | SelectHeader header ->
-        let nextState = { state with Header = header }
+    | UpdateBodyArg next ->
+        let nextState = { state with BodyArg = next }
         nextState, Cmd.none
-    | SelectBodyCell (cell) ->
-        let nextState = { state with BodyCell = cell}
+    | UpdateHeaderArg next ->
+        let nextState = { state with HeaderArg = next}
+        nextState, Cmd.none
+    | UpdateHeaderCellType next ->
+        let nextState = 
+            if Helper.isSameMajorHeaderCellType state.HeaderCellType next then
+                { state with 
+                    HeaderCellType = next 
+                }
+            else
+                let nextBodyCellType = if next.IsTermColumn() then BuildingBlock.BodyCellType.Term else BuildingBlock.BodyCellType.Text
+                { state with 
+                    HeaderCellType = next
+                    BodyCellType = nextBodyCellType
+                    HeaderArg = None
+                    BodyArg = None
+                }
+        nextState, Cmd.none
+    | UpdateBodyCellType next ->
+        let nextState = { state with BodyCellType = next }
         nextState, Cmd.none
 
     | SearchUnitTermTextChange (newTerm) ->

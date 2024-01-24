@@ -37,6 +37,20 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.
         }
         nextModel,Cmd.none
 
+module AdvancedSearch =
+
+    let update (msg: AdvancedSearch.Msg) (model:Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
+        match msg with
+        | AdvancedSearch.GetSearchResults content -> 
+            let cmd =
+                Cmd.OfAsync.either 
+                    Api.api.getTermsForAdvancedSearch
+                    content.config
+                    (fun terms -> Run (fun _ -> content.responseSetter terms))
+                    (curry GenericError Cmd.none >> DevMsg)
+                    
+            model, cmd
+
 module Dev = 
 
     let update (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Messages.Msg> =
@@ -425,6 +439,9 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
         match msg with
         | DoNothing -> currentModel,Cmd.none
+        | Run callback -> 
+            callback()
+            model, Cmd.none
         | UpdateHistory next -> {model with History = next}, Cmd.none
         | TestMyAPI ->
             let cmd =
@@ -524,6 +541,10 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                     TermSearchState = nextTermSearchState
             }
             nextModel,nextCmd
+        | AdvancedSearchMsg msg ->
+            let nextModel, cmd = AdvancedSearch.update msg model
+
+            nextModel, cmd
 
         | DevMsg msg ->
             let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
