@@ -119,6 +119,7 @@ let Main (model: Messages.Model) dispatch =
                                             (fun e -> ()),
                                             false
                                         ).toReactElement()
+                                        quickAccessButtonListStart (model.History: LocalHistory.Model) dispatch
                                     ]
                                 ]
                             ]
