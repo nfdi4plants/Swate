@@ -7,8 +7,7 @@ open Spreadsheet
 open Shared
 
 [<ReactComponentAttribute>]
-let Main(x: {| model: Messages.Model; dispatch: Messages.Msg -> unit |}) = 
-    let model, dispatch = x.model, x.dispatch
+let Main(model: Messages.Model, dispatch: Messages.Msg -> unit) = 
     match model.SpreadsheetModel.ActiveView with
     | ActiveView.Table _ ->
         MainComponents.SpreadsheetView.Main model dispatch

@@ -97,23 +97,21 @@ module private DropdownElements =
 
     let createIOTypeDropdownItem (model: Model) dispatch setUiState (headerType: BuildingBlock.HeaderCellType) (iotype: IOType) =
         let setIO (ioType) = 
-            Helper.selectHeaderCellType headerType setUiState dispatch
-            U2.Case2 ioType |> Some |> BuildingBlock.UpdateHeaderArg |> BuildingBlockMsg |> dispatch
+            { DropdownPage = DropdownPage.Main; DropdownIsActive = false } |> setUiState
+            (headerType,ioType) |> BuildingBlock.UpdateHeaderWithIO |> BuildingBlockMsg |> dispatch
         Bulma.dropdownItem.a [
-            prop.children [
-                match iotype with
-                | IOType.FreeText s ->
-                    let onSubmit = fun (v: string) -> 
-                        let header = IOType.FreeText v
-                        setIO header
-                    FreeTextInputElement onSubmit
-                | _ ->
-                    Html.div [
-                        prop.onClick (fun e -> e.stopPropagation(); setIO iotype)
-                        prop.onKeyDown(fun k -> if (int k.which) = 13 then setIO iotype)
-                        prop.text (iotype.ToString())
-                    ]
-            ]
+            match iotype with
+            | IOType.FreeText s ->
+                let onSubmit = fun (v: string) -> 
+                    let header = IOType.FreeText v
+                    setIO header
+                prop.children [FreeTextInputElement onSubmit]
+            | _ ->
+                prop.onClick (fun e -> e.stopPropagation(); setIO iotype)
+                prop.onKeyDown(fun k -> if (int k.which) = 13 then setIO iotype)
+                prop.children [
+                    Html.div [prop.text (iotype.ToString())]
+                ]
         ]
 
     /// Main column types subpage for dropdown

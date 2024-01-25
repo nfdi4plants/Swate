@@ -20,10 +20,12 @@ let private calculateNewSideBarSize (model:SplitWindow) (pos:float) =
 
 let private onResize_event (model:SplitWindow) (setModel: SplitWindow -> unit) = (fun (e: Event) ->
     /// must get width like this, cannot propagate model correctly.
-    let sidebarWindow = Browser.Dom.document.getElementById(sidebarId).clientWidth
-    let windowWidth = Browser.Dom.window.innerWidth
-    let new_sidebarWidth = calculateNewSideBarSize model (windowWidth - sidebarWindow)
-    { model with RightWindowWidth = new_sidebarWidth } |> setModel
+    let ele = Browser.Dom.document.getElementById(sidebarId)
+    if isNull ele |> not then
+        let sidebarWindow = ele.clientWidth
+        let windowWidth = Browser.Dom.window.innerWidth
+        let new_sidebarWidth = calculateNewSideBarSize model (windowWidth - sidebarWindow)
+        { model with RightWindowWidth = new_sidebarWidth } |> setModel
 )
     
 /// <summary> This event changes the size of main window and sidebar </summary>

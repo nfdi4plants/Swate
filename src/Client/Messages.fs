@@ -88,6 +88,7 @@ module BuildingBlock =
     open TermSearch
 
     type Msg =
+    | UpdateHeaderWithIO of BuildingBlock.HeaderCellType * IOType
     | UpdateHeaderCellType of BuildingBlock.HeaderCellType
     | UpdateHeaderArg of U2<OntologyAnnotation,IOType> option
     | UpdateBodyCellType of BuildingBlock.BodyCellType

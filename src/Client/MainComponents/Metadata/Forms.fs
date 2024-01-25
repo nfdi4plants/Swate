@@ -176,7 +176,7 @@ type FormComponents =
         let fullwidth = defaultArg fullwidth false
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
-        let debounceStorage, setdebounceStorage = React.useState(newDebounceStorage)
+        let debounceStorage = React.useRef(newDebounceStorage())
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
         Bulma.field.div [
             prop.style [if fullwidth then style.flexGrow 1]
@@ -193,7 +193,7 @@ type FormComponents =
                                     prop.valueOrDefault state
                                     prop.onChange(fun (e: string) ->
                                         setState e
-                                        debouncel debounceStorage label 1000 setLoading setter e
+                                        debouncel debounceStorage.current label 1000 setLoading setter e
                                     )
                                 ]
                             ]
@@ -337,28 +337,43 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member OntologyAnnotationInput (input: OntologyAnnotation, label: string, setter: OntologyAnnotation -> unit, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
+    static member OntologyAnnotationInput (input: OntologyAnnotation, setter: OntologyAnnotation -> unit, ?label: string, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
         let showTextLabels = defaultArg showTextLabels true
         let state, setState = React.useState(Helper.OntologyAnnotationMutable.fromOntologyAnnotation input)
+        let element = React.useElementRef()
         React.useEffect((fun () -> setState <| Helper.OntologyAnnotationMutable.fromOntologyAnnotation input), dependencies=[|box input|])
-        let hasLabel = label <> ""
         Bulma.field.div [ 
-            if hasLabel then Bulma.label label
+            if label.IsSome then Bulma.label label.Value
             Bulma.field.div [
+                //prop.ref element
+                prop.style [style.position.relative]
                 prop.classes ["is-flex"; "is-flex-direction-row"; "is-justify-content-space-between"]
                 prop.children [
                     Html.div [
                         prop.classes ["form-container"; if removebutton.IsSome then "pr-2"]
                         prop.children [
-                            FormComponents.TextInput(
-                                Option.defaultValue "" state.Name,
-                                (if showTextLabels then $"Term Name" else ""),
-                                (fun s -> 
-                                    let s = if s = "" then None else Some s
-                                    state.Name <- s 
-                                    state.ToOntologyAnnotation() |> setter),
-                                fullwidth = true
-                            )
+                            Bulma.field.div [
+                                prop.style [style.flexGrow 1]
+                                prop.children [
+                                    if showTextLabels then Bulma.label $"Term Name"
+                                    let innersetter = 
+                                        fun (oaOpt: OntologyAnnotation option) -> 
+                                            if oaOpt.IsSome then 
+                                                setter oaOpt.Value
+                                                setState (Helper.OntologyAnnotationMutable.fromOntologyAnnotation oaOpt.Value)
+                                    Components.TermSearch.Input(
+                                        innersetter,
+                                        input=state.ToOntologyAnnotation(),
+                                        fullwidth=true,
+                                        ?portalTermSelectArea=element.current,
+                                        debounceSetter=1000
+                                    )                                
+                                ]
+                            ]
+                            Html.div [
+                                prop.classes ["form-input-term-search-positioner"]
+                                prop.ref element
+                            ]
                             FormComponents.TextInput(
                                 Option.defaultValue "" state.TSR,
                                 (if showTextLabels then $"TSR" else ""),
@@ -397,7 +412,7 @@ type FormComponents =
     static member OntologyAnnotationsInput (oas: OntologyAnnotation [], label: string, setter: OntologyAnnotation [] -> unit, ?showTextLabels: bool) =
         FormComponents.InputSequence(
             oas, OntologyAnnotation.empty, label, setter, 
-            (fun (a,b,c,d) -> FormComponents.OntologyAnnotationInput(a,b,c,removebutton=d,?showTextLabels=showTextLabels))
+            (fun (a,b,c,d) -> FormComponents.OntologyAnnotationInput(a,c,label=b,removebutton=d,?showTextLabels=showTextLabels))
         )
 
     [<ReactComponent>]
@@ -629,11 +644,11 @@ type FormComponents =
                     createPersonFieldTextInput(state.Authors, "Authors", fun s -> state.Authors <- s)
                     FormComponents.OntologyAnnotationInput(
                         Option.defaultValue OntologyAnnotation.empty state.Status, 
-                        "Status", 
                         (fun s -> 
                             state.Status <- if s = OntologyAnnotation.empty then None else Some s
                             state.ToPublication() |> setter
-                        )
+                        ),
+                        "Status"
                     )
                     FormComponents.CommentsInput(
                         Option.defaultValue [||] state.Comments, 
@@ -713,11 +728,11 @@ type FormComponents =
                     createFieldTextInput(state.Name, "Name", fun s -> state.Name <- s)
                     FormComponents.OntologyAnnotationInput(
                         Option.defaultValue OntologyAnnotation.empty state.FactorType, 
-                        "Status", 
                         (fun s -> 
                             state.FactorType <- if s = OntologyAnnotation.empty then None else Some s
                             state.ToFactor() |> setter
-                        )
+                        ),
+                        "Status"
                     )
                     FormComponents.CommentsInput(
                         Option.defaultValue [||] state.Comments, 

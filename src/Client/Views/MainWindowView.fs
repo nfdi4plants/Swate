@@ -43,7 +43,7 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
 open Shared
 
 [<ReactComponent>]
-let Main (model: Messages.Model) dispatch =
+let Main (model: Messages.Model, dispatch) =
     let state = model.SpreadsheetModel
     Html.div [
         prop.id "MainWindow"
@@ -73,7 +73,7 @@ let Main (model: Messages.Model) dispatch =
                     | Some (ArcFiles.Study _)
                     | Some (ArcFiles.Investigation _) 
                     | Some (ArcFiles.Template _) ->
-                        XlsxFileView.Main {|model = model; dispatch = dispatch|}
+                        XlsxFileView.Main (model , dispatch)
                     if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 && state.ActiveView <> Spreadsheet.ActiveView.Metadata then
                         MainComponents.AddRows.Main dispatch
                 ]

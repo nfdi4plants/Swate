@@ -6,6 +6,7 @@ open Messages
 open ARCtrl.ISA
 open Shared
 
+[<ReactComponent>]
 let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) = 
     Bulma.section [
         FormComponents.TextInput (
@@ -18,27 +19,27 @@ let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) =
         )
         FormComponents.OntologyAnnotationInput(
             assay.MeasurementType |> Option.defaultValue OntologyAnnotation.empty,
-            "Measurement Type",
-            fun oa -> 
+            (fun oa -> 
                 let oa = if oa = OntologyAnnotation.empty then None else Some oa
                 assay.MeasurementType <- oa
-                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            "Measurement Type"
         )
         FormComponents.OntologyAnnotationInput(
             assay.TechnologyType |> Option.defaultValue OntologyAnnotation.empty,
-            "Technology Type",
-            fun oa -> 
+            (fun oa -> 
                 let oa = if oa = OntologyAnnotation.empty then None else Some oa
                 assay.TechnologyType <- oa
-                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            "Technology Type"
         )
         FormComponents.OntologyAnnotationInput(
             assay.TechnologyPlatform |> Option.defaultValue OntologyAnnotation.empty,
-            "Technology Platform",
-            fun oa -> 
+            (fun oa -> 
                 let oa = if oa = OntologyAnnotation.empty then None else Some oa
                 assay.TechnologyPlatform <- oa
-                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            "Technology Platform"
         )
         FormComponents.PersonsInput(
             assay.Performers,

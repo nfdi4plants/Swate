@@ -17,7 +17,7 @@ let sayHello name = $"Hello {name}"
 open Feliz
 
 let private split_container model dispatch = 
-    let mainWindow = Seq.singleton <| MainWindowView.Main model dispatch
+    let mainWindow = Seq.singleton <| MainWindowView.Main (model, dispatch)
     let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
     SplitWindowView.Main
         mainWindow

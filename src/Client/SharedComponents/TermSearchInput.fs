@@ -230,7 +230,8 @@ type TermSearch =
             ]
         ]
 
-    static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: TermTypes.Term option -> unit, show: bool, width: Styles.ICssUnit, alignRight) =
+    [<ReactComponent>]
+    static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: TermTypes.Term option -> unit, show: bool) =
         let searchesAreComplete = searchNameState.SearchIs = SearchIs.Done && searchTreeState.SearchIs = SearchIs.Done
         let foundInBoth (term:TermTypes.Term) =
             (searchTreeState.Results |> Array.contains term)
@@ -260,7 +261,7 @@ type TermSearch =
         Html.div [
             prop.id id
             prop.classes ["term-select-area"; if not show then "is-hidden";]
-            prop.style [style.width width; if alignRight then style.right 0]
+            prop.style [style.width (length.perc 100); style.top (length.perc 100)]
             prop.children [
                 yield! matchSearchState searchNameState false
                 yield! matchSearchState searchTreeState true
@@ -269,27 +270,28 @@ type TermSearch =
 
     [<ReactComponent>]
     static member Input (
-        setter: OntologyAnnotation option -> unit, dispatch, 
+        setter: OntologyAnnotation option -> unit,
         ?input: OntologyAnnotation, ?parent': OntologyAnnotation, 
-        ?showAdvancedSearch: bool,
-        ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?dropdownWidth: Styles.ICssUnit, ?alignRight: bool, ?displayParent: bool) 
+        ?advancedSearchDispatch: Messages.Msg -> unit,
+        ?debounceSetter: int, ?portalTermSelectArea: HTMLElement,
+        ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool) 
         =
         let displayParent = defaultArg displayParent true
-        let alignRight = defaultArg alignRight false
-        let dropdownWidth = defaultArg dropdownWidth (length.perc 100)
         let isExpanded = defaultArg isExpanded false
-        let showAdvancedSearch = defaultArg showAdvancedSearch false
         let advancedSearchActive, setAdvancedSearchActive = React.useState(false)
         let fullwidth = defaultArg fullwidth false
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
+        let parent, setParent = React.useState(parent')
         let searchNameState, setSearchNameState = React.useState(SearchState.init)
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
-        let debounceStorage, setdebounceStorage = React.useState(newDebounceStorage)
-        let parent, setParent = React.useState(parent')
+        let debounceStorage = React.useRef(newDebounceStorage())
+        let setter = fun inp -> if debounceSetter.IsSome then debounce debounceStorage.current "setter_debounce" debounceSetter.Value setter inp
+        React.useEffect((fun () -> setState input), dependencies=[|box input|])
+        React.useEffect((fun () -> setParent parent'), dependencies=[|box parent'|]) // careful, check console. might result in maximum dependency depth error.
         let stopSearch() = 
-            debounceStorage.Clear()
+            debounceStorage.current.Remove("TermSearch") |> ignore
             setLoading false
             setIsSearching false
             setSearchTreeState {searchTreeState with SearchIs = SearchIs.Idle}
@@ -306,7 +308,6 @@ type TermSearch =
             setSearchNameState <| SearchState.init()
             setSearchTreeState <| SearchState.init()
             setIsSearching true
-        React.useEffect((fun () -> setParent parent'), dependencies=[|box parent'|]) // careful, check console. might result in maximum dependency depth error.
         Bulma.control.div [
             if isExpanded then Bulma.control.isExpanded
             if size.IsSome then size.Value
@@ -324,10 +325,10 @@ type TermSearch =
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
                             startSearch(None)
-                            allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage, 0)
+                            allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         elif s.Trim() <> "" then
                             startSearch (Some s)
-                            mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage, 0)
+                            mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         else 
                             ()
                     )
@@ -337,11 +338,16 @@ type TermSearch =
                             stopSearch()
                         else
                             startSearch (Some s)
-                            mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage, 1000)
+                            mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
                     )
                     prop.onKeyDown(key.escape, fun _ -> stopSearch())
                 ]
-                TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching, dropdownWidth, alignRight)
+                let TermSelectArea = 
+                    TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
+                if portalTermSelectArea.IsSome then
+                    ReactDOM.createPortal(TermSelectArea,portalTermSelectArea.Value)
+                else
+                    TermSelectArea
                 Components.searchIcon
                 if state.IsSome && state.Value.Name.IsSome && state.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                 // Optional elements
@@ -353,11 +359,11 @@ type TermSearch =
                                 Html.span "Parent: "
                                 Html.span $"{parent.Value.NameText}, {parent.Value.TermAccessionShort}"
                             ]
-                        if showAdvancedSearch then
+                        if advancedSearchDispatch.IsSome then
                             Components.AdvancedSearch.Main(advancedSearchActive, setAdvancedSearchActive, (fun t -> 
                                 setAdvancedSearchActive false
                                 Some t |> selectTerm),
-                                dispatch
+                                advancedSearchDispatch.Value
                             )
                             Html.a [
                                 prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); setAdvancedSearchActive true)

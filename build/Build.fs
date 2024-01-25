@@ -422,6 +422,9 @@ let main args =
         match a with
         | "create-file" :: version :: a -> ReleaseNoteTasks.createVersionFile(version); 0
         | _ -> runOrDefault args
+    | "cmdtest" :: a ->
+        Git.Commit.exec "." (sprintf "Release v%s" ProjectInfo.prereleaseTag)
+        0
     | _ -> runOrDefault args
 
     

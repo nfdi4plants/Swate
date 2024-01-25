@@ -109,7 +109,7 @@ let Main (model:Messages.Model, dispatch) =
 
         mainFunctionContainer [
             Bulma.field.div [
-                Components.TermSearch.Input(setTerm, dispatch, fullwidth=true, size=Bulma.input.isLarge, ?parent'=model.TermSearchState.ParentTerm, showAdvancedSearch=true)
+                Components.TermSearch.Input(setTerm, fullwidth=true, size=Bulma.input.isLarge, ?parent'=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch)
             ]
             addButton(model, dispatch)
         ]

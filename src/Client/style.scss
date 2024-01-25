@@ -81,561 +81,575 @@ $colors: map-merge($colors, $addColors);
     flex-wrap: wrap;
     column-gap: 10px;
     flex-grow: 1;
+
+    .form-input-term-search-positioner {
+        position: absolute;
+        top: calc(100% - 10px);
+        z-index: 20;
+        width: 100%;
+    }
+
+    @media only screen and (max-width: 694px) {
+        .form-input-term-search-positioner {
+            position: relative;
+            z-index: 20;
+            top: -10px
+        }
+    }
 }
 
 .term-select-area {
-    position: absolute;
-    width: 100%;
-    max-height: 400px;
-    overflow: auto;
-    border: 1px solid $border-color;
-    background-color: $scheme-main;
-    border-top: unset;
-    z-index: 20;
-
-    .term-select-item {
-
-        > * {
-            padding: .5rem 1rem;
-        }
-
-        .term-select-item-main {
-            cursor: pointer;
-
-            > *:not(:last-child) {
-                padding-right: .5rem;
-            }
-
-            a:hover {
-                text-decoration: underline
-            }
-        }
-
-        .term-select-item-more {
-            border-top: .5px solid $border-color;
-            box-shadow: 0px 4px 8px $border-color;
-
-            td {
-                border: unset;
-                padding: 0.15em 0.25em;
-            }
-        }
-
-        .term-select-item-toggle-button {
-            padding: calc(0.5em - 1px) .8em;
-            display: flex;
-            background-color: transparent;
-            border: unset;
-            cursor: pointer;
-            color: $scheme-invert;
-            justify-content: center;
-            align-items: center;
-            border-radius: 2px;
-            white-space: nowrap
-        }
-
-        .term-select-item-toggle-button:hover {
-            background-color: $content-blockquote-background-color
-        }
-    }
-
-    .term-select-item:not(:last-child) {
-        border-bottom: 1px solid $border-color;
-    }
-}
-
-.modal-background {
-    opacity: 0.5
-}
-
-.modal-card {
-    box-shadow: 2px 2px black;
-}
-
-/*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/
-.fixed_headers {
-    border-collapse: collapse;
-    width: max-content;
-    border-style: hidden
-}
-
-.fixed_headers td,
-.fixed_headers thead th {
-    text-align: left;
-}
-
-.fixed_headers thead tr {
-    position: relative;
-}
-
-.fixed_headers tbody tr:nth-child(even) {
-    background-color: #DDD;
-}
-
-.fixed_headers thead th {
-    position: sticky;
-    top: 0; /* REQUIRED: https://stackoverflow.com/a/43707215 */
-    resize: horizontal;
-    overflow: auto;
-    z-index: 2
-}
-
-html, body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    font-size: 14px;
-    min-width: 400px;
-    height: 100vh;
-    overflow: auto
-}
-
-a {
-    color: $nfdi-blue-light
-}
-
-a:hover {
-    color: $nfdi-blue-lighter-20
-}
-
-.dragover-footertab {
-    position: relative
-}
-
-.dragover-footertab:before {
-    position: absolute;
-    content: "";
-    margin: 0 3px;
-    display: inline-block;
-    border: 7px solid transparent;
-    border-top: 8px solid black;
-    border-bottom: 0 none;
-    top: -3px;
-    left: -9px;
-}
-
-[type=checkbox]:checked.switch.is-primary + label::before, [type=checkbox]:checked.switch.is-primary + label::before {
-    background: $nfdi-mint
-}
-
-[data-tooltip]:not(.is-loading)::before, [data-tooltip]:not(.is-loading)::after, [data-tooltip]:not(.is-disabled)::before, [data-tooltip]:not(.is-disabled)::after, [data-tooltip]:not([disabled])::before, [data-tooltip]:not([disabled])::after {
-    box-sizing: border-box;
-    color: #fff;
-    left: 50px;
-    display: none;
-    font-family: BlinkMacSystemFont,-apple-system,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue","Helvetica","Arial",sans-serif;
-    font-size: .75rem;
-    hyphens: auto;
-    opacity: 0;
-    overflow: hidden;
-    pointer-events: none;
-    position: absolute;
-    visibility: hidden;
-    z-index: 1020;
-}
-
-[data-tooltip]:hover::before {
-    display: inline-block
-}
-
-#cy {
-    height: 300px;
-    display: block
-}
-
-.myNavbarSticky {
-    position: sticky;
-    position: -webkit-sticky;
-    min-height: min-content;
-    top: 0;
-    background-color: $primary;
-}
-
-.myNavbarSticky .navbar-item#logo {
-    position: relative;
-    overflow:hidden;
-
-    &::before {
-        content: "";
-        border-radius: 90px;
         position: absolute;
-        top: 50%;
-        left: 50%;
-        box-shadow: 0 0 15px 5px #fff, /* inner white */
-        0 0 30px 15px $success;
-    }
-}
+        width: 100%;
+        max-height: 400px;
+        overflow: auto;
+        border: 1px solid $border-color;
+        background-color: $scheme-main;
+        border-top: unset;
+        z-index: 20;
 
-.myNavbarButton {
-    height: 100% !important;
-    width: 100% !important;
-    background-color: transparent;
-    border-radius: unset;
-    border-color: transparent !important;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    display: inline-flex;
-    padding: unset;
-    box-shadow: unset !important
-}
+        .term-select-item {
 
-.myNavbarButton:not([disabled]):active {
-    background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)) !important
-}
+            > * {
+                padding: .5rem 1rem;
+            }
 
-.myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within, .myNavbarButton:not([disabled]):hover {
-    background-color: transparent;
-    color: $success
-}
+            .term-select-item-main {
+                cursor: pointer;
 
-.myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within {
-    border-color: white !important;
-}
+                > *:not(:last-child) {
+                    padding-right: .5rem;
+                }
 
-.myNavbarButton:not([disabled]):focus:not(:focus-visible), .myNavbarButton:not([disabled]):focus-within:not(:focus-visible) {
-    border-color: transparent !important;
-    color: white
-}
+                a:hover {
+                    text-decoration: underline
+                }
+            }
 
-.myNavbarButton[disabled] {
-    filter: brightness(85%);
-    background-color: transparent;
-    color: white;
-}
+            .term-select-item-more {
+                border-top: .5px solid $border-color;
+                box-shadow: 0px 4px 8px $border-color;
 
-.myNavbarButton[disabled]:focus, .myNavbarButton[disabled]:focus-within {
-    box-shadow: unset
-}
+                td {
+                    border: unset;
+                    padding: 0.15em 0.25em;
+                }
+            }
 
-.help {
-    @extend .help;
-    font-size: 0.85rem;
-}
+            .term-select-item-toggle-button {
+                padding: calc(0.5em - 1px) .8em;
+                display: flex;
+                background-color: transparent;
+                border: unset;
+                cursor: pointer;
+                color: $scheme-invert;
+                justify-content: center;
+                align-items: center;
+                border-radius: 2px;
+                white-space: nowrap
+            }
 
+            .term-select-item-toggle-button:hover {
+                background-color: $content-blockquote-background-color
+            }
+        }
 
-.mainFunctionContainer {
-    border-width: 0px 0px 0px 5px;
-    border-style: none none none solid;
-    padding: 0.25rem 1rem;
-    margin-bottom: 1rem;
-    border-image-slice: 1
-}
-
-.wrapFlexBox {
-    flex-wrap: wrap;
-    flex-shrink: 1;
-}
-
-.button {
-    @extend .button;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-}
-
-.textarea {
-    @extend .textarea;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif !important;
-    border: 3px solid lightgrey;
-}
-
-.textarea:focus {
-    border-color: $nfdi-mint
-}
-
-.button:disabled, .button[disabled] {
-    opacity: 0.5
-}
-
-.input {
-    @extend .input;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-}
-
-.clone * {
-    pointer-events: none
-}
-
-.delete {
-    @extend .delete
-}
-
-a.navbar-item:hover {
-    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)) !important;
-}
-
-.delete:hover {
-    @extend .delete;
-    background-color: $danger
-}
-
-.hoverTableEle {
-}
-
-.hoverTableEle:hover {
-    /*background-color: #E8E8E8 !important*/
-    background-color: rgba(0, 0, 0, 0.2)
-}
-
-.clickableTag {
-    cursor: pointer
-}
-
-.clickableTag:hover {
-    /*background-color: $lightBlueLighter20 !important;*/
-    box-shadow: inset 0 0 0 10em rgba(255, 255, 255, 0.3);
-}
-
-.clickableTagDelete {
-    cursor: pointer;
-    border: 0.2px solid $info
-}
-
-.clickableTagDelete:hover {
-    background-color: $danger !important;
-    border-color: $danger !important;
-    color: white
-}
-
-.toExcelColor {
-    color: $primarye !important
-}
-/////////// Custom simple checkbox, due to issue #54 ///////////////////
-.checkbox-label {
-    display: inline-block;
-    position: relative;
-    padding-left: 35px;
-    margin-bottom: 12px;
-    cursor: pointer;
-    font-size: 1rem;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    width: auto;
-}
-/* Hide the browser's default checkbox */
-.checkbox-input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-}
-/* Create a custom checkbox */
-.checkbox-checkmark {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    height: 20px;
-    width: 20px;
-    background-color: #eee;
-    border: 0.1px solid #dbdbdb;
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.checkbox-input[disabled] ~ .checkbox-label, .checkbox-input[disabled] ~ .checkbox-checkmark {
-    color: lightgrey;
-    cursor: not-allowed;
-}
-/* On mouse-over, add a grey background color */
-.checkbox-label:hover ~ .checkbox-checkmark, .checkbox-checkmark:hover {
-    background-color: #ccc;
-}
-/* On mouse-over on a disabled input, add a grey background color */
-.checkbox-input[disabled] ~ .checkbox-checkmark:hover, .checkbox-input[disabled] ~ .checkbox-label:hover ~ .checkbox-checkmark {
-    background-color: unset;
-}
-/* When the checkbox is checked, add a green background */
-.checkbox-input:checked ~ .checkbox-checkmark {
-    background-color: $success;
-    border: none;
-}
-/* Create the checkmark/indicator (hidden when not checked) */
-.checkbox-checkmark:after {
-    content: "";
-    position: absolute;
-    display: none;
-}
-/* Show the indicator when checked */
-.checkbox-input:checked ~ .checkbox-checkmark:after {
-    display: block;
-}
-/* Style the checkmark/indicator */
-.checkbox-checkmark:after {
-    top: 6px;
-    left: 6px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: white;
-}
-////////////////// End of custom checkbox /////////////////////////
-
-.niceBkgrnd {
-    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
-    background-size: 400% 400%;
-    animation: gradient 5s ease infinite;
-}
-
-@keyframes gradient {
-    0% {
-        background-position: 0% 50%;
+        .term-select-item:not(:last-child) {
+            border-bottom: 1px solid $border-color;
+        }
     }
 
-    50% {
-        background-position: 100% 50%;
+    .modal-background {
+        opacity: 0.5
     }
 
-    100% {
-        background-position: 0% 50%;
+    .modal-card {
+        box-shadow: 2px 2px black;
     }
-}
+    /*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/
+    .fixed_headers {
+        border-collapse: collapse;
+        width: max-content;
+        border-style: hidden
+    }
 
-tr.suggestion :hover {
-    cursor: pointer;
-}
+    .fixed_headers td,
+    .fixed_headers thead th {
+        text-align: left;
+    }
 
-tr.suggestion-details {
-    /*visibility: collapse;*/
-    display: none;
-    box-shadow: 1px 2px 2px darkgrey
-}
+    .fixed_headers thead tr {
+        position: relative;
+    }
+
+    .fixed_headers tbody tr:nth-child(even) {
+        background-color: #DDD;
+    }
+
+    .fixed_headers thead th {
+        position: sticky;
+        top: 0; /* REQUIRED: https://stackoverflow.com/a/43707215 */
+        resize: horizontal;
+        overflow: auto;
+        z-index: 2
+    }
+
+    html, body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+        font-size: 14px;
+        min-width: 400px;
+        height: 100vh;
+        overflow: auto
+    }
+
+    a {
+        color: $nfdi-blue-light
+    }
+
+    a:hover {
+        color: $nfdi-blue-lighter-20
+    }
+
+    .dragover-footertab {
+        position: relative
+    }
+
+    .dragover-footertab:before {
+        position: absolute;
+        content: "";
+        margin: 0 3px;
+        display: inline-block;
+        border: 7px solid transparent;
+        border-top: 8px solid black;
+        border-bottom: 0 none;
+        top: -3px;
+        left: -9px;
+    }
+
+    [type=checkbox]:checked.switch.is-primary + label::before, [type=checkbox]:checked.switch.is-primary + label::before {
+        background: $nfdi-mint
+    }
+
+    [data-tooltip]:not(.is-loading)::before, [data-tooltip]:not(.is-loading)::after, [data-tooltip]:not(.is-disabled)::before, [data-tooltip]:not(.is-disabled)::after, [data-tooltip]:not([disabled])::before, [data-tooltip]:not([disabled])::after {
+        box-sizing: border-box;
+        color: #fff;
+        left: 50px;
+        display: none;
+        font-family: BlinkMacSystemFont,-apple-system,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue","Helvetica","Arial",sans-serif;
+        font-size: .75rem;
+        hyphens: auto;
+        opacity: 0;
+        overflow: hidden;
+        pointer-events: none;
+        position: absolute;
+        visibility: hidden;
+        z-index: 1020;
+    }
+
+    [data-tooltip]:hover::before {
+        display: inline-block
+    }
+
+    #cy {
+        height: 300px;
+        display: block
+    }
+
+    .myNavbarSticky {
+        position: sticky;
+        position: -webkit-sticky;
+        min-height: min-content;
+        top: 0;
+        background-color: $primary;
+    }
+
+    .myNavbarSticky .navbar-item#logo {
+        position: relative;
+        overflow: hidden;
+
+        &::before {
+            content: "";
+            border-radius: 90px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            box-shadow: 0 0 15px 5px #fff, /* inner white */
+            0 0 30px 15px $success;
+        }
+    }
+
+    .myNavbarButton {
+        height: 100% !important;
+        width: 100% !important;
+        background-color: transparent;
+        border-radius: unset;
+        border-color: transparent !important;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        display: inline-flex;
+        padding: unset;
+        box-shadow: unset !important
+    }
+
+    .myNavbarButton:not([disabled]):active {
+        background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)) !important
+    }
+
+    .myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within, .myNavbarButton:not([disabled]):hover {
+        background-color: transparent;
+        color: $success
+    }
+
+    .myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within {
+        border-color: white !important;
+    }
+
+    .myNavbarButton:not([disabled]):focus:not(:focus-visible), .myNavbarButton:not([disabled]):focus-within:not(:focus-visible) {
+        border-color: transparent !important;
+        color: white
+    }
+
+    .myNavbarButton[disabled] {
+        filter: brightness(85%);
+        background-color: transparent;
+        color: white;
+    }
+
+    .myNavbarButton[disabled]:focus, .myNavbarButton[disabled]:focus-within {
+        box-shadow: unset
+    }
+
+    .help {
+        @extend .help;
+        font-size: 0.85rem;
+    }
 
 
-.delete :hover {
-    cursor: pointer;
-}
+    .mainFunctionContainer {
+        border-width: 0px 0px 0px 5px;
+        border-style: none none none solid;
+        padding: 0.25rem 1rem;
+        margin-bottom: 1rem;
+        border-image-slice: 1
+    }
 
-.nonSelectText {
-    user-select: none; /* standard syntax */
-    -webkit-user-select: none; /* webkit (safari, chrome) browsers */
-    -moz-user-select: none; /* mozilla browsers */
-    -khtml-user-select: none; /* webkit (konqueror) browsers */
-    -ms-user-select: none; /* IE10+ */
-}
+    .wrapFlexBox {
+        flex-wrap: wrap;
+        flex-shrink: 1;
+    }
 
-input::-ms-clear {
-    display: none;
-}
+    .button {
+        @extend .button;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    }
 
-.hideOver575px {
-    display: none !important
-}
+    .textarea {
+        @extend .textarea;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif !important;
+        border: 3px solid lightgrey;
+    }
 
-.hideOver775px {
-    display: none
-}
+    .textarea:focus {
+        border-color: $nfdi-mint
+    }
 
-.hideUnder575px {
-    display: flex
-}
+    .button:disabled, .button[disabled] {
+        opacity: 0.5
+    }
 
-.hideUnder775px {
-    display: flex
-}
+    .input {
+        @extend .input;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    }
 
-.flexToCentered {
-}
+    .clone * {
+        pointer-events: none
+    }
 
-.myFlexText {
-    text-align: justify;
-    font-size: 1.2rem;
-}
-/// Brands
+    .delete {
+        @extend .delete
+    }
 
-.nfdiIcon {
-    transition: 0.2s opacity;
-}
+    a.navbar-item:hover {
+        background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)) !important;
+    }
 
-.nfdiIcon:hover {
-    opacity: 0.7
-}
+    .delete:hover {
+        @extend .delete;
+        background-color: $danger
+    }
 
-.myFaBrand {
-    transition: 0.2s opacity;
-    padding: 10px;
-    cursor: pointer
-}
+    .hoverTableEle {
+    }
 
-.myFaBrand:hover {
-    opacity: 0.7;
-}
+    .hoverTableEle:hover {
+        /*background-color: #E8E8E8 !important*/
+        background-color: rgba(0, 0, 0, 0.2)
+    }
 
-.myFaTwitter {
-    background: #55ACEE;
-    color: white;
-}
+    .clickableTag {
+        cursor: pointer
+    }
 
-.myFaCSB {
-    background: #ed7d31;
-    color: white;
-}
+    .clickableTag:hover {
+        /*background-color: $lightBlueLighter20 !important;*/
+        box-shadow: inset 0 0 0 10em rgba(255, 255, 255, 0.3);
+    }
 
-.myFaGithub {
-    background: #24292e;
-    color: white
-}
+    .clickableTagDelete {
+        cursor: pointer;
+        border: 0.2px solid $info
+    }
 
-@media only screen and (max-width: 768px) {
+    .clickableTagDelete:hover {
+        background-color: $danger !important;
+        border-color: $danger !important;
+        color: white
+    }
 
-    .myFlexText {
+    .toExcelColor {
+        color: $primarye !important
+    }
+    /////////// Custom simple checkbox, due to issue #54 ///////////////////
+    .checkbox-label {
+        display: inline-block;
+        position: relative;
+        padding-left: 35px;
+        margin-bottom: 12px;
+        cursor: pointer;
         font-size: 1rem;
-        width: 90%;
-        margin: auto;
-        margin-bottom: 0.5rem;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        width: auto;
+    }
+    /* Hide the browser's default checkbox */
+    .checkbox-input {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+        height: 0;
+        width: 0;
+    }
+    /* Create a custom checkbox */
+    .checkbox-checkmark {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        height: 20px;
+        width: 20px;
+        background-color: #eee;
+        border: 0.1px solid #dbdbdb;
+        border-radius: 50%;
+        cursor: pointer;
     }
 
-    .hideUnder775px {
-        display: none
+    .checkbox-input[disabled] ~ .checkbox-label, .checkbox-input[disabled] ~ .checkbox-checkmark {
+        color: lightgrey;
+        cursor: not-allowed;
+    }
+    /* On mouse-over, add a grey background color */
+    .checkbox-label:hover ~ .checkbox-checkmark, .checkbox-checkmark:hover {
+        background-color: #ccc;
+    }
+    /* On mouse-over on a disabled input, add a grey background color */
+    .checkbox-input[disabled] ~ .checkbox-checkmark:hover, .checkbox-input[disabled] ~ .checkbox-label:hover ~ .checkbox-checkmark {
+        background-color: unset;
+    }
+    /* When the checkbox is checked, add a green background */
+    .checkbox-input:checked ~ .checkbox-checkmark {
+        background-color: $success;
+        border: none;
+    }
+    /* Create the checkmark/indicator (hidden when not checked) */
+    .checkbox-checkmark:after {
+        content: "";
+        position: absolute;
+        display: none;
+    }
+    /* Show the indicator when checked */
+    .checkbox-input:checked ~ .checkbox-checkmark:after {
+        display: block;
+    }
+    /* Style the checkmark/indicator */
+    .checkbox-checkmark:after {
+        top: 6px;
+        left: 6px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: white;
+    }
+    ////////////////// End of custom checkbox /////////////////////////
+
+    .niceBkgrnd {
+        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+        background-size: 400% 400%;
+        animation: gradient 5s ease infinite;
+    }
+
+    @keyframes gradient {
+        0% {
+            background-position: 0% 50%;
+        }
+
+        50% {
+            background-position: 100% 50%;
+        }
+
+        100% {
+            background-position: 0% 50%;
+        }
+    }
+
+    tr.suggestion :hover {
+        cursor: pointer;
+    }
+
+    tr.suggestion-details {
+        /*visibility: collapse;*/
+        display: none;
+        box-shadow: 1px 2px 2px darkgrey
+    }
+
+
+    .delete :hover {
+        cursor: pointer;
+    }
+
+    .nonSelectText {
+        user-select: none; /* standard syntax */
+        -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+        -moz-user-select: none; /* mozilla browsers */
+        -khtml-user-select: none; /* webkit (konqueror) browsers */
+        -ms-user-select: none; /* IE10+ */
+    }
+
+    input::-ms-clear {
+        display: none;
+    }
+
+    .hideOver575px {
+        display: none !important
     }
 
     .hideOver775px {
+        display: none
+    }
+
+    .hideUnder575px {
+        display: flex
+    }
+
+    .hideUnder775px {
         display: flex
     }
 
     .flexToCentered {
-        text-align: center
-    }
-
-    .reverseCols {
-        flex-direction: column-reverse;
-        display: flex;
-    }
-}
-
-@media only screen and (max-width: 575px) {
-    .hideOver575px {
-        display: flex !important
-    }
-
-    .hideUnder575px {
-        display: none !important
     }
 
     .myFlexText {
-        margin-bottom: 0.5rem;
-        font-size: 0.8rem;
+        text-align: justify;
+        font-size: 1.2rem;
     }
-}
+    /// Brands
 
-.danger_important {
-    color: $danger !important
-}
+    .nfdiIcon {
+        transition: 0.2s opacity;
+    }
 
-kbd {
-    margin: 0px 0.1em;
-    padding: 0.1em 0.6em;
-    border-radius: 3px;
-    border: 1px solid rgb(204, 204, 204);
-    color: rgb(51, 51, 51);
-    line-height: 1.4;
-    font-family: Arial,Helvetica,sans-serif;
-    font-size: 10px;
-    display: inline-block;
-    box-shadow: 0px 1px 0px rgba(0,0,0,0.2), inset 0px 0px 0px 2px #ffffff;
-    background-color: rgb(247, 247, 247);
-    -moz-box-shadow: 0 1px 0px rgba(0, 0, 0, 0.2), 0 0 0 2px #ffffff inset;
-    -webkit-box-shadow: 0 1px 0px rgba(0, 0, 0, 0.2), 0 0 0 2px #ffffff inset;
-    -moz-border-radius: 3px;
-    -webkit-border-radius: 3px;
-    text-shadow: 0 1px 0 #fff;
-}
+    .nfdiIcon:hover {
+        opacity: 0.7
+    }
+
+    .myFaBrand {
+        transition: 0.2s opacity;
+        padding: 10px;
+        cursor: pointer
+    }
+
+    .myFaBrand:hover {
+        opacity: 0.7;
+    }
+
+    .myFaTwitter {
+        background: #55ACEE;
+        color: white;
+    }
+
+    .myFaCSB {
+        background: #ed7d31;
+        color: white;
+    }
+
+    .myFaGithub {
+        background: #24292e;
+        color: white
+    }
+
+    @media only screen and (max-width: 768px) {
+
+        .myFlexText {
+            font-size: 1rem;
+            width: 90%;
+            margin: auto;
+            margin-bottom: 0.5rem;
+        }
+
+        .hideUnder775px {
+            display: none
+        }
+
+        .hideOver775px {
+            display: flex
+        }
+
+        .flexToCentered {
+            text-align: center
+        }
+
+        .reverseCols {
+            flex-direction: column-reverse;
+            display: flex;
+        }
+    }
+
+    @media only screen and (max-width: 575px) {
+        .hideOver575px {
+            display: flex !important
+        }
+
+        .hideUnder575px {
+            display: none !important
+        }
+
+        .myFlexText {
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    .danger_important {
+        color: $danger !important
+    }
+
+    kbd {
+        margin: 0px 0.1em;
+        padding: 0.1em 0.6em;
+        border-radius: 3px;
+        border: 1px solid rgb(204, 204, 204);
+        color: rgb(51, 51, 51);
+        line-height: 1.4;
+        font-family: Arial,Helvetica,sans-serif;
+        font-size: 10px;
+        display: inline-block;
+        box-shadow: 0px 1px 0px rgba(0,0,0,0.2), inset 0px 0px 0px 2px #ffffff;
+        background-color: rgb(247, 247, 247);
+        -moz-box-shadow: 0 1px 0px rgba(0, 0, 0, 0.2), 0 0 0 2px #ffffff inset;
+        -webkit-box-shadow: 0 1px 0px rgba(0, 0, 0, 0.2), 0 0 0 2px #ffffff inset;
+        -moz-border-radius: 3px;
+        -webkit-border-radius: 3px;
+        text-shadow: 0 1px 0 #fff;
+    }

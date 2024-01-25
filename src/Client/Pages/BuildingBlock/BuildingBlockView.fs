@@ -38,6 +38,15 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
                     BodyArg = None
                 }
         nextState, Cmd.none
+    | UpdateHeaderWithIO (hct, iotype) ->
+        let nextState = {
+            state with 
+                HeaderCellType = hct
+                HeaderArg = Some (Fable.Core.U2.Case2 iotype)
+                BodyArg = None
+                BodyCellType = BuildingBlock.BodyCellType.Text
+        }
+        nextState, Cmd.none
     | UpdateBodyCellType next ->
         let nextState = { state with BodyCellType = next }
         nextState, Cmd.none
