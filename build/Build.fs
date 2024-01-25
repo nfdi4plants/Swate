@@ -47,8 +47,8 @@ module ReleaseNoteTasks =
                 Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
             ]
         if commit then 
-            run git ["add"; "."] __SOURCE_DIRECTORY__
-            run git ["commit"; "-m"; (sprintf "Release v%s :bookmark:" ProjectInfo.prereleaseTag)] __SOURCE_DIRECTORY__
+            run git ["add"; "."] ""
+            run git ["commit"; "-m"; (sprintf "Release v%s :bookmark:" ProjectInfo.prereleaseTag)] ""
 
     let updateReleaseNotes = Target.create "releasenotes" (fun config ->
         ReleaseNotes.ensure()
@@ -260,14 +260,14 @@ module Release =
 
     let CreatePrereleaseTag() =
         if promptYesNo (sprintf "Tagging branch with %s OK?" ProjectInfo.prereleaseTag ) then 
-            run git ["tag"; "-f"; ProjectInfo.prereleaseTag; ] __SOURCE_DIRECTORY__
+            run git ["tag"; "-f"; ProjectInfo.prereleaseTag; ] ""
             Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.prereleaseTag
         else
             failwith "aborted"
 
     let ForcePushNightly() =
         if promptYesNo "Ready to force push release to nightly branch?" then 
-            run git ["push"; "-f"; "origin"; "HEAD:nightly"] __SOURCE_DIRECTORY__
+            run git ["push"; "-f"; "origin"; "HEAD:nightly"] ""
         else
             failwith "aborted"
 
