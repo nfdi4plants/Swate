@@ -223,22 +223,22 @@ module Release =
 
     open System.Diagnostics
 
-    let private executeCommand (command: string) : string =
-        let p = new Process()
-        p.StartInfo.FileName <- "git"
-        p.StartInfo.Arguments <- command
-        p.StartInfo.RedirectStandardOutput <- true
-        p.StartInfo.UseShellExecute <- false
-        p.StartInfo.CreateNoWindow <- true
-
-        p.Start() |> ignore
-
-        let output = p.StandardOutput.ReadToEnd()
-        p.WaitForExit()
-
-        output
 
     let GetLatestGitTag () : string =
+        let executeCommand (command: string) : string =
+            let p = new Process()
+            p.StartInfo.FileName <- "git"
+            p.StartInfo.Arguments <- command
+            p.StartInfo.RedirectStandardOutput <- true
+            p.StartInfo.UseShellExecute <- false
+            p.StartInfo.CreateNoWindow <- true
+
+            p.Start() |> ignore
+
+            let output = p.StandardOutput.ReadToEnd()
+            p.WaitForExit()
+
+            output
         executeCommand "describe --abbrev=0 --tags"
         |> String.trim
 
@@ -265,7 +265,8 @@ module Release =
 
     let ForcePushNightly() =
         if promptYesNo "Ready to force push release to nightly branch?" then 
-            Git.Commit.exec "." (sprintf "Release v%s" ProjectInfo.prereleaseTag) 
+            run git ["add"; "."] __SOURCE_DIRECTORY__
+            run git ["commit"; "-m"; (sprintf "Release v%s" ProjectInfo.prereleaseTag)] __SOURCE_DIRECTORY__
             run git ["push"; "-f"; "origin"; "HEAD:nightly"] __SOURCE_DIRECTORY__
         else
             failwith "aborted"
@@ -423,7 +424,8 @@ let main args =
         | "create-file" :: version :: a -> ReleaseNoteTasks.createVersionFile(version); 0
         | _ -> runOrDefault args
     | "cmdtest" :: a ->
-        Git.Commit.exec "." (sprintf "Release v%s" ProjectInfo.prereleaseTag)
+        run git ["add"; "."] ""
+        run git ["commit"; "-m"; (sprintf "Release v%s" ProjectInfo.prereleaseTag)] ""
         0
     | _ -> runOrDefault args
 
