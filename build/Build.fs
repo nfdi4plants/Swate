@@ -260,7 +260,7 @@ module Release =
 
     let CreatePrereleaseTag() =
         if promptYesNo (sprintf "Tagging branch with %s OK?" ProjectInfo.prereleaseTag ) then 
-            Git.Branches.tag "" ProjectInfo.prereleaseTag
+            run git ["tag"; "-f"; ProjectInfo.prereleaseTag; ] __SOURCE_DIRECTORY__
             Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.prereleaseTag
         else
             failwith "aborted"
