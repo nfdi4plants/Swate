@@ -287,7 +287,7 @@ type TermSearch =
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
         let debounceStorage = React.useRef(newDebounceStorage())
-        let setter = fun inp -> if debounceSetter.IsSome then debounce debounceStorage.current "setter_debounce" debounceSetter.Value setter inp
+        let dsetter = fun inp -> if debounceSetter.IsSome then debounce debounceStorage.current "setter_debounce" debounceSetter.Value setter inp
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
         React.useEffect((fun () -> setParent parent'), dependencies=[|box parent'|]) // careful, check console. might result in maximum dependency depth error.
         let stopSearch() = 
@@ -301,10 +301,11 @@ type TermSearch =
             setState oaOpt
             setter oaOpt
             setIsSearching false
-        let startSearch(queryString: string option) =
+        let startSearch(queryString: string option, isOnChange: bool) =
             let oaOpt = queryString |> Option.map (fun s -> OntologyAnnotation.fromString(s) )
-            setter oaOpt
-            setState oaOpt
+            if isOnChange then
+                dsetter oaOpt
+                setState oaOpt
             setSearchNameState <| SearchState.init()
             setSearchTreeState <| SearchState.init()
             setIsSearching true
@@ -324,20 +325,20 @@ type TermSearch =
                     prop.onDoubleClick(fun e ->
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
-                            startSearch(None)
+                            startSearch(None, false)
                             allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         elif s.Trim() <> "" then
-                            startSearch (Some s)
+                            startSearch (Some s, false)
                             mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         else 
                             ()
                     )
                     prop.onChange(fun (s: string) ->
                         if s.Trim() = "" then
-                            startSearch(None)
+                            startSearch(None, true)
                             stopSearch()
                         else
-                            startSearch (Some s)
+                            startSearch (Some s, true)
                             mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
                     )
                     prop.onKeyDown(key.escape, fun _ -> stopSearch())
