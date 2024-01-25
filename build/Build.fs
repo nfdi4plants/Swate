@@ -38,7 +38,7 @@ module ReleaseNoteTasks =
 
     open Fake.Extensions.Release
 
-    let createVersionFile(version: string) =
+    let createVersionFile(version: string, commit: bool) =
         let releaseDate = System.DateTime.UtcNow.ToShortDateString()
         Fake.DotNet.AssemblyInfoFile.createFSharp "src/Server/Version.fs"
             [   Fake.DotNet.AssemblyInfo.Title "Swate"
@@ -46,6 +46,9 @@ module ReleaseNoteTasks =
                 Fake.DotNet.AssemblyInfo.Metadata ("Version",version)
                 Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
             ]
+        if commit then 
+            run git ["add"; "."] __SOURCE_DIRECTORY__
+            run git ["commit"; "-m"; (sprintf "Release v%s :bookmark:" ProjectInfo.prereleaseTag)] __SOURCE_DIRECTORY__
 
     let updateReleaseNotes = Target.create "releasenotes" (fun config ->
         ReleaseNotes.ensure()
@@ -53,7 +56,7 @@ module ReleaseNoteTasks =
         ReleaseNotes.update(ProjectInfo.gitOwner, ProjectInfo.project, config)
 
         let newRelease = ReleaseNotes.load "RELEASE_NOTES.md"
-        createVersionFile(newRelease.AssemblyVersion)
+        createVersionFile(newRelease.AssemblyVersion, false)
 
         Trace.trace "Update Version.fs done!"
         
@@ -223,7 +226,6 @@ module Release =
 
     open System.Diagnostics
 
-
     let GetLatestGitTag () : string =
         let executeCommand (command: string) : string =
             let p = new Process()
@@ -265,8 +267,6 @@ module Release =
 
     let ForcePushNightly() =
         if promptYesNo "Ready to force push release to nightly branch?" then 
-            run git ["add"; "."] __SOURCE_DIRECTORY__
-            run git ["commit"; "-m"; (sprintf "Release v%s" ProjectInfo.prereleaseTag)] __SOURCE_DIRECTORY__
             run git ["push"; "-f"; "origin"; "HEAD:nightly"] __SOURCE_DIRECTORY__
         else
             failwith "aborted"
@@ -405,7 +405,7 @@ let main args =
             Release.SetPrereleaseTag()
             Release.CreatePrereleaseTag()
             let version = Release.GetLatestGitTag()
-            ReleaseNoteTasks.createVersionFile(version)
+            ReleaseNoteTasks.createVersionFile(version, true)
             Release.ForcePushNightly()
             0
         | _ -> 
@@ -421,7 +421,7 @@ let main args =
         | _ -> runOrDefault args
     | "version" :: a ->
         match a with
-        | "create-file" :: version :: a -> ReleaseNoteTasks.createVersionFile(version); 0
+        | "create-file" :: version :: a -> ReleaseNoteTasks.createVersionFile(version, false); 0
         | _ -> runOrDefault args
     | "cmdtest" :: a ->
         run git ["add"; "."] ""
