@@ -248,7 +248,7 @@ module Release =
         printfn "Please enter pre-release package suffix"
         let suffix = System.Console.ReadLine()
         ProjectInfo.prereleaseSuffix <- suffix
-        ProjectInfo.prereleaseTag <- (sprintf "%i.%i.%i-%s" ProjectInfo.release.SemVer.Major ProjectInfo.release.SemVer.Minor ProjectInfo.release.SemVer.Patch suffix)
+        ProjectInfo.prereleaseTag <- (sprintf "v%i.%i.%i-%s" ProjectInfo.release.SemVer.Major ProjectInfo.release.SemVer.Minor ProjectInfo.release.SemVer.Patch suffix)
         ProjectInfo.isPrerelease <- true
 
     let CreateTag() =
