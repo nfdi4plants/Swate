@@ -45,7 +45,7 @@ let private bodyRow (rowIndex: int) (state:Set<int>) setState (model:Model) (dis
     Html.tr [
         for columnIndex in 0 .. (table.ColumnCount-1) do
             let index = columnIndex, rowIndex
-            Cells.BodyCell(index, state, setState, model, dispatch)
+            Cells.Cell.Body (index, state, setState, model, dispatch)
                 //Cell((columnIndex,rowIndex), state, setState, model, dispatch)
             //yield! referenceColumns(state, header, (column,row), model, dispatch)
     ]
@@ -62,7 +62,7 @@ let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> 
     Html.tr [
         for columnIndex in 0 .. (table.ColumnCount-1) do
             yield
-                Cells.HeaderCell(columnIndex, state, setState, model, dispatch)
+                Cells.Cell.Header(columnIndex, state, setState, model, dispatch)
             //yield! referenceColumns(state, cell, (column,row), model, dispatch)
     ]
 
