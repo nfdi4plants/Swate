@@ -36,15 +36,19 @@ let private converters = [tryToConvertAssay; tryToConvertStudy; tryToConvertInve
 // TODO: Can this be done better? If we want to allow upload of any isa.xlsx file?
 let readFromBytes (bytes: byte []) =
     // Try each conversion function and return the first successful result
-    let rec tryConvert (converters: ('a -> 'b option) list) (json: 'a) : 'b =
-        match converters with
-        | [] -> failwith "Unable to parse json to supported isa file."
-        | convert :: rest ->
-            match convert json with
-            | Some result -> result
-            | None -> tryConvert rest json
     promise {
         let! fswb = FsSpreadsheet.Exceljs.Xlsx.fromBytes bytes
-        let arcFile = tryConvert converters fswb
-        return arcFile
+        let ws = fswb.GetWorksheets()
+        let arcfile =
+            match ws with
+            | _ when ws.Exists (fun ws -> ARCtrl.ISA.Spreadsheet.ArcAssay.metaDataSheetName = ws.Name ) -> 
+                ArcAssay.fromFsWorkbook fswb |> Assay |> Some
+            | _ when ws.Exists (fun ws -> ARCtrl.ISA.Spreadsheet.ArcStudy.metaDataSheetName = ws.Name ) -> 
+                ArcStudy.fromFsWorkbook fswb |> Study |> Some
+            | _ when ws.Exists (fun ws -> ARCtrl.ISA.Spreadsheet.ArcInvestigation.metaDataSheetName = ws.Name ) -> 
+                ArcInvestigation.fromFsWorkbook fswb |> Investigation |> Some
+            | _ when ws.Exists (fun ws -> ARCtrl.Template.Spreadsheet.Template.metaDataSheetName = ws.Name ) -> 
+                ARCtrl.Template.Spreadsheet.Template.fromFsWorkbook fswb |> Template |> Some
+            | _ -> None
+        return arcfile
     }
