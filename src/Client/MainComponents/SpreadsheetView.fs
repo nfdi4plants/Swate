@@ -10,16 +10,16 @@ open ARCtrl.ISA
 open Shared
 
 
-//let private referenceColumns (state:Set<int>, header:SwateCell, (columnIndex: int, rowIndex:int), model, dispatch) =
-//    if header.Header.isTermColumn then
-//        [
-//            let isExtended = state.Contains(columnIndex)
-//            if isExtended then
-//                if header.Header.HasUnit then
-//                    yield UnitCell((columnIndex,rowIndex), model, dispatch)
-//                yield TANCell((columnIndex,rowIndex), model, dispatch)
-//        ]
-//    else []
+let private referenceColumns (columnIndex, header: CompositeHeader, state: Set<int>, setState, model, dispatch) =
+    if header.IsTermColumn then
+        [
+            let isExtended = state.Contains columnIndex
+            if isExtended then
+                Cell.HeaderUnit(columnIndex, header, state, setState, model, dispatch)
+                Cell.HeaderTSR(columnIndex, header, state, setState, model, dispatch)
+                Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch)
+        ]
+    else []
 
 let cellPlaceholder (c_opt: CompositeCell option) =
     let tableCell (children: ReactElement list) = Html.td [
@@ -45,7 +45,9 @@ let private bodyRow (rowIndex: int) (state:Set<int>) setState (model:Model) (dis
     Html.tr [
         for columnIndex in 0 .. (table.ColumnCount-1) do
             let index = columnIndex, rowIndex
-            Cells.Cell.Body (index, state, setState, model, dispatch)
+            let state = model.SpreadsheetModel
+            let cell = state.ActiveTable.Values.[index]
+            Cells.Cell.Body (index, cell, model, dispatch)
                 //Cell((columnIndex,rowIndex), state, setState, model, dispatch)
             //yield! referenceColumns(state, header, (column,row), model, dispatch)
     ]
@@ -61,9 +63,10 @@ let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> 
     let table = model.SpreadsheetModel.ActiveTable
     Html.tr [
         for columnIndex in 0 .. (table.ColumnCount-1) do
+            let header = table.Headers.[columnIndex]
             yield
-                Cells.Cell.Header(columnIndex, state, setState, model, dispatch)
-            //yield! referenceColumns(state, cell, (column,row), model, dispatch)
+                Cells.Cell.Header(columnIndex, header, state, setState, model, dispatch)
+            yield! referenceColumns(columnIndex, header, state, setState, model, dispatch)
     ]
 
 [<ReactComponent>]

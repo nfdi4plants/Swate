@@ -43,8 +43,9 @@ let private cellInnerContainerStyle (specificStyle: IStyleAttribute list) = prop
         yield! specificStyle
     ]
 
-let private cellInputElement (isHeader: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value) =
+let private cellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value) =
     Bulma.input.text [
+        prop.readOnly isReadOnly
         prop.autoFocus true
         prop.style [
             if isHeader then style.fontWeight.bold
@@ -305,77 +306,104 @@ let private extendHeaderButton (state_extend: Set<int>, columnIndex, setState_ex
         prop.children [Html.i [prop.classes ["fa-sharp"; "fa-solid"; "fa-angles-up"; if isExtended then "fa-rotate-270" else "fa-rotate-90"]; prop.style [style.fontSize(length.em 1)]]]
     ]
 
+
+type ColumnType =
+| Main
+| Unit
+| TSR
+| TAN
+with
+    member this.IsMainColumn = match this with | Main -> true | _ -> false
+    member this.IsRefColumn = match this with | Unit | TSR | TAN -> true | _ -> false
+
+open Shared
+
 type Cell =
 
     [<ReactComponent>]
-    static member Header(columnIndex: int, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    static member HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let state = model.SpreadsheetModel
-        let header = state.ActiveTable.Headers.[columnIndex]
-        let cellValue = header.ToString()
         let state_cell, setState_cell = React.useState(CellState.init(cellValue))
+        let isReadOnly = columnType = Unit
         Html.th [
+            if columnType.IsRefColumn then Bulma.color.hasBackgroundGreyLighter
             prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}"
-            cellStyle [
-                //if isHeader && cell.Header.isInputColumn then
-                //    style.color(NFDIColors.white)
-                //    style.backgroundColor(NFDIColors.LightBlue.Base)
-                //elif isHeader && cell.Header.isOutputColumn then
-                //    style.color(NFDIColors.white)
-                //    style.backgroundColor(NFDIColors.Red.Lighter30)
-                //elif isHeader then
-                //    style.color(NFDIColors.white)
-                //    style.backgroundColor(NFDIColors.DarkBlue.Base)
-                //if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
-            ]
-            //prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
+            cellStyle []
             prop.children [
                 Html.div [
                     cellInnerContainerStyle []
-                    prop.onDoubleClick(fun e ->
+                    if not isReadOnly then prop.onDoubleClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                         if not state_cell.Active then setState_cell {state_cell with Active = true}
                     )
-                    //prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
                     prop.children [
                         if state_cell.Active then
                             /// Update change to mainState and exit active input.
                             let updateMainStateTable() =
                                 // Only update if changed
                                 if state_cell.Value <> cellValue then
-                                    let nextHeader = CompositeHeader.OfHeaderString state_cell.Value
-                                    Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch
+                                    setter state_cell.Value
                                 setState_cell {state_cell with Active = false}
-                            cellInputElement(true, updateMainStateTable, setState_cell, state_cell, cellValue)
+                            cellInputElement(true, isReadOnly, updateMainStateTable, setState_cell, state_cell, cellValue)
                         else
+                            let cellValue = // shadow cell value for tsr and tan to add columnType
+                                match columnType with
+                                | TSR | TAN -> $"{columnType} ({cellValue})" 
+                                | _ -> cellValue
                             basicValueDisplayCell cellValue
-                        extendHeaderButton(state_extend, columnIndex, setState_extend)
+                        if columnType = Main && not header.IsSingleColumn then 
+                            extendHeaderButton(state_extend, columnIndex, setState_extend)
                     ]
                 ]
             ]
         ]
 
+    static member Header(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let cellValue = header.ToString()
+        let setter =
+            fun (s: string) -> 
+                let mutable nextHeader = CompositeHeader.OfHeaderString s
+                // update header with ref columns if term column
+                if header.IsTermColumn && not header.IsFeaturedColumn then
+                    nextHeader <- nextHeader.UpdateDeepWith header
+                Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch
+        Cell.HeaderBase(Main, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
+
+    static member HeaderUnit(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let cellValue = "Unit"
+        let setter = fun (s: string) -> ()
+        Cell.HeaderBase(Unit, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
+
+    static member private HeaderTANSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
+        let oa = header.TryOA()
+        let tan = if s = "" then None else Some s
+        oa 
+        |> Option.map (fun x -> {x with TermAccessionNumber = tan})
+        |> Option.map header.UpdateWithOA
+        |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
+
+    static member HeaderTSR(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermAccessionShort) |> Option.defaultValue ""
+        let setter = fun (s: string) -> Cell.HeaderTANSetter(columnIndex, s, header, dispatch)
+        Cell.HeaderBase(TSR, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
+
+    static member HeaderTAN(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermAccessionShort) |> Option.defaultValue ""
+        let setter = fun (s: string) -> Cell.HeaderTANSetter(columnIndex, s, header, dispatch)
+        Cell.HeaderBase(TAN, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
+
     [<ReactComponent>]
-    static member Body(index: (int*int), state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    static member Body(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
-        let cell = state.ActiveTable.Values.[index] // This creates huge issues
         let cellValue = cell.GetContent().[0]
         let state_cell, setState_cell = React.useState(CellState.init(cellValue))
         let isSelected = state.SelectedCells.Contains index
         Html.td [
             prop.key $"Cell_{state.ActiveView.TableIndex}-{columnIndex}-{rowIndex}"
             cellStyle [
-                //if isHeader && cell.Header.isInputColumn then
-                //    style.color(NFDIColors.white)
-                //    style.backgroundColor(NFDIColors.LightBlue.Base)
-                //elif isHeader && cell.Header.isOutputColumn then
-                //    style.color(NFDIColors.white)
-                //    style.backgroundColor(NFDIColors.Red.Lighter30)
-                //elif isHeader then
-                //    style.color(NFDIColors.white)
-                //    style.backgroundColor(NFDIColors.DarkBlue.Base)
                 if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
             ]
             prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
@@ -398,18 +426,9 @@ type Cell =
                                     let nextCell = cell.UpdateMainField state_cell.Value
                                     Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
                                 setState_cell {state_cell with Active = false}
-                            cellInputElement(false, updateMainStateTable, setState_cell, state_cell, cellValue)
+                            cellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue)
                         else
-                            let displayName =
-                                if cell.isUnitized then
-                                    let oaName = cell.ToOA().NameText
-                                    let unitizedValue = if cellValue = "" then "" else cellValue + " " + oaName
-                                    unitizedValue
-                                else
-                                    cellValue
                             compositeCellDisplay cell
-                        //if isHeader && cell.Header.isTermColumn then
-                        //    extendHeaderButton(state_extend, columnIndex, setState_extend)
                     ]
                 ]
             ]
