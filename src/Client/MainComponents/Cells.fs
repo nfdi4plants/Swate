@@ -125,10 +125,11 @@ module private CellComponents =
                     ]
                     prop.text v
                 ]
-                if hasValidOA then Html.i [
-                    prop.style [style.custom("marginLeft", "auto")]
-                    prop.className ["fa-solid"; "fa-check"]
-                ]
+                if hasValidOA then 
+                    Bulma.icon [Html.i [
+                        prop.style [style.custom("marginLeft", "auto")]
+                        prop.className ["fa-solid"; "fa-check"]
+                    ]]
             ]
         ]
 
