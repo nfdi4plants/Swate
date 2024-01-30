@@ -140,7 +140,7 @@ module TermSearchAux =
         let termSelectItemMain (term: TermTypes.Term, show, setShow, setTerm, isDirectedSearchResult: bool) = 
             Html.div [
                 prop.classes ["is-flex"; "is-flex-direction-row"; "term-select-item-main"]
-                prop.onClick setTerm
+                prop.onMouseDown setTerm
                 prop.style [style.position.relative]
                 prop.children [
                     Html.i [
@@ -272,10 +272,13 @@ type TermSearch =
     static member Input (
         setter: OntologyAnnotation option -> unit,
         ?input: OntologyAnnotation, ?parent': OntologyAnnotation, 
+        ?debounceSetter: int,
         ?advancedSearchDispatch: Messages.Msg -> unit,
-        ?debounceSetter: int, ?portalTermSelectArea: HTMLElement,
-        ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool) 
+        ?portalTermSelectArea: HTMLElement,
+        ?onBlur: FocusEvent -> unit, ?onEscape: KeyboardEvent -> unit,
+        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool, ?borderRadius: int) 
         =
+        let autofocus = defaultArg autofocus false
         let displayParent = defaultArg displayParent true
         let isExpanded = defaultArg isExpanded false
         let advancedSearchActive, setAdvancedSearchActive = React.useState(false)
@@ -320,8 +323,13 @@ type TermSearch =
             if loading then Bulma.control.isLoading
             prop.children [
                 Bulma.input.text [
+                    prop.autoFocus autofocus
+                    prop.style [
+                        if borderRadius.IsSome then style.borderRadius borderRadius.Value
+                    ]
                     if size.IsSome then size.Value
                     if state.IsSome then prop.valueOrDefault state.Value.NameText
+                    if onBlur.IsSome then prop.onBlur onBlur.Value
                     prop.onDoubleClick(fun e ->
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
@@ -341,7 +349,10 @@ type TermSearch =
                             startSearch (Some s, true)
                             mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
                     )
-                    prop.onKeyDown(key.escape, fun _ -> stopSearch())
+                    prop.onKeyDown(key.escape, fun e -> 
+                        if onEscape.IsSome then onEscape.Value e
+                        stopSearch()
+                    )
                 ]
                 let TermSelectArea = 
                     TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)

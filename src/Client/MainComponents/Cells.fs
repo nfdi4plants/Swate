@@ -175,8 +175,10 @@ module private EventPresets =
             // don't select cell if active(editable)
             if state_cell.IsIdle then
                 let set = 
-                    match e.ctrlKey with
-                    | true ->
+                    match e.ctrlKey, selectedCells.Count with
+                    | true, 0 ->
+                        selectedCells
+                    | true, _ ->
                         let createSetOfIndex (columnMin:int, columnMax, rowMin:int, rowMax: int) =
                             [
                                 for c in columnMin .. columnMax do
@@ -189,7 +191,7 @@ module private EventPresets =
                         let rowMin, rowMax = System.Math.Min(snd source, snd target), System.Math.Max(snd source, snd target)
                         let set = createSetOfIndex (columnMin,columnMax,rowMin,rowMax)
                         set
-                    | false ->
+                    | false, _ ->
                         let next = if selectedCells = Set([index]) then Set.empty else Set([index])
                         next
                 UpdateSelectedCells set |> SpreadsheetMsg |> dispatch
@@ -416,11 +418,12 @@ type Cell =
         Html.td [ cellStyle []; prop.readOnly true ]
 
     [<ReactComponent>]
-    static member private BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+    static member private BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), cell: CompositeCell, model: Model, dispatch, ?oasetter: OntologyAnnotation option -> unit) =
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
         let state_cell, setState_cell = React.useState(CellState.init(cellValue))
         let isSelected = state.SelectedCells.Contains index
+        let makeIdle() = setState_cell {state_cell with CellMode = Idle}
         Html.td [
             prop.key $"Cell_{state.ActiveView.TableIndex}-{columnIndex}-{rowIndex}"
             cellStyle [
@@ -433,11 +436,11 @@ type Cell =
                     prop.onDoubleClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
-                        UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                         let mode = if e.ctrlKey && columnType = Main then Search else Active
                         if state_cell.IsIdle then setState_cell {state_cell with CellMode = mode}
+                        UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     )
-                    prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, model, dispatch)
+                    if state_cell.IsIdle then prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, model, dispatch)
                     prop.children [
                         match state_cell.CellMode with
                         | Active ->
@@ -446,11 +449,17 @@ type Cell =
                                 // Only update if changed
                                 if state_cell.Value <> cellValue then
                                     setter state_cell.Value
-                                setState_cell {state_cell with CellMode = Idle}
+                                makeIdle()
                             cellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue)
                         | Search ->
-                            let setter = fun oa -> log oa
-                            Components.TermSearch.Input(setter, fullwidth=true)
+                            if oasetter.IsSome then 
+                                let headerOA = state.ActiveTable.Headers.[columnIndex].TryOA()
+                                let oa = cell.ToOA()
+                                let onBlur = fun e -> makeIdle()
+                                let onEscape = fun e -> makeIdle()
+                                Components.TermSearch.Input(oasetter.Value, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, autofocus=true, borderRadius=0)
+                            else
+                                printfn "No setter for OntologyAnnotation given for table cell term search."
                         | Idle ->
                             if columnType = Main then
                                 compositeCellDisplay cell
@@ -466,7 +475,11 @@ type Cell =
         let setter = fun (s: string) ->
             let nextCell = cell.UpdateMainField s
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-        Cell.BodyBase(Main, cellValue, setter, index, cell, model, dispatch)
+        let oaSetter = fun (oa:OntologyAnnotation option) ->
+            let nextCell = oa |> Option.map cell.UpdateWithOA
+            if nextCell.IsSome then 
+                Msg.UpdateCell (index, nextCell.Value) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(Main, cellValue, setter, index, cell, model, dispatch, oaSetter)
 
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.GetContent().[1]
