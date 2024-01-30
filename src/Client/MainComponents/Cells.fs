@@ -110,7 +110,7 @@ module private CellComponents =
         ]
 
     let compositeCellDisplay (cc: CompositeCell) =
-        let ccType = match cc with | CompositeCell.Term oa -> "T" | CompositeCell.Unitized _ -> "U" | CompositeCell.FreeText _ -> "F"
+        let hasValidOA = match cc with | CompositeCell.Term oa -> oa.TermAccessionShort <> "" | CompositeCell.Unitized (v, oa) -> oa.TermAccessionShort <> "" | CompositeCell.FreeText _ -> false
         let v = cc.ToString()
         Html.div [
             prop.classes ["is-flex"]
@@ -125,9 +125,9 @@ module private CellComponents =
                     ]
                     prop.text v
                 ]
-                Html.span [
+                if hasValidOA then Html.i [
                     prop.style [style.custom("marginLeft", "auto")]
-                    prop.text ccType
+                    prop.className ["fa-solid"; "fa-check"]
                 ]
             ]
         ]
