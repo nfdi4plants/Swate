@@ -45,11 +45,16 @@ let private bodyRow (rowIndex: int) (state:Set<int>) setState (model:Model) (dis
     Html.tr [
         for columnIndex in 0 .. (table.ColumnCount-1) do
             let index = columnIndex, rowIndex
-            let state = model.SpreadsheetModel
-            let cell = state.ActiveTable.Values.[index]
+            let cell = model.SpreadsheetModel.ActiveTable.Values.[index]
             Cells.Cell.Body (index, cell, model, dispatch)
-                //Cell((columnIndex,rowIndex), state, setState, model, dispatch)
-            //yield! referenceColumns(state, header, (column,row), model, dispatch)
+            let isExtended = state.Contains columnIndex
+            if isExtended && (cell.isTerm || cell.isUnitized) then
+                if cell.isUnitized then 
+                    Cell.BodyUnit(index, cell, model, dispatch)
+                else
+                    Cell.Empty()
+                Cell.BodyTSR(index, cell, model, dispatch)
+                Cell.BodyTAN(index, cell, model, dispatch)
     ]
 
 let private bodyRows (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
@@ -64,9 +69,12 @@ let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> 
     Html.tr [
         for columnIndex in 0 .. (table.ColumnCount-1) do
             let header = table.Headers.[columnIndex]
-            yield
-                Cells.Cell.Header(columnIndex, header, state, setState, model, dispatch)
-            yield! referenceColumns(columnIndex, header, state, setState, model, dispatch)
+            Cells.Cell.Header(columnIndex, header, state, setState, model, dispatch)
+            let isExtended = state.Contains columnIndex
+            if isExtended then
+                Cell.HeaderUnit(columnIndex, header, state, setState, model, dispatch)
+                Cell.HeaderTSR(columnIndex, header, state, setState, model, dispatch)
+                Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch)
     ]
 
 [<ReactComponent>]

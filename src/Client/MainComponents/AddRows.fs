@@ -12,7 +12,6 @@ let Main (dispatch: Messages.Msg -> unit) =
     let state_rows, setState_rows = React.useState(init_RowsToAdd)
     Html.div [
         prop.id "ExpandTable"
-        prop.title "Add rows"
         prop.style [
             style.flexGrow 1; style.justifyContent.center; style.display.inheritFromParent; style.padding(length.rem 1)
             style.position.sticky; style.left 0
@@ -30,6 +29,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                     ]
                     Bulma.button.a [
                         Bulma.button.isRounded
+                        prop.title "Add rows"
                         prop.onClick(fun _ ->
                             let inp = Browser.Dom.document.getElementById "n_row_input"
                             inp?Value <- init_RowsToAdd

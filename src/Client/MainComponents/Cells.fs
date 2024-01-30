@@ -9,116 +9,171 @@ open Messages
 open Shared
 open ARCtrl.ISA
 
+type private CellMode = 
+| Active
+| Idle
+| Search
+
 type private CellState = {
-    Active: bool
+    CellMode: CellMode
     /// This value is used to show during input cell editing. After confirming edit it will be used to push update
     Value: string
 } with
     static member init() =
         {
-            Active      = false
+            CellMode    = Idle
             Value       = ""
         }
     static member init(v: string) =
         {
-            Active      = false
+            CellMode    = Idle
             Value       = v
         }
 
+    member this.IsActive = this.CellMode = Active
+    member this.IsSearch = this.CellMode = Search
+    member this.IsIdle = this.CellMode = Idle
 
-let private cellStyle (specificStyle: IStyleAttribute list) = prop.style [
-        style.minWidth 100
-        style.height 22
-        style.border(length.px 1, borderStyle.solid, "darkgrey")
-        yield! specificStyle
-    ]
+type private ColumnType =
+| Main
+| Unit
+| TSR
+| TAN
+with
+    member this.IsMainColumn = match this with | Main -> true | _ -> false
+    member this.IsRefColumn = match this with | Unit | TSR | TAN -> true | _ -> false
 
-let private cellInnerContainerStyle (specificStyle: IStyleAttribute list) = prop.style [
-        style.display.flex;
-        style.justifyContent.spaceBetween;
-        style.height(length.percent 100);
-        style.minHeight(35)
-        style.width(length.percent 100)
-        style.alignItems.center
-        yield! specificStyle
-    ]
 
-let private cellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value) =
-    Bulma.input.text [
-        prop.readOnly isReadOnly
-        prop.autoFocus true
-        prop.style [
-            if isHeader then style.fontWeight.bold
+module private CellComponents =
+
+
+    let cellStyle (specificStyle: IStyleAttribute list) = prop.style [
+            style.minWidth 100
+            style.height 22
+            style.border(length.px 1, borderStyle.solid, "darkgrey")
+            yield! specificStyle
+        ]
+
+    let cellInnerContainerStyle (specificStyle: IStyleAttribute list) = prop.style [
+            style.display.flex;
+            style.justifyContent.spaceBetween;
+            style.height(length.percent 100);
+            style.minHeight(35)
             style.width(length.percent 100)
-            style.height.unset
-            style.borderRadius(0)
-            style.border(0,borderStyle.none,"")
-            style.backgroundColor.transparent
-            style.margin (0)
-            style.padding(length.em 0.5,length.em 0.75)
-            //if isHeader then
-            //    style.color(NFDIColors.white)
+            style.alignItems.center
+            yield! specificStyle
         ]
-        // Update main spreadsheet state when leaving focus or...
-        prop.onBlur(fun _ ->
-            updateMainStateTable()
-        )
-        // .. when pressing "ENTER". "ESCAPE" will negate changes.
-        prop.onKeyDown(fun e ->
-            match e.which with
-            | 13. -> //enter
+
+    let cellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value) =
+        Bulma.input.text [
+            prop.readOnly isReadOnly
+            prop.autoFocus true
+            prop.style [
+                if isHeader then style.fontWeight.bold
+                style.width(length.percent 100)
+                style.height.unset
+                style.borderRadius(0)
+                style.border(0,borderStyle.none,"")
+                style.backgroundColor.transparent
+                style.margin (0)
+                style.padding(length.em 0.5,length.em 0.75)
+                //if isHeader then
+                //    style.color(NFDIColors.white)
+            ]
+            // Update main spreadsheet state when leaving focus or...
+            prop.onBlur(fun _ ->
                 updateMainStateTable()
-            | 27. -> //escape
-                setState_cell {Active = false; Value = cell_value}
-            | _ -> ()
-        )
-        // Only change cell value while typing to increase performance. 
-        prop.onChange(fun e ->
-            setState_cell {state_cell with Value = e}
-        )
-        prop.defaultValue cell_value
-    ]
-
-let private basicValueDisplayCell (v: string) =
-    Html.span [
-        prop.style [
-            style.flexGrow 1
-            style.padding(length.em 0.5,length.em 0.75)
+            )
+            // .. when pressing "ENTER". "ESCAPE" will negate changes.
+            prop.onKeyDown(fun e ->
+                match e.which with
+                | 13. -> //enter
+                    updateMainStateTable()
+                | 27. -> //escape
+                    setState_cell {CellMode = Idle; Value = cell_value}
+                | _ -> ()
+            )
+            // Only change cell value while typing to increase performance. 
+            prop.onChange(fun e ->
+                setState_cell {state_cell with Value = e}
+            )
+            prop.defaultValue cell_value
         ]
-        prop.text v
-    ]
 
-let private compositeCellDisplay (cc: CompositeCell) =
-    let ccType = match cc with | CompositeCell.Term oa -> "T" | CompositeCell.Unitized _ -> "U" | CompositeCell.FreeText _ -> "F"
-    let v = cc.ToString()
-    Html.div [
-        prop.classes ["is-flex"]
-        prop.style [
-            style.flexGrow 1
-            style.padding(length.em 0.5,length.em 0.75)
+    let basicValueDisplayCell (v: string) =
+        Html.span [
+            prop.style [
+                style.flexGrow 1
+                style.padding(length.em 0.5,length.em 0.75)
+            ]
+            prop.text v
         ]
-        prop.children [
-            Html.span [
-                prop.style [
-                    style.flexGrow 1
+
+    let compositeCellDisplay (cc: CompositeCell) =
+        let ccType = match cc with | CompositeCell.Term oa -> "T" | CompositeCell.Unitized _ -> "U" | CompositeCell.FreeText _ -> "F"
+        let v = cc.ToString()
+        Html.div [
+            prop.classes ["is-flex"]
+            prop.style [
+                style.flexGrow 1
+                style.padding(length.em 0.5,length.em 0.75)
+            ]
+            prop.children [
+                Html.span [
+                    prop.style [
+                        style.flexGrow 1
+                    ]
+                    prop.text v
                 ]
-                prop.text v
-            ]
-            Html.span [
-                prop.style [style.custom("marginLeft", "auto")]
-                prop.text ccType
+                Html.span [
+                    prop.style [style.custom("marginLeft", "auto")]
+                    prop.text ccType
+                ]
             ]
         ]
-    ]
+
+    let extendHeaderButton (state_extend: Set<int>, columnIndex, setState_extend) =
+        let isExtended = state_extend.Contains(columnIndex)
+        Bulma.icon [
+            prop.style [
+                style.cursor.pointer
+            ]
+            prop.onDoubleClick(fun e ->
+                e.stopPropagation()
+                e.preventDefault()
+                ()
+            )
+            prop.onClick(fun e ->
+                e.stopPropagation()
+                e.preventDefault()
+                let nextState = if isExtended then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
+                setState_extend nextState
+            )
+            prop.children [Html.i [prop.classes ["fa-sharp"; "fa-solid"; "fa-angles-up"; if isExtended then "fa-rotate-270" else "fa-rotate-90"]; prop.style [style.fontSize(length.em 1)]]]
+        ]
+
+
+module private CellAux =
+
+    let headerTANSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
+        let oa = header.TryOA()
+        let tan = if s = "" then None else Some s
+        oa 
+        |> Option.map (fun x -> {x with TermAccessionNumber = tan})
+        |> Option.map header.UpdateWithOA
+        |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
+
+open CellComponents
+open CellAux
 
 module private EventPresets =
 
     open Shared
 
-    let onClickSelect (index: int*int, state_cell, selectedCells: Set<int*int>, model:Messages.Model, dispatch)=
+    let onClickSelect (index: int*int, state_cell: CellState, selectedCells: Set<int*int>, model:Messages.Model, dispatch)=
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
-            if not state_cell.Active then
+            if state_cell.IsIdle then
                 let set = 
                     match e.ctrlKey with
                     | true ->
@@ -286,42 +341,13 @@ module private EventPresets =
 //        ]
 //    ]
 
-let private extendHeaderButton (state_extend: Set<int>, columnIndex, setState_extend) =
-    let isExtended = state_extend.Contains(columnIndex)
-    Bulma.icon [
-        prop.style [
-            style.cursor.pointer
-        ]
-        prop.onDoubleClick(fun e ->
-            e.stopPropagation()
-            e.preventDefault()
-            ()
-        )
-        prop.onClick(fun e ->
-            e.stopPropagation()
-            e.preventDefault()
-            let nextState = if isExtended then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
-            setState_extend nextState
-        )
-        prop.children [Html.i [prop.classes ["fa-sharp"; "fa-solid"; "fa-angles-up"; if isExtended then "fa-rotate-270" else "fa-rotate-90"]; prop.style [style.fontSize(length.em 1)]]]
-    ]
-
-
-type ColumnType =
-| Main
-| Unit
-| TSR
-| TAN
-with
-    member this.IsMainColumn = match this with | Main -> true | _ -> false
-    member this.IsRefColumn = match this with | Unit | TSR | TAN -> true | _ -> false
 
 open Shared
 
 type Cell =
 
     [<ReactComponent>]
-    static member HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    static member private HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let state = model.SpreadsheetModel
         let state_cell, setState_cell = React.useState(CellState.init(cellValue))
         let isReadOnly = columnType = Unit
@@ -336,16 +362,16 @@ type Cell =
                         e.preventDefault()
                         e.stopPropagation()
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-                        if not state_cell.Active then setState_cell {state_cell with Active = true}
+                        if state_cell.IsIdle then setState_cell {state_cell with CellMode = Active}
                     )
                     prop.children [
-                        if state_cell.Active then
+                        if state_cell.IsActive then
                             /// Update change to mainState and exit active input.
                             let updateMainStateTable() =
                                 // Only update if changed
                                 if state_cell.Value <> cellValue then
                                     setter state_cell.Value
-                                setState_cell {state_cell with Active = false}
+                                setState_cell {state_cell with CellMode = Idle}
                             cellInputElement(true, isReadOnly, updateMainStateTable, setState_cell, state_cell, cellValue)
                         else
                             let cellValue = // shadow cell value for tsr and tan to add columnType
@@ -376,29 +402,23 @@ type Cell =
         let setter = fun (s: string) -> ()
         Cell.HeaderBase(Unit, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
 
-    static member private HeaderTANSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
-        let oa = header.TryOA()
-        let tan = if s = "" then None else Some s
-        oa 
-        |> Option.map (fun x -> {x with TermAccessionNumber = tan})
-        |> Option.map header.UpdateWithOA
-        |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
-
     static member HeaderTSR(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermAccessionShort) |> Option.defaultValue ""
-        let setter = fun (s: string) -> Cell.HeaderTANSetter(columnIndex, s, header, dispatch)
+        let setter = fun (s: string) -> headerTANSetter(columnIndex, s, header, dispatch)
         Cell.HeaderBase(TSR, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
 
     static member HeaderTAN(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermAccessionShort) |> Option.defaultValue ""
-        let setter = fun (s: string) -> Cell.HeaderTANSetter(columnIndex, s, header, dispatch)
+        let setter = fun (s: string) -> headerTANSetter(columnIndex, s, header, dispatch)
         Cell.HeaderBase(TAN, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
 
+    static member Empty() =
+        Html.td [ cellStyle []; prop.readOnly true ]
+
     [<ReactComponent>]
-    static member Body(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+    static member private BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
-        let cellValue = cell.GetContent().[0]
         let state_cell, setState_cell = React.useState(CellState.init(cellValue))
         let isSelected = state.SelectedCells.Contains index
         Html.td [
@@ -414,22 +434,69 @@ type Cell =
                         e.preventDefault()
                         e.stopPropagation()
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-                        if not state_cell.Active then setState_cell {state_cell with Active = true}
+                        let mode = if e.ctrlKey && columnType = Main then Search else Active
+                        if state_cell.IsIdle then setState_cell {state_cell with CellMode = mode}
                     )
                     prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, model, dispatch)
                     prop.children [
-                        if state_cell.Active then
+                        match state_cell.CellMode with
+                        | Active ->
                             /// Update change to mainState and exit active input.
                             let updateMainStateTable() =
                                 // Only update if changed
                                 if state_cell.Value <> cellValue then
-                                    let nextCell = cell.UpdateMainField state_cell.Value
-                                    Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-                                setState_cell {state_cell with Active = false}
+                                    setter state_cell.Value
+                                setState_cell {state_cell with CellMode = Idle}
                             cellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue)
-                        else
-                            compositeCellDisplay cell
+                        | Search ->
+                            let setter = fun oa -> log oa
+                            Components.TermSearch.Input(setter, fullwidth=true)
+                        | Idle ->
+                            if columnType = Main then
+                                compositeCellDisplay cell
+                            else
+                                basicValueDisplayCell cellValue
                     ]
                 ]
             ]
         ]
+
+    static member Body(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let cellValue = cell.GetContent().[0]
+        let setter = fun (s: string) ->
+            let nextCell = cell.UpdateMainField s
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(Main, cellValue, setter, index, cell, model, dispatch)
+
+    static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let cellValue = cell.GetContent().[1]
+        let setter = fun (s: string) ->
+            let oa = cell.ToOA() 
+            let newName = if s = "" then None else Some s
+            let nextOA = {oa with Name = newName }
+            let nextCell = cell.UpdateWithOA nextOA
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(Unit, cellValue, setter, index, cell, model, dispatch)
+
+    static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let contentIndex = if cell.isUnitized then 2 else 1
+        let cellValue = cell.GetContent().[contentIndex]
+        let setter = fun (s: string) ->
+            let oa = cell.ToOA() 
+            let newTSR = if s = "" then None else Some s
+            let nextOA = {oa with TermSourceREF = newTSR}
+            let nextCell = cell.UpdateWithOA nextOA
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(TSR, cellValue, setter, index, cell, model, dispatch)
+
+    static member BodyTAN(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let contentIndex = if cell.isUnitized then 3 else 2
+        let cellValue = cell.GetContent().[contentIndex]
+        let setter = fun (s: string) ->
+            let oa = cell.ToOA() 
+            let newTAN = if s = "" then None else Some s
+            let nextOA = {oa with TermAccessionNumber = newTAN}
+            let nextCell = cell.UpdateWithOA nextOA
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(TAN, cellValue, setter, index, cell, model, dispatch)
+        
