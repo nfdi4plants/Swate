@@ -74,9 +74,11 @@ type ApiMsg =
 type StyleChangeMsg =
     | UpdateColorMode of ColorMode
 
-type PersistentStorageMsg =
+module PersistentStorage =
+    type Msg =
     | NewSearchableOntologies of Ontology []
     | UpdateAppVersion of string
+    | UpdateShowSidebar of bool
 
 module FilePicker =
     type Msg =
@@ -181,7 +183,7 @@ type Msg =
 | TermSearchMsg         of TermSearch.Msg
 | AdvancedSearchMsg     of AdvancedSearch.Msg
 | OfficeInteropMsg      of OfficeInterop.Msg
-| PersistentStorage     of PersistentStorageMsg
+| PersistentStorageMsg  of PersistentStorage.Msg
 | FilePickerMsg         of FilePicker.Msg
 | BuildingBlockMsg      of BuildingBlock.Msg
 | ProtocolMsg           of Protocol.Msg

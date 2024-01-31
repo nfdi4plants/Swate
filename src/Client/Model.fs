@@ -143,12 +143,14 @@ type PersistentStorageState = {
     SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
     Host                    : Swatehost option
+    ShowSideBar             : bool
     HasOntologiesLoaded     : bool
 } with
     static member init () = {
         SearchableOntologies    = [||]
         Host                    = None
         AppVersion              = ""
+        ShowSideBar             = false
         HasOntologiesLoaded     = false
     }
 

@@ -19,19 +19,19 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                         Bulma.tabs.isBoxed
                         prop.children [
                             Html.ul [
-                                yield Bulma.tab  [
+                                Bulma.tab  [
                                     prop.style [style.width (length.px 20)]
                                 ]
-                                yield 
-                                    MainComponents.FooterTabs.MainMetadata {| model=model; dispatch = dispatch |}
+                                
+                                MainComponents.FooterTabs.MainMetadata (model, dispatch)
                                 for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
-                                    yield
-                                        MainComponents.FooterTabs.Main {| index = index; tables = model.SpreadsheetModel.Tables; model = model; dispatch = dispatch |}
+                                    MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
                                 match model.SpreadsheetModel.ArcFile with
                                 | Some (ArcFiles.Template _) | Some (ArcFiles.Investigation _) ->
-                                    yield Html.none
+                                    Html.none
                                 | _ ->
-                                    yield MainComponents.FooterTabs.MainPlus {| dispatch = dispatch |}
+                                    MainComponents.FooterTabs.MainPlus dispatch
+                                MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
                             ]
                         ]
                     ]

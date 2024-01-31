@@ -291,7 +291,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         let cmds = Cmd.batch [
             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            onts |> NewSearchableOntologies |> PersistentStorage |> Cmd.ofMsg
+            onts |> PersistentStorage.NewSearchableOntologies |> PersistentStorageMsg |> Cmd.ofMsg
         ]
 
         nextState, cmds
@@ -325,7 +325,7 @@ let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : Api
 
         let cmds = Cmd.batch [
             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            appVersion |> UpdateAppVersion |> PersistentStorage |> Cmd.ofMsg
+            appVersion |>PersistentStorage. UpdateAppVersion |> PersistentStorageMsg |> Cmd.ofMsg
         ]
 
         nextState, cmds
@@ -362,9 +362,9 @@ let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messag
     | Response res ->
         handleApiResponseMsg res currentState
 
-let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorageMsg) (currentState:PersistentStorageState) : PersistentStorageState * Cmd<Msg> =
+let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (currentState:PersistentStorageState) : PersistentStorageState * Cmd<Msg> =
     match persistentStorageMsg with
-    | NewSearchableOntologies onts ->
+    | PersistentStorage.NewSearchableOntologies onts ->
         let nextState = {
             currentState with
                 SearchableOntologies    = onts |> Array.map (fun ont -> ont.Name |> SorensenDice.createBigrams, ont)
@@ -372,12 +372,14 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorageMsg) (curr
         }
 
         nextState,Cmd.none
-    | UpdateAppVersion appVersion ->
+    | PersistentStorage.UpdateAppVersion appVersion ->
         let nextState = {
             currentState with
                 AppVersion = appVersion
         }
         nextState,Cmd.none
+    | PersistentStorage.UpdateShowSidebar show ->
+        {currentState with ShowSideBar = show}, Cmd.none
 
 let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
     match topLevelMsg with
@@ -564,7 +566,7 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             }
             nextModel,nextCmd
 
-        | PersistentStorage persistentStorageMsg ->
+        | PersistentStorageMsg persistentStorageMsg ->
             let nextPersistentStorageState,nextCmd =
                 currentModel.PersistentStorageState
                 |> handlePersistenStorageMsg persistentStorageMsg
