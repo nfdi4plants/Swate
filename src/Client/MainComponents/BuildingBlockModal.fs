@@ -58,7 +58,10 @@ type Modals =
                     ]
                 ]
                 Bulma.modalCardBody [
-                    BuildingBlock.SearchComponent.Main model dispatch
+                    prop.style [style.overflow.inheritFromParent]
+                    prop.children [
+                        BuildingBlock.SearchComponent.Main model dispatch
+                    ]
                 ]
             ]
         ]
