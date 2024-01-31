@@ -167,7 +167,7 @@ module TermSearchAux =
                         ]
                     ]
                     Html.button [
-                        prop.onClick(fun e -> 
+                        prop.onMouseDown(fun e -> 
                             e.stopPropagation()
                             setShow (not show)
                         )
@@ -275,7 +275,7 @@ type TermSearch =
         ?debounceSetter: int,
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
-        ?onBlur: FocusEvent -> unit, ?onEscape: KeyboardEvent -> unit,
+        ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit,
         ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool, ?borderRadius: int) 
         =
         let autofocus = defaultArg autofocus false
@@ -291,6 +291,8 @@ type TermSearch =
         let isSearching, setIsSearching = React.useState(false)
         let debounceStorage = React.useRef(newDebounceStorage())
         let dsetter = fun inp -> if debounceSetter.IsSome then debounce debounceStorage.current "setter_debounce" debounceSetter.Value setter inp
+        let ref = React.useElementRef()
+        if onBlur.IsSome then React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, onBlur.Value) )
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
         React.useEffect((fun () -> setParent parent'), dependencies=[|box parent'|]) // careful, check console. might result in maximum dependency depth error.
         let stopSearch() = 
@@ -317,6 +319,7 @@ type TermSearch =
             if size.IsSome then size.Value
             Bulma.control.hasIconsLeft
             Bulma.control.hasIconsRight
+            prop.ref ref
             prop.style [
                 if fullwidth then style.flexGrow 1; 
             ]
@@ -329,7 +332,6 @@ type TermSearch =
                     ]
                     if size.IsSome then size.Value
                     if state.IsSome then prop.valueOrDefault state.Value.NameText
-                    if onBlur.IsSome then prop.onBlur onBlur.Value
                     prop.onDoubleClick(fun e ->
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search

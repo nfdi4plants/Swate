@@ -64,7 +64,9 @@ module private CellComponents =
             yield! specificStyle
         ]
 
-    let cellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: unit -> unit, setState_cell, state_cell, cell_value) =
+    let cellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: string -> unit, setState_cell, state_cell, cell_value) =
+        log "cell_value"
+        log cell_value
         Bulma.input.text [
             prop.readOnly isReadOnly
             prop.autoFocus true
@@ -82,13 +84,13 @@ module private CellComponents =
             ]
             // Update main spreadsheet state when leaving focus or...
             prop.onBlur(fun _ ->
-                updateMainStateTable()
+                updateMainStateTable cell_value
             )
             // .. when pressing "ENTER". "ESCAPE" will negate changes.
             prop.onKeyDown(fun e ->
                 match e.which with
                 | 13. -> //enter
-                    updateMainStateTable()
+                    updateMainStateTable cell_value
                 | 27. -> //escape
                     setState_cell {CellMode = Idle; Value = cell_value}
                 | _ -> ()
@@ -205,145 +207,6 @@ module private EventPresets =
                         else
                             None
                     TermSearch.UpdateParentTerm oa |> TermSearchMsg |> dispatch
-/////<summary> Only apply this element to SwateCell if header has term. </summary>
-//[<ReactComponent>]
-//let TANCell(index: (int*int), model: Model, dispatch) =
-//    let columnIndex = fst index
-//    let rowIndex = snd index
-//    let state = model.SpreadsheetModel
-//    let cell = state.ActiveTable.[index]
-//    let isHeader = cell.isHeader
-//    let cellValue =
-//        if isHeader then
-//            let tan = cell.Header.Term |> Option.map (fun x -> x.TermAccession) |> Option.defaultValue ""
-//            tan
-//        elif cell.isUnit then
-//            cell.Unit.Unit.TermAccession
-//        elif cell.isTerm then
-//            cell.Term.Term.TermAccession
-//        else ""
-//    let state_cell, setState_cell = React.useState(CellState.init(cellValue))
-//    let isSelected = state.SelectedCells.Contains index
-//    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
-//    cell_element [
-//        prop.key $"Cell_{state.ActiveTableIndex}-{columnIndex}-{rowIndex}_TAN"
-//        cellStyle [
-//            if isHeader then
-//                style.color(NFDIColors.white)
-//                style.backgroundColor(NFDIColors.DarkBlue.Lighter20)
-//            if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
-//        ]
-//        prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
-//        prop.children [
-//            Html.div [
-//                cellInnerContainerStyle []
-//                prop.onDoubleClick(fun e ->
-//                    e.preventDefault()
-//                    e.stopPropagation()
-//                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-//                    if not state_cell.Active then setState_cell {state_cell with Active = true}
-//                )
-//                prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
-//                prop.children [
-//                    if state_cell.Active then
-//                        let updateMainStateTable() =
-//                            // Only update if changed
-//                            if state_cell.Value <> cellValue then
-//                                // Updating unit name should remove unit tsr/tan
-//                                let nextTerm = 
-//                                    match cell with
-//                                    | IsHeader header ->
-//                                        let nextTerm = header.Term |> Option.map (fun t -> {t with TermAccession = state_cell.Value}) |> Option.defaultValue (TermMinimal.create "" state_cell.Value )
-//                                        let nextHeader = {header with Term = Some nextTerm}
-//                                        IsHeader nextHeader
-//                                    | IsTerm t_cell ->
-//                                        let nextTermCell =
-//                                            let term = { t_cell.Term with TermAccession = state_cell.Value }
-//                                            { t_cell with Term = term } 
-//                                        IsTerm nextTermCell
-//                                    | IsUnit u_cell ->
-//                                        let nextUnitCell =
-//                                            let unit = { u_cell.Unit with TermAccession = state_cell.Value }
-//                                            { u_cell with Unit = unit } 
-//                                        IsUnit nextUnitCell
-//                                    | IsFreetext _ ->
-//                                        let t_cell = cell.toTermCell().Term
-//                                        let term = {t_cell.Term with TermAccession = state_cell.Value}
-//                                        let nextCell = {t_cell with Term = term}
-//                                        IsTerm nextCell
-//                                Msg.UpdateTable (index, nextTerm) |> SpreadsheetMsg |> dispatch
-//                            setState_cell {state_cell with Active = false}
-//                        cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
-//                    else
-//                        let displayValue =
-//                            if isHeader then
-//                                $"{ColumnCoreNames.TermAccessionNumber.toString} ({cellValue})"
-//                            else
-//                                cellValue
-//                        Html.span [
-//                            prop.style [
-//                                style.flexGrow 1
-//                            ]
-//                            prop.text displayValue
-//                        ]
-//                ]
-//            ]
-//        ]
-//    ]
-
-//[<ReactComponent>]
-//let UnitCell(index: (int*int), model: Model, dispatch) =
-//    let columnIndex = fst index
-//    let rowIndex = snd index
-//    let state = model.SpreadsheetModel
-//    let cell = state.ActiveTable.[index]
-//    let isHeader = cell.isHeader
-//    let cellValue = if isHeader then ColumnCoreNames.Unit.toString elif cell.isUnit then cell.Unit.Unit.Name else "Unknown"
-//    let state_cell, setState_cell = React.useState(CellState.init(cellValue))
-//    let isSelected = state.SelectedCells.Contains index
-//    let cell_element : IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
-//    cell_element [
-//        prop.key $"Cell_{state.ActiveTableIndex}-{columnIndex}-{rowIndex}_Unit"
-//        cellStyle [
-//            if isHeader then
-//                style.color(NFDIColors.white)
-//                style.backgroundColor(NFDIColors.DarkBlue.Lighter20)
-//            if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
-//        ]
-//        prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
-//        prop.children [
-//            Html.div [
-//                cellInnerContainerStyle []
-//                prop.onDoubleClick(fun e ->
-//                    e.preventDefault()
-//                    e.stopPropagation()
-//                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-//                    if not state_cell.Active then setState_cell {state_cell with Active = true}
-//                )
-//                prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, dispatch)
-//                prop.children [
-//                    if not isHeader && state_cell.Active then
-//                        let updateMainStateTable() =
-//                            // Only update if changed
-//                            if state_cell.Value <> cellValue then
-//                                // This column only exists for unit cells
-//                                let nextTerm = {cell.Unit.Unit with Name = state_cell.Value}
-//                                let nextBody = IsUnit { cell.Unit with Unit = nextTerm }
-//                                Msg.UpdateTable (index, nextBody) |> SpreadsheetMsg |> dispatch
-//                            setState_cell {state_cell with Active = false}
-//                        cellInputElement(isHeader, updateMainStateTable, setState_cell, state_cell, cellValue)
-//                    else
-//                        Html.span [
-//                            prop.style [
-//                                style.flexGrow 1
-//                            ]
-//                            prop.text cellValue
-//                        ]
-//                ]
-//            ]
-//        ]
-//    ]
-
 
 open Shared
 
@@ -370,11 +233,12 @@ type Cell =
                     prop.children [
                         if state_cell.IsActive then
                             /// Update change to mainState and exit active input.
-                            let updateMainStateTable() =
+                            let updateMainStateTable =
+                                fun (s: string) -> 
                                 // Only update if changed
-                                if state_cell.Value <> cellValue then
-                                    setter state_cell.Value
-                                setState_cell {state_cell with CellMode = Idle}
+                                    if s <> cellValue then
+                                        setter s
+                                    setState_cell {state_cell with CellMode = Idle}
                             cellInputElement(true, isReadOnly, updateMainStateTable, setState_cell, state_cell, cellValue)
                         else
                             let cellValue = // shadow cell value for tsr and tan to add columnType
@@ -416,7 +280,15 @@ type Cell =
         Cell.HeaderBase(TAN, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
 
     static member Empty() =
-        Html.td [ cellStyle []; prop.readOnly true ]
+        Html.td [ cellStyle []; prop.readOnly true; prop.children [
+            Html.div [
+                prop.style [style.height (length.perc 100)]
+                prop.className "is-flex is-align-items-center is-justify-content-center"
+                prop.children [
+                    Html.div "-"
+                ]
+            ]
+        ]]
 
     [<ReactComponent>]
     static member private BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), cell: CompositeCell, model: Model, dispatch, ?oasetter: OntologyAnnotation option -> unit) =
@@ -446,11 +318,12 @@ type Cell =
                         match state_cell.CellMode with
                         | Active ->
                             /// Update change to mainState and exit active input.
-                            let updateMainStateTable() =
+                            let updateMainStateTable =
+                                fun (s: string) -> 
                                 // Only update if changed
-                                if state_cell.Value <> cellValue then
-                                    setter state_cell.Value
-                                makeIdle()
+                                    if s <> cellValue then
+                                        setter s
+                                    makeIdle()
                             cellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue)
                         | Search ->
                             if oasetter.IsSome then 
@@ -474,6 +347,8 @@ type Cell =
     static member Body(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.GetContent().[0]
         let setter = fun (s: string) ->
+            log "SETTER"
+            log s
             let nextCell = cell.UpdateMainField s
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         let oaSetter = fun (oa:OntologyAnnotation option) ->

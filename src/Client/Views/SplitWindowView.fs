@@ -82,6 +82,8 @@ let exampleTerm =
 [<ReactComponent>]
 let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) (mainModel:Messages.Model) (dispatch: Messages.Msg -> unit) =
     let (model, setModel) = React.useState(SplitWindow.init)
+    /// Used to show/hide the sidebar.
+    let show, setShow = React.useState(true)
     React.useEffect(model.WriteToLocalStorage, [|box model|])
     React.useEffectOnce(fun _ -> Browser.Dom.window.addEventListener("resize", onResize_event model setModel))
     Html.div [
