@@ -129,7 +129,5 @@ let Main (model: Model) dispatch =
         SearchBuildingBlockHeaderElement (state_bb, setState_bb, model, dispatch)
         if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
             SearchBuildingBlockBodyElement (model, dispatch)
-            //AdvancedSearch.modal_container state_bb setState_bb model dispatch
-            //AdvancedSearch.links_container model.AddBuildingBlockState.Header dispatch
         addBuildingBlockButton model dispatch
     ]

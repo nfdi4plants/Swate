@@ -149,18 +149,6 @@ module private DropdownElements =
     /// Output columns subpage for dropdown
     let dropdownContentIOTypeColumns header state setState (model:Model) dispatch =
         [
-            // Heading
-            //Bulma.dropdownItem.div [
-            //    prop.style [style.textAlign.center]
-            //    prop.children [
-            //        Html.h6 [
-            //            prop.className "subtitle"
-            //            prop.style [style.fontWeight.bold]
-            //            prop.text name
-            //        ]
-            //    ]
-            //]
-            //Bulma.dropdownDivider []
             IOType.Source           |> createIOTypeDropdownItem model dispatch setState header
             IOType.Sample           |> createIOTypeDropdownItem model dispatch setState header
             IOType.Material         |> createIOTypeDropdownItem model dispatch setState header

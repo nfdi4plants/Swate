@@ -8,8 +8,12 @@ open LocalHistory
 open Messages
 open Components.QuickAccessButton
 
+[<RequireQualifiedAccess>]
+type private Modal = 
+| BuildingBlock
+| Template
 
-let quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
+let private quickAccessButtonListStart (state: LocalHistory.Model) (setModal: Modal option -> unit) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
@@ -44,10 +48,30 @@ let quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                 ),
                 isActive = (state.NextPositionIsValid(state.HistoryCurrentPosition - 1))
             ).toReactElement()
+            QuickAccessButton.create(
+                "Add Building Block",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-circle-plus" ]
+                        Html.i [prop.className "fa-solid fa-table-columns" ]
+                    ]
+                ],
+                (fun _ -> setModal (Some Modal.BuildingBlock))
+            ).toReactElement()
+            //QuickAccessButton.create(
+            //    "Add Template",
+            //    [
+            //        Bulma.icon [ 
+            //            Html.i [prop.className "fa-solid fa-circle-plus" ]
+            //            Html.i [prop.className "fa-solid fa-table" ]
+            //        ]
+            //    ],
+            //    (fun _ -> setModal (Some Modal.Template))
+            //).toReactElement()
         ]
     ]
 
-let quickAccessButtonListEnd (model: Model) dispatch =
+let private quickAccessButtonListEnd (model: Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
@@ -71,9 +95,18 @@ let quickAccessButtonListEnd (model: Model) dispatch =
         ]
     ]
 
+let private modalDisplay (modal: Modal option, model, dispatch, setModal) = 
+    let rmv = fun _ -> setModal (None)
+    match modal with
+    | None -> Html.none
+    | Some Modal.BuildingBlock ->
+        MainComponents.Modals.BuildingBlock (model, dispatch, rmv)
+    | Some Modal.Template ->
+        MainComponents.Modals.BuildingBlock (model, dispatch, rmv)
 
 [<ReactComponent>]
 let Main (model: Messages.Model) dispatch =
+    let modal, setModal = React.useState(None)
     Bulma.navbar [
         prop.className "myNavbarSticky"
         prop.id "swate-mainNavbar"
@@ -84,6 +117,7 @@ let Main (model: Messages.Model) dispatch =
             style.minHeight(length.rem 3.25)
         ]
         prop.children [
+            modalDisplay (modal, model, dispatch, setModal)
             Bulma.navbarBrand.div [
 
             ]
@@ -119,7 +153,8 @@ let Main (model: Messages.Model) dispatch =
                                             (fun e -> ()),
                                             false
                                         ).toReactElement()
-                                        quickAccessButtonListStart (model.History: LocalHistory.Model) dispatch
+                                        quickAccessButtonListStart (model.History: LocalHistory.Model) setModal dispatch
+
                                     ]
                                 ]
                             ]
@@ -128,7 +163,7 @@ let Main (model: Messages.Model) dispatch =
                         Bulma.navbarStart.div [
                             prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                             prop.children [
-                                quickAccessButtonListStart model.History dispatch
+                                quickAccessButtonListStart model.History setModal dispatch
                             ]
                         ]
                         Bulma.navbarEnd.div [
