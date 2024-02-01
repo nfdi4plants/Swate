@@ -65,8 +65,6 @@ module private CellComponents =
         ]
 
     let cellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: string -> unit, setState_cell, state_cell, cell_value) =
-        log "cell_value"
-        log cell_value
         Bulma.input.text [
             prop.readOnly isReadOnly
             prop.autoFocus true
@@ -90,13 +88,14 @@ module private CellComponents =
             prop.onKeyDown(fun e ->
                 match e.which with
                 | 13. -> //enter
-                    updateMainStateTable cell_value
+                    updateMainStateTable state_cell.Value
                 | 27. -> //escape
                     setState_cell {CellMode = Idle; Value = cell_value}
                 | _ -> ()
             )
             // Only change cell value while typing to increase performance. 
             prop.onChange(fun e ->
+
                 setState_cell {state_cell with Value = e}
             )
             prop.defaultValue cell_value
@@ -347,8 +346,6 @@ type Cell =
     static member Body(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.GetContent().[0]
         let setter = fun (s: string) ->
-            log "SETTER"
-            log s
             let nextCell = cell.UpdateMainField s
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         let oaSetter = fun (oa:OntologyAnnotation option) ->
