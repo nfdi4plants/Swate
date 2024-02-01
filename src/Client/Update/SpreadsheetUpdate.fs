@@ -103,7 +103,11 @@ module Spreadsheet =
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
             | UpdateActiveView nextView ->
-                let nextState = { state with ActiveView = nextView }
+                let nextState = { 
+                    state with 
+                        ActiveView = nextView 
+                        SelectedCells = Set.empty
+                }
                 nextState, model, Cmd.none
             | RemoveTable removeIndex ->
                 let nextState = Controller.removeTable removeIndex state
