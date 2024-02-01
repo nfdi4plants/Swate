@@ -1,9 +1,12 @@
-﻿module LocalStorage.ModalPositions
+﻿module LocalStorage.Modal
 
 open Feliz
 open Fable.Core.JsInterop
 
-type Position = {
+/// <summary>
+/// Is not only used to store position but also size.
+/// </summary>
+type Rect = {
     X: int
     Y: int
 } with 
@@ -14,22 +17,24 @@ type Position = {
 
 open Fable.SimpleJson
 
+let [<Literal>] BuildingBlockModal = "BuildingBlock"
+
 [<RequireQualifiedAccess>]
-module LocalStorage =
+module Position =
 
     open Browser
 
-    let [<Literal>] private DataTheme_Key_Prefix = "ModalPosition_"
+    let [<Literal>] private Key_Prefix = "ModalPosition_"
 
-    let write(modalName:string, dt: Position) = 
+    let write(modalName:string, dt: Rect) = 
         let s = Json.serialize dt
-        WebStorage.localStorage.setItem(DataTheme_Key_Prefix + modalName, s)
+        WebStorage.localStorage.setItem(Key_Prefix + modalName, s)
 
     let load(modalName:string) =
-        let key = DataTheme_Key_Prefix + modalName
+        let key = Key_Prefix + modalName
         try 
             WebStorage.localStorage.getItem(key)
-            |> Json.parseAs<Position>
+            |> Json.parseAs<Rect>
             |> Some
         with
             |_ -> 
@@ -37,4 +42,25 @@ module LocalStorage =
                 printfn "Could not find %s" key
                 None
 
-let [<Literal>] BuildingBlockModal = "BuildingBlock"
+
+[<RequireQualifiedAccess>]
+module Size =
+    open Browser
+
+    let [<Literal>] private Key_Prefix = "ModalSize_"
+
+    let write(modalName:string, dt: Rect) = 
+        let s = Json.serialize dt
+        WebStorage.localStorage.setItem(Key_Prefix + modalName, s)
+
+    let load(modalName:string) =
+        let key = Key_Prefix + modalName
+        try 
+            WebStorage.localStorage.getItem(key)
+            |> Json.parseAs<Rect>
+            |> Some
+        with
+            |_ -> 
+                WebStorage.localStorage.removeItem(key)
+                printfn "Could not find %s" key
+                None

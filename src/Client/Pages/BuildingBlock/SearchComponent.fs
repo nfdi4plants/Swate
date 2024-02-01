@@ -125,7 +125,7 @@ let Main (model: Model) dispatch =
     let state_bb, setState_bb = React.useState(BuildingBlockUIState.init)
     //let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
     //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
-    mainFunctionContainer [
+    Html.div [
         SearchBuildingBlockHeaderElement (state_bb, setState_bb, model, dispatch)
         if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
             SearchBuildingBlockBodyElement (model, dispatch)

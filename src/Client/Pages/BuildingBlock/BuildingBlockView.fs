@@ -140,7 +140,9 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
 
         // Input forms, etc related to add building block.
         Bulma.label "Add annotation building blocks (columns) to the annotation table."
-        SearchComponent.Main model dispatch
+        mainFunctionContainer [
+            SearchComponent.Main model dispatch
+        ]
 
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->

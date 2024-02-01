@@ -332,6 +332,7 @@ type TermSearch =
                     ]
                     if size.IsSome then size.Value
                     if state.IsSome then prop.valueOrDefault state.Value.NameText
+                    prop.onMouseDown(fun e -> e.stopPropagation())
                     prop.onDoubleClick(fun e ->
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
