@@ -86,7 +86,7 @@
         <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
         <Compile Include="Pages\TemplateMetadata\TemplateMetadata.fs" />
         <Compile Include="Pages\Dag\Dag.fs" />
-        <Compile Include="MainComponents\Modals.fs" />
+        <Compile Include="MainComponents\Widgets.fs" />
         <Compile Include="MainComponents\MainViewContainer.fs" />
         <Compile Include="MainComponents\Metadata\Forms.fs" />
         <Compile Include="MainComponents\Metadata\Template.fs" />

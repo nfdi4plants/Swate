@@ -1,4 +1,4 @@
-﻿module LocalStorage.Modal
+﻿module LocalStorage.Widgets
 
 open Feliz
 open Fable.Core.JsInterop
@@ -17,14 +17,14 @@ type Rect = {
 
 open Fable.SimpleJson
 
-let [<Literal>] BuildingBlockModal = "BuildingBlock"
+let [<Literal>] BuildingBlockWidgets = "BuildingBlock"
 
 [<RequireQualifiedAccess>]
 module Position =
 
     open Browser
 
-    let [<Literal>] private Key_Prefix = "ModalPosition_"
+    let [<Literal>] private Key_Prefix = "WidgetsPosition_"
 
     let write(modalName:string, dt: Rect) = 
         let s = Json.serialize dt
@@ -47,7 +47,7 @@ module Position =
 module Size =
     open Browser
 
-    let [<Literal>] private Key_Prefix = "ModalSize_"
+    let [<Literal>] private Key_Prefix = "WidgetsSize_"
 
     let write(modalName:string, dt: Rect) = 
         let s = Json.serialize dt

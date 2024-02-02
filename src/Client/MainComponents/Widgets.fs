@@ -4,18 +4,18 @@ open Feliz
 open Feliz.Bulma
 open Browser.Types
 
-open LocalStorage.Modal
+open LocalStorage.Widgets
 
 module InitExtensions =
 
     type Rect with
         static member initBuildingBlockPosition() =
-            match Position.load BuildingBlockModal with
+            match Position.load BuildingBlockWidgets with
             | Some p -> Some p
             | None -> None       
             
         static member initBuildingBlockSize() =
-            match Size.load BuildingBlockModal with
+            match Size.load BuildingBlockWidgets with
             | Some p -> Some p
             | None -> None
 
@@ -61,7 +61,7 @@ module Elements =
             prop.children content
         ]
 
-type Modals =
+type Widgets =
 
     [<ReactComponent>]
     static member BuildingBlock (model, dispatch, rmv: MouseEvent -> unit) =
@@ -80,7 +80,7 @@ type Modals =
                     let onmouseup = fun e -> 
                         ResizeEventListener.onmouseup onmousemove
                         if size.IsSome then 
-                            Size.write(BuildingBlockModal,{X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
+                            Size.write(BuildingBlockWidgets,{X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
                     Browser.Dom.document.addEventListener("mousemove", onmousemove)
                     let config = createEmpty<AddEventListenerOptions>
                     config.once <- true
@@ -89,9 +89,12 @@ type Modals =
                 prop.style [
                     style.cursor.eastWestResize; style.display.flex
                     style.padding(2); style.overflow.visible
-                    style.position.absolute
+                    style.position.fixedRelativeToWindow
                     if size.IsSome then
                         style.width size.Value.X
+                    if position.IsNone then
+                        style.transform.translate (length.perc -50,length.perc -50)
+                        style.top (length.perc 50); style.left (length.perc 50); 
                     if position.IsSome then
                         style.top position.Value.Y; style.left position.Value.X; 
                 ]
@@ -110,7 +113,7 @@ type Modals =
                         let onmouseup = fun e -> 
                             MoveEventListener.onmouseup onmousemove
                             if position.IsSome then 
-                                Position.write(BuildingBlockModal,position.Value)
+                                Position.write(BuildingBlockWidgets,position.Value)
                         Browser.Dom.document.addEventListener("mousemove", onmousemove)
                         let config = createEmpty<AddEventListenerOptions>
                         config.once <- true

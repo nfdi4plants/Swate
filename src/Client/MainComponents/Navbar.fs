@@ -100,9 +100,9 @@ let private modalDisplay (modal: Modal option, model, dispatch, setModal) =
     match modal with
     | None -> Html.none
     | Some Modal.BuildingBlock ->
-        MainComponents.Modals.BuildingBlock (model, dispatch, rmv)
+        MainComponents.Widgets.BuildingBlock (model, dispatch, rmv)
     | Some Modal.Template ->
-        MainComponents.Modals.BuildingBlock (model, dispatch, rmv)
+        MainComponents.Widgets.BuildingBlock (model, dispatch, rmv)
 
 [<ReactComponent>]
 let Main (model: Messages.Model) dispatch =

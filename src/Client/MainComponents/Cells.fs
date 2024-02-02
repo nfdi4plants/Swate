@@ -43,7 +43,6 @@ with
     member this.IsMainColumn = match this with | Main -> true | _ -> false
     member this.IsRefColumn = match this with | Unit | TSR | TAN -> true | _ -> false
 
-
 module private CellComponents =
 
 
@@ -308,7 +307,7 @@ type Cell =
                     prop.onDoubleClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
-                        let mode = if e.ctrlKey && columnType = Main then Search else Active
+                        let mode = if (e.ctrlKey || e.metaKey )&& columnType = Main then Search else Active
                         if state_cell.IsIdle then setState_cell {state_cell with CellMode = mode}
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     )
