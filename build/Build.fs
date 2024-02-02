@@ -48,7 +48,7 @@ module ReleaseNoteTasks =
             ]
         if commit then 
             run git ["add"; "."] ""
-            run git ["commit"; "-m"; (sprintf "Release v%s :bookmark:" ProjectInfo.prereleaseTag)] ""
+            run git ["commit"; "-m"; (sprintf "Release %s :bookmark:" ProjectInfo.prereleaseTag)] ""
 
     let updateReleaseNotes = Target.create "releasenotes" (fun config ->
         ReleaseNotes.ensure()
