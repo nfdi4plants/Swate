@@ -98,6 +98,24 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
         ]
     ]
 
+let private scrollIntoViewRetry (id: string) =
+    let rec loop (iteration: int) = 
+        let headerelement = Browser.Dom.document.getElementById(id)
+        if isNull headerelement then
+            if iteration < 5 then 
+                Fable.Core.JS.setTimeout (fun _ -> loop (iteration+1)) 100 |> ignore
+            else
+                ()
+        else
+            let config = createEmpty<Browser.Types.ScrollIntoViewOptions>
+            config.behavior <- Browser.Types.ScrollBehavior.Smooth
+            config.block <- Browser.Types.ScrollAlignment.End
+            config.``inline`` <- Browser.Types.ScrollAlignment.End
+            log headerelement
+            headerelement.scrollIntoView(config)
+    loop 0
+    
+
 let private addBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState
     Bulma.field.div [
@@ -114,7 +132,10 @@ let private addBuildingBlockButton (model: Model) dispatch =
             Bulma.button.isFullWidth
             prop.onClick (fun _ ->
                 let column = CompositeColumn.create(header, [|if body.IsSome then body.Value|])
+                let index = Spreadsheet.Sidebar.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
+                let id = $"Header_{index}_Main"
+                scrollIntoViewRetry id
             )
             prop.text "Add Column"
         ]

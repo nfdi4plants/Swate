@@ -247,7 +247,8 @@ type Cell =
         let isReadOnly = columnType = Unit
         Html.th [
             if columnType.IsRefColumn then Bulma.color.hasBackgroundGreyLighter
-            prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}"
+            prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
+            prop.id $"Header_{columnIndex}_{columnType}"
             cellStyle []
             prop.children [
                 Html.div [
