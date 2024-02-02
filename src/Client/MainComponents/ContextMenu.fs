@@ -13,12 +13,16 @@ type private ContextFunctions = {
     Cut             : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     Paste           : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     FillColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    TransformCell   : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     //EditColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     RowIndex        : int
     ColumnIndex     : int
 }
 
-let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (selectedCell: CompositeCell option ) (rmv: _ -> unit) =
+let private isUnitOrTermCell (cell: CompositeCell option) =
+    cell.IsSome && not cell.Value.isFreeText
+
+let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (contextCell: CompositeCell option) (selectedCell: CompositeCell option ) (rmv: _ -> unit) =
     /// This element will remove the contextmenu when clicking anywhere else
     let rmv_element = Html.div [
         prop.onClick rmv
@@ -54,6 +58,9 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (sel
     let buttonList = [
         //button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
         button ("Fill Column", "fa-solid fa-file-signature", funcs.FillColumn rmv, [])
+        if isUnitOrTermCell contextCell then
+            let text = if contextCell.Value.isTerm then "As Unit Cell" else "As Term Cell"
+            button (text, "fa-solid fa-arrow-right-arrow-left", funcs.TransformCell rmv, [])
         divider
         button ("Copy", "fa-solid fa-copy", funcs.Copy rmv, [])
         button ("Cut", "fa-solid fa-scissors", funcs.Cut rmv, [])
@@ -90,6 +97,7 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
             Spreadsheet.DeleteRows indexArr |> Messages.SpreadsheetMsg |> dispatch
         else
             Spreadsheet.DeleteRow (snd index) |> Messages.SpreadsheetMsg |> dispatch
+    let cell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(fst index, snd index)
     //let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
     let funcs = {
         DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
@@ -98,10 +106,14 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
         Cut             = fun rmv e -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
         Paste           = fun rmv e -> rmv e; Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
         FillColumn      = fun rmv e -> rmv e; Spreadsheet.FillColumnWithTerm index |> Messages.SpreadsheetMsg |> dispatch
+        TransformCell   = fun rmv e -> 
+            if cell.IsSome && (cell.Value.isTerm || cell.Value.isUnitized) then
+                let nextCell = if cell.Value.isTerm then cell.Value.ToUnitizedCell() else cell.Value.ToTermCell()
+                rmv e; Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
         //EditColumn      = fun rmv e -> rmv e; editColumnEvent e
         RowIndex        = snd index
         ColumnIndex     = fst index
     }
-    let child = contextmenu mousePosition funcs model.SpreadsheetModel.Clipboard.Cell
+    let child = contextmenu mousePosition funcs cell model.SpreadsheetModel.Clipboard.Cell
     let name = $"context_{mousePosition}"
     Modals.Controller.renderModal(name, child)
