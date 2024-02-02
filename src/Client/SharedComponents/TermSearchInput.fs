@@ -275,8 +275,8 @@ type TermSearch =
         ?debounceSetter: int,
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
-        ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit,
-        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool, ?borderRadius: int) 
+        ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
+        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool, ?borderRadius: int, ?border: string) 
         =
         let autofocus = defaultArg autofocus false
         let displayParent = defaultArg displayParent true
@@ -292,7 +292,7 @@ type TermSearch =
         let debounceStorage = React.useRef(newDebounceStorage())
         let dsetter = fun inp -> if debounceSetter.IsSome then debounce debounceStorage.current "setter_debounce" debounceSetter.Value setter inp
         let ref = React.useElementRef()
-        if onBlur.IsSome then React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, onBlur.Value) )
+        if onBlur.IsSome then React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, onBlur.Value))
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
         React.useEffect((fun () -> setParent parent'), dependencies=[|box parent'|]) // careful, check console. might result in maximum dependency depth error.
         let stopSearch() = 
@@ -329,6 +329,7 @@ type TermSearch =
                     prop.autoFocus autofocus
                     prop.style [
                         if borderRadius.IsSome then style.borderRadius borderRadius.Value
+                        if border.IsSome then style.custom("border", border.Value)
                     ]
                     if size.IsSome then size.Value
                     if state.IsSome then prop.valueOrDefault state.Value.NameText
@@ -352,9 +353,17 @@ type TermSearch =
                             startSearch (Some s, true)
                             mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
                     )
-                    prop.onKeyDown(key.escape, fun e -> 
-                        if onEscape.IsSome then onEscape.Value e
-                        stopSearch()
+                    prop.onKeyDown(fun e -> 
+                        match e.which with
+                        | 27. -> //escape
+                            if onEscape.IsSome then onEscape.Value e
+                            stopSearch()
+                        | 13. -> //enter
+                            log "enter"
+                            if onEnter.IsSome then onEnter.Value e
+                            setter state
+                        | _ -> ()
+                            
                     )
                 ]
                 let TermSelectArea = 

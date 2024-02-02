@@ -8,6 +8,7 @@ open MainComponents
 open Messages
 open Shared
 open ARCtrl.ISA
+open Components
 
 type private CellMode = 
 | Active
@@ -63,41 +64,69 @@ module private CellComponents =
             yield! specificStyle
         ]
 
-    let cellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: string -> unit, setState_cell, state_cell, cell_value) =
-        Bulma.input.text [
-            prop.readOnly isReadOnly
-            prop.autoFocus true
-            prop.style [
-                if isHeader then style.fontWeight.bold
-                style.width(length.percent 100)
-                style.height.unset
-                style.borderRadius(0)
-                style.border(0,borderStyle.none,"")
-                style.backgroundColor.transparent
-                style.margin (0)
-                style.padding(length.em 0.5,length.em 0.75)
-                //if isHeader then
-                //    style.color(NFDIColors.white)
+    [<ReactComponent>]
+    let CellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: string -> unit, setState_cell, state_cell, cell_value, columnType) =
+        let ref = React.useElementRef()
+        React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, fun _ -> updateMainStateTable state_cell.Value))
+        let input = 
+            Bulma.control.div [
+                Bulma.control.isExpanded
+                prop.children [
+                    Bulma.input.text [
+                        prop.readOnly isReadOnly
+                        prop.autoFocus true
+                        prop.style [
+                            if isHeader then style.fontWeight.bold
+                            style.width(length.percent 100)
+                            style.height.unset
+                            style.borderRadius(0)
+                            style.border(0,borderStyle.none,"")
+                            style.backgroundColor.transparent
+                            style.margin (0)
+                            style.padding(length.em 0.5,length.em 0.75)
+                            //if isHeader then
+                            //    style.color(NFDIColors.white)
+                        ]
+                        // .. when pressing "ENTER". "ESCAPE" will negate changes.
+                        prop.onKeyDown(fun e ->
+                            match e.which with
+                            | 13. -> //enter
+                                updateMainStateTable state_cell.Value
+                            | 27. -> //escape
+                                setState_cell {CellMode = Idle; Value = cell_value}
+                            | _ -> ()
+                        )
+                        // Only change cell value while typing to increase performance. 
+                        prop.onChange(fun e ->
+                            setState_cell {state_cell with Value = e}
+                        )
+                        prop.defaultValue cell_value
+                    ]
+                ]
             ]
-            // Update main spreadsheet state when leaving focus or...
-            prop.onBlur(fun _ ->
-                updateMainStateTable cell_value
-            )
-            // .. when pressing "ENTER". "ESCAPE" will negate changes.
-            prop.onKeyDown(fun e ->
-                match e.which with
-                | 13. -> //enter
-                    updateMainStateTable state_cell.Value
-                | 27. -> //escape
-                    setState_cell {CellMode = Idle; Value = cell_value}
-                | _ -> ()
-            )
-            // Only change cell value while typing to increase performance. 
-            prop.onChange(fun e ->
-
-                setState_cell {state_cell with Value = e}
-            )
-            prop.defaultValue cell_value
+        let switchToSearchButton =
+            Bulma.control.div [
+                Bulma.button.button [
+                    prop.className "is-ghost"
+                    prop.style [style.borderWidth 0; style.borderRadius 0]
+                    prop.onClick(fun e ->
+                        e.stopPropagation()
+                        setState_cell {state_cell with CellMode = Search}
+                    )
+                    prop.children [
+                        Bulma.icon [Html.i [prop.className "fa-solid fa-search"]]
+                    ]
+                ]
+            ]
+        Bulma.field.div [
+            Bulma.field.hasAddons
+            prop.ref ref
+            prop.className "is-flex-grow-1 m-0"
+            prop.children [
+                input
+                if not isHeader && columnType = Main then
+                    switchToSearchButton
+            ]           
         ]
 
     let basicValueDisplayCell (v: string) =
@@ -214,6 +243,7 @@ type Cell =
     static member private HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let state = model.SpreadsheetModel
         let state_cell, setState_cell = React.useState(CellState.init(cellValue))
+        React.useEffect((fun _ -> setState_cell {state_cell with Value = cellValue}), [|box cellValue|])
         let isReadOnly = columnType = Unit
         Html.th [
             if columnType.IsRefColumn then Bulma.color.hasBackgroundGreyLighter
@@ -231,13 +261,12 @@ type Cell =
                     prop.children [
                         if state_cell.IsActive then
                             /// Update change to mainState and exit active input.
-                            let updateMainStateTable =
-                                fun (s: string) -> 
+                            let updateMainStateTable = fun (s: string) -> 
                                 // Only update if changed
-                                    if s <> cellValue then
-                                        setter s
-                                    setState_cell {state_cell with CellMode = Idle}
-                            cellInputElement(true, isReadOnly, updateMainStateTable, setState_cell, state_cell, cellValue)
+                                if s <> cellValue then
+                                    setter s
+                                setState_cell {state_cell with CellMode = Idle}
+                            CellInputElement(true, isReadOnly, updateMainStateTable, setState_cell, state_cell, cellValue, columnType)
                         else
                             let cellValue = // shadow cell value for tsr and tan to add columnType
                                 match columnType with
@@ -293,6 +322,7 @@ type Cell =
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
         let state_cell, setState_cell = React.useState(CellState.init(cellValue))
+        React.useEffect((fun _ -> setState_cell {state_cell with Value = cellValue}), [|box cellValue|])
         let isSelected = state.SelectedCells.Contains index
         let makeIdle() = setState_cell {state_cell with CellMode = Idle}
         Html.td [
@@ -316,20 +346,20 @@ type Cell =
                         match state_cell.CellMode with
                         | Active ->
                             /// Update change to mainState and exit active input.
-                            let updateMainStateTable =
-                                fun (s: string) -> 
+                            let updateMainStateTable = fun (s: string) -> 
                                 // Only update if changed
-                                    if s <> cellValue then
-                                        setter s
-                                    makeIdle()
-                            cellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue)
+                                if s <> cellValue then
+                                    setter s
+                                makeIdle()
+                            CellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue, columnType)
                         | Search ->
                             if oasetter.IsSome then 
                                 let headerOA = state.ActiveTable.Headers.[columnIndex].TryOA()
                                 let oa = cell.ToOA()
                                 let onBlur = fun e -> makeIdle()
                                 let onEscape = fun e -> makeIdle()
-                                Components.TermSearch.Input(oasetter.Value, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, autofocus=true, borderRadius=0)
+                                let onEnter = fun e -> makeIdle()
+                                Components.TermSearch.Input(oasetter.Value, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset")
                             else
                                 printfn "No setter for OntologyAnnotation given for table cell term search."
                         | Idle ->
