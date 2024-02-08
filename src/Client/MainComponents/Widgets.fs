@@ -97,7 +97,7 @@ type Widgets =
         let size, setSize = React.useState(fun _ -> Rect.initSizeFromPrefix prefix)
         let helpIsActive, setHelpIsActive = React.useState(false)
         let element = React.useElementRef()
-        React.useLayoutEffectOnce(fun _ -> MoveEventListener.ensurePositionInsideWindow element position.Value |> Some |> setPosition) // Reposition widget inside window
+        React.useLayoutEffectOnce(fun _ -> position |> Option.iter (fun position -> MoveEventListener.ensurePositionInsideWindow element position |> Some |> setPosition)) // Reposition widget inside window
         let resizeElement (content: ReactElement) =
             Bulma.modalCard [
                 prop.ref element
