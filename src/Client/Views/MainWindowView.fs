@@ -26,12 +26,10 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
                                 MainComponents.FooterTabs.MainMetadata (model, dispatch)
                                 for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
                                     MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
-                                match model.SpreadsheetModel.ArcFile with
-                                | Some (ArcFiles.Template _) | Some (ArcFiles.Investigation _) ->
-                                    Html.none
-                                | _ ->
-                                    MainComponents.FooterTabs.MainPlus dispatch
-                                MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
+                                if model.SpreadsheetModel.CanHaveTables() then 
+                                    MainComponents.FooterTabs.MainPlus (model, dispatch)
+                                if model.SpreadsheetModel.TableViewIsActive() then
+                                    MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
                             ]
                         ]
                     ]

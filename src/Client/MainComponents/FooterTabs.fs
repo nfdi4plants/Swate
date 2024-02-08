@@ -176,55 +176,61 @@ let MainMetadata(model: Messages.Model, dispatch: Messages.Msg -> unit) =
     ]
 
 [<ReactComponent>]
-let MainPlus(dispatch: Messages.Msg -> unit) =
+let MainPlus(model: Messages.Model, dispatch: Messages.Msg -> unit) =
     let state, setState = React.useState(FooterTab.init())
     let order = System.Int32.MaxValue-1 // MaxValue will be sidebar toggle
     let id = "Add-Spreadsheet-Button"
-    Bulma.tab [
-        prop.key id
-        prop.id id
-        if state.IsDraggedOver then prop.className "dragover-footertab"
-        prop.onDragEnter <| dragenter_handler(state, setState)
-        prop.onDragLeave <| dragleave_handler (state, setState)
-        prop.onDragOver drag_preventdefault
-        prop.onDrop <| drop_handler (order, state, setState, dispatch)
-        prop.onClick (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
-        prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
-        prop.children [
-            Html.a [
-                prop.style [style.height.inheritFromParent; style.pointerEvents.none]
-                prop.children [
-                    Bulma.icon [
-                        Bulma.icon.isSmall
-                        prop.children [
-                            Html.i [prop.className "fa-solid fa-plus"]
+    if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Metadata then
+        Html.none
+    else
+        Bulma.tab [
+            prop.key id
+            prop.id id
+            if state.IsDraggedOver then prop.className "dragover-footertab"
+            prop.onDragEnter <| dragenter_handler(state, setState)
+            prop.onDragLeave <| dragleave_handler (state, setState)
+            prop.onDragOver drag_preventdefault
+            prop.onDrop <| drop_handler (order, state, setState, dispatch)
+            prop.onClick (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
+            prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
+            prop.children [
+                Html.a [
+                    prop.style [style.height.inheritFromParent; style.pointerEvents.none]
+                    prop.children [
+                        Bulma.icon [
+                            Bulma.icon.isSmall
+                            prop.children [
+                                Html.i [prop.className "fa-solid fa-plus"]
+                            ]
                         ]
                     ]
                 ]
             ]
         ]
-    ]
 
 let ToggleSidebar(model: Messages.Model, dispatch: Messages.Msg -> unit) =
     let show = model.PersistentStorageState.ShowSideBar
     let order = System.Int32.MaxValue
     let id = "Toggle-Sidebar-Button"
-    Bulma.tab [
-        prop.key id
-        prop.id id
-        prop.onClick (fun e -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
-        prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer; style.marginLeft length.auto]
-        prop.children [
-            Html.a [
-                prop.style [style.height.inheritFromParent; style.pointerEvents.none]
-                prop.children [
-                    Bulma.icon [
-                        Bulma.icon.isSmall
-                        prop.children [
-                            Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
+    if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Metadata then
+        Html.none
+    else
+        Bulma.tab [
+            prop.key id
+            prop.id id
+            prop.onClick (fun e -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
+            prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer; style.marginLeft length.auto]
+            prop.children [
+                Html.a [
+                    prop.style [style.height.inheritFromParent; style.pointerEvents.none]
+                    prop.children [
+                        Bulma.icon [
+                            Bulma.icon.isSmall
+                            prop.children [
+                                Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
+                            ]
                         ]
                     ]
                 ]
             ]
         ]
-    ]

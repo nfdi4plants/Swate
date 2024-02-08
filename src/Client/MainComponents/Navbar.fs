@@ -48,26 +48,6 @@ let private quickAccessButtonListStart (state: LocalHistory.Model) (setModal: Mo
                 ),
                 isActive = (state.NextPositionIsValid(state.HistoryCurrentPosition - 1))
             ).toReactElement()
-            QuickAccessButton.create(
-                "Add Building Block",
-                [
-                    Bulma.icon [ 
-                        Html.i [prop.className "fa-solid fa-circle-plus" ]
-                        Html.i [prop.className "fa-solid fa-table-columns" ]
-                    ]
-                ],
-                (fun _ -> setModal (Some Modal.BuildingBlock))
-            ).toReactElement()
-            QuickAccessButton.create(
-                "Add Template",
-                [
-                    Bulma.icon [ 
-                        Html.i [prop.className "fa-solid fa-circle-plus" ]
-                        Html.i [prop.className "fa-solid fa-table" ]
-                    ]
-                ],
-                (fun _ -> setModal (Some Modal.Template))
-            ).toReactElement()
         ]
     ]
 
@@ -91,6 +71,35 @@ let private quickAccessButtonListEnd (model: Model) dispatch =
                 ],
                 (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
                 buttonProps = [Bulma.color.isDanger; Bulma.button.isInverted; Bulma.button.isOutlined]
+            ).toReactElement()
+        ]
+    ]
+
+let WidgetNavbarList (model, dispatch, setModal) =
+    Html.div [
+        prop.style [
+            style.display.flex; style.flexDirection.row
+        ]
+        prop.children [
+            QuickAccessButton.create(
+                "Add Building Block",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-circle-plus" ]
+                        Html.i [prop.className "fa-solid fa-table-columns" ]
+                    ]
+                ],
+                (fun _ -> setModal (Some Modal.BuildingBlock))
+            ).toReactElement()
+            QuickAccessButton.create(
+                "Add Template",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-circle-plus" ]
+                        Html.i [prop.className "fa-solid fa-table" ]
+                    ]
+                ],
+                (fun _ -> setModal (Some Modal.Template))
             ).toReactElement()
         ]
     ]
@@ -154,7 +163,7 @@ let Main (model: Messages.Model) dispatch =
                                             false
                                         ).toReactElement()
                                         quickAccessButtonListStart (model.History: LocalHistory.Model) setModal dispatch
-
+                                        if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, setModal)
                                     ]
                                 ]
                             ]
@@ -164,6 +173,7 @@ let Main (model: Messages.Model) dispatch =
                             prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                             prop.children [
                                 quickAccessButtonListStart model.History setModal dispatch
+                                if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, setModal)
                             ]
                         ]
                         Bulma.navbarEnd.div [

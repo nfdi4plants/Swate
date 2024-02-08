@@ -63,6 +63,14 @@ type Model = {
         match this.ArcFile with | Some (Assay a) -> a | _ -> ArcAssay.init("ASSAY_NULL")
     member this.headerIsSelected =
         not this.SelectedCells.IsEmpty && this.SelectedCells |> Seq.exists (fun (c,r) -> r = 0)
+    member this.CanHaveTables() = 
+        match this.ArcFile with 
+        | Some (ArcFiles.Assay _) | Some (ArcFiles.Study _) -> true
+        | _ -> false
+    member this.TableViewIsActive() =
+        match this.ActiveView with
+        | ActiveView.Table i -> true
+        | _ -> false
 
 type Msg =
 // <--> UI <-->
