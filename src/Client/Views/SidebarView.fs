@@ -169,7 +169,7 @@ module private Content =
             TemplateMetadata.Core.newNameMainElement model dispatch
 
         | Routing.Route.ProtocolSearch ->
-            Protocol.Search.ProtocolSearchView model dispatch
+            Protocol.Search.Main model dispatch
 
         | Routing.Route.ActivityLog ->
             ActivityLog.activityLogComponent model dispatch

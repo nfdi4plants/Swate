@@ -1,10 +1,5 @@
 @charset "utf-8";
 
-// OpenSans
-$FontPathOpenSans: "~open-sans-fonts/open-sans";
-$family-primary: 'Open Sans';
-
-
 // 1. Import the initial variables
 @import "../../node_modules/bulma/sass/utilities/initial-variables.sass";
 @import "../../node_modules/bulma/sass/utilities/functions.sass";
@@ -73,6 +68,38 @@ $colors: map-merge($colors, $addColors);
 
 @import "../../node_modules/bulma/bulma.sass";
 /*@import "../../node_modules/bulma-checkradio/src/sass/index.sass";*/
+
+.template-filter-container {
+    flex-grow: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+
+    > div {
+        flex-grow: 1
+    }
+}
+
+.widget-help-container {
+    padding: 5px;
+
+    > * {
+        font-size: 0.85rem; // Set the specific font size for all direct children
+    }
+}
+
+.tableFixHead {
+    overflow: auto;
+    max-height: 600px;
+    border-collapse: collapse;
+
+    > thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background-color: var(--scheme-main)
+    }
+}
 
 .form-container {
     display: flex;

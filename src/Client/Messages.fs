@@ -108,15 +108,17 @@ module Protocol =
         | ParseUploadedFileRequest          of raw: byte []
         | ParseUploadedFileResponse         of (string * InsertBuildingBlock []) []
         // Client
+        | UpdateTemplates                   of ARCtrl.Template.Template []
+        | UpdateLoading                     of bool
         | RemoveUploadedFileParsed
         // // ------ Protocol from Database ------
+        | GetAllProtocolsForceRequest
         | GetAllProtocolsRequest
         | GetAllProtocolsResponse           of string []
         | SelectProtocol                    of ARCtrl.Template.Template
         | ProtocolIncreaseTimesUsed         of protocolName:string
         // Client
         | RemoveSelectedProtocol
-        | UpdateLoading                     of bool
 
 type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockTermsRequest      of TermSearchable []

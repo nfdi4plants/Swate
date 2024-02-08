@@ -344,29 +344,44 @@ module Validation =
 module Protocol =
 
     [<RequireQualifiedAccess>]
-    type CuratedCommunityFilter =
-    | Both
+    type CommunityFilter =
+    | All
     | OnlyCurated
     | OnlyCommunity
+
+        member this.ToStringRdb() =
+            match this with
+            | All          -> "All"
+            | OnlyCurated   -> "Curated"
+            | OnlyCommunity -> "Community"
+
+        static member fromString(str:string) =
+            match str.ToLower() with
+            | "all" -> All
+            | "curated" -> OnlyCurated
+            | "community" -> OnlyCommunity
+            | anyElse -> printfn "Unable to parse %s to CommunityFilter. Default to 'All'." anyElse; All
 
     /// This model is used for both protocol insert and protocol search
     type Model = {
         // Client 
         Loading                 : bool
+        LastUpdated             : System.DateTime option
         // // ------ Process from file ------
         UploadedFileParsed      : (string*InsertBuildingBlock []) []
         // ------ Protocol from Database ------
-        ProtocolSelected        : ARCtrl.Template.Template option
-        ProtocolsAll            : ARCtrl.Template.Template []
+        TemplateSelected        : ARCtrl.Template.Template option
+        Templates               : ARCtrl.Template.Template []
     } with
         static member init () = {
             // Client
             Loading                 = false
-            ProtocolSelected        = None
+            LastUpdated             = None
+            TemplateSelected        = None
             // // ------ Process from file ------
             UploadedFileParsed      = [||]
             // ------ Protocol from Database ------
-            ProtocolsAll            = [||]
+            Templates               = [||]
         }
 
 type RequestBuildingBlockInfoStates =

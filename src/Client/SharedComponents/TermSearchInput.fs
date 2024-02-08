@@ -28,7 +28,7 @@ module TermSearchAux =
 
     let searchByName(query: string, setResults: TermTypes.Term [] -> unit) =
         async {
-            let! terms = Api.ontology.searchTerms {|limit = 5; ontologies = []; query=query|}
+            let! terms = Api.ontology.searchTerms {|limit = 10; ontologies = []; query=query|}
             setResults terms
         }
 

@@ -148,19 +148,19 @@ module TemplateFromDB =
                     prop.children [
                         Bulma.button.a [
                             Bulma.color.isSuccess
-                            if model.ProtocolState.ProtocolSelected.IsSome then
+                            if model.ProtocolState.TemplateSelected.IsSome then
                                 Bulma.button.isActive
                             else
                                 Bulma.color.isDanger
                                 prop.disabled true
                             Bulma.button.isFullWidth
                             prop.onClick (fun _ ->
-                                if model.ProtocolState.ProtocolSelected.IsNone then
+                                if model.ProtocolState.TemplateSelected.IsNone then
                                     failwith "No template selected!"
                                 // Remove existing columns
                                 let mutable columnsToRemove = []
                                 // find duplicate columns
-                                let tablecopy = model.ProtocolState.ProtocolSelected.Value.Table.Copy()
+                                let tablecopy = model.ProtocolState.TemplateSelected.Value.Table.Copy()
                                 for header in tablecopy.Headers do
                                     let containsAtIndex = model.SpreadsheetModel.ActiveTable.Headers.FindIndex(fun h -> h = header)
                                     if containsAtIndex >= 0 then
@@ -173,7 +173,7 @@ module TemplateFromDB =
                         ]
                     ]
                 ]
-                if model.ProtocolState.ProtocolSelected.IsSome then
+                if model.ProtocolState.TemplateSelected.IsSome then
                     Bulma.column [
                         Bulma.column.isNarrow
                         Bulma.button.a [
@@ -185,38 +185,36 @@ module TemplateFromDB =
             ]
         ]
 
+    
+
     let displaySelectedProtocolEle (model:Model) dispatch =
-        [
-            div [Style [OverflowX OverflowOptions.Auto; MarginBottom "1rem"]] [
-                Bulma.table [
-                    Bulma.table.isFullWidth;
-                    Bulma.table.isBordered
-                    prop.children [
-                        thead [] [
-                            Html.tr [
-                                Html.th "Column"
-                                Html.th "Column TAN"
-                                //Html.th "Unit"
-                                //Html.th "Unit TAN"
-                            ]
+        div [Style [OverflowX OverflowOptions.Auto; MarginBottom "1rem"]] [
+            Bulma.table [
+                Bulma.table.isFullWidth;
+                Bulma.table.isBordered
+                prop.children [
+                    thead [] [
+                        Html.tr [
+                            Html.th "Column"
+                            Html.th "Column TAN"
+                            //Html.th "Unit"
+                            //Html.th "Unit TAN"
                         ]
-                        tbody [] [
-                            for column in model.ProtocolState.ProtocolSelected.Value.Table.Columns do
-                                //let unitOption = column.TryGetColumnUnits()
-                                yield
-                                    Html.tr [
-                                        td [] [str (column.Header.ToString())]
-                                        td [] [str (if column.Header.IsTermColumn then column.Header.ToTerm().TermAccessionShort else "-")]
-                                        //td [] [str (if unitOption.IsSome then insertBB.UnitTerm.Value.Name else "-")]
-                                        //td [] [str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
-                                    ]
-                        ]
+                    ]
+                    tbody [] [
+                        for column in model.ProtocolState.TemplateSelected.Value.Table.Columns do
+                            //let unitOption = column.TryGetColumnUnits()
+                            yield
+                                Html.tr [
+                                    td [] [str (column.Header.ToString())]
+                                    td [] [str (if column.Header.IsTermColumn then column.Header.ToTerm().TermAccessionShort else "-")]
+                                    //td [] [str (if unitOption.IsSome then insertBB.UnitTerm.Value.Name else "-")]
+                                    //td [] [str (if insertBB.HasUnit then insertBB.UnitTerm.Value.TermAccession else "-")]
+                                ]
                     ]
                 ]
             ]
-            addFromDBToTableButton model dispatch
         ]
-    
 
     let showDatabaseProtocolTemplate (model:Messages.Model) dispatch =
         mainFunctionContainer [
@@ -234,9 +232,12 @@ module TemplateFromDB =
             Bulma.field.div [
                 addFromDBToTableButton model dispatch
             ]
-            if model.ProtocolState.ProtocolSelected.IsSome then
+            if model.ProtocolState.TemplateSelected.IsSome then
                 Bulma.field.div [
-                    yield! displaySelectedProtocolEle model dispatch
+                    displaySelectedProtocolEle model dispatch
+                ]
+                Bulma.field.div [
+                    addFromDBToTableButton model dispatch
                 ]
         ]
 

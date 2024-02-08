@@ -58,16 +58,16 @@ let private quickAccessButtonListStart (state: LocalHistory.Model) (setModal: Mo
                 ],
                 (fun _ -> setModal (Some Modal.BuildingBlock))
             ).toReactElement()
-            //QuickAccessButton.create(
-            //    "Add Template",
-            //    [
-            //        Bulma.icon [ 
-            //            Html.i [prop.className "fa-solid fa-circle-plus" ]
-            //            Html.i [prop.className "fa-solid fa-table" ]
-            //        ]
-            //    ],
-            //    (fun _ -> setModal (Some Modal.Template))
-            //).toReactElement()
+            QuickAccessButton.create(
+                "Add Template",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-circle-plus" ]
+                        Html.i [prop.className "fa-solid fa-table" ]
+                    ]
+                ],
+                (fun _ -> setModal (Some Modal.Template))
+            ).toReactElement()
         ]
     ]
 
@@ -102,7 +102,7 @@ let private modalDisplay (modal: Modal option, model, dispatch, setModal) =
     | Some Modal.BuildingBlock ->
         MainComponents.Widgets.BuildingBlock (model, dispatch, rmv)
     | Some Modal.Template ->
-        MainComponents.Widgets.BuildingBlock (model, dispatch, rmv)
+        MainComponents.Widgets.Templates (model, dispatch, rmv)
 
 [<ReactComponent>]
 let Main (model: Messages.Model) dispatch =
