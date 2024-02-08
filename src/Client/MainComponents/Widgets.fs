@@ -30,15 +30,21 @@ module MoveEventListener =
 
     open Fable.Core.JsInterop
 
-    let calculatePosition (element:IRefValue<HTMLElement option>) (startPosition: Rect) = fun (e: Event) ->
-        let e : MouseEvent = !!e
+    let ensurePositionInsideWindow (element:IRefValue<HTMLElement option>) (position: Rect) =
         let maxX = Browser.Dom.window.innerWidth - element.current.Value.offsetWidth;
-        let tempX = int e.clientX - startPosition.X
+        let tempX = position.X
         let newX = System.Math.Min(System.Math.Max(tempX,0),int maxX)
         let maxY = Browser.Dom.window.innerHeight - element.current.Value.offsetHeight;
-        let tempY = int e.clientY - startPosition.Y
+        let tempY = position.Y
         let newY = System.Math.Min(System.Math.Max(tempY,0),int maxY)
         {X = newX; Y = newY}
+
+    let calculatePosition (element:IRefValue<HTMLElement option>) (startPosition: Rect) = fun (e: Event) ->
+        let e : MouseEvent = !!e
+        let tempX = int e.clientX - startPosition.X
+        let tempY = int e.clientY - startPosition.Y
+        let tempPosition = {X = tempX; Y = tempY}
+        ensurePositionInsideWindow element tempPosition
 
     let onmousemove (element:IRefValue<HTMLElement option>) (startPosition: Rect) setPosition = fun (e: Event) ->
         let nextPosition = calculatePosition element startPosition e
@@ -58,7 +64,10 @@ module ResizeEventListener =
     let onmousemove (startPosition: Rect) (startSize: Rect) setSize = fun (e: Event) ->
         let e : MouseEvent = !!e
         let width = int e.clientX - startPosition.X + startSize.X
-        //let height = int e.clientY - startPosition.Y + startSize.Y
+        // I did not enable this, as it creates issues with overlays such as the term search dropdown. 
+        // The widget card itself has overflow: visible, which makes a set height impossible, 
+        // but wihout the visible overflow term search results might require scrolling.
+        // // let height = int e.clientY - startPosition.Y + startSize.Y
         setSize (Some {X = width; Y = startSize.Y})
 
     let onmouseup (prefix, element: IRefValue<HTMLElement option>) onmousemove = 
@@ -67,11 +76,6 @@ module ResizeEventListener =
             Size.write(prefix,{X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
 module Elements =
-    let resizeElement (content: ReactElement)  =
-        Html.div [
-            prop.style [style.cursor.northWestSouthEastResize; style.border(1, borderStyle.solid, "black")]
-            prop.children content
-        ]
 
     let helpExtendButton (extendToggle: unit -> unit) =
         Bulma.help [
@@ -93,6 +97,7 @@ type Widgets =
         let size, setSize = React.useState(fun _ -> Rect.initSizeFromPrefix prefix)
         let helpIsActive, setHelpIsActive = React.useState(false)
         let element = React.useElementRef()
+        React.useLayoutEffectOnce(fun _ -> MoveEventListener.ensurePositionInsideWindow element position.Value |> Some |> setPosition) // Reposition widget inside window
         let resizeElement (content: ReactElement) =
             Bulma.modalCard [
                 prop.ref element
@@ -109,11 +114,13 @@ type Widgets =
                     Browser.Dom.document.addEventListener("mouseup", onmouseup, config)
                 )
                 prop.style [
-                    style.cursor.eastWestResize; style.display.flex
+                    style.cursor.northWestSouthEastResize //style.cursor.eastWestResize; 
+                    style.display.flex
                     style.padding(2); style.overflow.visible
                     style.position.fixedRelativeToWindow
                     if size.IsSome then
                         style.width size.Value.X
+                        //style.height size.Value.Y
                     if position.IsNone then
                         //style.transform.translate (length.perc -50,length.perc -50)
                         style.top (length.perc 20); style.left (length.perc 20); 
@@ -124,7 +131,7 @@ type Widgets =
             ]
         resizeElement <| Html.div [
             prop.onMouseDown(fun e -> e.stopPropagation())
-            prop.style [style.cursor.defaultCursor]
+            prop.style [style.cursor.defaultCursor; style.display.flex; style.flexDirection.column; style.flexGrow 1]
             prop.children [
                 Bulma.modalCardHead [
                     prop.onMouseDown(fun e -> // move
@@ -190,7 +197,7 @@ type Widgets =
         let selectContent() = 
             [
                 Protocol.Search.FileSortElement(templates, setTemplates, model, dispatch)
-                Protocol.Search.Component (templates, model, dispatch, length.px 300)
+                Protocol.Search.Component (templates, model, dispatch, length.px 350)
             ]
         let insertContent() =
             [
@@ -198,7 +205,7 @@ type Widgets =
                     Protocol.Core.TemplateFromDB.addFromDBToTableButton model dispatch
                 ]
                 Bulma.field.div [
-                    prop.style [style.maxHeight (length.px 300); style.overflow.auto]
+                    prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.children [
                         Protocol.Core.TemplateFromDB.displaySelectedProtocolEle model dispatch
                     ]
