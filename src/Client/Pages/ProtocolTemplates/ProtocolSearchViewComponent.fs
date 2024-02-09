@@ -242,77 +242,62 @@ module ComponentAux =
             ]
         ]
 
-    let tagDisplayField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
-        Bulma.columns [
-            Bulma.columns.isMobile
+    let TagRemovableElement (tag:OntologyAnnotation) (color: IReactProperty) (rmv: unit -> unit) =
+        Bulma.control.div [
+            Bulma.tags [
+                prop.style [style.flexWrap.nowrap]
+                Bulma.tags.hasAddons
+                prop.children [
+                    Bulma.tag [color; prop.style [style.borderWidth 0]; prop.text tag.NameText; prop.title tag.TermAccessionShort]
+                    Bulma.tag [
+                        Bulma.tag.isDelete
+                        prop.onClick (fun _ -> rmv())
+                    ]
+                ]
+            ]
+        ]
+
+    let SwitchElement (tagIsFilterAnd: bool) (setFilter: bool -> unit) =
+        Html.div [
+            prop.style [style.marginLeft length.auto]
             prop.children [
-                Bulma.column [
-                    Bulma.field.div [
-                        Bulma.field.isGroupedMultiline
-                        prop.children [
-                            for selectedTag in state.ProtocolFilterErTags do
-                                yield Bulma.control.div [
-                                    Bulma.tags [
-                                        Bulma.tags.hasAddons
-                                        prop.children [
-                                            Bulma.tag [Bulma.color.isLink; prop.style [style.borderWidth 0]; prop.text selectedTag.NameText]
-                                            Bulma.delete [
-                                                prop.className "clickableTagDelete"
-                                                prop.onClick (fun _ ->
-                                                    {state with ProtocolFilterErTags = state.ProtocolFilterErTags |> List.except [selectedTag]} |> setState
-                                                    //RemoveProtocolErTag selectedTag |> ProtocolMsg |> dispatch
-                                                )
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            for selectedTag in state.ProtocolFilterTags do
-                                yield Bulma.control.div [
-                                    Bulma.tags [
-                                        Bulma.tags.hasAddons
-                                        prop.children [
-                                            Bulma.tag [Bulma.color.isInfo; prop.style [style.borderWidth 0]; prop.text selectedTag.NameText]
-                                            Bulma.delete [
-                                                prop.className "clickableTagDelete"
-                                                //Tag.Color IsWarning;
-                                                prop.onClick (fun _ ->
-                                                        {state with ProtocolFilterTags = state.ProtocolFilterTags |> List.except [selectedTag]} |> setState
-                                                        //RemoveProtocolTag selectedTag |> ProtocolMsg |> dispatch
-                                                )
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                        ]
+                Bulma.button.button [
+                    Bulma.button.isSmall
+                    prop.onClick (fun _ -> setFilter (not tagIsFilterAnd))
+                    prop.title (if tagIsFilterAnd then "Templates contain all tags." else "Templates contain at least one tag.")
+                    prop.text (if tagIsFilterAnd then "And" else "Or")
+                ]
+            ]
+        ]
+
+    let TagDisplayField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
+        Html.div [
+            prop.className "is-flex"
+            prop.children [
+                Bulma.field.div [
+                    Bulma.field.isGroupedMultiline
+                    prop.style [style.display.flex; style.flexGrow 1; style.gap (length.rem 0.5); style.flexWrap.wrap; style.flexDirection.row]
+                    prop.children [
+                        for selectedTag in state.ProtocolFilterErTags do
+                            let rmv = fun () -> {state with ProtocolFilterErTags = state.ProtocolFilterErTags |> List.except [selectedTag]} |> setState
+                            TagRemovableElement selectedTag Bulma.color.isLink rmv
+                        for selectedTag in state.ProtocolFilterTags do
+                            let rmv = fun () -> {state with ProtocolFilterTags = state.ProtocolFilterTags |> List.except [selectedTag]} |> setState
+                            TagRemovableElement selectedTag Bulma.color.isInfo rmv
                     ]
                 ]
                 // tag filter (AND or OR) 
-                Bulma.column [
-                    Bulma.column.isNarrow
-                    prop.title (if state.TagFilterIsAnd then "Templates contain all tags." else "Templates contain at least one tag.")
-                    Switch.checkbox [
-                        Bulma.color.isDark
-                        prop.style [style.userSelect.none]
-                        switch.isOutlined
-                        switch.isSmall
-                        prop.id "switch-2"
-                        prop.isChecked state.TagFilterIsAnd
-                        prop.onChange (fun (e:bool) ->
-                            {state with TagFilterIsAnd = not state.TagFilterIsAnd} |> setState
-                            //UpdateTagFilterIsAnd (not state.TagFilterIsAnd) |> ProtocolMsg |> dispatch
-                        )
-                        prop.children (if state.TagFilterIsAnd then Html.b "And" else Html.b "Or")
-                    ] |> prop.children
-                ]
+                let filtersetter = fun b -> setState {state with TagFilterIsAnd = b}
+                SwitchElement state.TagFilterIsAnd filtersetter
             ]
         ]
 
     let fileSortElements (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
 
         Html.div [
-            prop.style [style.marginBottom(length.rem 0.75); style.display.flex]
+            prop.style [style.marginBottom(length.rem 0.75); style.display.flex; style.flexDirection.column]
             prop.children [
-                Html.div [
+                Bulma.field.div [
                     prop.className "template-filter-container"
                     prop.children [
                         queryField model state setState
@@ -322,7 +307,9 @@ module ComponentAux =
                 ]
                 // Only show the tag list and tag filter (AND or OR) if any tag exists
                 if state.ProtocolFilterErTags <> [] || state.ProtocolFilterTags <> [] then
-                    tagDisplayField model state setState
+                    Bulma.field.div [
+                        TagDisplayField model state setState
+                    ]
             ]
         ]
 
@@ -430,42 +417,6 @@ module ComponentAux =
             ]
         ]
 
-    //let CommunityFilterDropdownItem (filter:Protocol.CommunityFilter) (child: ReactElement) (state:ProtocolViewState) (setState: ProtocolViewState -> unit) =
-    //    Bulma.dropdownItem.a [
-    //        prop.onClick(fun e ->
-    //                e.preventDefault();
-    //                {state with CommunityFilter = filter} |> setState
-    //                //UpdateCommunityFilter filter |> ProtocolMsg |> dispatch
-    //            )
-    //        prop.children child
-    //    ]
-
-    //let CommunityFilterElement (state:ProtocolViewState) (setState: ProtocolViewState -> unit) =
-    //    Bulma.dropdown [
-    //        Bulma.dropdown.isHoverable
-    //        prop.children [
-    //            Bulma.dropdownTrigger [
-    //                Bulma.button.button [
-    //                    Bulma.button.isSmall; Bulma.button.isOutlined; Bulma.color.isWhite;
-    //                    prop.style [style.padding 0]
-    //                    match state.CommunityFilter with
-    //                    | Protocol.CommunityFilter.All -> curatedCommunityTag
-    //                    | Protocol.CommunityFilter.OnlyCommunity -> communitytag
-    //                    | Protocol.CommunityFilter.OnlyCurated -> curatedTag
-    //                    |> prop.children
-    //                ]
-    //            ]
-    //            Bulma.dropdownMenu [
-    //                prop.style [style.minWidth.unset; style.fontWeight.normal]
-    //                Bulma.dropdownContent [
-    //                    CommunityFilterDropdownItem Protocol.CommunityFilter.All curatedCommunityTag state setState
-    //                    CommunityFilterDropdownItem Protocol.CommunityFilter.OnlyCurated curatedTag state setState
-    //                    CommunityFilterDropdownItem Protocol.CommunityFilter.OnlyCommunity communitytag state setState
-    //                ] |> prop.children
-    //            ]
-    //        ]
-    //    ]
-
 open Feliz
 open System
 open ComponentAux
@@ -534,22 +485,13 @@ type Search =
                 scoredTemplate
             else
                 protocol
-        let filterTableByTags tags ertags tagfilter (protocol:ARCtrl.Template.Template []) =
+        let filterTableByTags tags ertags tagfilter (templates:ARCtrl.Template.Template []) =
             if tags <> [] || ertags <> [] then
-                protocol |> Array.filter (fun x ->
-                    let tags' = Array.append x.Tags x.EndpointRepositories |> Array.distinct
-                    let filterTags = tags@ertags |> List.distinct
-                    Seq.except filterTags tags'
-                        |> fun filteredTags ->
-                            // if we want to filter by tag with AND, all tags must match
-                            if tagfilter then
-                                Seq.length filteredTags = tags'.Length - filterTags.Length
-                            // if we want to filter by tag with OR, at least one tag must match
-                            else
-                                Seq.length filteredTags < tags'.Length
-                )
+                let tagArray = tags@ertags |> Array.ofList
+                let filteredTemplates = templates |> ARCtrl.Template.Templates.filterByOntologyAnnotation(tagArray, tagfilter)
+                filteredTemplates
             else
-                protocol
+                templates
         let filterTableByCommunityFilter communityfilter (protocol:ARCtrl.Template.Template []) =
             match communityfilter with
             | Protocol.CommunityFilter.All          -> protocol

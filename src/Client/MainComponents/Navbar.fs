@@ -75,7 +75,7 @@ let private quickAccessButtonListEnd (model: Model) dispatch =
         ]
     ]
 
-let WidgetNavbarList (model, dispatch, setModal) =
+let private WidgetNavbarList (model, dispatch, setModal) =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row

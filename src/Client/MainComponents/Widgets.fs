@@ -114,9 +114,9 @@ type Widgets =
                     Browser.Dom.document.addEventListener("mouseup", onmouseup, config)
                 )
                 prop.style [
-                    style.cursor.northWestSouthEastResize //style.cursor.eastWestResize; 
+                    style.cursor.eastWestResize//style.cursor.northWestSouthEastResize ; 
                     style.display.flex
-                    style.padding(2); style.overflow.visible
+                    style.paddingRight(2); style.overflow.visible
                     style.position.fixedRelativeToWindow
                     if size.IsSome then
                         style.width size.Value.X
