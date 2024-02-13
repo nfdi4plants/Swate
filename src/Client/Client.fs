@@ -29,6 +29,12 @@ let private split_container model dispatch =
 [<ReactComponent>]
 let View (model : Model) (dispatch : Msg -> unit) =
     let (colorstate, setColorstate) = React.useState(LocalStorage.Darkmode.State.init)
+    // Make ARCitect always use lighttheme 
+    let makeColorSchemeLight = fun _ -> 
+        if model.PersistentStorageState.Host.IsSome && model.PersistentStorageState.Host.Value = Swatehost.ARCitect then 
+            setColorstate {colorstate with Theme = LocalStorage.Darkmode.DataTheme.Light}
+            LocalStorage.Darkmode.DataTheme.SET LocalStorage.Darkmode.DataTheme.Light
+    React.useEffect(makeColorSchemeLight, [|box model.PersistentStorageState.Host|])
     let v = {colorstate with SetTheme = setColorstate}
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
         Html.div [
