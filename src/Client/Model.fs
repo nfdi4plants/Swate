@@ -347,20 +347,27 @@ module Protocol =
     type CommunityFilter =
     | All
     | OnlyCurated
-    | OnlyCommunity
+    | OnlyCommunities
+    | Community of string
 
         member this.ToStringRdb() =
             match this with
-            | All          -> "All"
-            | OnlyCurated   -> "Curated"
-            | OnlyCommunity -> "Community"
+            | All               -> "All"
+            | OnlyCurated       -> "DataPLANT official"
+            | OnlyCommunities   -> "All Communities"
+            | Community name    -> name
 
         static member fromString(str:string) =
-            match str.ToLower() with
-            | "all" -> All
-            | "curated" -> OnlyCurated
-            | "community" -> OnlyCommunity
-            | anyElse -> printfn "Unable to parse %s to CommunityFilter. Default to 'All'." anyElse; All
+            match str with
+            | "All" -> All
+            | "All Curated" -> OnlyCurated
+            | "All Community" -> OnlyCommunities
+            | anyElse -> Community anyElse
+
+        static member CommunityFromOrganisation(org:ARCtrl.Template.Organisation) =
+            match org with
+            | ARCtrl.Template.Organisation.DataPLANT -> None
+            | ARCtrl.Template.Other name -> Some <| Community name
 
     /// This model is used for both protocol insert and protocol search
     type Model = {

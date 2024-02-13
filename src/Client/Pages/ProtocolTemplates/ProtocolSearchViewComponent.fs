@@ -213,14 +213,19 @@ module ComponentAux =
 
     open Fable.Core.JsInterop
 
-    let communitySelectField (model) (state: ProtocolViewState) setState =
-        let options = [
-            Model.Protocol.CommunityFilter.All
-            Model.Protocol.CommunityFilter.OnlyCurated
-            Model.Protocol.CommunityFilter.OnlyCommunity
-        ]
+    let communitySelectField (model: Messages.Model) (state: ProtocolViewState) setState =
+        let communityNames = 
+            model.ProtocolState.Templates 
+            |> Array.choose (fun t -> Model.Protocol.CommunityFilter.CommunityFromOrganisation t.Organisation) 
+            |> Array.distinct |> List.ofArray
+        let options = 
+            [
+                Model.Protocol.CommunityFilter.All
+                Model.Protocol.CommunityFilter.OnlyCurated
+                Model.Protocol.CommunityFilter.OnlyCommunities
+            ]@communityNames
         Html.div [
-            Bulma.label "Search for tags"
+            Bulma.label "Select community"
             Bulma.control.div [
                 Bulma.control.isExpanded 
                 prop.children [
@@ -493,10 +498,13 @@ type Search =
             else
                 templates
         let filterTableByCommunityFilter communityfilter (protocol:ARCtrl.Template.Template []) =
+            log communityfilter
             match communityfilter with
-            | Protocol.CommunityFilter.All          -> protocol
-            | Protocol.CommunityFilter.OnlyCurated   -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToString().ToLower()) curatedOrganisationNames)
-            | Protocol.CommunityFilter.OnlyCommunity -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToString().ToLower()) curatedOrganisationNames |> not)
+            | Protocol.CommunityFilter.All              -> protocol
+            | Protocol.CommunityFilter.OnlyCurated      -> protocol |> Array.filter (fun x -> log (x.Organisation.ToString().ToLower()) ; List.contains (x.Organisation.ToString().ToLower()) curatedOrganisationNames)
+            | Protocol.CommunityFilter.OnlyCommunities  -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToString().ToLower()) curatedOrganisationNames |> not)
+            | Protocol.CommunityFilter.Community name   -> protocol |> Array.filter (fun x -> x.Organisation.ToString() = name)
+
 
         let state, setState = React.useState(ProtocolViewState.init)
         let propagateOutside = fun () ->
