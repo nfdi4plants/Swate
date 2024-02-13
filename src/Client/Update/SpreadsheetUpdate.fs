@@ -97,6 +97,11 @@ module Spreadsheet =
                     state.ActiveTable.UpdateCellAt(fst index,snd index, cell)
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
+            | UpdateCells arr ->
+                let nextState = 
+                    state.ActiveTable.SetCellsAt arr
+                    {state with ArcFile = state.ArcFile}
+                nextState, model, Cmd.none
             | UpdateHeader (index, header) ->
                 let nextState = 
                     state.ActiveTable.UpdateHeader(index, header)

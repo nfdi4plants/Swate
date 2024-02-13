@@ -122,31 +122,31 @@ let sortButton icon msg =
 let fileSortElements (model:Messages.Model) dispatch =
     Bulma.field.div [
         Bulma.buttons [
-            Bulma.button.a [
-                prop.title "Copy to Clipboard"
-                prop.onClick(fun e ->
-                    CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
-                    let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
-                    let textArea = Browser.Dom.document.createElement "textarea"
-                    textArea?value <- txt
-                    textArea?style?top <- "0"
-                    textArea?style?left <- "0"
-                    textArea?style?position <- "fixed"
+            //Bulma.button.a [
+            //    prop.title "Copy to Clipboard"
+            //    prop.onClick(fun e ->
+            //        CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
+            //        let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
+            //        let textArea = Browser.Dom.document.createElement "textarea"
+            //        textArea?value <- txt
+            //        textArea?style?top <- "0"
+            //        textArea?style?left <- "0"
+            //        textArea?style?position <- "fixed"
 
-                    Browser.Dom.document.body.appendChild textArea |> ignore
+            //        Browser.Dom.document.body.appendChild textArea |> ignore
 
-                    textArea.focus()
-                    // Can't belive this actually worked
-                    textArea?select()
+            //        textArea.focus()
+            //        // Can't belive this actually worked
+            //        textArea?select()
 
-                    let t = Browser.Dom.document.execCommand("copy")
-                    Browser.Dom.document.body.removeChild(textArea) |> ignore
-                    ()
-                )
-                prop.children [
-                    CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" "fa-regular fa-clipboard" "fa-solid fa-check"
-                ]
-            ]
+            //        let t = Browser.Dom.document.execCommand("copy")
+            //        Browser.Dom.document.body.removeChild(textArea) |> ignore
+            //        ()
+            //    )
+            //    prop.children [
+            //        CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" "fa-solid fa-copy" "fa-solid fa-check"
+            //    ]
+            //]
 
             Bulma.buttons [
                 Bulma.buttons.hasAddons

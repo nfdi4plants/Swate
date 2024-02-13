@@ -75,6 +75,7 @@ type Model = {
 type Msg =
 // <--> UI <-->
 | UpdateCell of (int*int) * CompositeCell
+| UpdateCells of ((int*int) * CompositeCell) []
 | UpdateHeader of columIndex: int * CompositeHeader
 | UpdateActiveView of ActiveView
 | UpdateSelectedCells of Set<int*int>

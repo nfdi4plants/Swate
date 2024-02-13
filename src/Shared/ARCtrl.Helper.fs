@@ -25,6 +25,22 @@ module ARCtrlHelper =
 module Extensions =
 
     open ARCtrl.Template
+    open ArcTableAux
+
+    type ArcTable with
+        member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
+            SanityChecks.validateColumn <| CompositeColumn.create(this.Headers.[columnIndex],[|cell|])
+            Unchecked.setCellAt(columnIndex, rowIndex,cell) this.Values
+            Unchecked.fillMissingCells this.Headers this.Values
+
+        member this.SetCellsAt (cells: ((int*int)*CompositeCell) []) =
+            let columns = cells |> Array.groupBy (fun (index, cell) -> fst index)
+            for columnIndex, items in columns do
+                SanityChecks.validateColumn <| CompositeColumn.create(this.Headers.[columnIndex], items |> Array.map snd)
+            for index, cell in cells do
+                Unchecked.setCellAt(fst index, snd index, cell) this.Values
+            Unchecked.fillMissingCells this.Headers this.Values
+
 
     type Template with
         member this.FileName 

@@ -103,13 +103,23 @@ module Interface =
             | _ -> failwith "not implemented"
         | InsertFileNames fileNames ->
             match host with
-            | Some Swatehost.Excel | Some Swatehost.ARCitect ->
+            | Some Swatehost.Excel ->
                 let cmd = OfficeInterop.InsertFileNames fileNames |> OfficeInteropMsg |> Cmd.ofMsg
                 model, cmd
-            //| Swatehost.Browser ->
-            //    let arr = fileNames |> List.toArray |> Array.map (fun x -> TermTypes.TermMinimal.create x "")
-            //    let cmd = Spreadsheet.InsertOntologyTerms arr |> SpreadsheetMsg |> Cmd.ofMsg
-            //    model, cmd
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                if model.SpreadsheetModel.SelectedCells.IsEmpty then
+                    model, Cmd.ofMsg (DevMsg.GenericError (Cmd.none, exn("No cell(s) selected.")) |> DevMsg)
+                else
+                    let columnIndex, rowIndex = model.SpreadsheetModel.SelectedCells.MinimumElement
+                    let mutable rowIndex = rowIndex
+                    let cells = [|
+                        for name in fileNames do
+                            let cell = ARCtrl.ISA.CompositeCell.createFreeText name
+                            (columnIndex, rowIndex), cell
+                            rowIndex <- rowIndex + 1
+                    |]
+                    let cmd = Spreadsheet.UpdateCells cells |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
             | _ -> failwith "not implemented"
         | RemoveBuildingBlock ->
             match host with
