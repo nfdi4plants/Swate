@@ -9,11 +9,11 @@ open Messages
 open Components.QuickAccessButton
 
 [<RequireQualifiedAccess>]
-type private Modal = 
+type private Widget = 
 | BuildingBlock
 | Template
 
-let private quickAccessButtonListStart (state: LocalHistory.Model) (setModal: Modal option -> unit) dispatch =
+let private quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
@@ -75,7 +75,7 @@ let private quickAccessButtonListEnd (model: Model) dispatch =
         ]
     ]
 
-let private WidgetNavbarList (model, dispatch, setModal) =
+let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
@@ -89,7 +89,7 @@ let private WidgetNavbarList (model, dispatch, setModal) =
                         Html.i [prop.className "fa-solid fa-table-columns" ]
                     ]
                 ],
-                (fun _ -> setModal (Some Modal.BuildingBlock))
+                (fun _ -> addWidget Widget.BuildingBlock)
             ).toReactElement()
             QuickAccessButton.create(
                 "Add Template",
@@ -99,23 +99,34 @@ let private WidgetNavbarList (model, dispatch, setModal) =
                         Html.i [prop.className "fa-solid fa-table" ]
                     ]
                 ],
-                (fun _ -> setModal (Some Modal.Template))
+                (fun _ -> addWidget Widget.Template)
             ).toReactElement()
         ]
     ]
 
-let private modalDisplay (modal: Modal option, model, dispatch, setModal) = 
-    let rmv = fun _ -> setModal (None)
-    match modal with
-    | None -> Html.none
-    | Some Modal.BuildingBlock ->
-        MainComponents.Widgets.BuildingBlock (model, dispatch, rmv)
-    | Some Modal.Template ->
-        MainComponents.Widgets.Templates (model, dispatch, rmv)
+let private modalDisplay (widgets: Widget list, rmvWidget: Widget -> unit, model, dispatch) = 
+    let rmv (widget: Widget) = fun _ -> rmvWidget widget
+    let displayWidget (widget: Widget) (widgetComponent) =
+        if widgets |> List.contains widget then
+            widgetComponent (model, dispatch, rmv widget)
+        else
+            Html.none
+    match widgets.Length with
+    | 0 -> 
+        Html.none
+    | _ ->
+        Html.div [
+            displayWidget Widget.BuildingBlock MainComponents.Widgets.BuildingBlock
+            displayWidget Widget.Template MainComponents.Widgets.Templates
+        ]
 
 [<ReactComponent>]
 let Main (model: Messages.Model) dispatch =
-    let modal, setModal = React.useState(None)
+    let widgets, setWidgets = React.useState([])
+    let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
+    let addWidget (widget: Widget) = 
+        if widgets |> List.contains widget then () else 
+            widget::widgets |> setWidgets
     Bulma.navbar [
         prop.className "myNavbarSticky"
         prop.id "swate-mainNavbar"
@@ -126,7 +137,7 @@ let Main (model: Messages.Model) dispatch =
             style.minHeight(length.rem 3.25)
         ]
         prop.children [
-            modalDisplay (modal, model, dispatch, setModal)
+            modalDisplay (widgets, rmvWidget, model, dispatch)
             Bulma.navbarBrand.div [
 
             ]
@@ -162,8 +173,8 @@ let Main (model: Messages.Model) dispatch =
                                             (fun e -> ()),
                                             false
                                         ).toReactElement()
-                                        quickAccessButtonListStart (model.History: LocalHistory.Model) setModal dispatch
-                                        if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, setModal)
+                                        quickAccessButtonListStart (model.History: LocalHistory.Model) dispatch
+                                        if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, addWidget)
                                     ]
                                 ]
                             ]
@@ -172,8 +183,8 @@ let Main (model: Messages.Model) dispatch =
                         Bulma.navbarStart.div [
                             prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                             prop.children [
-                                quickAccessButtonListStart model.History setModal dispatch
-                                if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, setModal)
+                                quickAccessButtonListStart model.History dispatch
+                                if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, addWidget)
                             ]
                         ]
                         Bulma.navbarEnd.div [
