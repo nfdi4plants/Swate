@@ -71,7 +71,7 @@ type Route =
         | Route.TemplateMetadata    ->
             createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]] p.toStringRdbl
         | Route.FilePicker          ->
-            createElem [ Html.i [prop.className "fa-solid fa-upload" ]] p.toStringRdbl
+            createElem [ Html.i [prop.className "fa-solid fa-file-signature" ]] p.toStringRdbl
         | Route.ActivityLog         ->
             createElem [ Html.i [prop.className "fa-solid fa-timeline" ]] p.toStringRdbl
         | Route.Info                ->

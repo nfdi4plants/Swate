@@ -58,7 +58,7 @@ let private quickAccessButtonListEnd (model: Model) dispatch =
         ]
         prop.children [
             QuickAccessButton.create(
-                "Save as xlsx",
+                "Save",
                 [
                     Bulma.icon [Html.i [prop.className "fa-solid fa-floppy-disk";]]
                 ],

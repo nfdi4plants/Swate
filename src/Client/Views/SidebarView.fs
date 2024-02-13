@@ -62,9 +62,8 @@ let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
             //if not isIEBrowser then
                 // docsrc attribute not supported in iframe in IE
                 //createNavigationTab Routing.Route.Dag               model dispatch sidebarsize
-            createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
-        else
             createNavigationTab Routing.Route.JsonExport            model dispatch sidebarsize
+        else
             createNavigationTab Routing.Route.TemplateMetadata      model dispatch sidebarsize
             //createNavigationTab Routing.Route.Validation            model dispatch sidebarsize
             createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
@@ -163,7 +162,7 @@ module private Content =
             Protocol.Core.fileUploadViewComponent model dispatch
 
         | Routing.Route.JsonExport ->
-            JsonExporter.Core.jsonExporterMainElement model dispatch
+            JsonExporter.Core.FileExporter.Main(model, dispatch)
 
         | Routing.Route.TemplateMetadata ->
             TemplateMetadata.Core.newNameMainElement model dispatch

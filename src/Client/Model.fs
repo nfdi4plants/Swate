@@ -360,7 +360,7 @@ module Protocol =
         static member fromString(str:string) =
             match str with
             | "All" -> All
-            | "All Curated" -> OnlyCurated
+            | "DataPLANT official" -> OnlyCurated
             | "All Community" -> OnlyCommunities
             | anyElse -> Community anyElse
 

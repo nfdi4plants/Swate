@@ -215,6 +215,13 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                     ]
                                 ]
                                 Bulma.navbarItem.a [
+                                    prop.onClick (fun e ->
+                                        setState {state with BurgerActive = not state.BurgerActive}
+                                        UpdatePageState (Some Routing.Route.Info) |> dispatch
+                                    )
+                                    prop.text Routing.Route.Info.toStringRdbl
+                                ]
+                                Bulma.navbarItem.a [
                                     prop.href Shared.URLs.SwateWiki ;
                                     prop.target "_Blank";
                                     prop.text "How to use"
