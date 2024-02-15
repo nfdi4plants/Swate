@@ -30,14 +30,12 @@ type Model = {
     ActiveView: ActiveView
     SelectedCells: Set<int*int>
     ArcFile: ArcFiles option
-    Clipboard: TableClipboard
 } with
     static member init() =
         {
             ActiveView = ActiveView.Metadata
             SelectedCells = Set.empty
             ArcFile = None
-            Clipboard = TableClipboard.init()
         }
     member this.Tables
         with get() =
@@ -74,6 +72,7 @@ type Model = {
 
 type Msg =
 // <--> UI <-->
+| UpdateState of Model
 | UpdateCell of (int*int) * CompositeCell
 | UpdateCells of ((int*int) * CompositeCell) []
 | UpdateHeader of columIndex: int * CompositeHeader
@@ -88,11 +87,18 @@ type Msg =
 | DeleteRows of int []
 | DeleteColumn of int
 | CopySelectedCell
+| CopySelectedCells
 | CutSelectedCell
 | PasteSelectedCell
+| PasteSelectedCells
 | CopyCell of index:(int*int)
+| CopyCells of indices:(int*int) []
 | CutCell of index:(int*int)
 | PasteCell of index:(int*int)
+/// This Msg will paste all cell from clipboard into column starting from index. It will extend the table if necessary.
+| PasteCellsExtend of index:(int*int)
+| Clear of index:(int*int) []
+| ClearSelected
 | FillColumnWithTerm of index:(int*int)
 // /// Update column of index to new column type defined by given SwateCell.emptyXXX
 // | EditColumn of index: int * newType: SwateCell * b_type: BuildingBlockType option

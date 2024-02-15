@@ -17,6 +17,7 @@ open ARCtrl.ISA
 open ARCtrl.ISA.Spreadsheet
 open Spreadsheet.Sidebar.Controller
 
+
 module Spreadsheet =
 
     module Helper =
@@ -66,6 +67,8 @@ module Spreadsheet =
 
         let innerUpdate (state: Spreadsheet.Model) (model: Messages.Model) (msg: Spreadsheet.Msg) =
             match msg with
+            | UpdateState nextState ->
+                nextState, model, Cmd.none
             | CreateAnnotationTable usePrevOutput ->
                 let nextState = Controller.createTable usePrevOutput state
                 nextState, model, Cmd.none
@@ -156,15 +159,35 @@ module Spreadsheet =
                 let nextState = {state with SelectedCells = nextSelectedCells}
                 nextState, model, Cmd.none
             | CopyCell index ->
-                let nextState = Controller.copyCell index state
-                nextState, model, Cmd.none
+                let cmd = 
+                    Cmd.OfPromise.attempt 
+                        (Controller.copyCellByIndex index) 
+                        state
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | CopyCells indices ->
+                let cmd = 
+                    Cmd.OfPromise.attempt 
+                        (Controller.copyCellsByIndex indices) 
+                        state
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
             | CopySelectedCell ->
-                let nextState =
-                    if state.SelectedCells.IsEmpty then state else
-                        Controller.copySelectedCell state
-                nextState, model, Cmd.none
+                let cmd = 
+                    Cmd.OfPromise.attempt 
+                        (Controller.copySelectedCell) 
+                        state
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | CopySelectedCells ->
+                let cmd = 
+                    Cmd.OfPromise.attempt 
+                        (Controller.copySelectedCells) 
+                        state
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
             | CutCell index ->
-                let nextState = Controller.cutCell index state
+                let nextState = Controller.cutCellByIndex index state
                 nextState, model, Cmd.none
             | CutSelectedCell ->
                 let nextState =
@@ -172,12 +195,43 @@ module Spreadsheet =
                         Controller.cutSelectedCell state
                 nextState, model, Cmd.none
             | PasteCell index ->
-                let nextState = if state.Clipboard.Cell.IsNone then state else Controller.pasteCell index state
-                nextState, model, Cmd.none
+                let cmd =
+                    Cmd.OfPromise.either
+                        (Clipboard.Controller.pasteCellByIndex index)
+                        state
+                        (UpdateState >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | PasteCellsExtend index ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        (Clipboard.Controller.pasteCellsByIndexExtend index)
+                        state
+                        (UpdateState >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
             | PasteSelectedCell ->
-                let nextState = 
-                    if state.SelectedCells.IsEmpty || state.Clipboard.Cell.IsNone then state else
-                        Controller.pasteSelectedCell state
+                let cmd =
+                    Cmd.OfPromise.either
+                        (Clipboard.Controller.pasteCellIntoSelected)
+                        state
+                        (UpdateState >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | PasteSelectedCells ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        (Clipboard.Controller.pasteCellsIntoSelected)
+                        state
+                        (UpdateState >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | Clear indices ->
+                let nextState = Controller.clearCells indices state
+                nextState, model, Cmd.none
+            | ClearSelected ->
+                let indices = state.SelectedCells |> Set.toArray
+                let nextState = Controller.clearCells indices state
                 nextState, model, Cmd.none
             | FillColumnWithTerm index ->
                 let nextState = Controller.fillColumnWithCell index state

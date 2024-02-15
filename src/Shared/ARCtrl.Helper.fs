@@ -99,7 +99,41 @@ module Extensions =
             | CompositeHeader.Factor oa -> Some oa
             | _ -> None
 
+    let internal tryFromContent' (content: string []) =
+        match content with
+        | [|freetext|] -> CompositeCell.createFreeText freetext |> Ok
+        | [|name; tsr; tan|] -> CompositeCell.createTermFromString(name, tsr, tan) |> Ok
+        | [|value; name; tsr; tan|] -> CompositeCell.createUnitizedFromString(value, name, tsr, tan) |> Ok
+        | anyElse -> sprintf "Unable to convert \"%A\" to CompositeCell." anyElse |> Error
+
     type CompositeCell with
+        
+        static member tryFromContent (content: string []) =
+            match tryFromContent' content with
+            | Ok r -> Some r
+            | Error _ -> None
+
+        static member fromContent (content: string []) =
+            match tryFromContent' content with
+            | Ok r -> r
+            | Error msg -> raise (exn msg) 
+
+        member this.ToTabStr() = this.GetContent() |> String.concat "\t"
+
+        static member fromTabStr (str:string) = 
+            let content = str.Split('\t', System.StringSplitOptions.TrimEntries)
+            CompositeCell.fromContent content
+
+        static member ToTabTxt (cells: CompositeCell []) =
+            cells 
+            |> Array.map (fun c -> c.ToTabStr())
+            |> String.concat (System.Environment.NewLine)
+
+        static member fromTabTxt (tabTxt: string) =
+            let lines = tabTxt.Split(System.Environment.NewLine, System.StringSplitOptions.TrimEntries)
+            let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr line)
+            cells 
+
         member this.UpdateWithOA(oa:OntologyAnnotation) =
             match this with
             | CompositeCell.Term _ -> CompositeCell.createTerm oa

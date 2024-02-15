@@ -52,46 +52,26 @@ let debouncel<'T> (storage:Dictionary<string, int>) (key: string) (timeout: int)
 
 let newDebounceStorage = fun () -> Dictionary<string, int>(HashIdentity.Structural)
 
-module React =
-    open Fable.Core
-    open Browser.Types
-    open Feliz
-    open Fable.Core.JsInterop
+type Clipboard =
+    abstract member writeText: string -> JS.Promise<unit>
+    abstract member readText: unit -> JS.Promise<string>
 
-    type ElementSize = {
-        Width: float
-        Height: float
-    } with
-        static member init() = {
-            Width = 0.
-            Height = 0.
-        }
+type Navigator =
+    abstract member clipboard: Clipboard
 
-    [<Emit("$0?.[$1]")>]
-    let (!?) (opt: 't option) (property: string) : obj = nativeOnly
+[<Emit("navigator")>]
+let navigator : Navigator = jsNative
 
-    let useElementSize () =
-        let initialValue : HTMLElement option = None
-        let ref, setRef = React.useState(initialValue)
-        // https://usehooks-ts.com/react-hook/use-element-size
-        // Mutable values like 'ref.current' aren't valid dependencies
-        // because mutating them doesn't re-render the component.
-        // Instead, we use a state as a ref to be reactive.
-        let size, setSize = React.useState(ElementSize.init())
-        // Prevent too many rendering using useCallback
-        let handleSize = 
-            React.useCallback(
-                (fun () ->
-                    setSize {
-                        Width = ref |> Option.map (fun r -> r.offsetWidth) |> Option.defaultValue 0.
-                        Height = ref |> Option.map (fun r -> r.offsetHeight) |> Option.defaultValue 0.
-                    }
-                ), 
-                [| !? ref "offsetWidth"; !? ref "offsetHeight" |]
-            )
-        React.useLayoutEffect((fun () -> handleSize()), [|!? ref "offsetWidth"; !? ref "offsetHeight"|])
-        size, 
-        (fun (ele: Element) -> 
-            setRef (ele :?> HTMLElement |> Some)
-        )
+let takeFromArray (count: int) (array: 'a []) =
+    let exit (acc: 'a list) = List.rev acc |> Array.ofList
+    let rec takeRec (l2: 'a list) (acc: 'a list) index =
+      if index >= count then 
+        exit acc
+      else
+        match l2 with
+        | [] -> exit acc
+        | item::tail ->
+          let newAcc = item::acc
+          takeRec tail newAcc (index+1)
 
+    takeRec (Array.toList array) [] 0

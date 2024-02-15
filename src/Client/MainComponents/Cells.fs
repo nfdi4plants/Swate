@@ -205,7 +205,7 @@ module private EventPresets =
             // don't select cell if active(editable)
             if state_cell.IsIdle then
                 let set = 
-                    match e.ctrlKey, selectedCells.Count with
+                    match e.shiftKey, selectedCells.Count with
                     | true, 0 ->
                         selectedCells
                     | true, _ ->
@@ -338,11 +338,12 @@ type Cell =
                     prop.onDoubleClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
-                        let mode = if (e.ctrlKey || e.metaKey )&& columnType = Main then Search else Active
+                        let mode = if (e.ctrlKey || e.metaKey) && columnType = Main then Search else Active
                         if state_cell.IsIdle then setState_cell {state_cell with CellMode = mode}
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     )
                     if state_cell.IsIdle then prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, model, dispatch)
+                    prop.onMouseDown(fun e -> if state_cell.IsIdle && e.shiftKey then e.preventDefault())
                     prop.children [
                         match state_cell.CellMode with
                         | Active ->

@@ -97,6 +97,22 @@ let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet
     )
     {state with ArcFile = state.ArcFile}
 
+/// <summary>
+/// Transform cells of given indices to their empty equivalents
+/// </summary>
+/// <param name="indexArr"></param>
+/// <param name="state"></param>
+let clearCells (indexArr: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let table = state.ActiveTable
+    let newCells = [|
+        for index in indexArr do
+            let cell = table.Values.[index]
+            let emptyCell = cell.GetEmptyCell()
+            index, emptyCell
+    |]
+    table.SetCellsAt newCells
+    state
+
 // Ui depends on main column name, maybe change this to depends on BuildingBlockType?
 // Header main column name must be updated
 
