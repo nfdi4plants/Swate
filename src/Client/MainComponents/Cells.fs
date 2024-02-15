@@ -319,6 +319,29 @@ type Cell =
         ]]
 
     [<ReactComponent>]
+    static member private SearchCellSubcomponent(setter, headerOA: OntologyAnnotation option, cell: CompositeCell, makeIdle, cellState: CellState) = 
+        let oa = cell.ToOA()
+        let onBlur = fun e -> makeIdle()
+        let onEscape = fun e -> makeIdle()
+        let onEnter = fun e -> makeIdle()
+        let nosearch, setNoSearch= React.useState(true)
+        Bulma.field.div [
+            prop.style [style.flexGrow 1]
+            Bulma.field.hasAddons
+            prop.children [
+                Bulma.control.p [
+                    Bulma.button.a [
+                        prop.style [style.borderWidth 0]
+                        if nosearch then Bulma.color.hasTextGreyLight
+                        Bulma.button.isInverted
+                        prop.onClick(fun _ -> setNoSearch (not nosearch))
+                        prop.children [Bulma.icon [Html.i [prop.className "fa-solid fa-magnifying-glass"]]]
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member private BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), cell: CompositeCell, model: Model, dispatch, ?oasetter: OntologyAnnotation option -> unit) =
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
@@ -346,22 +369,15 @@ type Cell =
                     prop.onMouseDown(fun e -> if state_cell.IsIdle && e.shiftKey then e.preventDefault())
                     prop.children [
                         match state_cell.CellMode with
-                        | Active ->
-                            /// Update change to mainState and exit active input.
-                            let updateMainStateTable = fun (s: string) -> 
-                                // Only update if changed
-                                if s <> cellValue then
-                                    setter s
-                                makeIdle()
-                            CellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue, columnType)
-                        | Search ->
+                        | Active | Search ->
+                            // Update change to mainState and exit active input.
                             if oasetter.IsSome then 
-                                let headerOA = state.ActiveTable.Headers.[columnIndex].TryOA()
                                 let oa = cell.ToOA()
                                 let onBlur = fun e -> makeIdle()
                                 let onEscape = fun e -> makeIdle()
                                 let onEnter = fun e -> makeIdle()
-                                Components.TermSearch.Input(oasetter.Value, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset")
+                                let headerOA = state.ActiveTable.Headers.[columnIndex].TryOA()
+                                Components.TermSearch.Input(oasetter.Value, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset", searchableToggle=true)
                             else
                                 printfn "No setter for OntologyAnnotation given for table cell term search."
                         | Idle ->

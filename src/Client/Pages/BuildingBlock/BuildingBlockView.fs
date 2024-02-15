@@ -130,6 +130,8 @@ let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit)
         ]
     ]
 
+
+
 let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
     div [
         OnSubmit (fun e -> e.preventDefault())

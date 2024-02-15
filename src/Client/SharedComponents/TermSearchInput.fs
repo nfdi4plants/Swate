@@ -211,11 +211,30 @@ module TermSearchAux =
                     ]
                 ]
             ]
-            
+           
 open TermSearchAux
 open Fable.Core.JsInterop
 
 type TermSearch =
+
+    static member ToggleSearchContainer (element: ReactElement, ref: IRefValue<HTMLElement option>, searchable: bool, searchableSetter: bool -> unit) = 
+        Bulma.field.div [
+            prop.style [style.flexGrow 1]
+            prop.ref ref
+            Bulma.field.hasAddons
+            prop.children [
+                element
+                Bulma.control.p [
+                    Bulma.button.a [
+                        prop.style [style.borderWidth 0]
+                        if not searchable then Bulma.color.hasTextGreyLight
+                        Bulma.button.isInverted
+                        prop.onClick(fun _ -> searchableSetter (not searchable))
+                        prop.children [Bulma.icon [Html.i [prop.className "fa-solid fa-magnifying-glass"]]]
+                    ]
+                ]
+            ]
+        ]
 
     [<ReactComponent>]
     static member TermSelectItem (term: TermTypes.Term, setTerm, ?isDirectedSearchResult: bool) =
@@ -272,12 +291,13 @@ type TermSearch =
     static member Input (
         setter: OntologyAnnotation option -> unit,
         ?input: OntologyAnnotation, ?parent': OntologyAnnotation, 
-        ?debounceSetter: int,
+        ?debounceSetter: int, ?searchableToggle: bool,
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
         ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool, ?borderRadius: int, ?border: string) 
         =
+        let searchableToggle = defaultArg searchableToggle false
         let autofocus = defaultArg autofocus false
         let displayParent = defaultArg displayParent true
         let isExpanded = defaultArg isExpanded false
@@ -286,11 +306,12 @@ type TermSearch =
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
         let parent, setParent = React.useState(parent')
+        let searchable, setSearchable= React.useState(not searchableToggle)
         let searchNameState, setSearchNameState = React.useState(SearchState.init)
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
         let debounceStorage = React.useRef(newDebounceStorage())
-        let dsetter = fun inp -> if debounceSetter.IsSome then debounce debounceStorage.current "setter_debounce" debounceSetter.Value setter inp
+        let dsetter = fun inp -> if debounceSetter.IsSome then debounce debounceStorage.current "setter_debounce" debounceSetter.Value setter inp else setter inp
         let ref = React.useElementRef()
         if onBlur.IsSome then React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, onBlur.Value))
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
@@ -317,9 +338,9 @@ type TermSearch =
         Bulma.control.div [
             if isExpanded then Bulma.control.isExpanded
             if size.IsSome then size.Value
-            Bulma.control.hasIconsLeft
+            if searchable then Bulma.control.hasIconsLeft
             Bulma.control.hasIconsRight
-            prop.ref ref
+            if not searchableToggle then prop.ref ref
             prop.style [
                 if fullwidth then style.flexGrow 1; 
             ]
@@ -338,10 +359,10 @@ type TermSearch =
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
                             startSearch(None, false)
-                            allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
+                            if searchable then allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         elif s.Trim() <> "" then
                             startSearch (Some s, false)
-                            mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
+                            if searchable then mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         else 
                             ()
                     )
@@ -351,7 +372,7 @@ type TermSearch =
                             stopSearch()
                         else
                             startSearch (Some s, true)
-                            mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
+                            if searchable then mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
                     )
                     prop.onKeyDown(fun e -> 
                         match e.which with
@@ -359,9 +380,12 @@ type TermSearch =
                             if onEscape.IsSome then onEscape.Value e
                             stopSearch()
                         | 13. -> //enter
-                            log "enter"
                             if onEnter.IsSome then onEnter.Value e
                             setter state
+                        | 9. -> //tab
+                            if searchableToggle then 
+                                e.preventDefault()
+                                setSearchable (not searchable)
                         | _ -> ()
                             
                     )
@@ -372,7 +396,7 @@ type TermSearch =
                     ReactDOM.createPortal(TermSelectArea,portalTermSelectArea.Value)
                 else
                     TermSelectArea
-                Components.searchIcon
+                if searchable then Components.searchIcon
                 if state.IsSome && state.Value.Name.IsSome && state.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                 // Optional elements
                 Html.div [
@@ -398,3 +422,8 @@ type TermSearch =
                 ]   
             ]
         ]
+        |> fun main -> 
+            if searchableToggle then
+                TermSearch.ToggleSearchContainer(main, ref, searchable, setSearchable)
+            else 
+                main
