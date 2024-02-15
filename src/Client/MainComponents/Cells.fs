@@ -13,7 +13,6 @@ open Components
 type private CellMode = 
 | Active
 | Idle
-| Search
 
 type private CellState = {
     CellMode: CellMode
@@ -32,7 +31,6 @@ type private CellState = {
         }
 
     member this.IsActive = this.CellMode = Active
-    member this.IsSearch = this.CellMode = Search
     member this.IsIdle = this.CellMode = Idle
 
 type private ColumnType =
@@ -111,7 +109,7 @@ module private CellComponents =
                     prop.style [style.borderWidth 0; style.borderRadius 0]
                     prop.onClick(fun e ->
                         e.stopPropagation()
-                        setState_cell {state_cell with CellMode = Search}
+                        //setState_cell {state_cell with CellMode = Search}
                     )
                     prop.children [
                         Bulma.icon [Html.i [prop.className "fa-solid fa-search"]]
@@ -319,30 +317,7 @@ type Cell =
         ]]
 
     [<ReactComponent>]
-    static member private SearchCellSubcomponent(setter, headerOA: OntologyAnnotation option, cell: CompositeCell, makeIdle, cellState: CellState) = 
-        let oa = cell.ToOA()
-        let onBlur = fun e -> makeIdle()
-        let onEscape = fun e -> makeIdle()
-        let onEnter = fun e -> makeIdle()
-        let nosearch, setNoSearch= React.useState(true)
-        Bulma.field.div [
-            prop.style [style.flexGrow 1]
-            Bulma.field.hasAddons
-            prop.children [
-                Bulma.control.p [
-                    Bulma.button.a [
-                        prop.style [style.borderWidth 0]
-                        if nosearch then Bulma.color.hasTextGreyLight
-                        Bulma.button.isInverted
-                        prop.onClick(fun _ -> setNoSearch (not nosearch))
-                        prop.children [Bulma.icon [Html.i [prop.className "fa-solid fa-magnifying-glass"]]]
-                    ]
-                ]
-            ]
-        ]
-
-    [<ReactComponent>]
-    static member private BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), cell: CompositeCell, model: Model, dispatch, ?oasetter: OntologyAnnotation option -> unit) =
+    static member private BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), cell: CompositeCell, model: Model, dispatch, ?oasetter: OntologyAnnotation -> unit) =
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
         let state_cell, setState_cell = React.useState(CellState.init(cellValue))
@@ -360,16 +335,15 @@ type Cell =
                     cellInnerContainerStyle []
                     prop.onDoubleClick(fun e ->
                         e.preventDefault()
-                        e.stopPropagation()
-                        let mode = if (e.ctrlKey || e.metaKey) && columnType = Main then Search else Active
-                        if state_cell.IsIdle then setState_cell {state_cell with CellMode = mode}
+                        e.stopPropagation() 
+                        if state_cell.IsIdle then setState_cell {state_cell with CellMode = Active}
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     )
                     if state_cell.IsIdle then prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, model, dispatch)
                     prop.onMouseDown(fun e -> if state_cell.IsIdle && e.shiftKey then e.preventDefault())
                     prop.children [
                         match state_cell.CellMode with
-                        | Active | Search ->
+                        | Active ->
                             // Update change to mainState and exit active input.
                             if oasetter.IsSome then 
                                 let oa = cell.ToOA()
@@ -377,9 +351,16 @@ type Cell =
                                 let onEscape = fun e -> makeIdle()
                                 let onEnter = fun e -> makeIdle()
                                 let headerOA = state.ActiveTable.Headers.[columnIndex].TryOA()
-                                Components.TermSearch.Input(oasetter.Value, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset", searchableToggle=true)
+                                let setter = fun (oa: OntologyAnnotation option) -> 
+                                    if oa.IsSome then oasetter.Value oa.Value else setter ""
+                                Components.TermSearch.Input(setter, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset", searchableToggle=true)
                             else
-                                printfn "No setter for OntologyAnnotation given for table cell term search."
+                                let updateMainStateTable = fun (s: string) -> 
+                                    // Only update if changed
+                                    if s <> cellValue then
+                                        setter s
+                                    makeIdle()
+                                CellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue, columnType)
                         | Idle ->
                             if columnType = Main then
                                 compositeCellDisplay cell
@@ -395,10 +376,13 @@ type Cell =
         let setter = fun (s: string) ->
             let nextCell = cell.UpdateMainField s
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-        let oaSetter = fun (oa:OntologyAnnotation option) ->
-            let nextCell = oa |> Option.map cell.UpdateWithOA
-            if nextCell.IsSome then 
-                Msg.UpdateCell (index, nextCell.Value) |> SpreadsheetMsg |> dispatch
+        let oaSetter = fun (oa:OntologyAnnotation) ->
+            let nextCell = 
+                if oa.TermSourceREF.IsNone && oa.TermAccessionNumber.IsNone then // update only mainfield, if mainfield is the only field with value
+                    cell.UpdateMainField oa.NameText 
+                else 
+                    cell.UpdateWithOA oa
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(Main, cellValue, setter, index, cell, model, dispatch, oaSetter)
 
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =

@@ -226,7 +226,7 @@ type TermSearch =
                 element
                 Bulma.control.p [
                     Bulma.button.a [
-                        prop.style [style.borderWidth 0]
+                        prop.style [style.borderWidth 0; style.borderRadius 0]
                         if not searchable then Bulma.color.hasTextGreyLight
                         Bulma.button.isInverted
                         prop.onClick(fun _ -> searchableSetter (not searchable))
@@ -291,7 +291,7 @@ type TermSearch =
     static member Input (
         setter: OntologyAnnotation option -> unit,
         ?input: OntologyAnnotation, ?parent': OntologyAnnotation, 
-        ?debounceSetter: int, ?searchableToggle: bool,
+        ?debounceSetter: int, ?searchableToggle: bool, 
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
@@ -306,7 +306,7 @@ type TermSearch =
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
         let parent, setParent = React.useState(parent')
-        let searchable, setSearchable= React.useState(not searchableToggle)
+        let searchable, setSearchable = React.useState(not searchableToggle)
         let searchNameState, setSearchNameState = React.useState(SearchState.init)
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
@@ -338,7 +338,7 @@ type TermSearch =
         Bulma.control.div [
             if isExpanded then Bulma.control.isExpanded
             if size.IsSome then size.Value
-            if searchable then Bulma.control.hasIconsLeft
+            if not searchableToggle then Bulma.control.hasIconsLeft
             Bulma.control.hasIconsRight
             if not searchableToggle then prop.ref ref
             prop.style [
@@ -359,10 +359,10 @@ type TermSearch =
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
                             startSearch(None, false)
-                            if searchable then allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
+                            if searchable then allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0) else stopSearch()
                         elif s.Trim() <> "" then
                             startSearch (Some s, false)
-                            if searchable then mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
+                            if searchable then mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0) else stopSearch()
                         else 
                             ()
                     )
@@ -372,7 +372,7 @@ type TermSearch =
                             stopSearch()
                         else
                             startSearch (Some s, true)
-                            if searchable then mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
+                            if searchable then mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000) else stopSearch()
                     )
                     prop.onKeyDown(fun e -> 
                         match e.which with
@@ -396,7 +396,7 @@ type TermSearch =
                     ReactDOM.createPortal(TermSelectArea,portalTermSelectArea.Value)
                 else
                     TermSelectArea
-                if searchable then Components.searchIcon
+                if not searchableToggle then Components.searchIcon
                 if state.IsSome && state.Value.Name.IsSome && state.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                 // Optional elements
                 Html.div [
