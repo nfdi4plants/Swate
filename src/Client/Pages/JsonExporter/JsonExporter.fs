@@ -533,7 +533,7 @@ type FileExporter =
             mainFunctionContainer [
                 Bulma.field.div [Bulma.help [
                     str "Export Swate annotation tables to official ISA-JSON ("
-                    a [Href @"https://isa-specs.readthedocs.io/en/latest/isajson.html#"] [str "more"]
+                    a [Href @"https://isa-specs.readthedocs.io/en/latest/isajson.html#"; Target "_Blank"] [str "more"]
                     str ")."
                 ]]
                 FileExporter.JsonExport(model, dispatch)
