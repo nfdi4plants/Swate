@@ -22,6 +22,9 @@ let send (msg:ARCitect.Msg) =
         | StudyToARCitect study ->
             let json = ArcStudy.toArcJsonString study
             json
+        | InvestigationToARCitect inv ->
+            let json = ArcInvestigation.toArcJsonString inv
+            json
         | Error exn ->
             exn
     postMessageToARCitect(msg, data)
@@ -36,7 +39,10 @@ let EventHandler (dispatch: Messages.Msg -> unit) : IEventHandler =
             let study = ArcStudy.fromArcJsonString data.ArcStudyJsonString
             Spreadsheet.InitFromArcFile (ArcFiles.Study (study, [])) |> SpreadsheetMsg |> dispatch
             log($"Received Study {study.Identifier} from ARCitect!")
-            Browser.Dom.console.log(study)
+        InvestigationToSwate = fun data ->
+            let inv = ArcInvestigation.fromArcJsonString data.ArcInvestigationJsonString
+            Spreadsheet.InitFromArcFile (ArcFiles.Investigation inv) |> SpreadsheetMsg |> dispatch
+            log($"Received Investigation {inv.Title} from ARCitect!")
         Error = fun exn ->
             GenericError (Cmd.none, exn) |> DevMsg |> dispatch
     }

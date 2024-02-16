@@ -47,6 +47,8 @@ module Spreadsheet =
                         ARCitect.ARCitect.send(ARCitect.AssayToARCitect assay)
                     | Some (Study (study,_)) ->
                         ARCitect.ARCitect.send(ARCitect.StudyToARCitect study)
+                    | Some (Investigation inv) ->
+                        ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
                     | _ -> ()
                 state, {model with History = nextHistory}, cmd
 

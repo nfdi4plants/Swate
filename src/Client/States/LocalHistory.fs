@@ -197,7 +197,6 @@ type Model =
             // if e.g at position 4 and we create new table state from position 4 we want to delete position 0 .. 3 and use 4 as new 0
             let rebranchedList, toRemoveList1 =
                 if this.HistoryCurrentPosition <> 0 then
-                    printfn "[HISTORY] Rebranch to %i" this.HistoryCurrentPosition
                     this.HistoryOrder
                     |> List.splitAt this.HistoryCurrentPosition
                     |> fun (remove, keep) -> keep, remove
@@ -220,7 +219,6 @@ type Model =
         Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_key, HistoryOrder.toJson(nextState.HistoryOrder))
         // reset new table position to 0
         Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, "0")
-        printfn "[HISTORY] length: %i" nextState.HistoryOrder.Length
         nextState
 
     member this.ResetAll() =

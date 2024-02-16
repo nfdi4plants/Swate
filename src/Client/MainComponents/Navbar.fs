@@ -149,34 +149,12 @@ let Main (model: Messages.Model) dispatch =
                 prop.ariaLabel "menu"
                 prop.children [
                     match model.PersistentStorageState.Host with
-                    | Some Swatehost.ARCitect ->
+                    | Some (Swatehost.ARCitect) ->
                         Bulma.navbarStart.div [
                             prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                             prop.children [
-                                Html.div [
-                                    prop.style [
-                                        style.display.flex; style.flexDirection.row
-                                    ]
-                                    prop.children [ 
-                                        QuickAccessButton.create(
-                                            "Return to ARCitect", 
-                                            [
-                                                Bulma.icon [Html.i [prop.className "fa-solid fa-circle-left";]]
-                                            ],
-                                            (fun _ -> ARCitect.ARCitect.send Model.ARCitect.TriggerSwateClose)
-                                        ).toReactElement()
-                                        QuickAccessButton.create(
-                                            "Alpha State", 
-                                            [
-                                                Html.span "ALPHA STATE"
-                                            ],
-                                            (fun e -> ()),
-                                            false
-                                        ).toReactElement()
-                                        quickAccessButtonListStart (model.History: LocalHistory.Model) dispatch
-                                        if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, addWidget)
-                                    ]
-                                ]
+                                quickAccessButtonListStart model.History dispatch
+                                if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, addWidget)
                             ]
                         ]
                     | Some _ ->
