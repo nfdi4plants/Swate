@@ -219,7 +219,7 @@ type TermSearch =
 
     static member ToggleSearchContainer (element: ReactElement, ref: IRefValue<HTMLElement option>, searchable: bool, searchableSetter: bool -> unit) = 
         Bulma.field.div [
-            prop.style [style.flexGrow 1]
+            prop.style [style.flexGrow 1; style.position.relative]
             prop.ref ref
             Bulma.field.hasAddons
             prop.children [
@@ -343,6 +343,7 @@ type TermSearch =
             if not searchableToggle then prop.ref ref
             prop.style [
                 if fullwidth then style.flexGrow 1; 
+                style.minWidth 400
             ]
             if loading then Bulma.control.isLoading
             prop.children [
@@ -394,6 +395,8 @@ type TermSearch =
                     TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
                 if portalTermSelectArea.IsSome then
                     ReactDOM.createPortal(TermSelectArea,portalTermSelectArea.Value)
+                elif ref.current.IsSome then
+                    ReactDOM.createPortal(TermSelectArea,ref.current.Value)
                 else
                     TermSelectArea
                 if not searchableToggle then Components.searchIcon
