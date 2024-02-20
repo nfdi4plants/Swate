@@ -69,6 +69,10 @@ $colors: map-merge($colors, $addColors);
 @import "../../node_modules/bulma/bulma.sass";
 /*@import "../../node_modules/bulma-checkradio/src/sass/index.sass";*/
 
+.main-contrast-bg {
+    background-color: var(--scheme-main)
+}
+
 .template-filter-container {
     flex-grow: 1;
     display: flex;

@@ -248,10 +248,10 @@ type Cell =
             prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
             cellStyle []
-            Bulma.color.hasBackgroundWhite
+            prop.className "main-contrast-bg"
             prop.children [
                 Html.div [
-                    cellInnerContainerStyle []
+                    cellInnerContainerStyle [style.custom("backgroundColor","inherit")]
                     if not isReadOnly then prop.onDoubleClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
