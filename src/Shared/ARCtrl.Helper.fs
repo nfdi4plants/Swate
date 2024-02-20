@@ -47,15 +47,6 @@ module Extensions =
             with get() = this.Name.Replace(" ","_") + ".xlsx"
 
     type CompositeHeader with
-        member this.AsButtonName =
-            match this with
-            | CompositeHeader.Parameter _ -> "Parameter"
-            | CompositeHeader.Characteristic _ -> "Characteristic"
-            | CompositeHeader.Component _ -> "Component"
-            | CompositeHeader.Factor _ -> "Factor"
-            | CompositeHeader.Input _ -> "Input"
-            | CompositeHeader.Output _ -> "Output"
-            | anyElse -> anyElse.ToString()
 
         member this.UpdateWithOA (oa: OntologyAnnotation) =
             match this with
@@ -133,6 +124,13 @@ module Extensions =
             let lines = tabTxt.Split(System.Environment.NewLine, System.StringSplitOptions.None)
             let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr line)
             cells 
+
+        member this.ConvertToValidCell (header: CompositeHeader) =
+            match header.IsTermColumn, this with
+            | true, CompositeCell.Term _ | true, CompositeCell.Unitized _ -> this
+            | true, CompositeCell.FreeText txt -> this.ToTermCell()
+            | false, CompositeCell.Term _ | false, CompositeCell.Unitized _ -> this.ToFreeTextCell()
+            | false, CompositeCell.FreeText _ -> this
 
         member this.UpdateWithOA(oa:OntologyAnnotation) =
             match this with

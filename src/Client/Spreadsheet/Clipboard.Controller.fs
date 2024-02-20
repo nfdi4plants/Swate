@@ -47,7 +47,8 @@ let cutSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
 let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
     promise {
         let! tab = navigator.clipboard.readText()
-        let cell = CompositeCell.fromTabTxt tab |> Array.head
+        let header = state.ActiveTable.Headers.[fst index]
+        let cell = CompositeCell.fromTabTxt tab |> Array.head |> _.ConvertToValidCell(header)
         state.ActiveTable.SetCellAt(fst index, snd index, cell)
         return state
     }
@@ -55,7 +56,8 @@ let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Sp
 let pasteCellsByIndexExtend (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
     promise { 
         let! tab = navigator.clipboard.readText()
-        let cells = CompositeCell.fromTabTxt tab
+        let header = state.ActiveTable.Headers.[fst index]
+        let cells = CompositeCell.fromTabTxt tab |> Array.map _.ConvertToValidCell(header)
         let columnIndex, rowIndex = fst index, snd index
         let indexedCells = cells |> Array.indexed |> Array.map (fun (i,c) -> (columnIndex, rowIndex + i), c)
         state.ActiveTable.SetCellsAt indexedCells
@@ -77,7 +79,8 @@ let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.M
         let selectedSingleColumnCells = state.SelectedCells |> Set.filter (fun index -> fst index = columnIndex)
         promise {
             let! tab = navigator.clipboard.readText()
-            let cells = CompositeCell.fromTabTxt tab
+            let header = state.ActiveTable.Headers.[columnIndex]
+            let cells = CompositeCell.fromTabTxt tab |> Array.map _.ConvertToValidCell(header)
             let rowCount = selectedSingleColumnCells.Count
             let cellsTrimmed = cells |> takeFromArray rowCount
             let indicesTrimmed = (Set.toArray selectedSingleColumnCells).[0..cellsTrimmed.Length-1]
