@@ -248,6 +248,7 @@ type Cell =
             prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
             cellStyle []
+            Bulma.color.hasBackgroundWhite
             prop.children [
                 Html.div [
                     cellInnerContainerStyle []
