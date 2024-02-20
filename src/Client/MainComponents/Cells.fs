@@ -164,6 +164,8 @@ module private CellComponents =
         let isExtended = state_extend.Contains(columnIndex)
         Bulma.icon [
             prop.style [
+                style.height (length.perc 100)
+                style.minWidth 25
                 style.cursor.pointer
             ]
             prop.onDoubleClick(fun e ->
