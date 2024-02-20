@@ -48,7 +48,7 @@ let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Sp
     promise {
         let! tab = navigator.clipboard.readText()
         let cell = CompositeCell.fromTabTxt tab |> Array.head
-        state.ActiveTable.UpdateCellAt(fst index, snd index, cell)
+        state.ActiveTable.SetCellAt(fst index, snd index, cell)
         return state
     }
 

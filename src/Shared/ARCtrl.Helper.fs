@@ -130,7 +130,7 @@ module Extensions =
             |> String.concat (System.Environment.NewLine)
 
         static member fromTabTxt (tabTxt: string) =
-            let lines = tabTxt.Split(System.Environment.NewLine, System.StringSplitOptions.TrimEntries)
+            let lines = tabTxt.Split(System.Environment.NewLine, System.StringSplitOptions.None)
             let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr line)
             cells 
 
