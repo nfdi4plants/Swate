@@ -295,7 +295,7 @@ type TermSearch =
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
-        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool, ?borderRadius: int, ?border: string) 
+        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool, ?borderRadius: int, ?border: string, ?minWidth: Styles.ICssUnit) 
         =
         let searchableToggle = defaultArg searchableToggle false
         let autofocus = defaultArg autofocus false
@@ -343,7 +343,7 @@ type TermSearch =
             if not searchableToggle then prop.ref ref
             prop.style [
                 if fullwidth then style.flexGrow 1; 
-                style.minWidth 400
+                if minWidth.IsSome then style.minWidth minWidth.Value
             ]
             if loading then Bulma.control.isLoading
             prop.children [
