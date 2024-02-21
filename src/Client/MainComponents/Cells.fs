@@ -65,6 +65,7 @@ module private CellComponents =
     [<ReactComponent>]
     let CellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: string -> unit, setState_cell, state_cell, cell_value, columnType) =
         let ref = React.useElementRef()
+
         React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, fun _ -> updateMainStateTable state_cell.Value))
         let input = 
             Bulma.control.div [
@@ -102,29 +103,11 @@ module private CellComponents =
                     ]
                 ]
             ]
-        let switchToSearchButton =
-            Bulma.control.div [
-                Bulma.button.button [
-                    prop.className "is-ghost"
-                    prop.style [style.borderWidth 0; style.borderRadius 0]
-                    prop.onClick(fun e ->
-                        e.stopPropagation()
-                        //setState_cell {state_cell with CellMode = Search}
-                    )
-                    prop.children [
-                        Bulma.icon [Html.i [prop.className "fa-solid fa-search"]]
-                    ]
-                ]
-            ]
         Bulma.field.div [
             Bulma.field.hasAddons
             prop.ref ref
             prop.className "is-flex-grow-1 m-0"
-            prop.children [
-                input
-                if not isHeader && columnType = Main then
-                    switchToSearchButton
-            ]           
+            prop.children [ input ]           
         ]
 
     let basicValueDisplayCell (v: string) =
@@ -192,6 +175,15 @@ module private CellAux =
         |> Option.map (fun x -> {x with TermAccessionNumber = tan})
         |> Option.map header.UpdateWithOA
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
+
+    let oasetter (index, cell: CompositeCell, dispatch) = fun (oa:OntologyAnnotation) ->
+        let nextCell = 
+            if oa.TermSourceREF.IsNone && oa.TermAccessionNumber.IsNone then // update only mainfield, if mainfield is the only field with value
+                cell.UpdateMainField oa.NameText 
+            else 
+                cell.UpdateWithOA oa
+        Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        
 
 open CellComponents
 open CellAux
@@ -379,14 +371,8 @@ type Cell =
         let setter = fun (s: string) ->
             let nextCell = cell.UpdateMainField s
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-        let oaSetter = fun (oa:OntologyAnnotation) ->
-            let nextCell = 
-                if oa.TermSourceREF.IsNone && oa.TermAccessionNumber.IsNone then // update only mainfield, if mainfield is the only field with value
-                    cell.UpdateMainField oa.NameText 
-                else 
-                    cell.UpdateWithOA oa
-            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-        Cell.BodyBase(Main, cellValue, setter, index, cell, model, dispatch, oaSetter)
+        let oasetter = if cell.isTerm then CellAux.oasetter(index, cell, dispatch) |> Some else None
+        Cell.BodyBase(Main, cellValue, setter, index, cell, model, dispatch, ?oasetter=oasetter)
 
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.GetContent().[1]
@@ -396,7 +382,8 @@ type Cell =
             let nextOA = {oa with Name = newName }
             let nextCell = cell.UpdateWithOA nextOA
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-        Cell.BodyBase(Unit, cellValue, setter, index, cell, model, dispatch)
+        let oasetter = if cell.isUnitized then CellAux.oasetter(index, cell, dispatch) |> Some else None
+        Cell.BodyBase(Unit, cellValue, setter, index, cell, model, dispatch, ?oasetter=oasetter)
 
     static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let contentIndex = if cell.isUnitized then 2 else 1
