@@ -9,9 +9,74 @@ open Browser.Types
 open Fable.Core.JsInterop
 open ARCtrl.ISA
 open Shared
+open Fetch
 
+module private API =
+    let requestAsJson (url) =
+        promise {
+            let! response = fetch url [
+                requestHeaders [Accept "application/json"]
+            ]
+            let! json = response.json()
+            return Some json
+        }
 
-module Helper =
+    let requestByORCID (orcID: string) =
+        let url = $"https://pub.orcid.org/v3.0/{orcID}/record"
+        promise {
+            let! json = requestAsJson url 
+            let name: string = json?person?name?("given-names")?value
+            let lastName: string = json?person?name?("family-name")?value
+            let emails: obj [] = json?person?emails?email
+            let email = if emails.Length = 0 then None else Some (emails.[0]?email)
+            log(name, lastName, email)
+        }
+
+    let requestByDOI_FromPubMed (doi: string) =
+        /// https://academia.stackexchange.com/questions/67103/is-there-any-api-service-to-retrieve-abstract-of-a-journal-article
+        let url_pubmed = $"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={doi}&retmode=JSON"
+        promise {
+            let! json = requestAsJson url_pubmed
+            let errorList = json?esearchresult?errorlist
+            if isNull errorList then
+                let idList : string [] = json?esearchresult?idlist
+                let pubmedID = if idList.Length <> 1 then None else Some idList.[0]
+                return pubmedID
+            else
+                return None
+        }
+
+    let requestByDOI (doi: string) =
+        let url_crossref = $"https://api.crossref.org/works/{doi}"
+        promise {
+            let! json = requestAsJson url_crossref 
+            let titles: string [] = json?message?title
+            let title = if titles.Length = 0 then None else Some titles.[0]
+            let authors : Person [] = [|
+                for pj in json?message?author do
+                    let affiliationsJson: obj [] = pj?affiliation
+                    let affiliations : string [] = 
+                        [|
+                            for aff in affiliationsJson do 
+                                yield aff?("name") 
+                        |]
+                    let affString = affiliations |> String.concat ", "
+                    Person.create(ORCID=pj?ORCID, LastName=pj?family, FirstName=pj?given, Affiliation=affString)
+            |]
+            let! pubmedId = requestByDOI_FromPubMed doi
+            let authorString = authors |> Array.map (fun x -> $"{x.FirstName} {x.LastName}") |> String.concat ", "
+            let publication = Publication.create(?PubMedID=pubmedId, Doi=doi, Authors=authorString, ?Title=title)
+            return publication
+        }
+
+    let start (call: Fable.Core.JS.Promise<'a>, success, fail) =
+        call
+        |> Promise.either 
+            success
+            fail
+        |> Promise.start
+
+module private Helper =
     type PersonMutable(?firstname, ?lastname, ?midinitials, ?orcid, ?address, ?affiliation, ?email, ?phone, ?fax, ?roles) =
         member val FirstName : string option = firstname with get, set
         member val LastName : string option = lastname with get, set
@@ -479,6 +544,15 @@ type FormComponents =
             Bulma.cardContent [
                 prop.classes [if not isExtended then "is-hidden"]
                 prop.children [
+                    Bulma.button.button [
+                        prop.text "Get test person"
+                        prop.onClick (fun _ ->
+                            //API.requestByORCID ("0000-0002-8510-6810") |> Promise.start
+                            API.requestByDOI ("10.3390/ijms24087444") |> Promise.start
+                            //API.requestByDOI_FromPubMed ("10.3390/ijms24087444") |> Promise.start
+                            //let api = API.requestByDOI ("10.3390/ijms2408741d") //error
+                        )
+                    ]
                     Helper.cardFormGroup [
                         createPersonFieldTextInput(state.FirstName, "First Name", fun s -> state.FirstName <- s)
                         createPersonFieldTextInput(state.LastName, "Last Name", fun s -> state.LastName <- s)
@@ -640,6 +714,17 @@ type FormComponents =
                     Helper.cardFormGroup [
                         createPersonFieldTextInput(state.PubmedId, "PubMed Id", fun s -> state.PubmedId <- s)
                         createPersonFieldTextInput(state.Doi, "DOI", fun s -> state.Doi <- s)
+                        Bulma.field.div [
+                            Bulma.label [
+                                prop.style [style.opacity 0; style.userSelect.none]
+                                prop.text "-"
+                            ]
+                            Bulma.button.a [
+                                Bulma.button.isOutlined
+                                Bulma.color.isInfo
+                                prop.text "Search"
+                            ]
+                        ]
                     ]
                     createPersonFieldTextInput(state.Authors, "Authors", fun s -> state.Authors <- s)
                     FormComponents.OntologyAnnotationInput(
