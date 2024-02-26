@@ -15,7 +15,6 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
             Html.div [
                 prop.children [
                     Bulma.tabs [
-                        prop.style [style.overflowY.visible]
                         Bulma.tabs.isBoxed
                         prop.children [
                             Html.ul [
