@@ -75,16 +75,23 @@ let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.M
     if state.SelectedCells.IsEmpty then
         promise {return state}
     else
+        log "here"
         let columnIndex = state.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
         let selectedSingleColumnCells = state.SelectedCells |> Set.filter (fun index -> fst index = columnIndex)
         promise {
             let! tab = navigator.clipboard.readText()
             let header = state.ActiveTable.Headers.[columnIndex]
             let cells = CompositeCell.fromTabTxt tab |> Array.map _.ConvertToValidCell(header)
-            let rowCount = selectedSingleColumnCells.Count
-            let cellsTrimmed = cells |> takeFromArray rowCount
-            let indicesTrimmed = (Set.toArray selectedSingleColumnCells).[0..cellsTrimmed.Length-1]
-            let indexedCellsTrimmed = Array.zip indicesTrimmed cellsTrimmed
-            state.ActiveTable.SetCellsAt indexedCellsTrimmed
-            return state
+            if cells.Length = 1 then
+                let cell = cells.[0]
+                let newCells = selectedSingleColumnCells |> Array.ofSeq |> Array.map (fun index -> index, cell)
+                state.ActiveTable.SetCellsAt newCells
+                return state
+            else
+                let rowCount = selectedSingleColumnCells.Count
+                let cellsTrimmed = cells |> takeFromArray rowCount
+                let indicesTrimmed = (Set.toArray selectedSingleColumnCells).[0..cellsTrimmed.Length-1]
+                let indexedCellsTrimmed = Array.zip indicesTrimmed cellsTrimmed
+                state.ActiveTable.SetCellsAt indexedCellsTrimmed
+                return state
         }
