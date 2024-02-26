@@ -12,6 +12,17 @@ open Shared
 open Fetch
 
 module private API =
+
+    [<RequireQualifiedAccess>]
+    type Request<'A> =
+    | Ok of 'A
+    | Error of exn
+    | Loading
+    | Idle
+
+    module Null =
+        let defaultValue (def:'A) (x:'A) = if isNull x then def else x
+
     let requestAsJson (url) =
         promise {
             let! response = fetch url [
@@ -21,15 +32,60 @@ module private API =
             return Some json
         }
 
-    let requestByORCID (orcID: string) =
-        let url = $"https://pub.orcid.org/v3.0/{orcID}/record"
+    let private createAuthorString (authors: Person []) =
+        authors |> Array.map (fun x -> $"{x.FirstName} {x.LastName}") |> String.concat ", "
+
+    let private createAffiliationString (org_department: (string*string) []) : string option =
+        if org_department.Length = 0 then
+            None
+        else
+            org_department |> Array.map (fun (org,department) -> $"{org}, {department}") |> String.concat ";"
+            |> Some
+
+    let requestByORCID (orcid: string) =
+        let url = $"https://pub.orcid.org/v3.0/{orcid}/record"
         promise {
             let! json = requestAsJson url 
             let name: string = json?person?name?("given-names")?value
             let lastName: string = json?person?name?("family-name")?value
             let emails: obj [] = json?person?emails?email
             let email = if emails.Length = 0 then None else Some (emails.[0]?email)
-            log(name, lastName, email)
+            let groups: obj [] = json?("activities-summary")?employments?("affiliation-group")
+            let groupsParsed = 
+                groups |> Array.choose (fun json -> 
+                    let summaries : obj [] = json?summaries
+                    let summary = 
+                        summaries 
+                        |> Array.tryHead
+                        |> Option.map (fun s0 ->
+                            let s = s0?("employment-summary")
+                            let department = s?("department-name") |> Null.defaultValue ""
+                            let org = s?organization?name |> Null.defaultValue ""
+                            org, department
+                        )
+                    summary
+                )
+                |> createAffiliationString
+            let person = Person.create(ORCID=orcid,LastName=lastName, FirstName=name, ?Email=email, ?Affiliation=groupsParsed)
+            return person
+        }
+
+
+    let requestByPubMedID (id: string) =
+        let url = @"https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pubmed/?format=csl&id=" + id
+        promise {
+            let! json = requestAsJson url
+            let doi: string = json?DOI
+            let pmid: string = json?PMID
+            let authors : Person [] = 
+                [|
+                    for pj in json?author do
+                        Person.create(LastName=pj?family, FirstName=pj?given)
+                |]
+            let authorString = createAuthorString authors
+            let title = json?title
+            let publication = Publication.create(pmid, doi, authorString, title)
+            return publication
         }
 
     let requestByDOI_FromPubMed (doi: string) =
@@ -64,13 +120,13 @@ module private API =
                     Person.create(ORCID=pj?ORCID, LastName=pj?family, FirstName=pj?given, Affiliation=affString)
             |]
             let! pubmedId = requestByDOI_FromPubMed doi
-            let authorString = authors |> Array.map (fun x -> $"{x.FirstName} {x.LastName}") |> String.concat ", "
+            let authorString = createAuthorString authors
             let publication = Publication.create(?PubMedID=pubmedId, Doi=doi, Authors=authorString, ?Title=title)
             return publication
         }
 
-    let start (call: Fable.Core.JS.Promise<'a>, success, fail) =
-        call
+    let start (call: 't -> Fable.Core.JS.Promise<'a>) (args:'t) (success) (fail) =
+        call args
         |> Promise.either 
             success
             fail
@@ -231,6 +287,133 @@ module private Helper =
                 prop.children formComponents
             ]
         ]
+
+    let readOnlyFormElement(v: string option, label: string) =
+        let v = defaultArg v "-"
+        Bulma.field.div [
+            prop.className "is-flex is-flex-direction-column is-flex-grow-1"
+            prop.children [
+                Bulma.label label
+                Bulma.control.div [
+                    Bulma.control.isExpanded
+                    prop.children [
+                        Bulma.input.text [
+                            prop.readOnly true
+                            prop.valueOrDefault v
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+    let personModal (person: Person, confirm, back) =
+        Bulma.modal [
+            Bulma.modal.isActive
+            prop.children [
+                Bulma.modalBackground []
+                Bulma.modalClose []
+                Bulma.modalContent [
+                    Bulma.container [
+                        prop.className "p-1"
+                        prop.children [
+                            Bulma.box [
+                                cardFormGroup [
+                                    readOnlyFormElement(person.FirstName, "Given Name")
+                                    readOnlyFormElement(person.LastName, "Family Name")
+                                ]
+                                cardFormGroup [
+                                    readOnlyFormElement(person.EMail, "Email")
+                                    readOnlyFormElement(person.ORCID, "ORCID")
+                                ]
+                                cardFormGroup [
+                                    readOnlyFormElement(person.Affiliation, "Affiliation")
+                                ]
+                                Bulma.field.div [
+                                    prop.className "is-flex is-justify-content-flex-end"
+                                    prop.style [style.gap (length.rem 1)]
+                                    prop.children [
+                                        Bulma.button.button [
+                                            prop.text "back"
+                                            prop.onClick back
+                                        ]
+                                        Bulma.button.button [
+                                            Bulma.color.isSuccess
+                                            prop.text "confirm"
+                                            prop.onClick confirm
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+    let publicationModal (pub: Publication, confirm, back) =
+        Bulma.modal [
+            Bulma.modal.isActive
+            prop.children [
+                Bulma.modalBackground []
+                Bulma.modalClose []
+                Bulma.modalContent [
+                    Bulma.container [
+                        prop.className "p-1"
+                        prop.children [
+                            Bulma.box [
+                                cardFormGroup [
+                                    readOnlyFormElement(pub.Title, "Title")
+                                ]
+                                cardFormGroup [
+                                    readOnlyFormElement(pub.DOI, "DOI")
+                                    readOnlyFormElement(pub.PubMedID, "PubMedID")
+                                ]
+                                cardFormGroup [
+                                    readOnlyFormElement(pub.Authors, "Authors")
+                                ]
+                                cardFormGroup [
+                                    readOnlyFormElement(pub.Status |> Option.map _.ToString(), "Status")
+                                ]
+                                Bulma.field.div [
+                                    prop.className "is-flex is-justify-content-flex-end"
+                                    prop.style [style.gap (length.rem 1)]
+                                    prop.children [
+                                        Bulma.button.button [
+                                            prop.text "back"
+                                            prop.onClick back
+                                        ]
+                                        Bulma.button.button [
+                                            Bulma.color.isSuccess
+                                            prop.text "confirm"
+                                            prop.onClick confirm
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+    let errorModal (error: exn, back) =
+        Bulma.modal [
+            Bulma.modal.isActive
+            prop.children [
+                Bulma.modalBackground [prop.onClick back]
+                Bulma.modalClose [prop.onClick back]
+                Bulma.modalContent [
+                    Bulma.notification [
+                        Bulma.color.isDanger
+                        prop.children [
+                            Bulma.delete [prop.onClick back]
+                            Html.div error.Message
+                        ]
+                    ]
+                ]
+            ]
+        ]
+        
 
 type FormComponents =
 
@@ -402,6 +585,124 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
+    static member PublicationRequestInput (id: string option,searchAPI: string -> Fable.Core.JS.Promise<Publication>, doisetter, searchsetter: Publication -> unit, ?label:string) =
+        let id = defaultArg id ""
+        let state, setState = React.useState(API.Request<Publication>.Idle)
+        let resetState = fun _ -> setState API.Request.Idle
+        Bulma.field.div [
+            prop.className "is-flex-grow-1"
+            prop.children [
+                if label.IsSome then Bulma.label label.Value
+                Bulma.field.div [
+                    Bulma.field.hasAddons
+                    prop.children [
+                        //if state.IsSome || error.IsSome then
+                        match state with
+                        | API.Request.Ok pub -> Helper.publicationModal(pub,(fun _ -> searchsetter pub; resetState()), resetState)
+                        | API.Request.Error e -> Helper.errorModal(e, resetState)
+                        | API.Request.Loading -> Modals.Loading.loadingModal
+                        | _ -> Html.none
+                        Bulma.control.div [
+                            Bulma.control.isExpanded
+                            prop.children [
+                                FormComponents.TextInput(
+                                    id,
+                                    "",
+                                    setter=doisetter,
+                                    fullwidth=true
+                                )
+                            ]
+                        ]
+                        Bulma.control.div [
+                            Bulma.button.button [
+                                Bulma.color.isInfo
+                                prop.text "Search"
+                                prop.onClick (fun _ ->
+                                    //API.requestByORCID ("0000-0002-8510-6810") |> Promise.start
+                                    setState API.Request.Loading
+                                    API.start
+                                        searchAPI 
+                                        id
+                                        (API.Request.Ok >> setState)
+                                        (API.Request.Error >> setState)
+                                )
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member PersonRequestInput (orcid: string option, doisetter, searchsetter: Person -> unit, ?label:string) =
+        let orcid = defaultArg orcid ""
+        let state, setState = React.useState(API.Request<Person>.Idle)
+        let resetState = fun _ -> setState API.Request.Idle
+        Bulma.field.div [
+            prop.className "is-flex-grow-1"
+            prop.children [
+                if label.IsSome then Bulma.label label.Value
+                Bulma.field.div [
+                    Bulma.field.hasAddons
+                    prop.children [
+                        //if state.IsSome || error.IsSome then
+                        match state with
+                        | API.Request.Ok p -> Helper.personModal (p, (fun _ -> searchsetter p; resetState()), resetState)
+                        | API.Request.Error e -> Helper.errorModal(e, resetState)
+                        | API.Request.Loading -> Modals.Loading.loadingModal
+                        | _ -> Html.none
+                        Bulma.control.div [
+                            Bulma.control.isExpanded
+                            prop.children [
+                                FormComponents.TextInput(
+                                    orcid,
+                                    "",
+                                    setter=doisetter,
+                                    fullwidth=true
+                                )
+                            ]
+                        ]
+                        Bulma.control.div [
+                            Bulma.button.button [
+                                Bulma.color.isInfo
+                                prop.text "Search"
+                                prop.onClick (fun _ ->
+                                    //API.requestByORCID ("0000-0002-8510-6810") |> Promise.start
+                                    setState API.Request.Loading
+                                    API.start
+                                        API.requestByORCID 
+                                        orcid
+                                        (API.Request.Ok >> setState)
+                                        (API.Request.Error >> setState)
+                                )
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member DOIInput (id: string option, doisetter, searchsetter: Publication -> unit, ?label:string) =
+        FormComponents.PublicationRequestInput(
+            id,
+            API.requestByDOI,//"10.3390/ijms24087444"//"10.3390/ijms2408741d"//
+            doisetter,
+            searchsetter,
+            ?label=label
+        )
+
+    [<ReactComponent>]
+    static member PubMedIDInput (id: string option, doisetter, searchsetter: Publication -> unit, ?label:string) =
+        FormComponents.PublicationRequestInput(
+            id,
+            API.requestByPubMedID,             
+            doisetter,
+            searchsetter,
+            ?label=label
+        )
+
+    [<ReactComponent>]
     static member OntologyAnnotationInput (input: OntologyAnnotation, setter: OntologyAnnotation -> unit, ?label: string, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
         let showTextLabels = defaultArg showTextLabels true
         let state, setState = React.useState(Helper.OntologyAnnotationMutable.fromOntologyAnnotation input)
@@ -544,22 +845,21 @@ type FormComponents =
             Bulma.cardContent [
                 prop.classes [if not isExtended then "is-hidden"]
                 prop.children [
-                    Bulma.button.button [
-                        prop.text "Get test person"
-                        prop.onClick (fun _ ->
-                            //API.requestByORCID ("0000-0002-8510-6810") |> Promise.start
-                            API.requestByDOI ("10.3390/ijms24087444") |> Promise.start
-                            //API.requestByDOI_FromPubMed ("10.3390/ijms24087444") |> Promise.start
-                            //let api = API.requestByDOI ("10.3390/ijms2408741d") //error
-                        )
-                    ]
                     Helper.cardFormGroup [
                         createPersonFieldTextInput(state.FirstName, "First Name", fun s -> state.FirstName <- s)
                         createPersonFieldTextInput(state.LastName, "Last Name", fun s -> state.LastName <- s)
                     ]
                     Helper.cardFormGroup [
                         createPersonFieldTextInput(state.MidInitials, "Mid Initials", fun s -> state.MidInitials <- s)
-                        createPersonFieldTextInput(state.ORCID, "ORCID", fun s -> state.ORCID <- s)
+                        FormComponents.PersonRequestInput(
+                            state.ORCID,
+                            (fun s -> 
+                                let s = if s = "" then None else Some s
+                                state.ORCID <- s
+                                state.ToPerson() |> setter),
+                                (fun s -> setter s),
+                                "ORCID"
+                        )
                     ]
                     Helper.cardFormGroup [
                         createPersonFieldTextInput(state.Affiliation, "Affiliation", fun s -> state.Affiliation <- s)
@@ -663,13 +963,13 @@ type FormComponents =
         React.useEffect((fun _ -> setState <| Helper.PublicationMutable.fromPublication input), [|box input|])
         let title = Option.defaultValue "<title>" state.Title
         let doi = Option.defaultValue "<doi>" state.Doi
-        let createPersonFieldTextInput(field: string option, label, personSetter: string option -> unit) =
+        let createPersonFieldTextInput(field: string option, label, publicationSetter: string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
                 label,
                 (fun s -> 
                     let s = if s = "" then None else Some s
-                    personSetter s 
+                    publicationSetter s 
                     state.ToPublication() |> setter),
                 fullwidth=true
             )
@@ -712,19 +1012,24 @@ type FormComponents =
                 prop.children [
                     createPersonFieldTextInput(state.Title, "Title", fun s -> state.Title <- s)
                     Helper.cardFormGroup [
-                        createPersonFieldTextInput(state.PubmedId, "PubMed Id", fun s -> state.PubmedId <- s)
-                        createPersonFieldTextInput(state.Doi, "DOI", fun s -> state.Doi <- s)
-                        Bulma.field.div [
-                            Bulma.label [
-                                prop.style [style.opacity 0; style.userSelect.none]
-                                prop.text "-"
-                            ]
-                            Bulma.button.a [
-                                Bulma.button.isOutlined
-                                Bulma.color.isInfo
-                                prop.text "Search"
-                            ]
-                        ]
+                        FormComponents.PubMedIDInput(
+                            state.PubmedId,
+                            (fun s -> 
+                                let s = if s = "" then None else Some s
+                                state.PubmedId <- s
+                                state.ToPublication() |> setter),
+                            (fun pub -> setter pub),
+                            "PubMed Id"
+                        )
+                        FormComponents.DOIInput(
+                            state.Doi, 
+                            (fun s -> 
+                                let s = if s = "" then None else Some s
+                                state.Doi <- s
+                                state.ToPublication() |> setter),
+                            (fun pub -> setter pub),
+                            "DOI"
+                        )
                     ]
                     createPersonFieldTextInput(state.Authors, "Authors", fun s -> state.Authors <- s)
                     FormComponents.OntologyAnnotationInput(
