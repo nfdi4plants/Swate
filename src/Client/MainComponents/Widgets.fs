@@ -6,7 +6,7 @@ open Browser.Types
 
 open LocalStorage.Widgets
 
-module InitExtensions =
+module private InitExtensions =
 
     type Rect with
 
@@ -26,7 +26,7 @@ open InitExtensions
 open Fable.Core
 open Fable.Core.JsInterop
 
-module MoveEventListener =
+module private MoveEventListener =
 
     open Fable.Core.JsInterop
 
@@ -57,7 +57,7 @@ module MoveEventListener =
             let position = {X = int rect.left; Y = int rect.top}
             Position.write(prefix,position)
 
-module ResizeEventListener =
+module private ResizeEventListener =
 
     open Fable.Core.JsInterop
 
@@ -75,7 +75,7 @@ module ResizeEventListener =
         if element.current.IsSome then 
             Size.write(prefix,{X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
-module Elements =
+module private Elements =
 
     let helpExtendButton (extendToggle: unit -> unit) =
         Bulma.help [
@@ -89,7 +89,10 @@ module Elements =
             ]
         ]
 
-type Widgets =
+[<RequireQualifiedAccess>]
+type Widget =
+    | _BuildingBlock
+    | _Template
 
     [<ReactComponent>]
     static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit, ?help: ReactElement) =
@@ -114,6 +117,7 @@ type Widgets =
                     Browser.Dom.document.addEventListener("mouseup", onmouseup, config)
                 )
                 prop.style [
+                    style.zIndex 40
                     style.cursor.eastWestResize//style.cursor.northWestSouthEastResize ; 
                     style.display.flex
                     style.paddingRight(2); style.overflow.visible
@@ -150,7 +154,7 @@ type Widgets =
                     prop.style [style.cursor.move]
                     prop.children [
                         Bulma.modalCardTitle Html.none
-                        Bulma.delete [ prop.onClick rmv ]
+                        Bulma.delete [ prop.onClick (fun e -> e.stopPropagation(); rmv e) ]
                     ]
                 ]
                 Bulma.modalCardBody [
@@ -186,7 +190,7 @@ type Widgets =
             ]
         ]
         let prefix = BuildingBlockWidgets
-        Widgets.Base(content, prefix, rmv, help)
+        Widget.Base(content, prefix, rmv, help)
         
 
     [<ReactComponent>]
@@ -219,4 +223,4 @@ type Widgets =
         
         let help = Protocol.Search.InfoField()
         let prefix = TemplatesWidgets
-        Widgets.Base(content, prefix, rmv, help)
+        Widget.Base(content, prefix, rmv, help)

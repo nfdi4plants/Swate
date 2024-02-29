@@ -7,11 +7,7 @@ open Feliz.Bulma
 open LocalHistory
 open Messages
 open Components.QuickAccessButton
-
-[<RequireQualifiedAccess>]
-type private Widget = 
-| BuildingBlock
-| Template
+open MainComponents
 
 let private quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     Html.div [
@@ -89,7 +85,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                         Html.i [prop.className "fa-solid fa-table-columns" ]
                     ]
                 ],
-                (fun _ -> addWidget Widget.BuildingBlock)
+                (fun _ -> addWidget Widget._BuildingBlock)
             ).toReactElement()
             QuickAccessButton.create(
                 "Add Template",
@@ -99,34 +95,22 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                         Html.i [prop.className "fa-solid fa-table" ]
                     ]
                 ],
-                (fun _ -> addWidget Widget.Template)
+                (fun _ -> addWidget Widget._Template)
             ).toReactElement()
         ]
     ]
 
-let private modalDisplay (widgets: Widget list, rmvWidget: Widget -> unit, model, dispatch) = 
-    let rmv (widget: Widget) = fun _ -> rmvWidget widget
-    let displayWidget (widget: Widget) (widgetComponent) =
-        if widgets |> List.contains widget then
-            widgetComponent (model, dispatch, rmv widget)
-        else
-            Html.none
-    match widgets.Length with
-    | 0 -> 
-        Html.none
-    | _ ->
-        Html.div [
-            displayWidget Widget.BuildingBlock MainComponents.Widgets.BuildingBlock
-            displayWidget Widget.Template MainComponents.Widgets.Templates
-        ]
+
 
 [<ReactComponent>]
-let Main (model: Messages.Model) dispatch =
-    let widgets, setWidgets = React.useState([])
-    let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
+let Main(model: Messages.Model, dispatch, widgets, setWidgets) =
     let addWidget (widget: Widget) = 
-        if widgets |> List.contains widget then () else 
-            widget::widgets |> setWidgets
+        let add (widget) widgets = widget::widgets |> List.rev |> setWidgets
+        if widgets |> List.contains widget then 
+            List.filter (fun w -> w <> widget) widgets
+            |> fun filteredWidgets -> add widget filteredWidgets
+        else 
+            add widget widgets
     Bulma.navbar [
         prop.className "myNavbarSticky"
         prop.id "swate-mainNavbar"
@@ -137,7 +121,6 @@ let Main (model: Messages.Model) dispatch =
             style.minHeight(length.rem 3.25)
         ]
         prop.children [
-            modalDisplay (widgets, rmvWidget, model, dispatch)
             Bulma.navbarBrand.div [
 
             ]
