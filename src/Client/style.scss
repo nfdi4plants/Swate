@@ -14,6 +14,7 @@ html[data-theme="dark"] {
     --fs-background: #252529;
     --fs-foreground: #1e1e20;
     --scheme-invert-rgb: 255,255,255;
+    --table-alternate: #363636
 }
 
 html[data-theme="light"] {
@@ -25,6 +26,7 @@ html[data-theme="light"] {
     --fs-background: #f6f6f7;
     --fs-foreground: #e3e3e5;
     --scheme-invert-rgb: 0,0,0;
+    --table-alternate: #f2f2f2
 }
 
 $excel-primary: #217346;
@@ -44,6 +46,7 @@ $danger: $nfdi-red;
 $warning: $nfdi-yellow;
 
 // 3. Set the derived variables
+$button-static-background-color: var(--scheme-main);
 $border-color: hsl(0, 0%, 86%);
 $scheme-main: var(--scheme-main, hsl(0, 0%, 100%));
 $scheme-invert: var(--scheme-invert, hsl(0, 0%, 4%));
@@ -211,7 +214,7 @@ $colors: map-merge($colors, $addColors);
 }
 
 .fixed_headers tbody tr:nth-child(even) {
-    background-color: #DDD;
+    background-color: var(--table-alternate);
 }
 
 .fixed_headers thead th {

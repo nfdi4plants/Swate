@@ -30,58 +30,6 @@ module private CellComponents =
             yield! specificStyle
         ]
 
-    [<ReactComponent>]
-    let CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle) =
-        let state, setState = React.useState(input)
-        React.useEffect((fun () -> setState input), [|box input|])
-        let debounceStorage = React.useRef(newDebounceStorage())
-        let loading, setLoading = React.useState(false)
-        let dsetter (inp) = debouncel debounceStorage.current "TextChange" 1000 setLoading setter inp
-        let input = 
-            Bulma.control.div [
-                Bulma.control.isExpanded
-                if loading then Bulma.control.isLoading
-                prop.children [
-                    Bulma.input.text [
-                        prop.defaultValue input
-                        prop.readOnly isReadOnly
-                        prop.autoFocus true
-                        prop.style [
-                            if isHeader then style.fontWeight.bold
-                            style.width(length.percent 100)
-                            style.height.unset
-                            style.borderRadius(0)
-                            style.border(0,borderStyle.none,"")
-                            style.backgroundColor.transparent
-                            style.margin (0)
-                            style.padding(length.em 0.5,length.em 0.75)
-                        ]
-                        prop.onBlur(fun _ -> 
-                            if isHeader then setter state; 
-                            makeIdle()
-                        )
-                        prop.onKeyDown(fun e ->
-                            match e.which with
-                            | 13. -> //enter
-                                if isHeader then setter state
-                                makeIdle()
-                            | 27. -> //escape
-                                makeIdle()
-                            | _ -> ()
-                        )
-                        // Only change cell value while typing to increase performance. 
-                        prop.onChange(fun e -> 
-                            if isHeader then setState e else dsetter e
-                        )
-                    ]
-                ]
-            ]
-        Bulma.field.div [
-            Bulma.field.hasAddons
-            prop.className "is-flex-grow-1 m-0"
-            prop.children [ input ]           
-        ]
-
     let basicValueDisplayCell (v: string) =
         Html.span [
             prop.style [
@@ -205,6 +153,58 @@ open Fable.Core.JsInterop
 type Cell =
 
     [<ReactComponent>]
+    static member CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle) =
+        let state, setState = React.useState(input)
+        React.useEffect((fun () -> setState input), [|box input|])
+        let debounceStorage = React.useRef(newDebounceStorage())
+        let loading, setLoading = React.useState(false)
+        let dsetter (inp) = debouncel debounceStorage.current "TextChange" 1000 setLoading setter inp
+        let input = 
+            Bulma.control.div [
+                Bulma.control.isExpanded
+                if loading then Bulma.control.isLoading
+                prop.children [
+                    Bulma.input.text [
+                        prop.defaultValue input
+                        prop.readOnly isReadOnly
+                        prop.autoFocus true
+                        prop.style [
+                            if isHeader then style.fontWeight.bold
+                            style.width(length.percent 100)
+                            style.height.unset
+                            style.borderRadius(0)
+                            style.border(0,borderStyle.none,"")
+                            style.backgroundColor.transparent
+                            style.margin (0)
+                            style.padding(length.em 0.5,length.em 0.75)
+                        ]
+                        prop.onBlur(fun _ -> 
+                            if isHeader then setter state; 
+                            makeIdle()
+                        )
+                        prop.onKeyDown(fun e ->
+                            match e.which with
+                            | 13. -> //enter
+                                if isHeader then setter state
+                                makeIdle()
+                            | 27. -> //escape
+                                makeIdle()
+                            | _ -> ()
+                        )
+                        // Only change cell value while typing to increase performance. 
+                        prop.onChange(fun e -> 
+                            if isHeader then setState e else dsetter e
+                        )
+                    ]
+                ]
+            ]
+        Bulma.field.div [
+            Bulma.field.hasAddons
+            prop.className "is-flex-grow-1 m-0"
+            prop.children [ input ]           
+        ]
+
+    [<ReactComponent>]
     static member private HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let state = model.SpreadsheetModel
         let isReadOnly = columnType = Unit
@@ -229,7 +229,7 @@ type Cell =
                     )
                     prop.children [
                         if isActive then
-                            CellInputElement(cellValue, true, isReadOnly, setter, makeIdle)
+                            Cell.CellInputElement(cellValue, true, isReadOnly, setter, makeIdle)
                         else
                             let cellValue = // shadow cell value for tsr and tan to add columnType
                                 match columnType with
@@ -323,7 +323,7 @@ type Cell =
                                     if oa.IsSome then oasetter.Value oa.Value else setter ""
                                 Components.TermSearch.Input(setter, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset", searchableToggle=true, minWidth=length.px 400)
                             else
-                                CellInputElement(cellValue, false, false, setter, makeIdle)
+                                Cell.CellInputElement(cellValue, false, false, setter, makeIdle)
                         else
                             if columnType = Main then
                                 compositeCellDisplay cell
