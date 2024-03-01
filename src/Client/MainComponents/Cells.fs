@@ -56,7 +56,10 @@ module private CellComponents =
                             style.margin (0)
                             style.padding(length.em 0.5,length.em 0.75)
                         ]
-                        prop.onBlur(fun _ -> if isHeader then setter state; makeIdle())
+                        prop.onBlur(fun _ -> 
+                            if isHeader then setter state; 
+                            makeIdle()
+                        )
                         prop.onKeyDown(fun e ->
                             match e.which with
                             | 13. -> //enter

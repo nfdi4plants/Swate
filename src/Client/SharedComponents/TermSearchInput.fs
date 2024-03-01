@@ -232,12 +232,15 @@ type TermSearch =
             prop.children [
                 element
                 Bulma.control.p [
-                    Bulma.button.a [
-                        prop.style [style.borderWidth 0; style.borderRadius 0; style.marginRight 0]
-                        if not searchable then Bulma.color.hasTextGreyLight
-                        Bulma.button.isInverted
-                        prop.onClick(fun _ -> searchableSetter (not searchable))
-                        prop.children [Bulma.icon [Html.i [prop.className "fa-solid fa-magnifying-glass"]]]
+                    prop.style [style.marginRight 0]
+                    prop.children [
+                        Bulma.button.a [
+                            prop.style [style.borderWidth 0; style.borderRadius 0]
+                            if not searchable then Bulma.color.hasTextGreyLight
+                            Bulma.button.isInverted
+                            prop.onClick(fun _ -> searchableSetter (not searchable))
+                            prop.children [Bulma.icon [Html.i [prop.className "fa-solid fa-magnifying-glass"]]]
+                        ]
                     ]
                 ]
             ]
