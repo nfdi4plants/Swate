@@ -10,38 +10,6 @@ open Shared
 open ARCtrl.ISA
 open Components
 
-type private CellMode = 
-| Active
-| Idle
-
-type private CellState = {
-    CellMode: CellMode
-    /// This value is used to show during input cell editing. After confirming edit it will be used to push update
-    Value: string
-} with
-    static member init() =
-        {
-            CellMode    = Idle
-            Value       = ""
-        }
-    static member init(v: string) =
-        {
-            CellMode    = Idle
-            Value       = v
-        }
-
-    member this.IsActive = this.CellMode = Active
-    member this.IsIdle = this.CellMode = Idle
-
-type private ColumnType =
-| Main
-| Unit
-| TSR
-| TAN
-with
-    member this.IsMainColumn = match this with | Main -> true | _ -> false
-    member this.IsRefColumn = match this with | Unit | TSR | TAN -> true | _ -> false
-
 module private CellComponents =
 
 
@@ -63,15 +31,19 @@ module private CellComponents =
         ]
 
     [<ReactComponent>]
-    let CellInputElement (isHeader: bool, isReadOnly: bool, updateMainStateTable: string -> unit, setState_cell, state_cell, cell_value, columnType) =
-        let ref = React.useElementRef()
-
-        React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, fun _ -> updateMainStateTable state_cell.Value))
+    let CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle) =
+        let state, setState = React.useState(input)
+        React.useEffect((fun () -> setState input), [|box input|])
+        let debounceStorage = React.useRef(newDebounceStorage())
+        let loading, setLoading = React.useState(false)
+        let dsetter (inp) = debouncel debounceStorage.current "TextChange" 1000 setLoading setter inp
         let input = 
             Bulma.control.div [
                 Bulma.control.isExpanded
+                if loading then Bulma.control.isLoading
                 prop.children [
                     Bulma.input.text [
+                        prop.defaultValue input
                         prop.readOnly isReadOnly
                         prop.autoFocus true
                         prop.style [
@@ -83,29 +55,26 @@ module private CellComponents =
                             style.backgroundColor.transparent
                             style.margin (0)
                             style.padding(length.em 0.5,length.em 0.75)
-                            //if isHeader then
-                            //    style.color(NFDIColors.white)
                         ]
-                        // .. when pressing "ENTER". "ESCAPE" will negate changes.
+                        prop.onBlur(fun _ -> if isHeader then setter state; makeIdle())
                         prop.onKeyDown(fun e ->
                             match e.which with
                             | 13. -> //enter
-                                updateMainStateTable state_cell.Value
+                                if isHeader then setter state
+                                makeIdle()
                             | 27. -> //escape
-                                setState_cell {CellMode = Idle; Value = cell_value}
+                                makeIdle()
                             | _ -> ()
                         )
                         // Only change cell value while typing to increase performance. 
-                        prop.onChange(fun e ->
-                            setState_cell {state_cell with Value = e}
+                        prop.onChange(fun e -> 
+                            if isHeader then setState e else dsetter e
                         )
-                        prop.defaultValue cell_value
                     ]
                 ]
             ]
         Bulma.field.div [
             Bulma.field.hasAddons
-            prop.ref ref
             prop.className "is-flex-grow-1 m-0"
             prop.children [ input ]           
         ]
@@ -169,10 +138,10 @@ module private CellComponents =
 module private CellAux =
 
     let headerTANSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
-        let oa = header.TryOA()
-        let tan = if s = "" then None else Some s
-        oa 
-        |> Option.map (fun x -> {x with TermAccessionNumber = tan})
+        match header.TryOA(), s with
+        | Some oa, "" -> Some {oa with TermAccessionNumber = None}
+        | Some oa, s1 -> Some {oa with TermAccessionNumber = Some s1}
+        | None, _ -> None
         |> Option.map header.UpdateWithOA
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
 
@@ -192,10 +161,10 @@ module private EventPresets =
 
     open Shared
 
-    let onClickSelect (index: int*int, state_cell: CellState, selectedCells: Set<int*int>, model:Messages.Model, dispatch)=
+    let onClickSelect (index: int*int, isIdle:bool, selectedCells: Set<int*int>, model:Messages.Model, dispatch)=
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
-            if state_cell.IsIdle then
+            if isIdle then
                 let set = 
                     match e.shiftKey, selectedCells.Count with
                     | true, 0 ->
@@ -228,15 +197,18 @@ module private EventPresets =
                     TermSearch.UpdateParentTerm oa |> TermSearchMsg |> dispatch
 
 open Shared
+open Fable.Core.JsInterop
 
 type Cell =
 
     [<ReactComponent>]
     static member private HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let state = model.SpreadsheetModel
-        let state_cell, setState_cell = React.useState(CellState.init(cellValue))
-        React.useEffect((fun _ -> setState_cell {state_cell with Value = cellValue}), [|box cellValue|])
         let isReadOnly = columnType = Unit
+        let makeIdle() = UpdateActiveCell None |> SpreadsheetMsg |> dispatch
+        let makeActive() = UpdateActiveCell (Some (!^columnIndex, columnType)) |> SpreadsheetMsg |> dispatch
+        let isIdle = state.CellIsIdle (!^columnIndex, columnType)
+        let isActive = not isIdle
         Html.th [
             if columnType.IsRefColumn then Bulma.color.hasBackgroundGreyLighter
             prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
@@ -250,17 +222,11 @@ type Cell =
                         e.preventDefault()
                         e.stopPropagation()
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-                        if state_cell.IsIdle then setState_cell {state_cell with CellMode = Active}
+                        if isIdle then makeActive()
                     )
                     prop.children [
-                        if state_cell.IsActive then
-                            /// Update change to mainState and exit active input.
-                            let updateMainStateTable = fun (s: string) -> 
-                                // Only update if changed
-                                if s <> cellValue then
-                                    setter s
-                                setState_cell {state_cell with CellMode = Idle}
-                            CellInputElement(true, isReadOnly, updateMainStateTable, setState_cell, state_cell, cellValue, columnType)
+                        if isActive then
+                            CellInputElement(cellValue, true, isReadOnly, setter, makeIdle)
                         else
                             let cellValue = // shadow cell value for tsr and tan to add columnType
                                 match columnType with
@@ -281,7 +247,11 @@ type Cell =
                 let mutable nextHeader = CompositeHeader.OfHeaderString s
                 // update header with ref columns if term column
                 if header.IsTermColumn && not header.IsFeaturedColumn then
-                    nextHeader <- nextHeader.UpdateDeepWith header
+                    let updatedOA =
+                        match nextHeader.TryOA() ,header.TryOA() with
+                        | Some oa1, Some oa2 -> {oa1 with TermAccessionNumber = oa2.TermAccessionNumber; TermSourceREF = oa2.TermSourceREF}
+                        | _ -> failwith "this should never happen"
+                    nextHeader <- nextHeader.UpdateWithOA updatedOA
                 Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch
         Cell.HeaderBase(Main, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
 
@@ -315,10 +285,11 @@ type Cell =
     static member private BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), cell: CompositeCell, model: Model, dispatch, ?oasetter: OntologyAnnotation -> unit) =
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
-        let state_cell, setState_cell = React.useState(CellState.init(cellValue))
-        React.useEffect((fun _ -> setState_cell {state_cell with Value = cellValue}), [|box cellValue|])
         let isSelected = state.SelectedCells.Contains index
-        let makeIdle() = setState_cell {state_cell with CellMode = Idle}
+        let makeIdle() = UpdateActiveCell None |> SpreadsheetMsg |> dispatch
+        let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
+        let isIdle = state.CellIsIdle (!^index, columnType)
+        let isActive = not isIdle
         Html.td [
             prop.key $"Cell_{state.ActiveView.TableIndex}-{columnIndex}-{rowIndex}"
             cellStyle [
@@ -331,14 +302,13 @@ type Cell =
                     prop.onDoubleClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation() 
-                        if state_cell.IsIdle then setState_cell {state_cell with CellMode = Active}
+                        if isIdle then makeActive()
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                     )
-                    if state_cell.IsIdle then prop.onClick <| EventPresets.onClickSelect(index, state_cell, state.SelectedCells, model, dispatch)
-                    prop.onMouseDown(fun e -> if state_cell.IsIdle && e.shiftKey then e.preventDefault())
+                    if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
+                    prop.onMouseDown(fun e -> if isIdle && e.shiftKey then e.preventDefault())
                     prop.children [
-                        match state_cell.CellMode with
-                        | Active ->
+                        if isActive then
                             // Update change to mainState and exit active input.
                             if oasetter.IsSome then 
                                 let oa = cell.ToOA()
@@ -350,13 +320,8 @@ type Cell =
                                     if oa.IsSome then oasetter.Value oa.Value else setter ""
                                 Components.TermSearch.Input(setter, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset", searchableToggle=true, minWidth=length.px 400)
                             else
-                                let updateMainStateTable = fun (s: string) -> 
-                                    // Only update if changed
-                                    if s <> cellValue then
-                                        setter s
-                                    makeIdle()
-                                CellInputElement(false, false, updateMainStateTable, setState_cell, state_cell, cellValue, columnType)
-                        | Idle ->
+                                CellInputElement(cellValue, false, false, setter, makeIdle)
+                        else
                             if columnType = Main then
                                 compositeCellDisplay cell
                             else

@@ -26,7 +26,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                         prop.onChange(fun e -> setState_rows e)
                         prop.onKeyDown(key.enter, fun _ -> Spreadsheet.AddRows state_rows |> SpreadsheetMsg |> dispatch)
                         prop.defaultValue init_RowsToAdd
-                        prop.style [style.width(50)]
+                        prop.style [style.width(100)]
                     ]
                     Bulma.button.a [
                         Bulma.button.isRounded

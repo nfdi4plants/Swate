@@ -35,7 +35,7 @@ module Spreadsheet =
         /// </summary>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Messages.Model, cmd) =
             match msg with
-            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | CopySelectedCell | CopyCell _ -> 
+            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | UpdateActiveCell _ | CopySelectedCell | CopyCell _ -> 
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 state, model, cmd
             | _ -> 
@@ -159,6 +159,9 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | UpdateSelectedCells nextSelectedCells ->
                 let nextState = {state with SelectedCells = nextSelectedCells}
+                nextState, model, Cmd.none
+            | UpdateActiveCell next ->
+                let nextState = { state with ActiveCell = next }
                 nextState, model, Cmd.none
             | CopyCell index ->
                 let cmd = 

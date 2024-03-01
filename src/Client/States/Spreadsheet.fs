@@ -3,13 +3,17 @@ namespace Spreadsheet
 open Shared
 open OfficeInteropTypes
 open ARCtrl.ISA
+open Fable.Core
 
-type TableClipboard = {
-    Cell: CompositeCell option
-} with
-    static member init() = {
-        Cell = None
-    }
+type ColumnType =
+| Main
+| Unit
+| TSR
+| TAN
+with
+    member this.IsMainColumn = match this with | Main -> true | _ -> false
+    member this.IsRefColumn = not this.IsMainColumn 
+
 
 [<RequireQualifiedAccess>]
 type ActiveView = 
@@ -29,12 +33,21 @@ with
 type Model = {
     ActiveView: ActiveView
     SelectedCells: Set<int*int>
+    ActiveCell: (U2<int,(int*int)> * ColumnType) option
     ArcFile: ArcFiles option
 } with
+    member this.CellIsActive(index: U2<int, int*int>, columnType) =
+        match this.ActiveCell, index with
+        | Some (U2.Case1 (headerIndex), ct), U2.Case1 (targetIndex) -> headerIndex = targetIndex && ct = columnType
+        | Some (U2.Case2 (ci, ri), ct), U2.Case2 targetIndex -> (ci,ri) = targetIndex && ct = columnType
+        | _ -> false
+    member this.CellIsIdle(index: U2<int, int*int>, columnType) =
+        this.CellIsActive(index, columnType) |> not
     static member init() =
         {
             ActiveView = ActiveView.Metadata
             SelectedCells = Set.empty
+            ActiveCell = None
             ArcFile = None
         }
     member this.Tables
@@ -78,6 +91,7 @@ type Msg =
 | UpdateHeader of columIndex: int * CompositeHeader
 | UpdateActiveView of ActiveView
 | UpdateSelectedCells of Set<int*int>
+| UpdateActiveCell of (U2<int,(int*int)> * ColumnType) option
 | RemoveTable of index:int
 | RenameTable of index:int * name:string
 | UpdateTableOrder of pre_index:int * new_index:int

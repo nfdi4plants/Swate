@@ -89,6 +89,13 @@ module TermSearchAux =
         setSearchNameState <| SearchState.init()
         debouncel debounceStorage "TermSearch" debounceTimer setLoading queryDB ()
 
+    let dsetter (inp: OntologyAnnotation option, setter, debounceStorage: System.Collections.Generic.Dictionary<string,int>, setLoading: bool -> unit, debounceSetter: int option) = 
+        if debounceSetter.IsSome then 
+            debouncel debounceStorage "SetterDebounce" debounceSetter.Value setLoading setter inp 
+            log debounceStorage
+        else 
+            setter inp
+
     module Components =
 
         let termSeachNoResults = [
@@ -226,7 +233,7 @@ type TermSearch =
                 element
                 Bulma.control.p [
                     Bulma.button.a [
-                        prop.style [style.borderWidth 0; style.borderRadius 0]
+                        prop.style [style.borderWidth 0; style.borderRadius 0; style.marginRight 0]
                         if not searchable then Bulma.color.hasTextGreyLight
                         Bulma.button.isInverted
                         prop.onClick(fun _ -> searchableSetter (not searchable))
@@ -311,7 +318,6 @@ type TermSearch =
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
         let debounceStorage = React.useRef(newDebounceStorage())
-        let dsetter = fun inp -> if debounceSetter.IsSome then debounce debounceStorage.current "setter_debounce" debounceSetter.Value setter inp else setter inp
         let ref = React.useElementRef()
         if onBlur.IsSome then React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, onBlur.Value))
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
@@ -327,14 +333,15 @@ type TermSearch =
             setState oaOpt
             setter oaOpt
             setIsSearching false
-        let startSearch(queryString: string option, isOnChange: bool) =
-            let oaOpt = queryString |> Option.map (fun s -> OntologyAnnotation.fromString(s) )
-            if isOnChange then
-                dsetter oaOpt
-                setState oaOpt
+        let startSearch() =
+            setLoading true
             setSearchNameState <| SearchState.init()
             setSearchTreeState <| SearchState.init()
             setIsSearching true
+        let registerChange(queryString: string option) =
+            let oaOpt = queryString |> Option.map (fun s -> OntologyAnnotation.fromString(s) )
+            dsetter(oaOpt,setter,debounceStorage.current,setLoading,debounceSetter)
+            setState oaOpt
         Bulma.control.div [
             if isExpanded then Bulma.control.isExpanded
             if size.IsSome then size.Value
@@ -359,21 +366,25 @@ type TermSearch =
                     prop.onDoubleClick(fun e ->
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
-                            startSearch(None, false)
-                            if searchable then allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0) else stopSearch()
+                            if searchable then 
+                                startSearch()
+                                allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         elif s.Trim() <> "" then
-                            startSearch (Some s, false)
-                            if searchable then mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0) else stopSearch()
+                            if searchable then 
+                                startSearch ()
+                                mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         else 
                             ()
                     )
                     prop.onChange(fun (s: string) ->
                         if s.Trim() = "" then
-                            startSearch(None, true)
-                            stopSearch()
+                            registerChange(None)
+                            stopSearch() // When deleting text this should stop search from completing
                         else
-                            startSearch (Some s, true)
-                            if searchable then mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000) else stopSearch()
+                            registerChange(Some s)
+                            if searchable then 
+                                startSearch()
+                                mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
                     )
                     prop.onKeyDown(fun e -> 
                         match e.which with
@@ -382,7 +393,6 @@ type TermSearch =
                             stopSearch()
                         | 13. -> //enter
                             if onEnter.IsSome then onEnter.Value e
-                            setter state
                         | 9. -> //tab
                             if searchableToggle then 
                                 e.preventDefault()
@@ -391,8 +401,7 @@ type TermSearch =
                             
                     )
                 ]
-                let TermSelectArea = 
-                    TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
+                let TermSelectArea = TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
                 if portalTermSelectArea.IsSome then
                     ReactDOM.createPortal(TermSelectArea,portalTermSelectArea.Value)
                 elif ref.current.IsSome then
@@ -430,3 +439,7 @@ type TermSearch =
                 TermSearch.ToggleSearchContainer(main, ref, searchable, setSearchable)
             else 
                 main
+
+
+    //static member InputWithSearchToggle() =
+        
