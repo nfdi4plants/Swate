@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="StaticTermCollection.fs" />
     <None Include="paket.references" />
     <Compile Include="URLs.fs" />
     <Compile Include="Regex.fs" />

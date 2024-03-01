@@ -84,7 +84,7 @@ module private API =
                 |]
             let authorString = createAuthorString authors
             let title = json?title
-            let publication = Publication.create(pmid, doi, authorString, title)
+            let publication = Publication.create(pmid, doi, authorString, title, Term.Published)
             return publication
         }
 
@@ -121,7 +121,7 @@ module private API =
             |]
             let! pubmedId = requestByDOI_FromPubMed doi
             let authorString = createAuthorString authors
-            let publication = Publication.create(?PubMedID=pubmedId, Doi=doi, Authors=authorString, ?Title=title)
+            let publication = Publication.create(?PubMedID=pubmedId, Doi=doi, Authors=authorString, ?Title=title, Status=Term.Published)
             return publication
         }
 
@@ -979,7 +979,6 @@ type FormComponents =
                 state.Doi
                 state.Title
                 state.Authors
-                state.Comments |> Option.map (fun _ -> "")
                 state.Status |> Option.map (fun _ -> "")
             ]
             let all = fields.Length
