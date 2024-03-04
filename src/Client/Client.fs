@@ -52,11 +52,11 @@ let ARCitect_subscription (initial: Messages.Model) : (SubId * Subscribe<Message
         { new System.IDisposable with
             member _.Dispose() = rmv()
         }
-    let keyboardEventSubscription (dispatch: Messages.Msg -> unit) : System.IDisposable =
-        let rmv = Spreadsheet.KeyboardShortcuts.initEventListener dispatch
-        { new System.IDisposable with
-            member _.Dispose() = rmv()
-        }
+    //let keyboardEventSubscription (dispatch: Messages.Msg -> unit) : System.IDisposable =
+    //    let rmv = Spreadsheet.KeyboardShortcuts.initEventListener dispatch
+    //    { new System.IDisposable with
+    //        member _.Dispose() = rmv()
+    //    }
     [ 
         // Only subscribe to ARCitect messages when host is set correctly via query param.
         if initial.PersistentStorageState.Host = Some (Swatehost.ARCitect) then

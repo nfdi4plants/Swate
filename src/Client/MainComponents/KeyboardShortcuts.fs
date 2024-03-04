@@ -1,30 +1,27 @@
 module Spreadsheet.KeyboardShortcuts
 
-let private onKeydownEvent (dispatch: Messages.Msg -> unit) =
+let onKeydownEvent (dispatch: Messages.Msg -> unit) =
     fun (e: Browser.Types.Event) ->
         //e.preventDefault()
         //e.stopPropagation()
         let e = e :?> Browser.Types.KeyboardEvent
         log "KEY DOWN"
         match e.ctrlKey, e.which with
+        | false, 46. -> // del
+            Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch
         | false, _ -> ()
         // Ctrl + c
         | _, _ ->
             match (e.ctrlKey || e.metaKey), e.which with
             // Ctrl + c
             | true, 67. ->
-                log 67
                 Spreadsheet.CopySelectedCell |> Messages.SpreadsheetMsg |> dispatch
             // Ctrl + x
             | true, 88. ->
-                log 88
                 Spreadsheet.CutSelectedCell |> Messages.SpreadsheetMsg |> dispatch
             // Ctrl + v
             | true, 86. ->
-                log 86
                 Spreadsheet.PasteSelectedCell |> Messages.SpreadsheetMsg |> dispatch
-            | _, 46. -> // del
-                Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch
             | _, _ -> ()
 
 /// <summary>

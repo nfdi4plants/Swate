@@ -42,6 +42,7 @@ let RowLabel (rowIndex: int) =
                 prop.style [style.custom ("border", "unset"); style.borderRadius 0]
                 Bulma.button.isFullWidth
                 Bulma.button.isStatic
+                prop.tabIndex -1
                 prop.text (if rowIndex < 0 then "" else $"{rowIndex+1}")
             ]
         ]
