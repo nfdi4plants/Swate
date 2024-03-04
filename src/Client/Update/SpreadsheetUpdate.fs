@@ -35,7 +35,8 @@ module Spreadsheet =
         /// </summary>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Messages.Model, cmd) =
             match msg with
-            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ -> 
+            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ 
+            | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected -> 
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 state, model, cmd
             | _ -> 
@@ -174,6 +175,15 @@ module Spreadsheet =
                         let nextIndex = Controller.selectRelativeCell state.SelectedCells.MinimumElement moveBy state.ActiveTable
                         let s = Set([nextIndex])
                         UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
+                state, model, cmd
+            | SetActiveCellFromSelected ->
+                let cmd = 
+                    if state.SelectedCells.IsEmpty then
+                        Cmd.none
+                    else
+                        let min = state.SelectedCells.MinimumElement
+                        let cmd = (Fable.Core.U2.Case2 min, ColumnType.Main) |> Some |> UpdateActiveCell |> SpreadsheetMsg
+                        Cmd.ofMsg cmd
                 state, model, cmd
             | UpdateActiveCell next ->
                 let nextState = { state with ActiveCell = next }

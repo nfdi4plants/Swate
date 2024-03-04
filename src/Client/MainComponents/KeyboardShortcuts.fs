@@ -16,6 +16,8 @@ let onKeydownEvent (dispatch: Messages.Msg -> unit) =
             MoveSelectedCell Key.Right |> Messages.SpreadsheetMsg |> dispatch
         | false, 40. -> // arrow down
             MoveSelectedCell Key.Down |> Messages.SpreadsheetMsg |> dispatch
+        | false, key when key <= 90 && key >= 65 ->
+            SetActiveCellFromSelected |> Messages.SpreadsheetMsg |> dispatch
         | false, _ -> 
             ()
         // Ctrl + c
