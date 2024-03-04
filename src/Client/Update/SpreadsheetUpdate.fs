@@ -16,7 +16,7 @@ open FsSpreadsheet.Exceljs
 open ARCtrl.ISA
 open ARCtrl.ISA.Spreadsheet
 open Spreadsheet.Sidebar.Controller
-
+open Feliz
 
 module Spreadsheet =
 
@@ -35,7 +35,7 @@ module Spreadsheet =
         /// </summary>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Messages.Model, cmd) =
             match msg with
-            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | UpdateActiveCell _ | CopySelectedCell | CopyCell _ -> 
+            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ -> 
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 state, model, cmd
             | _ -> 
@@ -160,6 +160,21 @@ module Spreadsheet =
             | UpdateSelectedCells nextSelectedCells ->
                 let nextState = {state with SelectedCells = nextSelectedCells}
                 nextState, model, Cmd.none
+            | MoveSelectedCell keypressed ->
+                let cmd =
+                    match state.SelectedCells.IsEmpty with
+                    | true -> Cmd.none
+                    | false -> 
+                        let moveBy =
+                            match keypressed with
+                            | Key.Down -> (0,1)
+                            | Key.Up -> (0,-1)
+                            | Key.Left -> (-1,0)
+                            | Key.Right -> (1,0)
+                        let nextIndex = Controller.selectRelativeCell state.SelectedCells.MinimumElement moveBy state.ActiveTable
+                        let s = Set([nextIndex])
+                        UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
+                state, model, cmd
             | UpdateActiveCell next ->
                 let nextState = { state with ActiveCell = next }
                 nextState, model, Cmd.none

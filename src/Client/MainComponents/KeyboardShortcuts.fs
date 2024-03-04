@@ -5,11 +5,19 @@ let onKeydownEvent (dispatch: Messages.Msg -> unit) =
         //e.preventDefault()
         //e.stopPropagation()
         let e = e :?> Browser.Types.KeyboardEvent
-        log "KEY DOWN"
         match e.ctrlKey, e.which with
         | false, 46. -> // del
             Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch
-        | false, _ -> ()
+        | false, 37. -> // arrow left
+            MoveSelectedCell Key.Left |> Messages.SpreadsheetMsg |> dispatch
+        | false, 38. -> // arrow up
+            MoveSelectedCell Key.Up |> Messages.SpreadsheetMsg |> dispatch
+        | false, 39. -> // arrow right
+            MoveSelectedCell Key.Right |> Messages.SpreadsheetMsg |> dispatch
+        | false, 40. -> // arrow down
+            MoveSelectedCell Key.Down |> Messages.SpreadsheetMsg |> dispatch
+        | false, _ -> 
+            ()
         // Ctrl + c
         | _, _ ->
             match (e.ctrlKey || e.metaKey), e.which with

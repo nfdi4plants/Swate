@@ -113,6 +113,22 @@ let clearCells (indexArr: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet
     table.SetCellsAt newCells
     state
 
+open Fable.Core
+open System
+
+let selectRelativeCell (index: int*int) (move: int*int) (table: ArcTable) =
+    //let index =
+    //    match index with
+    //    | U2.Case2 index -> index,-1
+    //    | U2.Case1 index -> index
+    let columnIndex = Math.Min(Math.Max(fst index + fst move, 0), table.ColumnCount-1)
+    let rowIndex = Math.Min(Math.Max(snd index + snd move, 0), table.RowCount-1)
+    //if rowIndex = -1 then
+    //    U2.Case2 columnIndex
+    //else
+    //    U2.Case1 (columnIndex, rowIndex)
+    columnIndex, rowIndex
+
 // Ui depends on main column name, maybe change this to depends on BuildingBlockType?
 // Header main column name must be updated
 

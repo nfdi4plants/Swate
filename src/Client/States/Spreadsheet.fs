@@ -83,6 +83,14 @@ type Model = {
         | ActiveView.Table i -> true
         | _ -> false
 
+[<RequireQualifiedAccess>]
+type Key =
+    | Up
+    | Down
+    | Left
+    | Right
+
+
 type Msg =
 // <--> UI <-->
 | UpdateState of Model
@@ -91,6 +99,7 @@ type Msg =
 | UpdateHeader of columIndex: int * CompositeHeader
 | UpdateActiveView of ActiveView
 | UpdateSelectedCells of Set<int*int>
+| MoveSelectedCell of Key
 | UpdateActiveCell of (U2<int,(int*int)> * ColumnType) option
 | RemoveTable of index:int
 | RenameTable of index:int * name:string
