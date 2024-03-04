@@ -97,6 +97,15 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                 ],
                 (fun _ -> addWidget Widget._Template)
             ).toReactElement()
+            QuickAccessButton.create(
+                "File Picker",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-file-signature" ]
+                    ]
+                ],
+                (fun _ -> addWidget Widget._FilePicker)
+            ).toReactElement()
         ]
     ]
 

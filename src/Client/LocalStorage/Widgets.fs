@@ -19,6 +19,7 @@ open Fable.SimpleJson
 
 let [<Literal>] BuildingBlockWidgets = "BuildingBlock"
 let [<Literal>] TemplatesWidgets = "Templates"
+let [<Literal>] FilePickerWidgets = "FilerPicker"
 
 [<RequireQualifiedAccess>]
 module Position =

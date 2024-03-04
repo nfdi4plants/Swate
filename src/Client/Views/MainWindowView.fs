@@ -23,6 +23,7 @@ let private ModalDisplay (widgets: Widget list, rmvWidget: Widget -> unit, bring
         match widget with
         | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget) 
         | Widget._Template -> Widget.Templates (model, dispatch, rmv widget)
+        | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
         |> WidgetOrderContainer bringWidgetToFront
     match widgets.Length with
     | 0 -> 

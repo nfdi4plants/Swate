@@ -93,6 +93,7 @@ module private Elements =
 type Widget =
     | _BuildingBlock
     | _Template
+    | _FilePicker
 
     [<ReactComponent>]
     static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit, ?help: ReactElement) =
@@ -223,4 +224,18 @@ type Widget =
         
         let help = Protocol.Search.InfoField()
         let prefix = TemplatesWidgets
+        Widget.Base(content, prefix, rmv, help)
+
+    static member FilePicker (model, dispatch, rmv) =
+        let content = Html.div [
+            FilePicker.uploadButton model dispatch
+            if model.FilePickerState.FileNames <> [] then
+                FilePicker.fileSortElements model dispatch
+
+                FilePicker.FileNameTable.table model dispatch
+                //fileNameElements model dispatch
+                FilePicker.insertButton model dispatch
+        ]
+        let prefix = FilePickerWidgets
+        let help = Html.div []
         Widget.Base(content, prefix, rmv, help)

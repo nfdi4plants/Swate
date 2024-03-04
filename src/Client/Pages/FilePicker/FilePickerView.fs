@@ -65,7 +65,8 @@ module PathRerooting =
                 path.Replace(rootPath + string sep, "")
             relativePath
 
-let uploadButton (model:Messages.Model) dispatch (inputId: string) =
+let uploadButton (model:Messages.Model) dispatch =
+    let inputId = "filePicker_OnFilePickerMainFunc"
     Bulma.field.div [
         Html.input [
             prop.style [style.display.none]
@@ -255,12 +256,10 @@ module FileNameTable =
         ]
         
 
-let fileContainer (model:Messages.Model) dispatch inputId=
+let fileContainer (model:Messages.Model) dispatch =
     mainFunctionContainer [
 
-        Bulma.help  "Choose one or multiple files, rearrange them and add their names to the Excel sheet."
-
-        uploadButton model dispatch inputId
+        uploadButton model dispatch
 
         if model.FilePickerState.FileNames <> [] then
             fileSortElements model dispatch
@@ -271,12 +270,11 @@ let fileContainer (model:Messages.Model) dispatch inputId=
     ]
 
 let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
-    let inputId = "filePicker_OnFilePickerMainFunc"
     Bulma.content [
         pageHeader "File Picker"
 
         Bulma.label "Select files from your computer and insert their names into Excel"
 
         // Colored container element for all uploaded file names and sort elements
-        fileContainer model dispatch inputId
+        fileContainer model dispatch
     ]
