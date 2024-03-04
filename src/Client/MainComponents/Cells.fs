@@ -293,11 +293,23 @@ type Cell =
         let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
         let isIdle = state.CellIsIdle (!^index, columnType)
         let isActive = not isIdle
+        let ref = React.useElementRef()
+        React.useEffect((fun () -> 
+            if isSelected then
+                let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
+                options.behavior <- Browser.Types.ScrollBehavior.Auto
+                log ("SCROLL", index)
+                options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
+                options.block <- Browser.Types.ScrollAlignment.Nearest
+                if ref.current.IsSome then ref.current.Value.scrollIntoView(options)), 
+                [|box isSelected|]
+        )
         Html.td [
             prop.key $"Cell_{state.ActiveView.TableIndex}-{columnIndex}-{rowIndex}"
             cellStyle [
                 if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
             ]
+            prop.ref ref
             prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
             prop.children [
                 Html.div [
