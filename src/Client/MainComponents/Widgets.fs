@@ -25,6 +25,7 @@ open InitExtensions
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Protocol
 
 module private MoveEventListener =
 
@@ -197,12 +198,14 @@ type Widget =
     [<ReactComponent>]
     static member Templates (model: Messages.Model, dispatch, rmv: MouseEvent -> unit) =
         let templates, setTemplates = React.useState(model.ProtocolState.Templates)
+        let config, setConfig = React.useState(TemplateFilterConfig.init)
+        let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         React.useEffect((fun _ -> setTemplates model.ProtocolState.Templates), [|box model.ProtocolState.Templates|])
         let selectContent() = 
             [
-                Protocol.Search.FileSortElement(templates, setTemplates, model, dispatch)
-                Protocol.Search.Component (templates, model, dispatch, length.px 350)
+                Protocol.Search.FileSortElement(model, config, setConfig)
+                Protocol.Search.Component (filteredTemplates, model, dispatch, length.px 350)
             ]
         let insertContent() =
             [

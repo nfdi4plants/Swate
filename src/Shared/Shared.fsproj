@@ -12,7 +12,6 @@
     <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="AdvancedSearchTypes.fs" />
     <Compile Include="OfficeInteropTypes.fs" />
-    <Compile Include="TemplateTypes.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

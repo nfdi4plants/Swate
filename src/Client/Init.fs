@@ -26,7 +26,6 @@ let initializeModel () =
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
         SettingsXmlState            = SettingsXml.Model         .init ()
         JsonExporterModel           = JsonExporter.Model        .init ()
-        TemplateMetadataModel       = TemplateMetadata.Model    .init ()
         DagModel                    = Dag.Model                 .init ()
         CytoscapeModel              = Cytoscape.Model           .init ()
         SpreadsheetModel            = Spreadsheet.Model         .fromLocalStorage()

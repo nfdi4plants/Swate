@@ -8,7 +8,6 @@ open Fable.Remoting.Client
 open Fable.SimpleJson
 
 open TermTypes
-open TemplateTypes
 open ExcelColors
 open OfficeInterop
 open OfficeInteropTypes
@@ -161,7 +160,6 @@ type Model = {
     ///Used to manage all custom xml settings
     SettingsXmlState            : SettingsXml.Model
     JsonExporterModel           : JsonExporter.Model
-    TemplateMetadataModel       : TemplateMetadata.Model
     DagModel                    : Dag.Model
     CytoscapeModel              : Cytoscape.Model
     /// Contains all information about spreadsheet view
@@ -172,8 +170,6 @@ type Model = {
         { this with ExcelState = s}
     member this.updateByJsonExporterModel (m:JsonExporter.Model) =
         { this with JsonExporterModel = m}
-    member this.updateByTemplateMetadataModel (m:TemplateMetadata.Model) =
-        { this with TemplateMetadataModel = m}
     member this.updateByDagModel (m:Dag.Model) =
         { this with DagModel = m}
 
@@ -190,7 +186,6 @@ type Msg =
 | BuildingBlockMsg      of BuildingBlock.Msg
 | ProtocolMsg           of Protocol.Msg
 | JsonExporterMsg       of JsonExporter.Msg
-| TemplateMetadataMsg   of TemplateMetadata.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | CytoscapeMsg          of Cytoscape.Msg
 | SpreadsheetMsg        of Spreadsheet.Msg

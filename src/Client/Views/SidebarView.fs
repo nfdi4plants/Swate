@@ -164,9 +164,6 @@ module private Content =
         | Routing.Route.JsonExport ->
             JsonExporter.Core.FileExporter.Main(model, dispatch)
 
-        | Routing.Route.TemplateMetadata ->
-            TemplateMetadata.Core.newNameMainElement model dispatch
-
         | Routing.Route.ProtocolSearch ->
             Protocol.Search.Main model dispatch
 

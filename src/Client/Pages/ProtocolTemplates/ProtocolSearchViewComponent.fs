@@ -1,13 +1,63 @@
 namespace Protocol
 
 open Shared
-open TemplateTypes
 open Model
 open Messages.Protocol
 open Messages
 
 open Feliz
 open Feliz.Bulma
+
+/// Fields of Template that can be searched
+[<RequireQualifiedAccess>]
+type SearchFields =
+| Name
+| Organisation
+| Authors
+
+    static member private ofFieldString (str:string) =
+        let str = str.ToLower()
+        match str with
+        | "/o" | "/org"             -> Some Organisation
+        | "/a" | "/authors"         -> Some Authors
+        | "/n" | "/reset" | "/e"    -> Some Name
+        | _ -> None
+
+    member this.toStr =
+        match this with
+        | Name          -> "/name"
+        | Organisation  -> "/org"
+        | Authors       -> "/auth"
+
+    member this.toNameRdb =
+        match this with
+        | Name          -> "template name"
+        | Organisation  -> "organisation"
+        | Authors       -> "authors"
+
+    static member GetOfQuery(query:string) =
+        SearchFields.ofFieldString query
+
+open ARCtrl.ISA
+
+type TemplateFilterConfig = {
+        ProtocolSearchQuery     : string
+        ProtocolTagSearchQuery  : string
+        ProtocolFilterTags      : OntologyAnnotation list
+        ProtocolFilterErTags    : OntologyAnnotation list
+        CommunityFilter         : Model.Protocol.CommunityFilter
+        TagFilterIsAnd          : bool
+        Searchfield             : SearchFields
+} with
+    static member init () = {
+        ProtocolSearchQuery     = ""
+        ProtocolTagSearchQuery  = ""
+        ProtocolFilterTags      = []
+        ProtocolFilterErTags    = []
+        CommunityFilter         = Model.Protocol.CommunityFilter.OnlyCurated
+        TagFilterIsAnd          = true
+        Searchfield             = SearchFields.Name
+    }
 
 module ComponentAux = 
 
@@ -16,61 +66,10 @@ module ComponentAux =
         "nfdi4plants"
     ]
 
-    /// Fields of Template that can be searched
-    [<RequireQualifiedAccess>]
-    type SearchFields =
-    | Name
-    | Organisation
-    | Authors
-
-        static member private ofFieldString (str:string) =
-            let str = str.ToLower()
-            match str with
-            | "/o" | "/org"             -> Some Organisation
-            | "/a" | "/authors"         -> Some Authors
-            | "/n" | "/reset" | "/e"    -> Some Name
-            | _ -> None
-
-        member this.toStr =
-            match this with
-            | Name          -> "/name"
-            | Organisation  -> "/org"
-            | Authors       -> "/auth"
-
-        member this.toNameRdb =
-            match this with
-            | Name          -> "template name"
-            | Organisation  -> "organisation"
-            | Authors       -> "authors"
-
-        static member GetOfQuery(query:string) =
-            SearchFields.ofFieldString query
-
-    open ARCtrl.ISA
-
-    type ProtocolViewState = {
-            ProtocolSearchQuery     : string
-            ProtocolTagSearchQuery  : string
-            ProtocolFilterTags      : OntologyAnnotation list
-            ProtocolFilterErTags    : OntologyAnnotation list
-            CommunityFilter         : Model.Protocol.CommunityFilter
-            TagFilterIsAnd          : bool
-            Searchfield             : SearchFields
-    } with
-        static member init () = {
-            ProtocolSearchQuery     = ""
-            ProtocolTagSearchQuery  = ""
-            ProtocolFilterTags      = []
-            ProtocolFilterErTags    = []
-            CommunityFilter         = Model.Protocol.CommunityFilter.All
-            TagFilterIsAnd          = true
-            Searchfield             = SearchFields.Name
-        }
-
     [<LiteralAttribute>]
     let SearchFieldId = "template_searchfield_main"
 
-    let queryField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
+    let queryField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         Html.div [
             Bulma.label $"Search by {state.Searchfield.toNameRdb}"
             let hasSearchAddon = state.Searchfield <> SearchFields.Name
@@ -114,7 +113,7 @@ module ComponentAux =
             ]
         ]
 
-    let tagQueryField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
+    let tagQueryField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         let allTags = model.ProtocolState.Templates |> Array.collect (fun x -> x.Tags) |> Array.distinct |> Array.filter (fun x -> state.ProtocolFilterTags |> List.contains x |> not )
         let allErTags = model.ProtocolState.Templates |> Array.collect (fun x -> x.EndpointRepositories) |> Array.distinct |> Array.filter (fun x -> state.ProtocolFilterErTags |> List.contains x |> not )
         let hitTagList, hitErTagList =
@@ -213,7 +212,7 @@ module ComponentAux =
 
     open Fable.Core.JsInterop
 
-    let communitySelectField (model: Messages.Model) (state: ProtocolViewState) setState =
+    let communitySelectField (model: Messages.Model) (state: TemplateFilterConfig) setState =
         let communityNames = 
             model.ProtocolState.Templates 
             |> Array.choose (fun t -> Model.Protocol.CommunityFilter.CommunityFromOrganisation t.Organisation) 
@@ -222,7 +221,6 @@ module ComponentAux =
             [
                 Model.Protocol.CommunityFilter.All
                 Model.Protocol.CommunityFilter.OnlyCurated
-                Model.Protocol.CommunityFilter.OnlyCommunities
             ]@communityNames
         Html.div [
             Bulma.label "Select community"
@@ -230,14 +228,16 @@ module ComponentAux =
                 Bulma.control.isExpanded 
                 prop.children [
                     Bulma.select [
+                        prop.value (state.CommunityFilter.ToStringRdb())
                         prop.onChange(fun (e: Browser.Types.Event) ->
                             let filter = Model.Protocol.CommunityFilter.fromString e.target?value
-                            {state with CommunityFilter = filter} |> setState
+                            if state.CommunityFilter <> filter then
+                                {state with CommunityFilter = filter} |> setState
                         )
                         prop.children [
                             for option in options do
                                 Html.option [
-                                    prop.selected (state.CommunityFilter = option)
+                                    //prop.selected (state.CommunityFilter = option)
                                     prop.value (option.ToStringRdb())                                   
                                     prop.text (option.ToStringRdb())                                   
                                 ]
@@ -275,7 +275,7 @@ module ComponentAux =
             ]
         ]
 
-    let TagDisplayField (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
+    let TagDisplayField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         Html.div [
             prop.className "is-flex"
             prop.children [
@@ -297,7 +297,7 @@ module ComponentAux =
             ]
         ]
 
-    let fileSortElements (model:Model) (state: ProtocolViewState) (setState: ProtocolViewState -> unit) =
+    let fileSortElements (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
 
         Html.div [
             prop.style [style.marginBottom(length.rem 0.75); style.display.flex; style.flexDirection.column]
@@ -352,23 +352,31 @@ module ComponentAux =
                     //    UpdateDisplayedProtDetailsId (Some i) |> ProtocolMsg |> dispatch
                 )
                 prop.children [
-                    Html.td template.Name
-                    Html.td (
-                        if curatedOrganisationNames |> List.contains (template.Organisation.ToString().ToLower()) then
-                            curatedTag
-                        else
-                            communitytag
-                    )
+                    Html.td [
+                        prop.text template.Name
+                        prop.key $"{i}_{template.Id}_name"
+                    ]
+                    Html.td [
+                        prop.key $"{i}_{template.Id}_tag"
+                        prop.children [
+                            if curatedOrganisationNames |> List.contains (template.Organisation.ToString().ToLower()) then
+                                curatedTag
+                            else
+                                communitytag
+                        ]
+                    ]
                     //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt] []] ]
-                    Html.td [ prop.style [style.textAlign.center; style.verticalAlign.middle]; prop.text template.Version ]
+                    Html.td [ prop.key $"{i}_{template.Id}_version"; prop.style [style.textAlign.center; style.verticalAlign.middle]; prop.text template.Version ]
                     //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string template.Used) ]
-                    Html.td (
-                        Bulma.icon [Html.i [prop.className "fa-solid fa-chevron-down"]]
-                    )
+                    Html.td [
+                        prop.key $"{i}_{template.Id}_button"
+                        prop.children [Bulma.icon [Html.i [prop.className "fa-solid fa-chevron-down"]] ]
+                    ]
                 ]
             ]
             Html.tr [
                 Html.td [
+                    prop.key $"{i}_{template.Id}_description"
                     prop.style [
                         style.padding 0
                         if isShown then
@@ -422,6 +430,58 @@ module ComponentAux =
             ]
         ]
 
+module FilterHelper =
+    open ComponentAux
+
+    let sortTableBySearchQuery (searchfield: SearchFields) (searchQuery: string) (protocol: ARCtrl.Template.Template []) =
+        let query = searchQuery.Trim()
+        // Only search if field is not empty and does not start with "/".
+        // If it starts with "/" and does not match SearchFields then it will never trigger search
+        // As soon as it matches SearchFields it will be removed and can become 'query <> ""'
+        if query <> "" && query.StartsWith("/") |> not
+        then
+            let queryBigram = query |> Shared.SorensenDice.createBigrams
+            let createScore (str:string) =
+                str
+                |> Shared.SorensenDice.createBigrams
+                |> Shared.SorensenDice.calculateDistance queryBigram
+            let scoredTemplate =
+                protocol
+                |> Array.map (fun template ->
+                    let score =
+                        match searchfield with
+                        | SearchFields.Name          ->
+                            createScore template.Name
+                        | SearchFields.Organisation  ->
+                            createScore (template.Organisation.ToString())
+                        | SearchFields.Authors       ->
+                            let query' = query.ToLower()
+                            let scores = template.Authors |> Array.filter (fun author -> 
+                                (createAuthorStringHelper author).ToLower().Contains query'
+                                || (author.ORCID.IsSome && author.ORCID.Value = query)
+                            )
+                            if Array.isEmpty scores then 0.0 else 1.0
+                    score, template
+                )
+                |> Array.filter (fun (score,_) -> score > 0.2)
+                |> Array.sortByDescending fst
+                |> Array.map snd
+            scoredTemplate
+        else
+            protocol
+    let filterTableByTags tags ertags tagfilter (templates:ARCtrl.Template.Template []) =
+        if tags <> [] || ertags <> [] then
+            let tagArray = tags@ertags |> Array.ofList
+            let filteredTemplates = templates |> ARCtrl.Template.Templates.filterByOntologyAnnotation(tagArray, tagfilter)
+            filteredTemplates
+        else
+            templates
+    let filterTableByCommunityFilter communityfilter (protocol:ARCtrl.Template.Template []) =
+        match communityfilter with
+        | Protocol.CommunityFilter.All              -> protocol
+        | Protocol.CommunityFilter.OnlyCurated      -> protocol |> Array.filter (fun x -> x.Organisation.IsOfficial())
+        | Protocol.CommunityFilter.Community name   -> protocol |> Array.filter (fun x -> x.Organisation.ToString() = name)
+
 open Feliz
 open System
 open ComponentAux
@@ -431,99 +491,41 @@ type Search =
 
     static member InfoField() =
         Bulma.field.div [
-                Bulma.help [
-                    Html.b "Search for templates."
-                    Html.span " For more information you can look "
-                    Html.a [ prop.href Shared.URLs.SwateWiki; prop.target "_Blank"; prop.text "here"]
-                    Html.span ". If you find any problems with a template or have other suggestions you can contact us "
-                    Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.text "here"]
-                    Html.span "."
-                ]
-                Bulma.help [
-                    Html.span "You can search by template name, organisation and authors. Just type:"
-                    Bulma.content [
-                        Html.ul [
-                            Html.li [Html.code "/a"; Html.span " to search authors."]
-                            Html.li [Html.code "/o"; Html.span " to search organisations."]
-                            Html.li [Html.code "/n"; Html.span " to search template names."]
-                        ]
+            Bulma.content [
+                Html.b "Search for templates."
+                Html.span " For more information you can look "
+                Html.a [ prop.href Shared.URLs.SwateWiki; prop.target "_Blank"; prop.text "here"]
+                Html.span ". If you find any problems with a template or have other suggestions you can contact us "
+                Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.text "here"]
+                Html.span "."
+            ]
+            Bulma.content [
+                Html.span "You can search by template name, organisation and authors. Just type:"
+                Bulma.content [
+                    Html.ul [
+                        Html.li [Html.code "/a"; Html.span " to search authors."]
+                        Html.li [Html.code "/o"; Html.span " to search organisations."]
+                        Html.li [Html.code "/n"; Html.span " to search template names."]
                     ]
                 ]
             ]
+        ]
+
+    static member filterTemplates(templates: ARCtrl.Template.Template [], config: TemplateFilterConfig) =
+        if templates.Length = 0 then [||] else
+            templates
+            |> FilterHelper.filterTableByTags config.ProtocolFilterTags config.ProtocolFilterErTags config.TagFilterIsAnd 
+            |> FilterHelper.filterTableByCommunityFilter config.CommunityFilter
+            |> FilterHelper.sortTableBySearchQuery config.Searchfield config.ProtocolSearchQuery
+            |> Array.sortBy (fun template -> template.Name, template.Organisation)
 
     [<ReactComponent>]
-    static member FileSortElement(templates, setter, model, dispatch) =
-        let templates = model.ProtocolState.Templates
-        let sortTableBySearchQuery searchfield (searchQuery: string) (protocol: ARCtrl.Template.Template []) =
-            let query = searchQuery.Trim()
-            // Only search if field is not empty and does not start with "/".
-            // If it starts with "/" and does not match SearchFields then it will never trigger search
-            // As soon as it matches SearchFields it will be removed and can become 'query <> ""'
-            if query <> "" && query.StartsWith("/") |> not
-            then
-                let queryBigram = query |> Shared.SorensenDice.createBigrams
-                let createScore (str:string) =
-                    str
-                    |> Shared.SorensenDice.createBigrams
-                    |> Shared.SorensenDice.calculateDistance queryBigram
-                let scoredTemplate =
-                    protocol
-                    |> Array.map (fun template ->
-                        let score =
-                            match searchfield with
-                            | SearchFields.Name          ->
-                                createScore template.Name
-                            | SearchFields.Organisation  ->
-                                createScore (template.Organisation.ToString())
-                            | SearchFields.Authors       ->
-                                let query' = query.ToLower()
-                                let scores = template.Authors |> Array.filter (fun author -> 
-                                    (createAuthorStringHelper author).ToLower().Contains query'
-                                    || (author.ORCID.IsSome && author.ORCID.Value = query)
-                                )
-                                if Array.isEmpty scores then 0.0 else 1.0
-                        score, template
-                    )
-                    |> Array.filter (fun (score,_) -> score > 0.2)
-                    |> Array.sortByDescending fst
-                    |> Array.map snd
-                scoredTemplate
-            else
-                protocol
-        let filterTableByTags tags ertags tagfilter (templates:ARCtrl.Template.Template []) =
-            if tags <> [] || ertags <> [] then
-                let tagArray = tags@ertags |> Array.ofList
-                let filteredTemplates = templates |> ARCtrl.Template.Templates.filterByOntologyAnnotation(tagArray, tagfilter)
-                filteredTemplates
-            else
-                templates
-        let filterTableByCommunityFilter communityfilter (protocol:ARCtrl.Template.Template []) =
-            log communityfilter
-            match communityfilter with
-            | Protocol.CommunityFilter.All              -> protocol
-            | Protocol.CommunityFilter.OnlyCurated      -> protocol |> Array.filter (fun x -> log (x.Organisation.ToString().ToLower()) ; List.contains (x.Organisation.ToString().ToLower()) curatedOrganisationNames)
-            | Protocol.CommunityFilter.OnlyCommunities  -> protocol |> Array.filter (fun x -> List.contains (x.Organisation.ToString().ToLower()) curatedOrganisationNames |> not)
-            | Protocol.CommunityFilter.Community name   -> protocol |> Array.filter (fun x -> x.Organisation.ToString() = name)
-
-
-        let state, setState = React.useState(ProtocolViewState.init)
-        let propagateOutside = fun () ->
-            let sortedTable =
-                if templates.Length = 0 then [||] else
-                    model.ProtocolState.Templates
-                    |> filterTableByTags state.ProtocolFilterTags state.ProtocolFilterErTags state.TagFilterIsAnd 
-                    |> filterTableByCommunityFilter state.CommunityFilter
-                    |> sortTableBySearchQuery state.Searchfield state.ProtocolSearchQuery
-                    |> Array.sortBy (fun template -> template.Name, template.Organisation)
-            setter sortedTable
-        React.useEffect(propagateOutside, [|box state|])
-
-        fileSortElements model state setState
+    static member FileSortElement(model, config, configSetter: TemplateFilterConfig -> unit) =
+        fileSortElements model config configSetter
 
     [<ReactComponent>]
     static member Component (templates, model:Model, dispatch, ?maxheight: Styles.ICssUnit) =
         let maxheight = defaultArg maxheight (length.px 600)
-        let isEmpty = templates |> isNull || templates |> Array.isEmpty
         let showIds, setShowIds = React.useState(fun _ -> [])
         Html.div [
             prop.style [style.overflow.auto; style.maxHeight maxheight]

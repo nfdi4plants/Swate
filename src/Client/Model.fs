@@ -4,7 +4,6 @@ open Fable.React
 open Fable.React.Props
 open Shared
 open TermTypes
-open TemplateTypes
 open Thoth.Elmish
 open Routing
 
@@ -347,21 +346,18 @@ module Protocol =
     type CommunityFilter =
     | All
     | OnlyCurated
-    | OnlyCommunities
     | Community of string
 
         member this.ToStringRdb() =
             match this with
             | All               -> "All"
             | OnlyCurated       -> "DataPLANT official"
-            | OnlyCommunities   -> "All Communities"
             | Community name    -> name
 
         static member fromString(str:string) =
             match str with
             | "All" -> All
             | "DataPLANT official" -> OnlyCurated
-            | "All Community" -> OnlyCommunities
             | anyElse -> Community anyElse
 
         static member CommunityFromOrganisation(org:ARCtrl.Template.Organisation) =

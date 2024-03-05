@@ -645,10 +645,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             let nextModel, nextCmd = currentModel |> JsonExporter.Core.update msg
             nextModel, nextCmd
 
-        | TemplateMetadataMsg msg ->
-            let nextModel, nextCmd = currentModel |> TemplateMetadata.Core.update msg
-            nextModel, nextCmd
-
         | DagMsg msg ->
             let nextModel, nextCmd = currentModel |> Dag.Core.update msg
             nextModel, nextCmd

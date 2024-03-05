@@ -3,7 +3,6 @@ namespace Shared
 open System
 open Shared
 open TermTypes
-open TemplateTypes
 
 module Route =
 

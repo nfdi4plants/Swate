@@ -32,6 +32,8 @@ open Fable.Core
 [<ReactComponent>]
 let Main (model:Model) dispatch =
     let templates, setTemplates = React.useState(model.ProtocolState.Templates)
+    let config, setConfig = React.useState(TemplateFilterConfig.init)
+    let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
     React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
     React.useEffect((fun _ -> setTemplates model.ProtocolState.Templates), [|box model.ProtocolState.Templates|])
     let isEmpty = model.ProtocolState.Templates |> isNull || model.ProtocolState.Templates |> Array.isEmpty
@@ -50,7 +52,7 @@ let Main (model:Model) dispatch =
 
         mainFunctionContainer [
             Protocol.Search.InfoField()
-            Protocol.Search.FileSortElement(templates, setTemplates, model, dispatch)
-            Protocol.Search.Component (templates, model, dispatch)
+            Protocol.Search.FileSortElement(model, config, setConfig)
+            Protocol.Search.Component (filteredTemplates, model, dispatch)
         ]
     ]
