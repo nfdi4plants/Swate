@@ -30,41 +30,6 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
         }
         nextState, Cmd.none
 
-/// This logic only works as soon as we can access electron. Will not work in Browser.
-module PathRerooting =
-
-    open Fable.Core
-    open Fable.Core.JsInterop
-
-    let private normalizePath (path:string) =
-        path.Replace('\\','/')
-
-    let listOfSupportedDirectories = ["studies"; "assays"; "workflows"; "runs"] 
-
-    let private matchesSupportedDirectory (str:string) =
-        listOfSupportedDirectories |> List.contains str
-
-    /// <summary>Normalizes path and searches for 'listOfSupportedDirectories' (["studies"; "assays"; "workflows"; "runs"]) in path. reroots path to parent of supported directory if found
-    /// else returns only file name.</summary>
-    let rerootPath (path:string) =
-        let sep = '/'
-        let path = normalizePath path // shadow path variable to normalized
-        let splitPath = path.Split(sep)
-        let tryFindLevel = Array.tryFindIndexBack (fun x -> matchesSupportedDirectory x) splitPath
-        match tryFindLevel with
-        // if we cannot find any of `listOfSupportedDirectories` we just return the file name
-        | None ->
-            splitPath |> Array.last
-        | Some levelIndex ->
-            // If we find one of `listOfSupportedDirectories` we want to reroot relative to the folder containing the investigation file.
-            // It is located one level higher than any of `listOfSupportedDirectories`
-            let rootPath =
-                Array.take levelIndex splitPath // one level higher so `levelIndex` instead of `(levelIndex + 1)`
-                |> String.concat (string sep)
-            let relativePath =
-                path.Replace(rootPath + string sep, "")
-            relativePath
-
 let uploadButton (model:Messages.Model) dispatch =
     let inputId = "filePicker_OnFilePickerMainFunc"
     Bulma.field.div [
@@ -88,15 +53,40 @@ let uploadButton (model:Messages.Model) dispatch =
                 //picker?value <- null
             )
         ]
-        Bulma.button.button [
-            Bulma.color.isInfo
-            Bulma.button.isFullWidth
-            prop.onClick(fun e ->
-                let getUploadElement = Browser.Dom.document.getElementById inputId
-                getUploadElement.click()
-            )
-            prop.text "Pick file names"
-        ]
+        match model.PersistentStorageState.Host with
+            | Some (Swatehost.ARCitect) ->
+                Html.div [
+                    prop.className "is-flex is-flex-direction-row"
+                    prop.style [style.gap (length.rem 1)]
+                    prop.children [
+                        Bulma.button.button [
+                            Bulma.color.isInfo
+                            Bulma.button.isFullWidth
+                            prop.onClick(fun e ->
+                                ARCitect.RequestPaths false |> ARCitect.ARCitect.send
+                            )
+                            prop.text "Pick Files"
+                        ]
+                        Bulma.button.button [
+                            Bulma.color.isInfo
+                            Bulma.button.isFullWidth
+                            prop.onClick(fun e ->
+                                ARCitect.RequestPaths true |> ARCitect.ARCitect.send
+                            )
+                            prop.text "Pick Directories"
+                        ]
+                    ]
+                ]
+            | _ ->
+                Bulma.button.button [
+                    Bulma.color.isInfo
+                    Bulma.button.isFullWidth
+                    prop.onClick(fun e ->
+                        let getUploadElement = Browser.Dom.document.getElementById inputId
+                        getUploadElement.click()
+                    )
+                    prop.text "Pick file names"
+                ]
     ]
 
 let insertButton (model:Messages.Model) dispatch =

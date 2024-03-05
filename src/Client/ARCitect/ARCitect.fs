@@ -14,8 +14,6 @@ let send (msg:ARCitect.Msg) =
         match msg with
         | Init ->
             "Hello from Swate!"
-        | TriggerSwateClose ->
-            null
         | AssayToARCitect assay ->
             let assay = ArcAssay.toArcJsonString assay
             assay
@@ -25,6 +23,8 @@ let send (msg:ARCitect.Msg) =
         | InvestigationToARCitect inv ->
             let json = ArcInvestigation.toArcJsonString inv
             json
+        | RequestPaths selectDirectories ->
+            selectDirectories
         | Error exn ->
             exn
     postMessageToARCitect(msg, data)
@@ -43,6 +43,9 @@ let EventHandler (dispatch: Messages.Msg -> unit) : IEventHandler =
             let inv = ArcInvestigation.fromArcJsonString data.ArcInvestigationJsonString
             Spreadsheet.InitFromArcFile (ArcFiles.Investigation inv) |> SpreadsheetMsg |> dispatch
             log($"Received Investigation {inv.Title} from ARCitect!")
+        PathsToSwate = fun paths ->
+            log $"Received {paths.paths.Length} paths from ARCitect!"
+            FilePicker.LoadNewFiles (List.ofArray paths.paths) |> FilePickerMsg |> dispatch
         Error = fun exn ->
             GenericError (Cmd.none, exn) |> DevMsg |> dispatch
     }
