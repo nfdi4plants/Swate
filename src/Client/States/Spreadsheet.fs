@@ -100,6 +100,7 @@ type Msg =
 | UpdateActiveView of ActiveView
 | UpdateSelectedCells of Set<int*int>
 | MoveSelectedCell of Key
+| MoveColumn of current:int * next:int
 | UpdateActiveCell of (U2<int,(int*int)> * ColumnType) option
 | SetActiveCellFromSelected
 | RemoveTable of index:int

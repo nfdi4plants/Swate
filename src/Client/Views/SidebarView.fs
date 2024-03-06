@@ -64,7 +64,6 @@ let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
                 //createNavigationTab Routing.Route.Dag               model dispatch sidebarsize
             createNavigationTab Routing.Route.JsonExport            model dispatch sidebarsize
         else
-            createNavigationTab Routing.Route.TemplateMetadata      model dispatch sidebarsize
             //createNavigationTab Routing.Route.Validation            model dispatch sidebarsize
             createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
     ]

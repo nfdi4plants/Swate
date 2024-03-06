@@ -2,6 +2,7 @@ namespace Shared
 
 open ARCtrl.ISA
 open TermTypes
+open System.Collections.Generic
 
 /// This module contains helper functions which might be useful for ARCtrl
 [<AutoOpen>]
@@ -20,6 +21,35 @@ module ARCtrlHelper =
             | Investigation _ -> ArcTables(ResizeArray[])
             | Study (s,_) -> s
             | Assay a -> a
+
+
+module Helper =
+
+    let arrayMoveColumn (currentColumnIndex: int) (newColumnIndex: int) (arr: ResizeArray<'A>) =
+        let ele = arr.[currentColumnIndex]
+        arr.RemoveAt(currentColumnIndex)
+        arr.Insert(newColumnIndex, ele)
+        
+    let dictMoveColumn (currentColumnIndex: int) (newColumnIndex: int) (table: Dictionary<int * int, 'A>) =
+        /// This is necessary to always access the correct value for an index.
+        /// It is possible to only copy the specific target column at "currentColumnIndex" and sort the keys in the for loop depending on "currentColumnIndex" and "newColumnIndex".
+        /// this means. If currentColumnIndex < newColumnIndex then Seq.sortByDescending keys else Seq.sortBy keys.
+        /// this implementation would result in performance increase, but readability would decrease a lot.
+        let backupTable = Dictionary(table)
+        let range = [System.Math.Min(currentColumnIndex, newColumnIndex) .. System.Math.Max(currentColumnIndex,newColumnIndex)]
+        for columnIndex, rowIndex in backupTable.Keys do
+            let value = backupTable.[(columnIndex,rowIndex)]
+            let newColumnIndex = 
+              if columnIndex = currentColumnIndex then
+                newColumnIndex
+              elif List.contains columnIndex range then
+                let modifier = if currentColumnIndex < newColumnIndex then -1 else +1
+                let moveTo = modifier + columnIndex
+                moveTo
+              else
+                0 + columnIndex
+            let updatedKey = (newColumnIndex, rowIndex)
+            table.[updatedKey] <- value
 
 [<AutoOpen>]
 module Extensions =
@@ -41,6 +71,12 @@ module Extensions =
                 Unchecked.setCellAt(fst index, snd index, cell) this.Values
             Unchecked.fillMissingCells this.Headers this.Values
 
+        member this.MoveColumn(currentIndex: int, nextIndex: int) =
+            let updateHeaders =
+                Helper.arrayMoveColumn currentIndex nextIndex this.Headers
+            let updateBody =
+                Helper.dictMoveColumn currentIndex nextIndex this.Values
+            ()
 
     type Template with
         member this.FileName 

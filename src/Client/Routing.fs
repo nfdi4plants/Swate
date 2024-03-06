@@ -16,7 +16,6 @@ type Route =
 | ProtocolSearch
 | Dag /// Directed Acylclic Graph
 | JsonExport
-| TemplateMetadata
 | ActivityLog
 | Settings
 | NotFound
@@ -30,7 +29,6 @@ type Route =
         | Route.ProtocolSearch      -> "Template Search"
         | Route.Dag                 -> "Directed Acylclic Graph"
         | Route.JsonExport          -> "Json Export"
-        | Route.TemplateMetadata    -> "Template Metadata"
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
@@ -38,7 +36,7 @@ type Route =
 
     member this.isExpert =
         match this with
-        | Route.TemplateMetadata | Route.JsonExport -> true
+        | Route.JsonExport -> true
         | _ -> false
 
     member this.isActive(currentRoute: Route) =
@@ -68,8 +66,6 @@ type Route =
             createElem [ Html.i [prop.className "fa-solid fa-diagram-project" ]] p.toStringRdbl
         | Route.JsonExport          ->
             createElem [ Html.i [prop.className "fa-solid fa-file-export" ]] p.toStringRdbl
-        | Route.TemplateMetadata    ->
-            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]] p.toStringRdbl
         | Route.FilePicker          ->
             createElem [ Html.i [prop.className "fa-solid fa-file-signature" ]] p.toStringRdbl
         | Route.ActivityLog         ->
@@ -98,7 +94,6 @@ module Routing =
             map Route.ProtocolSearch        (s "Protocol" </> s "Search")
             map Route.Dag                   (s "Dag")
             map Route.JsonExport            (s "Experts" </> s "JsonExport")
-            map Route.TemplateMetadata      (s "Experts" </> s "TemplateMetadata")
             map Route.ActivityLog           (s "ActivityLog")
             map Route.Settings              (s "Settings")
             map Route.NotFound              (s "NotFound")

@@ -53,6 +53,7 @@
         <Compile Include="Modals\TermModal.fs" />
         <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
         <Compile Include="Modals\CytoscapeView.fs" />
+        <Compile Include="Modals\MoveColumn.fs" />
         <Compile Include="Spreadsheet\IO.fs" />
         <Compile Include="Spreadsheet\Types.fs" />
         <Compile Include="Spreadsheet\Clipboard.Controller.fs" />

@@ -9,6 +9,7 @@ open Messages
 type private ContextFunctions = {
     DeleteRow       : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     DeleteColumn    : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    MoveColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     Copy            : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     Cut             : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     Paste           : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
@@ -43,6 +44,7 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (con
         Bulma.button.button [
             prop.style [style.borderRadius 0; style.justifyContent.spaceBetween]
             prop.onClick msg
+            prop.className "py-1"
             Bulma.button.isFullWidth
             //Bulma.button.isSmall
             Bulma.color.isBlack
@@ -72,6 +74,7 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (con
         divider
         button ("Delete Row", "fa-solid fa-delete-left", funcs.DeleteRow rmv, [])
         button ("Delete Column", "fa-solid fa-delete-left fa-rotate-270", funcs.DeleteColumn rmv, [])
+        button ("Move Column", "fa-solid fa-arrow-right-arrow-left", funcs.MoveColumn rmv, [])
     ]
     Html.div [
         prop.style [
@@ -106,9 +109,11 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
     let cell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(fst index, snd index)
     let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
     //let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
+    let triggerMoveColumnModal _ = Modals.Controller.renderModal("MoveColumn_Modal", Modals.MoveColumn.Main(fst index, model, dispatch))
     let funcs = {
         DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
         DeleteColumn    = fun rmv e -> rmv e; Spreadsheet.DeleteColumn (fst index) |> Messages.SpreadsheetMsg |> dispatch
+        MoveColumn      = fun rmv e -> rmv e; triggerMoveColumnModal e
         Copy            = fun rmv e -> 
             rmv e; 
             if isSelectedCell then

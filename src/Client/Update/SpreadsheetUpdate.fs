@@ -158,6 +158,9 @@ module Spreadsheet =
             | DeleteColumn index ->
                 let nextState = Controller.deleteColumn index state
                 nextState, model, Cmd.none
+            | MoveColumn (current, next) ->
+                let nextState = Controller.moveColumn current next state
+                nextState, model, Cmd.none
             | UpdateSelectedCells nextSelectedCells ->
                 let nextState = {state with SelectedCells = nextSelectedCells}
                 nextState, model, Cmd.none
