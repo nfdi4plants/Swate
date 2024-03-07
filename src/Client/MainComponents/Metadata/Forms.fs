@@ -260,7 +260,7 @@ module private Helper =
             prop.classes ["is-flex"; "is-justify-content-center"]
             prop.children [
                 Bulma.button.button [
-                    prop.className "is-ghost"
+                    prop.className "is-outlined"
                     prop.text "+"
                     prop.onClick clickEvent
                 ]
