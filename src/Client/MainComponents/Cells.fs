@@ -183,6 +183,7 @@ type Cell =
                             makeIdle()
                         )
                         prop.onKeyDown(fun e ->
+                            e.stopPropagation()
                             match e.which with
                             | 13. -> //enter
                                 if isHeader then setter state
@@ -289,16 +290,18 @@ type Cell =
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
         let isSelected = state.SelectedCells.Contains index
-        let makeIdle() = UpdateActiveCell None |> SpreadsheetMsg |> dispatch
-        let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
         let isIdle = state.CellIsIdle (!^index, columnType)
         let isActive = not isIdle
         let ref = React.useElementRef()
+        let makeIdle() = 
+            UpdateActiveCell None |> SpreadsheetMsg |> dispatch
+            let ele = Browser.Dom.document.getElementById("SPREADSHEET_MAIN_VIEW")
+            ele.focus()
+        let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
         React.useEffect((fun () -> 
             if isSelected then
                 let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
                 options.behavior <- Browser.Types.ScrollBehavior.Auto
-                log ("SCROLL", index)
                 options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
                 options.block <- Browser.Types.ScrollAlignment.Nearest
                 if ref.current.IsSome then ref.current.Value.scrollIntoView(options)), 

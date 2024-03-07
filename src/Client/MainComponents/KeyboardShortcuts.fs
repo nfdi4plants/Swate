@@ -2,8 +2,6 @@ module Spreadsheet.KeyboardShortcuts
 
 let onKeydownEvent (dispatch: Messages.Msg -> unit) =
     fun (e: Browser.Types.Event) ->
-        //e.preventDefault()
-        //e.stopPropagation()
         let e = e :?> Browser.Types.KeyboardEvent
         match e.ctrlKey, e.which with
         | false, 46. -> // del
@@ -34,12 +32,3 @@ let onKeydownEvent (dispatch: Messages.Msg -> unit) =
                 Spreadsheet.PasteSelectedCell |> Messages.SpreadsheetMsg |> dispatch
             | _, _ -> ()
 
-/// <summary>
-/// Returns a function to remove the event listener
-/// </summary>
-/// <param name="eventHandler"></param>
-let initEventListener (dispatch) : unit -> unit =
-    log "INIT"
-    let handle = fun (e: Browser.Types.Event) -> onKeydownEvent dispatch e
-    Browser.Dom.window.addEventListener("message", handle)
-    fun () -> Browser.Dom.window.removeEventListener("keydown", handle)

@@ -69,7 +69,8 @@ module React =
 
             let listener = React.useCallbackRef(fun () ->
                 match addOptions with
-                | Some options -> document.addEventListener(eventType, fn, options)
+                | Some options -> 
+                    document.addEventListener(eventType, fn, options)
                 | None -> document.addEventListener(eventType, fn)
 
                 React.createDisposable(fun () ->

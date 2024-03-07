@@ -5,8 +5,8 @@
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="React.useListener.fs" />
         <Compile Include="Helper.fs" />
+        <Compile Include="React.useListener.fs" />
         <None Include="..\..\.editorconfig" Link=".editorconfig" />
         <None Include="vite.config.mts" />
         <None Include="paket.references" />

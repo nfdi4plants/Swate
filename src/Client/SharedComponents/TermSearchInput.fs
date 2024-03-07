@@ -390,6 +390,7 @@ type TermSearch =
                                 mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
                     )
                     prop.onKeyDown(fun e -> 
+                        e.stopPropagation()
                         match e.which with
                         | 27. -> //escape
                             if onEscape.IsSome then onEscape.Value e

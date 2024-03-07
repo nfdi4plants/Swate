@@ -70,7 +70,6 @@ open Shared
 [<ReactComponent>]
 let Main (model: Messages.Model, dispatch) =
     let widgets, setWidgets = React.useState([])
-    React.useListener.on("keydown", (Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch))
     let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
     let bringWidgetToFront (widget: Widget) = 
         let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev

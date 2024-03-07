@@ -9,7 +9,7 @@ open Spreadsheet.Cells
 open ARCtrl.ISA
 open Shared
 
-let cellPlaceholder (c_opt: CompositeCell option) =
+let private cellPlaceholder (c_opt: CompositeCell option) =
     let tableCell (children: ReactElement list) = Html.td [
         Html.div [
             prop.style [style.minHeight (length.px 30); style.minWidth (length.px 100)]
@@ -32,7 +32,7 @@ let cellPlaceholder (c_opt: CompositeCell option) =
 /// rowIndex < 0 equals header
 /// </summary>
 /// <param name="rowIndex"></param>
-let RowLabel (rowIndex: int) = 
+let private RowLabel (rowIndex: int) = 
     let t : IReactProperty list -> ReactElement = if rowIndex < 0 then Html.th else Html.td 
     t [
         prop.style [style.resize.none; style.border(length.px 1, borderStyle.solid, "darkgrey")]
@@ -48,7 +48,7 @@ let RowLabel (rowIndex: int) =
         ]
     ]
 
-let private bodyRow (rowIndex: int) (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
+let private bodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
     let table = model.SpreadsheetModel.ActiveTable
     Html.tr [
         RowLabel rowIndex
@@ -66,10 +66,10 @@ let private bodyRow (rowIndex: int) (state:Set<int>) setState (model:Model) (dis
                 Cell.BodyTAN(index, cell, model, dispatch)
     ]
 
-let private bodyRows (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
+let private bodyRows (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
     Html.tbody [
         for rowInd in 0 .. model.SpreadsheetModel.ActiveTable.RowCount-1 do
-            yield bodyRow rowInd state setState model dispatch 
+            yield bodyRow rowInd state model dispatch 
     ]
     
 
@@ -87,12 +87,21 @@ let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> 
                 Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch)
     ]
 
+open Fable.Core.JsInterop
+
 [<ReactComponent>]
 let Main (model:Model) (dispatch: Msg -> unit) =
+    //React.useListener.on("keydown", (Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch))
+    let ref = React.useElementRef()
+    //React.useElementListener.on(ref, "keydown", (Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch))
     /// This state is used to track which columns are expanded
     let state, setState : Set<int> * (Set<int> -> unit) = React.useState(Set.empty)
     Html.div [
+        prop.id "SPREADSHEET_MAIN_VIEW"
+        prop.tabIndex 0
         prop.style [style.border(1, borderStyle.solid, "grey"); style.width.minContent; style.marginRight(length.vw 10)]
+        prop.ref ref
+        prop.onKeyDown(fun e -> Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch e)
         prop.children [
             Html.table [
                 prop.className "fixed_headers"
@@ -100,7 +109,7 @@ let Main (model:Model) (dispatch: Msg -> unit) =
                     Html.thead [
                         headerRow state setState model dispatch
                     ]
-                    bodyRows state setState model dispatch
+                    bodyRows state model dispatch
                 ]
             ]
         ]
