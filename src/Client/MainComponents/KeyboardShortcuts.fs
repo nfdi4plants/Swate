@@ -4,6 +4,8 @@ let onKeydownEvent (dispatch: Messages.Msg -> unit) =
     fun (e: Browser.Types.Event) ->
         let e = e :?> Browser.Types.KeyboardEvent
         match e.ctrlKey, e.which with
+        | false, 27. | false, 13. | false, 9. | false, 16. -> // escape, enter, tab, shift
+            ()
         | false, 46. -> // del
             Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch
         | false, 37. -> // arrow left
@@ -14,21 +16,16 @@ let onKeydownEvent (dispatch: Messages.Msg -> unit) =
             MoveSelectedCell Key.Right |> Messages.SpreadsheetMsg |> dispatch
         | false, 40. -> // arrow down
             MoveSelectedCell Key.Down |> Messages.SpreadsheetMsg |> dispatch
-        | false, key when key <> 27. && key <> 13 && key <> 9 -> // tab, escape, enter (not in this order :O)
+        | false, key -> 
             SetActiveCellFromSelected |> Messages.SpreadsheetMsg |> dispatch
-        | false, _ -> 
-            ()
         // Ctrl + c
         | _, _ ->
             match (e.ctrlKey || e.metaKey), e.which with
-            // Ctrl + c
-            | true, 67. ->
-                Spreadsheet.CopySelectedCell |> Messages.SpreadsheetMsg |> dispatch
-            // Ctrl + x
-            | true, 88. ->
-                Spreadsheet.CutSelectedCell |> Messages.SpreadsheetMsg |> dispatch
-            // Ctrl + v
-            | true, 86. ->
-                Spreadsheet.PasteSelectedCell |> Messages.SpreadsheetMsg |> dispatch
+            | true, 67. -> // Ctrl + c
+                Spreadsheet.CopySelectedCells |> Messages.SpreadsheetMsg |> dispatch
+            | true, 88. -> // Ctrl + x
+                Spreadsheet.CutSelectedCells |> Messages.SpreadsheetMsg |> dispatch
+            | true, 86. -> // Ctrl + v
+                Spreadsheet.PasteSelectedCells |> Messages.SpreadsheetMsg |> dispatch
             | _, _ -> ()
 

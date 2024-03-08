@@ -158,6 +158,9 @@ module Spreadsheet =
             | DeleteColumn index ->
                 let nextState = Controller.deleteColumn index state
                 nextState, model, Cmd.none
+            | SetColumn (index, column) ->
+                let nextState = Controller.setColumn index column state
+                nextState, model, Cmd.none
             | MoveColumn (current, next) ->
                 let nextState = Controller.moveColumn current next state
                 nextState, model, Cmd.none
@@ -226,6 +229,11 @@ module Spreadsheet =
                 let nextState =
                     if state.SelectedCells.IsEmpty then state else
                         Controller.cutSelectedCell state
+                nextState, model, Cmd.none
+            | CutSelectedCells ->
+                let nextState =
+                    if state.SelectedCells.IsEmpty then state else
+                        Controller.cutSelectedCells state
                 nextState, model, Cmd.none
             | PasteCell index ->
                 let cmd =

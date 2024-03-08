@@ -39,10 +39,27 @@ let cutCellByIndex (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Mod
     copyCell cell |> Promise.start
     state
 
+let cutCellsByIndices (indices: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    log "HIT"
+    let cells = ResizeArray()
+    for index in indices do
+        let cell = state.ActiveTable.Values.[index]
+        // Remove selected cell value
+        let emptyCell = cell.GetEmptyCell()
+        state.ActiveTable.UpdateCellAt(fst index,snd index, emptyCell) 
+        cells.Add(cell)
+    copyCells (Array.ofSeq cells) |> Promise.start
+    state
+
 let cutSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     /// Array.min is used until multiple cells are supported, should this ever be intended
     let index = state.SelectedCells |> Set.toArray |> Array.min
     cutCellByIndex index state
+
+let cutSelectedCells (state: Spreadsheet.Model) : Spreadsheet.Model =
+    /// Array.min is used until multiple cells are supported, should this ever be intended
+    let indices = state.SelectedCells |> Set.toArray 
+    cutCellsByIndices indices state
 
 let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
     promise {

@@ -62,6 +62,11 @@ type Navigator =
 [<Emit("navigator")>]
 let navigator : Navigator = jsNative
 
+/// <summary>
+/// take "count" many items from array if existing. if not enough items return as many as possible
+/// </summary>
+/// <param name="count"></param>
+/// <param name="array"></param>
 let takeFromArray (count: int) (array: 'a []) =
     let exit (acc: 'a list) = List.rev acc |> Array.ofList
     let rec takeRec (l2: 'a list) (acc: 'a list) index =

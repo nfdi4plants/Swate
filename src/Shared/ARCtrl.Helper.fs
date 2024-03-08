@@ -78,6 +78,20 @@ module Extensions =
                 Helper.dictMoveColumn currentIndex nextIndex this.Values
             ()
 
+        member this.SetColumn(index: int, column: CompositeColumn) =
+            column.Validate(true) |> ignore
+            this.Headers.[index] <- column.Header
+            let cells = column.Cells
+            let keys = this.Values.Keys
+            for (ci, ri) in keys do    
+                if ci = index then
+                    let nextCell = cells |> Array.tryItem ri
+                    match nextCell with
+                    | Some c -> 
+                        this.Values.[(ci,ri)] <- c
+                    | None ->
+                        this.Values.[(ci,ri)] <- column.GetDefaultEmptyCell()
+
     type Template with
         member this.FileName 
             with get() = this.Name.Replace(" ","_") + ".xlsx"

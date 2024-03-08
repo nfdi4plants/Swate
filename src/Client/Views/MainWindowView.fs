@@ -49,7 +49,6 @@ let private SpreadsheetSelectionFooter (model: Messages.Model) dispatch =
                                 Bulma.tab  [
                                     prop.style [style.width (length.px 20)]
                                 ]
-                                
                                 MainComponents.FooterTabs.MainMetadata (model, dispatch)
                                 for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
                                     MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)

@@ -17,6 +17,7 @@ type private ContextFunctions = {
     FillColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     Clear           : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     TransformCell   : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+    UpdateAllCells  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     //EditColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
     RowIndex        : int
     ColumnIndex     : int
@@ -42,7 +43,7 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (con
     ]
     let button (name:string, icon: string, msg, props) = Html.li [
         Bulma.button.button [
-            prop.style [style.borderRadius 0; style.justifyContent.spaceBetween]
+            prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
             prop.onClick msg
             prop.className "py-1"
             Bulma.button.isFullWidth
@@ -57,14 +58,16 @@ let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (con
         ]
     ]
     let divider = Html.li [
-        Html.div [ prop.style [style.border(2, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0)] ]
+        Html.div [ prop.style [style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0); style.width (length.perc 75); style.marginLeft length.auto] ]
     ]
     let buttonList = [
         //button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
-        button ("Fill Column", "fa-solid fa-file-signature", funcs.FillColumn rmv, [])
+        button ("Fill Column", "fa-solid fa-pen", funcs.FillColumn rmv, [])
         if isUnitOrTermCell contextCell then
             let text = if contextCell.Value.isTerm then "As Unit Cell" else "As Term Cell"
             button (text, "fa-solid fa-arrow-right-arrow-left", funcs.TransformCell rmv, [])
+        else
+            button ("Update Column", "fa-solid fa-ellipsis-vertical", funcs.UpdateAllCells rmv, [])
         button ("Clear", "fa-solid fa-eraser", funcs.Clear rmv, [])
         divider
         button ("Copy", "fa-solid fa-copy", funcs.Copy rmv, [])
@@ -110,6 +113,10 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
     let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
     //let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
     let triggerMoveColumnModal _ = Modals.Controller.renderModal("MoveColumn_Modal", Modals.MoveColumn.Main(fst index, model, dispatch))
+    let triggerUpdateColumnModal _ = 
+        let columnIndex = fst index
+        let column = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
+        Modals.Controller.renderModal("UpdateColumn_Modal", Modals.UpdateColumn.Main(fst index, column, dispatch))
     let funcs = {
         DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
         DeleteColumn    = fun rmv e -> rmv e; Spreadsheet.DeleteColumn (fst index) |> Messages.SpreadsheetMsg |> dispatch
@@ -117,19 +124,15 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
         Copy            = fun rmv e -> 
             rmv e; 
             if isSelectedCell then
-                log "Copy Cells"
                 Spreadsheet.CopySelectedCells |> Messages.SpreadsheetMsg |> dispatch
             else
-                log "Copy Cell"
                 Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
         Cut             = fun rmv e -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
         Paste           = fun rmv e -> 
             rmv e; 
             if isSelectedCell then
-                log "Paste Cells"
                 Spreadsheet.PasteSelectedCells |> Messages.SpreadsheetMsg |> dispatch
             else
-                log "Paste Cell"
                 Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
         PasteAll        = fun rmv e ->
             rmv e;
@@ -140,6 +143,7 @@ let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Typ
             if cell.IsSome && (cell.Value.isTerm || cell.Value.isUnitized) then
                 let nextCell = if cell.Value.isTerm then cell.Value.ToUnitizedCell() else cell.Value.ToTermCell()
                 rmv e; Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
+        UpdateAllCells = fun rmv e -> rmv e; triggerUpdateColumnModal e
         //EditColumn      = fun rmv e -> rmv e; editColumnEvent e
         RowIndex        = snd index
         ColumnIndex     = fst index

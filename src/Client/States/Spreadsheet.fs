@@ -111,9 +111,11 @@ type Msg =
 | DeleteRow of int
 | DeleteRows of int []
 | DeleteColumn of int
+| SetColumn of index:int * column: CompositeColumn
 | CopySelectedCell
 | CopySelectedCells
 | CutSelectedCell
+| CutSelectedCells
 | PasteSelectedCell
 | PasteSelectedCells
 | CopyCell of index:(int*int)
