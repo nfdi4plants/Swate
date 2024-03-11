@@ -146,8 +146,8 @@ module Spreadsheet =
                 let nextState = Controller.addRows n state
                 nextState, model, Cmd.none
             | Reset ->
-                let nextHistory, nextState = Controller.resetTableState()
-                let nextModel = {model with History = nextHistory}
+                let nextState = Controller.resetTableState()
+                let nextModel = {model with History = LocalHistory.Model.init()}
                 nextState, nextModel, Cmd.none
             | DeleteRow index ->
                 let nextState = Controller.deleteRow index state

@@ -221,7 +221,10 @@ type Model =
         Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, "0")
         nextState
 
-    member this.ResetAll() =
-        Browser.WebStorage.localStorage.clear()
+    static member ResetHistoryWebStorage() =
+        Browser.WebStorage.localStorage.removeItem(Keys.swate_local_spreadsheet_key)
         Browser.WebStorage.sessionStorage.clear()
+
+    member this.ResetAll() =
+        Model.ResetHistoryWebStorage()
         Model.init()

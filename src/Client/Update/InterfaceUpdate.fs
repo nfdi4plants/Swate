@@ -41,7 +41,10 @@ module Interface =
                     | Swatehost.Browser ->
                         Cmd.none
                     | Swatehost.ARCitect ->
-                        Cmd.ofEffect (fun _ -> ARCitect.ARCitect.send ARCitect.Init)
+                        Cmd.ofEffect (fun _ -> 
+                            LocalHistory.Model.ResetHistoryWebStorage()
+                            ARCitect.ARCitect.send ARCitect.Init
+                        )
                 ]
             model, cmd
         | CreateAnnotationTable usePrevOutput ->

@@ -29,8 +29,8 @@ let updateTableOrder (prevIndex:int, newIndex:int) (state:Spreadsheet.Model) =
     state.Tables.MoveTable(prevIndex, newIndex)
     {state with ArcFile = state.ArcFile}
 
-let resetTableState () : LocalHistory.Model * Spreadsheet.Model =
-    LocalHistory.Model.init().ResetAll(),
+let resetTableState () : Spreadsheet.Model =
+    LocalHistory.Model.ResetHistoryWebStorage()
     Spreadsheet.Model.init()
 
 let renameTable (tableIndex:int) (newName: string) (state: Spreadsheet.Model) : Spreadsheet.Model =
