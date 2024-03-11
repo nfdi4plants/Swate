@@ -73,7 +73,7 @@ let private footer (model:Model) =
     div [Style [Color "grey"; Position PositionOptions.Sticky; Width "inherit"; Bottom "0"; TextAlign TextAlignOptions.Center ]] [
         div [] [
             str "Swate Release Version "
-            a [Href "https://github.com/nfdi4plants/Swate/releases"] [str model.PersistentStorageState.AppVersion]
+            a [Href "https://github.com/nfdi4plants/Swate/releases"; HTMLAttr.Target "_Blank"] [str model.PersistentStorageState.AppVersion]
             str " Host "
             Html.span [prop.style [style.color "#4fb3d9"]; prop.text (sprintf "%O" model.PersistentStorageState.Host)]
         ]
