@@ -3,8 +3,8 @@ module Spreadsheet.KeyboardShortcuts
 let onKeydownEvent (dispatch: Messages.Msg -> unit) =
     fun (e: Browser.Types.Event) ->
         let e = e :?> Browser.Types.KeyboardEvent
-        match e.ctrlKey, e.which with
-        | false, 27. | false, 13. | false, 9. | false, 16. -> // escape, enter, tab, shift
+        match (e.ctrlKey || e.metaKey), e.which with
+        | false, 27. | false, 13. | false, 9. | false, 16.  -> // escape, enter, tab, shift
             ()
         | false, 46. -> // del
             Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch
@@ -19,13 +19,13 @@ let onKeydownEvent (dispatch: Messages.Msg -> unit) =
         | false, key -> 
             SetActiveCellFromSelected |> Messages.SpreadsheetMsg |> dispatch
         // Ctrl + c
-        | _, _ ->
-            match (e.ctrlKey || e.metaKey), e.which with
-            | true, 67. -> // Ctrl + c
+        | true, _ ->
+            match e.which with
+            | 67. -> // Ctrl + c
                 Spreadsheet.CopySelectedCells |> Messages.SpreadsheetMsg |> dispatch
-            | true, 88. -> // Ctrl + x
+            | 88. -> // Ctrl + x
                 Spreadsheet.CutSelectedCells |> Messages.SpreadsheetMsg |> dispatch
-            | true, 86. -> // Ctrl + v
+            |  86. -> // Ctrl + v
                 Spreadsheet.PasteSelectedCells |> Messages.SpreadsheetMsg |> dispatch
-            | _, _ -> ()
+            | _ -> ()
 

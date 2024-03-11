@@ -26,6 +26,20 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
             fullwidth=true,
             isarea=true
         )
+        FormComponents.PersonsInput(
+            study.Contacts,
+            "Contacts",
+            fun persons ->
+                study.Contacts <- persons
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
+        )
+        FormComponents.PublicationsInput (
+            study.Publications,
+            "Publications",
+            fun pubs -> 
+                study.Publications <- pubs
+                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+        )
         FormComponents.DateTimeInput(
             Option.defaultValue "" study.SubmissionDate,
             "Submission Date", 
@@ -41,20 +55,6 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
                 let s = if s = "" then None else Some s
                 study.PublicReleaseDate <- s
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-        )
-        FormComponents.PublicationsInput (
-            study.Publications,
-            "Publications",
-            fun pubs -> 
-                study.Publications <- pubs
-                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-        )
-        FormComponents.PersonsInput(
-            study.Contacts,
-            "Contacts",
-            fun persons ->
-                study.Contacts <- persons
-                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
         FormComponents.OntologyAnnotationsInput(
             study.StudyDesignDescriptors,

@@ -38,12 +38,12 @@ let private termOrUnitizedSwitch (model:Messages.Model) dispatch =
         ]
     ]
 
-
 open Fable.Core
 
 [<ReactComponent>]
 let private SearchBuildingBlockBodyElement (model: Messages.Model, dispatch) =
     let element = React.useElementRef()
+    
     Bulma.field.div [
         prop.ref element
         prop.style [ style.display.flex; style.justifyContent.spaceBetween; style.position.relative ]
@@ -54,7 +54,7 @@ let private SearchBuildingBlockBodyElement (model: Messages.Model, dispatch) =
                 BuildingBlock.UpdateBodyArg case |> BuildingBlockMsg |> dispatch
             let parent = model.AddBuildingBlockState.TryHeaderOA()
             let input = model.AddBuildingBlockState.TryBodyOA()
-            Components.TermSearch.Input(setter, fullwidth=true, ?input=input, ?parent'=parent, displayParent=false, ?portalTermSelectArea=element.current, debounceSetter=1000)
+            Components.TermSearch.Input(setter, fullwidth=true, ?input=input, ?parent=parent, displayParent=false, ?portalTermSelectArea=element.current, debounceSetter=1000)
         ]
     ]
 
@@ -77,7 +77,7 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                     BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
                     //selectHeader ui setUi h |> dispatch 
                 let input = model.AddBuildingBlockState.TryHeaderOA()
-                Components.TermSearch.Input(setter, ?input=input, isExpanded=true, fullwidth=true, ?portalTermSelectArea=element.current, debounceSetter=1000)
+                Components.TermSearch.Input(setter, fullwidth=true, ?input=input, isExpanded=true, ?portalTermSelectArea=element.current, debounceSetter=1000)
             elif state.HeaderCellType.HasIOType() then
                 Bulma.control.div [
                     Bulma.control.isExpanded

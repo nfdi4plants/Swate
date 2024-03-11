@@ -37,6 +37,20 @@ let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) =
             fullwidth=true,
             isarea=true
         )
+        FormComponents.PersonsInput(
+            inv.Contacts,
+            "Contacts",
+            (fun i -> 
+                inv.Contacts <- i
+                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
+        )
+        FormComponents.PublicationsInput(
+            inv.Publications,
+            "Publications",
+            (fun i -> 
+                inv.Publications <- i
+                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
+        )
         FormComponents.DateTimeInput (
             Option.defaultValue "" inv.SubmissionDate,
             "Submission Date", 
@@ -56,20 +70,6 @@ let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) =
             "Ontology Source References",
             (fun oas -> 
                 inv.OntologySourceReferences <- oas
-                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-        )
-        FormComponents.PublicationsInput(
-            inv.Publications,
-            "Publications",
-            (fun i -> 
-                inv.Publications <- i
-                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-        )
-        FormComponents.PersonsInput(
-            inv.Contacts,
-            "Contacts",
-            (fun i -> 
-                inv.Contacts <- i
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.TextInputs(

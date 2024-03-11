@@ -336,7 +336,7 @@ type Cell =
                                 let headerOA = state.ActiveTable.Headers.[columnIndex].TryOA()
                                 let setter = fun (oa: OntologyAnnotation option) -> 
                                     if oa.IsSome then oasetter.Value oa.Value else setter ""
-                                Components.TermSearch.Input(setter, input=oa, fullwidth=true, ?parent'=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset", searchableToggle=true, minWidth=length.px 400)
+                                Components.TermSearch.Input(setter, input=oa, fullwidth=true, ?parent=headerOA, displayParent=false, debounceSetter=1000, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true, borderRadius=0, border="unset", searchableToggle=true, minWidth=length.px 400)
                             else
                                 Cell.CellInputElement(cellValue, false, false, setter, makeIdle)
                         else

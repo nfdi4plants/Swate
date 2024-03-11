@@ -92,7 +92,6 @@ module TermSearchAux =
     let dsetter (inp: OntologyAnnotation option, setter, debounceStorage: System.Collections.Generic.Dictionary<string,int>, setLoading: bool -> unit, debounceSetter: int option) = 
         if debounceSetter.IsSome then 
             debouncel debounceStorage "SetterDebounce" debounceSetter.Value setLoading setter inp 
-            log debounceStorage
         else 
             setter inp
 
@@ -147,7 +146,7 @@ module TermSearchAux =
         let termSelectItemMain (term: TermTypes.Term, show, setShow, setTerm, isDirectedSearchResult: bool) = 
             Html.div [
                 prop.classes ["is-flex"; "is-flex-direction-row"; "term-select-item-main"]
-                prop.onMouseDown setTerm
+                prop.onClick setTerm
                 prop.style [style.position.relative]
                 prop.children [
                     Html.i [
@@ -174,7 +173,7 @@ module TermSearchAux =
                         ]
                     ]
                     Html.button [
-                        prop.onMouseDown(fun e -> 
+                        prop.onClick(fun e -> 
                             e.stopPropagation()
                             setShow (not show)
                         )
@@ -300,7 +299,7 @@ type TermSearch =
     [<ReactComponent>]
     static member Input (
         setter: OntologyAnnotation option -> unit,
-        ?input: OntologyAnnotation, ?parent': OntologyAnnotation, 
+        ?input: OntologyAnnotation, ?parent: OntologyAnnotation, 
         ?debounceSetter: int, ?searchableToggle: bool, 
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
@@ -315,7 +314,6 @@ type TermSearch =
         let fullwidth = defaultArg fullwidth false
         let loading, setLoading = React.useState(false)
         let state, setState = React.useState(input)
-        let parent, setParent = React.useState(parent')
         let searchable, setSearchable = React.useState(not searchableToggle)
         let searchNameState, setSearchNameState = React.useState(SearchState.init)
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
@@ -324,7 +322,6 @@ type TermSearch =
         let ref = React.useElementRef()
         if onBlur.IsSome then React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, onBlur.Value))
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
-        React.useEffect((fun () -> setParent parent'), dependencies=[|box parent'|]) // careful, check console. might result in maximum dependency depth error.
         let stopSearch() = 
             debounceStorage.current.Remove("TermSearch") |> ignore
             setLoading false
