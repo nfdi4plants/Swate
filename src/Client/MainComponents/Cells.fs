@@ -277,8 +277,8 @@ type Cell =
     static member Empty() =
         Html.td [ cellStyle []; prop.readOnly true; prop.children [
             Html.div [
-                prop.style [style.height (length.perc 100)]
-                prop.className "is-flex is-align-items-center is-justify-content-center"
+                prop.style [style.height (length.perc 100); style.cursor.notAllowed; style.userSelect.none]
+                prop.className "is-flex is-align-items-center is-justify-content-center has-background-grey-lighter"
                 prop.children [
                     Html.div "-"
                 ]
