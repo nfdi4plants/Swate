@@ -50,6 +50,14 @@ type Model = {
             ActiveCell = None
             ArcFile = None
         }
+
+    static member init(arcFile: ArcFiles) =
+        {
+            ActiveView = ActiveView.Metadata
+            SelectedCells = Set.empty
+            ActiveCell = None
+            ArcFile = Some arcFile
+        }
     member this.Tables
         with get() =
             match this.ArcFile with

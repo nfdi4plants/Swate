@@ -43,7 +43,7 @@ module Spreadsheet =
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
-                    match model.SpreadsheetModel.ArcFile with
+                    match state.ArcFile with // model is not yet updated at this position.
                     | Some (Assay assay) ->
                         ARCitect.ARCitect.send(ARCitect.AssayToARCitect assay)
                     | Some (Study (study,_)) ->
@@ -88,7 +88,7 @@ module Spreadsheet =
                 let nextState = { state with ArcFile = Some arcFile }
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState = { Spreadsheet.Model.init() with ArcFile = Some arcFile }
+                let nextState = Spreadsheet.Model.init(arcFile)
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation oa ->
                 let nextState = Controller.insertTerm_IntoSelected oa state
