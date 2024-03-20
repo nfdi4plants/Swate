@@ -107,7 +107,7 @@ type UpdateColumn =
             cellValues 
             |> Array.mapi (fun i c -> 
                 match suffix with
-                | true -> baseStr + string i
+                | true -> baseStr + string (i+1)
                 | false -> baseStr
             ) 
             |> setPreview
