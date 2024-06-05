@@ -1,0 +1,32 @@
+name: Manage issues
+
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+      - transferred
+
+jobs:
+  label_issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - run: gh issue edit "$NUMBER" --add-label "$LABELS"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          LABELS: "Status: Needs Triage"
+
+  add-to-project:
+    name: Add issue to project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v1.0.1
+        with:
+          # You can target a project in a different organization
+          # to the issue
+          project-url: https://github.com/orgs/nfdi4plants/projects/10
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
