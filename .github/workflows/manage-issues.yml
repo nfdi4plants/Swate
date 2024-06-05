@@ -5,7 +5,6 @@ on:
     types:
       - opened
       - reopened
-      - transferred
 
 jobs:
   label_issues:
