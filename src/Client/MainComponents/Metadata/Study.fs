@@ -3,7 +3,7 @@
 open Feliz
 open Feliz.Bulma
 open Messages
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, dispatch: Msg -> unit) = 
@@ -27,17 +27,17 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
             isarea=true
         )
         FormComponents.PersonsInput(
-            study.Contacts,
+            Array.ofSeq study.Contacts,
             "Contacts",
             fun persons ->
-                study.Contacts <- persons
+                study.Contacts <- ResizeArray(persons)
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
         FormComponents.PublicationsInput (
-            study.Publications,
+            Array.ofSeq study.Publications,
             "Publications",
             fun pubs -> 
-                study.Publications <- pubs
+                study.Publications <- ResizeArray(pubs)
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
         FormComponents.DateTimeInput(
@@ -57,10 +57,10 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
         FormComponents.OntologyAnnotationsInput(
-            study.StudyDesignDescriptors,
+            Array.ofSeq study.StudyDesignDescriptors,
             "Study Design Descriptors",
             fun oas ->
-                study.StudyDesignDescriptors <- oas
+                study.StudyDesignDescriptors <- ResizeArray(oas)
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
         FormComponents.TextInputs(
@@ -70,18 +70,11 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
                 study.RegisteredAssayIdentifiers <- ResizeArray(rais)
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
-        FormComponents.FactorsInput(
-            study.Factors,
-            "Factors",
-            fun factors ->
-                study.Factors <- factors
-                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-        )
         FormComponents.CommentsInput(
-            study.Comments,
+            Array.ofSeq study.Comments,
             "Comments",
             fun comments ->
-                study.Comments <- comments
+                study.Comments <- ResizeArray(comments)
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
     ]

@@ -2,7 +2,7 @@ module MainComponents.FooterTabs
 
 open Feliz
 open Feliz.Bulma
-open ARCtrl.ISA
+open ARCtrl
 
 type private FooterTab = {
     IsEditable: bool

@@ -7,7 +7,7 @@ open Spreadsheet
 open Messages
 open Browser.Types
 open Fable.Core.JsInterop
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 open Elmish

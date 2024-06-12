@@ -3,7 +3,7 @@
 open Feliz
 open Feliz.Bulma
 open Messages
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 [<ReactComponent>]
@@ -42,17 +42,17 @@ let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) =
             "Technology Platform"
         )
         FormComponents.PersonsInput(
-            assay.Performers,
+            Array.ofSeq assay.Performers,
             "Performers",
             fun persons ->
-                assay.Performers <- persons
+                assay.Performers <- ResizeArray persons
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
         FormComponents.CommentsInput(
-            assay.Comments,
+            Array.ofSeq assay.Comments,
             "Comments",
             fun comments ->
-                assay.Comments <- comments
+                assay.Comments <- ResizeArray comments
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
     ]

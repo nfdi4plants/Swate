@@ -1,6 +1,6 @@
 ﻿module Model.ARCitect
 
-open ARCtrl.ISA
+open ARCtrl
 
 type Msg =
     | Init

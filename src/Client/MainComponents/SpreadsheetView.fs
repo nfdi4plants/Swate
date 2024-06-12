@@ -6,7 +6,7 @@ open Feliz.Bulma
 open Spreadsheet
 open Messages
 open Spreadsheet.Cells
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 let private cellPlaceholder (c_opt: CompositeCell option) =

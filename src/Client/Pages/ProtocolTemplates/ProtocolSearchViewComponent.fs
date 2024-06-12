@@ -38,7 +38,7 @@ type SearchFields =
     static member GetOfQuery(query:string) =
         SearchFields.ofFieldString query
 
-open ARCtrl.ISA
+open ARCtrl
 
 type TemplateFilterConfig = {
         ProtocolSearchQuery     : string
@@ -114,8 +114,8 @@ module ComponentAux =
         ]
 
     let tagQueryField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
-        let allTags = model.ProtocolState.Templates |> Array.collect (fun x -> x.Tags) |> Array.distinct |> Array.filter (fun x -> state.ProtocolFilterTags |> List.contains x |> not )
-        let allErTags = model.ProtocolState.Templates |> Array.collect (fun x -> x.EndpointRepositories) |> Array.distinct |> Array.filter (fun x -> state.ProtocolFilterErTags |> List.contains x |> not )
+        let allTags = model.ProtocolState.Templates |> Seq.collect (fun x -> x.Tags) |> Seq.distinct |> Seq.filter (fun x -> state.ProtocolFilterTags |> List.contains x |> not ) |> Array.ofSeq
+        let allErTags = model.ProtocolState.Templates |> Seq.collect (fun x -> x.EndpointRepositories) |> Seq.distinct |> Seq.filter (fun x -> state.ProtocolFilterErTags |> List.contains x |> not ) |> Array.ofSeq
         let hitTagList, hitErTagList =
             if state.ProtocolTagSearchQuery <> ""
             then
@@ -333,9 +333,9 @@ module ComponentAux =
     let createAuthorStringHelper (author: Person) = 
         let mi = if author.MidInitials.IsSome then author.MidInitials.Value else ""
         $"{author.FirstName} {mi} {author.LastName}"
-    let createAuthorsStringHelper (authors: Person []) = authors |> Array.map createAuthorStringHelper |> String.concat ", "
+    let createAuthorsStringHelper (authors: ResizeArray<Person>) = authors |> Seq.map createAuthorStringHelper |> String.concat ", "
 
-    let protocolElement i (template:ARCtrl.Template.Template) (isShown:bool) (setIsShown: bool -> unit) (model:Model) dispatch  =
+    let protocolElement i (template:ARCtrl.Template) (isShown:bool) (setIsShown: bool -> unit) (model:Model) dispatch  =
         [
             Html.tr [
                 prop.key $"{i}_{template.Id}"
@@ -433,7 +433,7 @@ module ComponentAux =
 module FilterHelper =
     open ComponentAux
 
-    let sortTableBySearchQuery (searchfield: SearchFields) (searchQuery: string) (protocol: ARCtrl.Template.Template []) =
+    let sortTableBySearchQuery (searchfield: SearchFields) (searchQuery: string) (protocol: ARCtrl.Template []) =
         let query = searchQuery.Trim()
         // Only search if field is not empty and does not start with "/".
         // If it starts with "/" and does not match SearchFields then it will never trigger search
@@ -456,11 +456,11 @@ module FilterHelper =
                             createScore (template.Organisation.ToString())
                         | SearchFields.Authors       ->
                             let query' = query.ToLower()
-                            let scores = template.Authors |> Array.filter (fun author -> 
+                            let scores = template.Authors |> Seq.filter (fun author -> 
                                 (createAuthorStringHelper author).ToLower().Contains query'
                                 || (author.ORCID.IsSome && author.ORCID.Value = query)
                             )
-                            if Array.isEmpty scores then 0.0 else 1.0
+                            if Seq.isEmpty scores then 0.0 else 1.0
                     score, template
                 )
                 |> Array.filter (fun (score,_) -> score > 0.2)
@@ -469,14 +469,14 @@ module FilterHelper =
             scoredTemplate
         else
             protocol
-    let filterTableByTags tags ertags tagfilter (templates:ARCtrl.Template.Template []) =
+    let filterTableByTags tags ertags tagfilter (templates: ARCtrl.Template []) =
         if tags <> [] || ertags <> [] then
-            let tagArray = tags@ertags |> Array.ofList
-            let filteredTemplates = templates |> ARCtrl.Template.Templates.filterByOntologyAnnotation(tagArray, tagfilter)
-            filteredTemplates
+            let tagArray = tags@ertags |> ResizeArray
+            let filteredTemplates = ResizeArray templates |> ARCtrl.Templates.filterByOntologyAnnotation(tagArray, tagfilter)
+            Array.ofSeq filteredTemplates
         else
             templates
-    let filterTableByCommunityFilter communityfilter (protocol:ARCtrl.Template.Template []) =
+    let filterTableByCommunityFilter communityfilter (protocol:ARCtrl.Template []) =
         match communityfilter with
         | Protocol.CommunityFilter.All              -> protocol
         | Protocol.CommunityFilter.OnlyCurated      -> protocol |> Array.filter (fun x -> x.Organisation.IsOfficial())
@@ -511,9 +511,10 @@ type Search =
             ]
         ]
 
-    static member filterTemplates(templates: ARCtrl.Template.Template [], config: TemplateFilterConfig) =
+    static member filterTemplates(templates: ARCtrl.Template [], config: TemplateFilterConfig) =
         if templates.Length = 0 then [||] else
             templates
+            |> Array.ofSeq
             |> FilterHelper.filterTableByTags config.ProtocolFilterTags config.ProtocolFilterErTags config.TagFilterIsAnd 
             |> FilterHelper.filterTableByCommunityFilter config.CommunityFilter
             |> FilterHelper.sortTableBySearchQuery config.Searchfield config.ProtocolSearchQuery

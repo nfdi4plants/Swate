@@ -1,6 +1,6 @@
 namespace Shared
 
-open ARCtrl.ISA
+open ARCtrl
 open TermTypes
 open System.Collections.Generic
 
@@ -9,7 +9,7 @@ open System.Collections.Generic
 module ARCtrlHelper =
 
     type ArcFiles =
-    | Template      of ARCtrl.Template.Template
+    | Template      of Template
     | Investigation of ArcInvestigation
     | Study         of ArcStudy * ArcAssay list
     | Assay         of ArcAssay
@@ -56,6 +56,9 @@ module Extensions =
 
     open ARCtrl.Template
     open ArcTableAux
+
+    type OntologyAnnotation with
+        static member empty = OntologyAnnotation.create()
 
     type ArcTable with
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
@@ -192,11 +195,13 @@ module Extensions =
             match this with
             | CompositeCell.Term oa -> oa
             | CompositeCell.Unitized (v, oa) -> oa
-            | CompositeCell.FreeText t -> OntologyAnnotation.fromString t
+            | CompositeCell.FreeText t -> OntologyAnnotation.create t
 
         member this.UpdateMainField(s: string) =
             match this with
-            | CompositeCell.Term oa -> CompositeCell.Term ({oa with Name = Some s})
+            | CompositeCell.Term oa -> 
+                oa.Name <- Some s
+                CompositeCell.Term oa
             | CompositeCell.Unitized (_, oa) -> CompositeCell.Unitized (s, oa)
             | CompositeCell.FreeText _ -> CompositeCell.FreeText s
 
@@ -205,7 +210,7 @@ module Extensions =
         /// </summary>
         /// <param name="tsr"></param>
         member this.UpdateTSR(tsr: string) =
-            let updateTSR (oa: OntologyAnnotation) = {oa with TermSourceREF = tsr |> Some}
+            let updateTSR (oa: OntologyAnnotation) = oa.TermSourceREF <- Some tsr ;oa
             match this with
             | CompositeCell.Term oa -> CompositeCell.Term (updateTSR oa)
             | CompositeCell.Unitized (v, oa) -> CompositeCell.Unitized (v, updateTSR oa)
@@ -216,12 +221,12 @@ module Extensions =
         /// </summary>
         /// <param name="tsr"></param>
         member this.UpdateTAN(tan: string) =
-            let updateTAN (oa: OntologyAnnotation) = {oa with TermAccessionNumber = tan |> Some}
+            let updateTAN (oa: OntologyAnnotation) = oa.TermSourceREF <- Some tan ;oa
             match this with
             | CompositeCell.Term oa -> CompositeCell.Term (updateTAN oa)
             | CompositeCell.Unitized (v, oa) -> CompositeCell.Unitized (v, updateTAN oa)
             | _ -> this
 
     type OntologyAnnotation with
-        static member fromTerm (term:Term) = OntologyAnnotation.fromString(term.Name, term.FK_Ontology, term.Accession)
+        static member fromTerm (term:Term) = OntologyAnnotation(term.Name, term.FK_Ontology, term.Accession)
         member this.ToTermMinimal() = TermMinimal.create this.NameText this.TermAccessionShort

@@ -8,16 +8,11 @@
     <ItemGroup>
         <None Include="paket.references" />
         <Compile Include="Version.fs" />
-        <Compile Include="CyjsAdaption.fs" />
-        <Compile Include="ISADotNet.fs" />
         <Compile Include="Database\Helper.fs" />
         <Compile Include="Database\Ontology.fs" />
         <Compile Include="Database\Term.fs" />
         <Compile Include="Database\Template.fs" />
         <Compile Include="Database\TreeSearch.fs" />
-        <Compile Include="TemplateMetadata.fs" />
-        <Compile Include="Export.fs" />
-        <Compile Include="Import.fs" />
         <Compile Include="Api\Helper.fs" />
         <Compile Include="Api\IOntologyAPI.fs" />
         <Compile Include="Api\IExportAPI.fs" />
@@ -25,6 +20,9 @@
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\Shared\Shared.fsproj" />
+    </ItemGroup>
+    <ItemGroup>
+      <Folder Include="public\" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

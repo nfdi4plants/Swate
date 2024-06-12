@@ -4,7 +4,6 @@
 open Feliz
 open Feliz.Bulma
 open Spreadsheet
-open ARCtrl.ISA
 open Messages
 
 let Main(minWidth: int, left: ReactElement seq) = 

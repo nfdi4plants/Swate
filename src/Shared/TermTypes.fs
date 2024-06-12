@@ -1,6 +1,6 @@
 namespace Shared
 
-open ARCtrl.ISA
+open ARCtrl
 
 module TermTypes =
 

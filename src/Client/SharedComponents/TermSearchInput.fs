@@ -3,7 +3,7 @@
 open Feliz
 open Feliz.Bulma
 open Browser.Types
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 open Fable.Core.JsInterop
 
@@ -339,7 +339,7 @@ type TermSearch =
             setSearchTreeState <| SearchState.init()
             setIsSearching true
         let registerChange(queryString: string option) =
-            let oaOpt = queryString |> Option.map (fun s -> OntologyAnnotation.fromString(s) )
+            let oaOpt = queryString |> Option.map (fun s -> OntologyAnnotation(s) )
             dsetter(oaOpt,setter,debounceStorage.current,setLoading,debounceSetter)
             setState oaOpt
         Bulma.control.div [

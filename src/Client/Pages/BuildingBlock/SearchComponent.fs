@@ -11,7 +11,7 @@ open Model.BuildingBlock
 open Model.TermSearch
 open Model
 open Messages
-open ARCtrl.ISA
+open ARCtrl
 open BuildingBlock.Helper
 
 let private termOrUnitizedSwitch (model:Messages.Model) dispatch =

@@ -12,9 +12,9 @@ open Spreadsheet.Clipboard
 open Fable.Remoting.Client
 open Fable.Remoting.Client.InternalUtilities
 open FsSpreadsheet
-open FsSpreadsheet.Exceljs
-open ARCtrl.ISA
-open ARCtrl.ISA.Spreadsheet
+open FsSpreadsheet.Js
+open ARCtrl
+open ARCtrl.Spreadsheet
 open Spreadsheet.Sidebar.Controller
 open Feliz
 
@@ -347,10 +347,10 @@ module Spreadsheet =
                     | Assay aa ->
                         n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t ->
-                        n + "_" + t.FileName, ARCtrl.Template.Spreadsheet.Template.toFsWorkbook t
+                        n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
                 let cmd =
                     Cmd.OfPromise.either
-                        FsSpreadsheet.Exceljs.Xlsx.toBytes
+                        Xlsx.toXlsxBytes
                         fswb
                         (fun bytes -> ExportXlsxDownload (name,bytes) |> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError (JsonExporter.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)

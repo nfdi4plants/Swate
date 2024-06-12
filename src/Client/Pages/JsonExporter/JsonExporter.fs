@@ -450,8 +450,8 @@ open Feliz.Bulma
 
 module FileExporterAux =
 
-    open ARCtrl.ISA
-    open ARCtrl.ISA.Json
+    open ARCtrl
+    open ARCtrl.Json
 
     [<RequireQualifiedAccess>]
     type ISA =
@@ -470,9 +470,9 @@ module FileExporterAux =
         let timed = fun s -> System.DateTime.Now.ToString("yyyyMMdd_hhmm_") + s
         match arcfile with
         | None | Some (ArcFiles.Template _) -> None
-        | Some (ArcFiles.Assay a) -> (timed "assay.json",ArcAssay.toJsonString a) |> Some
-        | Some (ArcFiles.Study (s,as')) -> (timed "study.json", ArcStudy.toJsonString s (ResizeArray as')) |> Some
-        | Some (ArcFiles.Investigation i) -> (timed "investigation.json", ArcInvestigation.toJsonString i) |> Some
+        | Some (ArcFiles.Assay a) -> (timed "assay.json",ArcAssay.toISAJsonString 0 a) |> Some
+        | Some (ArcFiles.Study (s,as')) -> (timed "study.json", ArcStudy.toISAJsonString(as',0) s)  |> Some
+        | Some (ArcFiles.Investigation i) -> (timed "investigation.json", ArcInvestigation.toISAJsonString 0 i) |> Some
 
 open FileExporterAux
 

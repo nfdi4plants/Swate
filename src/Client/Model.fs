@@ -88,7 +88,7 @@ type LogItem =
 
 module TermSearch =
 
-    open ARCtrl.ISA
+    open ARCtrl
 
     type Model = {
         SelectedTerm            : OntologyAnnotation option
@@ -200,7 +200,7 @@ open Fable.Core
 
 module BuildingBlock =
 
-    open ARCtrl.ISA
+    open ARCtrl
 
     type [<RequireQualifiedAccess>] HeaderCellType =
     | Component
@@ -360,10 +360,10 @@ module Protocol =
             | "DataPLANT official" -> OnlyCurated
             | anyElse -> Community anyElse
 
-        static member CommunityFromOrganisation(org:ARCtrl.Template.Organisation) =
+        static member CommunityFromOrganisation(org: ARCtrl.Organisation) =
             match org with
-            | ARCtrl.Template.Organisation.DataPLANT -> None
-            | ARCtrl.Template.Other name -> Some <| Community name
+            | ARCtrl.Organisation.DataPLANT -> None
+            | ARCtrl.Organisation.Other name -> Some <| Community name
 
     /// This model is used for both protocol insert and protocol search
     type Model = {
@@ -373,8 +373,8 @@ module Protocol =
         // // ------ Process from file ------
         UploadedFileParsed      : (string*InsertBuildingBlock []) []
         // ------ Protocol from Database ------
-        TemplateSelected        : ARCtrl.Template.Template option
-        Templates               : ARCtrl.Template.Template []
+        TemplateSelected        : ARCtrl.Template option
+        Templates               : ARCtrl.Template []
     } with
         static member init () = {
             // Client

@@ -7,7 +7,7 @@ open Spreadsheet
 open MainComponents
 open Messages
 open Shared
-open ARCtrl.ISA
+open ARCtrl
 open Components
 
 module private CellComponents =
@@ -90,8 +90,8 @@ module private CellAux =
 
     let headerTANSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
         match header.TryOA(), s with
-        | Some oa, "" -> Some {oa with TermAccessionNumber = None}
-        | Some oa, s1 -> Some {oa with TermAccessionNumber = Some s1}
+        | Some oa, "" -> oa.TermAccessionNumber <- None;  Some oa
+        | Some oa, s1 ->  oa.TermAccessionNumber <- Some s1;  Some oa
         | None, _ -> None
         |> Option.map header.UpdateWithOA
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
@@ -253,7 +253,7 @@ type Cell =
                 if header.IsTermColumn && not header.IsFeaturedColumn then
                     let updatedOA =
                         match nextHeader.TryOA() ,header.TryOA() with
-                        | Some oa1, Some oa2 -> {oa1 with TermAccessionNumber = oa2.TermAccessionNumber; TermSourceREF = oa2.TermSourceREF}
+                        | Some oa1, Some oa2 -> oa1.TermAccessionNumber <- oa2.TermAccessionNumber; oa1.TermSourceREF <- oa2.TermSourceREF; oa1
                         | _ -> failwith "this should never happen"
                     nextHeader <- nextHeader.UpdateWithOA updatedOA
                 Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch
@@ -362,8 +362,8 @@ type Cell =
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newName = if s = "" then None else Some s
-            let nextOA = {oa with Name = newName }
-            let nextCell = cell.UpdateWithOA nextOA
+            oa.Name <- newName
+            let nextCell = cell.UpdateWithOA oa
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         let oasetter = if cell.isUnitized then CellAux.oasetter(index, cell, dispatch) |> Some else None
         Cell.BodyBase(Unit, cellValue, setter, index, cell, model, dispatch, ?oasetter=oasetter)
@@ -374,8 +374,8 @@ type Cell =
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTSR = if s = "" then None else Some s
-            let nextOA = {oa with TermSourceREF = newTSR}
-            let nextCell = cell.UpdateWithOA nextOA
+            oa.TermSourceREF <- newTSR
+            let nextCell = cell.UpdateWithOA oa
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(TSR, cellValue, setter, index, cell, model, dispatch)
 
@@ -385,8 +385,8 @@ type Cell =
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTAN = if s = "" then None else Some s
-            let nextOA = {oa with TermAccessionNumber = newTAN}
-            let nextCell = cell.UpdateWithOA nextOA
+            oa.TermAccessionNumber <- newTAN
+            let nextCell = cell.UpdateWithOA oa
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(TAN, cellValue, setter, index, cell, model, dispatch)
         

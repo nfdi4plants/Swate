@@ -49,12 +49,13 @@ module Protocol =
             let state = {state with Loading = false}
             let templates = 
                 try
-                    protocolsJson |> Array.map (ARCtrl.Template.Json.Template.fromJsonString) |> Ok
+                    protocolsJson |> ARCtrl.Json.Templates.fromJsonString |> Ok
                 with
                     | e -> Result.Error e
             let nextState, cmd = 
                 match templates with
-                | Ok t -> 
+                | Ok t0 -> 
+                    let t = Array.ofSeq t0.Values
                     let nextState = { state with LastUpdated = Some System.DateTime.UtcNow }
                     nextState, UpdateTemplates t |> ProtocolMsg |> Cmd.ofMsg
                 | Result.Error e -> state, GenericError (Cmd.none,e) |> DevMsg |> Cmd.ofMsg

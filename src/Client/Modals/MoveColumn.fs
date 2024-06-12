@@ -7,7 +7,7 @@ open Messages
 open Shared
 open OfficeInteropTypes
 
-open ARCtrl.ISA
+open ARCtrl
 
 type MoveColumn =
 

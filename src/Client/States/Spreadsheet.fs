@@ -2,7 +2,7 @@ namespace Spreadsheet
 
 open Shared
 open OfficeInteropTypes
-open ARCtrl.ISA
+open ARCtrl
 open Fable.Core
 
 type ColumnType =

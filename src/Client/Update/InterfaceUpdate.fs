@@ -112,7 +112,7 @@ module Interface =
                     let mutable rowIndex = rowIndex
                     let cells = [|
                         for name in fileNames do
-                            let cell = ARCtrl.ISA.CompositeCell.createFreeText name
+                            let cell = ARCtrl.CompositeCell.createFreeText name
                             (columnIndex, rowIndex), cell
                             rowIndex <- rowIndex + 1
                     |]

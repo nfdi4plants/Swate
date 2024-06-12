@@ -4,7 +4,7 @@ open Shared
 open OfficeInteropTypes
 open Model
 open Messages
-open ARCtrl.ISA
+open ARCtrl
 open Model.BuildingBlock
 
 let isSameMajorHeaderCellType (hct1: BuildingBlock.HeaderCellType) (hct2: BuildingBlock.HeaderCellType) =

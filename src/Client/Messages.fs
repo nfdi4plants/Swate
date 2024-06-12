@@ -13,7 +13,7 @@ open OfficeInterop
 open OfficeInteropTypes
 open Model
 open Routing
-open ARCtrl.ISA
+open ARCtrl
 open Fable.Core
 
 type System.Exception with
@@ -107,14 +107,14 @@ module Protocol =
         | ParseUploadedFileRequest          of raw: byte []
         | ParseUploadedFileResponse         of (string * InsertBuildingBlock []) []
         // Client
-        | UpdateTemplates                   of ARCtrl.Template.Template []
+        | UpdateTemplates                   of Template []
         | UpdateLoading                     of bool
         | RemoveUploadedFileParsed
         // // ------ Protocol from Database ------
         | GetAllProtocolsForceRequest
         | GetAllProtocolsRequest
-        | GetAllProtocolsResponse           of string []
-        | SelectProtocol                    of ARCtrl.Template.Template
+        | GetAllProtocolsResponse           of string
+        | SelectProtocol                    of Template
         | ProtocolIncreaseTimesUsed         of protocolName:string
         // Client
         | RemoveSelectedProtocol

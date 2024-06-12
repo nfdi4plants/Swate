@@ -22,7 +22,7 @@ let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : Ter
 
 open Feliz
 open Feliz.Bulma
-open ARCtrl.ISA
+open ARCtrl
 open Fable.Core.JsInterop
 
 /// "Fill selected cells with this term" - button //

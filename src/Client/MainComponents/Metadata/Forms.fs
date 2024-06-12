@@ -7,9 +7,10 @@ open Spreadsheet
 open Messages
 open Browser.Types
 open Fable.Core.JsInterop
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 open Fetch
+open ARCtrl.Json
 
 module private API =
 
@@ -66,7 +67,7 @@ module private API =
                     summary
                 )
                 |> createAffiliationString
-            let person = Person.create(ORCID=orcid,LastName=lastName, FirstName=name, ?Email=email, ?Affiliation=groupsParsed)
+            let person = Person.create(orcid=orcid,lastName=lastName, firstName=name, ?email=email, ?affiliation=groupsParsed)
             return person
         }
 
@@ -117,11 +118,11 @@ module private API =
                                 yield aff?("name") 
                         |]
                     let affString = affiliations |> String.concat ", "
-                    Person.create(ORCID=pj?ORCID, LastName=pj?family, FirstName=pj?given, Affiliation=affString)
+                    Person.create(ORCID=pj?ORCID, LastName=pj?family, FirstName=pj?given, affiliation=affString)
             |]
             let! pubmedId = requestByDOI_FromPubMed doi
             let authorString = createAuthorString authors
-            let publication = Publication.create(?PubMedID=pubmedId, Doi=doi, Authors=authorString, ?Title=title, Status=Term.Published)
+            let publication = Publication.create(?pubMedID=pubmedId, doi=doi, authors=authorString, ?title=title, status=Term.Published)
             return publication
         }
 
@@ -133,127 +134,127 @@ module private API =
         |> Promise.start
 
 module private Helper =
-    type PersonMutable(?firstname, ?lastname, ?midinitials, ?orcid, ?address, ?affiliation, ?email, ?phone, ?fax, ?roles) =
-        member val FirstName : string option = firstname with get, set
-        member val LastName : string option = lastname with get, set
-        member val MidInitials : string option = midinitials with get, set
-        member val ORCID : string option = orcid with get, set
-        member val Address : string option = address with get, set
-        member val Affiliation : string option = affiliation with get, set
-        member val EMail : string option = email with get, set
-        member val Phone : string option = phone with get, set
-        member val Fax : string option = fax with get, set
-        member val Roles : OntologyAnnotation [] option = roles with get, set
+    //type PersonMutable(?firstname, ?lastname, ?midinitials, ?orcid, ?address, ?affiliation, ?email, ?phone, ?fax, ?roles) =
+    //    member val FirstName : string option = firstname with get, set
+    //    member val LastName : string option = lastname with get, set
+    //    member val MidInitials : string option = midinitials with get, set
+    //    member val ORCID : string option = orcid with get, set
+    //    member val Address : string option = address with get, set
+    //    member val Affiliation : string option = affiliation with get, set
+    //    member val EMail : string option = email with get, set
+    //    member val Phone : string option = phone with get, set
+    //    member val Fax : string option = fax with get, set
+    //    member val Roles : OntologyAnnotation [] option = roles with get, set
         
-        static member fromPerson(person:Person) =
-            PersonMutable(
-                ?firstname=person.FirstName, 
-                ?lastname=person.LastName, 
-                ?midinitials=person.MidInitials,
-                ?orcid=person.ORCID,
-                ?address=person.Address,
-                ?affiliation=person.Affiliation,
-                ?email=person.EMail,
-                ?phone=person.Phone,
-                ?fax=person.Fax,
-                ?roles=person.Roles
-            )
+    //    static member fromPerson(person:Person) =
+    //        PersonMutable(
+    //            ?firstname=person.FirstName, 
+    //            ?lastname=person.LastName, 
+    //            ?midinitials=person.MidInitials,
+    //            ?orcid=person.ORCID,
+    //            ?address=person.Address,
+    //            ?affiliation=person.Affiliation,
+    //            ?email=person.EMail,
+    //            ?phone=person.Phone,
+    //            ?fax=person.Fax,
+    //            ?roles=person.Roles
+    //        )
 
-        member this.ToPerson() =
-            Person.create(
-                ?FirstName=this.FirstName, 
-                ?LastName=this.LastName, 
-                ?MidInitials=this.MidInitials,
-                ?ORCID=this.ORCID,
-                ?Address=this.Address,
-                ?Affiliation=this.Affiliation,
-                ?Email=this.EMail,
-                ?Phone=this.Phone,
-                ?Fax=this.Fax,
-                ?Roles=this.Roles
-            )
+    //    member this.ToPerson() =
+    //        Person.create(
+    //            ?FirstName=this.FirstName, 
+    //            ?LastName=this.LastName, 
+    //            ?MidInitials=this.MidInitials,
+    //            ?ORCID=this.ORCID,
+    //            ?Address=this.Address,
+    //            ?Affiliation=this.Affiliation,
+    //            ?Email=this.EMail,
+    //            ?Phone=this.Phone,
+    //            ?Fax=this.Fax,
+    //            ?Roles=this.Roles
+    //        )
 
-    type OntologyAnnotationMutable(?name,?tsr,?tan) =
-        member val Name : string option = name with get, set
-        member val TSR : string option = tsr with get, set
-        member val TAN : string option = tan with get, set
+    //type OntologyAnnotationMutable(?name,?tsr,?tan) =
+    //    member val Name : string option = name with get, set
+    //    member val TSR : string option = tsr with get, set
+    //    member val TAN : string option = tan with get, set
 
-        static member fromOntologyAnnotation(oa: OntologyAnnotation) =
-            let name = if oa.NameText = "" then None else Some oa.NameText
-            OntologyAnnotationMutable(?name=name, ?tsr=oa.TermSourceREF, ?tan=oa.TermAccessionNumber)
+    //    static member fromOntologyAnnotation(oa: OntologyAnnotation) =
+    //        let name = if oa.NameText = "" then None else Some oa.NameText
+    //        OntologyAnnotationMutable(?name=name, ?tsr=oa.TermSourceREF, ?tan=oa.TermAccessionNumber)
 
-        member this.ToOntologyAnnotation() =
-            OntologyAnnotation.fromString(?termName=this.Name,?tsr=this.TSR,?tan=this.TAN)
+    //    member this.ToOntologyAnnotation() =
+    //        OntologyAnnotation.fromString(?termName=this.Name,?tsr=this.TSR,?tan=this.TAN)
 
-    type PublicationMutable(?pubmedid: string, ?doi: string, ?authors: string, ?title: string, ?status: OntologyAnnotation, ?comments: Comment []) =
-        member val PubmedId = pubmedid with get, set
-        member val Doi = doi with get, set
-        member val Authors = authors with get, set
-        member val Title = title with get, set
-        member val Status = status with get, set
-        member val Comments = comments with get, set
+    //type PublicationMutable(?pubmedid: string, ?doi: string, ?authors: string, ?title: string, ?status: OntologyAnnotation, ?comments: Comment []) =
+    //    member val PubmedId = pubmedid with get, set
+    //    member val Doi = doi with get, set
+    //    member val Authors = authors with get, set
+    //    member val Title = title with get, set
+    //    member val Status = status with get, set
+    //    member val Comments = comments with get, set
 
-        static member fromPublication(pub:Publication) =
-            PublicationMutable(
-                ?pubmedid=pub.PubMedID,
-                ?doi=pub.DOI,
-                ?authors=pub.Authors,
-                ?title=pub.Title,
-                ?status=pub.Status,
-                ?comments=pub.Comments
-            )
+    //    static member fromPublication(pub:Publication) =
+    //        PublicationMutable(
+    //            ?pubmedid=pub.PubMedID,
+    //            ?doi=pub.DOI,
+    //            ?authors=pub.Authors,
+    //            ?title=pub.Title,
+    //            ?status=pub.Status,
+    //            ?comments=pub.Comments
+    //        )
 
-        member this.ToPublication() =
-            Publication.create(
-                ?PubMedID=this.PubmedId,
-                ?Doi=this.Doi,
-                ?Authors=this.Authors,
-                ?Title=this.Title,
-                ?Status=this.Status,
-                ?Comments=this.Comments
-            )
+    //    member this.ToPublication() =
+    //        Publication.create(
+    //            ?PubMedID=this.PubmedId,
+    //            ?Doi=this.Doi,
+    //            ?Authors=this.Authors,
+    //            ?Title=this.Title,
+    //            ?Status=this.Status,
+    //            ?Comments=this.Comments
+    //        )
 
-    type FactorMutable(?name,?factortype,?comments) =
-        member val Name = name with get, set
-        member val FactorType = factortype with get, set
-        member val Comments = comments with get, set
+    //type FactorMutable(?name,?factortype,?comments) =
+    //    member val Name = name with get, set
+    //    member val FactorType = factortype with get, set
+    //    member val Comments = comments with get, set
 
-        static member fromFactor(f:Factor) =
-            FactorMutable(
-                ?name=f.Name,
-                ?factortype=f.FactorType,
-                ?comments=f.Comments
-            )
-        member this.ToFactor() =
-            Factor.create(
-                ?Name=this.Name,
-                ?FactorType=this.FactorType,
-                ?Comments=this.Comments
-            )
+    //    static member fromFactor(f:Factor) =
+    //        FactorMutable(
+    //            ?name=f.Name,
+    //            ?factortype=f.FactorType,
+    //            ?comments=f.Comments
+    //        )
+    //    member this.ToFactor() =
+    //        Factor.create(
+    //            ?Name=this.Name,
+    //            ?FactorType=this.FactorType,
+    //            ?Comments=this.Comments
+    //        )
 
-    type OntologySourceReferenceMutable(?name,?description,?file,?version,?comments) =
-        member val Name = name with get, set
-        member val Description = description with get, set
-        member val File = file with get, set
-        member val Version = version with get, set
-        member val Comments = comments with get, set
+    //type OntologySourceReferenceMutable(?name,?description,?file,?version,?comments) =
+    //    member val Name = name with get, set
+    //    member val Description = description with get, set
+    //    member val File = file with get, set
+    //    member val Version = version with get, set
+    //    member val Comments = comments with get, set
 
-        static member fromOntologySourceReference(o:OntologySourceReference) =
-            OntologySourceReferenceMutable(
-                ?name=o.Name,
-                ?description= o.Description,
-                ?file=o.File,
-                ?version=o.Version,
-                ?comments=o.Comments
-            )
-        member this.ToOntologySourceReference() =
-            OntologySourceReference.create(
-                ?Name=this.Name,
-                ?Description=this.Description,
-                ?File=this.File,
-                ?Version=this.Version,
-                ?Comments=this.Comments
-            )
+    //    static member fromOntologySourceReference(o:OntologySourceReference) =
+    //        OntologySourceReferenceMutable(
+    //            ?name=o.Name,
+    //            ?description= o.Description,
+    //            ?file=o.File,
+    //            ?version=o.Version,
+    //            ?comments=o.Comments
+    //        )
+    //    member this.ToOntologySourceReference() =
+    //        OntologySourceReference.create(
+    //            ?Name=this.Name,
+    //            ?Description=this.Description,
+    //            ?File=this.File,
+    //            ?Version=this.Version,
+    //            ?Comments=this.Comments
+    //        )
 
     let addButton (clickEvent: MouseEvent -> unit) =
         Html.div [
@@ -705,9 +706,9 @@ type FormComponents =
     [<ReactComponent>]
     static member OntologyAnnotationInput (input: OntologyAnnotation, setter: OntologyAnnotation -> unit, ?label: string, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
         let showTextLabels = defaultArg showTextLabels true
-        let state, setState = React.useState(Helper.OntologyAnnotationMutable.fromOntologyAnnotation input)
+        let state, setState = React.useState(input)
         let element = React.useElementRef()
-        React.useEffect((fun () -> setState <| Helper.OntologyAnnotationMutable.fromOntologyAnnotation input), dependencies=[|box input|])
+        React.useEffect((fun () -> setState input), dependencies=[|box input|])
         Bulma.field.div [ 
             if label.IsSome then Bulma.label label.Value
             Bulma.field.div [
@@ -726,10 +727,10 @@ type FormComponents =
                                         fun (oaOpt: OntologyAnnotation option) -> 
                                             if oaOpt.IsSome then 
                                                 setter oaOpt.Value
-                                                setState (Helper.OntologyAnnotationMutable.fromOntologyAnnotation oaOpt.Value)
+                                                setState oaOpt.Value
                                     Components.TermSearch.Input(
                                         innersetter,
-                                        input=state.ToOntologyAnnotation(),
+                                        input=state,
                                         fullwidth=true,
                                         ?portalTermSelectArea=element.current,
                                         debounceSetter=1000
@@ -741,21 +742,21 @@ type FormComponents =
                                 prop.ref element
                             ]
                             FormComponents.TextInput(
-                                Option.defaultValue "" state.TSR,
+                                Option.defaultValue "" state.TermSourceREF,
                                 (if showTextLabels then $"TSR" else ""),
                                 (fun s -> 
                                     let s = if s = "" then None else Some s
-                                    state.TSR <- s 
-                                    state.ToOntologyAnnotation() |> setter),
+                                    state.TermSourceREF <- s 
+                                    state |> setter),
                                 fullwidth = true
                             )
                             FormComponents.TextInput(
-                                Option.defaultValue "" state.TAN,
+                                Option.defaultValue "" state.TermAccessionNumber,
                                 (if showTextLabels then $"TAN" else ""),
                                 (fun s -> 
                                     let s = if s = "" then None else Some s
-                                    state.TAN <- s 
-                                    state.ToOntologyAnnotation() |> setter),
+                                    state.TermAccessionNumber <- s 
+                                    state |> setter),
                                 fullwidth = true
                             )
                         ]
@@ -785,8 +786,8 @@ type FormComponents =
     static member PersonInput(input: Person, setter: Person -> unit, ?deletebutton: MouseEvent -> unit) =
         let isExtended, setIsExtended = React.useState(false)
         // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
-        let state, setState = React.useState(Helper.PersonMutable.fromPerson input) 
-        React.useEffect((fun _ -> setState <| Helper.PersonMutable.fromPerson input), [|box input|])
+        let state, setState = React.useState(input) 
+        React.useEffect((fun _ -> setState input), [|box input|])
         let fn = Option.defaultValue "" state.FirstName 
         let ln = Option.defaultValue "" state.LastName
         let mi = Option.defaultValue "" state.MidInitials
@@ -801,21 +802,21 @@ type FormComponents =
                 (fun s -> 
                     let s = if s = "" then None else Some s
                     personSetter s 
-                    state.ToPerson() |> setter),
+                    state |> setter),
                 fullwidth=true
             )
-        let countFilledFieldsString (person: Helper.PersonMutable) =
+        let countFilledFieldsString (person: Person) =
             let fields = [
-                state.FirstName
-                state.LastName
-                state.MidInitials
-                state.ORCID
-                state.Address
-                state.Affiliation
-                state.EMail
-                state.Phone
-                state.Fax
-                state.Roles |> Option.map (fun _ -> "")
+                person.FirstName
+                person.LastName
+                person.MidInitials
+                person.ORCID
+                person.Address
+                person.Affiliation
+                person.EMail
+                person.Phone
+                person.Fax
+                if person.Roles.Count > 0 then Some "roles" else None // just for count. Value does not matter
             ]
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
@@ -856,7 +857,7 @@ type FormComponents =
                             (fun s -> 
                                 let s = if s = "" then None else Some s
                                 state.ORCID <- s
-                                state.ToPerson() |> setter),
+                                state |> setter),
                                 (fun s -> setter s),
                                 "ORCID"
                         )
@@ -871,12 +872,11 @@ type FormComponents =
                         createPersonFieldTextInput(state.Fax, "Fax", fun s -> state.Fax <- s)
                     ]
                     FormComponents.OntologyAnnotationsInput(
-                        Option.defaultValue [||] state.Roles,
+                        Array.ofSeq state.Roles,
                         "Roles",
                         (fun oas -> 
-                            let oas = if oas = [||] then None else Some oas
-                            state.Roles <- oas
-                            state.ToPerson() |> setter
+                            state.Roles <- ResizeArray(oas)
+                            state |> setter
                         ),
                         showTextLabels = false
                     )
@@ -916,13 +916,17 @@ type FormComponents =
                     FormComponents.TextInput(
                         comment.Name |> Option.defaultValue "",
                         (if showTextLabels then $"Term Name" else ""),
-                        (fun s -> {comment with Name = if s = "" then None else Some s} |> setter),
+                        (fun s ->
+                            comment.Name <- if s = "" then None else Some s
+                            comment |> setter),
                         fullwidth = true
                     )
                     FormComponents.TextInput(
                         comment.Value |> Option.defaultValue "",
                         (if showTextLabels then $"TSR" else ""),
-                        (fun s -> {comment with Value = if s = "" then None else Some s} |> setter),
+                        (fun s -> 
+                            comment.Value <- if s = "" then None else Some s
+                            comment |> setter),
                         fullwidth = true
                     )
                     if removebutton.IsSome then
@@ -959,10 +963,10 @@ type FormComponents =
     static member PublicationInput(input: Publication, setter: Publication -> unit, ?deletebutton: MouseEvent -> unit) =
         let isExtended, setIsExtended = React.useState(false)
         // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
-        let state, setState = React.useState(Helper.PublicationMutable.fromPublication input) 
-        React.useEffect((fun _ -> setState <| Helper.PublicationMutable.fromPublication input), [|box input|])
+        let state, setState = React.useState(input) 
+        React.useEffect((fun _ -> setState input), [|box input|])
         let title = Option.defaultValue "<title>" state.Title
-        let doi = Option.defaultValue "<doi>" state.Doi
+        let doi = Option.defaultValue "<doi>" state.DOI
         let createPersonFieldTextInput(field: string option, label, publicationSetter: string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
@@ -970,13 +974,13 @@ type FormComponents =
                 (fun s -> 
                     let s = if s = "" then None else Some s
                     publicationSetter s 
-                    state.ToPublication() |> setter),
+                    state |> setter),
                 fullwidth=true
             )
         let countFilledFieldsString () =
             let fields = [
-                state.PubmedId
-                state.Doi
+                state.PubMedID
+                state.DOI
                 state.Title
                 state.Authors
                 state.Status |> Option.map (fun _ -> "")
@@ -1012,20 +1016,20 @@ type FormComponents =
                     createPersonFieldTextInput(state.Title, "Title", fun s -> state.Title <- s)
                     Helper.cardFormGroup [
                         FormComponents.PubMedIDInput(
-                            state.PubmedId,
+                            state.PubMedID,
                             (fun s -> 
                                 let s = if s = "" then None else Some s
-                                state.PubmedId <- s
-                                state.ToPublication() |> setter),
+                                state.PubMedID <- s
+                                state |> setter),
                             (fun pub -> setter pub),
                             "PubMed Id"
                         )
                         FormComponents.DOIInput(
-                            state.Doi, 
+                            state.DOI, 
                             (fun s -> 
                                 let s = if s = "" then None else Some s
-                                state.Doi <- s
-                                state.ToPublication() |> setter),
+                                state.DOI <- s
+                                state |> setter),
                             (fun pub -> setter pub),
                             "DOI"
                         )
@@ -1035,16 +1039,16 @@ type FormComponents =
                         Option.defaultValue OntologyAnnotation.empty state.Status, 
                         (fun s -> 
                             state.Status <- if s = OntologyAnnotation.empty then None else Some s
-                            state.ToPublication() |> setter
+                            state |> setter
                         ),
                         "Status"
                     )
                     FormComponents.CommentsInput(
-                        Option.defaultValue [||] state.Comments, 
+                        Array.ofSeq state.Comments, 
                         "Comments", 
                         (fun c -> 
-                            state.Comments <- if c = [||] then None else Some c
-                            state.ToPublication() |> setter
+                            state.Comments <- ResizeArray(c)
+                            state |> setter
                         )
                     )
                     if deletebutton.IsSome then
@@ -1063,95 +1067,11 @@ type FormComponents =
         )
 
     [<ReactComponent>]
-    static member FactorInput(input: Factor, setter: Factor -> unit, ?deletebutton: MouseEvent -> unit) =
-        let isExtended, setIsExtended = React.useState(false)
-        // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
-        let state, setState = React.useState(Helper.FactorMutable.fromFactor input) 
-        React.useEffect((fun _ -> setState <| Helper.FactorMutable.fromFactor input), [|box input|])
-        let name = Option.defaultValue "<name>" state.Name
-        let type' = Option.defaultValue "<type>" (state.FactorType |> Option.map (fun x -> x.NameText))
-        let createFieldTextInput(field: string option, label, personSetter: string option -> unit) =
-            FormComponents.TextInput(
-                field |> Option.defaultValue "",
-                label,
-                (fun s -> 
-                    let s = if s = "" then None else Some s
-                    personSetter s 
-                    state.ToFactor() |> setter),
-                fullwidth=true
-            )
-        let countFilledFieldsString () =
-            let fields = [
-                state.Name
-                state.FactorType |> Option.map (fun _ -> "")
-                state.Comments |> Option.map (fun _ -> "")
-            ]
-            let all = fields.Length
-            let filled = fields |> List.choose id |> _.Length
-            $"{filled}/{all}"
-        Bulma.card [
-            Bulma.cardHeader [
-                Bulma.cardHeaderTitle.div [
-                    //prop.classes ["is-align-items-flex-start"]
-                    prop.children [
-                        Html.div [
-                            Bulma.title.h5 name
-                            Bulma.subtitle.h6 type'
-                        ]
-                        Html.div [
-                            prop.style [style.custom("marginLeft", "auto")]
-                            prop.text (countFilledFieldsString ())
-                        ]
-                    ]
-                ]
-                Bulma.cardHeaderIcon.a [
-                    prop.onClick (fun _ -> not isExtended |> setIsExtended)
-                    prop.children [
-                        Bulma.icon [Html.i [prop.classes ["fas"; "fa-angle-down"]]]
-                    ]
-                ]
-            ]
-            Bulma.cardContent [
-                prop.classes [if not isExtended then "is-hidden"]
-                prop.children [
-                    createFieldTextInput(state.Name, "Name", fun s -> state.Name <- s)
-                    FormComponents.OntologyAnnotationInput(
-                        Option.defaultValue OntologyAnnotation.empty state.FactorType, 
-                        (fun s -> 
-                            state.FactorType <- if s = OntologyAnnotation.empty then None else Some s
-                            state.ToFactor() |> setter
-                        ),
-                        "Status"
-                    )
-                    FormComponents.CommentsInput(
-                        Option.defaultValue [||] state.Comments, 
-                        "Comments", 
-                        (fun c -> 
-                            state.Comments <- if c = [||] then None else Some c
-                            state.ToFactor() |> setter
-                        )
-                    )
-                    if deletebutton.IsSome then
-                        Helper.deleteButton deletebutton.Value
-                ]
-            ]
-        ]
-
-    static member FactorsInput(input: Factor [], label: string, setter: Factor [] -> unit) =
-        FormComponents.InputSequence(
-            input,
-            Factor.create(),
-            label,
-            setter,
-            (fun (a,b,c,d) -> FormComponents.FactorInput(a,c,deletebutton=d))
-        )
-
-    [<ReactComponent>]
     static member OntologySourceReferenceInput(input: OntologySourceReference, setter: OntologySourceReference -> unit, ?deletebutton: MouseEvent -> unit) =
         let isExtended, setIsExtended = React.useState(false)
         // Must use `React.useRef` do this. Otherwise simultanios updates will overwrite each other
-        let state, setState = React.useState(Helper.OntologySourceReferenceMutable.fromOntologySourceReference input) 
-        React.useEffect((fun _ -> setState <| Helper.OntologySourceReferenceMutable.fromOntologySourceReference input), [|box input|])
+        let state, setState = React.useState(input) 
+        React.useEffect((fun _ -> setState input), [|box input|])
         let name = Option.defaultValue "<name>" state.Name
         let version = Option.defaultValue "<version>" state.Version
         let createFieldTextInput(field: string option, label, personSetter: string option -> unit) =
@@ -1161,7 +1081,7 @@ type FormComponents =
                 (fun s -> 
                     let s = if s = "" then None else Some s
                     personSetter s 
-                    state.ToOntologySourceReference() |> setter),
+                    state |> setter),
                 fullwidth=true
             )
         let countFilledFieldsString () =
@@ -1170,7 +1090,7 @@ type FormComponents =
                 state.File
                 state.Version
                 state.Description
-                state.Comments |> Option.map (fun _ -> "")
+                if state.Comments.Count > 0 then Some "comments" else None // just for count. Value does not matter
             ]
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
@@ -1211,16 +1131,16 @@ type FormComponents =
                         (fun s -> 
                             let s = if s = "" then None else Some s
                             state.Description <- s
-                            state.ToOntologySourceReference() |> setter),
+                            state |> setter),
                         fullwidth=true,
                         isarea=true
                     )
                     FormComponents.CommentsInput(
-                        Option.defaultValue [||] state.Comments, 
+                        Array.ofSeq state.Comments, 
                         "Comments", 
                         (fun c -> 
-                            state.Comments <- if c = [||] then None else Some c
-                            state.ToOntologySourceReference() |> setter
+                            state.Comments <- ResizeArray(c)
+                            state |> setter
                         )
                     )
                     if deletebutton.IsSome then

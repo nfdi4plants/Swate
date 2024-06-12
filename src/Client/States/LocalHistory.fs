@@ -52,9 +52,8 @@ module HistoryOrder =
 //    member this.toJson() = Json.serialize this
 
 module ConversionTypes =  
-    open ARCtrl.ISA
-    open ARCtrl.ISA.Json
-    open ARCtrl.Template.Json
+    open ARCtrl
+    open ARCtrl.Json
     open Shared
 
     [<RequireQualifiedAccess>]
@@ -73,9 +72,9 @@ module ConversionTypes =
         static member fromSpreadsheetModel (model: Spreadsheet.Model) =
             let jsonArcFile, jsonString =
                 match model.ArcFile with
-                | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, i.ToArcJsonString()
-                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, s.ToArcJsonString()
-                | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, a.ToArcJsonString()
+                | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toCompressedJsonString 0 i
+                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, ArcStudy.toCompressedJsonString 0 s
+                | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toCompressedJsonString 0 a
                 | Some (ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
                 | None -> JsonArcFiles.None, ""
             {
@@ -85,18 +84,21 @@ module ConversionTypes =
             }
         member this.ToSpreadsheetModel() = 
             let init = Spreadsheet.Model.init()
-            let arcFile = 
-                match this.JsonArcFiles with
-                | JsonArcFiles.Investigation -> ArcInvestigation.fromArcJsonString this.JsonString |> ArcFiles.Investigation |> Some
-                | JsonArcFiles.Study -> ArcStudy.fromArcJsonString this.JsonString |> fun s -> ArcFiles.Study(s, []) |> Some
-                | JsonArcFiles.Assay -> ArcAssay.fromArcJsonString this.JsonString |> ArcFiles.Assay |> Some
-                | JsonArcFiles.Template -> Template.fromJsonString this.JsonString |> ArcFiles.Template |> Some
-                | JsonArcFiles.None -> None
-            {
-                init with
-                    ActiveView = this.ActiveView
-                    ArcFile = arcFile
-            }
+            try
+                let arcFile = 
+                    match this.JsonArcFiles with
+                    | JsonArcFiles.Investigation -> ArcInvestigation.fromCompressedJsonString this.JsonString |> ArcFiles.Investigation |> Some
+                    | JsonArcFiles.Study -> ArcStudy.fromCompressedJsonString this.JsonString |> fun s -> ArcFiles.Study(s, []) |> Some
+                    | JsonArcFiles.Assay -> ArcAssay.fromCompressedJsonString this.JsonString |> ArcFiles.Assay |> Some
+                    | JsonArcFiles.Template -> Template.fromJsonString this.JsonString |> ArcFiles.Template |> Some
+                    | JsonArcFiles.None -> None
+                {
+                    init with
+                        ActiveView = this.ActiveView
+                        ArcFile = arcFile
+                }
+            with
+                | _ -> init
         static member toSpreadsheetModel (sessionStorage: SessionStorage) =
             sessionStorage.ToSpreadsheetModel()
 

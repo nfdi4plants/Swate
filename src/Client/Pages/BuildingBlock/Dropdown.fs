@@ -11,7 +11,7 @@ open Model.BuildingBlock
 open Model.TermSearch
 open Model
 open Messages
-open ARCtrl.ISA
+open ARCtrl
 open BuildingBlock.Helper
 open Fable.Core
 
@@ -152,9 +152,7 @@ module private DropdownElements =
             IOType.Source           |> createIOTypeDropdownItem model dispatch setState header
             IOType.Sample           |> createIOTypeDropdownItem model dispatch setState header
             IOType.Material         |> createIOTypeDropdownItem model dispatch setState header
-            IOType.RawDataFile      |> createIOTypeDropdownItem model dispatch setState header
-            IOType.DerivedDataFile  |> createIOTypeDropdownItem model dispatch setState header
-            IOType.ImageFile        |> createIOTypeDropdownItem model dispatch setState header
+            IOType.Data             |> createIOTypeDropdownItem model dispatch setState header
             IOType.FreeText ""      |> createIOTypeDropdownItem model dispatch setState header
             // Navigation element back to main page
             backToMainDropdownButton setState

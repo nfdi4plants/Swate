@@ -167,7 +167,7 @@ module TemplateFromDB =
                                         columnsToRemove <- containsAtIndex::columnsToRemove
                                 tablecopy.RemoveColumns (Array.ofList columnsToRemove)
                                 let index = Spreadsheet.Sidebar.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
-                                SpreadsheetInterface.JoinTable (tablecopy, Some index, Some ARCtrl.ISA.TableJoinOptions.WithUnit ) |> InterfaceMsg |> dispatch
+                                SpreadsheetInterface.JoinTable (tablecopy, Some index, Some ARCtrl.TableJoinOptions.WithUnit ) |> InterfaceMsg |> dispatch
                             )
                             prop.text "Add template"
                         ]

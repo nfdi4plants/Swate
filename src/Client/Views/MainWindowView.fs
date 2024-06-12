@@ -103,6 +103,7 @@ let Main (model: Messages.Model, dispatch) =
                     | Some (ArcFiles.Study _)
                     | Some (ArcFiles.Investigation _) 
                     | Some (ArcFiles.Template _) ->
+                        Html.none
                         XlsxFileView.Main (model , dispatch)
                     if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 && state.ActiveView <> Spreadsheet.ActiveView.Metadata then
                         MainComponents.AddRows.Main dispatch

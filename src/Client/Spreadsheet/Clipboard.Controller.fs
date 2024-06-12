@@ -1,7 +1,7 @@
 module Spreadsheet.Clipboard.Controller
 
 open Fable.Core
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 let copyCell (cell: CompositeCell) : JS.Promise<unit> =

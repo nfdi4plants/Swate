@@ -6,8 +6,8 @@ open Model.ARCitect
 open Shared
 open Messages
 open Elmish
-open ARCtrl.ISA
-open ARCtrl.ISA.Json
+open ARCtrl
+open ARCtrl.Json
 
 let send (msg:ARCitect.Msg) =
     let (data: obj) =
@@ -15,13 +15,13 @@ let send (msg:ARCitect.Msg) =
         | Init ->
             "Hello from Swate!"
         | AssayToARCitect assay ->
-            let assay = ArcAssay.toArcJsonString assay
+            let assay = ArcAssay.toJsonString 0 assay
             assay
         | StudyToARCitect study ->
-            let json = ArcStudy.toArcJsonString study
+            let json = ArcStudy.toJsonString 0 study
             json
         | InvestigationToARCitect inv ->
-            let json = ArcInvestigation.toArcJsonString inv
+            let json = ArcInvestigation.toJsonString 0 inv
             json
         | RequestPaths selectDirectories ->
             selectDirectories
@@ -32,15 +32,15 @@ let send (msg:ARCitect.Msg) =
 let EventHandler (dispatch: Messages.Msg -> unit) : IEventHandler =
     {
         AssayToSwate = fun data ->
-            let assay = ArcAssay.fromArcJsonString data.ArcAssayJsonString
+            let assay = ArcAssay.fromJsonString data.ArcAssayJsonString
             log($"Received Assay {assay.Identifier} from ARCitect!")
             Spreadsheet.InitFromArcFile (ArcFiles.Assay assay) |> SpreadsheetMsg |> dispatch
         StudyToSwate = fun data ->
-            let study = ArcStudy.fromArcJsonString data.ArcStudyJsonString
+            let study = ArcStudy.fromJsonString data.ArcStudyJsonString
             Spreadsheet.InitFromArcFile (ArcFiles.Study (study, [])) |> SpreadsheetMsg |> dispatch
             log($"Received Study {study.Identifier} from ARCitect!")
         InvestigationToSwate = fun data ->
-            let inv = ArcInvestigation.fromArcJsonString data.ArcInvestigationJsonString
+            let inv = ArcInvestigation.fromJsonString data.ArcInvestigationJsonString
             Spreadsheet.InitFromArcFile (ArcFiles.Investigation inv) |> SpreadsheetMsg |> dispatch
             log($"Received Investigation {inv.Title} from ARCitect!")
         PathsToSwate = fun paths ->

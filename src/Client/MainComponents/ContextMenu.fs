@@ -3,7 +3,7 @@ module MainComponents.ContextMenu
 open Feliz
 open Feliz.Bulma
 open Spreadsheet
-open ARCtrl.ISA
+open ARCtrl
 open Messages
 
 type private ContextFunctions = {

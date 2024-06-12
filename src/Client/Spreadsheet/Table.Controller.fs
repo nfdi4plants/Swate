@@ -5,7 +5,7 @@ open Shared.TermTypes
 open Shared.OfficeInteropTypes
 open Spreadsheet
 open Types
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 module ControllerTableAux =

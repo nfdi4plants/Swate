@@ -3,7 +3,7 @@ namespace SpreadsheetInterface
 open Shared
 open OfficeInteropTypes
 
-open ARCtrl.ISA
+open ARCtrl
 
 ///<summary>This type is used to interface between standalone, electron and excel logic and will forward the command to the correct logic.</summary>
 type Msg =

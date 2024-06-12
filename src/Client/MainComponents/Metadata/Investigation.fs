@@ -7,7 +7,7 @@ open Spreadsheet
 open Messages
 open Browser.Types
 open Fable.Core.JsInterop
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) = 
@@ -38,17 +38,17 @@ let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) =
             isarea=true
         )
         FormComponents.PersonsInput(
-            inv.Contacts,
+            Array.ofSeq inv.Contacts,
             "Contacts",
             (fun i -> 
-                inv.Contacts <- i
+                inv.Contacts <- ResizeArray i
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.PublicationsInput(
-            inv.Publications,
+            Array.ofSeq inv.Publications,
             "Publications",
             (fun i -> 
-                inv.Publications <- i
+                inv.Publications <- ResizeArray i
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.DateTimeInput (
@@ -66,10 +66,10 @@ let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) =
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.OntologySourceReferencesInput(
-            inv.OntologySourceReferences,
+            Array.ofSeq inv.OntologySourceReferences,
             "Ontology Source References",
             (fun oas -> 
-                inv.OntologySourceReferences <- oas
+                inv.OntologySourceReferences <- ResizeArray oas
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.TextInputs(
@@ -80,10 +80,10 @@ let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) =
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.CommentsInput(
-            inv.Comments,
+            Array.ofSeq inv.Comments,
             "Comments",
             (fun i -> 
-                inv.Comments <- i
+                inv.Comments <- ResizeArray i
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
     ]
