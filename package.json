@@ -20,7 +20,7 @@
         "sass": "^1.69.5",
         "selfsigned": "^2.4.1",
         "tailwindcss": "^3.3.6",
-        "vite": "^5.0.5"
+        "vite": "^5.0.13"
     },
     "dependencies": {
         "@creativebulma/bulma-tooltip": "^1.2.0",
