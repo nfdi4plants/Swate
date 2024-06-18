@@ -176,13 +176,13 @@ let templateApi credentials =
     {
         getTemplates = fun () -> async {
             let! templates = ARCtrl.Template.Web.getTemplates (None)
-            let templatesJson = ARCtrl.Json.Templates.toJsonString 0 (Array.ofSeq templates.Values)
+            let templatesJson = ARCtrl.Json.Templates.toJsonString 0 (Array.ofSeq templates)
             return templatesJson
         }
 
         getTemplateById = fun id -> async {
             let! templates = ARCtrl.Template.Web.getTemplates (None)
-            let template = templates.Values |> Seq.find (fun t -> t.Id = System.Guid(id))
+            let template = templates |> Seq.find (fun t -> t.Id = System.Guid(id))
             let templateJson = Template.toCompressedJsonString 0 template
             return templateJson
         }

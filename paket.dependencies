@@ -2,7 +2,7 @@ source https://api.nuget.org/v3/index.json
 framework: net8.0
 storage: none
 
-nuget ARCtrl 2.0.0-alpha.6.swate alpha
+nuget ARCtrl 2.0.0-alpha.7.swate alpha
 nuget Fable.Fetch 2.7.0
 nuget Feliz.Bulma.Checkradio
 nuget Feliz.Bulma.Switch

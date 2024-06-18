@@ -18,25 +18,25 @@ let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) =
             fullwidth=true
         )
         FormComponents.OntologyAnnotationInput(
-            assay.MeasurementType |> Option.defaultValue OntologyAnnotation.empty,
+            assay.MeasurementType |> Option.defaultValue (OntologyAnnotation.empty()),
             (fun oa -> 
-                let oa = if oa = OntologyAnnotation.empty then None else Some oa
+                let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                 assay.MeasurementType <- oa
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
             "Measurement Type"
         )
         FormComponents.OntologyAnnotationInput(
-            assay.TechnologyType |> Option.defaultValue OntologyAnnotation.empty,
+            assay.TechnologyType |> Option.defaultValue (OntologyAnnotation.empty()),
             (fun oa -> 
-                let oa = if oa = OntologyAnnotation.empty then None else Some oa
+                let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                 assay.TechnologyType <- oa
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
             "Technology Type"
         )
         FormComponents.OntologyAnnotationInput(
-            assay.TechnologyPlatform |> Option.defaultValue OntologyAnnotation.empty,
+            assay.TechnologyPlatform |> Option.defaultValue (OntologyAnnotation.empty()),
             (fun oa -> 
-                let oa = if oa = OntologyAnnotation.empty then None else Some oa
+                let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                 assay.TechnologyPlatform <- oa
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
             "Technology Platform"

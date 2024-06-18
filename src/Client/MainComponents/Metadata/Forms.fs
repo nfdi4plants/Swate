@@ -778,7 +778,7 @@ type FormComponents =
     [<ReactComponent>]
     static member OntologyAnnotationsInput (oas: OntologyAnnotation [], label: string, setter: OntologyAnnotation [] -> unit, ?showTextLabels: bool) =
         FormComponents.InputSequence(
-            oas, OntologyAnnotation.empty, label, setter, 
+            oas, (OntologyAnnotation.empty()), label, setter, 
             (fun (a,b,c,d) -> FormComponents.OntologyAnnotationInput(a,c,label=b,removebutton=d,?showTextLabels=showTextLabels))
         )
 
@@ -1036,9 +1036,9 @@ type FormComponents =
                     ]
                     createPersonFieldTextInput(state.Authors, "Authors", fun s -> state.Authors <- s)
                     FormComponents.OntologyAnnotationInput(
-                        Option.defaultValue OntologyAnnotation.empty state.Status, 
+                        Option.defaultValue (OntologyAnnotation.empty()) state.Status, 
                         (fun s -> 
-                            state.Status <- if s = OntologyAnnotation.empty then None else Some s
+                            state.Status <- if s = (OntologyAnnotation.empty()) then None else Some s
                             state |> setter
                         ),
                         "Status"

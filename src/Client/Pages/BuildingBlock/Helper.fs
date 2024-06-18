@@ -18,7 +18,7 @@ let selectHeaderCellType (hct: BuildingBlock.HeaderCellType) setUiState dispatch
 open Fable.Core
 
 let createCompositeHeaderFromState (state: BuildingBlock.Model) =
-    let getOA() = state.TryHeaderOA() |> Option.defaultValue OntologyAnnotation.empty
+    let getOA() = state.TryHeaderOA() |> Option.defaultValue (OntologyAnnotation.empty())
     let getIOType() = state.TryHeaderIO() |> Option.defaultValue (IOType.FreeText "")
     match state.HeaderCellType with
     | HeaderCellType.Component -> CompositeHeader.Component <| getOA()

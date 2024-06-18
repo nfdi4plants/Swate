@@ -99,8 +99,12 @@ module Spreadsheet =
                 let cmd = Cmd.none
                 state, model, cmd
             | UpdateCell (index, cell) ->
+                log ("[UPDATECELL]", index, cell)
                 let nextState = 
                     state.ActiveTable.UpdateCellAt(fst index,snd index, cell)
+                    log "START"
+                    log state.ActiveTable
+                    log "END"
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
             | UpdateCells arr ->

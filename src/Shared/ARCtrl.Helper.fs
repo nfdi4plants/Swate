@@ -58,7 +58,7 @@ module Extensions =
     open ArcTableAux
 
     type OntologyAnnotation with
-        static member empty = OntologyAnnotation.create()
+        static member empty() = OntologyAnnotation.create()
 
     type ArcTable with
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
@@ -109,10 +109,10 @@ module Extensions =
             | CompositeHeader.Factor _ -> CompositeHeader.Factor oa
             | _ ->  failwithf "Cannot update OntologyAnnotation on CompositeHeader without OntologyAnnotation: '%A'" this
 
-        static member ParameterEmpty = CompositeHeader.Parameter OntologyAnnotation.empty
-        static member CharacteristicEmpty = CompositeHeader.Characteristic OntologyAnnotation.empty
-        static member ComponentEmpty = CompositeHeader.Component OntologyAnnotation.empty
-        static member FactorEmpty = CompositeHeader.Factor OntologyAnnotation.empty
+        static member ParameterEmpty = CompositeHeader.Parameter <| OntologyAnnotation.empty()
+        static member CharacteristicEmpty = CompositeHeader.Characteristic <| OntologyAnnotation.empty()
+        static member ComponentEmpty = CompositeHeader.Component <| OntologyAnnotation.empty()
+        static member FactorEmpty = CompositeHeader.Factor <| OntologyAnnotation.empty()
         static member InputEmpty = CompositeHeader.Input <| IOType.FreeText ""
         static member OutputEmpty = CompositeHeader.Output <| IOType.FreeText ""
 

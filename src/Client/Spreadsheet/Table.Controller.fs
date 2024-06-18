@@ -105,6 +105,7 @@ let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet
         let cell = cell|> Option.defaultValue (column.GetDefaultEmptyCell())
         if i = columnIndex then
             for cellRowIndex in 0 .. column.Cells.Length-1 do
+                let cell = cell
                 state.ActiveTable.UpdateCellAt(columnIndex, cellRowIndex, cell)
     )
     {state with ArcFile = state.ArcFile}
