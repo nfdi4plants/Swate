@@ -463,8 +463,12 @@ module FilterHelper =
                             if Seq.isEmpty scores then 0.0 else 1.0
                     score, template
                 )
-                |> Array.filter (fun (score,_) -> score > 0.2)
+                |> Array.filter (fun (score,_) -> score > 0.3)
                 |> Array.sortByDescending fst
+                |> fun y -> 
+                    for score, x in y do
+                        log (score, x.Name)
+                    y
                 |> Array.map snd
             scoredTemplate
         else
@@ -515,10 +519,10 @@ type Search =
         if templates.Length = 0 then [||] else
             templates
             |> Array.ofSeq
+            |> Array.sortBy (fun template -> template.Name, template.Organisation)
             |> FilterHelper.filterTableByTags config.ProtocolFilterTags config.ProtocolFilterErTags config.TagFilterIsAnd 
             |> FilterHelper.filterTableByCommunityFilter config.CommunityFilter
             |> FilterHelper.sortTableBySearchQuery config.Searchfield config.ProtocolSearchQuery
-            |> Array.sortBy (fun template -> template.Name, template.Organisation)
 
     [<ReactComponent>]
     static member FileSortElement(model, config, configSetter: TemplateFilterConfig -> unit) =
