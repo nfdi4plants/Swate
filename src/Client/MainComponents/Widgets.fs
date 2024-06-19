@@ -1,4 +1,4 @@
-﻿namespace MainComponents
+namespace MainComponents
 
 open Feliz
 open Feliz.Bulma
@@ -235,7 +235,12 @@ type Widget =
             if model.FilePickerState.FileNames <> [] then
                 FilePicker.fileSortElements model dispatch
 
-                FilePicker.FileNameTable.table model dispatch
+                Bulma.field.div [
+                    prop.style [style.maxHeight (length.px 350); style.overflow.auto]
+                    prop.children [
+                        FilePicker.FileNameTable.table model dispatch
+                    ]
+                ]
                 //fileNameElements model dispatch
                 FilePicker.insertButton model dispatch
         ]
