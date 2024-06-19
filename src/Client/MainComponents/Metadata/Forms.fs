@@ -1,4 +1,4 @@
-﻿namespace MainComponents.Metadata
+namespace MainComponents.Metadata
 
 open Feliz
 open Feliz.Bulma
@@ -261,7 +261,6 @@ module private Helper =
             prop.classes ["is-flex"; "is-justify-content-center"]
             prop.children [
                 Bulma.button.button [
-                    prop.className "is-outlined"
                     prop.text "+"
                     prop.onClick clickEvent
                 ]
