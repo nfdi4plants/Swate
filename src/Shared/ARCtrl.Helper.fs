@@ -59,6 +59,8 @@ module Extensions =
 
     type OntologyAnnotation with
         static member empty() = OntologyAnnotation.create()
+        static member fromTerm (term:Term) = OntologyAnnotation(term.Name, term.FK_Ontology, term.Accession)
+        member this.ToTermMinimal() = TermMinimal.create this.NameText this.TermAccessionShort
 
     type ArcTable with
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
@@ -226,7 +228,3 @@ module Extensions =
             | CompositeCell.Term oa -> CompositeCell.Term (updateTAN oa)
             | CompositeCell.Unitized (v, oa) -> CompositeCell.Unitized (v, updateTAN oa)
             | _ -> this
-
-    type OntologyAnnotation with
-        static member fromTerm (term:Term) = OntologyAnnotation(term.Name, term.FK_Ontology, term.Accession)
-        member this.ToTermMinimal() = TermMinimal.create this.NameText this.TermAccessionShort

@@ -66,7 +66,7 @@ let private quickAccessButtonListEnd (model: Model) dispatch =
                     Bulma.icon [Html.i [prop.className "fa-sharp fa-solid fa-trash";]]
                 ],
                 (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
-                buttonProps = [Bulma.color.isDanger; Bulma.button.isInverted; Bulma.button.isOutlined]
+                buttonProps = [Bulma.color.isDanger]
             ).toReactElement()
         ]
     ]

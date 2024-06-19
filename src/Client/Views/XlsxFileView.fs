@@ -1,4 +1,4 @@
-﻿module XlsxFileView
+module XlsxFileView
 
 open Feliz
 open Feliz.Bulma
@@ -10,7 +10,11 @@ open Shared
 let Main(model: Messages.Model, dispatch: Messages.Msg -> unit) = 
     match model.SpreadsheetModel.ActiveView with
     | ActiveView.Table _ ->
-        MainComponents.SpreadsheetView.Main model dispatch
+        match model.SpreadsheetModel.ActiveTable.ColumnCount with
+        | 0 -> 
+            MainComponents.EmptyTableElement.Main()
+        | _ ->
+            MainComponents.SpreadsheetView.Main model dispatch
     | ActiveView.Metadata ->
         Bulma.section [
             Bulma.container [

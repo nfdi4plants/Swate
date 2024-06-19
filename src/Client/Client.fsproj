@@ -86,6 +86,7 @@
         <Compile Include="Pages\Settings\SettingsView.fs" />
         <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
         <Compile Include="Pages\Dag\Dag.fs" />
+        <Compile Include="MainComponents\EmptyTableElement.fs" />
         <Compile Include="MainComponents\Widgets.fs" />
         <Compile Include="MainComponents\MainViewContainer.fs" />
         <Compile Include="MainComponents\Metadata\Forms.fs" />

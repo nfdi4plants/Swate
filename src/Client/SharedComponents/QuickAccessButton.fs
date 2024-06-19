@@ -30,9 +30,9 @@ type QuickAccessButton = {
             prop.children [
                 Bulma.button.a [
                     prop.tabIndex (if isDisabled then -1 else 0)
+                    prop.className "myNavbarButton"
                     yield! this.ButtonProps
                     prop.disabled isDisabled
-                    prop.className "myNavbarButton"
                     prop.onClick this.Msg
                     prop.children [
                         Html.div [
