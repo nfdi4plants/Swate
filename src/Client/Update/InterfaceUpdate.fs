@@ -12,6 +12,7 @@ open Elmish
 open Model
 open Shared
 open Fable.Core.JsInterop
+open Shared.ARCtrlHelper
 
 module private Helper =
     open ExcelJS.Fable.GlobalBindings
@@ -112,7 +113,8 @@ module Interface =
                     let mutable rowIndex = rowIndex
                     let cells = [|
                         for name in fileNames do
-                            let cell = ARCtrl.CompositeCell.createFreeText name
+                            let c0 = model.SpreadsheetModel.ActiveTable.TryGetCellAt(columnIndex,rowIndex).Value
+                            let cell = c0.UpdateMainField name
                             (columnIndex, rowIndex), cell
                             rowIndex <- rowIndex + 1
                     |]

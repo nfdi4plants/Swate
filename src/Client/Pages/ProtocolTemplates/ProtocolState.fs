@@ -55,7 +55,7 @@ module Protocol =
             let nextState, cmd = 
                 match templates with
                 | Ok t0 -> 
-                    let t = Array.ofSeq t0.Values
+                    let t = Array.ofSeq t0
                     let nextState = { state with LastUpdated = Some System.DateTime.UtcNow }
                     nextState, UpdateTemplates t |> ProtocolMsg |> Cmd.ofMsg
                 | Result.Error e -> state, GenericError (Cmd.none,e) |> DevMsg |> Cmd.ofMsg
