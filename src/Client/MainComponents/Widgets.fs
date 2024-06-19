@@ -104,7 +104,7 @@ type Widget =
         let element = React.useElementRef()
         React.useLayoutEffectOnce(fun _ -> position |> Option.iter (fun position -> MoveEventListener.ensurePositionInsideWindow element position |> Some |> setPosition)) // Reposition widget inside window
         let resizeElement (content: ReactElement) =
-            Bulma.modalCard [
+            Bulma.card [
                 prop.ref element
                 prop.onMouseDown(fun e ->  // resize
                     e.preventDefault()
@@ -122,8 +122,10 @@ type Widget =
                     style.zIndex 40
                     style.cursor.eastWestResize//style.cursor.northWestSouthEastResize ; 
                     style.display.flex
-                    style.paddingRight(2); style.overflow.visible
+                    style.paddingRight(2);
+                    style.overflow.visible
                     style.position.fixedRelativeToWindow
+                    style.minWidth.minContent
                     if size.IsSome then
                         style.width size.Value.X
                         //style.height size.Value.Y
@@ -139,7 +141,7 @@ type Widget =
             prop.onMouseDown(fun e -> e.stopPropagation())
             prop.style [style.cursor.defaultCursor; style.display.flex; style.flexDirection.column; style.flexGrow 1]
             prop.children [
-                Bulma.modalCardHead [
+                Bulma.cardHeader [
                     prop.onMouseDown(fun e -> // move
                         e.preventDefault()
                         e.stopPropagation()
@@ -155,18 +157,22 @@ type Widget =
                     )
                     prop.style [style.cursor.move]
                     prop.children [
-                        Bulma.modalCardTitle Html.none
-                        Bulma.delete [ prop.onClick (fun e -> e.stopPropagation(); rmv e) ]
+                        Bulma.cardHeaderTitle.p Html.none
+                        Bulma.cardHeaderIcon.a [
+                            Bulma.delete [
+                                prop.onClick (fun e -> e.stopPropagation(); rmv e)
+                            ]
+                        ]
                     ]
                 ]
-                Bulma.modalCardBody [
+                Bulma.cardContent [
                     prop.style [style.overflow.inheritFromParent]
                     prop.children [
                         content
                         if help.IsSome then Elements.helpExtendButton (fun _ -> setHelpIsActive (not helpIsActive))
                     ]
                 ]
-                Bulma.modalCardFoot [
+                Bulma.cardFooter [
                     prop.style [style.padding 5]
                     if help.IsSome then
                         prop.children [

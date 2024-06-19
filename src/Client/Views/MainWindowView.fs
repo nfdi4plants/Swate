@@ -16,15 +16,8 @@ let private WidgetOrderContainer bringWidgetToFront (widget) =
         ]
     ]
 
-let private ModalDisplay (widgets: Widget list, rmvWidget: Widget -> unit, bringWidgetToFront: Widget -> unit, model, dispatch) = 
-    let rmv (widget: Widget) = fun _ -> rmvWidget widget
-    let displayWidget (widget: Widget) =
-        let bringWidgetToFront = fun _ -> bringWidgetToFront widget
-        match widget with
-        | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget) 
-        | Widget._Template -> Widget.Templates (model, dispatch, rmv widget)
-        | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
-        |> WidgetOrderContainer bringWidgetToFront
+let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactElement) = 
+    
     match widgets.Length with
     | 0 -> 
         Html.none
@@ -73,6 +66,16 @@ let Main (model: Messages.Model, dispatch) =
     let bringWidgetToFront (widget: Widget) = 
         let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev
         setWidgets newList
+    let displayWidget (widget: Widget) =
+        let rmv (widget: Widget) = fun _ -> rmvWidget widget
+        let bringWidgetToFront = fun _ -> bringWidgetToFront widget
+        match widget with
+        | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget) 
+        | Widget._Template -> Widget.Templates (model, dispatch, rmv widget)
+        | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
+        |> WidgetOrderContainer bringWidgetToFront
+    let addWidget (widget: Widget) = 
+        widget::widgets |> List.rev |> setWidgets
     let state = model.SpreadsheetModel
     Html.div [
         prop.id "MainWindow"
@@ -84,7 +87,7 @@ let Main (model: Messages.Model, dispatch) =
         ]
         prop.children [
             MainComponents.Navbar.Main (model, dispatch, widgets, setWidgets)
-            ModalDisplay (widgets, rmvWidget, bringWidgetToFront, model, dispatch)
+            ModalDisplay (widgets, displayWidget)
             Html.div [
                 prop.id "TableContainer"
                 prop.style [
@@ -104,7 +107,7 @@ let Main (model: Messages.Model, dispatch) =
                     | Some (ArcFiles.Investigation _) 
                     | Some (ArcFiles.Template _) ->
                         Html.none
-                        XlsxFileView.Main (model , dispatch)
+                        XlsxFileView.Main (model, dispatch, (fun () -> addWidget Widget._BuildingBlock), (fun () -> addWidget Widget._Template))
                     if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 && state.ActiveView <> Spreadsheet.ActiveView.Metadata then
                         MainComponents.AddRows.Main dispatch
                 ]

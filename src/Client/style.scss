@@ -16,6 +16,22 @@ $primarye-invert: white;
 @use "bulma/sass" with ( $primary: $nfdi-blue-dark, $success: $nfdi-mint, $info: $nfdi-blue-light, $danger: $nfdi-red, $warning: $nfdi-yellow, $custom-colors: ( "primarye":($primarye, $primarye-invert)), );
 @forward "bulma/sass/themes";
 
+.gap-1 {
+    gap: 0.25rem
+}
+
+.gap-2 {
+    gap: 0.5rem
+}
+
+.gap-3 {
+    gap: 1rem
+}
+
+.gap-4 {
+    gap: 1.5rem
+}
+
 :root {
     --bulma-duration: 0.1s;
 }

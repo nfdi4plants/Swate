@@ -7,12 +7,12 @@ open Spreadsheet
 open Shared
 
 [<ReactComponentAttribute>]
-let Main(model: Messages.Model, dispatch: Messages.Msg -> unit) = 
+let Main(model: Messages.Model, dispatch: Messages.Msg -> unit, openBuildingBlockWidget, openTemplateWidget) = 
     match model.SpreadsheetModel.ActiveView with
     | ActiveView.Table _ ->
         match model.SpreadsheetModel.ActiveTable.ColumnCount with
         | 0 -> 
-            MainComponents.EmptyTableElement.Main()
+            MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget)
         | _ ->
             MainComponents.SpreadsheetView.Main model dispatch
     | ActiveView.Metadata ->
