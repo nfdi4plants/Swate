@@ -124,7 +124,7 @@ let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
         SelectedCells = Set.empty}
 
 let setColumn (index: int) (column: CompositeColumn) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    state.ActiveTable.SetColumn (index, column)
+    state.ActiveTable.UpdateColumn (index, column.Header, column.Cells)
     {state with
         ArcFile = state.ArcFile
         SelectedCells = Set.empty}

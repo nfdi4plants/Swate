@@ -1,4 +1,4 @@
-﻿namespace Modals
+namespace Modals
 
 open Feliz
 open Feliz.Bulma
