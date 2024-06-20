@@ -108,7 +108,7 @@ let private scrollIntoViewRetry (id: string) =
                 ()
         else
             let rect = headerelement.getBoundingClientRect()
-            if rect.left >= 0 then
+            if rect.left >= 0 && ((rect.right <= Browser.Dom.window.innerWidth) || (rect.right <= Browser.Dom.document.documentElement.clientWidth)) then
                 ()
             else
                 let config = createEmpty<Browser.Types.ScrollIntoViewOptions>
