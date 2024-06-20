@@ -134,7 +134,8 @@ let Main (index: int, tables: ArcTables, model: Messages.Model, dispatch: Messag
         prop.children [
             if state.IsEditable then
                 let updateName = fun e ->
-                    Spreadsheet.RenameTable (index, state.Name) |> Messages.SpreadsheetMsg |> dispatch
+                    if state.Name <> table.Name then
+                        Spreadsheet.RenameTable (index, state.Name) |> Messages.SpreadsheetMsg |> dispatch
                     setState {state with IsEditable = false}
                 Bulma.input.text [
                     prop.autoFocus(true)
