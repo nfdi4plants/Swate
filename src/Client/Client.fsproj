@@ -59,7 +59,7 @@
         <Compile Include="Spreadsheet\Types.fs" />
         <Compile Include="Spreadsheet\Clipboard.Controller.fs" />
         <Compile Include="Spreadsheet\Table.Controller.fs" />
-        <Compile Include="Spreadsheet\Sidebar.Controller.fs" />
+        <Compile Include="Spreadsheet\BuildingBlocks.Controller.fs" />
         <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
         <Compile Include="SharedComponents\AdvancedSearch.fs" />
         <Compile Include="SharedComponents\TermSearchInput.fs" />

@@ -135,7 +135,7 @@ let private addBuildingBlockButton (model: Model) dispatch =
             Bulma.button.isFullWidth
             prop.onClick (fun _ ->
                 let column = CompositeColumn.create(header, [|if body.IsSome then body.Value|])
-                let index = Spreadsheet.Sidebar.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
+                let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
                 let id = $"Header_{index}_Main"
                 scrollIntoViewRetry id

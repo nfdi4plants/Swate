@@ -10,6 +10,13 @@ open Shared
 
 module ControllerTableAux =
 
+    let rec createNewTableName (ind: int) names =
+        let name = "NewTable" + string ind
+        if Seq.contains name names then
+            createNewTableName (ind+1) names
+        else
+            name
+
     let findEarlierTable (tableIndex:int) (tables: ArcTables) =
         let indices = [ 0 .. tables.TableCount-1 ]
         let lower = indices |> Seq.tryFindBack (fun k -> k < tableIndex)
@@ -24,6 +31,40 @@ module ControllerTableAux =
         findEarlierTable tableIndex tables, findLaterTable tableIndex tables
 
 open ControllerTableAux
+
+let switchTable (nextIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    match state.ActiveView with
+    | ActiveView.Table i when i = nextIndex -> state
+    | _ ->
+        { state with
+            ActiveCell = None
+            SelectedCells = Set.empty
+            ActiveView = ActiveView.Table nextIndex }
+
+/// <summary>This is the basic function to create new Tables from an array of SwateBuildingBlocks</summary>
+let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    state.Tables.AddTable(newTable)
+    switchTable (state.Tables.TableCount - 1) state
+    
+
+/// <summary>This function is used to create multiple tables at once.</summary>
+let addTables (tables: ArcTable []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    state.Tables.AddTables(tables)
+    switchTable (state.Tables.TableCount - 1) state
+
+
+/// <summary>Adds the most basic empty Swate table with auto generated name.</summary>
+let createTable (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let tables = state.ArcFile.Value.Tables()
+    let newName = createNewTableName 0 tables.TableNames
+    let newTable = ArcTable.init(newName)
+    if usePrevOutput && ((tables.TableCount-1) >= state.ActiveView.TableIndex) then
+        let table = tables.GetTableAt(state.ActiveView.TableIndex)
+        let output = table.GetOutputColumn()
+        let newInput = output.Header.TryOutput().Value |> CompositeHeader.Input
+        newTable.AddColumn(newInput,output.Cells,forceReplace=true)
+    let nextState = {state with ArcFile = state.ArcFile}
+    addTable newTable nextState
 
 let updateTableOrder (prevIndex:int, newIndex:int) (state:Spreadsheet.Model) =
     state.Tables.MoveTable(prevIndex, newIndex)
@@ -45,22 +86,18 @@ let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Mode
         // if active table is removed get the next closest table and set it active
         match state.ActiveView with
         | ActiveView.Table i when i = removeIndex ->
-            let nextView =
-                let neighbors = findNeighborTables removeIndex state.Tables
-                match neighbors with
-                | Some (i, _), _ -> ActiveView.Table i
-                | None, Some (i, _) -> ActiveView.Table i
-                // This is a fallback option, which should never be hit
-                | _ -> ActiveView.Metadata
-            { state with
-                ArcFile = state.ArcFile
-                ActiveView = nextView }
+            let neighbors = findNeighborTables removeIndex state.Tables
+            match neighbors with
+            | Some (i, _), _ ->
+                switchTable i state
+            | None, Some (i, _) ->
+                switchTable i state
+            | _ -> { state with ActiveView = ActiveView.Metadata }
         | ActiveView.Table i -> // Tables still exist and an inactive one was removed. Just remove it.
-            let nextTable_Index = if i > removeIndex then i - 1 else i
+            let nextTableIndex = if i > removeIndex then i - 1 else i
             { state with
-                ArcFile = state.ArcFile
-                ActiveView = ActiveView.Table nextTable_Index }
-        | _ -> state
+                ActiveView = ActiveView.Table nextTableIndex }
+        | _ -> {state with ActiveView = ActiveView.Metadata }
 
 ///<summary>Add `n` rows to active table.</summary>
 let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =

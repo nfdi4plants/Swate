@@ -1,4 +1,4 @@
-module Spreadsheet.Sidebar.Controller
+module Spreadsheet.BuildingBlocks.Controller
 
 open System.Collections.Generic
 open Shared.TermTypes
@@ -10,17 +10,6 @@ open Shared
 
 
 module SidebarControllerAux =
-    let rec createNewTableName (ind: int) names =
-        let name = "NewTable" + string ind
-        if Seq.contains name names then
-            createNewTableName (ind+1) names
-        else
-            name
-
-    /// Uses current `ActiveTableIndex` to return next `ActiveTableIndex` whenever a new table is added and we want to
-    /// switch to the new table.
-    let getNextActiveTableIndex (state: Spreadsheet.Model) =
-        if state.Tables.TableCount = 0 then 0 else state.ActiveView.TableIndex + 1
 
     /// <summary>
     /// Uses the first selected columnIndex from `state.SelectedCells` to determine if new column should be inserted or appended.
@@ -44,38 +33,6 @@ module SanityChecks =
 
 
 open SidebarControllerAux
-
-/// <summary>This is the basic function to create new Tables from an array of SwateBuildingBlocks</summary>
-let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let tables = state.Tables
-    // calculate next index
-    let newIndex = getNextActiveTableIndex state
-    tables.AddTable(newTable, newIndex)
-    { state with
-        ArcFile = state.ArcFile
-        ActiveView = ActiveView.Table newIndex }
-
-/// <summary>This function is used to create multiple tables at once.</summary>
-let addTables (tables: ArcTable []) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let newIndex = getNextActiveTableIndex state 
-    state.Tables.AddTables(tables, newIndex)
-    { state with
-        ArcFile = state.ArcFile
-        ActiveView = ActiveView.Table (newIndex + tables.Length) }
-
-
-/// <summary>Adds the most basic empty Swate table with auto generated name.</summary>
-let createTable (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let tables = state.ArcFile.Value.Tables()
-    let newName = createNewTableName 0 tables.TableNames
-    let newTable = ArcTable.init(newName)
-    if usePrevOutput && (tables.TableCount-1) >= state.ActiveView.TableIndex then
-        let table = tables.GetTableAt(state.ActiveView.TableIndex)
-        let output = table.GetOutputColumn()
-        let newInput = output.Header.TryOutput().Value |> CompositeHeader.Input
-        newTable.AddColumn(newInput,output.Cells,forceReplace=true)
-    let nextState = {state with ArcFile = state.ArcFile}
-    addTable newTable nextState
 
 let addBuildingBlock(newColumn: CompositeColumn) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable

@@ -7,16 +7,13 @@ open LocalHistory
 open Model
 open Shared
 open Spreadsheet.Table
-open Spreadsheet.Sidebar
+open Spreadsheet.BuildingBlocks
 open Spreadsheet.Clipboard
 open Fable.Remoting.Client
-open Fable.Remoting.Client.InternalUtilities
 open FsSpreadsheet
 open FsSpreadsheet.Js
 open ARCtrl
 open ARCtrl.Spreadsheet
-open Spreadsheet.Sidebar.Controller
-open Feliz
 
 module Spreadsheet =
 
