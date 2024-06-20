@@ -107,12 +107,16 @@ let private scrollIntoViewRetry (id: string) =
             else
                 ()
         else
-            let config = createEmpty<Browser.Types.ScrollIntoViewOptions>
-            config.behavior <- Browser.Types.ScrollBehavior.Smooth
-            config.block <- Browser.Types.ScrollAlignment.End
-            config.``inline`` <- Browser.Types.ScrollAlignment.End
-            log headerelement
-            headerelement.scrollIntoView(config)
+            let rect = headerelement.getBoundingClientRect()
+            if rect.left >= 0 then
+                ()
+            else
+                let config = createEmpty<Browser.Types.ScrollIntoViewOptions>
+                config.behavior <- Browser.Types.ScrollBehavior.Smooth
+                config.block <- Browser.Types.ScrollAlignment.End
+                config.``inline`` <- Browser.Types.ScrollAlignment.End
+                //log headerelement
+                headerelement.scrollIntoView(config)
     loop 0
     
 

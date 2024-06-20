@@ -161,12 +161,14 @@ module TemplateFromDB =
                                 let mutable columnsToRemove = []
                                 // find duplicate columns
                                 let tablecopy = model.ProtocolState.TemplateSelected.Value.Table.Copy()
-                                for header in tablecopy.Headers do
-                                    let containsAtIndex = model.SpreadsheetModel.ActiveTable.Headers.FindIndex(fun h -> h = header)
-                                    if containsAtIndex >= 0 then
-                                        columnsToRemove <- containsAtIndex::columnsToRemove
+                                for header in model.SpreadsheetModel.ActiveTable.Headers do
+                                    let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
+                                    if containsAtIndex.IsSome then
+                                        columnsToRemove <- containsAtIndex.Value::columnsToRemove
+                                log columnsToRemove
                                 tablecopy.RemoveColumns (Array.ofList columnsToRemove)
                                 let index = Spreadsheet.Sidebar.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
+                                log index
                                 SpreadsheetInterface.JoinTable (tablecopy, Some index, Some ARCtrl.TableJoinOptions.WithUnit ) |> InterfaceMsg |> dispatch
                             )
                             prop.text "Add template"
