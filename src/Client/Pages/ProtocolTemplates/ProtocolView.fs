@@ -167,8 +167,27 @@ module TemplateFromDB =
                                         columnsToRemove <- containsAtIndex.Value::columnsToRemove
                                 log columnsToRemove
                                 tablecopy.RemoveColumns (Array.ofList columnsToRemove)
+                                tablecopy.IteriColumns(fun i c0 ->
+                                    let c1 = {c0 with Cells = [||]}
+                                    let c2 =
+                                        if c1.Header.isInput then
+                                            match model.SpreadsheetModel.ActiveTable.TryGetInputColumn() with
+                                            | Some ic ->
+                                                {c1 with Cells = ic.Cells}
+                                            | _ -> c1
+                                        elif c1.Header.isOutput then
+                                            match model.SpreadsheetModel.ActiveTable.TryGetOutputColumn() with
+                                            | Some oc ->
+                                                {c1 with Cells = oc.Cells}
+                                            | _ -> c1
+                                        else
+                                            c1
+                                    tablecopy.UpdateColumn(i, c2.Header, c2.Cells)
+                                )
+                                log(tablecopy.RowCount, tablecopy.ColumnCount)
                                 let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
-                                SpreadsheetInterface.JoinTable (tablecopy, Some index, Some ARCtrl.TableJoinOptions.WithUnit ) |> InterfaceMsg |> dispatch
+                                let joinConfig = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
+                                SpreadsheetInterface.JoinTable (tablecopy, Some index, joinConfig ) |> InterfaceMsg |> dispatch
                             )
                             prop.text "Add template"
                         ]
