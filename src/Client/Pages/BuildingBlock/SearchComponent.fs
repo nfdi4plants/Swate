@@ -1,4 +1,4 @@
-﻿module BuildingBlock.SearchComponent
+module BuildingBlock.SearchComponent
 
 open Feliz
 open Feliz.Bulma
@@ -125,7 +125,6 @@ let private addBuildingBlockButton (model: Model) dispatch =
             let isValid = Helper.isValidColumn header
             if isValid then
                 Bulma.color.isSuccess
-                Bulma.button.isActive
             else
                 Bulma.color.isDanger
                 prop.disabled true

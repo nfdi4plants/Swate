@@ -35,15 +35,26 @@ let private cellPlaceholder (c_opt: CompositeCell option) =
 let private RowLabel (rowIndex: int) = 
     let t : IReactProperty list -> ReactElement = if rowIndex < 0 then Html.th else Html.td 
     t [
-        prop.style [style.resize.none; style.border(length.px 1, borderStyle.solid, "darkgrey")]
+        //prop.style [style.resize.none; style.border(length.px 1, borderStyle.solid, "darkgrey")]
+        //prop.children [
+        //    Bulma.button.button [
+        //        prop.className "px-2 py-1"
+        //        prop.style [style.custom ("border", "unset"); style.borderRadius 0]
+        //        Bulma.button.isFullWidth
+        //        Bulma.button.isStatic
+        //        prop.tabIndex -1
+        //        prop.text (if rowIndex < 0 then "" else $"{rowIndex+1}")
+        //    ]
+        //]
+        prop.style [style.resize.none; style.border(length.px 1, borderStyle.solid, "darkgrey"); style.height(length.perc 100)]
         prop.children [
-            Bulma.button.button [
-                prop.className "px-2 py-1"
-                prop.style [style.custom ("border", "unset"); style.borderRadius 0]
-                Bulma.button.isFullWidth
-                Bulma.button.isStatic
-                prop.tabIndex -1
-                prop.text (if rowIndex < 0 then "" else $"{rowIndex+1}")
+            Html.div [
+                prop.style [style.height(length.perc 100);]
+                prop.className "is-flex is-justify-content-center is-align-items-center px-2 is-unselectable my-grey-out"
+                prop.disabled true
+                prop.children [
+                    Html.b (if rowIndex < 0 then "" else $"{rowIndex+1}")
+                ]
             ]
         ]
     ]

@@ -195,6 +195,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                     span [AriaHidden true] [ ]
                                     span [AriaHidden true] [ ]
                                     span [AriaHidden true] [ ]
+                                    span [AriaHidden true] [ ]
                                 ]
                             ]
                         ]

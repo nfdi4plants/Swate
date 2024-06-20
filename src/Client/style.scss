@@ -15,6 +15,12 @@ $primarye-invert: white;
 // 1. Import the initial variables
 @use "bulma/sass" with ( $primary: $nfdi-blue-dark, $success: $nfdi-mint, $info: $nfdi-blue-light, $danger: $nfdi-red, $warning: $nfdi-yellow, $custom-colors: ( "primarye":($primarye, $primarye-invert)), );
 @forward "bulma/sass/themes";
+@use "bulma/sass/utilities/css-variables" as cv;
+
+.my-grey-out {
+    background-color: cv.getVar("scheme-main-ter");
+    color: cv.getVar("link")
+}
 
 .gap-1 {
     gap: 0.25rem
@@ -37,7 +43,7 @@ $primarye-invert: white;
 }
 
 .main-contrast-bg {
-    background-color: var(--scheme-main)
+    background-color: cv.getVar("scheme-main")
 }
 
 .template-filter-container {
@@ -68,7 +74,7 @@ $primarye-invert: white;
         position: sticky;
         top: 0;
         z-index: 1;
-        background-color: var(--scheme-main)
+        background-color: cv.getVar("scheme-main")
     }
 }
 
@@ -101,8 +107,8 @@ $primarye-invert: white;
     width: 100%;
     max-height: 400px;
     overflow: auto;
-    border: 1px solid var(--bulma-border-color);
-    background-color: var(--bulma-scheme-main);
+    border: 1px solid cv.getVar("border");
+    background-color: cv.getVar("scheme-main");
     border-top: unset;
     z-index: 20;
 
@@ -125,8 +131,8 @@ $primarye-invert: white;
         }
 
         .term-select-item-more {
-            border-top: .5px solid var(--bulma-border-color);
-            box-shadow: 0px 4px 8px var(--bulma-border-color);
+            border-top: .5px solid cv.getVar("border");
+            box-shadow: 0px 4px 8px cv.getVar("border");
 
             td {
                 border: unset;
@@ -140,7 +146,7 @@ $primarye-invert: white;
             background-color: transparent;
             border: unset;
             cursor: pointer;
-            color: var(--bulma-scheme-invert);
+            color: cv.getVar("scheme-invert");
             justify-content: center;
             align-items: center;
             border-radius: 2px;
@@ -148,12 +154,12 @@ $primarye-invert: white;
         }
 
         .term-select-item-toggle-button:hover {
-            background-color: var(--bulma-content-blockquote-background-color)
+            background-color: cv.getVar("background")
         }
     }
 
     .term-select-item:not(:last-child) {
-        border-bottom: 1px solid var(--bulma-border-color);
+        border-bottom: 1px solid cv.getVar("border");
     }
 }
 
@@ -178,7 +184,7 @@ $primarye-invert: white;
 }
 
 .fixed_headers tbody tr:nth-child(even) {
-    background-color: var(--table-alternate);
+    background-color: cv.getVar("scheme-main-bis");
 }
 
 .fixed_headers thead th {
@@ -197,11 +203,16 @@ html, body {
     overflow: auto
 }
 
-a {
+
+table {
+    height: fit-content;
+}
+
+a:not([class]){
     color: $nfdi-blue-light
 }
 
-a:hover {
+a:not([class]):hover {
     color: $nfdi-blue-lighter-20
 }
 
@@ -255,7 +266,7 @@ a:hover {
     position: -webkit-sticky;
     min-height: min-content;
     top: 0;
-    background-color: var(--bulma-primary);
+    background-color: cv.getVar("primary");
 }
 
 .myNavbarSticky .navbar-item#logo {
@@ -269,7 +280,7 @@ a:hover {
         top: 50%;
         left: 50%;
         box-shadow: 0 0 15px 5px #fff, /* inner white */
-        0 0 30px 15px var(--bulma-success);
+        0 0 30px 15px cv.getVar("success");
     }
 }
 
@@ -293,13 +304,13 @@ a:hover {
 
 .myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within, .myNavbarButton:not([disabled]):hover {
     background-color: transparent;
-    color: var(--bulma-success)
+    color: cv.getVar("success")
 }
 
 
 .myNavbarButton.is-danger:not([disabled]):focus, .myNavbarButton.is-danger:not([disabled]):focus-within, .myNavbarButton.is-danger:not([disabled]):hover {
     background-color: transparent;
-    color: var(--bulma-danger)
+    color: cv.getVar("danger")
 }
 
 .myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within {
@@ -404,8 +415,8 @@ a.navbar-item:hover {
 }
 
 .clickableTagDelete:hover {
-    background-color: var(--bulma-danger) !important;
-    border-color: var(--bulma-anger) !important;
+    background-color: cv.getVar("danger") !important;
+    border-color: cv.getVar("danger") !important;
     color: white
 }
 
@@ -461,7 +472,7 @@ a.navbar-item:hover {
 }
 /* When the checkbox is checked, add a green background */
 .checkbox-input:checked ~ .checkbox-checkmark {
-    background-color: var(--bulma-success);
+    background-color: cv.getVar("success");
     border: none;
 }
 /* Create the checkmark/indicator (hidden when not checked) */
@@ -633,7 +644,7 @@ input::-ms-clear {
 }
 
 .danger_important {
-    color: var(--bulma-danger) !important
+    color: cv.getVar("danger") !important
 }
 
 kbd {
