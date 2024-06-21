@@ -164,19 +164,6 @@ type ApiCallHistoryItem = {
     Status         : ApiCallStatus
 }
 
-type ApiState = {
-    currentCall : ApiCallHistoryItem
-    callHistory : ApiCallHistoryItem list
-} with
-    static member init() = {
-        currentCall = ApiState.noCall
-        callHistory = []
-    }
-    static member noCall = {
-        FunctionName = "None"
-        Status = IsNone
-    }
-
 type PageState = {
     CurrentPage : Routing.Route
     IsExpert    : bool
@@ -281,14 +268,6 @@ module BuildingBlock =
         BodyCellType    : BodyCellType
         BodyArg         : U2<string, OntologyAnnotation> option
 
-        // Below everything is more or less deprecated
-        // This section is used to add a unit directly to an already existing building block
-        Unit2TermSearchText             : string
-        Unit2SelectedTerm               : Term option
-        Unit2TermSuggestions            : Term []
-        HasUnit2TermSuggestionsLoading  : bool
-        ShowUnit2TermSuggestions        : bool
-
     } with
         static member init () = {
 
@@ -296,14 +275,6 @@ module BuildingBlock =
             HeaderArg           = None
             BodyCellType        = BodyCellType.Term
             BodyArg             = None
-
-            // Below everything is more or less deprecated
-            // This section is used to add a unit directly to an already existing building block
-            Unit2TermSearchText                     = ""
-            Unit2SelectedTerm                       = None
-            Unit2TermSuggestions                    = [||]
-            ShowUnit2TermSuggestions                = false
-            HasUnit2TermSuggestionsLoading          = false
         }
 
         member this.TryHeaderOA() =
@@ -325,20 +296,6 @@ module BuildingBlock =
             match this.BodyArg with
                 | Some (U2.Case1 s) -> Some s
                 | _ -> None
-
-/// Validation scheme for Table
-module Validation =
-    type Model = {
-        ActiveTableBuildingBlocks   : BuildingBlock []
-        TableValidationScheme       : OfficeInterop.CustomXmlTypes.Validation.TableValidation
-        // Client view related
-        DisplayedOptionsId      : int option
-    } with
-        static member init () = {
-            ActiveTableBuildingBlocks   = [||]
-            TableValidationScheme       = OfficeInterop.CustomXmlTypes.Validation.TableValidation.init()
-            DisplayedOptionsId          = None
-        }
 
 module Protocol =
 
@@ -405,39 +362,5 @@ type BuildingBlockDetailsState = {
         CurrentRequestState = Inactive
         BuildingBlockValues = [||]
     }
-
-module SettingsXml =
-    type Model = {
-        // // Client // //
-        // Validation xml
-        ActiveSwateValidation                   : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-        NextAnnotationTableForActiveValidation  : string option
-        // Protocol group xml
-        ActiveProtocolGroup                     : obj option //OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-        NextAnnotationTableForActiveProtGroup   : string option
-        // Protocol
-        ActiveProtocol                          : obj option //OfficeInterop.Types.Xml.GroupTypes.Protocol option
-        NextAnnotationTableForActiveProtocol    : string option
-        //
-        RawXml                                  : string option
-        NextRawXml                              : string option
-        FoundTables                             : string []
-        ValidationXmls                          : obj [] //OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
-    } with
-        static member init () = {
-            // Client
-            ActiveSwateValidation                   = None
-            NextAnnotationTableForActiveValidation  = None
-            ActiveProtocolGroup                     = None
-            NextAnnotationTableForActiveProtGroup   = None
-            ActiveProtocol                          = None
-            // Unused
-            NextAnnotationTableForActiveProtocol    = None
-            //
-            RawXml                                  = None
-            NextRawXml                              = None
-            FoundTables                             = [||]
-            ValidationXmls                          = [||]
-        }
 
 // The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'

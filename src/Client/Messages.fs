@@ -42,33 +42,17 @@ module AdvancedSearch =
     type Msg =
         | GetSearchResults of {| config:AdvancedSearchTypes.AdvancedSearchOptions; responseSetter: Term [] -> unit |}
 
+module Ontologies =
+
+   type Msg =
+    | GetOntologies
+
 type DevMsg =
     | LogTableMetadata
     | GenericLog            of Cmd<Messages.Msg> * (string*string)
     | GenericInteropLogs    of Cmd<Messages.Msg> * InteropLogging.Msg list
     | GenericError          of Cmd<Messages.Msg> * exn
     | UpdateDisplayLogList  of LogItem list
-    
-type ApiRequestMsg =
-    | GetNewUnitTermSuggestions                 of string
-    | FetchAllOntologies
-    /// TermSearchable [] is created by officeInterop and passed to server for db search.
-    | SearchForInsertTermsRequest              of TermSearchable []
-    //
-    | GetAppVersion
-
-type ApiResponseMsg =
-    | UnitTermSuggestionResponse                of Term []
-    | FetchAllOntologiesResponse                of Ontology []
-    | SearchForInsertTermsResponse              of TermSearchable []  
-    //
-    | GetAppVersionResponse                     of string
-
-type ApiMsg =
-    | Request    of ApiRequestMsg
-    | Response   of ApiResponseMsg
-    | ApiError   of exn
-    | ApiSuccess of (string*string)
 
 type StyleChangeMsg =
     | UpdateColorMode of ColorMode
@@ -94,11 +78,6 @@ module BuildingBlock =
     | UpdateHeaderArg of U2<OntologyAnnotation,IOType> option
     | UpdateBodyCellType of BuildingBlock.BodyCellType
     | UpdateBodyArg of U2<string, OntologyAnnotation> option
-    // Below everything is more or less deprecated
-    // Is still used for unit update in office
-    | SearchUnitTermTextChange  of searchString:string
-    | UnitTermSuggestionUsed    of unitTerm:Term
-    | NewUnitTermSuggestions    of Term []
 
 module Protocol =
 
@@ -137,29 +116,19 @@ type Model = {
     PageState                   : PageState
     ///Data that needs to be persistent once loaded
     PersistentStorageState      : PersistentStorageState
-    ///Debouncing
-    DebouncerState              : Debouncer.State
     ///Error handling, Logging, etc.
     DevState                    : DevState
     ///States regarding term search
     TermSearchState             : TermSearch.Model
     ///Use this in the future to model excel stuff like table data
     ExcelState                  : OfficeInterop.Model
-    /// This should be removed. Overhead making maintainance more difficult
-    /// "Use this to log Api calls and maybe handle them better"
-    ApiState                    : ApiState
     ///States regarding File picker functionality
     FilePickerState             : FilePicker.Model
     ProtocolState               : Protocol.Model
     ///Insert annotation columns
     AddBuildingBlockState       : BuildingBlock.Model
-    ///Create Validation scheme for Table
-    ValidationState             : Validation.Model
     ///Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
-    ///Used to manage all custom xml settings
-    SettingsXmlState            : SettingsXml.Model
-    JsonExporterModel           : JsonExporter.Model
     DagModel                    : Dag.Model
     CytoscapeModel              : Cytoscape.Model
     /// Contains all information about spreadsheet view
@@ -168,16 +137,12 @@ type Model = {
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
-    member this.updateByJsonExporterModel (m:JsonExporter.Model) =
-        { this with JsonExporterModel = m}
     member this.updateByDagModel (m:Dag.Model) =
         { this with DagModel = m}
 
 type Msg =
-| Bounce                of (System.TimeSpan*string*Msg)
-| DebouncerSelfMsg      of Debouncer.SelfMessage<Msg>
-| Api                   of ApiMsg
 | DevMsg                of DevMsg
+| OntologyMsg           of Ontologies.Msg
 | TermSearchMsg         of TermSearch.Msg
 | AdvancedSearchMsg     of AdvancedSearch.Msg
 | OfficeInteropMsg      of OfficeInterop.Msg
@@ -185,7 +150,6 @@ type Msg =
 | FilePickerMsg         of FilePicker.Msg
 | BuildingBlockMsg      of BuildingBlock.Msg
 | ProtocolMsg           of Protocol.Msg
-| JsonExporterMsg       of JsonExporter.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | CytoscapeMsg          of Cytoscape.Msg
 | SpreadsheetMsg        of Spreadsheet.Msg
@@ -193,7 +157,6 @@ type Msg =
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
 | InterfaceMsg          of SpreadsheetInterface.Msg
 //| SettingsProtocolMsg   of SettingsProtocolMsg
-| TopLevelMsg           of TopLevelMsg
 | UpdatePageState       of Routing.Route option
 | UpdateIsExpert        of bool
 | Batch                 of seq<Messages.Msg>

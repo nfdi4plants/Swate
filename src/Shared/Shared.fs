@@ -32,18 +32,6 @@ module SorensenDice =
             calculateDistance resultSet searchSet
         )
 
-///<summary>This type is still used for JsonExporter page.</summary>
-[<RequireQualifiedAccess>]
-type JsonExportType =
-| ProcessSeq
-| Assay
-| ProtocolTemplate
-    member this.toExplanation =
-        match this with
-        | ProcessSeq        -> "Sequence of ISA process.json."
-        | Assay             -> "ISA assay.json"
-        | ProtocolTemplate  -> "Schema for Swate protocol template, with template metadata and table json."
-
 /// Development api
 type ITestAPI = {
     test    : unit      -> Async<string*string>

@@ -104,264 +104,6 @@ module Dev =
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd
 
-let handleApiRequestMsg (reqMsg: ApiRequestMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
-
-    let handleTermSuggestionRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString =
-        let currentCall = {
-            FunctionName = apiFunctionname
-            Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-        let nextCmd = 
-            Cmd.OfAsync.either
-                Api.api.getTermSuggestions
-                {|n= 5; query = queryString; ontology = None|}
-                (responseHandler >> Api)
-                (ApiError >> Api)
-
-        nextState,nextCmd
-
-    let handleUnitTermSuggestionRequest (apiFunctionname:string) (responseHandler: (Term []) -> ApiMsg) queryString =
-        let currentCall = {
-            FunctionName = apiFunctionname
-            Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-        let nextCmd = 
-            Cmd.OfAsync.either
-                Api.api.getUnitTermSuggestions
-                {|n= 5; query = queryString|}
-                (responseHandler >> Api)
-                (ApiError >> Api)
-
-        nextState,nextCmd
-
-    let handleTermSuggestionByParentTermRequest (apiFunctionname:string) (responseHandler: Term [] -> ApiMsg) queryString (parent:TermMinimal) =
-        let currentCall = {
-            FunctionName = apiFunctionname
-            Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-        let nextCmd = 
-            Cmd.OfAsync.either
-                Api.api.getTermSuggestionsByParentTerm
-                {|n= 5; query = queryString; parent_term = parent|}
-                (responseHandler >> Api)
-                (ApiError >> Api)
-
-        nextState,nextCmd
-
-    match reqMsg with
-
-    | GetNewUnitTermSuggestions (queryString) ->
-        handleUnitTermSuggestionRequest
-            "getUnitTermSuggestions"
-            (UnitTermSuggestionResponse >> Response)
-            queryString
-
-    | FetchAllOntologies ->
-        let currentCall = {
-                FunctionName = "getAllOntologies"
-                Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-
-        nextState,
-        Cmd.OfAsync.either
-            Api.api.getAllOntologies
-            ()
-            (FetchAllOntologiesResponse >> Response >> Api)
-            (ApiError >> Api)
-
-    | SearchForInsertTermsRequest (tableTerms) ->
-        let currentCall = {
-            FunctionName = "getTermsByNames"
-            Status = Pending
-        }
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-        let cmd =
-            Cmd.OfAsync.either
-                Api.api.getTermsByNames
-                tableTerms
-                (SearchForInsertTermsResponse >> Response >> Api)
-                (fun e ->
-                    Msg.Batch [
-                        OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg
-                        ApiError e |> Api
-                    ] )
-        let stateCmd = OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.ServerSearchDatabase |> OfficeInteropMsg |> Cmd.ofMsg
-        let cmds = Cmd.batch [cmd; stateCmd]
-        nextState, cmds
-    //
-    | GetAppVersion ->
-        let currentCall = {
-            FunctionName = "getAppVersion"
-            Status = Pending
-        }
-
-        let nextState = {
-            currentState with
-                currentCall = currentCall
-        }
-
-        let cmd =
-            Cmd.OfAsync.either
-                Api.serviceApi.getAppVersion
-                ()
-                (GetAppVersionResponse >> Response >> Api)
-                (ApiError >> Api)
-            
-        nextState, cmd
-        
-
-let handleApiResponseMsg (resMsg: ApiResponseMsg) (currentState: ApiState) : ApiState * Cmd<Messages.Msg> =
-
-    let handleTermSuggestionResponse (responseHandler: Term [] -> Msg) (suggestions: Term[]) =
-        let finishedCall = {
-            currentState.currentCall with
-                Status = Successfull
-        }
-
-        let nextState = {
-            currentCall = ApiState.noCall
-            callHistory = finishedCall::currentState.callHistory
-        }
-
-        let cmds = Cmd.batch [
-            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            suggestions |> responseHandler |> Cmd.ofMsg
-        ]
-
-        nextState, cmds
-
-    let handleUnitTermSuggestionResponse (responseHandler: Term [] -> Msg) (suggestions: Term[]) =
-        let finishedCall = {
-            currentState.currentCall with
-                Status = Successfull
-        }
-
-        let nextState = {
-            currentCall = ApiState.noCall
-            callHistory = finishedCall::currentState.callHistory
-        }
-
-        let cmds = Cmd.batch [
-            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            (suggestions) |> responseHandler |> Cmd.ofMsg
-        ]
-
-        nextState, cmds
-
-    match resMsg with
-    | UnitTermSuggestionResponse (suggestions) ->
-
-        handleUnitTermSuggestionResponse
-            (BuildingBlock.Msg.NewUnitTermSuggestions >> BuildingBlockMsg)
-            suggestions            
-
-    | FetchAllOntologiesResponse onts ->
-        let finishedCall = {
-            currentState.currentCall with
-                Status = Successfull
-        }
-
-        let nextState = {
-            currentCall = ApiState.noCall
-            callHistory = finishedCall::currentState.callHistory
-        }
-
-        let cmds = Cmd.batch [
-            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            onts |> PersistentStorage.NewSearchableOntologies |> PersistentStorageMsg |> Cmd.ofMsg
-        ]
-
-        nextState, cmds
-
-    | SearchForInsertTermsResponse (termsWithSearchResult) ->
-        let finishedCall = {
-            currentState.currentCall with
-                Status = Successfull
-        }
-        let nextState = {
-            currentCall = ApiState.noCall
-            callHistory = finishedCall::currentState.callHistory
-        }
-        let cmd =
-            SpreadsheetInterface.UpdateTermColumnsResponse termsWithSearchResult |> InterfaceMsg |> Cmd.ofMsg
-        let loggingCmd =
-             ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-        nextState, Cmd.batch [cmd; loggingCmd]
-
-    //
-    | GetAppVersionResponse appVersion ->
-        let finishedCall = {
-            currentState.currentCall with
-                Status = Successfull
-        }
-
-        let nextState = {
-            currentCall = ApiState.noCall
-            callHistory = finishedCall::currentState.callHistory
-        }
-
-        let cmds = Cmd.batch [
-            ("Debug",sprintf "[ApiSuccess]: Call %s successfull." finishedCall.FunctionName) |> ApiSuccess |> Api |> Cmd.ofMsg
-            appVersion |>PersistentStorage. UpdateAppVersion |> PersistentStorageMsg |> Cmd.ofMsg
-        ]
-
-        nextState, cmds
-
-open Dev
-open Messages
-
-let handleApiMsg (apiMsg:ApiMsg) (currentState:ApiState) : ApiState * Cmd<Messages.Msg> =
-    match apiMsg with
-    | ApiError e ->
-        
-        let failedCall = {
-            currentState.currentCall with
-                Status = Failed (e.GetPropagatedError())
-        }
-
-        let nextState = {
-            currentCall = ApiState.noCall
-            callHistory = failedCall::currentState.callHistory
-        }
-        let batch = Cmd.batch [
-            let modalName = "GenericError"
-            Cmd.ofEffect(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
-            curry GenericLog Cmd.none ("Error",sprintf "[ApiError]: Call %s failed with: %s" failedCall.FunctionName (e.GetPropagatedError())) |> DevMsg |> Cmd.ofMsg
-        ]
-
-        nextState, batch
-
-    | ApiSuccess (level,logMsg) ->
-        currentState, curry GenericLog Cmd.none (level,logMsg) |> DevMsg |> Cmd.ofMsg
-
-    | Request req ->
-        handleApiRequestMsg req currentState
-    | Response res ->
-        handleApiResponseMsg res currentState
-
 let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (currentState:PersistentStorageState) : PersistentStorageState * Cmd<Msg> =
     match persistentStorageMsg with
     | PersistentStorage.NewSearchableOntologies onts ->
@@ -423,19 +165,18 @@ let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (current
             Modals.Controller.renderModal("BuildingBlockDetails", Modals.BuildingBlockDetailsModal.buildingBlockDetailModal(nextState, dispatch))
         )
         nextState, cmd
-            
-let handleTopLevelMsg (topLevelMsg:TopLevelMsg) (currentModel: Model) : Model * Cmd<Msg> =
-    match topLevelMsg with
-    // Client
-    | CloseSuggestions ->
-        let nextModel = {
-            currentModel with
-                AddBuildingBlockState = {
-                    currentModel.AddBuildingBlockState with
-                        ShowUnit2TermSuggestions = false
-                }
-        }
-        nextModel, Cmd.none
+
+module Ontologies =
+    let update (omsg: Ontologies.Msg) (model: Model) =
+        match omsg with
+        | Ontologies.GetOntologies ->
+            let cmd =
+                Cmd.OfAsync.either 
+                    Api.api.getAllOntologies
+                    ()
+                    (PersistentStorage.NewSearchableOntologies >> PersistentStorageMsg)
+                    (curry GenericError Cmd.none >> DevMsg)
+            model, cmd
 
 let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
@@ -498,28 +239,10 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
         // https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
         //| Navigate route ->
         //    currentModel, Navigation.newUrl (Routing.Route.toRouteUrl route)
-        | Bounce (delay, bounceId, msgToBounce) ->
 
-            let (debouncerModel, debouncerCmd) =
-                currentModel.DebouncerState
-                |> Debouncer.bounce delay bounceId msgToBounce
-
-            let nextModel = {
-                currentModel with
-                    DebouncerState = debouncerModel
-            }
-
-            nextModel,Cmd.map DebouncerSelfMsg debouncerCmd
-
-        | DebouncerSelfMsg debouncerMsg ->
-            let nextDebouncerState, debouncerCmd =
-                Debouncer.update debouncerMsg currentModel.DebouncerState
-
-            let nextModel = {
-                currentModel with
-                    DebouncerState = nextDebouncerState
-            }
-            nextModel, debouncerCmd
+        | OntologyMsg msg ->
+            let nextModel, cmd = Ontologies.update msg model
+            nextModel, cmd
 
         | OfficeInteropMsg excelMsg ->
             let nextModel,nextCmd = Update.OfficeInterop.update currentModel excelMsg
@@ -554,15 +277,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             let nextModel = {
                 currentModel with
                     DevState = nextDevState
-            }
-            nextModel,nextCmd
-
-        | Api apiMsg ->
-            let nextApiState,nextCmd = currentModel.ApiState |> handleApiMsg apiMsg
-
-            let nextModel = {
-                currentModel with
-                    ApiState = nextApiState
             }
             nextModel,nextCmd
 
@@ -641,25 +355,15 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                     CytoscapeModel = nextState}
             nextModel, nextCmd
 
-        | JsonExporterMsg msg ->
-            let nextModel, nextCmd = currentModel |> JsonExporter.Core.update msg
-            nextModel, nextCmd
-
         | DagMsg msg ->
             let nextModel, nextCmd = currentModel |> Dag.Core.update msg
-            nextModel, nextCmd
-
-        | TopLevelMsg msg ->
-            let nextModel, nextCmd =
-                handleTopLevelMsg msg currentModel
-
             nextModel, nextCmd
 
     /// This function is used to determine which msg should be logged to activity log.
     /// The function is exception based, so msg which should not be logged needs to be added here.
     let matchMsgToLog (msg: Msg) =
         match msg with
-        | Bounce _ | DevMsg _ | UpdatePageState _ -> false
+        | DevMsg _ | UpdatePageState _ -> false
         | _ -> true
 
     let logg (msg:Msg) (model: Model) : Model =

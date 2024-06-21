@@ -38,7 +38,6 @@
         <Compile Include="States\LocalHistory.fs" />
         <Compile Include="States\CytoscapeState.fs" />
         <Compile Include="States\DagState.fs" />
-        <Compile Include="States\JsonExporterState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
         <Compile Include="ARCitect\Interop.fs" />

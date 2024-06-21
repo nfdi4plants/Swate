@@ -11,7 +11,6 @@ open ExcelColors
 open Model
 
 open Messages
-open JsonExporter
 
 open Browser.Dom
 
@@ -27,175 +26,6 @@ let download(filename, text) =
 
   document.body.removeChild(element) |> ignore
   ()
-
-let update (msg:JsonExporter.Msg) (currentModel: Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
-    match msg with
-    // Style
-    | UpdateLoading isLoading ->
-        let nextModel = { currentModel with Messages.Model.JsonExporterModel.Loading = isLoading }
-        nextModel, Cmd.none
-    | UpdateShowTableExportTypeDropdown nextVal ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                ShowTableExportTypeDropdown = nextVal
-                ShowWorkbookExportTypeDropdown = false
-                ShowXLSXExportTypeDropdown = false
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
-    | UpdateShowWorkbookExportTypeDropdown nextVal ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                ShowTableExportTypeDropdown = false
-                ShowWorkbookExportTypeDropdown = nextVal
-                ShowXLSXExportTypeDropdown = false
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
-    | UpdateShowXLSXExportTypeDropdown nextVal ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                ShowTableExportTypeDropdown = false
-                ShowWorkbookExportTypeDropdown = false
-                ShowXLSXExportTypeDropdown = nextVal
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
-    | UpdateTableJsonExportType nextType ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                TableJsonExportType             = nextType
-                ShowTableExportTypeDropdown     = false
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
-    | UpdateWorkbookJsonExportType nextType ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                WorkbookJsonExportType          = nextType
-                ShowWorkbookExportTypeDropdown  = false
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
-    | UpdateXLSXParsingExportType nextType ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                XLSXParsingExportType           = nextType
-                ShowXLSXExportTypeDropdown      = false
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
-    | CloseAllDropdowns ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                ShowTableExportTypeDropdown = false
-                ShowWorkbookExportTypeDropdown = false
-                ShowXLSXExportTypeDropdown = false
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
-    //
-    | ParseTableOfficeInteropRequest ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                Loading             = true
-        }
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.Core.getBuildingBlocksAndSheet
-                ()
-                (ParseTableServerRequest >> JsonExporterMsg)
-                (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
-        currentModel.updateByJsonExporterModel nextModel, cmd
-    | ParseTableServerRequest (worksheetName, buildingBlocks) ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                CurrentExportType   = Some currentModel.JsonExporterModel.TableJsonExportType
-                Loading             = true
-        }
-        let api =
-            match currentModel.JsonExporterModel.TableJsonExportType with
-            | JsonExportType.Assay ->
-                Api.swateJsonAPIv1.parseAnnotationTableToAssayJson
-            | JsonExportType.ProcessSeq ->
-                Api.swateJsonAPIv1.parseAnnotationTableToProcessSeqJson
-            | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
-        let cmd =
-            Cmd.OfAsync.either
-                api
-                (worksheetName, buildingBlocks)
-                (ParseTableServerResponse >> JsonExporterMsg)
-                (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
-        currentModel.updateByJsonExporterModel nextModel, cmd
-    //
-    | ParseTablesOfficeInteropRequest ->
-        let cmd =
-            Cmd.OfPromise.either
-                OfficeInterop.Core.getBuildingBlocksAndSheets
-                ()
-                (ParseTablesServerRequest >> JsonExporterMsg)
-                (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
-        currentModel, cmd
-    | ParseTablesServerRequest (worksheetBuildingBlocksTuple) ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                CurrentExportType   = Some currentModel.JsonExporterModel.WorkbookJsonExportType
-                Loading             = true
-        }
-        let api =
-            match currentModel.JsonExporterModel.WorkbookJsonExportType with
-            | JsonExportType.ProcessSeq ->
-                Api.swateJsonAPIv1.parseAnnotationTablesToProcessSeqJson
-            | JsonExportType.Assay ->
-                Api.swateJsonAPIv1.parseAnnotationTablesToAssayJson
-            | anythingElse -> failwith $"Cannot parse \"{anythingElse.ToString()}\" with this endpoint."
-        let cmd =
-            Cmd.OfAsync.either
-                api
-                worksheetBuildingBlocksTuple
-                (ParseTableServerResponse >> JsonExporterMsg)
-                (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
-
-        currentModel.updateByJsonExporterModel nextModel, cmd
-    //
-    | ParseTableServerResponse parsedJson ->
-        let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
-        let jsonName = Option.bind (fun x -> Some <| "_" + x.ToString()) currentModel.JsonExporterModel.CurrentExportType |> Option.defaultValue ""
-        let _ = download ($"{n}{jsonName}.json",parsedJson)
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                Loading             = false
-                CurrentExportType   = None
-        }
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
-    //
-    | StoreXLSXByteArray byteArr ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                XLSXByteArray = byteArr
-        }
-        currentModel.updateByJsonExporterModel nextModel , Cmd.none
-    | ParseXLSXToJsonRequest byteArr ->
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                CurrentExportType   = Some currentModel.JsonExporterModel.XLSXParsingExportType
-                Loading             = true
-        }
-        let apif =
-            match currentModel.JsonExporterModel.XLSXParsingExportType with
-            | JsonExportType.ProcessSeq        -> Api.isaDotNetCommonApi.toProcessSeqJsonStr
-            | JsonExportType.Assay             -> Api.isaDotNetCommonApi.toAssayJsonStr
-            | JsonExportType.ProtocolTemplate  -> Api.isaDotNetCommonApi.toSwateTemplateJsonStr
-        let cmd =
-            Cmd.OfAsync.either
-                apif
-                byteArr
-                (ParseXLSXToJsonResponse >> JsonExporterMsg)
-                (curry GenericError (UpdateLoading false |> JsonExporterMsg |> Cmd.ofMsg) >> DevMsg)
-        currentModel.updateByJsonExporterModel nextModel, cmd
-    | ParseXLSXToJsonResponse jsonStr ->
-        let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
-        let jsonName = Option.bind (fun x -> Some <| "_" + x.ToString()) currentModel.JsonExporterModel.CurrentExportType |> Option.defaultValue ""
-        let _ = download ($"{n}{jsonName}.json",jsonStr)
-        let nextModel = {
-            currentModel.JsonExporterModel with
-                Loading = false
-        }
-
-        currentModel.updateByJsonExporterModel nextModel, Cmd.none
 
 //open Messages
 //open Feliz
@@ -448,23 +278,27 @@ let update (msg:JsonExporter.Msg) (currentModel: Messages.Model) : Messages.Mode
 open Feliz
 open Feliz.Bulma
 
-module FileExporterAux =
+type private JsonExportFormat =
+    | ARCtrl
+    | ARCtrlCompressed
+    | ISA
+    | ROCrate
+
+type private JsonExportState = {
+    Error: exn option
+    Json: string
+    ExportFormat: JsonExportFormat
+} with
+    static member init() = {
+        Error = None;
+        Json = ""
+        ExportFormat = ROCrate
+    }
+
+module private FileExporterAux =
 
     open ARCtrl
     open ARCtrl.Json
-
-    [<RequireQualifiedAccess>]
-    type ISA =
-    | Assay
-    | Study
-    | Investigation
-    
-        static member initFromArcfile(arcfile: ArcFiles) =
-            match arcfile with
-            | ArcFiles.Assay _ -> Some Assay
-            | ArcFiles.Study _ -> Some Study
-            | ArcFiles.Investigation _ -> Some Investigation
-            | ArcFiles.Template _ -> None
 
     let toISAJsonString (arcfile: ArcFiles option) =
         let timed = fun s -> System.DateTime.Now.ToString("yyyyMMdd_hhmm_") + s
@@ -478,28 +312,34 @@ open FileExporterAux
 
 type FileExporter =
 
+    
+    static member private FileFormat(efm: JsonExportFormat, state: JsonExportState) =
+        Html.option [
+            
+        ]
+
     [<ReactComponent>]
     static member JsonExport(model: Messages.Model, dispatch) =
-        let isa, setIsa = React.useState(model.SpreadsheetModel.ArcFile |> Option.bind ISA.initFromArcfile)
+        let state, setState = React.useState JsonExportState.init
         Html.div [
             Bulma.field.div [
                 Bulma.field.hasAddons
                 prop.children [
                     Bulma.control.p [
-                        //Html.span [
-                        //    prop.className "select"
-                        //    prop.children [
-                        //        Html.select [
-                        //            Html.option "Test"
-                        //            Html.option "Test2"
-                        //            Html.option "Test3"
-                        //        ]
-                        //    ]
-                        //]
-                        Bulma.button.a [
-                            prop.text "ISA"
-                            Bulma.button.isStatic
+                        Html.span [
+                            prop.className "select"
+                            prop.children [
+                                Html.select [
+                                    Html.option "ISA"
+                                    Html.option "Test2"
+                                    Html.option "Test3"
+                                ]
+                            ]
                         ]
+                        //Bulma.button.a [
+                        //    prop.text "ISA"
+                        //    Bulma.button.isStatic
+                        //]
                     ]
                     Bulma.control.p [
                         Bulma.control.isExpanded
@@ -507,8 +347,6 @@ type FileExporter =
                             Bulma.button.button [
                                 Bulma.button.isFullWidth
                                 prop.text "Download"
-                                if isa.IsNone then 
-                                    prop.disabled true
                                 prop.onClick (fun _ -> 
                                     let r = toISAJsonString model.SpreadsheetModel.ArcFile
                                     r |> Option.iter (fun r -> download r)
@@ -518,10 +356,10 @@ type FileExporter =
                     ]
                 ]
             ]
-            if isa.IsNone then
+            if state.Error.IsSome then
                 Bulma.help [
                     Bulma.color.isDanger
-                    prop.text "Unable to convert Template to ISA-JSON"
+                    prop.textf "Error trying to convert: %s" state.Error.Value.Message
                 ]
         ]
 

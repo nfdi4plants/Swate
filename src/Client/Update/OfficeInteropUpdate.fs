@@ -115,24 +115,25 @@ module OfficeInterop =
             currentModel, cmd
         //
         | FillHiddenColsRequest ->
-            let cmd =
-                Cmd.OfPromise.either
-                    OfficeInterop.Core.getAllAnnotationBlockDetails 
-                    ()
-                    (fun (searchTerms,deprecationLogs) ->
-                        // Push possible deprecation messages by piping through "GenericInteropLogs"
-                        GenericInteropLogs (
-                            // This will be executed after "deprecationLogs" are handled by "GenericInteropLogs"
-                            SearchForInsertTermsRequest searchTerms |> Request |> Api |> Cmd.ofMsg,
-                            // This will be pushed to Activity logs, or as wanring modal to user in case of LogIdentifier.Warning
-                            deprecationLogs
-                        )
-                        |> DevMsg
-                    )
-                    (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
-            let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
-            let cmds = Cmd.batch [cmd; stateCmd]
-            currentModel, cmds
+            failwith "FillHiddenColsRequest Not implemented yet"
+            //let cmd =
+            //    Cmd.OfPromise.either
+            //        OfficeInterop.Core.getAllAnnotationBlockDetails 
+            //        ()
+            //        (fun (searchTerms,deprecationLogs) ->
+            //            // Push possible deprecation messages by piping through "GenericInteropLogs"
+            //            GenericInteropLogs (
+            //                // This will be executed after "deprecationLogs" are handled by "GenericInteropLogs"
+            //                SearchForInsertTermsRequest searchTerms |> Request |> Api |> Cmd.ofMsg,
+            //                // This will be pushed to Activity logs, or as wanring modal to user in case of LogIdentifier.Warning
+            //                deprecationLogs
+            //            )
+            //            |> DevMsg
+            //        )
+            //        (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
+            //let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
+            //let cmds = Cmd.batch [cmd; stateCmd]
+            currentModel, Cmd.none
 
         | FillHiddenColumns (termsWithSearchResult) ->
             let nextState = {

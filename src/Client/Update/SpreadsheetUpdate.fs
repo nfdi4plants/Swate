@@ -289,7 +289,7 @@ module Spreadsheet =
                         (UpdateArcFile >> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
                 state, model, cmd
-            | ExportJsonTable ->
+            | ExportJson ->
                 failwith "ExportsJsonTable is not implemented"
                 //let exportJsonState = {model.JsonExporterModel with Loading = true}
                 //let nextModel = model.updateByJsonExporterModel exportJsonState
@@ -301,21 +301,6 @@ module Spreadsheet =
                 //        func
                 //        ()
                 //        (JsonExporter.State.ParseTableServerRequest >> Messages.JsonExporterMsg)
-                //        (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
-                //state, nextModel, cmd
-                state, model, Cmd.none
-            | ExportJsonTables ->
-                failwith "ExportJsonTables is not implemented"
-                //let exportJsonState = {model.JsonExporterModel with Loading = true}
-                //let nextModel = model.updateByJsonExporterModel exportJsonState
-                //let func() = promise {
-                //    return Controller.getTables state
-                //}
-                //let cmd =
-                //    Cmd.OfPromise.either
-                //        func
-                //        ()
-                //        (JsonExporter.State.ParseTablesServerRequest >> Messages.JsonExporterMsg)
                 //        (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
                 //state, nextModel, cmd
                 state, model, Cmd.none
@@ -336,8 +321,6 @@ module Spreadsheet =
                 state, model, Cmd.none
             | ExportXlsx arcfile->
                 // we highjack this loading function
-                let exportJsonState = {model.JsonExporterModel with Loading = true}
-                let nextModel = model.updateByJsonExporterModel exportJsonState
                 let name, fswb =
                     let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
                     match arcfile with
@@ -354,16 +337,11 @@ module Spreadsheet =
                         Xlsx.toXlsxBytes
                         fswb
                         (fun bytes -> ExportXlsxDownload (name,bytes) |> Messages.SpreadsheetMsg)
-                        (Messages.curry Messages.GenericError (JsonExporter.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
-                state, nextModel, cmd
+                        (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
+                state, model, cmd
             | ExportXlsxDownload (name,xlsxBytes) ->
                 let _ = Helper.download (name ,xlsxBytes)
-                let nextJsonExporter = {
-                    model.JsonExporterModel with
-                        Loading             = false
-                }
-                let nextModel = model.updateByJsonExporterModel nextJsonExporter
-                state, nextModel, Cmd.none
+                state, model, Cmd.none
             | UpdateTermColumns ->
                 //let getUpdateTermColumns() = promise {
                 //    return Controller.getUpdateTermColumns state

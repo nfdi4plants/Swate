@@ -20,9 +20,7 @@ type Msg =
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
 /// Starts chain to export active table to isa json
-| ExportJsonTable
-/// Starts chain to export all tables to isa json
-| ExportJsonTables
+| ExportJson
 /// Starts chain to parse all tables to DAG
 | ParseTablesToDag
 | UpdateTermColumns

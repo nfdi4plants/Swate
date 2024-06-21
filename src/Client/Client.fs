@@ -19,7 +19,7 @@ open Feliz.Bulma
 
 let private split_container model dispatch = 
     let mainWindow = Seq.singleton <| MainWindowView.Main (model, dispatch)
-    let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
+    let sideWindow = Seq.singleton <| SidebarView.SidebarView.Main(model, dispatch)
     SplitWindowView.Main
         mainWindow
         sideWindow
@@ -40,7 +40,7 @@ let View (model : Model) (dispatch : Msg -> unit) =
         Html.div [
             match model.PersistentStorageState.Host with
             | Some Swatehost.Excel ->
-                SidebarView.SidebarView model dispatch
+                SidebarView.SidebarView.Main(model, dispatch)
             | _ ->
                 split_container model dispatch
         ]

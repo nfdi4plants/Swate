@@ -118,7 +118,7 @@ module TemplateFromJsonFile =
             Bulma.field.div [
                 Bulma.help [
                     b [] [str "Insert tables via ISA-JSON files."]
-                    str " You can use Swate.Experts to create these files from existing Swate tables. "
+                    str " You can use Settings --> Swate.Experts to create these files from existing Swate tables. "
                     span [Style [Color NFDIColors.Red.Base]] [str "Only missing building blocks will be added."]
                 ]
             ]
@@ -276,8 +276,8 @@ let fileUploadViewComponent (model:Messages.Model) dispatch =
 
         TemplateFromDB.showDatabaseProtocolTemplate model dispatch
 
-        //// Box 2
-        //Bulma.label "Add template(s) from file."
+        // Box 2
+        Bulma.label "Add template(s) from file."
 
-        //TemplateFromJsonFile.protocolInsertElement model dispatch
+        TemplateFromJsonFile.protocolInsertElement model dispatch
     ]

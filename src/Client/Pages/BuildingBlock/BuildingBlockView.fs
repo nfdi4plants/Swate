@@ -51,84 +51,38 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
         let nextState = { state with BodyCellType = next }
         nextState, Cmd.none
 
-    | SearchUnitTermTextChange (newTerm) ->
-
-        let triggerNewSearch =
-            newTerm.Length > 2
-       
-        let (delay, bounceId, msgToBounce) =
-            (System.TimeSpan.FromSeconds 0.5),
-            "GetNewUnitTermSuggestions",
-            (
-                if triggerNewSearch then
-                    (newTerm) |> (GetNewUnitTermSuggestions >> Request >> Api)
-                else
-                    DoNothing
-            )
-
-        let nextState = {
-            state with
-                Unit2TermSearchText                  = newTerm
-                Unit2SelectedTerm                    = None
-                ShowUnit2TermSuggestions             = triggerNewSearch
-                HasUnit2TermSuggestionsLoading       = true
-        }
-
-        nextState, ((delay, bounceId, msgToBounce) |> Bounce |> Cmd.ofMsg)
-
-    | NewUnitTermSuggestions suggestions ->
-
-        let nextState = {
-            state with
-                Unit2TermSuggestions             = suggestions
-                ShowUnit2TermSuggestions         = true
-                HasUnit2TermSuggestionsLoading   = false
-        }
-
-        nextState,Cmd.none
-
-    | UnitTermSuggestionUsed suggestion ->
-        let nextState ={
-            state with
-                Unit2TermSearchText             = suggestion.Name
-                Unit2SelectedTerm               = Some suggestion
-                ShowUnit2TermSuggestions        = false
-                HasUnit2TermSuggestionsLoading  = false
-        }
-        nextState, Cmd.none
-
 open SidebarComponents
 open Feliz
 open Feliz.Bulma
 
-let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
-    mainFunctionContainer [
-        Bulma.field.div [
-            Bulma.button.button [
+//let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
+//    mainFunctionContainer [
+//        Bulma.field.div [
+//            Bulma.button.button [
                 
-                let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
-                Bulma.color.isSuccess
-                if isValid then
-                    Bulma.button.isActive
-                else
-                    Bulma.color.isDanger
-                    prop.disabled true
-                Bulma.button.isFullWidth
-                prop.onClick (fun _ ->
-                    let unitTerm =
-                        if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
-                    match model.AddBuildingBlockState.Unit2TermSearchText with
-                    | "" ->
-                        curry GenericLog Cmd.none ("Error", "Cannot execute function with empty unit input") |> DevMsg |> dispatch
-                    | hasUnitTerm when model.AddBuildingBlockState.Unit2SelectedTerm.IsSome ->
-                        OfficeInterop.UpdateUnitForCells unitTerm.Value |> OfficeInteropMsg |> dispatch
-                    | freeText ->
-                        OfficeInterop.UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> OfficeInteropMsg |> dispatch
-                )
-                prop.text "Update unit for cells"
-            ]
-        ]
-    ]
+//                let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
+//                Bulma.color.isSuccess
+//                if isValid then
+//                    Bulma.button.isActive
+//                else
+//                    Bulma.color.isDanger
+//                    prop.disabled true
+//                Bulma.button.isFullWidth
+//                prop.onClick (fun _ ->
+//                    let unitTerm =
+//                        if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
+//                    match model.AddBuildingBlockState.Unit2TermSearchText with
+//                    | "" ->
+//                        curry GenericLog Cmd.none ("Error", "Cannot execute function with empty unit input") |> DevMsg |> dispatch
+//                    | hasUnitTerm when model.AddBuildingBlockState.Unit2SelectedTerm.IsSome ->
+//                        OfficeInterop.UpdateUnitForCells unitTerm.Value |> OfficeInteropMsg |> dispatch
+//                    | freeText ->
+//                        OfficeInterop.UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> OfficeInteropMsg |> dispatch
+//                )
+//                prop.text "Update unit for cells"
+//            ]
+//        ]
+//    ]
 
 
 
@@ -146,10 +100,10 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
             SearchComponent.Main model dispatch
         ]
 
-        match model.PersistentStorageState.Host with
-        | Some Swatehost.Excel ->
-            Bulma.label "Add/Update unit reference to existing building block."
-            // Input forms, etc related to add unit to existing building block.
-            addUnitToExistingBlockElements model dispatch
-        | _ -> Html.none
+        //match model.PersistentStorageState.Host with
+        //| Some Swatehost.Excel ->
+        //    Bulma.label "Add/Update unit reference to existing building block."
+        //    // Input forms, etc related to add unit to existing building block.
+        //    addUnitToExistingBlockElements model dispatch
+        //| _ -> Html.none
     ]

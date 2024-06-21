@@ -30,8 +30,7 @@ module Interface =
         | Initialize host ->
             let cmd =
                 Cmd.batch [
-                    Cmd.ofMsg (GetAppVersion |> Request |> Api)
-                    Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
+                    Cmd.ofMsg (Ontologies.GetOntologies |> OntologyMsg)
                     match host with
                     | Swatehost.Excel ->
                         Cmd.OfPromise.either
@@ -138,22 +137,13 @@ module Interface =
                         Spreadsheet.DeleteColumn (distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | ExportJsonTable ->
+        | ExportJson ->
             match host with
             | Some Swatehost.Excel ->
-                let cmd = JsonExporterMsg JsonExporter.ParseTableOfficeInteropRequest |> Cmd.ofMsg
-                model, cmd
+                failwith "ExportJsonTable not implemented for Excel"
+                model, Cmd.none
             | Some Swatehost.Browser ->
-                let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTable |> Cmd.ofMsg
-                model, cmd
-            | _ -> failwith "not implemented"
-        | ExportJsonTables ->
-            match host with
-            | Some Swatehost.Excel ->
-                let cmd = JsonExporterMsg JsonExporter.ParseTablesOfficeInteropRequest |> Cmd.ofMsg
-                model, cmd
-            | Some Swatehost.Browser ->
-                let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTables |> Cmd.ofMsg
+                let cmd = SpreadsheetMsg Spreadsheet.ExportJson |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | ParseTablesToDag ->

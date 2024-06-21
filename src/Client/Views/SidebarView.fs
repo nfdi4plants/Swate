@@ -30,6 +30,7 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
     Bulma.tab [
         if isActive then Bulma.tab.isActive
         Html.a [
+            prop.className "navigation" // this class does not do anything, but disables <a> styling.
             prop.onClick (fun e -> e.preventDefault(); UpdatePageState (Some pageLink) |> dispatch)
             match sidebarsize with
             | Mini | MobileMini -> 
@@ -66,17 +67,6 @@ let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
         else
             //createNavigationTab Routing.Route.Validation            model dispatch sidebarsize
             createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
-    ]
-
-
-let private footer (model:Model) =
-    div [Style [Color "grey"; Position PositionOptions.Sticky; Width "inherit"; Bottom "0"; TextAlign TextAlignOptions.Center ]] [
-        div [] [
-            str "Swate Release Version "
-            a [Href "https://github.com/nfdi4plants/Swate/releases"; HTMLAttr.Target "_Blank"] [str model.PersistentStorageState.AppVersion]
-            str " Host "
-            Html.span [prop.style [style.color "#4fb3d9"]; prop.text (sprintf "%O" model.PersistentStorageState.Host)]
-        ]
     ]
 
 module private ResizeObserver =
@@ -129,11 +119,6 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
             let ele = Browser.Dom.document.getElementById(Sidebar_Id)
             ResizeObserver.observer(state, setState).observe(ele)
         )
-        OnClick (fun e ->
-            if model.AddBuildingBlockState.ShowUnit2TermSuggestions
-            then
-                TopLevelMsg.CloseSuggestions |> TopLevelMsg |> dispatch
-        )
         Style [
             Display DisplayOptions.Flex
             FlexGrow "1"
@@ -144,9 +129,27 @@ let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: Sidebar
         ]
     ] children
 
+type SidebarView =
 
-module private Content =
-    let main (model:Model) (dispatch: Msg -> unit) =
+    [<ReactComponent>]
+    static member private footer (model:Model, dispatch) =
+        React.useEffectOnce(fun () -> 
+            async {
+                let! versionResponse = Api.serviceApi.getAppVersion()
+                PersistentStorage.UpdateAppVersion versionResponse |> PersistentStorageMsg |> dispatch
+            }
+            |> Async.StartImmediate
+        )
+        div [Style [Color "grey"; Position PositionOptions.Sticky; Width "inherit"; Bottom "0"; TextAlign TextAlignOptions.Center ]] [
+            div [] [
+                str "Swate Release Version "
+                a [Href "https://github.com/nfdi4plants/Swate/releases"; HTMLAttr.Target "_Blank"] [str model.PersistentStorageState.AppVersion]
+                str " Host "
+                Html.span [prop.style [style.color "#4fb3d9"]; prop.text (sprintf "%O" model.PersistentStorageState.Host)]
+            ]
+        ]
+
+    static member private content (model:Model) (dispatch: Msg -> unit) =
         match model.PageState.CurrentPage with
         | Routing.Route.BuildingBlock | Routing.Route.Home _ ->
             BuildingBlock.Core.addBuildingBlockComponent model dispatch
@@ -184,37 +187,37 @@ module private Content =
         | Routing.Route.NotFound ->
             NotFoundView.notFoundComponent model dispatch
         
-/// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
-[<ReactComponent>]
-let SidebarView (model: Model) (dispatch: Msg -> unit) =
-    let state, setState = React.useState(SidebarStyle.init)
-    viewContainer model dispatch state setState [
-        SidebarComponents.Navbar.NavbarComponent model dispatch state.Size
+    /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
+    [<ReactComponent>]
+    static member Main (model: Model, dispatch: Msg -> unit) =
+        let state, setState = React.useState(SidebarStyle.init)
+        viewContainer model dispatch state setState [
+            SidebarComponents.Navbar.NavbarComponent model dispatch state.Size
 
-        Bulma.container [
-            Bulma.container.isFluid
-            prop.className "pl-4 pr-4"
-            prop.children [
-                tabs model dispatch state.Size
+            Bulma.container [
+                Bulma.container.isFluid
+                prop.className "pl-4 pr-4"
+                prop.children [
+                    tabs model dispatch state.Size
 
-                //str <| state.Size.ToString()
+                    //str <| state.Size.ToString()
 
-                //Button.button [
-                //    Button.OnClick (fun _ ->
-                //        //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
-                //        //()
-                //        //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
-                //        ()
-                //    )
-                //] [ str "Test button" ]
+                    //Button.button [
+                    //    Button.OnClick (fun _ ->
+                    //        //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
+                    //        //()
+                    //        //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
+                    //        ()
+                    //    )
+                    //] [ str "Test button" ]
 
-                match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
-                | Some Swatehost.Excel, true ->
-                    SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
-                | _ -> ()
+                    match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
+                    | Some Swatehost.Excel, true ->
+                        SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
+                    | _ -> ()
 
-                Content.main model dispatch
+                    SidebarView.content model dispatch
+                ]
             ]
+            SidebarView.footer (model, dispatch)
         ]
-        footer model
-    ]
