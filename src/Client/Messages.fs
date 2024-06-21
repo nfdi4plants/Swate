@@ -82,21 +82,16 @@ module BuildingBlock =
 module Protocol =
 
     type Msg =
-        // // ------ Process from file ------
-        | ParseUploadedFileRequest          of raw: byte []
-        | ParseUploadedFileResponse         of (string * InsertBuildingBlock []) []
         // Client
         | UpdateTemplates                   of Template []
         | UpdateLoading                     of bool
-        | RemoveUploadedFileParsed
+        | RemoveSelectedProtocol
         // // ------ Protocol from Database ------
         | GetAllProtocolsForceRequest
         | GetAllProtocolsRequest
         | GetAllProtocolsResponse           of string
         | SelectProtocol                    of Template
         | ProtocolIncreaseTimesUsed         of protocolName:string
-        // Client
-        | RemoveSelectedProtocol
 
 type BuildingBlockDetailsMsg =
     | GetSelectedBuildingBlockTermsRequest      of TermSearchable []

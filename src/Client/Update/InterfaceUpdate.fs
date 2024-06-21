@@ -80,7 +80,7 @@ module Interface =
                 let cmd = Spreadsheet.JoinTable (table, index, options) |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | ImportFile tables ->
+        | UpdateArcFile tables ->
             match host with
             | Some Swatehost.Excel ->
                 //let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
@@ -88,6 +88,15 @@ module Interface =
                 model, Cmd.none
             | Some Swatehost.Browser ->
                 let cmd = Spreadsheet.UpdateArcFile tables |> SpreadsheetMsg |> Cmd.ofMsg
+                model, cmd
+            | _ -> failwith "not implemented"
+        | ImportXlsx bytes ->
+            match host with
+            | Some Swatehost.Excel ->
+                Browser.Dom.window.alert "ImportXlsx Not implemented"
+                model, Cmd.none
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                let cmd = Spreadsheet.ImportXlsx bytes |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | InsertOntologyAnnotation termMinimal ->

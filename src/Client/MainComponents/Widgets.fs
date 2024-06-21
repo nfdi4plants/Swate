@@ -216,12 +216,12 @@ type Widget =
         let insertContent() =
             [
                 Bulma.field.div [
-                    Protocol.Core.TemplateFromDB.addFromDBToTableButton model dispatch
+                    Protocol.TemplateFromDB.addFromDBToTableButton model dispatch
                 ]
                 Bulma.field.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.children [
-                        Protocol.Core.TemplateFromDB.displaySelectedProtocolEle model dispatch
+                        Protocol.TemplateFromDB.displaySelectedProtocolEle model dispatch
                     ]
                 ]
             ]

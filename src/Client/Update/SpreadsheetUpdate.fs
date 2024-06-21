@@ -286,10 +286,10 @@ module Spreadsheet =
             //| EditColumn (columnIndex, newCellType, b_type) ->
             //    let cmd = createPromiseCmd <| fun _ -> Controller.editColumn (columnIndex, newCellType, b_type) state 
             //    state, model, cmd
-            | SetArcFileFromBytes bytes ->
+            | ImportXlsx bytes ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Spreadsheet.IO.readFromBytes
+                        Spreadsheet.IO.Xlsx.readFromBytes
                         bytes
                         (UpdateArcFile >> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
@@ -299,23 +299,23 @@ module Spreadsheet =
                     let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
                     let nameFromId (id: string) = (n + "_" + id + ".json")
                     match arcfile, jef with
-                    | Investigation ai, JsonExport.ARCtrl -> nameFromId ai.Identifier, ArcInvestigation.toJsonString 0 ai
-                    | Investigation ai, JsonExport.ARCtrlCompressed -> nameFromId ai.Identifier, ArcInvestigation.toCompressedJsonString 0 ai
-                    | Investigation ai, JsonExport.ISA -> nameFromId ai.Identifier, ArcInvestigation.toISAJsonString 0 ai
-                    | Investigation ai, JsonExport.ROCrate -> nameFromId ai.Identifier, ArcInvestigation.toROCrateJsonString 0 ai
+                    | Investigation ai, JsonExportFormat.ARCtrl -> nameFromId ai.Identifier, ArcInvestigation.toJsonString 0 ai
+                    | Investigation ai, JsonExportFormat.ARCtrlCompressed -> nameFromId ai.Identifier, ArcInvestigation.toCompressedJsonString 0 ai
+                    | Investigation ai, JsonExportFormat.ISA -> nameFromId ai.Identifier, ArcInvestigation.toISAJsonString 0 ai
+                    | Investigation ai, JsonExportFormat.ROCrate -> nameFromId ai.Identifier, ArcInvestigation.toROCrateJsonString 0 ai
 
-                    | Study (as',_), JsonExport.ARCtrl -> nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
-                    | Study (as',_), JsonExport.ARCtrlCompressed -> nameFromId as'.Identifier, ArcStudy.toCompressedJsonString 0 (as')
-                    | Study (as',aaList), JsonExport.ISA -> nameFromId as'.Identifier, ArcStudy.toISAJsonString (aaList,0) (as')
-                    | Study (as',aaList), JsonExport.ROCrate -> nameFromId as'.Identifier, ArcStudy.toROCrateJsonString (aaList,0) (as')
+                    | Study (as',_), JsonExportFormat.ARCtrl -> nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
+                    | Study (as',_), JsonExportFormat.ARCtrlCompressed -> nameFromId as'.Identifier, ArcStudy.toCompressedJsonString 0 (as')
+                    | Study (as',aaList), JsonExportFormat.ISA -> nameFromId as'.Identifier, ArcStudy.toISAJsonString (aaList,0) (as')
+                    | Study (as',aaList), JsonExportFormat.ROCrate -> nameFromId as'.Identifier, ArcStudy.toROCrateJsonString (aaList,0) (as')
 
-                    | Assay aa, JsonExport.ARCtrl -> nameFromId aa.Identifier, ArcAssay.toJsonString 0 aa
-                    | Assay aa, JsonExport.ARCtrlCompressed -> nameFromId aa.Identifier, ArcAssay.toCompressedJsonString 0 aa
-                    | Assay aa, JsonExport.ISA -> nameFromId aa.Identifier, ArcAssay.toISAJsonString 0 aa
-                    | Assay aa, JsonExport.ROCrate -> nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
+                    | Assay aa, JsonExportFormat.ARCtrl -> nameFromId aa.Identifier, ArcAssay.toJsonString 0 aa
+                    | Assay aa, JsonExportFormat.ARCtrlCompressed -> nameFromId aa.Identifier, ArcAssay.toCompressedJsonString 0 aa
+                    | Assay aa, JsonExportFormat.ISA -> nameFromId aa.Identifier, ArcAssay.toISAJsonString 0 aa
+                    | Assay aa, JsonExportFormat.ROCrate -> nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
 
-                    | Template t, JsonExport.ARCtrl -> nameFromId t.FileName, Template.toJsonString 0 t
-                    | Template t, JsonExport.ARCtrlCompressed -> nameFromId t.FileName, Template.toCompressedJsonString 0 t
+                    | Template t, JsonExportFormat.ARCtrl -> nameFromId t.FileName, Template.toJsonString 0 t
+                    | Template t, JsonExportFormat.ARCtrlCompressed -> nameFromId t.FileName, Template.toCompressedJsonString 0 t
                     | Template _, anyElse -> failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
                 Helper.downloadFromString (name , jsonString)
 

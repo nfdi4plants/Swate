@@ -157,7 +157,7 @@ type SidebarView =
             FilePicker.filePickerComponent model dispatch
 
         | Routing.Route.Protocol ->
-            Protocol.Core.fileUploadViewComponent model dispatch
+            Protocol.Templates.Main (model, dispatch)
 
         | Routing.Route.JsonExport ->
             JsonExporter.Core.FileExporter.Main(model, dispatch)

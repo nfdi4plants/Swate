@@ -15,19 +15,6 @@ module Protocol =
         match fujMsg with
         | UpdateLoading next ->
             {state with Loading = next}, Cmd.none
-        // // ------ Process from file ------
-        | ParseUploadedFileRequest bytes ->
-            failwith "ParseUploadedFileRequest IS NOT IMPLEMENTED YET"
-            //let cmd =
-            //    Cmd.OfAsync.either
-            //        Api.templateApi.tryParseToBuildingBlocks
-            //        bytes
-            //        (ParseUploadedFileResponse >> ProtocolMsg)
-            //        (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
-            state, Cmd.none
-        | ParseUploadedFileResponse buildingBlockTables ->
-            let nextState = { state with UploadedFileParsed = buildingBlockTables }
-            nextState, Cmd.none
         // ------ Protocol from Database ------
         | GetAllProtocolsRequest ->
             let now = System.DateTime.UtcNow
@@ -87,7 +74,4 @@ module Protocol =
                 state with
                     TemplateSelected = None
             }
-            nextState, Cmd.none
-        | RemoveUploadedFileParsed ->
-            let nextState = {state with UploadedFileParsed = Array.empty}
             nextState, Cmd.none

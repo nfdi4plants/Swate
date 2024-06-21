@@ -53,6 +53,7 @@
         <Compile Include="Modals\CytoscapeView.fs" />
         <Compile Include="Modals\MoveColumn.fs" />
         <Compile Include="Modals\UpdateColumn.fs" />
+        <Compile Include="Modals\SelectiveImportModal.fs" />
         <Compile Include="Spreadsheet\IO.fs" />
         <Compile Include="Spreadsheet\Types.fs" />
         <Compile Include="Spreadsheet\Clipboard.Controller.fs" />
@@ -76,7 +77,9 @@
         <Compile Include="Pages\TermSearch\TermSearchView.fs" />
         <Compile Include="Pages\ProtocolTemplates\ProtocolState.fs" />
         <Compile Include="Pages\ProtocolTemplates\ProtocolSearchViewComponent.fs" />
-        <Compile Include="Pages\ProtocolTemplates\ProtocolSearchView.fs" />
+        <Compile Include="Pages\ProtocolTemplates\ProtocolSearch.fs" />
+        <Compile Include="Pages\ProtocolTemplates\TemplateFromDB.fs" />
+        <Compile Include="Pages\ProtocolTemplates\TemplateFromFile.fs" />
         <Compile Include="Pages\ProtocolTemplates\ProtocolView.fs" />
         <Compile Include="Pages\FilePicker\FilePickerView.fs" />
         <Compile Include="Pages\Info\InfoView.fs" />

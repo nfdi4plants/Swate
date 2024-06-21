@@ -316,8 +316,6 @@ module Protocol =
         // Client 
         Loading                 : bool
         LastUpdated             : System.DateTime option
-        // // ------ Process from file ------
-        UploadedFileParsed      : (string*InsertBuildingBlock []) []
         // ------ Protocol from Database ------
         TemplateSelected        : ARCtrl.Template option
         Templates               : ARCtrl.Template []
@@ -327,8 +325,6 @@ module Protocol =
             Loading                 = false
             LastUpdated             = None
             TemplateSelected        = None
-            // // ------ Process from file ------
-            UploadedFileParsed      = [||]
             // ------ Protocol from Database ------
             Templates               = [||]
         }

@@ -208,14 +208,6 @@ table {
     height: fit-content;
 }
 
-a:not([class]){
-    color: $nfdi-blue-light
-}
-
-a:not([class]):hover {
-    color: $nfdi-blue-lighter-20
-}
-
 .dragover-footertab {
     position: relative
 }

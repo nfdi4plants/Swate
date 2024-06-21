@@ -277,13 +277,12 @@ let download(filename, text) =
 
 open Feliz
 open Feliz.Bulma
-open Shared.JsonExport
 
 type private JsonExportState = {
     ExportFormat: JsonExportFormat
 } with
     static member init() = {
-        ExportFormat = ROCrate
+        ExportFormat = JsonExportFormat.ROCrate
     }
 
 type FileExporter =
@@ -315,10 +314,10 @@ type FileExporter =
                                         |> setState
                                     )
                                     prop.children [
-                                        FileExporter.FileFormat(ROCrate, state, setState)
-                                        FileExporter.FileFormat(ISA, state, setState)
-                                        FileExporter.FileFormat(ARCtrl, state, setState)
-                                        FileExporter.FileFormat(ARCtrlCompressed, state, setState)
+                                        FileExporter.FileFormat(JsonExportFormat.ROCrate, state, setState)
+                                        FileExporter.FileFormat(JsonExportFormat.ISA, state, setState)
+                                        FileExporter.FileFormat(JsonExportFormat.ARCtrl, state, setState)
+                                        FileExporter.FileFormat(JsonExportFormat.ARCtrlCompressed, state, setState)
                                     ]
                                 ]
                             ]

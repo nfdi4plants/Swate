@@ -13,13 +13,14 @@ type Msg =
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
 | JoinTable of ArcTable * index: int option * options: TableJoinOptions option
-| ImportFile of ArcFiles
+| UpdateArcFile of ArcFiles
 /// Open modal for selected building block, allows editing on standalone only.
 | EditBuildingBlock
 /// Inserts TermMinimal to selected fields of one column
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
+| ImportXlsx of byte []
 /// Starts chain to export active table to isa json
-| ExportJson of ArcFiles * JsonExport.JsonExportFormat
+| ExportJson of ArcFiles * JsonExportFormat
 | UpdateTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []

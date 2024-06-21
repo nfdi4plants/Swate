@@ -8,11 +8,18 @@ open System.Collections.Generic
 [<AutoOpen>]
 module ARCtrlHelper =
 
+    [<RequireQualifiedAccess>]
+    type ArcFilesDiscriminate =
+        | Assay
+        | Study
+        | Investigation
+        | Template
+
     type ArcFiles =
-    | Template      of Template
-    | Investigation of ArcInvestigation
-    | Study         of ArcStudy * ArcAssay list
-    | Assay         of ArcAssay
+        | Template      of Template
+        | Investigation of ArcInvestigation
+        | Study         of ArcStudy * ArcAssay list
+        | Assay         of ArcAssay
 
     with
         member this.Tables() : ArcTables =
@@ -21,6 +28,21 @@ module ARCtrlHelper =
             | Investigation _ -> ArcTables(ResizeArray[])
             | Study (s,_) -> s
             | Assay a -> a
+
+    [<RequireQualifiedAccess>]
+    type JsonExportFormat =
+        | ARCtrl
+        | ARCtrlCompressed
+        | ISA
+        | ROCrate
+
+        static member fromString (str: string) =
+            match str.ToLower() with
+            | "arctrl" -> ARCtrl
+            | "arctrlcompressed" -> ARCtrlCompressed
+            | "isa" -> ISA
+            | "rocrate" -> ROCrate
+            | _ -> failwithf "Unknown JSON export format: %s" str
 
 
 module Helper =

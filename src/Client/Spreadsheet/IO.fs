@@ -6,22 +6,54 @@ open FsSpreadsheet.Js
 open Shared
 open FsSpreadsheet
 
-// TODO: Can this be done better? If we want to allow upload of any isa.xlsx file?
-let readFromBytes (bytes: byte []) =
-    // Try each conversion function and return the first successful result
-    promise {
-        let! fswb = FsSpreadsheet.Js.Xlsx.fromXlsxBytes bytes
-        let ws = fswb.GetWorksheets()
-        let arcfile =
-            match ws with
-            | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcAssay.metaDataSheetName = ws.Name ) -> 
-                ArcAssay.fromFsWorkbook fswb |> Assay 
-            | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcStudy.metaDataSheetName = ws.Name ) -> 
-                ArcStudy.fromFsWorkbook fswb |> Study
-            | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcInvestigation.metaDataSheetName = ws.Name ) -> 
-                ArcInvestigation.fromFsWorkbook fswb |> Investigation
-            | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.Template.metaDataSheetName = ws.Name ) -> 
-                ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template
-            | _ -> failwith "Unable to identify given file. Missing metadata sheet with correct name."
-        return arcfile
-    }
+module Xlsx =
+
+    let readFromBytes (bytes: byte []) =
+        // Try each conversion function and return the first successful result
+        promise {
+            let! fswb = FsSpreadsheet.Js.Xlsx.fromXlsxBytes bytes
+            let ws = fswb.GetWorksheets()
+            let arcfile =
+                match ws with
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcAssay.metaDataSheetName = ws.Name ) -> 
+                    ArcAssay.fromFsWorkbook fswb |> Assay 
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcStudy.metaDataSheetName = ws.Name ) -> 
+                    ArcStudy.fromFsWorkbook fswb |> Study
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcInvestigation.metaDataSheetName = ws.Name ) -> 
+                    ArcInvestigation.fromFsWorkbook fswb |> Investigation
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.Template.metaDataSheetName = ws.Name ) -> 
+                    ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template
+                | _ -> failwith "Unable to identify given file. Missing metadata sheet with correct name."
+            return arcfile
+        }
+
+module Json =
+
+    open ARCtrlHelper
+    open ARCtrl
+    open ARCtrl.Json
+
+    let readFromJson (fileType: ArcFilesDiscriminate) (jsonType: JsonExportFormat) (json: string) =
+        promise {
+            let arcfile =
+                match fileType, jsonType with
+                | ArcFilesDiscriminate.Investigation, JsonExportFormat.ARCtrl ->            ArcInvestigation.fromJsonString json |> ArcFiles.Investigation
+                | ArcFilesDiscriminate.Investigation, JsonExportFormat.ARCtrlCompressed ->  ArcInvestigation.fromCompressedJsonString json |> ArcFiles.Investigation
+                | ArcFilesDiscriminate.Investigation, JsonExportFormat.ISA ->               ArcInvestigation.fromISAJsonString json |> ArcFiles.Investigation
+                | ArcFilesDiscriminate.Investigation, JsonExportFormat.ROCrate ->           ArcInvestigation.fromROCrateJsonString json |> ArcFiles.Investigation
+
+                | ArcFilesDiscriminate.Study, JsonExportFormat.ARCtrl ->            ArcStudy.fromJsonString json |> fun x -> ArcFiles.Study(x, [])
+                | ArcFilesDiscriminate.Study, JsonExportFormat.ARCtrlCompressed ->  ArcStudy.fromCompressedJsonString json |> fun x -> ArcFiles.Study(x, [])
+                | ArcFilesDiscriminate.Study, JsonExportFormat.ISA ->               ArcStudy.fromISAJsonString json |> ArcFiles.Study
+                | ArcFilesDiscriminate.Study, JsonExportFormat.ROCrate ->           ArcStudy.fromROCrateJsonString json |> ArcFiles.Study
+
+                | ArcFilesDiscriminate.Assay, JsonExportFormat.ARCtrl ->            ArcAssay.fromJsonString json |> ArcFiles.Assay
+                | ArcFilesDiscriminate.Assay, JsonExportFormat.ARCtrlCompressed ->  ArcAssay.fromCompressedJsonString json |> ArcFiles.Assay
+                | ArcFilesDiscriminate.Assay, JsonExportFormat.ISA ->               ArcAssay.fromISAJsonString json |> ArcFiles.Assay
+                | ArcFilesDiscriminate.Assay, JsonExportFormat.ROCrate ->           ArcAssay.fromROCrateJsonString json |> ArcFiles.Assay
+
+                | ArcFilesDiscriminate.Template, JsonExportFormat.ARCtrl ->             Template.fromJsonString json |> ArcFiles.Template
+                | ArcFilesDiscriminate.Template, JsonExportFormat.ARCtrlCompressed ->   Template.fromCompressedJsonString json |> ArcFiles.Template
+                | ArcFilesDiscriminate.Template, anyElse -> failwithf "Error. It is not intended to parse Template from %s format." (string anyElse)
+            return arcfile
+        }

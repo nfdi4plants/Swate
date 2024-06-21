@@ -139,7 +139,7 @@ type Msg =
 // | EditColumn of index: int * newType: SwateCell * b_type: BuildingBlockType option
 /// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
 | Reset
-| SetArcFileFromBytes of byte []
+| ImportXlsx of byte []
 // <--> INTEROP <-->
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | AddAnnotationBlock of CompositeColumn
@@ -152,7 +152,7 @@ type Msg =
 | UpdateTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []
 /// Starts chain to export active table to isa json
-| ExportJson of ArcFiles * JsonExport.JsonExportFormat
+| ExportJson of ArcFiles * JsonExportFormat
 /// Starts chain to export all tables to xlsx swate tables.
 | ExportXlsx of ArcFiles
 | ExportXlsxDownload of filename: string * byte []
