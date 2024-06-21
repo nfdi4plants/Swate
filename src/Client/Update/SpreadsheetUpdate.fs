@@ -14,6 +14,7 @@ open FsSpreadsheet
 open FsSpreadsheet.Js
 open ARCtrl
 open ARCtrl.Spreadsheet
+open ARCtrl.Json
 
 module Spreadsheet =
 
@@ -24,6 +25,10 @@ module Spreadsheet =
         open Fable.Core.JsInterop
 
         let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
+
+        let downloadFromString(filename, content:string) = 
+            let bytes = System.Text.Encoding.UTF8.GetBytes(content)
+            bytes.SaveFileAs(filename)
 
         /// <summary>
         /// This function will store the information correctly.
@@ -289,38 +294,33 @@ module Spreadsheet =
                         (UpdateArcFile >> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
                 state, model, cmd
-            | ExportJson ->
-                failwith "ExportsJsonTable is not implemented"
-                //let exportJsonState = {model.JsonExporterModel with Loading = true}
-                //let nextModel = model.updateByJsonExporterModel exportJsonState
-                //let func() = promise {
-                //    return Controller.getTable state
-                //}
-                //let cmd =
-                //    Cmd.OfPromise.either
-                //        func
-                //        ()
-                //        (JsonExporter.State.ParseTableServerRequest >> Messages.JsonExporterMsg)
-                //        (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
-                //state, nextModel, cmd
-                state, model, Cmd.none
-            | ParseTablesToDag ->
-                failwith "ParseTablesToDag is not implemented"
-                //let dagState = {model.DagModel with Loading = true}
-                //let nextModel = model.updateByDagModel dagState
-                //let func() = promise {
-                //    return Controller.getTables state
-                //}
-                //let cmd =
-                //    Cmd.OfPromise.either
-                //        func
-                //        ()
-                //        (Dag.ParseTablesDagServerRequest >> Messages.DagMsg)
-                //        (Messages.curry Messages.GenericError (Dag.UpdateLoading false |> Messages.DagMsg |> Cmd.ofMsg) >> Messages.DevMsg)
-                //state, nextModel, cmd
+            | ExportJson (arcfile,jef) ->
+                let name, jsonString =
+                    let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
+                    let nameFromId (id: string) = (n + "_" + id + ".json")
+                    match arcfile, jef with
+                    | Investigation ai, JsonExport.ARCtrl -> nameFromId ai.Identifier, ArcInvestigation.toJsonString 0 ai
+                    | Investigation ai, JsonExport.ARCtrlCompressed -> nameFromId ai.Identifier, ArcInvestigation.toCompressedJsonString 0 ai
+                    | Investigation ai, JsonExport.ISA -> nameFromId ai.Identifier, ArcInvestigation.toISAJsonString 0 ai
+                    | Investigation ai, JsonExport.ROCrate -> nameFromId ai.Identifier, ArcInvestigation.toROCrateJsonString 0 ai
+
+                    | Study (as',_), JsonExport.ARCtrl -> nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
+                    | Study (as',_), JsonExport.ARCtrlCompressed -> nameFromId as'.Identifier, ArcStudy.toCompressedJsonString 0 (as')
+                    | Study (as',aaList), JsonExport.ISA -> nameFromId as'.Identifier, ArcStudy.toISAJsonString (aaList,0) (as')
+                    | Study (as',aaList), JsonExport.ROCrate -> nameFromId as'.Identifier, ArcStudy.toROCrateJsonString (aaList,0) (as')
+
+                    | Assay aa, JsonExport.ARCtrl -> nameFromId aa.Identifier, ArcAssay.toJsonString 0 aa
+                    | Assay aa, JsonExport.ARCtrlCompressed -> nameFromId aa.Identifier, ArcAssay.toCompressedJsonString 0 aa
+                    | Assay aa, JsonExport.ISA -> nameFromId aa.Identifier, ArcAssay.toISAJsonString 0 aa
+                    | Assay aa, JsonExport.ROCrate -> nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
+
+                    | Template t, JsonExport.ARCtrl -> nameFromId t.FileName, Template.toJsonString 0 t
+                    | Template t, JsonExport.ARCtrlCompressed -> nameFromId t.FileName, Template.toCompressedJsonString 0 t
+                    | Template _, anyElse -> failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
+                Helper.downloadFromString (name , jsonString)
+
                 state, model, Cmd.none
             | ExportXlsx arcfile->
-                // we highjack this loading function
                 let name, fswb =
                     let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
                     match arcfile with

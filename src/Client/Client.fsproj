@@ -31,9 +31,9 @@
         <Compile Include="OfficeInterop\Functions\CustomXmlFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
-        <Compile Include="OfficeInterop\OfficeInteropState.fs" />
         <Compile Include="States\ARCitect.fs" />
         <Compile Include="States\SpreadsheetInterface.fs" />
+        <Compile Include="States\OfficeInteropState.fs" />
         <Compile Include="States\Spreadsheet.fs" />
         <Compile Include="States\LocalHistory.fs" />
         <Compile Include="States\CytoscapeState.fs" />

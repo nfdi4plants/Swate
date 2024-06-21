@@ -277,45 +277,23 @@ let download(filename, text) =
 
 open Feliz
 open Feliz.Bulma
-
-type private JsonExportFormat =
-    | ARCtrl
-    | ARCtrlCompressed
-    | ISA
-    | ROCrate
+open Shared.JsonExport
 
 type private JsonExportState = {
-    Error: exn option
-    Json: string
     ExportFormat: JsonExportFormat
 } with
     static member init() = {
-        Error = None;
-        Json = ""
         ExportFormat = ROCrate
     }
-
-module private FileExporterAux =
-
-    open ARCtrl
-    open ARCtrl.Json
-
-    let toISAJsonString (arcfile: ArcFiles option) =
-        let timed = fun s -> System.DateTime.Now.ToString("yyyyMMdd_hhmm_") + s
-        match arcfile with
-        | None | Some (ArcFiles.Template _) -> None
-        | Some (ArcFiles.Assay a) -> (timed "assay.json",ArcAssay.toISAJsonString 0 a) |> Some
-        | Some (ArcFiles.Study (s,as')) -> (timed "study.json", ArcStudy.toISAJsonString(as',0) s)  |> Some
-        | Some (ArcFiles.Investigation i) -> (timed "investigation.json", ArcInvestigation.toISAJsonString 0 i) |> Some
-
-open FileExporterAux
 
 type FileExporter =
 
     
-    static member private FileFormat(efm: JsonExportFormat, state: JsonExportState) =
+    static member private FileFormat(efm: JsonExportFormat, state: JsonExportState, setState) =
+        let isSelected = efm = state.ExportFormat
         Html.option [
-            
+            prop.selected isSelected
+            prop.text (string efm)
         ]
 
     [<ReactComponent>]
@@ -330,16 +308,21 @@ type FileExporter =
                             prop.className "select"
                             prop.children [
                                 Html.select [
-                                    Html.option "ISA"
-                                    Html.option "Test2"
-                                    Html.option "Test3"
+                                    prop.onChange (fun (e:Browser.Types.Event) ->
+                                        let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
+                                        { state with
+                                            ExportFormat = jef }
+                                        |> setState
+                                    )
+                                    prop.children [
+                                        FileExporter.FileFormat(ROCrate, state, setState)
+                                        FileExporter.FileFormat(ISA, state, setState)
+                                        FileExporter.FileFormat(ARCtrl, state, setState)
+                                        FileExporter.FileFormat(ARCtrlCompressed, state, setState)
+                                    ]
                                 ]
                             ]
                         ]
-                        //Bulma.button.a [
-                        //    prop.text "ISA"
-                        //    Bulma.button.isStatic
-                        //]
                     ]
                     Bulma.control.p [
                         Bulma.control.isExpanded
@@ -347,20 +330,15 @@ type FileExporter =
                             Bulma.button.button [
                                 Bulma.button.isFullWidth
                                 prop.text "Download"
-                                prop.onClick (fun _ -> 
-                                    let r = toISAJsonString model.SpreadsheetModel.ArcFile
-                                    r |> Option.iter (fun r -> download r)
+                                prop.onClick (fun _ ->
+                                    if model.SpreadsheetModel.ArcFile.IsSome then
+                                        SpreadsheetInterface.ExportJson (model.SpreadsheetModel.ArcFile.Value, state.ExportFormat) |> InterfaceMsg |> dispatch
                                 )
                             ]
                         ]
                     ]
                 ]
             ]
-            if state.Error.IsSome then
-                Bulma.help [
-                    Bulma.color.isDanger
-                    prop.textf "Error trying to convert: %s" state.Error.Value.Message
-                ]
         ]
 
     static member Main(model:Messages.Model, dispatch: Messages.Msg -> unit) =
@@ -369,11 +347,47 @@ type FileExporter =
 
             Bulma.label "Export to Json"
             mainFunctionContainer [
-                Bulma.field.div [Bulma.help [
-                    str "Export Swate annotation tables to official ISA-JSON ("
-                    a [Href @"https://isa-specs.readthedocs.io/en/latest/isajson.html#"; Target "_Blank"] [str "more"]
-                    str ")."
-                ]]
+                Bulma.field.div [
+                    Bulma.content [
+                        Bulma.help "Export Swate annotation tables to official JSON."
+                        Html.ul [
+                            Html.li [
+                                Html.b "ARCtrl"
+                                str ": A simple ARCtrl specific format."
+                            ]
+                            Html.li [
+                                Html.b "ARCtrlCompressed"
+                                str ": A compressed ARCtrl specific format."
+                            ]
+                            Html.li [
+                                Html.b "ISA"
+                                str ": ISA-JSON format ("
+                                Html.a [
+                                    prop.target.blank
+                                    prop.href "https://isa-specs.readthedocs.io/en/latest/isajson.html#"
+                                    prop.text "ISA-JSON"
+                                ]
+                                str ")."
+                            ]
+                            Html.li [
+                                Html.b "ROCrate"
+                                str ": ROCrate format ("
+                                Html.a [
+                                    prop.target.blank
+                                    prop.href "https://www.researchobject.org/ro-crate/"
+                                    prop.text "ROCrate"
+                                ]
+                                str ", "
+                                Html.a [
+                                    prop.target.blank
+                                    prop.href "https://github.com/nfdi4plants/isa-ro-crate-profile/blob/main/profile/isa_ro_crate.md"
+                                    prop.text "ISA-Profile"
+                                ]
+                                str ")."
+                            ]
+                        ]
+                    ]
+                ]
                 FileExporter.JsonExport(model, dispatch)
             ]
         ]

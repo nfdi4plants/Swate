@@ -152,12 +152,10 @@ type Msg =
 | UpdateTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []
 /// Starts chain to export active table to isa json
-| ExportJson
+| ExportJson of ArcFiles * JsonExport.JsonExportFormat
 /// Starts chain to export all tables to xlsx swate tables.
 | ExportXlsx of ArcFiles
 | ExportXlsxDownload of filename: string * byte []
-/// Starts chain to parse all tables to DAG
-| ParseTablesToDag
 // <--> Result Messages <-->
 ///// This message will save `Model` to local storage and to session storage for history
 //| Success of Model

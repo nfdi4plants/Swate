@@ -56,17 +56,13 @@ let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
     let isIEBrowser : bool = Browser.Dom.window.document?documentMode 
     tabRow model [
         if not model.PageState.IsExpert then
-            createNavigationTab Routing.Route.BuildingBlock         model dispatch sidebarsize
-            createNavigationTab Routing.Route.TermSearch            model dispatch sidebarsize
-            createNavigationTab Routing.Route.Protocol              model dispatch sidebarsize
-            createNavigationTab Routing.Route.FilePicker            model dispatch sidebarsize
-            //if not isIEBrowser then
-                // docsrc attribute not supported in iframe in IE
-                //createNavigationTab Routing.Route.Dag               model dispatch sidebarsize
-            createNavigationTab Routing.Route.JsonExport            model dispatch sidebarsize
+            createNavigationTab Routing.Route.BuildingBlock     model dispatch sidebarsize
+            createNavigationTab Routing.Route.TermSearch        model dispatch sidebarsize
+            createNavigationTab Routing.Route.Protocol          model dispatch sidebarsize
+            createNavigationTab Routing.Route.FilePicker        model dispatch sidebarsize
+            createNavigationTab Routing.Route.JsonExport        model dispatch sidebarsize
         else
-            //createNavigationTab Routing.Route.Validation            model dispatch sidebarsize
-            createNavigationTab Routing.Route.Info                  model dispatch sidebarsize
+            createNavigationTab Routing.Route.JsonExport        model dispatch sidebarsize
     ]
 
 module private ResizeObserver =

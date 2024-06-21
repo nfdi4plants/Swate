@@ -4,7 +4,6 @@ open ARCtrl
 
 module TermTypes =
 
-    open Shared.Regex
     open System
 
     type Ontology = {

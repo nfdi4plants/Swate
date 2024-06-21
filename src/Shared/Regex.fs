@@ -1,5 +1,6 @@
 namespace Shared
 
+[<System.Obsolete("Use these functions from ARCtrl")>]
 module Regex =
 
     module Pattern =

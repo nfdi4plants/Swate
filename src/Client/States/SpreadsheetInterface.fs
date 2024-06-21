@@ -20,6 +20,6 @@ type Msg =
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
 /// Starts chain to export active table to isa json
-| ExportJson
+| ExportJson of ArcFiles * JsonExport.JsonExportFormat
 | UpdateTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []

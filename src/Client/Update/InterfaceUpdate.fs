@@ -137,13 +137,13 @@ module Interface =
                         Spreadsheet.DeleteColumn (distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | ExportJson ->
+        | ExportJson (arcfile, jef) ->
             match host with
             | Some Swatehost.Excel ->
-                failwith "ExportJsonTable not implemented for Excel"
+                failwith "ExportJson not implemented for Excel"
                 model, Cmd.none
             | Some Swatehost.Browser ->
-                let cmd = SpreadsheetMsg Spreadsheet.ExportJson |> Cmd.ofMsg
+                let cmd = SpreadsheetMsg (Spreadsheet.ExportJson (arcfile, jef)) |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | EditBuildingBlock ->
