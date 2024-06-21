@@ -146,15 +146,6 @@ module Interface =
                 let cmd = SpreadsheetMsg Spreadsheet.ExportJson |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | ParseTablesToDag ->
-            match host with
-            | Some Swatehost.Excel ->
-                let cmd = DagMsg Dag.ParseTablesOfficeInteropRequest |> Cmd.ofMsg
-                model, cmd
-            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                let cmd = SpreadsheetMsg Spreadsheet.ParseTablesToDag |> Cmd.ofMsg
-                model, cmd
-            | _ -> failwith "not implemented"
         | EditBuildingBlock ->
             match host with
             | Some Swatehost.Excel ->

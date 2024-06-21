@@ -355,10 +355,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                     CytoscapeModel = nextState}
             nextModel, nextCmd
 
-        | DagMsg msg ->
-            let nextModel, nextCmd = currentModel |> Dag.Core.update msg
-            nextModel, nextCmd
-
     /// This function is used to determine which msg should be logged to activity log.
     /// The function is exception based, so msg which should not be logged needs to be added here.
     let matchMsgToLog (msg: Msg) =

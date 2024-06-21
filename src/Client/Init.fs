@@ -21,7 +21,6 @@ let initializeModel () =
         AddBuildingBlockState       = BuildingBlock.Model       .init ()
         ProtocolState               = Protocol.Model            .init ()
         BuildingBlockDetailsState   = BuildingBlockDetailsState .init ()
-        DagModel                    = Dag.Model                 .init ()
         CytoscapeModel              = Cytoscape.Model           .init ()
         SpreadsheetModel            = Spreadsheet.Model         .fromLocalStorage()
         History                     = LocalHistory.Model        .init().UpdateFromSessionStorage()

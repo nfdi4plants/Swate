@@ -129,7 +129,6 @@ type Model = {
     AddBuildingBlockState       : BuildingBlock.Model
     ///Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
-    DagModel                    : Dag.Model
     CytoscapeModel              : Cytoscape.Model
     /// Contains all information about spreadsheet view
     SpreadsheetModel            : Spreadsheet.Model
@@ -137,8 +136,6 @@ type Model = {
 } with
     member this.updateByExcelState (s:OfficeInterop.Model) =
         { this with ExcelState = s}
-    member this.updateByDagModel (m:Dag.Model) =
-        { this with DagModel = m}
 
 type Msg =
 | DevMsg                of DevMsg
@@ -153,7 +150,6 @@ type Msg =
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | CytoscapeMsg          of Cytoscape.Msg
 | SpreadsheetMsg        of Spreadsheet.Msg
-| DagMsg                of Dag.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
 | InterfaceMsg          of SpreadsheetInterface.Msg
 //| SettingsProtocolMsg   of SettingsProtocolMsg

@@ -175,12 +175,6 @@ type SidebarView =
         | Routing.Route.Settings ->
             SettingsView.settingsViewComponent model dispatch
 
-        //| Routing.Route.SettingsXml ->
-        //    SettingsXml.settingsXmlViewComponent model dispatch
-
-        | Routing.Route.Dag ->
-            Dag.Core.mainElement model dispatch
-
         | Routing.Route.Info ->
             InfoView.infoComponent model dispatch
 

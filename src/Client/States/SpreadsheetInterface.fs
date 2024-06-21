@@ -21,7 +21,5 @@ type Msg =
 | InsertFileNames of string list
 /// Starts chain to export active table to isa json
 | ExportJson
-/// Starts chain to parse all tables to DAG
-| ParseTablesToDag
 | UpdateTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []

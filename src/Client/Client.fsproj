@@ -37,7 +37,6 @@
         <Compile Include="States\Spreadsheet.fs" />
         <Compile Include="States\LocalHistory.fs" />
         <Compile Include="States\CytoscapeState.fs" />
-        <Compile Include="States\DagState.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="Messages.fs" />
         <Compile Include="ARCitect\Interop.fs" />
@@ -84,7 +83,6 @@
         <Compile Include="Pages\ActivityLog\ActivityLogView.fs" />
         <Compile Include="Pages\Settings\SettingsView.fs" />
         <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
-        <Compile Include="Pages\Dag\Dag.fs" />
         <Compile Include="MainComponents\EmptyTableElement.fs" />
         <Compile Include="MainComponents\Widgets.fs" />
         <Compile Include="MainComponents\MainViewContainer.fs" />

@@ -153,17 +153,6 @@ type PersistentStorageState = {
         HasOntologiesLoaded     = false
     }
 
-type ApiCallStatus =
-    | IsNone
-    | Pending
-    | Successfull
-    | Failed of string
-
-type ApiCallHistoryItem = {
-    FunctionName   : string
-    Status         : ApiCallStatus
-}
-
 type PageState = {
     CurrentPage : Routing.Route
     IsExpert    : bool
