@@ -16,6 +16,7 @@ open Elmish
 open Feliz
 open Feliz.Bulma
 open Shared
+open ARCtrl
 
 type private TemplateFromFileState = {
     /// User select type to upload
@@ -101,6 +102,25 @@ type TemplateFromFile =
     [<ReactComponent>]
     static member Main(model: Messages.Model, dispatch) =
         let state, setState = React.useState(TemplateFromFileState.init)
+        let af = React.useRef (
+            let a = ArcAssay.init("My Assay")
+            let t1 = a.InitTable("Template Table 1")
+            t1.AddColumns([|
+                CompositeColumn.create(CompositeHeader.Input IOType.Source, [| for i in 1 .. 5 do sprintf "Source _ %i" i |> CompositeCell.FreeText |])
+                CompositeColumn.create(CompositeHeader.Output IOType.Sample, [| for i in 1 .. 5 do sprintf "Sample _ %i" i |> CompositeCell.FreeText |])
+                CompositeColumn.create(CompositeHeader.Component (OntologyAnnotation("instrument model", "MS", "MS:19283")), [| for i in 1 .. 5 do OntologyAnnotation("SCIEX instrument model", "MS", "MS:21387189237") |> CompositeCell.Term |])
+                CompositeColumn.create(CompositeHeader.Factor (OntologyAnnotation("temperature", "UO", "UO:21387")), [| for i in 1 .. 5 do CompositeCell.createUnitized("", OntologyAnnotation("degree celcius", "UO", "UO:21387189237")) |])
+            |])
+            let t2 = a.InitTable("Template Table 2")
+            t2.AddColumns([|
+                CompositeColumn.create(CompositeHeader.Input IOType.Source, [| for i in 1 .. 5 do sprintf "Source2 _ %i" i |> CompositeCell.FreeText |])
+                CompositeColumn.create(CompositeHeader.Output IOType.Sample, [| for i in 1 .. 5 do sprintf "Sample2 _ %i" i |> CompositeCell.FreeText |])
+                CompositeColumn.create(CompositeHeader.Component (OntologyAnnotation("instrument", "MS", "MS:19283")), [| for i in 1 .. 5 do OntologyAnnotation("SCIEX instrument model", "MS", "MS:21387189237") |> CompositeCell.Term |])
+                CompositeColumn.create(CompositeHeader.Factor (OntologyAnnotation("temperature", "UO", "UO:21387")), [| for i in 1 .. 5 do CompositeCell.createUnitized("", OntologyAnnotation("degree celcius", "UO", "UO:21387189237")) |])
+            |])
+            let af = ArcFiles.Assay a
+            af
+        )
         let setJsonFormat = fun x -> setState { state with JsonFormat = x }
         let setFileType = fun x -> setState { state with FileType = x }
         let fileTypeDisabled (ft: ArcFilesDiscriminate) =
@@ -118,9 +138,10 @@ type TemplateFromFile =
         mainFunctionContainer [
             // modal!
             match state.UploadedFile with
-            | Some af -> 
+            | Some af ->
                 Modals.SelectiveImportModal.Main af (fun _ -> TemplateFromFileState.init() |> setState)
             | None -> Html.none
+            Modals.SelectiveImportModal.Main af.current (fun _ -> TemplateFromFileState.init() |> setState)
             Bulma.field.div [
                 Bulma.help [
                     b [] [str "Import JSON files."]
