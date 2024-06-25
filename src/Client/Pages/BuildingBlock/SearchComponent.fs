@@ -134,7 +134,12 @@ let private addBuildingBlockButton (model: Model) dispatch =
                 prop.disabled true
             Bulma.button.isFullWidth
             prop.onClick (fun _ ->
-                let column = CompositeColumn.create(header, [|if body.IsSome then body.Value|])
+                let bodyCells =
+                    if body.IsSome then // create as many body cells as there are rows in the active table
+                        Array.init (model.SpreadsheetModel.ActiveTable.RowCount) (fun _ -> body.Value)
+                    else
+                        Array.empty                    
+                let column = CompositeColumn.create(header, bodyCells)
                 let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
                 let id = $"Header_{index}_Main"
