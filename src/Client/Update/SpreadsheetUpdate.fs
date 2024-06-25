@@ -74,6 +74,9 @@ module Spreadsheet =
             match msg with
             | UpdateState nextState ->
                 nextState, model, Cmd.none
+            | AddTable table ->
+                let nextState = Controller.addTable table state
+                nextState, model, Cmd.none
             | CreateAnnotationTable usePrevOutput ->
                 let nextState = Controller.createTable usePrevOutput state
                 nextState, model, Cmd.none

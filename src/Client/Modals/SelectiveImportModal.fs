@@ -58,6 +58,32 @@ module private Helper =
                 arcFile
         SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg |> dispatch
 
+    let submitTables (tables: ResizeArray<ArcTable>) (importState: SelectiveImportModalState) (activeTable: ArcTable) (dispatch: Messages.Msg -> unit) =
+        if importState.ImportTables.Length = 0 then
+            ()
+        else
+            let addMsgs =
+                importState.ImportTables
+                |> Seq.filter (fun x -> x.FullImport)
+                |> Seq.map (fun x -> tables.[x.Index])
+                |> Seq.map (fun table ->
+                    let nTable = ArcTable.init(table.Name)
+                    nTable.Join(table, joinOptions=importState.ImportType)
+                    nTable
+                )
+                |> Seq.map (fun table -> SpreadsheetInterface.AddTable table |> InterfaceMsg)
+            let appendMsg =
+                let tables = importState.ImportTables |> Seq.filter (fun x -> not x.FullImport) |> Seq.map (fun x -> tables.[x.Index])
+                /// Everything will be appended against this table, which in the end will be appended to the main table
+                let tempTable = ArcTable.init("ThisIsAPlaceholder")
+                for table in tables do
+                    let preparedTemplate = Table.distinctByHeader tempTable table
+                    tempTable.Join(preparedTemplate, joinOptions=importState.ImportType)
+                let appendTable = Table.distinctByHeader activeTable tempTable
+                SpreadsheetInterface.JoinTable (appendTable, None, Some importState.ImportType) |> InterfaceMsg
+            appendMsg |> dispatch
+            if Seq.length addMsgs = 0 then () else addMsgs |> Seq.iter dispatch
+
 open Helper
 
 type SelectiveImportModal =
@@ -87,22 +113,23 @@ type SelectiveImportModal =
                 Bulma.control.div [
                     prop.className "is-flex is-justify-content-space-between"
                     prop.children [
-                        myradio(ARCtrl.TableJoinOptions.Headers, " Only Column Headers")
-                        myradio(ARCtrl.TableJoinOptions.WithValues, " With Values")
-                        myradio(ARCtrl.TableJoinOptions.WithUnit, " With Units")
+                        myradio(ARCtrl.TableJoinOptions.Headers, " Column Headers")
+                        myradio(ARCtrl.TableJoinOptions.WithUnit, " ..With Units")
+                        myradio(ARCtrl.TableJoinOptions.WithValues, " ..With Values")
                     ]
                 ]
             ]
         ]
 
-    static member private MetadataImport(isActive: bool, setActive: bool -> unit) =
+    static member private MetadataImport(isActive: bool, setActive: bool -> unit, disArcFile: ArcFilesDiscriminate) =
+        let name = string disArcFile
         Bulma.box [
             if isActive then color.hasBackgroundInfo
             prop.children [
                 Bulma.field.div [
                     Bulma.label [
                         Html.i [prop.className "fa-solid fa-lightbulb"]
-                        Html.text (" Metadata")
+                        Html.textf " %s Metadata" name
                     ]
                     Bulma.control.div [
                         Html.label [
@@ -208,17 +235,16 @@ type SelectiveImportModal =
                                 prop.children [
                                     Html.thead [
                                         Html.tr [
-                                            Html.th "Column"
-                                            for ri in 1 .. table.RowCount do
-                                                Html.th ri
+                                            for c in table.Headers do
+                                                Html.th (c.ToString())
                                         ]
                                     ]
                                     Html.tbody [
-                                        for c in table.Columns do
+                                        for ri in 0 .. (table.RowCount-1) do
+                                            let row = table.GetRow(ri, true)
                                             Html.tr [
-                                                Html.th (c.Header.ToString())
-                                                for cv in c.Cells do
-                                                    Html.td (cv.ToString())
+                                                for c in row do
+                                                    Html.td (c.ToString())
                                             ]
                                     ]
                                 ]
@@ -229,14 +255,14 @@ type SelectiveImportModal =
         ]
 
     [<ReactComponent>]
-    static member Main (import: ArcFiles) (rmv: _ -> unit) =
+    static member Main (import: ArcFiles) (model: Spreadsheet.Model) dispatch (rmv: _ -> unit) =
         let state, setState = React.useState(SelectiveImportModalState.init)
-        let tables =
+        let tables, disArcfile =
             match import with
-            | Assay a -> a.Tables
-            | Study (s,_) -> s.Tables
-            | Template t -> ResizeArray([t.Table])
-            | _ -> ResizeArray()
+            | Assay a -> a.Tables, ArcFilesDiscriminate.Assay
+            | Study (s,_) -> s.Tables, ArcFilesDiscriminate.Study
+            | Template t -> ResizeArray([t.Table]), ArcFilesDiscriminate.Template
+            | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
         let setMetadataImport = fun b ->
             {state with ImportMetadata = b; ImportTables = state.ImportTables |> List.map (fun t -> {t with FullImport = true})} |> setState
         let addTableImport = fun (i:int) (fullImport: bool) ->
@@ -259,12 +285,8 @@ type SelectiveImportModal =
                         Bulma.modalCardBody [
                             prop.className "p-5"
                             prop.children [
-                                Bulma.button.a [
-                                    prop.onClick (fun _ -> log state)
-                                    prop.text "test"
-                                ]
                                 SelectiveImportModal.ImportTypeRadio(state.ImportType, fun it -> {state with ImportType = it} |> setState)
-                                SelectiveImportModal.MetadataImport(state.ImportMetadata, setMetadataImport)
+                                SelectiveImportModal.MetadataImport(state.ImportMetadata, setMetadataImport, disArcfile)
                                 for ti in 0 .. (tables.Count-1) do
                                     let t = tables.[ti]
                                     SelectiveImportModal.TableImport(ti, t, state, addTableImport, rmvTableImport)
@@ -276,6 +298,9 @@ type SelectiveImportModal =
                                 prop.style [style.marginLeft length.auto]
                                 prop.text "Submit"
                                 prop.onClick(fun e ->
+                                    match state.ImportMetadata with
+                                    | true -> submitWithMetadata import state dispatch
+                                    | false -> submitTables tables state model.ActiveTable dispatch
                                     rmv e
                                 )
                             ]

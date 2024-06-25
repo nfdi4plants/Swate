@@ -139,9 +139,9 @@ type TemplateFromFile =
             // modal!
             match state.UploadedFile with
             | Some af ->
-                Modals.SelectiveImportModal.Main af (fun _ -> TemplateFromFileState.init() |> setState)
+                Modals.SelectiveImportModal.Main af model.SpreadsheetModel dispatch (fun _ -> TemplateFromFileState.init() |> setState)
             | None -> Html.none
-            Modals.SelectiveImportModal.Main af.current (fun _ -> TemplateFromFileState.init() |> setState)
+            //Modals.SelectiveImportModal.Main af.current model.SpreadsheetModel dispatch (fun _ -> TemplateFromFileState.init() |> setState)
             Bulma.field.div [
                 Bulma.help [
                     b [] [str "Import JSON files."]

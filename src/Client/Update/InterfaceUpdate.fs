@@ -56,6 +56,16 @@ module Interface =
                 let cmd = Spreadsheet.CreateAnnotationTable usePrevOutput |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
+        | AddTable table ->
+            match host with
+            | Some Swatehost.Excel ->
+                //let cmd = OfficeInterop.AddTable table |> OfficeInteropMsg |> Cmd.ofMsg
+                failwith "AddTable not implemented for Excel"
+                model, Cmd.none
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                let cmd = Spreadsheet.AddTable table |> SpreadsheetMsg |> Cmd.ofMsg
+                model, cmd
+            | _ -> failwith "not implemented"
         | AddAnnotationBlock minBuildingBlockInfo ->
             match host with
             //| Swatehost.Excel _ ->

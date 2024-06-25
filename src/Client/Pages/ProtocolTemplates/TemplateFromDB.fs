@@ -3,6 +3,7 @@ namespace Protocol
 open Feliz
 open Feliz.Bulma
 open Messages
+open Shared
 
 type TemplateFromDB =
     
@@ -31,37 +32,11 @@ type TemplateFromDB =
                             prop.onClick (fun _ ->
                                 if model.ProtocolState.TemplateSelected.IsNone then
                                     failwith "No template selected!"
-                                // Remove existing columns
-                                let mutable columnsToRemove = []
-                                // find duplicate columns
-                                let tablecopy = model.ProtocolState.TemplateSelected.Value.Table.Copy()
-                                for header in model.SpreadsheetModel.ActiveTable.Headers do
-                                    let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
-                                    if containsAtIndex.IsSome then
-                                        columnsToRemove <- containsAtIndex.Value::columnsToRemove
-                                log columnsToRemove
-                                tablecopy.RemoveColumns (Array.ofList columnsToRemove)
-                                tablecopy.IteriColumns(fun i c0 ->
-                                    let c1 = {c0 with Cells = [||]}
-                                    let c2 =
-                                        if c1.Header.isInput then
-                                            match model.SpreadsheetModel.ActiveTable.TryGetInputColumn() with
-                                            | Some ic ->
-                                                {c1 with Cells = ic.Cells}
-                                            | _ -> c1
-                                        elif c1.Header.isOutput then
-                                            match model.SpreadsheetModel.ActiveTable.TryGetOutputColumn() with
-                                            | Some oc ->
-                                                {c1 with Cells = oc.Cells}
-                                            | _ -> c1
-                                        else
-                                            c1
-                                    tablecopy.UpdateColumn(i, c2.Header, c2.Cells)
-                                )
-                                log(tablecopy.RowCount, tablecopy.ColumnCount)
+                                /// Filter out existing building blocks and keep input/output values.
+                                let joinConfig = ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
+                                let preparedTemplate = Table.selectiveTablePrepare model.SpreadsheetModel.ActiveTable model.ProtocolState.TemplateSelected.Value.Table
                                 let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
-                                let joinConfig = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
-                                SpreadsheetInterface.JoinTable (tablecopy, Some index, joinConfig ) |> InterfaceMsg |> dispatch
+                                SpreadsheetInterface.JoinTable (preparedTemplate, Some index, Some joinConfig) |> InterfaceMsg |> dispatch
                             )
                             prop.text "Add template"
                         ]

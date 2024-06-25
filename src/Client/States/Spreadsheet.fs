@@ -111,6 +111,7 @@ type Msg =
 | MoveColumn of current:int * next:int
 | UpdateActiveCell of (U2<int,(int*int)> * ColumnType) option
 | SetActiveCellFromSelected
+| AddTable of ArcTable
 | RemoveTable of index:int
 | RenameTable of index:int * name:string
 | UpdateTableOrder of pre_index:int * new_index:int
