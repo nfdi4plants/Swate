@@ -107,6 +107,7 @@ let Main (model:Model) (dispatch: Msg -> unit) =
     //React.useElementListener.on(ref, "keydown", (Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch))
     /// This state is used to track which columns are expanded
     let state, setState : Set<int> * (Set<int> -> unit) = React.useState(Set.empty)
+    React.useEffect((fun _ -> setState Set.empty), [|box model.SpreadsheetModel.ActiveView|])
     Html.div [
         prop.id "SPREADSHEET_MAIN_VIEW"
         prop.tabIndex 0

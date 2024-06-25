@@ -141,7 +141,7 @@ type SidebarView =
                 str "Swate Release Version "
                 a [Href "https://github.com/nfdi4plants/Swate/releases"; HTMLAttr.Target "_Blank"] [str model.PersistentStorageState.AppVersion]
                 str " Host "
-                Html.span [prop.style [style.color "#4fb3d9"]; prop.text (sprintf "%O" model.PersistentStorageState.Host)]
+                Html.a [prop.style [style.cursor.defaultCursor] ;prop.text (sprintf "%O" model.PersistentStorageState.Host)]
             ]
         ]
 
