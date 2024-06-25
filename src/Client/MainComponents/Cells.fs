@@ -96,13 +96,7 @@ module private CellAux =
         |> Option.map header.UpdateWithOA
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
 
-    let oasetter (index, cell: CompositeCell, dispatch) = fun (oa:OntologyAnnotation) ->
-        let nextCell = 
-            if oa.TermSourceREF.IsNone && oa.TermAccessionNumber.IsNone then // update only mainfield, if mainfield is the only field with value
-                cell.UpdateMainField oa.NameText 
-            else 
-                cell.UpdateWithOA oa
-        Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+    let oasetter (index, nextCell: CompositeCell, dispatch) = Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         
 
 open CellComponents
@@ -354,18 +348,35 @@ type Cell =
         let setter = fun (s: string) ->
             let nextCell = cell.UpdateMainField s
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-        let oasetter = if cell.isTerm then CellAux.oasetter(index, cell, dispatch) |> Some else None
+        let oasetter =
+            if cell.isTerm then
+                fun (oa:OntologyAnnotation) ->
+                    let nextCell = cell.UpdateWithOA oa
+                    CellAux.oasetter(index, nextCell, dispatch)
+                |> Some
+            else
+                None
         Cell.BodyBase(Main, cellValue, setter, index, cell, model, dispatch, ?oasetter=oasetter)
 
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.GetContent().[1]
         let setter = fun (s: string) ->
-            let oa = cell.ToOA() 
+            let oa = cell.ToOA()
             let newName = if s = "" then None else Some s
             oa.Name <- newName
             let nextCell = cell.UpdateWithOA oa
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-        let oasetter = if cell.isUnitized then CellAux.oasetter(index, cell, dispatch) |> Some else None
+        let oasetter =
+            if cell.isUnitized then
+                log "IsUnitized"
+                fun (oa:OntologyAnnotation) ->
+                    log ("oa", oa)
+                    let nextCell = cell.UpdateWithOA oa
+                    log ("nextCell", nextCell)
+                    CellAux.oasetter(index, nextCell, dispatch)
+                |> Some
+            else
+                None
         Cell.BodyBase(Unit, cellValue, setter, index, cell, model, dispatch, ?oasetter=oasetter)
 
     static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
