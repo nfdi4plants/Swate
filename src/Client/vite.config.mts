@@ -10,13 +10,13 @@ const proxyTarget = "http://localhost:" + proxyPort;
 export default defineConfig({
     plugins: [
         react(),
-        //basicSsl()
+        basicSsl()
     ],
     build: {
         outDir: "../../deploy/public",
     },
     server: {
-        port: 8080,
+        port: 3000,
         proxy: {
             // redirect requests that start with /api/ to the server on port 5000
             "/api/": {

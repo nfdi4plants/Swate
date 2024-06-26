@@ -31,6 +31,7 @@ module Interface =
             let cmd =
                 Cmd.batch [
                     Cmd.ofMsg (Ontologies.GetOntologies |> OntologyMsg)
+                    log ("HOST",host)
                     match host with
                     | Swatehost.Excel ->
                         Cmd.OfPromise.either
