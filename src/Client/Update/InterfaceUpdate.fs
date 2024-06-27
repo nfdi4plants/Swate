@@ -14,10 +14,44 @@ open Shared
 open Fable.Core.JsInterop
 open Shared.ARCtrlHelper
 
-module private Helper =
+/// This seems like such a hack :(
+module private ExcelHelper =
+
+    open Fable.Core
     open ExcelJS.Fable.GlobalBindings
 
-    let initializeAddIn () = Office.onReady()
+    let initializeAddIn () = Office.onReady().``then``(fun _ -> ()) |> Async.AwaitPromise
+
+    /// Office-js will kill iframe loading in ARCitect, therefore we must load it conditionally
+    let addOfficeJsScript(callback: unit -> unit) =
+        let cdn = @"https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+        let _type = "text/javascript"
+        let s = Browser.Dom.document.createElement("script")
+        s?``type`` <- _type
+        s?src <- cdn
+        Browser.Dom.document.head.appendChild s |> ignore
+        s.onload <- fun _ -> callback()
+        ()
+
+    /// Make a function that loops short sleep sequences until a mutable variable is set to true
+    /// do mutabel dotnet ref for variable
+    let myAwaitLoadedThenInit(loaded: ref<bool>) =
+        let rec loop() =
+            async {
+            if loaded.Value then
+                do! initializeAddIn()
+            else
+                do! Async.Sleep 100
+                do! loop()
+            }
+        loop()
+
+    let officeload() =
+        let loaded = ref false
+        async {
+            addOfficeJsScript(fun _ -> loaded.Value <- true)
+            do! myAwaitLoadedThenInit loaded
+        }
 
 //open Fable.Core.JS
 
@@ -31,13 +65,12 @@ module Interface =
             let cmd =
                 Cmd.batch [
                     Cmd.ofMsg (Ontologies.GetOntologies |> OntologyMsg)
-                    log ("HOST",host)
                     match host with
                     | Swatehost.Excel ->
-                        Cmd.OfPromise.either
-                            OfficeInterop.Core.tryFindActiveAnnotationTable
+                        Cmd.OfAsync.either
+                            ExcelHelper.officeload
                             ()
-                            (OfficeInterop.AnnotationTableExists >> OfficeInteropMsg)
+                            (fun _ -> TryFindAnnotationTable |> OfficeInteropMsg)
                             (curry GenericError Cmd.none >> DevMsg)
                     | Swatehost.Browser ->
                         Cmd.none

@@ -29,6 +29,7 @@ type Msg =
     // create and update table element functions
     | CreateAnnotationTable                 of tryUsePrevOutput:bool 
     | AnnotationtableCreated
+    | TryFindAnnotationTable
     | AnnotationTableExists                 of TryFindAnnoTableResult
     | InsertOntologyTerm                    of TermMinimal
     | AddAnnotationBlock                    of InsertBuildingBlock
