@@ -709,7 +709,7 @@ type FormComponents =
         let element = React.useElementRef()
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
         Bulma.field.div [ 
-            if label.IsSome then Bulma.label label.Value
+            //if label.IsSome then Bulma.label label.Value
             Bulma.field.div [
                 //prop.ref element
                 prop.style [style.position.relative]
@@ -721,7 +721,8 @@ type FormComponents =
                             Bulma.field.div [
                                 prop.style [style.flexGrow 1]
                                 prop.children [
-                                    if showTextLabels then Bulma.label $"Term Name"
+                                    let label = defaultArg label "Term Name" 
+                                    Bulma.label label
                                     let innersetter = 
                                         fun (oaOpt: OntologyAnnotation option) -> 
                                             if oaOpt.IsSome then 

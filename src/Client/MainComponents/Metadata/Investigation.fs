@@ -1,4 +1,4 @@
-﻿module MainComponents.Metadata.Investigation
+module MainComponents.Metadata.Investigation
 
 open Feliz
 open Feliz.Bulma
@@ -72,13 +72,13 @@ let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) =
                 inv.OntologySourceReferences <- ResizeArray oas
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
-        FormComponents.TextInputs(
-            Array.ofSeq inv.RegisteredStudyIdentifiers,
-            "RegisteredStudyIdentifiers",
-            (fun i -> 
-                inv.RegisteredStudyIdentifiers <- ResizeArray i
-                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-        )
+        //FormComponents.TextInputs(
+        //    Array.ofSeq inv.RegisteredStudyIdentifiers,
+        //    "RegisteredStudyIdentifiers",
+        //    (fun i -> 
+        //        inv.RegisteredStudyIdentifiers <- ResizeArray i
+        //        inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
+        //)
         FormComponents.CommentsInput(
             Array.ofSeq inv.Comments,
             "Comments",

@@ -1,4 +1,4 @@
-﻿module MainComponents.Metadata.Study
+module MainComponents.Metadata.Study
 
 open Feliz
 open Feliz.Bulma
@@ -63,13 +63,13 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, 
                 study.StudyDesignDescriptors <- ResizeArray(oas)
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
         )
-        FormComponents.TextInputs(
-            Array.ofSeq study.RegisteredAssayIdentifiers,
-            "Registered Assay Identifiers",
-            fun rais ->
-                study.RegisteredAssayIdentifiers <- ResizeArray(rais)
-                (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-        )
+        //FormComponents.TextInputs(
+        //    Array.ofSeq study.RegisteredAssayIdentifiers,
+        //    "Registered Assay Identifiers",
+        //    fun rais ->
+        //        study.RegisteredAssayIdentifiers <- ResizeArray(rais)
+        //        (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+        //)
         FormComponents.CommentsInput(
             Array.ofSeq study.Comments,
             "Comments",
