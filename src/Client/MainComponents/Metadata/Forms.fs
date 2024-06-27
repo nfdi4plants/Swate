@@ -85,7 +85,7 @@ module private API =
                 |]
             let authorString = createAuthorString authors
             let title = json?title
-            let publication = Publication.create(pmid, doi, authorString, title, Term.Published)
+            let publication = Publication.create(pmid, doi, authorString, title, TermCollection.Published)
             return publication
         }
 
@@ -122,7 +122,7 @@ module private API =
             |]
             let! pubmedId = requestByDOI_FromPubMed doi
             let authorString = createAuthorString authors
-            let publication = Publication.create(?pubMedID=pubmedId, doi=doi, authors=authorString, ?title=title, status=Term.Published)
+            let publication = Publication.create(?pubMedID=pubmedId, doi=doi, authors=authorString, ?title=title, status=TermCollection.Published)
             return publication
         }
 
@@ -703,7 +703,7 @@ type FormComponents =
         )
 
     [<ReactComponent>]
-    static member OntologyAnnotationInput (input: OntologyAnnotation, setter: OntologyAnnotation -> unit, ?label: string, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit) =
+    static member OntologyAnnotationInput (input: OntologyAnnotation, setter: OntologyAnnotation -> unit, ?label: string, ?showTextLabels: bool, ?removebutton: MouseEvent -> unit, ?parent: OntologyAnnotation) =
         let showTextLabels = defaultArg showTextLabels true
         let state, setState = React.useState(input)
         let element = React.useElementRef()
@@ -733,6 +733,7 @@ type FormComponents =
                                         input=state,
                                         fullwidth=true,
                                         ?portalTermSelectArea=element.current,
+                                        ?parent=parent,
                                         debounceSetter=1000
                                     )                                
                                 ]
@@ -776,10 +777,10 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member OntologyAnnotationsInput (oas: OntologyAnnotation [], label: string, setter: OntologyAnnotation [] -> unit, ?showTextLabels: bool) =
+    static member OntologyAnnotationsInput (oas: OntologyAnnotation [], label: string, setter: OntologyAnnotation [] -> unit, ?showTextLabels: bool, ?parent: OntologyAnnotation) =
         FormComponents.InputSequence(
             oas, (OntologyAnnotation.empty()), label, setter, 
-            (fun (a,b,c,d) -> FormComponents.OntologyAnnotationInput(a,c,label=b,removebutton=d,?showTextLabels=showTextLabels))
+            (fun (a,b,c,d) -> FormComponents.OntologyAnnotationInput(a,c,label=b,removebutton=d,?showTextLabels=showTextLabels, ?parent=parent))
         )
 
     [<ReactComponent>]
@@ -879,6 +880,7 @@ type FormComponents =
                             state |> setter
                         ),
                         showTextLabels = false
+                        //parent=Shared.TermCollection.PersonRoleWithinExperiment
                     )
                     if deletebutton.IsSome then
                         Helper.deleteButton deletebutton.Value
@@ -1041,7 +1043,8 @@ type FormComponents =
                             state.Status <- if s = (OntologyAnnotation.empty()) then None else Some s
                             state |> setter
                         ),
-                        "Status"
+                        "Status",
+                        parent=Shared.TermCollection.PublicationStatus
                     )
                     FormComponents.CommentsInput(
                         Array.ofSeq state.Comments, 
