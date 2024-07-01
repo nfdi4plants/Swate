@@ -65,18 +65,16 @@ let triggerResponsiveReturnEle id =
 let responsiveReturnEle id (fa: string) (faToggled: string) =
     let notTriggeredId = createNonTriggeredId id
     let triggeredId = createTriggeredId id
-    div [Style [
-        Position PositionOptions.Relative
-    ]] [
+    Bulma.icon [
         Html.i [
             prop.style [
-                    style.position.absolute
-                    style.top 0
-                    style.left 0
-                    style.display.block
-                    style.custom("transition", "opacity 0.25s, transform 0.25s")
-                    style.opacity 1
-                ]
+                style.position.absolute
+                //style.top 0
+                //style.left 0
+                style.display.block
+                style.custom("transition", "opacity 0.25s, transform 0.25s")
+                style.opacity 1
+            ]
             prop.id notTriggeredId
             prop.onTransitionEnd (fun e ->
                 Fable.Core.JS.setTimeout (fun () ->
@@ -89,8 +87,8 @@ let responsiveReturnEle id (fa: string) (faToggled: string) =
         Html.i [
             prop.style [
                     style.position.absolute
-                    style.top 0
-                    style.left 0
+                    //style.top 0
+                    //style.left 0
                     style.display.block
                     style.custom("transition", "opacity 0.25s, transform 0.25s")
                     style.opacity 0

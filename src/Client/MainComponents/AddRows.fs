@@ -12,7 +12,6 @@ let Main (dispatch: Messages.Msg -> unit) =
     let state_rows, setState_rows = React.useState(init_RowsToAdd)
     Html.div [
         prop.id "ExpandTable"
-        prop.title "Add rows"
         prop.style [
             style.flexGrow 1; style.justifyContent.center; style.display.inheritFromParent; style.padding(length.rem 1)
             style.position.sticky; style.left 0
@@ -25,11 +24,13 @@ let Main (dispatch: Messages.Msg -> unit) =
                         prop.id "n_row_input"
                         prop.min init_RowsToAdd
                         prop.onChange(fun e -> setState_rows e)
+                        prop.onKeyDown(key.enter, fun _ -> Spreadsheet.AddRows state_rows |> SpreadsheetMsg |> dispatch)
                         prop.defaultValue init_RowsToAdd
-                        prop.style [style.width(50)]
+                        prop.style [style.width(100)]
                     ]
                     Bulma.button.a [
                         Bulma.button.isRounded
+                        prop.title "Add rows"
                         prop.onClick(fun _ ->
                             let inp = Browser.Dom.document.getElementById "n_row_input"
                             inp?Value <- init_RowsToAdd

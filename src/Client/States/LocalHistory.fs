@@ -52,9 +52,8 @@ module HistoryOrder =
 //    member this.toJson() = Json.serialize this
 
 module ConversionTypes =  
-    open ARCtrl.ISA
-    open ARCtrl.ISA.Json
-    open ARCtrl.Template.Json
+    open ARCtrl
+    open ARCtrl.Json
     open Shared
 
     [<RequireQualifiedAccess>]
@@ -73,9 +72,9 @@ module ConversionTypes =
         static member fromSpreadsheetModel (model: Spreadsheet.Model) =
             let jsonArcFile, jsonString =
                 match model.ArcFile with
-                | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, i.ToArcJsonString()
-                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, s.ToArcJsonString()
-                | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, a.ToArcJsonString()
+                | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toCompressedJsonString 0 i
+                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, ArcStudy.toCompressedJsonString 0 s
+                | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toCompressedJsonString 0 a
                 | Some (ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
                 | None -> JsonArcFiles.None, ""
             {
@@ -85,18 +84,21 @@ module ConversionTypes =
             }
         member this.ToSpreadsheetModel() = 
             let init = Spreadsheet.Model.init()
-            let arcFile = 
-                match this.JsonArcFiles with
-                | JsonArcFiles.Investigation -> ArcInvestigation.fromArcJsonString this.JsonString |> ArcFiles.Investigation |> Some
-                | JsonArcFiles.Study -> ArcStudy.fromArcJsonString this.JsonString |> fun s -> ArcFiles.Study(s, []) |> Some
-                | JsonArcFiles.Assay -> ArcAssay.fromArcJsonString this.JsonString |> ArcFiles.Assay |> Some
-                | JsonArcFiles.Template -> Template.fromJsonString this.JsonString |> ArcFiles.Template |> Some
-                | JsonArcFiles.None -> None
-            {
-                init with
-                    ActiveView = this.ActiveView
-                    ArcFile = arcFile
-            }
+            try
+                let arcFile = 
+                    match this.JsonArcFiles with
+                    | JsonArcFiles.Investigation -> ArcInvestigation.fromCompressedJsonString this.JsonString |> ArcFiles.Investigation |> Some
+                    | JsonArcFiles.Study -> ArcStudy.fromCompressedJsonString this.JsonString |> fun s -> ArcFiles.Study(s, []) |> Some
+                    | JsonArcFiles.Assay -> ArcAssay.fromCompressedJsonString this.JsonString |> ArcFiles.Assay |> Some
+                    | JsonArcFiles.Template -> Template.fromJsonString this.JsonString |> ArcFiles.Template |> Some
+                    | JsonArcFiles.None -> None
+                {
+                    init with
+                        ActiveView = this.ActiveView
+                        ArcFile = arcFile
+                }
+            with
+                | _ -> init
         static member toSpreadsheetModel (sessionStorage: SessionStorage) =
             sessionStorage.ToSpreadsheetModel()
 
@@ -197,7 +199,6 @@ type Model =
             // if e.g at position 4 and we create new table state from position 4 we want to delete position 0 .. 3 and use 4 as new 0
             let rebranchedList, toRemoveList1 =
                 if this.HistoryCurrentPosition <> 0 then
-                    printfn "[HISTORY] Rebranch to %i" this.HistoryCurrentPosition
                     this.HistoryOrder
                     |> List.splitAt this.HistoryCurrentPosition
                     |> fun (remove, keep) -> keep, remove
@@ -220,10 +221,12 @@ type Model =
         Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_key, HistoryOrder.toJson(nextState.HistoryOrder))
         // reset new table position to 0
         Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, "0")
-        printfn "[HISTORY] length: %i" nextState.HistoryOrder.Length
         nextState
 
-    member this.ResetAll() =
-        Browser.WebStorage.localStorage.clear()
+    static member ResetHistoryWebStorage() =
+        Browser.WebStorage.localStorage.removeItem(Keys.swate_local_spreadsheet_key)
         Browser.WebStorage.sessionStorage.clear()
+
+    member this.ResetAll() =
+        Model.ResetHistoryWebStorage()
         Model.init()

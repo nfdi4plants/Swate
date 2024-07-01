@@ -13,11 +13,13 @@ open Fable.Remoting.Giraffe
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Configuration
 
-let serviceApi = {
+open ARCtrl
+open ARCtrl.Json
+
+let serviceApi: IServiceAPIv1 = {
     getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyMetadata_Version }
 }
 
-open ISADotNet
 open Microsoft.AspNetCore.Http
 
 let dagApiv1 = {
@@ -169,20 +171,22 @@ let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
 
 open Database
 
-let templateApi credentials = {
-    getTemplates = fun () -> async {
-        let! templates = ARCtrl.Template.Web.getTemplates None
-        let templatesJson = templates |> Array.map (ARCtrl.Template.Json.Template.toJsonString 0)
-        return templatesJson
-    }
+let templateApi credentials = 
+    let templateUrl = @"https://github.com/nfdi4plants/Swate-templates/releases/download/latest/templates_v2.0.0.json"
+    {
+        getTemplates = fun () -> async {
+            let! templates = ARCtrl.Template.Web.getTemplates (None)
+            let templatesJson = ARCtrl.Json.Templates.toJsonString 0 (Array.ofSeq templates)
+            return templatesJson
+        }
 
-    getTemplateById = fun id -> async {
-        let! templates = ARCtrl.Template.Web.getTemplates None
-        let template = templates |> Array.find (fun t -> t.Id = System.Guid(id))
-        let templateJson = ARCtrl.Template.Json.Template.toJsonString 0 template
-        return templateJson
+        getTemplateById = fun id -> async {
+            let! templates = ARCtrl.Template.Web.getTemplates (None)
+            let template = templates |> Seq.find (fun t -> t.Id = System.Guid(id))
+            let templateJson = Template.toCompressedJsonString 0 template
+            return templateJson
+        }
     }
-}
 
 let testApi (ctx: HttpContext): ITestAPI = {
     test = fun () -> async {
@@ -368,10 +372,10 @@ let config (app:IApplicationBuilder) =
     ) 
 
 let app = application {
-    //url "http://localhost:5000" //"http://localhost:5000/"
-    //app_config config
+    url "http://*:5000"
+    app_config config
     use_router topLevelRouter
-    //use_cors "CORS_CONFIG" cors_config
+    use_cors "CORS_CONFIG" cors_config
     memory_cache
     use_static "public"
     use_gzip

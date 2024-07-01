@@ -1,4 +1,4 @@
-﻿module MainComponents.Metadata.Investigation
+module MainComponents.Metadata.Investigation
 
 open Feliz
 open Feliz.Bulma
@@ -7,7 +7,7 @@ open Spreadsheet
 open Messages
 open Browser.Types
 open Fable.Core.JsInterop
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) = 
@@ -37,6 +37,20 @@ let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) =
             fullwidth=true,
             isarea=true
         )
+        FormComponents.PersonsInput(
+            Array.ofSeq inv.Contacts,
+            "Contacts",
+            (fun i -> 
+                inv.Contacts <- ResizeArray i
+                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
+        )
+        FormComponents.PublicationsInput(
+            Array.ofSeq inv.Publications,
+            "Publications",
+            (fun i -> 
+                inv.Publications <- ResizeArray i
+                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
+        )
         FormComponents.DateTimeInput (
             Option.defaultValue "" inv.SubmissionDate,
             "Submission Date", 
@@ -52,38 +66,24 @@ let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) =
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.OntologySourceReferencesInput(
-            inv.OntologySourceReferences,
+            Array.ofSeq inv.OntologySourceReferences,
             "Ontology Source References",
             (fun oas -> 
-                inv.OntologySourceReferences <- oas
+                inv.OntologySourceReferences <- ResizeArray oas
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
-        FormComponents.PublicationsInput(
-            inv.Publications,
-            "Publications",
-            (fun i -> 
-                inv.Publications <- i
-                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-        )
-        FormComponents.PersonsInput(
-            inv.Contacts,
-            "Contacts",
-            (fun i -> 
-                inv.Contacts <- i
-                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-        )
-        FormComponents.TextInputs(
-            Array.ofSeq inv.RegisteredStudyIdentifiers,
-            "RegisteredStudyIdentifiers",
-            (fun i -> 
-                inv.RegisteredStudyIdentifiers <- ResizeArray i
-                inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-        )
+        //FormComponents.TextInputs(
+        //    Array.ofSeq inv.RegisteredStudyIdentifiers,
+        //    "RegisteredStudyIdentifiers",
+        //    (fun i -> 
+        //        inv.RegisteredStudyIdentifiers <- ResizeArray i
+        //        inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
+        //)
         FormComponents.CommentsInput(
-            inv.Comments,
+            Array.ofSeq inv.Comments,
             "Comments",
             (fun i -> 
-                inv.Comments <- i
+                inv.Comments <- ResizeArray i
                 inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
     ]

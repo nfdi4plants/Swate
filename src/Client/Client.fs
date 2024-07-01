@@ -15,10 +15,11 @@ let _ = importSideEffects "./style.scss"
 let sayHello name = $"Hello {name}"
 
 open Feliz
+open Feliz.Bulma
 
 let private split_container model dispatch = 
-    let mainWindow = Seq.singleton <| MainWindowView.Main model dispatch
-    let sideWindow = Seq.singleton <| SidebarView.SidebarView model dispatch
+    let mainWindow = Seq.singleton <| MainWindowView.Main (model, dispatch)
+    let sideWindow = Seq.singleton <| SidebarView.SidebarView.Main(model, dispatch)
     SplitWindowView.Main
         mainWindow
         sideWindow
@@ -28,13 +29,18 @@ let private split_container model dispatch =
 [<ReactComponent>]
 let View (model : Model) (dispatch : Msg -> unit) =
     let (colorstate, setColorstate) = React.useState(LocalStorage.Darkmode.State.init)
+    // Make ARCitect always use lighttheme 
+    let makeColorSchemeLight = fun _ -> 
+        if model.PersistentStorageState.Host.IsSome && model.PersistentStorageState.Host.Value = Swatehost.ARCitect then 
+            setColorstate {colorstate with Theme = LocalStorage.Darkmode.DataTheme.Light}
+            LocalStorage.Darkmode.DataTheme.SET LocalStorage.Darkmode.DataTheme.Light
+    React.useEffect(makeColorSchemeLight, [|box model.PersistentStorageState.Host|])
     let v = {colorstate with SetTheme = setColorstate}
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
         Html.div [
-            Html.div [prop.id "modal-container"]
             match model.PersistentStorageState.Host with
             | Some Swatehost.Excel ->
-                SidebarView.SidebarView model dispatch
+                SidebarView.SidebarView.Main(model, dispatch)
             | _ ->
                 split_container model dispatch
         ]

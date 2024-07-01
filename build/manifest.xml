@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>5d6f5462-3401-48ec-9406-d12882e9ad83</Id>
   <Version>1.0.0</Version>
@@ -16,7 +16,7 @@
     <Host Name="Workbook"/>
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/"/>
+    <SourceLocation DefaultValue="https://localhost:3000?is_swatehost=2"/>
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
@@ -65,7 +65,7 @@
                         <SourceLocation resid="Swate.Core.Url"/>
                     </Action>
                 </Control>
-                <Control xsi:type="Button" id="Swate.Experts">
+                <!--<Control xsi:type="Button" id="Swate.Experts">
                   <Label resid="Swate.Experts.Label"/>
                   <Supertip>
                     <Title resid="Swate.Experts.Label"/>
@@ -86,7 +86,7 @@
                     <TaskpaneId>ButtonId1</TaskpaneId>
                     <SourceLocation resid="Swate.Experts.Url"/>
                   </Action>
-                </Control>
+                </Control>-->
               </Group>
             </OfficeTab>
           </ExtensionPoint>
@@ -116,8 +116,8 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
-        <bt:Url id="Swate.Core.Url" DefaultValue="https://localhost:3000/#BuildingBlock"/>
-        <bt:Url id="Swate.Experts.Url" DefaultValue="https://localhost:3000/#Experts/JsonExport"/>
+        <bt:Url id="Swate.Core.Url" DefaultValue="https://localhost:3000?is_swatehost=2"/>
+        <!--<bt:Url id="Swate.Experts.Url" DefaultValue="https://localhost:3000/#Experts/JsonExport"/>-->
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>

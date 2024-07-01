@@ -4,8 +4,29 @@ open Feliz
 open Feliz.Bulma
 open Messages
 open Shared
+open MainComponents
+open Shared
+open Fable.Core.JsInterop
 
-let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
+let private WidgetOrderContainer bringWidgetToFront (widget) =
+    Html.div [
+        prop.onClick bringWidgetToFront
+        prop.children [
+            widget
+        ]
+    ]
+
+let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactElement) = 
+    
+    match widgets.Length with
+    | 0 -> 
+        Html.none
+    | _ ->
+        Html.div [
+            for widget in widgets do displayWidget widget
+        ]
+
+let private SpreadsheetSelectionFooter (model: Messages.Model) dispatch =
     Html.div [
         prop.style [
             style.position.sticky;
@@ -15,23 +36,19 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
             Html.div [
                 prop.children [
                     Bulma.tabs [
-                        prop.style [style.overflowY.visible]
                         Bulma.tabs.isBoxed
                         prop.children [
                             Html.ul [
-                                yield Bulma.tab  [
+                                Bulma.tab  [
                                     prop.style [style.width (length.px 20)]
                                 ]
-                                yield 
-                                    MainComponents.FooterTabs.MainMetadata {| model=model; dispatch = dispatch |}
+                                MainComponents.FooterTabs.MainMetadata (model, dispatch)
                                 for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
-                                    yield
-                                        MainComponents.FooterTabs.Main {| index = index; tables = model.SpreadsheetModel.Tables; model = model; dispatch = dispatch |}
-                                match model.SpreadsheetModel.ArcFile with
-                                | Some (ArcFiles.Template _) | Some (ArcFiles.Investigation _) ->
-                                    yield Html.none
-                                | _ ->
-                                    yield MainComponents.FooterTabs.MainPlus {| dispatch = dispatch |}
+                                    MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
+                                if model.SpreadsheetModel.CanHaveTables() then 
+                                    MainComponents.FooterTabs.MainPlus (model, dispatch)
+                                if model.SpreadsheetModel.TableViewIsActive() then
+                                    MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
                             ]
                         ]
                     ]
@@ -43,7 +60,22 @@ let private spreadsheetSelectionFooter (model: Messages.Model) dispatch =
 open Shared
 
 [<ReactComponent>]
-let Main (model: Messages.Model) dispatch =
+let Main (model: Messages.Model, dispatch) =
+    let widgets, setWidgets = React.useState([])
+    let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
+    let bringWidgetToFront (widget: Widget) = 
+        let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev
+        setWidgets newList
+    let displayWidget (widget: Widget) =
+        let rmv (widget: Widget) = fun _ -> rmvWidget widget
+        let bringWidgetToFront = fun _ -> bringWidgetToFront widget
+        match widget with
+        | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget) 
+        | Widget._Template -> Widget.Templates (model, dispatch, rmv widget)
+        | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
+        |> WidgetOrderContainer bringWidgetToFront
+    let addWidget (widget: Widget) = 
+        widget::widgets |> List.rev |> setWidgets
     let state = model.SpreadsheetModel
     Html.div [
         prop.id "MainWindow"
@@ -54,7 +86,8 @@ let Main (model: Messages.Model) dispatch =
             style.height (length.percent 100)
         ]
         prop.children [
-            MainComponents.Navbar.Main model dispatch
+            MainComponents.Navbar.Main (model, dispatch, widgets, setWidgets)
+            ModalDisplay (widgets, displayWidget)
             Html.div [
                 prop.id "TableContainer"
                 prop.style [
@@ -73,12 +106,13 @@ let Main (model: Messages.Model) dispatch =
                     | Some (ArcFiles.Study _)
                     | Some (ArcFiles.Investigation _) 
                     | Some (ArcFiles.Template _) ->
-                        XlsxFileView.Main {|model = model; dispatch = dispatch|}
+                        Html.none
+                        XlsxFileView.Main (model, dispatch, (fun () -> addWidget Widget._BuildingBlock), (fun () -> addWidget Widget._Template))
                     if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 && state.ActiveView <> Spreadsheet.ActiveView.Metadata then
                         MainComponents.AddRows.Main dispatch
                 ]
             ]
             if state.ArcFile.IsSome then 
-                spreadsheetSelectionFooter model dispatch
+                SpreadsheetSelectionFooter model dispatch
         ]
     ]

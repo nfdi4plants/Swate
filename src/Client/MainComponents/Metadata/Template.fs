@@ -7,7 +7,7 @@ open Spreadsheet
 open Messages
 open Browser.Types
 open Fable.Core.JsInterop
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 open ARCtrl.Template
 
@@ -63,24 +63,24 @@ let Main(template: Template, model: Messages.Model, dispatch: Msg -> unit) =
                 template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.OntologyAnnotationsInput(
-            template.Tags,
+            Array.ofSeq template.Tags,
             "Tags",
             (fun (s) -> 
-                template.Tags <- s
+                template.Tags <- ResizeArray s
                 template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.OntologyAnnotationsInput(
-            template.EndpointRepositories,
+            Array.ofSeq template.EndpointRepositories,
             "Endpoint Repositories",
             (fun (s) -> 
-                template.EndpointRepositories <- s
+                template.EndpointRepositories <- ResizeArray s
                 template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
         FormComponents.PersonsInput(
-            template.Authors,
+            Array.ofSeq template.Authors,
             "Authors",
             (fun (s) -> 
-                template.Authors <- s
+                template.Authors <-ResizeArray s
                 template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
         )
     ]

@@ -7,15 +7,14 @@ open LocalHistory
 open Model
 open Shared
 open Spreadsheet.Table
-open Spreadsheet.Sidebar
+open Spreadsheet.BuildingBlocks
 open Spreadsheet.Clipboard
 open Fable.Remoting.Client
-open Fable.Remoting.Client.InternalUtilities
 open FsSpreadsheet
-open FsSpreadsheet.Exceljs
-open ARCtrl.ISA
-open ARCtrl.ISA.Spreadsheet
-open Spreadsheet.Sidebar.Controller
+open FsSpreadsheet.Js
+open ARCtrl
+open ARCtrl.Spreadsheet
+open ARCtrl.Json
 
 module Spreadsheet =
 
@@ -27,6 +26,10 @@ module Spreadsheet =
 
         let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
 
+        let downloadFromString(filename, content:string) = 
+            let bytes = System.Text.Encoding.UTF8.GetBytes(content)
+            bytes.SaveFileAs(filename)
+
         /// <summary>
         /// This function will store the information correctly.
         /// Can return save information to local storage (persistent between browser sessions) and session storage.
@@ -34,18 +37,21 @@ module Spreadsheet =
         /// </summary>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Messages.Model, cmd) =
             match msg with
-            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ | CopySelectedCell | CopyCell _ -> 
+            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ 
+            | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected -> 
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 state, model, cmd
             | _ -> 
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
-                    match model.SpreadsheetModel.ArcFile with
+                    match state.ArcFile with // model is not yet updated at this position.
                     | Some (Assay assay) ->
                         ARCitect.ARCitect.send(ARCitect.AssayToARCitect assay)
                     | Some (Study (study,_)) ->
                         ARCitect.ARCitect.send(ARCitect.StudyToARCitect study)
+                    | Some (Investigation inv) ->
+                        ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
                     | _ -> ()
                 state, {model with History = nextHistory}, cmd
 
@@ -66,6 +72,11 @@ module Spreadsheet =
 
         let innerUpdate (state: Spreadsheet.Model) (model: Messages.Model) (msg: Spreadsheet.Msg) =
             match msg with
+            | UpdateState nextState ->
+                nextState, model, Cmd.none
+            | AddTable table ->
+                let nextState = Controller.addTable table state
+                nextState, model, Cmd.none
             | CreateAnnotationTable usePrevOutput ->
                 let nextState = Controller.createTable usePrevOutput state
                 nextState, model, Cmd.none
@@ -82,7 +93,7 @@ module Spreadsheet =
                 let nextState = { state with ArcFile = Some arcFile }
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState = { Spreadsheet.Model.init() with ArcFile = Some arcFile }
+                let nextState = Spreadsheet.Model.init(arcFile)
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation oa ->
                 let nextState = Controller.insertTerm_IntoSelected oa state
@@ -97,13 +108,22 @@ module Spreadsheet =
                     state.ActiveTable.UpdateCellAt(fst index,snd index, cell)
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
+            | UpdateCells arr ->
+                let nextState = 
+                    state.ActiveTable.SetCellsAt arr
+                    {state with ArcFile = state.ArcFile}
+                nextState, model, Cmd.none
             | UpdateHeader (index, header) ->
                 let nextState = 
                     state.ActiveTable.UpdateHeader(index, header)
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
             | UpdateActiveView nextView ->
-                let nextState = { state with ActiveView = nextView }
+                let nextState = { 
+                    state with 
+                        ActiveView = nextView 
+                        SelectedCells = Set.empty
+                }
                 nextState, model, Cmd.none
             | RemoveTable removeIndex ->
                 let nextState = Controller.removeTable removeIndex state
@@ -131,8 +151,8 @@ module Spreadsheet =
                 let nextState = Controller.addRows n state
                 nextState, model, Cmd.none
             | Reset ->
-                let nextHistory, nextState = Controller.resetTableState()
-                let nextModel = {model with History = nextHistory}
+                let nextState = Controller.resetTableState()
+                let nextModel = {model with History = LocalHistory.Model.init()}
                 nextState, nextModel, Cmd.none
             | DeleteRow index ->
                 let nextState = Controller.deleteRow index state
@@ -143,32 +163,121 @@ module Spreadsheet =
             | DeleteColumn index ->
                 let nextState = Controller.deleteColumn index state
                 nextState, model, Cmd.none
+            | SetColumn (index, column) ->
+                let nextState = Controller.setColumn index column state
+                nextState, model, Cmd.none
+            | MoveColumn (current, next) ->
+                let nextState = Controller.moveColumn current next state
+                nextState, model, Cmd.none
             | UpdateSelectedCells nextSelectedCells ->
                 let nextState = {state with SelectedCells = nextSelectedCells}
                 nextState, model, Cmd.none
+            | MoveSelectedCell keypressed ->
+                let cmd =
+                    match state.SelectedCells.IsEmpty with
+                    | true -> Cmd.none
+                    | false -> 
+                        let moveBy =
+                            match keypressed with
+                            | Key.Down -> (0,1)
+                            | Key.Up -> (0,-1)
+                            | Key.Left -> (-1,0)
+                            | Key.Right -> (1,0)
+                        let nextIndex = Controller.selectRelativeCell state.SelectedCells.MinimumElement moveBy state.ActiveTable
+                        let s = Set([nextIndex])
+                        UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
+                state, model, cmd
+            | SetActiveCellFromSelected ->
+                let cmd = 
+                    if state.SelectedCells.IsEmpty then
+                        Cmd.none
+                    else
+                        let min = state.SelectedCells.MinimumElement
+                        let cmd = (Fable.Core.U2.Case2 min, ColumnType.Main) |> Some |> UpdateActiveCell |> SpreadsheetMsg
+                        Cmd.ofMsg cmd
+                state, model, cmd
+            | UpdateActiveCell next ->
+                let nextState = { state with ActiveCell = next }
+                nextState, model, Cmd.none
             | CopyCell index ->
-                let nextState = Controller.copyCell index state
-                nextState, model, Cmd.none
+                let cmd = 
+                    Cmd.OfPromise.attempt 
+                        (Controller.copyCellByIndex index) 
+                        state
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | CopyCells indices ->
+                let cmd = 
+                    Cmd.OfPromise.attempt 
+                        (Controller.copyCellsByIndex indices) 
+                        state
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
             | CopySelectedCell ->
-                let nextState =
-                    if state.SelectedCells.IsEmpty then state else
-                        Controller.copySelectedCell state
-                nextState, model, Cmd.none
+                let cmd = 
+                    Cmd.OfPromise.attempt 
+                        (Controller.copySelectedCell) 
+                        state
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | CopySelectedCells ->
+                let cmd = 
+                    Cmd.OfPromise.attempt 
+                        (Controller.copySelectedCells) 
+                        state
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
             | CutCell index ->
-                let nextState = Controller.cutCell index state
+                let nextState = Controller.cutCellByIndex index state
                 nextState, model, Cmd.none
             | CutSelectedCell ->
                 let nextState =
                     if state.SelectedCells.IsEmpty then state else
                         Controller.cutSelectedCell state
                 nextState, model, Cmd.none
-            | PasteCell index ->
-                let nextState = if state.Clipboard.Cell.IsNone then state else Controller.pasteCell index state
+            | CutSelectedCells ->
+                let nextState =
+                    if state.SelectedCells.IsEmpty then state else
+                        Controller.cutSelectedCells state
                 nextState, model, Cmd.none
+            | PasteCell index ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        (Clipboard.Controller.pasteCellByIndex index)
+                        state
+                        (UpdateState >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | PasteCellsExtend index ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        (Clipboard.Controller.pasteCellsByIndexExtend index)
+                        state
+                        (UpdateState >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
             | PasteSelectedCell ->
-                let nextState = 
-                    if state.SelectedCells.IsEmpty || state.Clipboard.Cell.IsNone then state else
-                        Controller.pasteSelectedCell state
+                let cmd =
+                    Cmd.OfPromise.either
+                        (Clipboard.Controller.pasteCellIntoSelected)
+                        state
+                        (UpdateState >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | PasteSelectedCells ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        (Clipboard.Controller.pasteCellsIntoSelected)
+                        state
+                        (UpdateState >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | Clear indices ->
+                let nextState = Controller.clearCells indices state
+                nextState, model, Cmd.none
+            | ClearSelected ->
+                let indices = state.SelectedCells |> Set.toArray
+                let nextState = Controller.clearCells indices state
                 nextState, model, Cmd.none
             | FillColumnWithTerm index ->
                 let nextState = Controller.fillColumnWithCell index state
@@ -176,63 +285,41 @@ module Spreadsheet =
             //| EditColumn (columnIndex, newCellType, b_type) ->
             //    let cmd = createPromiseCmd <| fun _ -> Controller.editColumn (columnIndex, newCellType, b_type) state 
             //    state, model, cmd
-            | SetArcFileFromBytes bytes ->
+            | ImportXlsx bytes ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Spreadsheet.IO.readFromBytes
+                        Spreadsheet.IO.Xlsx.readFromBytes
                         bytes
                         (UpdateArcFile >> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
                 state, model, cmd
-            | ExportJsonTable ->
-                failwith "ExportsJsonTable is not implemented"
-                //let exportJsonState = {model.JsonExporterModel with Loading = true}
-                //let nextModel = model.updateByJsonExporterModel exportJsonState
-                //let func() = promise {
-                //    return Controller.getTable state
-                //}
-                //let cmd =
-                //    Cmd.OfPromise.either
-                //        func
-                //        ()
-                //        (JsonExporter.State.ParseTableServerRequest >> Messages.JsonExporterMsg)
-                //        (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
-                //state, nextModel, cmd
-                state, model, Cmd.none
-            | ExportJsonTables ->
-                failwith "ExportJsonTables is not implemented"
-                //let exportJsonState = {model.JsonExporterModel with Loading = true}
-                //let nextModel = model.updateByJsonExporterModel exportJsonState
-                //let func() = promise {
-                //    return Controller.getTables state
-                //}
-                //let cmd =
-                //    Cmd.OfPromise.either
-                //        func
-                //        ()
-                //        (JsonExporter.State.ParseTablesServerRequest >> Messages.JsonExporterMsg)
-                //        (Messages.curry Messages.GenericError (JsonExporter.State.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
-                //state, nextModel, cmd
-                state, model, Cmd.none
-            | ParseTablesToDag ->
-                failwith "ParseTablesToDag is not implemented"
-                //let dagState = {model.DagModel with Loading = true}
-                //let nextModel = model.updateByDagModel dagState
-                //let func() = promise {
-                //    return Controller.getTables state
-                //}
-                //let cmd =
-                //    Cmd.OfPromise.either
-                //        func
-                //        ()
-                //        (Dag.ParseTablesDagServerRequest >> Messages.DagMsg)
-                //        (Messages.curry Messages.GenericError (Dag.UpdateLoading false |> Messages.DagMsg |> Cmd.ofMsg) >> Messages.DevMsg)
-                //state, nextModel, cmd
+            | ExportJson (arcfile,jef) ->
+                let name, jsonString =
+                    let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
+                    let nameFromId (id: string) = (n + "_" + id + ".json")
+                    match arcfile, jef with
+                    | Investigation ai, JsonExportFormat.ARCtrl -> nameFromId ai.Identifier, ArcInvestigation.toJsonString 0 ai
+                    | Investigation ai, JsonExportFormat.ARCtrlCompressed -> nameFromId ai.Identifier, ArcInvestigation.toCompressedJsonString 0 ai
+                    | Investigation ai, JsonExportFormat.ISA -> nameFromId ai.Identifier, ArcInvestigation.toISAJsonString 0 ai
+                    | Investigation ai, JsonExportFormat.ROCrate -> nameFromId ai.Identifier, ArcInvestigation.toROCrateJsonString 0 ai
+
+                    | Study (as',_), JsonExportFormat.ARCtrl -> nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
+                    | Study (as',_), JsonExportFormat.ARCtrlCompressed -> nameFromId as'.Identifier, ArcStudy.toCompressedJsonString 0 (as')
+                    | Study (as',aaList), JsonExportFormat.ISA -> nameFromId as'.Identifier, ArcStudy.toISAJsonString (aaList,0) (as')
+                    | Study (as',aaList), JsonExportFormat.ROCrate -> nameFromId as'.Identifier, ArcStudy.toROCrateJsonString (aaList,0) (as')
+
+                    | Assay aa, JsonExportFormat.ARCtrl -> nameFromId aa.Identifier, ArcAssay.toJsonString 0 aa
+                    | Assay aa, JsonExportFormat.ARCtrlCompressed -> nameFromId aa.Identifier, ArcAssay.toCompressedJsonString 0 aa
+                    | Assay aa, JsonExportFormat.ISA -> nameFromId aa.Identifier, ArcAssay.toISAJsonString 0 aa
+                    | Assay aa, JsonExportFormat.ROCrate -> nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
+
+                    | Template t, JsonExportFormat.ARCtrl -> nameFromId t.FileName, Template.toJsonString 0 t
+                    | Template t, JsonExportFormat.ARCtrlCompressed -> nameFromId t.FileName, Template.toCompressedJsonString 0 t
+                    | Template _, anyElse -> failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
+                Helper.downloadFromString (name , jsonString)
+
                 state, model, Cmd.none
             | ExportXlsx arcfile->
-                // we highjack this loading function
-                let exportJsonState = {model.JsonExporterModel with Loading = true}
-                let nextModel = model.updateByJsonExporterModel exportJsonState
                 let name, fswb =
                     let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
                     match arcfile with
@@ -243,22 +330,17 @@ module Spreadsheet =
                     | Assay aa ->
                         n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t ->
-                        n + "_" + t.FileName, ARCtrl.Template.Spreadsheet.Template.toFsWorkbook t
+                        n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
                 let cmd =
                     Cmd.OfPromise.either
-                        FsSpreadsheet.Exceljs.Xlsx.toBytes
+                        Xlsx.toXlsxBytes
                         fswb
                         (fun bytes -> ExportXlsxDownload (name,bytes) |> Messages.SpreadsheetMsg)
-                        (Messages.curry Messages.GenericError (JsonExporter.UpdateLoading false |> Messages.JsonExporterMsg |> Cmd.ofMsg) >> Messages.DevMsg)
-                state, nextModel, cmd
+                        (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
+                state, model, cmd
             | ExportXlsxDownload (name,xlsxBytes) ->
                 let _ = Helper.download (name ,xlsxBytes)
-                let nextJsonExporter = {
-                    model.JsonExporterModel with
-                        Loading             = false
-                }
-                let nextModel = model.updateByJsonExporterModel nextJsonExporter
-                state, nextModel, Cmd.none
+                state, model, Cmd.none
             | UpdateTermColumns ->
                 //let getUpdateTermColumns() = promise {
                 //    return Controller.getUpdateTermColumns state

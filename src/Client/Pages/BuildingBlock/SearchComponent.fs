@@ -1,4 +1,4 @@
-﻿module BuildingBlock.SearchComponent
+module BuildingBlock.SearchComponent
 
 open Feliz
 open Feliz.Bulma
@@ -11,7 +11,7 @@ open Model.BuildingBlock
 open Model.TermSearch
 open Model
 open Messages
-open ARCtrl.ISA
+open ARCtrl
 open BuildingBlock.Helper
 
 let private termOrUnitizedSwitch (model:Messages.Model) dispatch =
@@ -38,17 +38,15 @@ let private termOrUnitizedSwitch (model:Messages.Model) dispatch =
         ]
     ]
 
-
 open Fable.Core
 
-let private SearchBuildingBlockBodyElement (model: Messages.Model) dispatch =
-    let id = "SearchBuildingBlockBodyElementID"
+[<ReactComponent>]
+let private SearchBuildingBlockBodyElement (model: Messages.Model, dispatch) =
     let element = React.useElementRef()
-    React.useEffectOnce(fun _ -> element.current <- Some <| Browser.Dom.document.getElementById(id))
-    let width = element.current |> Option.map (fun ele -> length.px ele.clientWidth)
+    
     Bulma.field.div [
-        prop.id id
-        prop.style [ style.display.flex; style.justifyContent.spaceBetween ]
+        prop.ref element
+        prop.style [ style.display.flex; style.justifyContent.spaceBetween; style.position.relative ]
         prop.children [
             termOrUnitizedSwitch model dispatch
             let setter (oaOpt: OntologyAnnotation option) =
@@ -56,18 +54,16 @@ let private SearchBuildingBlockBodyElement (model: Messages.Model) dispatch =
                 BuildingBlock.UpdateBodyArg case |> BuildingBlockMsg |> dispatch
             let parent = model.AddBuildingBlockState.TryHeaderOA()
             let input = model.AddBuildingBlockState.TryBodyOA()
-            Components.TermSearch.Input(setter, dispatch, fullwidth=true, ?input=input, ?parent'=parent, displayParent=false, ?dropdownWidth=width, alignRight=true)
+            Components.TermSearch.Input(setter, fullwidth=true, ?input=input, ?parent=parent, displayParent=false, ?portalTermSelectArea=element.current, debounceSetter=1000)
         ]
     ]
 
-let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState) setUi (model: Model) dispatch =
+[<ReactComponent>]
+let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, model: Model, dispatch) =
     let state = model.AddBuildingBlockState
-    let id = "SearchBuildingBlockHeaderElementID"
     let element = React.useElementRef()
-    React.useEffectOnce(fun _ -> element.current <- Some <| Browser.Dom.document.getElementById(id))
-    let width = element.current |> Option.map (fun ele -> length.px ele.clientWidth)
     Bulma.field.div [
-        prop.id id
+        prop.ref element
         Bulma.field.hasAddons
         prop.style [style.position.relative]
         // Choose building block type dropdown element
@@ -81,7 +77,7 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState) setUi (m
                     BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
                     //selectHeader ui setUi h |> dispatch 
                 let input = model.AddBuildingBlockState.TryHeaderOA()
-                Components.TermSearch.Input(setter, dispatch, ?input=input, isExpanded=true, fullwidth=true, ?dropdownWidth=width, alignRight=true)
+                Components.TermSearch.Input(setter, fullwidth=true, ?input=input, isExpanded=true, ?portalTermSelectArea=element.current, debounceSetter=1000)
             elif state.HeaderCellType.HasIOType() then
                 Bulma.control.div [
                     Bulma.control.isExpanded
@@ -102,6 +98,28 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState) setUi (m
         ]
     ]
 
+let private scrollIntoViewRetry (id: string) =
+    let rec loop (iteration: int) = 
+        let headerelement = Browser.Dom.document.getElementById(id)
+        if isNull headerelement then
+            if iteration < 5 then 
+                Fable.Core.JS.setTimeout (fun _ -> loop (iteration+1)) 100 |> ignore
+            else
+                ()
+        else
+            let rect = headerelement.getBoundingClientRect()
+            if rect.left >= 0 && ((rect.right <= Browser.Dom.window.innerWidth) || (rect.right <= Browser.Dom.document.documentElement.clientWidth)) then
+                ()
+            else
+                let config = createEmpty<Browser.Types.ScrollIntoViewOptions>
+                config.behavior <- Browser.Types.ScrollBehavior.Smooth
+                config.block <- Browser.Types.ScrollAlignment.End
+                config.``inline`` <- Browser.Types.ScrollAlignment.End
+                //log headerelement
+                headerelement.scrollIntoView(config)
+    loop 0
+    
+
 let private addBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState
     Bulma.field.div [
@@ -111,14 +129,21 @@ let private addBuildingBlockButton (model: Model) dispatch =
             let isValid = Helper.isValidColumn header
             if isValid then
                 Bulma.color.isSuccess
-                Bulma.button.isActive
             else
                 Bulma.color.isDanger
                 prop.disabled true
             Bulma.button.isFullWidth
             prop.onClick (fun _ ->
-                let column = CompositeColumn.create(header, [|if body.IsSome then body.Value|])
+                let bodyCells =
+                    if body.IsSome then // create as many body cells as there are rows in the active table
+                        Array.init (model.SpreadsheetModel.ActiveTable.RowCount) (fun _ -> body.Value)
+                    else
+                        Array.empty                    
+                let column = CompositeColumn.create(header, bodyCells)
+                let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
+                let id = $"Header_{index}_Main"
+                scrollIntoViewRetry id
             )
             prop.text "Add Column"
         ]
@@ -129,11 +154,9 @@ let Main (model: Model) dispatch =
     let state_bb, setState_bb = React.useState(BuildingBlockUIState.init)
     //let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
     //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
-    mainFunctionContainer [
-        SearchBuildingBlockHeaderElement state_bb setState_bb model dispatch
+    Html.div [
+        SearchBuildingBlockHeaderElement (state_bb, setState_bb, model, dispatch)
         if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
-            SearchBuildingBlockBodyElement model dispatch
-            //AdvancedSearch.modal_container state_bb setState_bb model dispatch
-            //AdvancedSearch.links_container model.AddBuildingBlockState.Header dispatch
+            SearchBuildingBlockBodyElement (model, dispatch)
         addBuildingBlockButton model dispatch
     ]

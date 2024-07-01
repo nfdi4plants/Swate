@@ -119,9 +119,9 @@ let settingsViewComponent (model:Model) dispatch =
         //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Advanced Settings"]
         //customXmlSettings model dispatch
 
-        Bulma.label "Advanced Settings"
-        if model.PageState.IsExpert then 
-            swateCore model dispatch
-        else
-            swateExperts model dispatch
+        //Bulma.label "Advanced Settings"
+        //if model.PageState.IsExpert then 
+        //    swateCore model dispatch
+        //else
+        //    swateExperts model dispatch
     ]

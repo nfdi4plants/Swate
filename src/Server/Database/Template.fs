@@ -3,10 +3,7 @@ module Database.Template
 open Neo4j.Driver
 open System
 
-open Shared.TemplateTypes
 open Helper
-
-open ISADotNet
 open Newtonsoft.Json
 
 //type Author = {

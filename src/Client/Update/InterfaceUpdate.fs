@@ -12,11 +12,46 @@ open Elmish
 open Model
 open Shared
 open Fable.Core.JsInterop
+open Shared.ARCtrlHelper
 
-module private Helper =
+/// This seems like such a hack :(
+module private ExcelHelper =
+
+    open Fable.Core
     open ExcelJS.Fable.GlobalBindings
 
-    let initializeAddIn () = Office.onReady()
+    let initializeAddIn () = Office.onReady().``then``(fun _ -> ()) |> Async.AwaitPromise
+
+    /// Office-js will kill iframe loading in ARCitect, therefore we must load it conditionally
+    let addOfficeJsScript(callback: unit -> unit) =
+        let cdn = @"https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+        let _type = "text/javascript"
+        let s = Browser.Dom.document.createElement("script")
+        s?``type`` <- _type
+        s?src <- cdn
+        Browser.Dom.document.head.appendChild s |> ignore
+        s.onload <- fun _ -> callback()
+        ()
+
+    /// Make a function that loops short sleep sequences until a mutable variable is set to true
+    /// do mutabel dotnet ref for variable
+    let myAwaitLoadedThenInit(loaded: ref<bool>) =
+        let rec loop() =
+            async {
+            if loaded.Value then
+                do! initializeAddIn()
+            else
+                do! Async.Sleep 100
+                do! loop()
+            }
+        loop()
+
+    let officeload() =
+        let loaded = ref false
+        async {
+            addOfficeJsScript(fun _ -> loaded.Value <- true)
+            do! myAwaitLoadedThenInit loaded
+        }
 
 //open Fable.Core.JS
 
@@ -29,24 +64,21 @@ module Interface =
         | Initialize host ->
             let cmd =
                 Cmd.batch [
-                    Cmd.ofMsg (GetAppVersion |> Request |> Api)
-                    Cmd.ofMsg (FetchAllOntologies |> Request |> Api)
+                    Cmd.ofMsg (Ontologies.GetOntologies |> OntologyMsg)
                     match host with
                     | Swatehost.Excel ->
-                        Cmd.OfPromise.either
-                            OfficeInterop.Core.tryFindActiveAnnotationTable
+                        Cmd.OfAsync.either
+                            ExcelHelper.officeload
                             ()
-                            (OfficeInterop.AnnotationTableExists >> OfficeInteropMsg)
+                            (fun _ -> TryFindAnnotationTable |> OfficeInteropMsg)
                             (curry GenericError Cmd.none >> DevMsg)
                     | Swatehost.Browser ->
-                        Cmd.batch [
-                            Cmd.ofEffect (fun dispatch -> Spreadsheet.KeyboardShortcuts.addOnKeydownEvent dispatch)
-                        ]
+                        Cmd.none
                     | Swatehost.ARCitect ->
-                        Cmd.batch [
-                            Cmd.ofEffect (fun dispatch -> Spreadsheet.KeyboardShortcuts.addOnKeydownEvent dispatch)
-                            Cmd.ofEffect (fun _ -> ARCitect.ARCitect.send ARCitect.Init)
-                        ]
+                        Cmd.ofEffect (fun _ -> 
+                            LocalHistory.Model.ResetHistoryWebStorage()
+                            ARCitect.ARCitect.send ARCitect.Init
+                        )
                 ]
             model, cmd
         | CreateAnnotationTable usePrevOutput ->
@@ -56,6 +88,16 @@ module Interface =
                 model, cmd
             | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = Spreadsheet.CreateAnnotationTable usePrevOutput |> SpreadsheetMsg |> Cmd.ofMsg
+                model, cmd
+            | _ -> failwith "not implemented"
+        | AddTable table ->
+            match host with
+            | Some Swatehost.Excel ->
+                //let cmd = OfficeInterop.AddTable table |> OfficeInteropMsg |> Cmd.ofMsg
+                failwith "AddTable not implemented for Excel"
+                model, Cmd.none
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                let cmd = Spreadsheet.AddTable table |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | AddAnnotationBlock minBuildingBlockInfo ->
@@ -82,7 +124,7 @@ module Interface =
                 let cmd = Spreadsheet.JoinTable (table, index, options) |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | ImportFile tables ->
+        | UpdateArcFile tables ->
             match host with
             | Some Swatehost.Excel ->
                 //let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
@@ -90,6 +132,15 @@ module Interface =
                 model, Cmd.none
             | Some Swatehost.Browser ->
                 let cmd = Spreadsheet.UpdateArcFile tables |> SpreadsheetMsg |> Cmd.ofMsg
+                model, cmd
+            | _ -> failwith "not implemented"
+        | ImportXlsx bytes ->
+            match host with
+            | Some Swatehost.Excel ->
+                Browser.Dom.window.alert "ImportXlsx Not implemented"
+                model, Cmd.none
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                let cmd = Spreadsheet.ImportXlsx bytes |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | InsertOntologyAnnotation termMinimal ->
@@ -103,13 +154,24 @@ module Interface =
             | _ -> failwith "not implemented"
         | InsertFileNames fileNames ->
             match host with
-            | Some Swatehost.Excel | Some Swatehost.ARCitect ->
+            | Some Swatehost.Excel ->
                 let cmd = OfficeInterop.InsertFileNames fileNames |> OfficeInteropMsg |> Cmd.ofMsg
                 model, cmd
-            //| Swatehost.Browser ->
-            //    let arr = fileNames |> List.toArray |> Array.map (fun x -> TermTypes.TermMinimal.create x "")
-            //    let cmd = Spreadsheet.InsertOntologyTerms arr |> SpreadsheetMsg |> Cmd.ofMsg
-            //    model, cmd
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                if model.SpreadsheetModel.SelectedCells.IsEmpty then
+                    model, Cmd.ofMsg (DevMsg.GenericError (Cmd.none, exn("No cell(s) selected.")) |> DevMsg)
+                else
+                    let columnIndex, rowIndex = model.SpreadsheetModel.SelectedCells.MinimumElement
+                    let mutable rowIndex = rowIndex
+                    let cells = [|
+                        for name in fileNames do
+                            let c0 = model.SpreadsheetModel.ActiveTable.TryGetCellAt(columnIndex,rowIndex).Value
+                            let cell = c0.UpdateMainField name
+                            (columnIndex, rowIndex), cell
+                            rowIndex <- rowIndex + 1
+                    |]
+                    let cmd = Spreadsheet.UpdateCells cells |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
             | _ -> failwith "not implemented"
         | RemoveBuildingBlock ->
             match host with
@@ -128,31 +190,13 @@ module Interface =
                         Spreadsheet.DeleteColumn (distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | ExportJsonTable ->
+        | ExportJson (arcfile, jef) ->
             match host with
             | Some Swatehost.Excel ->
-                let cmd = JsonExporterMsg JsonExporter.ParseTableOfficeInteropRequest |> Cmd.ofMsg
-                model, cmd
+                failwith "ExportJson not implemented for Excel"
+                model, Cmd.none
             | Some Swatehost.Browser ->
-                let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTable |> Cmd.ofMsg
-                model, cmd
-            | _ -> failwith "not implemented"
-        | ExportJsonTables ->
-            match host with
-            | Some Swatehost.Excel ->
-                let cmd = JsonExporterMsg JsonExporter.ParseTablesOfficeInteropRequest |> Cmd.ofMsg
-                model, cmd
-            | Some Swatehost.Browser ->
-                let cmd = SpreadsheetMsg Spreadsheet.ExportJsonTables |> Cmd.ofMsg
-                model, cmd
-            | _ -> failwith "not implemented"
-        | ParseTablesToDag ->
-            match host with
-            | Some Swatehost.Excel ->
-                let cmd = DagMsg Dag.ParseTablesOfficeInteropRequest |> Cmd.ofMsg
-                model, cmd
-            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                let cmd = SpreadsheetMsg Spreadsheet.ParseTablesToDag |> Cmd.ofMsg
+                let cmd = SpreadsheetMsg (Spreadsheet.ExportJson (arcfile, jef)) |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | EditBuildingBlock ->

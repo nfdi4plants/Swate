@@ -30,42 +30,8 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
         }
         nextState, Cmd.none
 
-/// This logic only works as soon as we can access electron. Will not work in Browser.
-module PathRerooting =
-
-    open Fable.Core
-    open Fable.Core.JsInterop
-
-    let private normalizePath (path:string) =
-        path.Replace('\\','/')
-
-    let listOfSupportedDirectories = ["studies"; "assays"; "workflows"; "runs"] 
-
-    let private matchesSupportedDirectory (str:string) =
-        listOfSupportedDirectories |> List.contains str
-
-    /// <summary>Normalizes path and searches for 'listOfSupportedDirectories' (["studies"; "assays"; "workflows"; "runs"]) in path. reroots path to parent of supported directory if found
-    /// else returns only file name.</summary>
-    let rerootPath (path:string) =
-        let sep = '/'
-        let path = normalizePath path // shadow path variable to normalized
-        let splitPath = path.Split(sep)
-        let tryFindLevel = Array.tryFindIndexBack (fun x -> matchesSupportedDirectory x) splitPath
-        match tryFindLevel with
-        // if we cannot find any of `listOfSupportedDirectories` we just return the file name
-        | None ->
-            splitPath |> Array.last
-        | Some levelIndex ->
-            // If we find one of `listOfSupportedDirectories` we want to reroot relative to the folder containing the investigation file.
-            // It is located one level higher than any of `listOfSupportedDirectories`
-            let rootPath =
-                Array.take levelIndex splitPath // one level higher so `levelIndex` instead of `(levelIndex + 1)`
-                |> String.concat (string sep)
-            let relativePath =
-                path.Replace(rootPath + string sep, "")
-            relativePath
-
-let uploadButton (model:Messages.Model) dispatch (inputId: string) =
+let uploadButton (model:Messages.Model) dispatch =
+    let inputId = "filePicker_OnFilePickerMainFunc"
     Bulma.field.div [
         Html.input [
             prop.style [style.display.none]
@@ -87,15 +53,40 @@ let uploadButton (model:Messages.Model) dispatch (inputId: string) =
                 //picker?value <- null
             )
         ]
-        Bulma.button.button [
-            Bulma.color.isInfo
-            Bulma.button.isFullWidth
-            prop.onClick(fun e ->
-                let getUploadElement = Browser.Dom.document.getElementById inputId
-                getUploadElement.click()
-            )
-            prop.text "Pick file names"
-        ]
+        match model.PersistentStorageState.Host with
+            | Some (Swatehost.ARCitect) ->
+                Html.div [
+                    prop.className "is-flex is-flex-direction-row"
+                    prop.style [style.gap (length.rem 1)]
+                    prop.children [
+                        Bulma.button.button [
+                            Bulma.color.isInfo
+                            Bulma.button.isFullWidth
+                            prop.onClick(fun e ->
+                                ARCitect.RequestPaths false |> ARCitect.ARCitect.send
+                            )
+                            prop.text "Pick Files"
+                        ]
+                        Bulma.button.button [
+                            Bulma.color.isInfo
+                            Bulma.button.isFullWidth
+                            prop.onClick(fun e ->
+                                ARCitect.RequestPaths true |> ARCitect.ARCitect.send
+                            )
+                            prop.text "Pick Directories"
+                        ]
+                    ]
+                ]
+            | _ ->
+                Bulma.button.button [
+                    Bulma.color.isInfo
+                    Bulma.button.isFullWidth
+                    prop.onClick(fun e ->
+                        let getUploadElement = Browser.Dom.document.getElementById inputId
+                        getUploadElement.click()
+                    )
+                    prop.text "Pick file names"
+                ]
     ]
 
 let insertButton (model:Messages.Model) dispatch =
@@ -122,31 +113,31 @@ let sortButton icon msg =
 let fileSortElements (model:Messages.Model) dispatch =
     Bulma.field.div [
         Bulma.buttons [
-            Bulma.button.a [
-                prop.title "Copy to Clipboard"
-                prop.onClick(fun e ->
-                    CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
-                    let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
-                    let textArea = Browser.Dom.document.createElement "textarea"
-                    textArea?value <- txt
-                    textArea?style?top <- "0"
-                    textArea?style?left <- "0"
-                    textArea?style?position <- "fixed"
+            //Bulma.button.a [
+            //    prop.title "Copy to Clipboard"
+            //    prop.onClick(fun e ->
+            //        CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
+            //        let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
+            //        let textArea = Browser.Dom.document.createElement "textarea"
+            //        textArea?value <- txt
+            //        textArea?style?top <- "0"
+            //        textArea?style?left <- "0"
+            //        textArea?style?position <- "fixed"
 
-                    Browser.Dom.document.body.appendChild textArea |> ignore
+            //        Browser.Dom.document.body.appendChild textArea |> ignore
 
-                    textArea.focus()
-                    // Can't belive this actually worked
-                    textArea?select()
+            //        textArea.focus()
+            //        // Can't belive this actually worked
+            //        textArea?select()
 
-                    let t = Browser.Dom.document.execCommand("copy")
-                    Browser.Dom.document.body.removeChild(textArea) |> ignore
-                    ()
-                )
-                prop.children [
-                    CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" "fa-regular fa-clipboard" "fa-solid fa-check"
-                ]
-            ]
+            //        let t = Browser.Dom.document.execCommand("copy")
+            //        Browser.Dom.document.body.removeChild(textArea) |> ignore
+            //        ()
+            //    )
+            //    prop.children [
+            //        CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" "fa-solid fa-copy" "fa-solid fa-check"
+            //    ]
+            //]
 
             Bulma.buttons [
                 Bulma.buttons.hasAddons
@@ -255,12 +246,10 @@ module FileNameTable =
         ]
         
 
-let fileContainer (model:Messages.Model) dispatch inputId=
+let fileContainer (model:Messages.Model) dispatch =
     mainFunctionContainer [
 
-        Bulma.help  "Choose one or multiple files, rearrange them and add their names to the Excel sheet."
-
-        uploadButton model dispatch inputId
+        uploadButton model dispatch
 
         if model.FilePickerState.FileNames <> [] then
             fileSortElements model dispatch
@@ -271,12 +260,11 @@ let fileContainer (model:Messages.Model) dispatch inputId=
     ]
 
 let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
-    let inputId = "filePicker_OnFilePickerMainFunc"
     Bulma.content [
         pageHeader "File Picker"
 
         Bulma.label "Select files from your computer and insert their names into Excel"
 
         // Colored container element for all uploaded file names and sort elements
-        fileContainer model dispatch inputId
+        fileContainer model dispatch
     ]

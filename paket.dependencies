@@ -2,12 +2,19 @@ source https://api.nuget.org/v3/index.json
 framework: net8.0
 storage: none
 
-nuget ARCtrl 1.0.5
+nuget ARCtrl 2.0.0-alpha.7.swate alpha
+nuget ARCtrl.Contract 2.0.0-alpha.7.swate alpha
+nuget ARCtrl.Core 2.0.0-alpha.7.swate alpha
+nuget ARCtrl.CWL 2.0.0-alpha.7.swate alpha
+nuget ARCtrl.FileSystem 2.0.0-alpha.7.swate alpha
+nuget ARCtrl.Json 2.0.0-alpha.7.swate alpha
+nuget ARCtrl.Spreadsheet 2.0.0-alpha.7.swate alpha
+nuget Fable.Fetch 2.7.0
 nuget Feliz.Bulma.Checkradio
 nuget Feliz.Bulma.Switch
 nuget Fsharp.Core ~> 8
 nuget Fable.Remoting.Giraffe ~> 5
-nuget FsSpreadsheet.Exceljs ~> 5.0.2
+nuget FsSpreadsheet.Js ~> 6.1.3
 nuget Saturn ~> 0
 
 nuget Fable.Core ~> 4

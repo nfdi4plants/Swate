@@ -3,7 +3,6 @@ namespace Shared
 open System
 open Shared
 open TermTypes
-open TemplateTypes
 
 module Route =
 
@@ -32,18 +31,6 @@ module SorensenDice =
             let resultSet = f result |> createBigrams
             calculateDistance resultSet searchSet
         )
-
-///<summary>This type is still used for JsonExporter page.</summary>
-[<RequireQualifiedAccess>]
-type JsonExportType =
-| ProcessSeq
-| Assay
-| ProtocolTemplate
-    member this.toExplanation =
-        match this with
-        | ProcessSeq        -> "Sequence of ISA process.json."
-        | Assay             -> "ISA assay.json"
-        | ProtocolTemplate  -> "Schema for Swate protocol template, with template metadata and table json."
 
 /// Development api
 type ITestAPI = {
@@ -152,7 +139,7 @@ type IOntologyAPIv3 = {
 
 type ITemplateAPIv1 = {
     // must return template as string, fable remoting cannot do conversion automatically
-    getTemplates                    : unit      -> Async<string []> 
+    getTemplates                    : unit      -> Async<string> 
     getTemplateById                 : string    -> Async<string>
 }
 

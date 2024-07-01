@@ -27,7 +27,8 @@ open Helper
 
 [<RequireQualifiedAccess>]
 module V3 =
-    open ARCtrl.ISA.Regex.ActivePatterns
+
+    open ARCtrl.Helper.Regex.ActivePatterns
 
     let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv3 =
         {

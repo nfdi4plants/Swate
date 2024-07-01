@@ -15,8 +15,8 @@ let debounce<'T> (storage:Dictionary<string, int>) (key: string) (timeout: int) 
     let key = key // fn.ToString()
     // Cancel previous debouncer
     match storage.TryGetValue(key) with
-    | true, timeoutId -> printfn "CLEAR"; Fable.Core.JS.clearTimeout timeoutId
-    | _ -> printfn "Not clear";()
+    | true, timeoutId -> Fable.Core.JS.clearTimeout timeoutId
+    | _ -> ()
 
     // Create a new timeout and memoize it
     let timeoutId = 
@@ -51,3 +51,32 @@ let debouncel<'T> (storage:Dictionary<string, int>) (key: string) (timeout: int)
     storage.[key] <- timeoutId
 
 let newDebounceStorage = fun () -> Dictionary<string, int>(HashIdentity.Structural)
+
+type Clipboard =
+    abstract member writeText: string -> JS.Promise<unit>
+    abstract member readText: unit -> JS.Promise<string>
+
+type Navigator =
+    abstract member clipboard: Clipboard
+
+[<Emit("navigator")>]
+let navigator : Navigator = jsNative
+
+/// <summary>
+/// take "count" many items from array if existing. if not enough items return as many as possible
+/// </summary>
+/// <param name="count"></param>
+/// <param name="array"></param>
+let takeFromArray (count: int) (array: 'a []) =
+    let exit (acc: 'a list) = List.rev acc |> Array.ofList
+    let rec takeRec (l2: 'a list) (acc: 'a list) index =
+      if index >= count then 
+        exit acc
+      else
+        match l2 with
+        | [] -> exit acc
+        | item::tail ->
+          let newAcc = item::acc
+          takeRec tail newAcc (index+1)
+
+    takeRec (Array.toList array) [] 0

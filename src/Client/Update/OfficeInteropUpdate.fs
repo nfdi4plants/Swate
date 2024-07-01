@@ -9,9 +9,9 @@ open Shared
 open OfficeInteropTypes
 
 module OfficeInterop = 
-    let update (currentModel:Messages.Model) (excelInteropMsg: OfficeInterop.Msg) : Messages.Model * Cmd<Messages.Msg> =
+    let update (model:Messages.Model) (msg: OfficeInterop.Msg) : Messages.Model * Cmd<Messages.Msg> =
 
-        match excelInteropMsg with
+        match msg with
 
         | AutoFitTable hidecols ->
             let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run (OfficeInterop.Core.autoFitTable hidecols)
@@ -21,18 +21,26 @@ module OfficeInterop =
                     ()
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
 
+        | TryFindAnnotationTable ->
+            let cmd =
+                Cmd.OfPromise.either
+                    OfficeInterop.Core.tryFindActiveAnnotationTable
+                    ()
+                    (OfficeInterop.AnnotationTableExists >> OfficeInteropMsg)
+                    (curry GenericError Cmd.none >> DevMsg)
+            model, cmd
         | AnnotationTableExists annoTableOpt ->
             let exists =
                 match annoTableOpt with
                 | Success name -> true
                 | _ -> false
             let nextState = {
-                currentModel.ExcelState with
+                model.ExcelState with
                     HasAnnotationTable = exists
             }
-            currentModel.updateByExcelState nextState,Cmd.none
+            model.updateByExcelState nextState,Cmd.none
 
         | InsertOntologyTerm (term) ->
             let cmd =
@@ -41,7 +49,7 @@ module OfficeInterop =
                     term
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
 
         | AddAnnotationBlock (minBuildingBlockInfo) ->
             let cmd =
@@ -50,7 +58,7 @@ module OfficeInterop =
                     (minBuildingBlockInfo)
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
 
         | AddAnnotationBlocks minBuildingBlockInfos ->
             let cmd =
@@ -59,7 +67,7 @@ module OfficeInterop =
                     minBuildingBlockInfos
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
 
         | ImportFile buildingBlockTables ->
             let nextCmd =
@@ -68,7 +76,7 @@ module OfficeInterop =
                     buildingBlockTables
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, nextCmd
+            model, nextCmd
 
         | RemoveBuildingBlock ->
             let cmd =
@@ -77,7 +85,7 @@ module OfficeInterop =
                     ()
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
 
         | UpdateUnitForCells (unitTerm) ->
             let cmd =
@@ -86,7 +94,7 @@ module OfficeInterop =
                     unitTerm
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
 
         | CreateAnnotationTable(tryUsePrevOutput) ->
             let cmd =
@@ -95,14 +103,14 @@ module OfficeInterop =
                     (false,tryUsePrevOutput)
                     (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel,cmd
+            model,cmd
 
         | AnnotationtableCreated ->
             let nextState = {
-                currentModel.ExcelState with
+                model.ExcelState with
                     HasAnnotationTable = true
             }
-            currentModel.updateByExcelState nextState, Cmd.none
+            model.updateByExcelState nextState, Cmd.none
 
 
         | GetParentTerm ->
@@ -110,33 +118,34 @@ module OfficeInterop =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.getParentTerm
                     ()
-                    (fun tmin -> tmin |> Option.map (fun t -> ARCtrl.ISA.OntologyAnnotation.fromTerm t.toTerm) |> TermSearch.UpdateParentTerm |> TermSearchMsg)
+                    (fun tmin -> tmin |> Option.map (fun t -> ARCtrl.OntologyAnnotation.fromTerm t.toTerm) |> TermSearch.UpdateParentTerm |> TermSearchMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
         //
         | FillHiddenColsRequest ->
-            let cmd =
-                Cmd.OfPromise.either
-                    OfficeInterop.Core.getAllAnnotationBlockDetails 
-                    ()
-                    (fun (searchTerms,deprecationLogs) ->
-                        // Push possible deprecation messages by piping through "GenericInteropLogs"
-                        GenericInteropLogs (
-                            // This will be executed after "deprecationLogs" are handled by "GenericInteropLogs"
-                            SearchForInsertTermsRequest searchTerms |> Request |> Api |> Cmd.ofMsg,
-                            // This will be pushed to Activity logs, or as wanring modal to user in case of LogIdentifier.Warning
-                            deprecationLogs
-                        )
-                        |> DevMsg
-                    )
-                    (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
-            let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
-            let cmds = Cmd.batch [cmd; stateCmd]
-            currentModel, cmds
+            failwith "FillHiddenColsRequest Not implemented yet"
+            //let cmd =
+            //    Cmd.OfPromise.either
+            //        OfficeInterop.Core.getAllAnnotationBlockDetails 
+            //        ()
+            //        (fun (searchTerms,deprecationLogs) ->
+            //            // Push possible deprecation messages by piping through "GenericInteropLogs"
+            //            GenericInteropLogs (
+            //                // This will be executed after "deprecationLogs" are handled by "GenericInteropLogs"
+            //                SearchForInsertTermsRequest searchTerms |> Request |> Api |> Cmd.ofMsg,
+            //                // This will be pushed to Activity logs, or as wanring modal to user in case of LogIdentifier.Warning
+            //                deprecationLogs
+            //            )
+            //            |> DevMsg
+            //        )
+            //        (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
+            //let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
+            //let cmds = Cmd.batch [cmd; stateCmd]
+            model, Cmd.none
 
         | FillHiddenColumns (termsWithSearchResult) ->
             let nextState = {
-                currentModel.ExcelState with
+                model.ExcelState with
                     FillHiddenColsStateStore = FillHiddenColsState.ExcelWriteFoundTerms
             }
             let cmd =
@@ -145,15 +154,15 @@ module OfficeInterop =
                     (termsWithSearchResult)
                     (curry GenericInteropLogs (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
-            currentModel.updateByExcelState nextState, cmd
+            model.updateByExcelState nextState, cmd
 
 
         | UpdateFillHiddenColsState newState ->
             let nextState = {
-                currentModel.ExcelState with
+                model.ExcelState with
                     FillHiddenColsStateStore = newState
             }
-            currentModel.updateByExcelState nextState, Cmd.none
+            model.updateByExcelState nextState, Cmd.none
         //
         | InsertFileNames (fileNameList) ->
             let cmd = 
@@ -162,7 +171,7 @@ module OfficeInterop =
                     (fileNameList)
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
 
         //
         | GetSelectedBuildingBlockTerms ->
@@ -178,7 +187,7 @@ module OfficeInterop =
                         ]
                     )
                     (curry GenericError (UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails |> Cmd.ofMsg) >> DevMsg)
-            currentModel, cmd
+            model, cmd
 
         // DEV
         | TryExcel  ->
@@ -188,7 +197,7 @@ module OfficeInterop =
                     ()
                     ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
         | TryExcel2 ->
             let cmd = 
                 Cmd.OfPromise.either
@@ -196,7 +205,7 @@ module OfficeInterop =
                     ()
                     ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            currentModel, cmd
+            model, cmd
         //| _ ->
         //    printfn "Hit currently non existing message"
         //    currentState, Cmd.none

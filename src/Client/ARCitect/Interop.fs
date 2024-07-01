@@ -45,6 +45,7 @@ let initEventListener (eventHandler: IEventHandler) : unit -> unit =
             let e = e :?> Browser.Types.MessageEvent
             match verifyARCitectMsg e with
             | Some content ->
+                log ("Message from ARCitect: " + content.api)
                 runApiFromName eventHandler content.api content.data
             | None ->
                 ()

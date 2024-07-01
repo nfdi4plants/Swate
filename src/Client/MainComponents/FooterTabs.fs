@@ -2,7 +2,7 @@ module MainComponents.FooterTabs
 
 open Feliz
 open Feliz.Bulma
-open ARCtrl.ISA
+open ARCtrl
 
 type private FooterTab = {
     IsEditable: bool
@@ -95,11 +95,9 @@ let private dragleave_handler(state, setState) = fun (e: Browser.Types.DragEvent
     setState {state with IsDraggedOver = false}
 
 [<ReactComponent>]
-let Main (input: {|index: int; tables: ArcTables; model: Messages.Model; dispatch: Messages.Msg -> unit|}) =
-    let index = input.index
-    let table = input.tables.GetTableAt(index)
+let Main (index: int, tables: ArcTables, model: Messages.Model, dispatch: Messages.Msg -> unit) =
+    let table = tables.GetTableAt(index)
     let state, setState = React.useState(FooterTab.init(table.Name))
-    let dispatch = input.dispatch
     let id = $"ReorderMe_{index}_{table.Name}"
     Bulma.tab [
         if state.IsDraggedOver then prop.className "dragover-footertab"
@@ -120,7 +118,7 @@ let Main (input: {|index: int; tables: ArcTables; model: Messages.Model; dispatc
         // Use this to ensure updating reactelement correctly
         prop.key id
         prop.id id
-        if input.model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then Bulma.tab.isActive
+        if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then Bulma.tab.isActive
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView (Spreadsheet.ActiveView.Table index) |> Messages.SpreadsheetMsg |> dispatch)
         prop.onContextMenu(fun e ->
             e.stopPropagation()
@@ -136,7 +134,8 @@ let Main (input: {|index: int; tables: ArcTables; model: Messages.Model; dispatc
         prop.children [
             if state.IsEditable then
                 let updateName = fun e ->
-                    Spreadsheet.RenameTable (index, state.Name) |> Messages.SpreadsheetMsg |> dispatch
+                    if state.Name <> table.Name then
+                        Spreadsheet.RenameTable (index, state.Name) |> Messages.SpreadsheetMsg |> dispatch
                     setState {state with IsEditable = false}
                 Bulma.input.text [
                     prop.autoFocus(true)
@@ -162,13 +161,12 @@ let Main (input: {|index: int; tables: ArcTables; model: Messages.Model; dispatc
     ]
 
 [<ReactComponent>]
-let MainMetadata(input:{|model: Messages.Model; dispatch: Messages.Msg -> unit|}) =
-    let dispatch = input.dispatch
+let MainMetadata(model: Messages.Model, dispatch: Messages.Msg -> unit) =
     let order = 0
     let id = "Metadata-Tab"
     let nav = Spreadsheet.ActiveView.Metadata
     Bulma.tab [
-        if input.model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
+        if model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
         prop.key id
         prop.id id
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
@@ -179,10 +177,9 @@ let MainMetadata(input:{|model: Messages.Model; dispatch: Messages.Msg -> unit|}
     ]
 
 [<ReactComponent>]
-let MainPlus(input:{|dispatch: Messages.Msg -> unit|}) =
-    let dispatch = input.dispatch
+let MainPlus(model: Messages.Model, dispatch: Messages.Msg -> unit) =
     let state, setState = React.useState(FooterTab.init())
-    let order = System.Int32.MaxValue
+    let order = System.Int32.MaxValue-1 // MaxValue will be sidebar toggle
     let id = "Add-Spreadsheet-Button"
     Bulma.tab [
         prop.key id
@@ -202,6 +199,30 @@ let MainPlus(input:{|dispatch: Messages.Msg -> unit|}) =
                         Bulma.icon.isSmall
                         prop.children [
                             Html.i [prop.className "fa-solid fa-plus"]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let ToggleSidebar(model: Messages.Model, dispatch: Messages.Msg -> unit) =
+    let show = model.PersistentStorageState.ShowSideBar
+    let order = System.Int32.MaxValue
+    let id = "Toggle-Sidebar-Button"
+    Bulma.tab [
+        prop.key id
+        prop.id id
+        prop.onClick (fun e -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
+        prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer; style.marginLeft length.auto]
+        prop.children [
+            Html.a [
+                prop.style [style.height.inheritFromParent; style.pointerEvents.none]
+                prop.children [
+                    Bulma.icon [
+                        Bulma.icon.isSmall
+                        prop.children [
+                            Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
                         ]
                     ]
                 ]

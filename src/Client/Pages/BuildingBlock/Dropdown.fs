@@ -11,7 +11,7 @@ open Model.BuildingBlock
 open Model.TermSearch
 open Model
 open Messages
-open ARCtrl.ISA
+open ARCtrl
 open BuildingBlock.Helper
 open Fable.Core
 
@@ -97,23 +97,21 @@ module private DropdownElements =
 
     let createIOTypeDropdownItem (model: Model) dispatch setUiState (headerType: BuildingBlock.HeaderCellType) (iotype: IOType) =
         let setIO (ioType) = 
-            Helper.selectHeaderCellType headerType setUiState dispatch
-            U2.Case2 ioType |> Some |> BuildingBlock.UpdateHeaderArg |> BuildingBlockMsg |> dispatch
+            { DropdownPage = DropdownPage.Main; DropdownIsActive = false } |> setUiState
+            (headerType,ioType) |> BuildingBlock.UpdateHeaderWithIO |> BuildingBlockMsg |> dispatch
         Bulma.dropdownItem.a [
-            prop.children [
-                match iotype with
-                | IOType.FreeText s ->
-                    let onSubmit = fun (v: string) -> 
-                        let header = IOType.FreeText v
-                        setIO header
-                    FreeTextInputElement onSubmit
-                | _ ->
-                    Html.div [
-                        prop.onClick (fun e -> e.stopPropagation(); setIO iotype)
-                        prop.onKeyDown(fun k -> if (int k.which) = 13 then setIO iotype)
-                        prop.text (iotype.ToString())
-                    ]
-            ]
+            match iotype with
+            | IOType.FreeText s ->
+                let onSubmit = fun (v: string) -> 
+                    let header = IOType.FreeText v
+                    setIO header
+                prop.children [FreeTextInputElement onSubmit]
+            | _ ->
+                prop.onClick (fun e -> e.stopPropagation(); setIO iotype)
+                prop.onKeyDown(fun k -> if (int k.which) = 13 then setIO iotype)
+                prop.children [
+                    Html.div [prop.text (iotype.ToString())]
+                ]
         ]
 
     /// Main column types subpage for dropdown
@@ -151,24 +149,10 @@ module private DropdownElements =
     /// Output columns subpage for dropdown
     let dropdownContentIOTypeColumns header state setState (model:Model) dispatch =
         [
-            // Heading
-            //Bulma.dropdownItem.div [
-            //    prop.style [style.textAlign.center]
-            //    prop.children [
-            //        Html.h6 [
-            //            prop.className "subtitle"
-            //            prop.style [style.fontWeight.bold]
-            //            prop.text name
-            //        ]
-            //    ]
-            //]
-            //Bulma.dropdownDivider []
             IOType.Source           |> createIOTypeDropdownItem model dispatch setState header
             IOType.Sample           |> createIOTypeDropdownItem model dispatch setState header
             IOType.Material         |> createIOTypeDropdownItem model dispatch setState header
-            IOType.RawDataFile      |> createIOTypeDropdownItem model dispatch setState header
-            IOType.DerivedDataFile  |> createIOTypeDropdownItem model dispatch setState header
-            IOType.ImageFile        |> createIOTypeDropdownItem model dispatch setState header
+            IOType.Data             |> createIOTypeDropdownItem model dispatch setState header
             IOType.FreeText ""      |> createIOTypeDropdownItem model dispatch setState header
             // Navigation element back to main page
             backToMainDropdownButton setState

@@ -38,7 +38,7 @@ module ReleaseNoteTasks =
 
     open Fake.Extensions.Release
 
-    let createVersionFile(version: string) =
+    let createVersionFile(version: string, commit: bool) =
         let releaseDate = System.DateTime.UtcNow.ToShortDateString()
         Fake.DotNet.AssemblyInfoFile.createFSharp "src/Server/Version.fs"
             [   Fake.DotNet.AssemblyInfo.Title "Swate"
@@ -46,6 +46,9 @@ module ReleaseNoteTasks =
                 Fake.DotNet.AssemblyInfo.Metadata ("Version",version)
                 Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
             ]
+        if commit then 
+            run git ["add"; "."] ""
+            run git ["commit"; "-m"; (sprintf "Release %s :bookmark:" ProjectInfo.prereleaseTag)] ""
 
     let updateReleaseNotes = Target.create "releasenotes" (fun config ->
         ReleaseNotes.ensure()
@@ -53,7 +56,7 @@ module ReleaseNoteTasks =
         ReleaseNotes.update(ProjectInfo.gitOwner, ProjectInfo.project, config)
 
         let newRelease = ReleaseNotes.load "RELEASE_NOTES.md"
-        createVersionFile(newRelease.AssemblyVersion)
+        createVersionFile(newRelease.AssemblyVersion, false)
 
         Trace.trace "Update Version.fs done!"
         
@@ -223,22 +226,21 @@ module Release =
 
     open System.Diagnostics
 
-    let private executeCommand (command: string) : string =
-        let p = new Process()
-        p.StartInfo.FileName <- "git"
-        p.StartInfo.Arguments <- command
-        p.StartInfo.RedirectStandardOutput <- true
-        p.StartInfo.UseShellExecute <- false
-        p.StartInfo.CreateNoWindow <- true
-
-        p.Start() |> ignore
-
-        let output = p.StandardOutput.ReadToEnd()
-        p.WaitForExit()
-
-        output
-
     let GetLatestGitTag () : string =
+        let executeCommand (command: string) : string =
+            let p = new Process()
+            p.StartInfo.FileName <- "git"
+            p.StartInfo.Arguments <- command
+            p.StartInfo.RedirectStandardOutput <- true
+            p.StartInfo.UseShellExecute <- false
+            p.StartInfo.CreateNoWindow <- true
+
+            p.Start() |> ignore
+
+            let output = p.StandardOutput.ReadToEnd()
+            p.WaitForExit()
+
+            output
         executeCommand "describe --abbrev=0 --tags"
         |> String.trim
 
@@ -246,7 +248,7 @@ module Release =
         printfn "Please enter pre-release package suffix"
         let suffix = System.Console.ReadLine()
         ProjectInfo.prereleaseSuffix <- suffix
-        ProjectInfo.prereleaseTag <- (sprintf "%i.%i.%i-%s" ProjectInfo.release.SemVer.Major ProjectInfo.release.SemVer.Minor ProjectInfo.release.SemVer.Patch suffix)
+        ProjectInfo.prereleaseTag <- (sprintf "v%i.%i.%i-%s" ProjectInfo.release.SemVer.Major ProjectInfo.release.SemVer.Minor ProjectInfo.release.SemVer.Patch suffix)
         ProjectInfo.isPrerelease <- true
 
     let CreateTag() =
@@ -258,15 +260,14 @@ module Release =
 
     let CreatePrereleaseTag() =
         if promptYesNo (sprintf "Tagging branch with %s OK?" ProjectInfo.prereleaseTag ) then 
-            Git.Branches.tag "" ProjectInfo.prereleaseTag
+            run git ["tag"; "-f"; ProjectInfo.prereleaseTag; ] ""
             Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.prereleaseTag
         else
             failwith "aborted"
 
     let ForcePushNightly() =
         if promptYesNo "Ready to force push release to nightly branch?" then 
-            Git.Commit.exec "." (sprintf "Release v%s" ProjectInfo.prereleaseTag) 
-            run git ["push"; "-f"; "origin"; "HEAD:nightly"] __SOURCE_DIRECTORY__
+            run git ["push"; "-f"; "origin"; "HEAD:nightly"] ""
         else
             failwith "aborted"
 
@@ -404,7 +405,7 @@ let main args =
             Release.SetPrereleaseTag()
             Release.CreatePrereleaseTag()
             let version = Release.GetLatestGitTag()
-            ReleaseNoteTasks.createVersionFile(version)
+            ReleaseNoteTasks.createVersionFile(version, true)
             Release.ForcePushNightly()
             0
         | _ -> 
@@ -420,8 +421,12 @@ let main args =
         | _ -> runOrDefault args
     | "version" :: a ->
         match a with
-        | "create-file" :: version :: a -> ReleaseNoteTasks.createVersionFile(version); 0
+        | "create-file" :: version :: a -> ReleaseNoteTasks.createVersionFile(version, false); 0
         | _ -> runOrDefault args
+    | "cmdtest" :: a ->
+        run git ["add"; "."] ""
+        run git ["commit"; "-m"; (sprintf "Release v%s" ProjectInfo.prereleaseTag)] ""
+        0
     | _ -> runOrDefault args
 
     

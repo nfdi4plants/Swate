@@ -7,9 +7,9 @@ open Feliz.Bulma
 open LocalHistory
 open Messages
 open Components.QuickAccessButton
+open MainComponents
 
-
-let quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
+let private quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
@@ -47,14 +47,14 @@ let quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
         ]
     ]
 
-let quickAccessButtonListEnd (model: Model) dispatch =
+let private quickAccessButtonListEnd (model: Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
             QuickAccessButton.create(
-                "Save as xlsx",
+                "Save",
                 [
                     Bulma.icon [Html.i [prop.className "fa-solid fa-floppy-disk";]]
                 ],
@@ -66,14 +66,60 @@ let quickAccessButtonListEnd (model: Model) dispatch =
                     Bulma.icon [Html.i [prop.className "fa-sharp fa-solid fa-trash";]]
                 ],
                 (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
-                buttonProps = [Bulma.color.isDanger; Bulma.button.isInverted; Bulma.button.isOutlined]
+                buttonProps = [Bulma.color.isDanger]
+            ).toReactElement()
+        ]
+    ]
+
+let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
+    Html.div [
+        prop.style [
+            style.display.flex; style.flexDirection.row
+        ]
+        prop.children [
+            QuickAccessButton.create(
+                "Add Building Block",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-circle-plus" ]
+                        Html.i [prop.className "fa-solid fa-table-columns" ]
+                    ]
+                ],
+                (fun _ -> addWidget Widget._BuildingBlock)
+            ).toReactElement()
+            QuickAccessButton.create(
+                "Add Template",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-circle-plus" ]
+                        Html.i [prop.className "fa-solid fa-table" ]
+                    ]
+                ],
+                (fun _ -> addWidget Widget._Template)
+            ).toReactElement()
+            QuickAccessButton.create(
+                "File Picker",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-file-signature" ]
+                    ]
+                ],
+                (fun _ -> addWidget Widget._FilePicker)
             ).toReactElement()
         ]
     ]
 
 
+
 [<ReactComponent>]
-let Main (model: Messages.Model) dispatch =
+let Main(model: Messages.Model, dispatch, widgets, setWidgets) =
+    let addWidget (widget: Widget) = 
+        let add (widget) widgets = widget::widgets |> List.rev |> setWidgets
+        if widgets |> List.contains widget then 
+            List.filter (fun w -> w <> widget) widgets
+            |> fun filteredWidgets -> add widget filteredWidgets
+        else 
+            add widget widgets
     Bulma.navbar [
         prop.className "myNavbarSticky"
         prop.id "swate-mainNavbar"
@@ -95,32 +141,12 @@ let Main (model: Messages.Model) dispatch =
                 prop.ariaLabel "menu"
                 prop.children [
                     match model.PersistentStorageState.Host with
-                    | Some Swatehost.ARCitect ->
+                    | Some (Swatehost.ARCitect) ->
                         Bulma.navbarStart.div [
                             prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                             prop.children [
-                                Html.div [
-                                    prop.style [
-                                        style.display.flex; style.flexDirection.row
-                                    ]
-                                    prop.children [ 
-                                        QuickAccessButton.create(
-                                            "Return to ARCitect", 
-                                            [
-                                                Bulma.icon [Html.i [prop.className "fa-solid fa-circle-left";]]
-                                            ],
-                                            (fun _ -> ARCitect.ARCitect.send Model.ARCitect.TriggerSwateClose)
-                                        ).toReactElement()
-                                        QuickAccessButton.create(
-                                            "Alpha State", 
-                                            [
-                                                Html.span "ALPHA STATE"
-                                            ],
-                                            (fun e -> ()),
-                                            false
-                                        ).toReactElement()
-                                    ]
-                                ]
+                                quickAccessButtonListStart model.History dispatch
+                                if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, addWidget)
                             ]
                         ]
                     | Some _ ->
@@ -128,6 +154,7 @@ let Main (model: Messages.Model) dispatch =
                             prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                             prop.children [
                                 quickAccessButtonListStart model.History dispatch
+                                if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, addWidget)
                             ]
                         ]
                         Bulma.navbarEnd.div [

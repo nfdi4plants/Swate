@@ -1,4 +1,4 @@
-﻿module XlsxFileView
+module XlsxFileView
 
 open Feliz
 open Feliz.Bulma
@@ -7,11 +7,14 @@ open Spreadsheet
 open Shared
 
 [<ReactComponentAttribute>]
-let Main(x: {| model: Messages.Model; dispatch: Messages.Msg -> unit |}) = 
-    let model, dispatch = x.model, x.dispatch
+let Main(model: Messages.Model, dispatch: Messages.Msg -> unit, openBuildingBlockWidget, openTemplateWidget) = 
     match model.SpreadsheetModel.ActiveView with
     | ActiveView.Table _ ->
-        MainComponents.SpreadsheetView.Main model dispatch
+        match model.SpreadsheetModel.ActiveTable.ColumnCount with
+        | 0 -> 
+            MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget)
+        | _ ->
+            MainComponents.SpreadsheetView.Main model dispatch
     | ActiveView.Metadata ->
         Bulma.section [
             Bulma.container [

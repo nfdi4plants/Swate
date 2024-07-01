@@ -3,9 +3,10 @@
 open Feliz
 open Feliz.Bulma
 open Messages
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
+[<ReactComponent>]
 let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) = 
     Bulma.section [
         FormComponents.TextInput (
@@ -17,41 +18,41 @@ let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) =
             fullwidth=true
         )
         FormComponents.OntologyAnnotationInput(
-            assay.MeasurementType |> Option.defaultValue OntologyAnnotation.empty,
-            "Measurement Type",
-            fun oa -> 
-                let oa = if oa = OntologyAnnotation.empty then None else Some oa
+            assay.MeasurementType |> Option.defaultValue (OntologyAnnotation.empty()),
+            (fun oa -> 
+                let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                 assay.MeasurementType <- oa
-                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            "Measurement Type"
         )
         FormComponents.OntologyAnnotationInput(
-            assay.TechnologyType |> Option.defaultValue OntologyAnnotation.empty,
-            "Technology Type",
-            fun oa -> 
-                let oa = if oa = OntologyAnnotation.empty then None else Some oa
+            assay.TechnologyType |> Option.defaultValue (OntologyAnnotation.empty()),
+            (fun oa -> 
+                let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                 assay.TechnologyType <- oa
-                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            "Technology Type"
         )
         FormComponents.OntologyAnnotationInput(
-            assay.TechnologyPlatform |> Option.defaultValue OntologyAnnotation.empty,
-            "Technology Platform",
-            fun oa -> 
-                let oa = if oa = OntologyAnnotation.empty then None else Some oa
+            assay.TechnologyPlatform |> Option.defaultValue (OntologyAnnotation.empty()),
+            (fun oa -> 
+                let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                 assay.TechnologyPlatform <- oa
-                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+            "Technology Platform"
         )
         FormComponents.PersonsInput(
-            assay.Performers,
+            Array.ofSeq assay.Performers,
             "Performers",
             fun persons ->
-                assay.Performers <- persons
+                assay.Performers <- ResizeArray persons
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
         FormComponents.CommentsInput(
-            assay.Comments,
+            Array.ofSeq assay.Comments,
             "Comments",
             fun comments ->
-                assay.Comments <- comments
+                assay.Comments <- ResizeArray comments
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
     ]

@@ -45,12 +45,14 @@ type Queries =
 
     static member NameQueryFullText (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: int) =
         let sb = new StringBuilder()
-        let limit = defaultArg limit 10
-        sb.AppendLine $"""CALL db.index.fulltext.queryNodes("TermName",$Name, {{limit: $Limit}})
+        sb.AppendLine $"""CALL db.index.fulltext.queryNodes("TermName",$Name)
 YIELD {nodeName}""" |> ignore
         if ontologyFilter.IsSome then
             sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
         sb.AppendLine(Queries.TermReturn nodeName) |> ignore
+        sb.AppendLine($"""ORDER BY apoc.text.distance(toLower({nodeName}.name), toLower($Name))""") |> ignore
+        if limit.IsSome then 
+            sb.AppendLine(Queries.Limit(limit.Value)) |> ignore
         sb.ToString()
             
 
@@ -74,19 +76,18 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// Searchtype defaults to "get term suggestions with auto complete".
     member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology, ?limit: int) =
-        let limit = defaultArg limit 5
         let nodeName = "node"
         let fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
                 FullTextSearch.PerformanceComplete.ofQueryString termName
-        let query = Queries.NameQueryFullText (nodeName, ?ontologyFilter=sourceOntologyName, limit=limit)
+        let query = Queries.NameQueryFullText (nodeName, ?ontologyFilter=sourceOntologyName, ?limit = limit)
         let parameters =
             Map [
                 "Name",fulltextSearchStr |> box
                 if sourceOntologyName.IsSome then sourceOntologyName.Value.toParamTuple
-                "Limit", box limit
+                if limit.IsSome then "Limit", box limit.Value
             ] |> Some
         Neo4j.runQuery(query,parameters,(Term.asTerm(nodeName)),?session=session,?credentials=credentials)
 
@@ -95,10 +96,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// </summary>
     member this.searchByParentStepwise(query: string, parentId: string, ?searchType:FullTextSearch, ?limit: int) =
         let limit = defaultArg limit 5
-        let searchNameQuery =
-            """CALL db.index.fulltext.queryNodes("TermName", $Search, {limit: $Limit}) 
-        YIELD node
-        RETURN node.accession"""
+        let searchNameQuery = Queries.NameQueryFullText ("node", limit=limit)
         let searchTreeQuery =
           """MATCH (node:Term)
     WHERE node.accession IN $AccessionList
@@ -127,7 +125,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 session.RunAsync(
                     searchNameQuery, 
                     System.Collections.Generic.Dictionary<string,obj>([
-                        KeyValuePair("Search", box fulltextSearchStr);
+                        KeyValuePair("Name", box fulltextSearchStr);
                         // KeyValuePair("Accession", box parentId);
                         KeyValuePair("Limit", box limit)
                     ]),

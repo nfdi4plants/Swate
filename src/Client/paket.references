@@ -16,7 +16,8 @@ ExcelJS.Fable
 Feliz.ElmishComponents
 Fable.Elmish.Browser
 FsSpreadsheet
-FsSpreadsheet.Exceljs
+FsSpreadsheet.Js
 Feliz.Bulma.Checkradio
 Feliz.Bulma.Switch
 ARCtrl
+Fable.Fetch

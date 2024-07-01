@@ -1,78 +1,82 @@
 @charset "utf-8";
 
-// OpenSans
-$FontPathOpenSans: "~open-sans-fonts/open-sans";
-$family-primary: 'Open Sans';
-
-
-// 1. Import the initial variables
-@import "../../node_modules/bulma/sass/utilities/initial-variables.sass";
-@import "../../node_modules/bulma/sass/utilities/functions.sass";
-
-// 2. Set your own initial variables
-html[data-theme="dark"] {
-    --scheme-main: hsl(0, 0%, 4%);
-    --scheme-invert: hsl(0, 0%, 100%);
-    --text: hsl(0, 0%, 100%);
-    --text-light: hsl(0, 0%, 96%);
-    --text-strong: hsl(0, 0%, 100%);
-    --fs-background: #252529;
-    --fs-foreground: #1e1e20;
-    --scheme-invert-rgb: 255,255,255;
-}
-
-html[data-theme="light"] {
-    --scheme-main: hsl(0, 0%, 100%);
-    --scheme-invert: hsl(0, 0%, 4%);
-    --text: hsl(0, 0%, 4%);
-    --text-light: hsl(0, 0%, 14%);
-    --text-strong: hsl(0, 0%, 4%);
-    --fs-background: #f6f6f7;
-    --fs-foreground: #e3e3e5;
-    --scheme-invert-rgb: 0,0,0;
-}
-
+// Set your brand colors
 $excel-primary: #217346;
 $excel-primary30: #639d7d;
-$nfdi-blue-dark: #2D3E50 ;
+$nfdi-blue-dark: #2D3E50;
 $nfdi-mint: #1FC2A7;
 $nfdi-blue-light: #4fb3d9;
 $nfdi-blue-lighter-20: #72c2e1;
-$nfdi-red: #c21f3a;//#e83151;//#E32746;
+$nfdi-red: #c21f3a; //#e83151;//#E32746;
 $nfdi-yellow: #FFC000;
-
-// global bulma overrides
-$primary: $nfdi-blue-dark;
-$success: $nfdi-mint;
-$info: $nfdi-blue-light;
-$danger: $nfdi-red;
-$warning: $nfdi-yellow;
-
-// 3. Set the derived variables
-$border-color: hsl(0, 0%, 86%);
-$scheme-main: var(--scheme-main, hsl(0, 0%, 100%));
-$scheme-invert: var(--scheme-invert, hsl(0, 0%, 4%));
-$text: var(--text);
-$text-light: var(--text-light);
-$text-strong: var(--text-strong);
-$modal-background-background-color: var(--fs-background, #FF0000);
-$content-blockquote-background-color: var(--fs-background);
-$modal-card-head-background-color: var(--fs-foreground);
-$tabs-boxed-link-hover-background-color: var(--fs-background);
-$dropdown-item-hover-background-color: var(--fs-background);
-$shadow: 0 0.5em 1em -0.125em rgba(var(--scheme-invert-rgb), 0.1), 0 0px 0 1px rgba(var(--scheme-invert-rgb), 0.02);
-
-// 4. set up custom color
 $primarye: $excel-primary;
-$primarye-invert: findColorInvert($excel-primary);
+$primarye-invert: white;
 
-// 5. Add new color variables to the color map.
-@import "../../node_modules/bulma/sass/utilities/derived-variables";
-$addColors: ( "primarye":($primarye, $primarye-invert) );
-$colors: map-merge($colors, $addColors);
+// 1. Import the initial variables
+@use "bulma/sass" with ( $primary: $nfdi-blue-dark, $success: $nfdi-mint, $info: $nfdi-blue-light, $danger: $nfdi-red, $warning: $nfdi-yellow, $custom-colors: ( "primarye":($primarye, $primarye-invert)), );
+@forward "bulma/sass/themes";
+@use "bulma/sass/utilities/css-variables" as cv;
 
-@import "../../node_modules/bulma/bulma.sass";
-/*@import "../../node_modules/bulma-checkradio/src/sass/index.sass";*/
+.my-grey-out {
+    background-color: cv.getVar("scheme-main-ter");
+    color: cv.getVar("link")
+}
+
+.gap-1 {
+    gap: 0.25rem
+}
+
+.gap-2 {
+    gap: 0.5rem
+}
+
+.gap-3 {
+    gap: 1rem
+}
+
+.gap-4 {
+    gap: 1.5rem
+}
+
+:root {
+    --bulma-duration: 0.1s;
+}
+
+.main-contrast-bg {
+    background-color: cv.getVar("scheme-main")
+}
+
+.template-filter-container {
+    flex-grow: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+
+    > div {
+        flex-grow: 1
+    }
+}
+
+.widget-help-container {
+    padding: 5px;
+
+    > * {
+        font-size: 0.85rem; // Set the specific font size for all direct children
+    }
+}
+
+.tableFixHead {
+    overflow: auto;
+    max-height: 600px;
+    border-collapse: collapse;
+
+    > thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background-color: cv.getVar("scheme-main")
+    }
+}
 
 .form-container {
     display: flex;
@@ -81,6 +85,21 @@ $colors: map-merge($colors, $addColors);
     flex-wrap: wrap;
     column-gap: 10px;
     flex-grow: 1;
+
+    .form-input-term-search-positioner {
+        position: absolute;
+        top: calc(100% - 10px);
+        z-index: 20;
+        width: 100%;
+    }
+
+    @media only screen and (max-width: 694px) {
+        .form-input-term-search-positioner {
+            position: relative;
+            z-index: 20;
+            top: -10px
+        }
+    }
 }
 
 .term-select-area {
@@ -88,8 +107,8 @@ $colors: map-merge($colors, $addColors);
     width: 100%;
     max-height: 400px;
     overflow: auto;
-    border: 1px solid $border-color;
-    background-color: $scheme-main;
+    border: 1px solid cv.getVar("border");
+    background-color: cv.getVar("scheme-main");
     border-top: unset;
     z-index: 20;
 
@@ -112,8 +131,8 @@ $colors: map-merge($colors, $addColors);
         }
 
         .term-select-item-more {
-            border-top: .5px solid $border-color;
-            box-shadow: 0px 4px 8px $border-color;
+            border-top: .5px solid cv.getVar("border");
+            box-shadow: 0px 4px 8px cv.getVar("border");
 
             td {
                 border: unset;
@@ -127,7 +146,7 @@ $colors: map-merge($colors, $addColors);
             background-color: transparent;
             border: unset;
             cursor: pointer;
-            color: $scheme-invert;
+            color: cv.getVar("scheme-invert");
             justify-content: center;
             align-items: center;
             border-radius: 2px;
@@ -135,21 +154,17 @@ $colors: map-merge($colors, $addColors);
         }
 
         .term-select-item-toggle-button:hover {
-            background-color: $content-blockquote-background-color
+            background-color: cv.getVar("background")
         }
     }
 
     .term-select-item:not(:last-child) {
-        border-bottom: 1px solid $border-color;
+        border-bottom: 1px solid cv.getVar("border");
     }
 }
 
 .modal-background {
-    opacity: 0.5
-}
-
-.modal-card {
-    box-shadow: 2px 2px black;
+    opacity: 0.8
 }
 
 /*https: //stackoverflow.com/questions/54044479/table-with-sticky-header-and-resizable-columns-without-using-jquery*/
@@ -169,7 +184,7 @@ $colors: map-merge($colors, $addColors);
 }
 
 .fixed_headers tbody tr:nth-child(even) {
-    background-color: #DDD;
+    background-color: cv.getVar("scheme-main-bis");
 }
 
 .fixed_headers thead th {
@@ -188,12 +203,9 @@ html, body {
     overflow: auto
 }
 
-a {
-    color: $nfdi-blue-light
-}
 
-a:hover {
-    color: $nfdi-blue-lighter-20
+table {
+    height: fit-content;
 }
 
 .dragover-footertab {
@@ -246,12 +258,12 @@ a:hover {
     position: -webkit-sticky;
     min-height: min-content;
     top: 0;
-    background-color: $primary;
+    background-color: cv.getVar("primary");
 }
 
 .myNavbarSticky .navbar-item#logo {
     position: relative;
-    overflow:hidden;
+    overflow: hidden;
 
     &::before {
         content: "";
@@ -260,7 +272,7 @@ a:hover {
         top: 50%;
         left: 50%;
         box-shadow: 0 0 15px 5px #fff, /* inner white */
-        0 0 30px 15px $success;
+        0 0 30px 15px cv.getVar("success");
     }
 }
 
@@ -284,7 +296,13 @@ a:hover {
 
 .myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within, .myNavbarButton:not([disabled]):hover {
     background-color: transparent;
-    color: $success
+    color: cv.getVar("success")
+}
+
+
+.myNavbarButton.is-danger:not([disabled]):focus, .myNavbarButton.is-danger:not([disabled]):focus-within, .myNavbarButton.is-danger:not([disabled]):hover {
+    background-color: transparent;
+    color: cv.getVar("danger")
 }
 
 .myNavbarButton:not([disabled]):focus, .myNavbarButton:not([disabled]):focus-within {
@@ -363,7 +381,7 @@ a.navbar-item:hover {
 
 .delete:hover {
     @extend .delete;
-    background-color: $danger
+    background-color: var(--bulma-danger)
 }
 
 .hoverTableEle {
@@ -385,12 +403,12 @@ a.navbar-item:hover {
 
 .clickableTagDelete {
     cursor: pointer;
-    border: 0.2px solid $info
+    border: 0.2px solid var(--bulma-info)
 }
 
 .clickableTagDelete:hover {
-    background-color: $danger !important;
-    border-color: $danger !important;
+    background-color: cv.getVar("danger") !important;
+    border-color: cv.getVar("danger") !important;
     color: white
 }
 
@@ -446,7 +464,7 @@ a.navbar-item:hover {
 }
 /* When the checkbox is checked, add a green background */
 .checkbox-input:checked ~ .checkbox-checkmark {
-    background-color: $success;
+    background-color: cv.getVar("success");
     border: none;
 }
 /* Create the checkmark/indicator (hidden when not checked) */
@@ -618,7 +636,7 @@ input::-ms-clear {
 }
 
 .danger_important {
-    color: $danger !important
+    color: cv.getVar("danger") !important
 }
 
 kbd {

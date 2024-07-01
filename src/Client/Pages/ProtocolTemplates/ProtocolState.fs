@@ -10,45 +10,53 @@ module Protocol =
     open Shared
     open Fable.Core
 
-    let update (fujMsg:Protocol.Msg) (currentState: Protocol.Model) : Protocol.Model * Cmd<Messages.Msg> =
+    let update (fujMsg:Protocol.Msg) (state: Protocol.Model) : Protocol.Model * Cmd<Messages.Msg> =
 
         match fujMsg with
-        // // ------ Process from file ------
-        | ParseUploadedFileRequest bytes ->
-            let nextModel = { currentState with Loading = true }
-            failwith "ParseUploadedFileRequest IS NOT IMPLEMENTED YET"
-            //let cmd =
-            //    Cmd.OfAsync.either
-            //        Api.templateApi.tryParseToBuildingBlocks
-            //        bytes
-            //        (ParseUploadedFileResponse >> ProtocolMsg)
-            //        (curry GenericError (UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg) >> DevMsg)
-            nextModel, Cmd.none
-        | ParseUploadedFileResponse buildingBlockTables ->
-            let nextState = { currentState with UploadedFileParsed = buildingBlockTables; Loading = false }
-            nextState, Cmd.none
+        | UpdateLoading next ->
+            {state with Loading = next}, Cmd.none
         // ------ Protocol from Database ------
         | GetAllProtocolsRequest ->
-            let nextState = {currentState with Loading = true}
+            let now = System.DateTime.UtcNow
+            let olderThanOneHour = state.LastUpdated |> Option.map (fun last -> (now - last) > System.TimeSpan(1,0,0))
+            let cmd = 
+                if olderThanOneHour.IsNone || olderThanOneHour.Value then GetAllProtocolsForceRequest |> ProtocolMsg |> Cmd.ofMsg else Cmd.none
+            state, cmd
+        | GetAllProtocolsForceRequest ->
+            let nextState = {state with Loading = true}
             let cmd =
+                let updateRequestStateOnErrorCmd = UpdateLoading false |> ProtocolMsg |> Cmd.ofMsg
                 Cmd.OfAsync.either
                     Api.templateApi.getTemplates
                     ()
                     (GetAllProtocolsResponse >> ProtocolMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
+                    (curry GenericError updateRequestStateOnErrorCmd >> DevMsg)
             nextState, cmd
         | GetAllProtocolsResponse protocolsJson ->
-            let protocols = protocolsJson |> Array.map (ARCtrl.Template.Json.Template.fromJsonString)
+            let state = {state with Loading = false}
+            let templates = 
+                try
+                    protocolsJson |> ARCtrl.Json.Templates.fromJsonString |> Ok
+                with
+                    | e -> Result.Error e
+            let nextState, cmd = 
+                match templates with
+                | Ok t0 -> 
+                    let t = Array.ofSeq t0
+                    let nextState = { state with LastUpdated = Some System.DateTime.UtcNow }
+                    nextState, UpdateTemplates t |> ProtocolMsg |> Cmd.ofMsg
+                | Result.Error e -> state, GenericError (Cmd.none,e) |> DevMsg |> Cmd.ofMsg
+            nextState, cmd
+        | UpdateTemplates templates ->
             let nextState = {
-                currentState with
-                    ProtocolsAll = protocols
-                    Loading = false
+                state with
+                    Templates = templates
             }
             nextState, Cmd.none
         | SelectProtocol prot -> 
             let nextState = {
-                currentState with
-                    ProtocolSelected = Some prot
+                state with
+                    TemplateSelected = Some prot
             }
             nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.Protocol)
         | ProtocolIncreaseTimesUsed templateId ->
@@ -58,20 +66,12 @@ module Protocol =
             //        Api.templateApi.increaseTimesUsedById
             //        templateId
             //        (curry GenericError Cmd.none >> DevMsg)
-            currentState, Cmd.none
+            state, Cmd.none
                 
         // Client
-        | UpdateLoading nextLoadingState ->
-            let nextState = {
-                currentState with Loading = nextLoadingState
-            }
-            nextState, Cmd.none
         | RemoveSelectedProtocol ->
             let nextState = {
-                currentState with
-                    ProtocolSelected = None
+                state with
+                    TemplateSelected = None
             }
-            nextState, Cmd.none
-        | RemoveUploadedFileParsed ->
-            let nextState = {currentState with UploadedFileParsed = Array.empty}
             nextState, Cmd.none

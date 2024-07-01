@@ -1,6 +1,7 @@
 module SplitWindowView
 
 open Feliz
+open Feliz.Bulma
 open Elmish
 open Browser.Types
 open LocalStorage.SplitWindow
@@ -20,10 +21,12 @@ let private calculateNewSideBarSize (model:SplitWindow) (pos:float) =
 
 let private onResize_event (model:SplitWindow) (setModel: SplitWindow -> unit) = (fun (e: Event) ->
     /// must get width like this, cannot propagate model correctly.
-    let sidebarWindow = Browser.Dom.document.getElementById(sidebarId).clientWidth
-    let windowWidth = Browser.Dom.window.innerWidth
-    let new_sidebarWidth = calculateNewSideBarSize model (windowWidth - sidebarWindow)
-    { model with RightWindowWidth = new_sidebarWidth } |> setModel
+    let ele = Browser.Dom.document.getElementById(sidebarId)
+    if isNull ele |> not then
+        let sidebarWindow = ele.clientWidth
+        let windowWidth = Browser.Dom.window.innerWidth
+        let new_sidebarWidth = calculateNewSideBarSize model (windowWidth - sidebarWindow)
+        { model with RightWindowWidth = new_sidebarWidth } |> setModel
 )
     
 /// <summary> This event changes the size of main window and sidebar </summary>
@@ -74,12 +77,31 @@ let exampleTerm =
         false
         "MS"
 
+let private sidebarCombinedElement(sidebarId: string, model: SplitWindow, setModel, dispatch, right) =
+    Html.div [
+        prop.id sidebarId
+        prop.style [
+            style.float'.right;
+            style.minWidth(minWidth);
+            style.flexBasis(length.px model.RightWindowWidth); style.flexShrink 0; style.flexGrow 0
+            style.height(length.vh 100)
+            style.width(length.perc 100)
+            style.overflow.hidden
+            style.display.flex
+        ]
+        prop.children [
+            dragbar model setModel dispatch
+            yield! right 
+        ]
+    ]
+
 // https://jsfiddle.net/gaby/Bek9L/
 // https://stackoverflow.com/questions/6219031/how-can-i-resize-a-div-by-dragging-just-one-side-of-it
 /// Splits screen into two parts. Left and right, with a dragbar in between to change size of right side.
 [<ReactComponent>]
 let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) (mainModel:Messages.Model) (dispatch: Messages.Msg -> unit) =
     let (model, setModel) = React.useState(SplitWindow.init)
+    let isNotMetadataSheet = not (mainModel.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Metadata)
     React.useEffect(model.WriteToLocalStorage, [|box model|])
     React.useEffectOnce(fun _ -> Browser.Dom.window.addEventListener("resize", onResize_event model setModel))
     Html.div [
@@ -87,32 +109,8 @@ let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElemen
             style.display.flex
         ]
         prop.children [
-            Html.div [
-                prop.style [
-                    style.minWidth(minWidth)
-                    style.flexGrow 1
-                    style.flexShrink 1
-                    style.height(length.vh 100)
-                    style.width(length.perc 100)
-                ]
-                prop.children left
-            ]
-            if not (mainModel.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Metadata) then
-                Html.div [
-                    prop.id sidebarId
-                    prop.style [
-                        style.float'.right;
-                        style.minWidth(minWidth);
-                        style.flexBasis(length.px model.RightWindowWidth); style.flexShrink 0; style.flexGrow 0
-                        style.height(length.vh 100)
-                        style.width(length.perc 100)
-                        style.overflow.hidden
-                        style.display.flex
-                    ]
-                    prop.children [
-                        dragbar model setModel dispatch
-                        yield! right 
-                    ]
-                ]
+            MainComponents.MainViewContainer.Main(minWidth, left)
+            if isNotMetadataSheet && mainModel.PersistentStorageState.ShowSideBar then
+                sidebarCombinedElement(sidebarId, model, setModel, dispatch, right)
         ]
     ]

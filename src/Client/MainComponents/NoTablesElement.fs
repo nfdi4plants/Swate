@@ -3,11 +3,11 @@ module MainComponents.NoTablesElement
 open Feliz
 open Feliz.Bulma
 
-open Spreadsheet
+open SpreadsheetInterface
 open Messages
 open Browser.Types
 open Fable.Core.JsInterop
-open ARCtrl.ISA
+open ARCtrl
 open Shared
 
 open Elmish
@@ -22,7 +22,7 @@ module private UploadHandler =
 
     [<Literal>]
     let id = "droparea"
-    let updateMsg = fun r -> r |> SetArcFileFromBytes |> SpreadsheetMsg
+    let updateMsg = fun r -> r |> ImportXlsx |> InterfaceMsg
 
     let setActive_DropArea() =
         styleCounter <- styleCounter + 1
@@ -69,7 +69,7 @@ let private uploadNewTable dispatch =
 
                         reader.onload <- fun evt ->
                             let (r: byte []) = evt.target?result
-                            r |> SetArcFileFromBytes |> SpreadsheetMsg |> dispatch
+                            r |> ImportXlsx |> InterfaceMsg |> dispatch
                                    
                         reader.onerror <- fun evt ->
                             curry GenericLog Cmd.none ("Error", evt?Value) |> DevMsg |> dispatch
@@ -127,7 +127,7 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                             let i = ArcInvestigation.init("New Investigation")
                             ArcFiles.Investigation i
                             |> UpdateArcFile
-                            |> Messages.SpreadsheetMsg
+                            |> InterfaceMsg
                             |> dispatch
                         )
                         prop.text "Investigation"
@@ -135,10 +135,10 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                     Bulma.dropdownItem.a [
                         prop.onClick(fun _ ->
                             let s = ArcStudy.init("New Study")
-                            let newTable = s.InitTable("New Study Table")
+                            let _ = s.InitTable("New Study Table")
                             ArcFiles.Study (s, [])
                             |> UpdateArcFile
-                            |> Messages.SpreadsheetMsg
+                            |> InterfaceMsg
                             |> dispatch
                         )
                         prop.text "Study"
@@ -149,7 +149,7 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                             let newTable = a.InitTable("New Assay Table")
                             ArcFiles.Assay a
                             |> UpdateArcFile
-                            |> Messages.SpreadsheetMsg
+                            |> InterfaceMsg
                             |> dispatch
                         )
                         prop.text "Assay"
@@ -165,7 +165,7 @@ let private createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
                             template.LastUpdated <- System.DateTime.Now
                             ArcFiles.Template template
                             |> UpdateArcFile
-                            |> Messages.SpreadsheetMsg
+                            |> InterfaceMsg
                             |> dispatch
                         )
                         prop.text "Template"

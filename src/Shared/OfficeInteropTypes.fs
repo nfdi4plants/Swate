@@ -1,7 +1,7 @@
 namespace Shared
 
 open System
-open ARCtrl.ISA
+open ARCtrl
 
 module OfficeInteropTypes =
 

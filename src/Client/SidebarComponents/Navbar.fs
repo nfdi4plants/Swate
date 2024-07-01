@@ -195,6 +195,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                     span [AriaHidden true] [ ]
                                     span [AriaHidden true] [ ]
                                     span [AriaHidden true] [ ]
+                                    span [AriaHidden true] [ ]
                                 ]
                             ]
                         ]
@@ -213,6 +214,13 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                         Html.span "News "
                                         Html.i [prop.className "fa-brands fa-twitter"; prop.style [style.color "#1DA1F2"; style.marginLeft 2]] 
                                     ]
+                                ]
+                                Bulma.navbarItem.a [
+                                    prop.onClick (fun e ->
+                                        setState {state with BurgerActive = not state.BurgerActive}
+                                        UpdatePageState (Some Routing.Route.Info) |> dispatch
+                                    )
+                                    prop.text Routing.Route.Info.toStringRdbl
                                 ]
                                 Bulma.navbarItem.a [
                                     prop.href Shared.URLs.SwateWiki ;

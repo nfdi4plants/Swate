@@ -4,7 +4,6 @@ open Fable.React
 open Fable.React.Props
 open Shared
 open TermTypes
-open TemplateTypes
 open Thoth.Elmish
 open Routing
 
@@ -89,7 +88,7 @@ type LogItem =
 
 module TermSearch =
 
-    open ARCtrl.ISA
+    open ARCtrl
 
     type Model = {
         SelectedTerm            : OntologyAnnotation option
@@ -143,37 +142,15 @@ type PersistentStorageState = {
     SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
     Host                    : Swatehost option
+    ShowSideBar             : bool
     HasOntologiesLoaded     : bool
 } with
     static member init () = {
         SearchableOntologies    = [||]
         Host                    = None
         AppVersion              = ""
+        ShowSideBar             = false
         HasOntologiesLoaded     = false
-    }
-
-type ApiCallStatus =
-    | IsNone
-    | Pending
-    | Successfull
-    | Failed of string
-
-type ApiCallHistoryItem = {
-    FunctionName   : string
-    Status         : ApiCallStatus
-}
-
-type ApiState = {
-    currentCall : ApiCallHistoryItem
-    callHistory : ApiCallHistoryItem list
-} with
-    static member init() = {
-        currentCall = ApiState.noCall
-        callHistory = []
-    }
-    static member noCall = {
-        FunctionName = "None"
-        Status = IsNone
     }
 
 type PageState = {
@@ -199,7 +176,7 @@ open Fable.Core
 
 module BuildingBlock =
 
-    open ARCtrl.ISA
+    open ARCtrl
 
     type [<RequireQualifiedAccess>] HeaderCellType =
     | Component
@@ -280,14 +257,6 @@ module BuildingBlock =
         BodyCellType    : BodyCellType
         BodyArg         : U2<string, OntologyAnnotation> option
 
-        // Below everything is more or less deprecated
-        // This section is used to add a unit directly to an already existing building block
-        Unit2TermSearchText             : string
-        Unit2SelectedTerm               : Term option
-        Unit2TermSuggestions            : Term []
-        HasUnit2TermSuggestionsLoading  : bool
-        ShowUnit2TermSuggestions        : bool
-
     } with
         static member init () = {
 
@@ -295,14 +264,6 @@ module BuildingBlock =
             HeaderArg           = None
             BodyCellType        = BodyCellType.Term
             BodyArg             = None
-
-            // Below everything is more or less deprecated
-            // This section is used to add a unit directly to an already existing building block
-            Unit2TermSearchText                     = ""
-            Unit2SelectedTerm                       = None
-            Unit2TermSuggestions                    = [||]
-            ShowUnit2TermSuggestions                = false
-            HasUnit2TermSuggestionsLoading          = false
         }
 
         member this.TryHeaderOA() =
@@ -325,46 +286,47 @@ module BuildingBlock =
                 | Some (U2.Case1 s) -> Some s
                 | _ -> None
 
-/// Validation scheme for Table
-module Validation =
-    type Model = {
-        ActiveTableBuildingBlocks   : BuildingBlock []
-        TableValidationScheme       : OfficeInterop.CustomXmlTypes.Validation.TableValidation
-        // Client view related
-        DisplayedOptionsId      : int option
-    } with
-        static member init () = {
-            ActiveTableBuildingBlocks   = [||]
-            TableValidationScheme       = OfficeInterop.CustomXmlTypes.Validation.TableValidation.init()
-            DisplayedOptionsId          = None
-        }
-
 module Protocol =
 
     [<RequireQualifiedAccess>]
-    type CuratedCommunityFilter =
-    | Both
+    type CommunityFilter =
+    | All
     | OnlyCurated
-    | OnlyCommunity
+    | Community of string
+
+        member this.ToStringRdb() =
+            match this with
+            | All               -> "All"
+            | OnlyCurated       -> "DataPLANT official"
+            | Community name    -> name
+
+        static member fromString(str:string) =
+            match str with
+            | "All" -> All
+            | "DataPLANT official" -> OnlyCurated
+            | anyElse -> Community anyElse
+
+        static member CommunityFromOrganisation(org: ARCtrl.Organisation) =
+            match org with
+            | ARCtrl.Organisation.DataPLANT -> None
+            | ARCtrl.Organisation.Other name -> Some <| Community name
 
     /// This model is used for both protocol insert and protocol search
     type Model = {
         // Client 
         Loading                 : bool
-        // // ------ Process from file ------
-        UploadedFileParsed      : (string*InsertBuildingBlock []) []
+        LastUpdated             : System.DateTime option
         // ------ Protocol from Database ------
-        ProtocolSelected        : ARCtrl.Template.Template option
-        ProtocolsAll            : ARCtrl.Template.Template []
+        TemplateSelected        : ARCtrl.Template option
+        Templates               : ARCtrl.Template []
     } with
         static member init () = {
             // Client
             Loading                 = false
-            ProtocolSelected        = None
-            // // ------ Process from file ------
-            UploadedFileParsed      = [||]
+            LastUpdated             = None
+            TemplateSelected        = None
             // ------ Protocol from Database ------
-            ProtocolsAll            = [||]
+            Templates               = [||]
         }
 
 type RequestBuildingBlockInfoStates =
@@ -385,39 +347,5 @@ type BuildingBlockDetailsState = {
         CurrentRequestState = Inactive
         BuildingBlockValues = [||]
     }
-
-module SettingsXml =
-    type Model = {
-        // // Client // //
-        // Validation xml
-        ActiveSwateValidation                   : obj option //OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-        NextAnnotationTableForActiveValidation  : string option
-        // Protocol group xml
-        ActiveProtocolGroup                     : obj option //OfficeInterop.Types.Xml.GroupTypes.ProtocolGroup option
-        NextAnnotationTableForActiveProtGroup   : string option
-        // Protocol
-        ActiveProtocol                          : obj option //OfficeInterop.Types.Xml.GroupTypes.Protocol option
-        NextAnnotationTableForActiveProtocol    : string option
-        //
-        RawXml                                  : string option
-        NextRawXml                              : string option
-        FoundTables                             : string []
-        ValidationXmls                          : obj [] //OfficeInterop.Types.Xml.ValidationTypes.TableValidation []
-    } with
-        static member init () = {
-            // Client
-            ActiveSwateValidation                   = None
-            NextAnnotationTableForActiveValidation  = None
-            ActiveProtocolGroup                     = None
-            NextAnnotationTableForActiveProtGroup   = None
-            ActiveProtocol                          = None
-            // Unused
-            NextAnnotationTableForActiveProtocol    = None
-            //
-            RawXml                                  = None
-            NextRawXml                              = None
-            FoundTables                             = [||]
-            ValidationXmls                          = [||]
-        }
 
 // The main MODEL was shifted to 'Messages.fs' to allow saving 'Msg'
