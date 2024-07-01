@@ -10,7 +10,6 @@ open Fable.SimpleJson
 open TermTypes
 open ExcelColors
 open OfficeInterop
-open OfficeInteropTypes
 open Model
 open Routing
 open ARCtrl
@@ -105,32 +104,6 @@ type SettingsDataStewardMsg =
 
 type TopLevelMsg =
     | CloseSuggestions
-
-type Model = {
-    ///PageState
-    PageState                   : PageState
-    ///Data that needs to be persistent once loaded
-    PersistentStorageState      : PersistentStorageState
-    ///Error handling, Logging, etc.
-    DevState                    : DevState
-    ///States regarding term search
-    TermSearchState             : TermSearch.Model
-    ///Use this in the future to model excel stuff like table data
-    ExcelState                  : OfficeInterop.Model
-    ///States regarding File picker functionality
-    FilePickerState             : FilePicker.Model
-    ProtocolState               : Protocol.Model
-    ///Insert annotation columns
-    AddBuildingBlockState       : BuildingBlock.Model
-    ///Used to show selected building block information
-    BuildingBlockDetailsState   : BuildingBlockDetailsState
-    CytoscapeModel              : Cytoscape.Model
-    /// Contains all information about spreadsheet view
-    SpreadsheetModel            : Spreadsheet.Model
-    History                     : LocalHistory.Model
-} with
-    member this.updateByExcelState (s:OfficeInterop.Model) =
-        { this with ExcelState = s}
 
 type Msg =
 | DevMsg                of DevMsg

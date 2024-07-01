@@ -25,10 +25,8 @@
         <Compile Include="Api.fs" />
         <Compile Include="Routing.fs" />
         <Compile Include="OfficeInterop\InteropLogging.fs" />
-        <Compile Include="OfficeInterop\CustomXmlTypes.fs" />
         <Compile Include="OfficeInterop\Functions\Indexing.fs" />
         <Compile Include="OfficeInterop\Functions\BuildingBlockFunctions.fs" />
-        <Compile Include="OfficeInterop\Functions\CustomXmlFunctions.fs" />
         <Compile Include="OfficeInterop\HelperFunctions.fs" />
         <Compile Include="OfficeInterop\OfficeInterop.fs" />
         <Compile Include="States\ARCitect.fs" />
@@ -94,7 +92,7 @@
         <Compile Include="MainComponents\Metadata\Assay.fs" />
         <Compile Include="MainComponents\Metadata\Study.fs" />
         <Compile Include="MainComponents\Metadata\Investigation.fs" />
-        <Compile Include="MainComponents\NoTablesElement.fs" />
+        <Compile Include="MainComponents\NoFileElement.fs" />
         <Compile Include="MainComponents\ContextMenu.fs" />
         <Compile Include="MainComponents\Cells.fs" />
         <Compile Include="MainComponents\KeyboardShortcuts.fs" />

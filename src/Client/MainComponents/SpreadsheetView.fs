@@ -8,6 +8,7 @@ open Messages
 open Spreadsheet.Cells
 open ARCtrl
 open Shared
+open Model
 
 let private cellPlaceholder (c_opt: CompositeCell option) =
     let tableCell (children: ReactElement list) = Html.td [

@@ -1,13 +1,14 @@
-﻿module MainComponents.Metadata.Assay
+module MainComponents.Metadata.Assay
 
 open Feliz
 open Feliz.Bulma
 open Messages
 open ARCtrl
 open Shared
+open Model
 
 [<ReactComponent>]
-let Main(assay: ArcAssay, model: Messages.Model, dispatch: Msg -> unit) = 
+let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) = 
     Bulma.section [
         FormComponents.TextInput (
             assay.Identifier,

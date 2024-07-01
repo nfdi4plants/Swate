@@ -3,14 +3,14 @@ module TermSearch
 open Fable.React
 open Fable.React.Props
 open ExcelColors
-open Model
 open Messages
 open Shared
 open TermTypes
 open CustomComponents
 open Elmish
-
 open TermSearch
+open Model
+
 
 let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : TermSearch.Model * Cmd<Messages.Msg> =
     match termSearchMsg with
@@ -26,7 +26,7 @@ open ARCtrl
 open Fable.Core.JsInterop
 
 /// "Fill selected cells with this term" - button //
-let private addButton (model: Messages.Model, dispatch) =
+let private addButton (model: Model, dispatch) =
 
     // For some reason columns seem to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
     // It would not be full width. This results in the need to remove padding left/right for Column.column childs.
@@ -97,7 +97,7 @@ let private addButton (model: Messages.Model, dispatch) =
     ]
 
 [<ReactComponent>]
-let Main (model:Messages.Model, dispatch) =
+let Main (model:Model, dispatch) =
     let setTerm = fun (term: OntologyAnnotation option) -> TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
     div [
         OnSubmit    (fun e -> e.preventDefault())

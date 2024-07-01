@@ -1,7 +1,6 @@
 namespace SpreadsheetInterface
 
 open Shared
-open OfficeInteropTypes
 
 open ARCtrl
 

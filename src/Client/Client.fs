@@ -3,12 +3,10 @@ module Client
 open Elmish.Navigation
 open Elmish.UrlParser
 open Elmish
-open Elmish.React
-open Fable.React
 open Messages
+open Model
 open Update
 open Fable.Core.JsInterop
-open Routing
 let _ = importSideEffects "./style.scss"
 
 ///<summary> This is a basic test case used in Client unit tests </summary>
@@ -46,7 +44,7 @@ let View (model : Model) (dispatch : Msg -> unit) =
         ]
     )
             
-let ARCitect_subscription (initial: Messages.Model) : (SubId * Subscribe<Messages.Msg>) list =
+let ARCitect_subscription (initial: Model) : (SubId * Subscribe<Messages.Msg>) list =
     let subscription (dispatch: Messages.Msg -> unit) : System.IDisposable =
         let rmv = ARCitect.Interop.initEventListener (ARCitect.ARCitect.EventHandler dispatch)
         { new System.IDisposable with

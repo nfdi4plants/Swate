@@ -182,7 +182,7 @@ module Modals.EditColumn
 //    ]
 
 //[<ReactComponent>]
-//let Main (columnIndex: int) (model: Messages.Model) (dispatch) (rmv: _ -> unit) =
+//let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
 //    let column : (int*SwateCell) [] = model.SpreadsheetModel.getColumn(columnIndex)
 //    let header = column |> Array.sortBy fst |> Array.head |> snd |> fun header -> header.Header
 //    let last = EditState.init(header)

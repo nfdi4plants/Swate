@@ -2,6 +2,7 @@ module NotFoundView
 
 open Fable.React
 open Messages
+open Model
 
 let notFoundComponent (model:Model) (dispatch:Msg -> unit) =
     div [] [

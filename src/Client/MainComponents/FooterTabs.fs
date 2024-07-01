@@ -3,6 +3,7 @@ module MainComponents.FooterTabs
 open Feliz
 open Feliz.Bulma
 open ARCtrl
+open Model
 
 type private FooterTab = {
     IsEditable: bool
@@ -95,7 +96,7 @@ let private dragleave_handler(state, setState) = fun (e: Browser.Types.DragEvent
     setState {state with IsDraggedOver = false}
 
 [<ReactComponent>]
-let Main (index: int, tables: ArcTables, model: Messages.Model, dispatch: Messages.Msg -> unit) =
+let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg -> unit) =
     let table = tables.GetTableAt(index)
     let state, setState = React.useState(FooterTab.init(table.Name))
     let id = $"ReorderMe_{index}_{table.Name}"
@@ -161,7 +162,7 @@ let Main (index: int, tables: ArcTables, model: Messages.Model, dispatch: Messag
     ]
 
 [<ReactComponent>]
-let MainMetadata(model: Messages.Model, dispatch: Messages.Msg -> unit) =
+let MainMetadata(model: Model, dispatch: Messages.Msg -> unit) =
     let order = 0
     let id = "Metadata-Tab"
     let nav = Spreadsheet.ActiveView.Metadata
@@ -177,7 +178,7 @@ let MainMetadata(model: Messages.Model, dispatch: Messages.Msg -> unit) =
     ]
 
 [<ReactComponent>]
-let MainPlus(model: Messages.Model, dispatch: Messages.Msg -> unit) =
+let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
     let state, setState = React.useState(FooterTab.init())
     let order = System.Int32.MaxValue-1 // MaxValue will be sidebar toggle
     let id = "Add-Spreadsheet-Button"
@@ -206,7 +207,7 @@ let MainPlus(model: Messages.Model, dispatch: Messages.Msg -> unit) =
         ]
     ]
 
-let ToggleSidebar(model: Messages.Model, dispatch: Messages.Msg -> unit) =
+let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
     let show = model.PersistentStorageState.ShowSideBar
     let order = System.Int32.MaxValue
     let id = "Toggle-Sidebar-Button"

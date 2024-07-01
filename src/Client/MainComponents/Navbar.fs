@@ -8,6 +8,7 @@ open LocalHistory
 open Messages
 open Components.QuickAccessButton
 open MainComponents
+open Model
 
 let private quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     Html.div [
@@ -112,7 +113,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
 
 
 [<ReactComponent>]
-let Main(model: Messages.Model, dispatch, widgets, setWidgets) =
+let Main(model: Model, dispatch, widgets, setWidgets) =
     let addWidget (widget: Widget) = 
         let add (widget) widgets = widget::widgets |> List.rev |> setWidgets
         if widgets |> List.contains widget then 

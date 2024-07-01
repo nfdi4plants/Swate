@@ -212,7 +212,7 @@ module ComponentAux =
 
     open Fable.Core.JsInterop
 
-    let communitySelectField (model: Messages.Model) (state: TemplateFilterConfig) setState =
+    let communitySelectField (model: Model) (state: TemplateFilterConfig) setState =
         let communityNames = 
             model.ProtocolState.Templates 
             |> Array.choose (fun t -> Model.Protocol.CommunityFilter.CommunityFromOrganisation t.Organisation) 
@@ -421,7 +421,7 @@ module ComponentAux =
             ]
         ]
 
-    let RefreshButton (model:Messages.Model) dispatch =
+    let RefreshButton (model:Model) dispatch =
         Bulma.button.button [
             Bulma.button.isSmall
             prop.onClick (fun _ -> Messages.Protocol.GetAllProtocolsForceRequest |> ProtocolMsg |> dispatch)

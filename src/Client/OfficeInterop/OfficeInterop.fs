@@ -379,61 +379,6 @@ let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
         // return message
         [InteropLogging.Msg.create InteropLogging.Info "Autoformat Table"]
     )
-    
-/// <summary>This is currently used to get information about the table for the table validation feature.</summary>
-let getTableRepresentation() =
-    Excel.run(fun context ->
-
-        promise {
-
-            let! annotationTable = getActiveAnnotationTableName(context)
-
-            // Ref. 2
-            let! buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context annotationTable
-
-            let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-            let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
-
-            let! xmlParsed = getCustomXml customXmlParts context
-            let currentTableValidation = CustomXmlFunctions.Validation.getSwateValidationForCurrentTable annotationTable xmlParsed
-
-            // This function updates the current SwateValidation xml with all found building blocks.
-            let updateCurrentTableValidationXml =
-                // We start by transforming all building blocks into ColumnValidations
-                let existingBuildingBlocks = buildingBlocks |> Array.map (fun buildingBlock -> CustomXmlTypes.Validation.ColumnValidation.ofBuildingBlock buildingBlock)
-                // Map over all newColumnValidations and see if they exist in the currentTableValidation xml. If they do, then update them by their validation parameters.
-                let updateTableValidation =
-                    // Check if a TableValidation for the active table AND worksheet exists, else return the newly build colValidations.
-                    if currentTableValidation.IsSome then
-                        let updatedNewColumnValidations =
-                            existingBuildingBlocks
-                            |> Array.map (fun newColVal ->
-                                let tryFindCurrentColVal = currentTableValidation.Value.ColumnValidations |> List.tryFind (fun x -> x.ColumnHeader = newColVal.ColumnHeader)
-                                if tryFindCurrentColVal.IsSome then
-                                    {newColVal with
-                                        Importance = tryFindCurrentColVal.Value.Importance
-                                        ValidationFormat = tryFindCurrentColVal.Value.ValidationFormat
-                                    }
-                                else
-                                    newColVal
-                            )
-                            |> List.ofArray
-                        // Update TableValidation with updated ColumnValidations
-                        {currentTableValidation.Value with
-                            ColumnValidations = updatedNewColumnValidations}
-                    else
-                        // Should no current TableValidation xml exist, create a new one
-                        CustomXmlTypes.Validation.TableValidation.create
-                            ""
-                            annotationTable
-                            (System.DateTime.Now.ToUniversalTime())
-                            []
-                            (List.ofArray existingBuildingBlocks)
-                updateTableValidation
-
-            return updateCurrentTableValidationXml, buildingBlocks
-        }
-    )
 
 let getBuildingBlocksAndSheet() =
     Excel.run(fun context ->
@@ -1693,52 +1638,6 @@ let updateSwateCustomXml(newXmlString:String) =
                 )
 
             return "Info", "Custom xml update successful" 
-        }
-    )
-
-let writeTableValidationToXml(tableValidation:CustomXmlTypes.Validation.TableValidation,currentSwateVersion:string) =
-    Excel.run(fun context ->
-
-        // Update DateTime 
-        let newTableValidation = {
-            tableValidation with
-                // This line is used to give freshly created TableValidations the current Swate Version
-                SwateVersion = currentSwateVersion
-                DateTime = System.DateTime.Now.ToUniversalTime()
-            }
-
-        // The first part accesses current CustomXml
-        let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
-        let customXmlParts = workbook.customXmlParts.load (propertyNames = U2.Case2 (ResizeArray[|"items"|]))
-    
-        promise {
-    
-            let! xmlParsed = getCustomXml customXmlParts context
-    
-            let nextCustomXml = CustomXmlFunctions.Validation.updateSwateValidation newTableValidation xmlParsed
-
-            let nextCustomXmlString = nextCustomXml |> Fable.SimpleXml.Generator.ofXmlElement |> Fable.SimpleXml.Generator.serializeXml
-                        
-            let! deleteXml =
-                context.sync().``then``(fun e ->
-                    let items = customXmlParts.items
-                    let xmls = items |> Seq.map (fun x -> x.delete() )
-    
-                    xmls |> Array.ofSeq
-                )
-    
-            let! addNext =
-                context.sync().``then``(fun e ->
-                    customXmlParts.add(nextCustomXmlString)
-                )
-
-            // This will be displayed in activity log
-            return
-                "Info",
-                sprintf
-                    "Update Validation Scheme with '%s' @%s"
-                    newTableValidation.AnnotationTable
-                    ( newTableValidation.DateTime.ToString("yyyy-MM-dd HH:mm") )
         }
     )
 

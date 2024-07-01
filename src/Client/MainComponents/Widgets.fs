@@ -3,7 +3,6 @@ namespace MainComponents
 open Feliz
 open Feliz.Bulma
 open Browser.Types
-
 open LocalStorage.Widgets
 
 module private InitExtensions =
@@ -26,6 +25,7 @@ open InitExtensions
 open Fable.Core
 open Fable.Core.JsInterop
 open Protocol
+open Model
 
 module private MoveEventListener =
 
@@ -202,7 +202,7 @@ type Widget =
         
 
     [<ReactComponent>]
-    static member Templates (model: Messages.Model, dispatch, rmv: MouseEvent -> unit) =
+    static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
         let templates, setTemplates = React.useState(model.ProtocolState.Templates)
         let config, setConfig = React.useState(TemplateFilterConfig.init)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)

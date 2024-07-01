@@ -3,13 +3,13 @@ namespace Update
 open Elmish
 
 open Messages
-open Model
 open OfficeInterop
 open Shared
 open OfficeInteropTypes
+open Model
 
 module OfficeInterop = 
-    let update (model:Messages.Model) (msg: OfficeInterop.Msg) : Messages.Model * Cmd<Messages.Msg> =
+    let update (state: OfficeInterop.Model) (model:Model) (msg: OfficeInterop.Msg) : OfficeInterop.Model * Model * Cmd<Messages.Msg> =
 
         match msg with
 
@@ -21,7 +21,7 @@ module OfficeInterop =
                     ()
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
 
         | TryFindAnnotationTable ->
             let cmd =
@@ -30,7 +30,7 @@ module OfficeInterop =
                     ()
                     (OfficeInterop.AnnotationTableExists >> OfficeInteropMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
         | AnnotationTableExists annoTableOpt ->
             let exists =
                 match annoTableOpt with
@@ -40,7 +40,7 @@ module OfficeInterop =
                 model.ExcelState with
                     HasAnnotationTable = exists
             }
-            model.updateByExcelState nextState,Cmd.none
+            nextState, model, Cmd.none
 
         | InsertOntologyTerm (term) ->
             let cmd =
@@ -49,7 +49,7 @@ module OfficeInterop =
                     term
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
 
         | AddAnnotationBlock (minBuildingBlockInfo) ->
             let cmd =
@@ -58,7 +58,7 @@ module OfficeInterop =
                     (minBuildingBlockInfo)
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
 
         | AddAnnotationBlocks minBuildingBlockInfos ->
             let cmd =
@@ -67,7 +67,7 @@ module OfficeInterop =
                     minBuildingBlockInfos
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
 
         | ImportFile buildingBlockTables ->
             let nextCmd =
@@ -76,7 +76,7 @@ module OfficeInterop =
                     buildingBlockTables
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, nextCmd
+            state, model, nextCmd
 
         | RemoveBuildingBlock ->
             let cmd =
@@ -85,7 +85,7 @@ module OfficeInterop =
                     ()
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
 
         | UpdateUnitForCells (unitTerm) ->
             let cmd =
@@ -94,7 +94,7 @@ module OfficeInterop =
                     unitTerm
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
 
         | CreateAnnotationTable(tryUsePrevOutput) ->
             let cmd =
@@ -103,14 +103,14 @@ module OfficeInterop =
                     (false,tryUsePrevOutput)
                     (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model,cmd
+            state, model,cmd
 
         | AnnotationtableCreated ->
             let nextState = {
                 model.ExcelState with
                     HasAnnotationTable = true
             }
-            model.updateByExcelState nextState, Cmd.none
+            nextState, model, Cmd.none
 
 
         | GetParentTerm ->
@@ -120,7 +120,7 @@ module OfficeInterop =
                     ()
                     (fun tmin -> tmin |> Option.map (fun t -> ARCtrl.OntologyAnnotation.fromTerm t.toTerm) |> TermSearch.UpdateParentTerm |> TermSearchMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
         //
         | FillHiddenColsRequest ->
             failwith "FillHiddenColsRequest Not implemented yet"
@@ -141,7 +141,7 @@ module OfficeInterop =
             //        (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
             //let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
             //let cmds = Cmd.batch [cmd; stateCmd]
-            model, Cmd.none
+            state, model, Cmd.none
 
         | FillHiddenColumns (termsWithSearchResult) ->
             let nextState = {
@@ -154,7 +154,7 @@ module OfficeInterop =
                     (termsWithSearchResult)
                     (curry GenericInteropLogs (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                     (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
-            model.updateByExcelState nextState, cmd
+            nextState, model, cmd
 
 
         | UpdateFillHiddenColsState newState ->
@@ -162,7 +162,7 @@ module OfficeInterop =
                 model.ExcelState with
                     FillHiddenColsStateStore = newState
             }
-            model.updateByExcelState nextState, Cmd.none
+            nextState, model, Cmd.none
         //
         | InsertFileNames (fileNameList) ->
             let cmd = 
@@ -171,7 +171,7 @@ module OfficeInterop =
                     (fileNameList)
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
 
         //
         | GetSelectedBuildingBlockTerms ->
@@ -187,7 +187,7 @@ module OfficeInterop =
                         ]
                     )
                     (curry GenericError (UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails |> Cmd.ofMsg) >> DevMsg)
-            model, cmd
+            state, model, cmd
 
         // DEV
         | TryExcel  ->
@@ -197,7 +197,7 @@ module OfficeInterop =
                     ()
                     ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
         | TryExcel2 ->
             let cmd = 
                 Cmd.OfPromise.either
@@ -205,7 +205,7 @@ module OfficeInterop =
                     ()
                     ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+            state, model, cmd
         //| _ ->
         //    printfn "Hit currently non existing message"
         //    currentState, Cmd.none

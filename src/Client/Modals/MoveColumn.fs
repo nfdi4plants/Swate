@@ -55,7 +55,7 @@ type MoveColumn =
         ]
 
     [<ReactComponent>]
-    static member Main (columnIndex: int, model: Messages.Model, dispatch) (rmv: _ -> unit) =
+    static member Main (columnIndex: int, model: Model, dispatch) (rmv: _ -> unit) =
         let table = model.SpreadsheetModel.ActiveTable
         let state, setState = React.useState(Array.ofSeq table.Headers)
         let index, setIndex = React.useState(columnIndex)

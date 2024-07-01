@@ -5,8 +5,9 @@ open Feliz.Bulma
 open Messages
 open ARCtrl
 open Shared
+open Model
 
-let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Messages.Model, dispatch: Msg -> unit) = 
+let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch: Msg -> unit) = 
     Bulma.section [ 
         FormComponents.TextInput (
             study.Identifier,

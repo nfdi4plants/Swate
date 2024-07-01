@@ -14,7 +14,7 @@ open Messages
 open ARCtrl
 open BuildingBlock.Helper
 
-let private termOrUnitizedSwitch (model:Messages.Model) dispatch =
+let private termOrUnitizedSwitch (model:Model) dispatch =
         
     let state = model.AddBuildingBlockState
     Bulma.buttons [
@@ -41,7 +41,7 @@ let private termOrUnitizedSwitch (model:Messages.Model) dispatch =
 open Fable.Core
 
 [<ReactComponent>]
-let private SearchBuildingBlockBodyElement (model: Messages.Model, dispatch) =
+let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
     let element = React.useElementRef()
     
     Bulma.field.div [

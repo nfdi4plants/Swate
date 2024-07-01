@@ -9,6 +9,7 @@ open Messages
 open Shared
 open ARCtrl
 open Components
+open Model
 
 module private CellComponents =
 
@@ -106,7 +107,7 @@ module private EventPresets =
 
     open Shared
 
-    let onClickSelect (index: int*int, isIdle:bool, selectedCells: Set<int*int>, model:Messages.Model, dispatch)=
+    let onClickSelect (index: int*int, isIdle:bool, selectedCells: Set<int*int>, model:Model, dispatch)=
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
             if isIdle then

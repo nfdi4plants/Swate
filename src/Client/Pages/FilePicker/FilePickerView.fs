@@ -30,7 +30,7 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
         }
         nextState, Cmd.none
 
-let uploadButton (model:Messages.Model) dispatch =
+let uploadButton (model:Model) dispatch =
     let inputId = "filePicker_OnFilePickerMainFunc"
     Bulma.field.div [
         Html.input [
@@ -89,7 +89,7 @@ let uploadButton (model:Messages.Model) dispatch =
                 ]
     ]
 
-let insertButton (model:Messages.Model) dispatch =
+let insertButton (model:Model) dispatch =
     Bulma.field.div [
         Bulma.button.button [
             Bulma.color.isSuccess
@@ -110,7 +110,7 @@ let sortButton icon msg =
         ]
     ]
 
-let fileSortElements (model:Messages.Model) dispatch =
+let fileSortElements (model:Model) dispatch =
     Bulma.field.div [
         Bulma.buttons [
             //Bulma.button.a [
@@ -227,7 +227,7 @@ module FileNameTable =
         ]
         
 
-    let table (model:Messages.Model) dispatch =
+    let table (model:Model) dispatch =
         Bulma.table [
             Bulma.table.isHoverable
             Bulma.table.isStriped
@@ -246,7 +246,7 @@ module FileNameTable =
         ]
         
 
-let fileContainer (model:Messages.Model) dispatch =
+let fileContainer (model:Model) dispatch =
     mainFunctionContainer [
 
         uploadButton model dispatch
@@ -259,7 +259,7 @@ let fileContainer (model:Messages.Model) dispatch =
             insertButton model dispatch
     ]
 
-let filePickerComponent (model:Messages.Model) (dispatch:Messages.Msg -> unit) =
+let filePickerComponent (model:Model) (dispatch:Messages.Msg -> unit) =
     Bulma.content [
         pageHeader "File Picker"
 

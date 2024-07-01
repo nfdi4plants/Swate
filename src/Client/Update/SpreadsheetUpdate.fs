@@ -35,7 +35,7 @@ module Spreadsheet =
         /// Can return save information to local storage (persistent between browser sessions) and session storage.
         /// It works based of exlusion. As it specifies certain messages not triggering history update.
         /// </summary>
-        let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Messages.Model, cmd) =
+        let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
             match msg with
             | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ 
             | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected -> 
@@ -55,7 +55,7 @@ module Spreadsheet =
                     | _ -> ()
                 state, {model with History = nextHistory}, cmd
 
-    let update (state: Spreadsheet.Model) (model: Messages.Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Messages.Model * Cmd<Messages.Msg> =
+    let update (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Model * Cmd<Messages.Msg> =
 
         //let createPromiseCmd (func: unit -> Spreadsheet.Model) =
         //    let nextState() = promise {
@@ -70,7 +70,7 @@ module Spreadsheet =
         //let newHistoryController (state, model, cmd) =
         //    updateSessionStorageMsg msg, model 
 
-        let innerUpdate (state: Spreadsheet.Model) (model: Messages.Model) (msg: Spreadsheet.Msg) =
+        let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
             | UpdateState nextState ->
                 nextState, model, Cmd.none

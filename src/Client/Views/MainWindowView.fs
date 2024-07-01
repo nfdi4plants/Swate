@@ -7,6 +7,7 @@ open Shared
 open MainComponents
 open Shared
 open Fable.Core.JsInterop
+open Model
 
 let private WidgetOrderContainer bringWidgetToFront (widget) =
     Html.div [
@@ -26,7 +27,7 @@ let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactEl
             for widget in widgets do displayWidget widget
         ]
 
-let private SpreadsheetSelectionFooter (model: Messages.Model) dispatch =
+let private SpreadsheetSelectionFooter (model: Model) dispatch =
     Html.div [
         prop.style [
             style.position.sticky;
@@ -60,7 +61,7 @@ let private SpreadsheetSelectionFooter (model: Messages.Model) dispatch =
 open Shared
 
 [<ReactComponent>]
-let Main (model: Messages.Model, dispatch) =
+let Main (model: Model, dispatch) =
     let widgets, setWidgets = React.useState([])
     let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
     let bringWidgetToFront (widget: Widget) = 
@@ -101,7 +102,7 @@ let Main (model: Messages.Model, dispatch) =
                     //
                     match state.ArcFile with
                     | None ->
-                        MainComponents.NoTablesElement.Main {|dispatch = dispatch|}
+                        MainComponents.NoFileElement.Main {|dispatch = dispatch|}
                     | Some (ArcFiles.Assay _) 
                     | Some (ArcFiles.Study _)
                     | Some (ArcFiles.Investigation _) 

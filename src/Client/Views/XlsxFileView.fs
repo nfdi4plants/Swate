@@ -5,9 +5,10 @@ open Feliz.Bulma
 open Messages
 open Spreadsheet
 open Shared
+open Model
 
 [<ReactComponentAttribute>]
-let Main(model: Messages.Model, dispatch: Messages.Msg -> unit, openBuildingBlockWidget, openTemplateWidget) = 
+let Main(model: Model, dispatch: Messages.Msg -> unit, openBuildingBlockWidget, openTemplateWidget) = 
     match model.SpreadsheetModel.ActiveView with
     | ActiveView.Table _ ->
         match model.SpreadsheetModel.ActiveTable.ColumnCount with

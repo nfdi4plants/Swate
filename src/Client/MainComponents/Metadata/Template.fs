@@ -1,4 +1,4 @@
-﻿module MainComponents.Metadata.Template
+module MainComponents.Metadata.Template
 
 open Feliz
 open Feliz.Bulma
@@ -10,9 +10,10 @@ open Fable.Core.JsInterop
 open ARCtrl
 open Shared
 open ARCtrl.Template
+open Model
 
 
-let Main(template: Template, model: Messages.Model, dispatch: Msg -> unit) = 
+let Main(template: Template, model: Model, dispatch: Msg -> unit) = 
     Bulma.section [
         FormComponents.GUIDInput (
             template.Id,

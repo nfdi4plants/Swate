@@ -100,7 +100,7 @@ type TemplateFromFile =
         ]
 
     [<ReactComponent>]
-    static member Main(model: Messages.Model, dispatch) =
+    static member Main(model: Model, dispatch) =
         let state, setState = React.useState(TemplateFromFileState.init)
         let af = React.useRef (
             let a = ArcAssay.init("My Assay")

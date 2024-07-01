@@ -242,7 +242,7 @@ let download(filename, text) =
 //        ]
 //    ]
 
-//let jsonExporterMainElement (model:Messages.Model) (dispatch: Messages.Msg -> unit) =
+//let jsonExporterMainElement (model:Model) (dispatch: Messages.Msg -> unit) =
     
     //Bulma.content [
         
@@ -287,7 +287,6 @@ type private JsonExportState = {
 
 type FileExporter =
 
-    
     static member private FileFormat(efm: JsonExportFormat, state: JsonExportState, setState) =
         let isSelected = efm = state.ExportFormat
         Html.option [
@@ -296,7 +295,7 @@ type FileExporter =
         ]
 
     [<ReactComponent>]
-    static member JsonExport(model: Messages.Model, dispatch) =
+    static member JsonExport(model: Model, dispatch) =
         let state, setState = React.useState JsonExportState.init
         Html.div [
             Bulma.field.div [
@@ -340,7 +339,7 @@ type FileExporter =
             ]
         ]
 
-    static member Main(model:Messages.Model, dispatch: Messages.Msg -> unit) =
+    static member Main(model:Model, dispatch: Messages.Msg -> unit) =
         Html.div [
             pageHeader "File Export"
 

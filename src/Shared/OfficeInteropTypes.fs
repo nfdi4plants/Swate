@@ -3,6 +3,7 @@ namespace Shared
 open System
 open ARCtrl
 
+[<Obsolete>]
 module OfficeInteropTypes =
 
     open Shared.TermTypes

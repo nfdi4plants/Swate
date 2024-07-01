@@ -9,8 +9,9 @@ open Browser.Types
 open Fable.Core.JsInterop
 open ARCtrl
 open Shared
+open Model
 
-let Main(inv: ArcInvestigation, model: Messages.Model, dispatch: Msg -> unit) = 
+let Main(inv: ArcInvestigation, model: Model, dispatch: Msg -> unit) = 
     Bulma.section [ 
         FormComponents.TextInput (
             inv.Identifier,

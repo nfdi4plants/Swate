@@ -57,7 +57,7 @@ module private ExcelHelper =
 
 module Interface =
 
-    let update (model: Messages.Model) (msg: SpreadsheetInterface.Msg) : Messages.Model * Cmd<Messages.Msg> =
+    let update (model: Model) (msg: SpreadsheetInterface.Msg) : Model * Cmd<Messages.Msg> =
         let host = model.PersistentStorageState.Host
         match msg with
         // This is very bloated, might be good to reduce

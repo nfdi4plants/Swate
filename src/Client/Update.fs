@@ -8,8 +8,8 @@ open Shared
 open TermTypes
 open OfficeInteropTypes
 open Routing
-open Model
 open Messages
+open Model
 
 let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.Msg> =
     match route with
@@ -17,29 +17,29 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.
         let swatehost = Swatehost.ofQueryParam queryIntegerOption
         let nextModel = {
             currentModel with 
-                Messages.Model.PageState.CurrentPage = Route.BuildingBlock
-                Messages.Model.PageState.IsExpert = false
-                Messages.Model.PersistentStorageState.Host = Some swatehost
+                Model.PageState.CurrentPage = Route.BuildingBlock
+                Model.PageState.IsExpert = false
+                Model.PersistentStorageState.Host = Some swatehost
         }
         nextModel,Cmd.none
     | Some page ->
         let nextModel = {
             currentModel with 
-                Messages.Model.PageState.CurrentPage = page
-                Messages.Model.PageState.IsExpert = page.isExpert
+                Model.PageState.CurrentPage = page
+                Model.PageState.IsExpert = page.isExpert
         }
         nextModel,Cmd.none
     | None ->
         let nextModel = {
             currentModel with 
-                Messages.Model.PageState.CurrentPage = Route.BuildingBlock
-                Messages.Model.PageState.IsExpert = false
+                Model.PageState.CurrentPage = Route.BuildingBlock
+                Model.PageState.IsExpert = false
         }
         nextModel,Cmd.none
 
 module AdvancedSearch =
 
-    let update (msg: AdvancedSearch.Msg) (model:Messages.Model) : Messages.Model * Cmd<Messages.Msg> =
+    let update (msg: AdvancedSearch.Msg) (model:Model) : Model * Cmd<Messages.Msg> =
         match msg with
         | AdvancedSearch.GetSearchResults content -> 
             let cmd =
@@ -245,7 +245,8 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             nextModel, cmd
 
         | OfficeInteropMsg excelMsg ->
-            let nextModel,nextCmd = Update.OfficeInterop.update currentModel excelMsg
+            let nextState,nextModel0,nextCmd = Update.OfficeInterop.update model.ExcelState currentModel excelMsg
+            let nextModel = {nextModel0 with ExcelState = nextState}
             nextModel,nextCmd
 
         | SpreadsheetMsg msg ->

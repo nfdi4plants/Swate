@@ -1,7 +1,6 @@
 namespace Spreadsheet
 
 open Shared
-open OfficeInteropTypes
 open ARCtrl
 open Fable.Core
 

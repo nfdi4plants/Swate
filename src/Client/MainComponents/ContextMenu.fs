@@ -4,7 +4,7 @@ open Feliz
 open Feliz.Bulma
 open Spreadsheet
 open ARCtrl
-open Messages
+open Model
 
 type private ContextFunctions = {
     DeleteRow       : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit

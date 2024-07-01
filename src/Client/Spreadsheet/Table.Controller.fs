@@ -2,7 +2,6 @@ module Spreadsheet.Table.Controller
 
 open System.Collections.Generic
 open Shared.TermTypes
-open Shared.OfficeInteropTypes
 open Spreadsheet
 open Types
 open ARCtrl

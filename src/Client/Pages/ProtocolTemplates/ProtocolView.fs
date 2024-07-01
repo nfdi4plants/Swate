@@ -22,7 +22,7 @@ open Feliz.Bulma
 
 type Templates =
 
-    static member Main (model:Messages.Model, dispatch) =
+    static member Main (model:Model, dispatch) =
         div [ 
             OnSubmit (fun e -> e.preventDefault())
             // https://keycode.info/

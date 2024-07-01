@@ -3,6 +3,7 @@ namespace Protocol
 open Feliz
 open Feliz.Bulma
 open Messages
+open Model
 open Shared
 
 type TemplateFromDB =
@@ -15,7 +16,7 @@ type TemplateFromDB =
             prop.style [style.margin (length.rem 1, length.px 0)]
             prop.text "Browse database" ]
 
-    static member addFromDBToTableButton (model:Messages.Model) dispatch =
+    static member addFromDBToTableButton (model:Model) dispatch =
         Bulma.columns [
             Bulma.columns.isMobile
             prop.children [
@@ -86,7 +87,7 @@ type TemplateFromDB =
             ]
         ]
 
-    static member Main(model:Messages.Model, dispatch) =
+    static member Main(model:Model, dispatch) =
         mainFunctionContainer [
             Bulma.field.div [
                 Bulma.help [
