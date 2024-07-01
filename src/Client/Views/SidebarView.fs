@@ -163,7 +163,7 @@ type SidebarView =
             JsonExporter.Core.FileExporter.Main(model, dispatch)
 
         | Routing.Route.ProtocolSearch ->
-            Protocol.Search.Main model dispatch
+            Protocol.SearchContainer.Main model dispatch
 
         | Routing.Route.ActivityLog ->
             ActivityLog.activityLogComponent model dispatch
