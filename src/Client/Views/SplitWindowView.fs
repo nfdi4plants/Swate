@@ -101,7 +101,7 @@ open Model
 // https://stackoverflow.com/questions/6219031/how-can-i-resize-a-div-by-dragging-just-one-side-of-it
 /// Splits screen into two parts. Left and right, with a dragbar in between to change size of right side.
 [<ReactComponent>]
-let Main (left:seq<Fable.React.ReactElement>) (right:seq<Fable.React.ReactElement>) (mainModel:Model) (dispatch: Messages.Msg -> unit) =
+let Main (left:seq<ReactElement>) (right:seq<ReactElement>) (mainModel:Model) (dispatch: Messages.Msg -> unit) =
     let (model, setModel) = React.useState(SplitWindow.init)
     let isNotMetadataSheet = not (mainModel.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Metadata)
     React.useEffect(model.WriteToLocalStorage, [|box model|])

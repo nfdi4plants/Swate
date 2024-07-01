@@ -1,10 +1,5 @@
 module FilePicker
 
-open Fable.React
-open Fable.React.Props
-open Fable.Core.JsInterop
-open Thoth.Json
-open Thoth.Elmish
 open ExcelColors
 open Api
 open Model
@@ -233,13 +228,13 @@ module FileNameTable =
             Bulma.table.isStriped
             Bulma.table.isHoverable
             prop.children [
-                tbody [] [
+                Html.tbody [
                     for index,fileName in model.FilePickerState.FileNames do
                         Html.tr [
-                            td [] [b [] [str $"{index}"]]
-                            td [] [str fileName]
-                            td [] [moveButtonList (index,fileName) model dispatch]
-                            td [Style [TextAlign TextAlignOptions.Right]] [deleteFromTable (index,fileName) model dispatch]
+                            Html.td [Html.b $"{index}"]
+                            Html.td fileName
+                            Html.td [moveButtonList (index,fileName) model dispatch]
+                            Html.td [prop.style [style.textAlign.right]; prop.children [deleteFromTable (index,fileName) model dispatch]]
                         ]
                 ]
             ]

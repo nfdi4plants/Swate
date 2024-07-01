@@ -76,8 +76,6 @@ let exampleExcelFunction2 () =
                 tableNames
             )
 
-            let! xmlParsed = getCustomXml customXmlParts context
-
             //let tableValidations = getAllSwateTableValidation xmlParsed
             
             return (sprintf "%A"  allTables)

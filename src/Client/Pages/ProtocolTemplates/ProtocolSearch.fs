@@ -7,7 +7,7 @@ open Messages
 open Feliz
 open Feliz.Bulma
 
-module private Helper = 
+module private HelperProtocolSearch = 
 
     let breadcrumbEle (model:Model) dispatch =
         Bulma.breadcrumb [
@@ -42,21 +42,22 @@ type SearchContainer =
         React.useEffect((fun _ -> setTemplates model.ProtocolState.Templates), [|box model.ProtocolState.Templates|])
         let isEmpty = model.ProtocolState.Templates |> isNull || model.ProtocolState.Templates |> Array.isEmpty
         let isLoading = model.ProtocolState.Loading
-        div [
-            OnSubmit (fun e -> e.preventDefault())
+        Html.div [
+            prop.onSubmit (fun e -> e.preventDefault())
             // https://keycode.info/
-            OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-        ] [
-            Helper.breadcrumbEle model dispatch
+            prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
+            prop.children [
+                HelperProtocolSearch.breadcrumbEle model dispatch
 
-            if isEmpty && not isLoading then
-                Bulma.help [Bulma.color.isDanger; prop.text "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
+                if isEmpty && not isLoading then
+                    Bulma.help [Bulma.color.isDanger; prop.text "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
 
-            Bulma.label "Search the database for protocol templates."
+                Bulma.label "Search the database for protocol templates."
 
-            mainFunctionContainer [
-                Protocol.Search.InfoField()
-                Protocol.Search.FileSortElement(model, config, setConfig)
-                Protocol.Search.Component (filteredTemplates, model, dispatch)
+                mainFunctionContainer [
+                    Protocol.Search.InfoField()
+                    Protocol.Search.FileSortElement(model, config, setConfig)
+                    Protocol.Search.Component (filteredTemplates, model, dispatch)
+                ]
             ]
         ]

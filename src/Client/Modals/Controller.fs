@@ -1,8 +1,6 @@
 module Modals.Controller
 
-open Fable.React
-open Fable.React.Props
-
+open Feliz
 
 [<Literal>]
 let private ModalContainerId_inner = "modal_inner_"
@@ -17,7 +15,7 @@ let removeModal(name:string) =
 ///<summary>Function to add a modal to the html body of the active document. If an object with the same name exists, it is removed first.</summary>
 ///<param name="name">The name of the modal, this is used for generate an Id for the modal by which it is later identified.</param>
 ///<param name="reactElement">The modal itself with a open parameter which will be the correct remove function for the modal.</param>
-let renderModal(name: string, reactElement: (_ -> unit) -> Fable.React.ReactElement) =
+let renderModal(name: string, reactElement: (_ -> unit) -> ReactElement) =
     let parent = Browser.Dom.document.getElementById("modal-container")
     let id = createId name
     /// check if existing and if so remove

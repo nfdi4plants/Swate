@@ -12,7 +12,6 @@ open Shared
 open TermTypes
 open CustomComponents
 
-open OfficeInteropTypes
 open Elmish
 
 let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
@@ -87,17 +86,17 @@ open Feliz.Bulma
 
 
 let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
-    div [
-        OnSubmit (fun e -> e.preventDefault())
-        // https://keycode.info/
-        OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-    ] [
-        pageHeader "Building Blocks"
+    Html.div [
+        prop.onSubmit (fun e -> e.preventDefault())
+        prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
+        prop.children [
+            pageHeader "Building Blocks"
 
-        // Input forms, etc related to add building block.
-        Bulma.label "Add annotation building blocks (columns) to the annotation table."
-        mainFunctionContainer [
-            SearchComponent.Main model dispatch
+            // Input forms, etc related to add building block.
+            Bulma.label "Add annotation building blocks (columns) to the annotation table."
+            mainFunctionContainer [
+                SearchComponent.Main model dispatch
+            ]
         ]
 
         //match model.PersistentStorageState.Host with

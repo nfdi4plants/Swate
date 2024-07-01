@@ -11,40 +11,41 @@ open Feliz
 open Feliz.Bulma
 
 let responsiveFaElement toggle fa faToggled = 
-    div [Style [
-        Position PositionOptions.Relative
-    ]] [
-        Bulma.icon [ Html.i [
-            prop.style [
-                style.position.absolute
-                style.top 0
-                style.left 0
-                style.display.block
-                style.transitionProperty "opacity 0.25s, transform 0.25s"
-                if toggle then style.opacity 0 else style.opacity 1
-            ]
-            fa
-        ]]
-        Bulma.icon [ Html.i [
-            prop.style [
-                style.position.absolute
-                style.top 0
-                style.left 0
-                style.display.block
-                style.transitionProperty "opacity 0.25s, transform 0.25s"
-                if toggle then style.opacity 1 else style.opacity 0
-                if toggle then style.transform [transform.rotate -180] else style.transform [transform.rotate 0]
-            ]
-            faToggled
-        ]]
-        // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
-        Bulma.icon [ Html.i [
-            prop.style [
-                style.display.block
-                style.opacity 0 
-            ]
-            fa
-        ]]
+    Html.div [
+        prop.style [style.position.relative]
+        prop.children [
+            Bulma.icon [ Html.i [
+                prop.style [
+                    style.position.absolute
+                    style.top 0
+                    style.left 0
+                    style.display.block
+                    style.transitionProperty "opacity 0.25s, transform 0.25s"
+                    if toggle then style.opacity 0 else style.opacity 1
+                ]
+                fa
+            ]]
+            Bulma.icon [ Html.i [
+                prop.style [
+                    style.position.absolute
+                    style.top 0
+                    style.left 0
+                    style.display.block
+                    style.transitionProperty "opacity 0.25s, transform 0.25s"
+                    if toggle then style.opacity 1 else style.opacity 0
+                    if toggle then style.transform [transform.rotate -180] else style.transform [transform.rotate 0]
+                ]
+                faToggled
+            ]]
+            // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
+            Bulma.icon [ Html.i [
+                prop.style [
+                    style.display.block
+                    style.opacity 0 
+                ]
+                fa
+            ]]
+        ]
     ]
 
 let private createTriggeredId id =

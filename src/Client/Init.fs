@@ -6,7 +6,6 @@ open LocalHistory
 open Model
 open Messages
 open Update
-open Thoth.Elmish
 
 let initializeModel () =
     let dt = LocalStorage.Darkmode.DataTheme.GET()

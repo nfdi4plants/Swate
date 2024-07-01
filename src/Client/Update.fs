@@ -2,11 +2,9 @@
 module Update.Update
 
 open Elmish
-open Thoth.Elmish
 
 open Shared
 open TermTypes
-open OfficeInteropTypes
 open Routing
 open Messages
 open Model

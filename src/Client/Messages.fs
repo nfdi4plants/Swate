@@ -2,7 +2,6 @@
 module rec Messages
 
 open Elmish
-open Thoth.Elmish
 open Shared
 open Fable.Remoting.Client
 open Fable.SimpleJson

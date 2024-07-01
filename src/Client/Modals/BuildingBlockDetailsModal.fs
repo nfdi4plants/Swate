@@ -52,15 +52,16 @@ let private rowIndicesToReadable (rowIndices:int []) =
 
 let private infoIcon (txt:string) =
     if txt = "" then
-        str "No defintion found"
+        Html.text "No defintion found"
     else
-        span [
-            Style [Color NFDIColors.Yellow.Base; (*OverflowY OverflowOptions.Visible*)]
-            Class ("has-tooltip-right has-tooltip-multiline")
-            Props.Custom ("data-tooltip", txt)
-        ] [
-            Bulma.icon [
-                Html.i [prop.className "fa-solid fa-circle-info"]
+        Html.span [
+            prop.style [style.color NFDIColors.Yellow.Base]
+            prop.className "has-tooltip-right has-tooltip-multiline"
+            prop.custom("data-tooltip", txt)
+            prop.children [
+                Bulma.icon [
+                    Html.i [prop.className "fa-solid fa-circle-info"]
+                ]
             ]
         ]
 
@@ -72,31 +73,31 @@ let private searchResultTermToTableHeaderElement (term:TermSearchable option) =
     match term with
     | Some isEmpty when isEmpty.Term.Name = "" && isEmpty.Term.TermAccession = "" ->
         Html.tr [
-            th [] [str "-"]
-            th [] [str "-"]
-            th [Style [TextAlign TextAlignOptions.Center]] [str "-"]
-            th [] [str (rowIndicesToReadable isEmpty.RowIndices)]
+            Html.th "-"
+            Html.th "-"
+            Html.th [prop.style [style.textAlign.center]; prop.text "-"]
+            Html.th (rowIndicesToReadable isEmpty.RowIndices)
         ]
     | Some hasResult when hasResult.SearchResultTerm.IsSome ->
         Html.tr [
-            th [] [str hasResult.SearchResultTerm.Value.Name]
-            th [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon hasResult.SearchResultTerm.Value.Description]
-            th [] [str hasResult.SearchResultTerm.Value.Accession]
-            th [] [str (rowIndicesToReadable hasResult.RowIndices)]
+            Html.th hasResult.SearchResultTerm.Value.Name
+            Html.th [prop.style [style.textAlign.center]; prop.children [infoIcon hasResult.SearchResultTerm.Value.Description]]
+            Html.th hasResult.SearchResultTerm.Value.Accession
+            Html.th (rowIndicesToReadable hasResult.RowIndices)
         ]
     | Some hasNoResult when hasNoResult.SearchResultTerm.IsNone ->
         Html.tr [
-            th [ Style [Color NFDIColors.Red.Lighter20] ] [str hasNoResult.Term.Name]
-            th [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon userSpecificTermMsg]
-            th [] [str hasNoResult.Term.TermAccession]
-            th [] [str (rowIndicesToReadable hasNoResult.RowIndices)]
+            Html.th [prop.style [style.color NFDIColors.Red.Lighter20]; prop.text hasNoResult.Term.Name]
+            Html.th [prop.style [style.textAlign.center]; prop.children [infoIcon userSpecificTermMsg]]
+            Html.th hasNoResult.Term.TermAccession
+            Html.th (rowIndicesToReadable hasNoResult.RowIndices)
         ]
     | None ->
         Html.tr [
-            th [] [str "-"]
-            th [] [str "-"]
-            th [] [str "-"]
-            th [] [str "Header"]
+            Html.th "-"
+            Html.th "-"
+            Html.th "-"
+            Html.th "Header"
         ]
     | anythingElse -> failwith $"""Swate encountered an error when trying to parse {anythingElse} to search results."""
 
@@ -106,24 +107,24 @@ let private searchResultTermToTableElement (term:TermSearchable) =
     match term with
     | isEmpty when term.Term.Name = "" && term.Term.TermAccession = "" ->
         Html.tr [
-            td [] [str "-"]
-            td [ Style [TextAlign TextAlignOptions.Center] ] [str "-"]
-            td [] [str "-"]
-            td [] [str (rowIndicesToReadable isEmpty.RowIndices)]
+            Html.td "-"
+            Html.td [prop.style [style.textAlign.center]; prop.text "-"]
+            Html.td "-"
+            Html.td (rowIndicesToReadable isEmpty.RowIndices)
         ]
     | hasResult when term.SearchResultTerm.IsSome ->
         Html.tr [
-            td [] [str hasResult.SearchResultTerm.Value.Name]
-            td [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon hasResult.SearchResultTerm.Value.Description]
-            td [] [str hasResult.SearchResultTerm.Value.Accession]
-            td [] [str (rowIndicesToReadable hasResult.RowIndices)]
+            Html.td hasResult.SearchResultTerm.Value.Name
+            Html.td [prop.style [style.textAlign.center]; prop.children [infoIcon hasResult.SearchResultTerm.Value.Description]]
+            Html.td hasResult.SearchResultTerm.Value.Accession
+            Html.td (rowIndicesToReadable hasResult.RowIndices)
         ]
     | hasNoResult when term.SearchResultTerm.IsNone ->
         Html.tr [
-            td [ Style [Color NFDIColors.Red.Lighter20] ] [str hasNoResult.Term.Name]
-            td [ Style [TextAlign TextAlignOptions.Center] ] [infoIcon userSpecificTermMsg]
-            td [] [str hasNoResult.Term.TermAccession]
-            td [] [str (rowIndicesToReadable hasNoResult.RowIndices)]
+            Html.td [prop.style [style.color NFDIColors.Red.Lighter20]; prop.text hasNoResult.Term.Name]
+            Html.td [prop.style [style.textAlign.center]; prop.children [infoIcon userSpecificTermMsg]]
+            Html.td hasNoResult.Term.TermAccession
+            Html.td (rowIndicesToReadable hasNoResult.RowIndices)
         ]
     | anythingElse -> failwith $"""Swate encountered an error when trying to parse {anythingElse} to search results."""
 
@@ -135,18 +136,18 @@ let private tableElement (terms:TermSearchable []) =
         Bulma.table.isFullWidth
         Bulma.table.isStriped
         prop.children [
-            thead [] [
+            Html.thead [
                 Html.tr [
-                    th [Class "toExcelColor"] [str "Name"]
-                    th [Class "toExcelColor"; Style [TextAlign TextAlignOptions.Center] ] [str "Desc."]
-                    th [Class "toExcelColor"] [str "TAN"]
-                    th [Class "toExcelColor"] [str "Row"]
+                    Html.th [prop.className "toExcelColor"; prop.text "Name"]
+                    Html.th [prop.className "toExcelColor"; prop.style [ style.textAlign.center]; prop.text "Desc."]
+                    Html.th [prop.className "toExcelColor"; prop.text "TAN"]
+                    Html.th [prop.className "toExcelColor"; prop.text "Row"]
                 ]
             ]
-            thead [] [
+            Html.thead [
                 searchResultTermToTableHeaderElement rowHeader
             ]
-            tbody [] [
+            Html.tbody [
                 for term in bodyRows do 
                     yield
                         searchResultTermToTableElement term

@@ -55,7 +55,7 @@ let private shortCutIconList model dispatch =
             "Update Ontology Terms",
             [
                 Html.i [prop.className "fa-solid fa-spell-check"]
-                span [] [str model.ExcelState.FillHiddenColsStateStore.toReadableString]
+                Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
                 Html.i [prop.className "fa-solid fa-pen"]
             ],
             (fun _ -> SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch)
@@ -72,7 +72,7 @@ let private shortCutIconList model dispatch =
             "Get Building Block Information",
             [ 
                 Html.i [prop.className "fa-solid fa-question pr-1"]
-                span [] [str model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg]
+                Html.span model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
             (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
@@ -92,57 +92,57 @@ let private quickAccessDropdownElement model dispatch (state: NavbarState) (setS
         prop.style [ style.padding 0; if isSndNavbar then style.custom("marginLeft", "auto")]
         prop.title (if state.QuickAccessActive then "Close quick access" else "Open quick access")
         prop.children [
-            div [Style [
-                Width "100%"
-                Height "100%"
-                Position PositionOptions.Relative
-            ]] [
-                Bulma.button.a [
-                    prop.style [style.backgroundColor "transparent"; style.height(length.perc 100); if state.QuickAccessActive then style.color NFDIColors.Yellow.Base]
-                    Bulma.color.isWhite
-                    Bulma.button.isInverted
-                    div [Style [
-                        Display DisplayOptions.InlineFlex
-                        Position PositionOptions.Relative
-                        JustifyContent "center"
-                    ]] [
-                        Html.i [
-                            prop.style [
-                                style.position.absolute
-                                style.display.block
-                                style.custom("transition","opacity 0.25s, transform 0.25s")
-                                style.opacity (if state.QuickAccessActive then 1 else 0)
-                                style.transform (if state.QuickAccessActive then [transform.rotate -180] else [transform.rotate 0])
-                            ]
-                            prop.className "fa-solid fa-times"
-                        ]
-                        Html.i [
-                            prop.style [
-                                style.position.absolute
-                                style.display.block
-                                style.custom("transition","opacity 0.25s, transform 0.25s")
-                                style.opacity (if state.QuickAccessActive then 0 else 1)
-                            ]
-                            prop.className "fa-solid fa-ellipsis"
-                        ]
-                        // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
-                        Html.i [
-                            prop.style [
-                                style.display.block
-                                style.opacity 0
-                            ]
-                            prop.className "fa-solid fa-ellipsis"
+            Html.div [
+                prop.style [style.width(length.perc 100); style.height (length.perc 100); style.position.relative]
+                prop.children [
+                    Bulma.button.a [
+                        prop.style [style.backgroundColor "transparent"; style.height(length.perc 100); if state.QuickAccessActive then style.color NFDIColors.Yellow.Base]
+                        Bulma.color.isWhite
+                        Bulma.button.isInverted
+                        prop.children [
+                            Html.div [
+                                prop.style [ style.display.inlineFlex; style.position.relative; style.justifyContent.center]
+                                prop.children [
+                                    Html.i [
+                                        prop.style [
+                                            style.position.absolute
+                                            style.display.block
+                                            style.custom("transition","opacity 0.25s, transform 0.25s")
+                                            style.opacity (if state.QuickAccessActive then 1 else 0)
+                                            style.transform (if state.QuickAccessActive then [transform.rotate -180] else [transform.rotate 0])
+                                        ]
+                                        prop.className "fa-solid fa-times"
+                                    ]
+                                    Html.i [
+                                        prop.style [
+                                            style.position.absolute
+                                            style.display.block
+                                            style.custom("transition","opacity 0.25s, transform 0.25s")
+                                            style.opacity (if state.QuickAccessActive then 0 else 1)
+                                        ]
+                                        prop.className "fa-solid fa-ellipsis"
+                                    ]
+                                    // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
+                                    Html.i [
+                                        prop.style [
+                                            style.display.block
+                                            style.opacity 0
+                                        ]
+                                        prop.className "fa-solid fa-ellipsis"
+                                    ]
+                                ]
+                            ]                            
                         ]
                     ]
-                    |> prop.children
                 ]
             ]
         ]
     ]
 
 let private quickAccessListElement model dispatch =
-    div [Style [Display DisplayOptions.Flex; FlexDirection "row"]] [
-        yield! navbarShortCutIconList model dispatch
+    Html.div [
+        prop.style [style.display.flex; style.flexDirection.row]
+        prop.children (navbarShortCutIconList model dispatch)
     ]
 
 
@@ -192,10 +192,10 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                 prop.ariaExpanded false
                                 prop.style [style.display.block]
                                 prop.children [
-                                    span [AriaHidden true] [ ]
-                                    span [AriaHidden true] [ ]
-                                    span [AriaHidden true] [ ]
-                                    span [AriaHidden true] [ ]
+                                    Html.span [prop.ariaHidden true]
+                                    Html.span [prop.ariaHidden true]
+                                    Html.span [prop.ariaHidden true]
+                                    Html.span [prop.ariaHidden true]
                                 ]
                             ]
                         ]

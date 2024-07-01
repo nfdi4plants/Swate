@@ -6,8 +6,6 @@ open ExcelColors
 open Model
 open Messages
 open Browser
-open Browser.MediaQueryList
-open Browser.MediaQueryListExtensions
 
 open CustomComponents
 open Fable.Core.JsInterop
@@ -109,21 +107,22 @@ module private ResizeObserver =
 
 let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: SidebarStyle) (setState: SidebarStyle -> unit) (children: ReactElement list) =
 
-    div [
-        Id Sidebar_Id
-        OnLoad(fun e ->
+    Html.div [
+        prop.id Sidebar_Id
+        prop.onLoad(fun e ->
             let ele = Browser.Dom.document.getElementById(Sidebar_Id)
             ResizeObserver.observer(state, setState).observe(ele)
         )
-        Style [
-            Display DisplayOptions.Flex
-            FlexGrow "1"
-            FlexDirection "column"
-            Position PositionOptions.Relative
-            MaxWidth "100%"
-            OverflowY OverflowOptions.Auto
+        prop.style [
+            style.display.flex
+            style.flexGrow 1
+            style.flexDirection.column
+            style.position.relative
+            style.maxWidth (length.perc 100)
+            style.overflowY.auto
         ]
-    ] children
+        prop.children children
+    ]
 
 type SidebarView =
 
@@ -136,12 +135,15 @@ type SidebarView =
             }
             |> Async.StartImmediate
         )
-        div [Style [Color "grey"; Position PositionOptions.Sticky; Width "inherit"; Bottom "0"; TextAlign TextAlignOptions.Center ]] [
-            div [] [
-                str "Swate Release Version "
-                a [Href "https://github.com/nfdi4plants/Swate/releases"; HTMLAttr.Target "_Blank"] [str model.PersistentStorageState.AppVersion]
-                str " Host "
-                Html.a [prop.style [style.cursor.defaultCursor] ;prop.text (sprintf "%O" model.PersistentStorageState.Host)]
+        Html.div [
+            prop.style [style.color "grey"; style.position.sticky; style.width.inheritFromParent; style.bottom 0; style.textAlign.center]
+            prop.children [
+                Html.div [
+                    Html.text "Swate Release Version "
+                    Html.a [prop.href "https://github.com/nfdi4plants/Swate/releases"; prop.target.blank; prop.text model.PersistentStorageState.AppVersion]
+                    Html.text " Host "
+                    Html.a [prop.style [style.cursor.defaultCursor]; prop.text (sprintf "%O" model.PersistentStorageState.Host)]
+                ]
             ]
         ]
 

@@ -144,8 +144,8 @@ type TemplateFromFile =
             //Modals.SelectiveImportModal.Main af.current model.SpreadsheetModel dispatch (fun _ -> TemplateFromFileState.init() |> setState)
             Bulma.field.div [
                 Bulma.help [
-                    b [] [str "Import JSON files."]
-                    str " You can use \"Json Export\" to create these files from existing Swate tables. "
+                    Html.b "Import JSON files."
+                    Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
                 ]
             ]
             Bulma.field.div [
