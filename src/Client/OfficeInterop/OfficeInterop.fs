@@ -1,6 +1,5 @@
 module OfficeInterop.Core
 
-open System.Collections.Generic
 open Fable.Core
 open ExcelJS.Fable
 open Excel
@@ -13,6 +12,91 @@ open TermTypes
 open OfficeInterop
 open OfficeInterop.HelperFunctions
 open BuildingBlockFunctions
+
+open ARCtrl
+open ARCtrl.Spreadsheet
+
+module OfficeInteropExtensions =
+
+    open ARCtrl.Spreadsheet.ArcTable
+
+    type ArcTable with
+
+        /// <summary>
+        /// WIP
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="headers"></param>
+        /// <param name="rows"></param>
+        static member ofStringSeqs(name:string, headers:#seq<string>, rows:#seq<#seq<string>>) =
+
+            let columns = 
+                Seq.append [headers] rows 
+                |> Seq.transpose
+
+            let columnsList = 
+                columns 
+                |> Seq.toArray
+                |> Array.map (Seq.toArray)
+
+
+            let compositeColumns = ArcTable.composeColumns columnsList
+
+            let arcTable = 
+                ArcTable.init name
+                |> ArcTable.addColumns(compositeColumns,skipFillMissing = true)
+                |> Some
+
+            arcTable
+
+        /// <summary>
+        /// Transforms ArcTable to excel compatible "values", row major
+        /// </summary>
+        member this.ToExcelValues() =
+
+            let table = this
+
+            // Cancel if there are no columns
+            if table.Columns.Length = 0 then
+                ResizeArray()
+            else
+                let columns = 
+                    table.Columns
+                    |> List.ofArray
+                    |> List.sortBy classifyColumnOrder
+                    |> List.collect CompositeColumn.toStringCellColumns
+                    |> Seq.transpose
+                    |> Seq.map (fun x ->
+                        x |> Seq.map (box >> Some)
+                        |> ResizeArray
+                    )
+                    |> ResizeArray                    
+
+                columns
+
+            //|> List.iteri (fun colI col ->         
+            //    col
+            //    |> List.iteri (fun rowI stringCell -> 
+            //        let value = 
+            //            if rowI = 0 then
+                    
+            //                match Dictionary.tryGet stringCell stringCount with
+            //                | Some spaces ->
+            //                    stringCount.[stringCell] <- spaces + " "
+            //                    stringCell + " " + spaces
+            //                | None ->
+            //                    stringCount.Add(stringCell,"")
+            //                    stringCell
+            //            else stringCell
+            //        let address = FsAddress(rowI+1,colI+1)
+            //        fsTable.Cell(address, ws.CellCollection).SetValueAs value
+            //    )  
+            //)
+            //ws
+
+    let x = 0
+
+open OfficeInteropExtensions
 
 // Reoccuring Comment Defitinitions
 
@@ -165,8 +249,7 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
             "TableStyleMedium7"
     
     // The next part loads relevant information from the excel objects and allows us to access them after 'context.sync()'
-    
-    let tableRange = range
+    let tableRange = range.getColumn(0)
     let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount";"address"; "isEntireColumn"; "worksheet"])))
 
     let activeSheet = tableRange.worksheet
@@ -186,7 +269,7 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
         let! allTableNames = getAllTableNames context
     
         // sync with proxy objects after loading values from excel
-        let! table,newTableLogging = context.sync().``then``( fun _ ->
+        let! table, newTableLogging = context.sync().``then``( fun _ ->
     
             // Filter all names of tables on the active worksheet for names starting with "annotationTable".
             let annoTables =
@@ -209,47 +292,38 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
             // Ref. 1
             r.enableEvents <- false
     
-            // We do not want to create annotation tables of any size. The recommended workflow is to use the addBuildingBlock functionality.
-            // Therefore we recreate the tableRange but with a columncount of 2. The 2 Basic columns in any annotation table.
-            // "Source Name" | "Sample Name"
-            let adaptedRange =
-                let rowCount =
-                    if useExistingPrevOutput then
-                        (float prevTableOutput.Length + 1.)
-                    elif tableRange.isEntireColumn then
-                        21.
-                    elif tableRange.rowCount <= 2. then
-                        2.
-                    else
-                        tableRange.rowCount
-                activeSheet.getRangeByIndexes(tableRange.rowIndex,tableRange.columnIndex,rowCount,2.)
-    
             // Create table in current worksheet
-            let annotationTable = activeSheet.tables.add(U2.Case1 adaptedRange,true)
-    
-            // Update annotationTable column headers
-            (annotationTable.columns.getItemAt 0.).name <- BuildingBlockType.Source.toString
-            (annotationTable.columns.getItemAt 1.).name <- BuildingBlockType.Sample.toString
+
+            // Create new annotationTable name
+            let newName = findNewTableName allTableNames
+
+            let inMemoryTable = ArcTable.init(newName)
+
+            let newCells = Array.init (int tableRange.rowCount - 1) (fun _ -> CompositeCell.emptyFreeText)
+            
+            inMemoryTable.AddColumn(CompositeHeader.Input IOType.Source, newCells)
+
+            let tableStrings = inMemoryTable.ToExcelValues()
+
+            let annotationTable = activeSheet.tables.add(U2.Case1 tableRange, true)
+
+            // Update annotationTable name
+            annotationTable.name <- newName
+
+            tableRange.values <- tableStrings
+
+            // Update annotationTable style
+            annotationTable.style <- style
     
             if useExistingPrevOutput then
                 let newColValues = prevTableOutput |> Array.map (fun cell -> ResizeArray[|Option.bind (box >> Some) cell.Value|] ) |> ResizeArray
                 let col1 = (annotationTable.columns.getItemAt 0.)
                 let body = col1.getDataBodyRange()
                 body.values <- newColValues
-    
-            // Create new annotationTable name
-            let newName = findNewTableName allTableNames
-            // Update annotationTable name
-            annotationTable.name <- newName
-    
-            // Update annotationTable style
-            annotationTable.style <- style
-    
+   
             // Fit widths and heights of cols and rows to value size. (In this case the new column headers).
             activeSheet.getUsedRange().format.autofitColumns()
             activeSheet.getUsedRange().format.autofitRows()
-    
-            // let annoTableName = allTableNames |> Array.filter (fun x -> x.StartsWith "annotationTable")
     
             r.enableEvents <- true
     
@@ -268,7 +342,7 @@ let createAnnotationTable (isDark:bool, tryUseLastOutput:bool) =
     Excel.run (fun context ->
         let selectedRange = context.workbook.getSelectedRange()
         promise {
-            let! newTableLogging = createAnnotationTableAtRange (isDark,tryUseLastOutput,selectedRange,context)
+            let! newTableLogging = createAnnotationTableAtRange (isDark, tryUseLastOutput, selectedRange, context)
 
             // Interop logging expects list of logs
             return [snd newTableLogging] 

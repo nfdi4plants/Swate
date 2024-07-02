@@ -127,6 +127,6 @@
     <PackageReference Include="Feliz" Version="2.8.0" />
     <PackageReference Include="Feliz.Bulma" Version="3.0.0" />
     <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
-    <PackageReference Include="FsSpreadsheet.Js" Version="[6.1.3]" />
+    <PackageReference Include="FsSpreadsheet.Js" Version="[6.2.0]" />
   </ItemGroup>
 </Project>
