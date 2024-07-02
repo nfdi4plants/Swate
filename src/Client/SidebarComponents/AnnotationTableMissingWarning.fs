@@ -24,7 +24,7 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
                 Bulma.button.button [
                     Bulma.button.isFullWidth
                     prop.onClick (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
-                    prop.text "create annotation table"
+                    prop.text "Create Annotation Table"
                 ]                
             ]
         ]
