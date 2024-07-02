@@ -16,6 +16,17 @@ open BuildingBlockFunctions
 open ARCtrl
 open ARCtrl.Spreadsheet
 
+module MyHelper =
+
+    let getTableByName (context:RequestContext) (tableName:string) =
+        let _ = context.workbook.load(U2.Case1 "tables")
+        let annotationTable = context.workbook.tables.getItem(tableName)
+        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+        let annoBodyRange = annotationTable.getDataBodyRange()
+        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+        annotationTable, annoHeaderRange, annoBodyRange
+
 module OfficeInteropExtensions =
 
     open ARCtrl.Spreadsheet.ArcTable
@@ -28,7 +39,7 @@ module OfficeInteropExtensions =
         /// <param name="name"></param>
         /// <param name="headers"></param>
         /// <param name="rows"></param>
-        static member ofStringSeqs(name:string, headers:#seq<string>, rows:#seq<#seq<string>>) =
+        static member fromStringSeqs(name:string, headers:#seq<string>, rows:#seq<#seq<string>>) =
 
             let columns = 
                 Seq.append [headers] rows 
@@ -74,25 +85,32 @@ module OfficeInteropExtensions =
 
                 columns
 
-            //|> List.iteri (fun colI col ->         
-            //    col
-            //    |> List.iteri (fun rowI stringCell -> 
-            //        let value = 
-            //            if rowI = 0 then
-                    
-            //                match Dictionary.tryGet stringCell stringCount with
-            //                | Some spaces ->
-            //                    stringCount.[stringCell] <- spaces + " "
-            //                    stringCell + " " + spaces
-            //                | None ->
-            //                    stringCount.Add(stringCell,"")
-            //                    stringCell
-            //            else stringCell
-            //        let address = FsAddress(rowI+1,colI+1)
-            //        fsTable.Cell(address, ws.CellCollection).SetValueAs value
-            //    )  
-            //)
-            //ws
+        static member arcTableFromExcelTableName (tableName:string, context:RequestContext) =
+
+            let _, headerRange, bodyRowRange = MyHelper.getTableByName context tableName
+            promise {
+                let! inMemoryTable = context.sync().``then``(fun _ ->
+                    let headers =
+                        headerRange.values.[0]
+                        |> Seq.map (fun item ->
+                            item
+                            |> Option.map string
+                            |> Option.defaultValue ""
+                        )
+                    let bodyRows =
+                        bodyRowRange.values
+                        |> Seq.map (fun items ->
+                            items
+                            |> Seq.map (fun item ->
+                                item
+                                |> Option.map string
+                                |> Option.defaultValue ""
+                            )
+                        )
+                    ArcTable.fromStringSeqs(tableName, headers, bodyRows)
+                )
+                return inMemoryTable
+            }
 
     let x = 0
 
@@ -211,6 +229,29 @@ let getPrevTableOutput (context:RequestContext) =
         let! prevTableName = getPrevAnnotationTable context
 
         if prevTableName.IsSome then
+
+            let _, headerRange, bodyRowRange = MyHelper.getTableByName context prevTableName.Value
+            let! inMemoryTable = context.sync().``then``(fun _ ->
+                let headers =
+                    headerRange.values.[0]
+                    |> Seq.map (fun item ->
+                        item
+                        |> Option.map string
+                        |> Option.defaultValue ""
+                    )
+                let bodyRows =
+                    bodyRowRange.values
+                    |> Seq.map (fun items ->
+                        items
+                        |> Seq.map (fun item ->
+                            item
+                            |> Option.map string
+                            |> Option.defaultValue ""
+                        )
+                    )
+                ArcTable.fromStringSeqs(prevTableName.Value, headers, bodyRows)
+            )
+
             // Ref. 2
             let! buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context prevTableName.Value
 
@@ -261,7 +302,9 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
     promise {
     
         // Is user input signals to try and find+reuse the output from the previous annotationTable do this, otherwise just return empty array
-        let! prevTableOutput = if tryUseLastOutput then getPrevTableOutput context else promise {return Array.empty}
+        let! prevTableOutput =
+            if tryUseLastOutput then getPrevTableOutput context
+            else promise {return Array.empty}
     
         // If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
         let useExistingPrevOutput = tryUseLastOutput && Array.isEmpty >> not <| prevTableOutput
