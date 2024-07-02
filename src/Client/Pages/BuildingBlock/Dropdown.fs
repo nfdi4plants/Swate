@@ -1,19 +1,11 @@
-﻿module BuildingBlock.Dropdown
+module BuildingBlock.Dropdown
 
 open Feliz
 open Feliz.Bulma
-open Shared
-open TermTypes
-open OfficeInteropTypes
-open Fable.Core.JsInterop
-open Elmish
 open Model.BuildingBlock
-open Model.TermSearch
 open Model
 open Messages
 open ARCtrl
-open BuildingBlock.Helper
-open Fable.Core
 
 
 [<ReactComponent>]

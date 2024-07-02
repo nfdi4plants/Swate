@@ -3,8 +3,6 @@ module BuildingBlock.SearchComponent
 open Feliz
 open Feliz.Bulma
 open Shared
-open TermTypes
-open OfficeInteropTypes
 open Fable.Core.JsInterop
 open Elmish
 open Model.BuildingBlock
