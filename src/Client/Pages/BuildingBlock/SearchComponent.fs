@@ -136,7 +136,8 @@ let private addBuildingBlockButton (model: Model) dispatch =
             prop.onClick (fun _ ->
                 let bodyCells =
                     if body.IsSome then // create as many body cells as there are rows in the active table
-                        Array.init (model.SpreadsheetModel.ActiveTable.RowCount) (fun _ -> body.Value)
+                        let rowCount = System.Math.Max(1,model.SpreadsheetModel.ActiveTable.RowCount)
+                        Array.init rowCount (fun _ -> body.Value)
                     else
                         Array.empty                    
                 let column = CompositeColumn.create(header, bodyCells)
