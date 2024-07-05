@@ -16,6 +16,9 @@ $primarye-invert: white;
 @use "bulma/sass" with ( $primary: $nfdi-blue-dark, $success: $nfdi-mint, $info: $nfdi-blue-light, $danger: $nfdi-red, $warning: $nfdi-yellow, $custom-colors: ( "primarye":($primarye, $primarye-invert)), );
 @forward "bulma/sass/themes";
 @use "bulma/sass/utilities/css-variables" as cv;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 .my-grey-out {
     background-color: cv.getVar("scheme-main-ter");
