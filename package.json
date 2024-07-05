@@ -1,9 +1,5 @@
 {
-  "browserslist": [
-    "ie 11"
-  ],
   "private": true,
-  "type": "module",
   "engines": {
     "node": "~18 || ~20",
     "npm": "~9 || ~10"
@@ -13,17 +9,14 @@
     "@types/node": "^20.10.3",
     "@vitejs/plugin-basic-ssl": "^1.0.2",
     "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.16",
-    "core-js": "^3.33.3",
-    "postcss": "^8.4.32",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
     "remotedev": "^0.2.7",
     "sass": "^1.69.5",
-    "selfsigned": "^2.4.1",
-    "tailwindcss": "^3.3.6",
+    "tailwindcss": "^3.4.4",
     "vite": "^5.0.5"
   },
   "dependencies": {
-    "@creativebulma/bulma-tooltip": "^1.2.0",
     "@nfdi4plants/exceljs": "^0.3.0",
     "bulma": "^1.0.1",
     "bulma-checkradio": "^2.1.3",
