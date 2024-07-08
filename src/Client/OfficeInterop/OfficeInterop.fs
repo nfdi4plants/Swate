@@ -16,33 +16,41 @@ open BuildingBlockFunctions
 open ARCtrl
 open ARCtrl.Spreadsheet
 
-module MyHelper =
-
-    let getTableByName (context:RequestContext) (tableName:string) =
-        let _ = context.workbook.load(U2.Case1 "tables")
-        let annotationTable = context.workbook.tables.getItem(tableName)
-        let annoHeaderRange = annotationTable.getHeaderRowRange()
-        let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-        let annoBodyRange = annotationTable.getDataBodyRange()
-        let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
-        annotationTable, annoHeaderRange, annoBodyRange
-
-    /// <summary>Swaps 'Rows with column values' to 'Columns with row values'.</summary>
-    let viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
-        rows
-        |> Seq.collect (fun x -> Seq.indexed x)
-        |> Seq.groupBy fst
-        |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
-        |> Seq.toArray
-
 module OfficeInteropExtensions =
 
     open ARCtrl.Spreadsheet.ArcTable
 
+    type ExcelHelper =
+
+        /// <summary>
+        /// Get the excel table of the given context and name
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="tableName"></param>
+        static member getTableByName (context:RequestContext) (tableName:string) =
+            let _ = context.workbook.load(U2.Case1 "tables")
+            let annotationTable = context.workbook.tables.getItem(tableName)
+            let annoHeaderRange = annotationTable.getHeaderRowRange()
+            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+            let annoBodyRange = annotationTable.getDataBodyRange()
+            let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+            annotationTable, annoHeaderRange, annoBodyRange
+
+        /// <summary>
+        /// Swaps 'Rows with column values' to 'Columns with row values'
+        /// </summary>
+        /// <param name="rows"></param>
+        static member viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
+            rows
+            |> Seq.collect (fun x -> Seq.indexed x)
+            |> Seq.groupBy fst
+            |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
+            |> Seq.toArray
+
     type ArcTable with
 
         /// <summary>
-        /// WIP
+        /// Creates ArcTable based on table name and collections of strings, representing columns and rows
         /// </summary>
         /// <param name="name"></param>
         /// <param name="headers"></param>
@@ -57,7 +65,6 @@ module OfficeInteropExtensions =
                 columns 
                 |> Seq.toArray
                 |> Array.map (Seq.toArray)
-
 
             let compositeColumns = ArcTable.composeColumns columnsList
 
@@ -95,7 +102,7 @@ module OfficeInteropExtensions =
 
         static member arcTableFromExcelTableName (tableName:string, context:RequestContext) =
 
-            let _, headerRange, bodyRowRange = MyHelper.getTableByName context tableName
+            let _, headerRange, bodyRowRange = ExcelHelper.getTableByName context tableName
             promise {
                 let! inMemoryTable = context.sync().``then``(fun _ ->
                     let headers =
@@ -118,9 +125,7 @@ module OfficeInteropExtensions =
                     ArcTable.fromStringSeqs(tableName, headers, bodyRows)
                 )
                 return inMemoryTable
-            }            
-
-    let x = 0
+            }
 
 open OfficeInteropExtensions
 
@@ -370,6 +375,7 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
 
         let _ = table.rows.load(propertyNames = U2.Case2 (ResizeArray[|"count"|]))
 
+        //Skip header because it is newly generated for inMemory table
         let newColValues =
             prevTableOutput.[1..]
             |> Array.map (fun cell ->
@@ -379,25 +385,19 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
             ) |> ResizeArray
 
         let! table, logging = context.sync().``then``(fun _ ->
-            //if useExistingPrevOutput then // This is the correct logic
-            if tryUseLastOutput then // this is only to make testing easier
-                log "Use prev output"
+
+            //logic to compare size of previous table and current table and adapt size of inMemory table
+            if useExistingPrevOutput then
                 let rowCount0 = int table.rows.count
                 let diff = rowCount0 - newColValues.Count
-                log $"Diff: {diff}"
-                if diff > 0 then // table larger than values
-                    log "Table larger than values"
-                    // https://learn.microsoft.com/en-us/javascript/api/excel/excel.tablerowcollection?view=excel-js-preview#excel-excel-tablerowcollection-deleterowsat-member(1)
-                    // https://fable.io/docs/javascript/features.html#dynamic-typing-proceed-with-caution
+
+                if diff > 0 then // table larger than values -> Delete rows to reduce inMemoryTable size to previous table size
                     table.rows?deleteRowsAt(newColValues.Count, diff)
-                elif diff < 0 then // more values than table
+                elif diff < 0 then // more values than table -> Add rows to increase inMemoryTable size to previous table size
                     let absolute = (-1) * diff
                     let nextvalues = createMatrixForTables 1 absolute ""
-                    log ("More values than table: ", absolute)
                     table.rows.add(-1, U4.Case1 nextvalues) |> ignore
-                    ()
-                else
-                    log "Perfect row size for prev values"
+
                 let body = (table.columns.getItemAt 0.).getDataBodyRange()
                 body.values <- newColValues
 
