@@ -100,7 +100,7 @@ module OfficeInteropExtensions =
 
                 columns
 
-        static member arcTableFromExcelTableName (tableName:string, context:RequestContext) =
+        static member fromExcelTableName (tableName:string, context:RequestContext) =
 
             let _, headerRange, bodyRowRange = ExcelHelper.getTableByName context tableName
             promise {
@@ -238,25 +238,32 @@ let getPrevAnnotationTableName (context:RequestContext) =
 // I sort by the resulting lowest number (since the worksheet is then closest to the active one), I find the output column in the particular
 // annotationTable and use the values it contains for the new annotationTable in the active worksheet.
 
-let getPrevTable (context:RequestContext) =
+/// <summary>
+/// Get the previous arc table to the active worksheet
+/// </summary>
+/// <param name="context"></param>
+let tryGetPrevTable (context:RequestContext) =
     promise {
         let! prevTableName = getPrevAnnotationTableName context
 
         if prevTableName.IsSome then
         
-            let! result = ArcTable.arcTableFromExcelTableName(prevTableName.Value, context)
+            let! result = ArcTable.fromExcelTableName (prevTableName.Value, context)
             return result
 
         else
 
-            let! result = ArcTable.arcTableFromExcelTableName("", context)
-            return result
+            return None
     }
 
+/// <summary>
+/// Get output column of arc excel table
+/// </summary>
+/// <param name="context"></param>
 let getPrevTableOutput (context:RequestContext) =
     promise {
 
-        let! inMemoryTable = getPrevTable context
+        let! inMemoryTable = tryGetPrevTable context
 
         if inMemoryTable.IsSome then        
 
@@ -391,9 +398,9 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
                 let rowCount0 = int table.rows.count
                 let diff = rowCount0 - newColValues.Count
 
-                if diff > 0 then // table larger than values -> Delete rows to reduce inMemoryTable size to previous table size
+                if diff > 0 then // table larger than values -> Delete rows to reduce excel table size to previous table size
                     table.rows?deleteRowsAt(newColValues.Count, diff)
-                elif diff < 0 then // more values than table -> Add rows to increase inMemoryTable size to previous table size
+                elif diff < 0 then // more values than table -> Add rows to increase excel table size to previous table size
                     let absolute = (-1) * diff
                     let nextvalues = createMatrixForTables 1 absolute ""
                     table.rows.add(-1, U4.Case1 nextvalues) |> ignore
@@ -408,7 +415,7 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
             r.enableEvents <- true
     
             // Return info message
-            let logging = InteropLogging.Msg.create InteropLogging.Info (sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." tableRange.address (6. - 1.))
+            let logging = InteropLogging.Msg.create InteropLogging.Info (sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." tableRange.address (tableRange.rowCount - 1.))
 
             table, logging
         )
