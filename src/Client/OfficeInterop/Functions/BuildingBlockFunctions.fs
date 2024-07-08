@@ -1,3 +1,4 @@
+[<System.Obsolete>]
 module OfficeInterop.BuildingBlockFunctions
 
 open Fable.Core
