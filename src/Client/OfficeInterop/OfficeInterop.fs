@@ -260,7 +260,7 @@ let tryGetPrevTable (context:RequestContext) =
 /// Get output column of arc excel table
 /// </summary>
 /// <param name="context"></param>
-let getPrevTableOutput (context:RequestContext) =
+let tryGetPrevTableOutput (context:RequestContext) =
     promise {
 
         let! inMemoryTable = tryGetPrevTable context
@@ -276,15 +276,15 @@ let getPrevTableOutput (context:RequestContext) =
                     |> (fun lists -> lists.Head.Head :: lists.Head.Tail)
                     |> Array.ofList
 
-                if outputValues.Length > 0 then return outputValues
-                else return [||]
+                if outputValues.Length > 0 then return Some outputValues
+                else return None
 
             else
 
-                return [||]
+                return None
 
         else
-            return [||]
+            return None
     }
 
 /// <summary>This function is used to create a new annotation table.
@@ -334,19 +334,20 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
                 |> Array.map (fun x -> x.name)
                 |> Array.filter (fun x -> x.StartsWith "annotationTable")
     
-            // Fail the function if there are not exactly 0 annotation tables in the active worksheet.
-            // This check is done, to only have one annotationTable per workSheet.
             match annoTables.Length with
+            //Create a new annotation table in the active worksheet
             | 0 ->
                 ()
+            //Create a mew worksheet with a new annotation table when the active worksheet already contains one
             | x when x = 1 ->
                 //Create new worksheet and set it active
                 context.workbook.worksheets.add() |> ignore
-                let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
                 let lastWorkSheet = context.workbook.worksheets.getLast()
                 lastWorkSheet.activate()
                 activeSheet <- lastWorkSheet
                 hasCreatedNewWorkSheet <- true
+            // Fail the function if there are more than 1 annotation table in the active worksheet.
+            // This check is done, to only have one annotationTable per workSheet.
             | x when x > 1 ->
                 failwith "The active worksheet contains more than one annotationTable. This should not happen. Please report this as a bug to the developers."
             | _ ->
@@ -355,20 +356,20 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
 
         // Is user input signals to try and find+reuse the output from the previous annotationTable do this, otherwise just return empty array
         let! prevTableOutput =
-            if (tryUseLastOutput) then getPrevTableOutput context                
-            else promise {return Array.empty}
+            if (tryUseLastOutput) then tryGetPrevTableOutput context                
+            else promise {return None}
     
         // If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
-        let useExistingPrevOutput = (tryUseLastOutput) && Array.isEmpty >> not <| prevTableOutput
-
+        let useExistingPrevOutput = (tryUseLastOutput) && prevTableOutput.IsSome
+        log("useExistingPrevOutput", useExistingPrevOutput)
         let! allTableNames = getAllTableNames context
-
-        let _ = activeSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
 
         let newTableRange =
             if hasCreatedNewWorkSheet then activeSheet.getCell(tableRange.rowIndex, tableRange.columnIndex)
             else tableRange
+
         let _ =
+            activeSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|])) |> ignore
             if hasCreatedNewWorkSheet then newTableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"])))
             else tableRange
 
@@ -405,19 +406,19 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
         
         let _ = table.rows.load(propertyNames = U2.Case2 (ResizeArray[|"count"|]))
 
-        //Skip header because it is newly generated for inMemory table
-        let newColValues =
-            prevTableOutput.[1..]
-            |> Array.map (fun cell ->
-                [|cell|]
-                |> Array.map (box >> Some)
-                |> ResizeArray
-            ) |> ResizeArray
-
         let! table, logging = context.sync().``then``(fun _ ->
 
             //logic to compare size of previous table and current table and adapt size of inMemory table
             if useExistingPrevOutput then
+                //Skip header because it is newly generated for inMemory table
+                let newColValues =
+                    prevTableOutput.Value.[1..]
+                    |> Array.map (fun cell ->
+                        [|cell|]
+                        |> Array.map (box >> Some)
+                        |> ResizeArray
+                    ) |> ResizeArray
+
                 let rowCount0 = int table.rows.count
                 let diff = rowCount0 - newColValues.Count
 
