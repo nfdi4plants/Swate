@@ -313,26 +313,19 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
     let tableRange = range.getColumn(0)
     let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"])))
 
-    let activeSheet = tableRange.worksheet
+    let mutable activeSheet = tableRange.worksheet
     let _ = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
     let activeTables = activeSheet.tables.load(propertyNames=U2.Case1 "items")
     
     let r = context.runtime.load(U2.Case1 "enableEvents")
-    
-    promise {
-    
-        // Is user input signals to try and find+reuse the output from the previous annotationTable do this, otherwise just return empty array
-        let! prevTableOutput =
-            if tryUseLastOutput then getPrevTableOutput context                
-            else promise {return Array.empty}
-    
-        // If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
-        let useExistingPrevOutput = tryUseLastOutput && Array.isEmpty >> not <| prevTableOutput
 
-        let! allTableNames = getAllTableNames context
+    //Required because a new tablerange is required for the new table range
+    let mutable hasCreatedNewWorkSheet = false
+
+    promise {
 
         // sync with proxy objects after loading values from excel
-        let! table = context.sync().``then``( fun _ ->
+        do! context.sync().``then``( fun _ ->
     
             // Filter all names of tables on the active worksheet for names starting with "annotationTable".
             let annoTables =
@@ -343,14 +336,44 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
     
             // Fail the function if there are not exactly 0 annotation tables in the active worksheet.
             // This check is done, to only have one annotationTable per workSheet.
-            let _ =
-                match annoTables.Length with
-                | x when x > 0 ->
-                    failwith "The active worksheet contains more than zero annotationTables. Please move to a new worksheet."
-                | 0 ->
-                    ()
-                | _ ->
-                    failwith "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers."
+            match annoTables.Length with
+            | 0 ->
+                ()
+            | x when x = 1 ->
+                //Create new worksheet and set it active
+                context.workbook.worksheets.add() |> ignore
+                let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+                let lastWorkSheet = context.workbook.worksheets.getLast()
+                lastWorkSheet.activate()
+                activeSheet <- lastWorkSheet
+                hasCreatedNewWorkSheet <- true
+            | x when x > 1 ->
+                failwith "The active worksheet contains more than one annotationTable. This should not happen. Please report this as a bug to the developers."
+            | _ ->
+                failwith "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers."
+        )
+
+        // Is user input signals to try and find+reuse the output from the previous annotationTable do this, otherwise just return empty array
+        let! prevTableOutput =
+            if (tryUseLastOutput) then getPrevTableOutput context                
+            else promise {return Array.empty}
+    
+        // If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
+        let useExistingPrevOutput = (tryUseLastOutput) && Array.isEmpty >> not <| prevTableOutput
+
+        let! allTableNames = getAllTableNames context
+
+        let _ = activeSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
+
+        let newTableRange =
+            if hasCreatedNewWorkSheet then activeSheet.getCell(tableRange.rowIndex, tableRange.columnIndex)
+            else tableRange
+        let _ =
+            if hasCreatedNewWorkSheet then newTableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"])))
+            else tableRange
+
+        // sync with proxy objects after loading values from excel
+        let! table = context.sync().``then``( fun _ ->
     
             // Ref. 1
             r.enableEvents <- false
@@ -368,18 +391,18 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
 
             let tableStrings = inMemoryTable.ToExcelValues()
 
-            let annotationTable = activeSheet.tables.add(U2.Case1 tableRange, true)
+            let annotationTable = activeSheet.tables.add(U2.Case1 newTableRange, true)
 
             // Update annotationTable name
             annotationTable.name <- newName
 
-            tableRange.values <- tableStrings
+            newTableRange.values <- tableStrings
 
             // Update annotationTable style
             annotationTable.style <- style
             annotationTable
         )
-
+        
         let _ = table.rows.load(propertyNames = U2.Case2 (ResizeArray[|"count"|]))
 
         //Skip header because it is newly generated for inMemory table
@@ -413,9 +436,9 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
             activeSheet.getUsedRange().format.autofitRows()
     
             r.enableEvents <- true
-    
+
             // Return info message
-            let logging = InteropLogging.Msg.create InteropLogging.Info (sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." tableRange.address (tableRange.rowCount - 1.))
+            let logging = InteropLogging.Msg.create InteropLogging.Info (sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." newTableRange.address (newTableRange.rowCount - 1.))
 
             table, logging
         )
