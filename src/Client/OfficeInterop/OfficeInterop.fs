@@ -359,9 +359,6 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
             if (tryUseLastOutput) then tryGetPrevTableOutput context                
             else promise {return None}
     
-        // If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
-        let useExistingPrevOutput = prevTableOutput.IsSome
-        log("useExistingPrevOutput", useExistingPrevOutput)
         let! allTableNames = getAllTableNames context
 
         let _ = activeSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|])) |> ignore
@@ -408,7 +405,7 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
         let! table, logging = context.sync().``then``(fun _ ->
 
             //logic to compare size of previous table and current table and adapt size of inMemory table
-            if useExistingPrevOutput then
+            if prevTableOutput.IsSome then
                 //Skip header because it is newly generated for inMemory table
                 let newColValues =
                     prevTableOutput.Value.[1..]
