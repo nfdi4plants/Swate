@@ -360,17 +360,16 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
             else promise {return None}
     
         // If try to use last output check if we found some output in "prevTableOutput" by checking if the array is not empty.
-        let useExistingPrevOutput = (tryUseLastOutput) && prevTableOutput.IsSome
+        let useExistingPrevOutput = prevTableOutput.IsSome
         log("useExistingPrevOutput", useExistingPrevOutput)
         let! allTableNames = getAllTableNames context
 
-        let newTableRange =
-            if hasCreatedNewWorkSheet then activeSheet.getCell(tableRange.rowIndex, tableRange.columnIndex)
-            else tableRange
+        let _ = activeSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|])) |> ignore
 
-        let _ =
-            activeSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|])) |> ignore
-            if hasCreatedNewWorkSheet then newTableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"])))
+        let newTableRange =
+            if hasCreatedNewWorkSheet then
+                activeSheet.getCell(tableRange.rowIndex, tableRange.columnIndex)
+                    .load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"])))
             else tableRange
 
         // sync with proxy objects after loading values from excel
