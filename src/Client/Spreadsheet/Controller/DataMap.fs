@@ -41,3 +41,21 @@ let updateDataMapDataContextAt (dtx) (index) (state: Spreadsheet.Model) : Spread
             logw "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
             state.ArcFile
     {state with ArcFile = nextArcFile}
+
+let addRows (n:int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let rows = Array.init n (fun _ -> DataContext())
+    if state.HasDataMap() then
+        state.DataMapOrDefault.DataContexts.AddRange(rows)
+    {state with ArcFile = state.ArcFile}
+
+let deleteRow (n:int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    if state.HasDataMap() then
+        state.DataMapOrDefault.DataContexts.RemoveAt n
+    {state with ArcFile = state.ArcFile}
+
+let deleteRows (rows:int []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    if state.HasDataMap() then
+        rows
+        |> Array.sortDescending
+        |> Array.iter (fun n -> state.DataMapOrDefault.DataContexts.RemoveAt n)
+    {state with ArcFile = state.ArcFile}

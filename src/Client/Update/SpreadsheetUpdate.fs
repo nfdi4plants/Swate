@@ -152,17 +152,29 @@ module Spreadsheet =
                         nextState, nextModel
                 nextState, nextModel, Cmd.none
             | AddRows (n) ->
-                let nextState = Controller.Table.addRows n state
+                let nextState =
+                    if state.TableViewIsActive() then
+                        Controller.Table.addRows n state
+                    else
+                        Controller.DataMap.addRows n state
                 nextState, model, Cmd.none
             | Reset ->
                 let nextState = Controller.Table.resetTableState()
                 let nextModel = {model with History = LocalHistory.Model.init()}
                 nextState, nextModel, Cmd.none
             | DeleteRow index ->
-                let nextState = Controller.Table.deleteRow index state
+                let nextState =
+                    if state.TableViewIsActive() then
+                        Controller.Table.deleteRow index state
+                    else
+                        Controller.DataMap.deleteRow index state
                 nextState, model, Cmd.none
             | DeleteRows indexArr ->
-                let nextState = Controller.Table.deleteRows indexArr state
+                let nextState =
+                    if state.TableViewIsActive() then
+                        Controller.Table.deleteRows indexArr state
+                    else
+                        Controller.DataMap.deleteRows indexArr state
                 nextState, model, Cmd.none
             | DeleteColumn index ->
                 let nextState = Controller.Table.deleteColumn index state

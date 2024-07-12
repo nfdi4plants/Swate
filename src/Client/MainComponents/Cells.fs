@@ -48,7 +48,8 @@ module private CellAux =
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
 
     let oasetter (index, nextCell: CompositeCell, dispatch) = Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-        
+
+    let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, model, dispatch) else ContextMenu.DataMap.onContextMenu (index, model, dispatch)
 
 open CellComponents
 open CellAux
@@ -166,6 +167,7 @@ type Cell =
             prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
             cellStyle []
+            prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
             prop.className "main-contrast-bg"
             prop.children [
                 Html.div [
@@ -234,7 +236,7 @@ type Cell =
         ]]
 
     [<ReactComponent>]
-    static member BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), model: Model, dispatch, ?oasetter: {|oa: OntologyAnnotation; setter: OntologyAnnotation -> unit|}, ?displayValue, ?readonly: bool) =
+    static member BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), model: Model, dispatch, ?oasetter: {|oa: OntologyAnnotation; setter: OntologyAnnotation -> unit|}, ?displayValue, ?readonly: bool, ?tooltip: string) =
         let readonly = defaultArg readonly false
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
@@ -258,12 +260,14 @@ type Cell =
                 [|box isSelected|]
         )
         Html.td [
+            if tooltip.IsSome then prop.title tooltip.Value
             prop.key $"Cell_{state.ActiveView.TableIndex}-{columnIndex}-{rowIndex}"
             cellStyle [
                 if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
             ]
+            prop.readOnly readonly
             prop.ref ref
-            prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
+            prop.onContextMenu (CellAux.contextMenuController index model dispatch)
             prop.children [
                 Html.div [
                     cellInnerContainerStyle []
@@ -310,7 +314,7 @@ type Cell =
             prop.key $"Cell_Select_{columnIndex}_{rowIndex}"
             cellStyle []
             prop.ref ref
-            prop.onContextMenu <| ContextMenu.onContextMenu (index, model, dispatch)
+            prop.onContextMenu (CellAux.contextMenuController index model dispatch)
             prop.children [
                 Html.div [
                     cellInnerContainerStyle []
