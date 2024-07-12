@@ -5,7 +5,6 @@ open Feliz.Bulma
 open Model
 open Messages
 open Shared
-open OfficeInteropTypes
 
 open ARCtrl
 

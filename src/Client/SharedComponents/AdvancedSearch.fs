@@ -260,21 +260,25 @@ module private ResultsTable =
 
 let private keepObsoleteCheckradioElement (state:AdvancedSearch.Model) setState =
     let currentKeepObsolete = state.AdvancedSearchOptions.KeepObsolete
-    let checkradioName = "keepObsolete_checkradio"
-    let id = sprintf "%s"checkradioName
     Bulma.field.div [
-        Bulma.input.radio [
-            prop.name checkradioName
-            prop.id id
-            prop.isChecked (state.AdvancedSearchOptions.KeepObsolete)
-            prop.onChange (fun (e:bool) ->
-                {state with AdvancedSearch.Model.AdvancedSearchOptions.KeepObsolete = not currentKeepObsolete}
-                |> setState
-            )
-        ]
-        Html.label [
-            prop.htmlFor id
-            prop.text (if currentKeepObsolete then "yes" else "no")
+        Bulma.control.div [
+            Html.label [
+                prop.className "checkbox"
+                prop.children [
+                    Html.input [
+                        prop.type'.checkbox
+                        prop.isChecked (state.AdvancedSearchOptions.KeepObsolete)
+                        prop.onChange (fun (e:bool) ->
+                            {state with AdvancedSearch.Model.AdvancedSearchOptions.KeepObsolete = e}
+                            |> setState
+                        )
+                    ]
+                    Html.span [
+                        prop.className "is-unselectable"
+                        prop.text (if currentKeepObsolete then " yes" else " no")
+                    ]
+                ]
+            ]
         ]
     ]
 
@@ -362,9 +366,7 @@ let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.
         //]
         Bulma.field.div [
             Bulma.label "Keep obsolete terms"
-            Html.div [
-                keepObsoleteCheckradioElement state setState
-            ]
+            keepObsoleteCheckradioElement state setState
         ]
     ]
 

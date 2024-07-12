@@ -24,7 +24,7 @@ services:
     networks:
       - swobup_network
     environment:
-      - NEO4J_AUTH=neo4j/test
+      - NEO4J_AUTH=neo4j/testing12345
       - NEO4J_server_memory_pagecache_size=7G
       - NEO4J_server_memory_heap_initial__size=5G
       - NEO4J_server_memory_heap_max__size=5G
@@ -34,7 +34,6 @@ services:
       - NEO4J_PLUGINS=["graph-data-science", "apoc"]
       - NEO4J_dbms_security_procedures_unrestricted=algo.*, apoc.*
       - NEO4J_server_jvm_additional='-XX:+ExitOnOutOfMemoryError'
-      - NEO4J_dbms_security_auth__minimum__password__length=4
     volumes:
       - ./neo4j/data:/data
       - ./neo4j/logs:/logs
@@ -53,7 +52,7 @@ services:
       - swobup_network
     environment:
       - DB_USER=neo4j
-      - DB_PASSWORD=test
+      - DB_PASSWORD=testing12345
       - DB_URL=bolt://neo4j:7687
       - DB_NAME=neo4j
 
@@ -68,7 +67,7 @@ services:
       - GITHUB_SECRET=test
       - DB_URL=bolt://neo4j:7687
       - DB_USER=neo4j
-      - DB_PASSWORD=test
+      - DB_PASSWORD=testing12345
       - ONTOLOGY_REPOSITORY=nfdi4plants/nfdi4plants_ontology
       - TEMPLATE_REPOSITORY=nfdi4plants/SWATE_templates
       - SWATE_API=https://swate-alpha.nfdi4plants.org

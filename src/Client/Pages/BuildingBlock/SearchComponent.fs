@@ -139,7 +139,7 @@ let private addBuildingBlockButton (model: Model) dispatch =
                     else
                         Array.empty                    
                 let column = CompositeColumn.create(header, bodyCells)
-                let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
+                let index = Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
                 let id = $"Header_{index}_Main"
                 scrollIntoViewRetry id

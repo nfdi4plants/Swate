@@ -56,4 +56,29 @@ let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) =
                 assay.Comments <- ResizeArray comments
                 assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
+        DatamapConfig.Main(
+            assay.DataMap,
+            fun dtm ->
+                logw "HARDCODED DTM EXTENSION!"
+                let create_Datacontext (i:int) =
+                    DataContext(
+                        $"id_string_{i}",
+                        "My Name",
+                        DataFile.DerivedDataFile,
+                        "My Format",
+                        "My Selector Format",
+                        OntologyAnnotation("Explication", "MS", "MS:123456"),
+                        OntologyAnnotation("Unit", "MS", "MS:123456"),
+                        OntologyAnnotation("ObjectType", "MS", "MS:123456"),
+                        "My Label",
+                        "My Description",
+                        "KevinF.exe",
+                        (ResizeArray [Comment.create("Hello", "World")])
+                    )
+                dtm |> Option.iter (fun dtm ->
+                    for i in 0 .. 5 do
+                        dtm.DataContexts.Add (create_Datacontext i)
+                )
+                dtm |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+            )
     ]

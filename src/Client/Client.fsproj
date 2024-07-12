@@ -53,9 +53,10 @@
     <Compile Include="Modals\SelectiveImportModal.fs" />
     <Compile Include="Spreadsheet\IO.fs" />
     <Compile Include="Spreadsheet\Types.fs" />
-    <Compile Include="Spreadsheet\Clipboard.Controller.fs" />
-    <Compile Include="Spreadsheet\Table.Controller.fs" />
-    <Compile Include="Spreadsheet\BuildingBlocks.Controller.fs" />
+    <Compile Include="Spreadsheet\Controller\BuildingBlocks.fs" />
+    <Compile Include="Spreadsheet\Controller\Table.fs" />
+    <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
+    <Compile Include="Spreadsheet\Controller\DataMap.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\AdvancedSearch.fs" />
     <Compile Include="SharedComponents\TermSearchInput.fs" />
@@ -83,9 +84,11 @@
     <Compile Include="Pages\ActivityLog\ActivityLogView.fs" />
     <Compile Include="Pages\Settings\SettingsView.fs" />
     <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
+    <Compile Include="MainComponents\CellStyles.fs" />
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />
     <Compile Include="MainComponents\MainViewContainer.fs" />
+    <Compile Include="MainComponents\Metadata\DatamapConfig.fs" />
     <Compile Include="MainComponents\Metadata\Forms.fs" />
     <Compile Include="MainComponents\Metadata\Template.fs" />
     <Compile Include="MainComponents\Metadata\Assay.fs" />
@@ -96,6 +99,8 @@
     <Compile Include="MainComponents\Cells.fs" />
     <Compile Include="MainComponents\KeyboardShortcuts.fs" />
     <Compile Include="MainComponents\AddRows.fs" />
+    <Compile Include="MainComponents\DataMap\Cells.fs" />
+    <Compile Include="MainComponents\DataMap\DataMap.fs" />
     <Compile Include="MainComponents\SpreadsheetView.fs" />
     <Compile Include="MainComponents\Navbar.fs" />
     <Compile Include="MainComponents\FooterTabs.fs" />

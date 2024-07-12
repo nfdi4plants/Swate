@@ -1,4 +1,4 @@
-module Spreadsheet.Clipboard.Controller
+module Spreadsheet.Controller.Clipboard
 
 open Fable.Core
 open ARCtrl
@@ -18,7 +18,6 @@ let copyCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<uni
 
 let copyCellsByIndex (indices: (int*int) []) (state: Spreadsheet.Model) : JS.Promise<unit> =
     let cells = [|for index in indices do yield state.ActiveTable.Values.[index] |]
-    log cells
     copyCells cells
 
 let copySelectedCell (state: Spreadsheet.Model) : JS.Promise<unit> =
@@ -40,7 +39,6 @@ let cutCellByIndex (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Mod
     state
 
 let cutCellsByIndices (indices: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    log "HIT"
     let cells = ResizeArray()
     for index in indices do
         let cell = state.ActiveTable.Values.[index]
@@ -92,7 +90,6 @@ let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.M
     if state.SelectedCells.IsEmpty then
         promise {return state}
     else
-        log "here"
         let columnIndex = state.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
         let selectedSingleColumnCells = state.SelectedCells |> Set.filter (fun index -> fst index = columnIndex)
         promise {

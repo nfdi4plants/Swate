@@ -78,4 +78,9 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch:
                 study.Comments <- ResizeArray(comments)
                 (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
         )
+        DatamapConfig.Main(
+            study.DataMap,
+            fun dtm ->
+                dtm |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+        )
     ]

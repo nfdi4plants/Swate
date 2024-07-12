@@ -137,6 +137,26 @@ module Extensions =
     open ARCtrl.Template
     open ArcTableAux
 
+    type DataMap with
+        static member ColumnCount = 9
+
+    type DataFile with
+        member this.ToStringRdb() =
+            match this with
+            | DataFile.DerivedDataFile -> "Derived Data File"
+            | DataFile.ImageFile -> "Image File"
+            | DataFile.RawDataFile -> "Raw Data File"
+        static member tryFromString (str: string) =
+            match str.ToLower() with
+            | "derived data file" | "deriveddatafile" -> Some DataFile.DerivedDataFile
+            | "image file" | "imagefile" -> Some DataFile.ImageFile
+            | "raw data file" | "rawdatafile" -> Some DataFile.RawDataFile
+            | _ -> None
+        static member fromString (str:string) =
+            match DataFile.tryFromString str with
+            | Some r -> r
+            | None -> failwithf "Unknown DataFile: %s" str
+
     type OntologyAnnotation with
         static member empty() = OntologyAnnotation.create()
         static member fromTerm (term:Term) = OntologyAnnotation(term.Name, term.FK_Ontology, term.Accession)
@@ -220,7 +240,14 @@ module Extensions =
         | anyElse -> sprintf "Unable to convert \"%A\" to CompositeCell." anyElse |> Error
 
     type CompositeCell with
-        
+
+        member this.ToDataCell() =
+            match this with
+            | CompositeCell.Unitized (_, unit) -> CompositeCell.createDataFromString unit.NameText
+            | CompositeCell.FreeText txt -> CompositeCell.createDataFromString txt
+            | CompositeCell.Term term -> CompositeCell.createDataFromString term.NameText
+            | CompositeCell.Data _ -> this
+
         static member tryFromContent (content: string []) =
             match tryFromContent' content with
             | Ok r -> Some r
@@ -248,23 +275,36 @@ module Extensions =
             cells 
 
         member this.ConvertToValidCell (header: CompositeHeader) =
-            match header.IsTermColumn, this with
-            | true, CompositeCell.Term _ | true, CompositeCell.Unitized _ -> this
-            | true, CompositeCell.FreeText txt -> this.ToTermCell()
-            | false, CompositeCell.Term _ | false, CompositeCell.Unitized _ -> this.ToFreeTextCell()
-            | false, CompositeCell.FreeText _ -> this
+            match this with
+            // term header
+            | CompositeCell.Term _ when header.IsTermColumn -> this
+            | CompositeCell.Unitized _ when header.IsTermColumn -> this
+            | CompositeCell.FreeText _ when header.IsTermColumn -> this.ToTermCell()
+            | CompositeCell.Data _ when header.IsTermColumn -> this.ToFreeTextCell().ToTermCell()
+            // data header
+            | CompositeCell.Term _ when header.IsDataColumn -> this.ToDataCell()
+            | CompositeCell.Unitized _ when header.IsDataColumn -> this.ToDataCell()
+            | CompositeCell.FreeText _ when header.IsDataColumn -> this.ToDataCell()
+            | CompositeCell.Data _ when header.IsDataColumn -> this
+            // freetext header?
+            | CompositeCell.Term _ | CompositeCell.Unitized _ -> this.ToFreeTextCell()
+            | CompositeCell.FreeText _ -> this
+            | CompositeCell.Data _ -> this.ToFreeTextCell()
+
 
         member this.UpdateWithOA(oa:OntologyAnnotation) =
             match this with
             | CompositeCell.Term _ -> CompositeCell.createTerm oa
             | CompositeCell.Unitized (v,_) -> CompositeCell.createUnitized (v,oa)
             | CompositeCell.FreeText _ -> CompositeCell.createFreeText oa.NameText
+            | CompositeCell.Data _ -> CompositeCell.createDataFromString oa.NameText
 
         member this.ToOA() =
             match this with
             | CompositeCell.Term oa -> oa
             | CompositeCell.Unitized (v, oa) -> oa
             | CompositeCell.FreeText t -> OntologyAnnotation.create t
+            | CompositeCell.Data d -> OntologyAnnotation.create d.NameText
 
         member this.UpdateMainField(s: string) =
             match this with
@@ -273,6 +313,9 @@ module Extensions =
                 CompositeCell.Term oa
             | CompositeCell.Unitized (_, oa) -> CompositeCell.Unitized (s, oa)
             | CompositeCell.FreeText _ -> CompositeCell.FreeText s
+            | CompositeCell.Data d ->
+                d.Name <- Some s
+                CompositeCell.Data d
 
         /// <summary>
         /// Will return `this` if executed on Freetext cell.

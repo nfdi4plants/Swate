@@ -35,3 +35,5 @@ let Main(model: Model, dispatch: Messages.Msg -> unit, openBuildingBlockWidget, 
                 ]
             ]
         ]
+    | ActiveView.DataMap ->
+        MainComponents.DataMap.DataMap.Main (model, dispatch)
