@@ -1,8 +1,7 @@
-module Spreadsheet.BuildingBlocks.Controller
+module Spreadsheet.Controller.BuildingBlocks
 
 open System.Collections.Generic
 open Shared.TermTypes
-open Shared.OfficeInteropTypes
 open Spreadsheet
 open Types
 open ARCtrl

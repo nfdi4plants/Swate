@@ -41,9 +41,11 @@ let private SpreadsheetSelectionFooter (model: Model) dispatch =
                         prop.children [
                             Html.ul [
                                 Bulma.tab  [
-                                    prop.style [style.width (length.px 20)]
+                                    prop.style [style.width (length.px 20); style.custom ("order", -2)]
                                 ]
                                 MainComponents.FooterTabs.MainMetadata (model, dispatch)
+                                if model.SpreadsheetModel.HasDataMap() then
+                                    MainComponents.FooterTabs.MainDataMap (model, dispatch)
                                 for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
                                     MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
                                 if model.SpreadsheetModel.CanHaveTables() then 

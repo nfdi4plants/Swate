@@ -17,6 +17,7 @@ with
 [<RequireQualifiedAccess>]
 type ActiveView = 
 | Table of index:int
+| DataMap
 | Metadata
 with 
     /// <summary>
@@ -25,7 +26,8 @@ with
     member this.TableIndex =
         match this with
         | Table i -> i
-        | _ -> 0
+        | DataMap -> 0
+        | Metadata -> -1
 
 ///<summary>If you change this model, it will kill caching for users! if you apply changes to it, make sure to keep a version
 ///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>
@@ -68,10 +70,20 @@ type Model = {
         with get() = 
             match this.ActiveView with
             | ActiveView.Table i -> this.Tables.GetTableAt(i)
-            | ActiveView.Metadata -> 
+            | ActiveView.Metadata | ActiveView.DataMap -> 
                 let t = ArcTable.init("NULL_TABLE") //return NULL_TABLE-named table for easier handling of return value
                 t.AddColumn(CompositeHeader.FreeText "WARNING", [|CompositeCell.FreeText "If you see this table view, pls contact a developer and report it."|])
                 t
+    member this.HasDataMap() =
+        match this.ArcFile with
+        | Some (Assay a) -> a.DataMap.IsSome
+        | Some (Study (s,_)) -> s.DataMap.IsSome
+        | _ -> false
+    member this.DataMapOrDefault =
+        match this.ArcFile with
+        | Some (Assay a) when a.DataMap.IsSome -> a.DataMap.Value
+        | Some (Study (s,_)) when s.DataMap.IsSome -> s.DataMap.Value
+        | _ -> DataMap.init()
     member this.getSelectedColumnHeader =
         if this.SelectedCells.IsEmpty then None else
             let columnIndex = this.SelectedCells |> Set.toList |> List.minBy fst |> fst
@@ -110,6 +122,8 @@ type Msg =
 | MoveColumn of current:int * next:int
 | UpdateActiveCell of (U2<int,(int*int)> * ColumnType) option
 | SetActiveCellFromSelected
+| UpdateDatamap of DataMap option
+| UpdateDataMapDataContextAt of index: int * DataContext
 | AddTable of ArcTable
 | RemoveTable of index:int
 | RenameTable of index:int * name:string

@@ -1,4 +1,4 @@
-﻿namespace Components
+namespace Components
 
 open Feliz
 open Feliz.Bulma
@@ -49,7 +49,7 @@ module TermSearchAux =
         setSearchTreeState: SearchState -> unit,
         setLoading: bool -> unit,
         stopSearch: unit -> unit,
-        debounceStorage: System.Collections.Generic.Dictionary<string,int>,
+        debounceStorage: DebounceStorage,
         debounceTimer: int
     ) = 
         let queryDB() =
@@ -72,7 +72,7 @@ module TermSearchAux =
         setSearchTreeState: SearchState -> unit,
         setLoading: bool -> unit,
         stopSearch: unit -> unit,
-        debounceStorage: System.Collections.Generic.Dictionary<string,int>,
+        debounceStorage: DebounceStorage,
         debounceTimer: int
     ) =
         let queryDB() =
@@ -89,7 +89,7 @@ module TermSearchAux =
         setSearchNameState <| SearchState.init()
         debouncel debounceStorage "TermSearch" debounceTimer setLoading queryDB ()
 
-    let dsetter (inp: OntologyAnnotation option, setter, debounceStorage: System.Collections.Generic.Dictionary<string,int>, setLoading: bool -> unit, debounceSetter: int option) = 
+    let dsetter (inp: OntologyAnnotation option, setter, debounceStorage: DebounceStorage, setLoading: bool -> unit, debounceSetter: int option) = 
         if debounceSetter.IsSome then 
             debouncel debounceStorage "SetterDebounce" debounceSetter.Value setLoading setter inp 
         else 
@@ -97,7 +97,7 @@ module TermSearchAux =
 
     module Components =
 
-        let termSeachNoResults = [
+        let termSeachNoResults (advancedTermSearchActiveSetter: (bool -> unit) option) = [
             Html.div [
                 prop.key $"TermSelectItem_NoResults"
                 prop.classes ["term-select-item"]
@@ -105,13 +105,18 @@ module TermSearchAux =
                     Html.div "No terms found matching your input."
                 ]
             ]
-            Html.div [
-                prop.key $"TermSelectItem_Suggestion"
-                prop.classes ["term-select-item"]
-                prop.children [
-                    Html.div "Can't find the term you are looking for? Try Advanced Search!"
+            if advancedTermSearchActiveSetter.IsSome then
+                Html.div [
+                    prop.key $"TermSelectItem_Suggestion"
+                    prop.classes ["term-select-item"]
+                    prop.children [
+                        Html.span "Can't find the term you are looking for? "
+                        Html.a [
+                            prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); advancedTermSearchActiveSetter.Value true)
+                            prop.text "Try Advanced Search!"
+                        ]
+                    ]
                 ]
-            ]
             Html.div [
                 prop.key $"TermSelectItem_Contact"
                 prop.classes ["term-select-item"]
@@ -234,6 +239,7 @@ type TermSearch =
                     prop.style [style.marginRight 0]
                     prop.children [
                         Bulma.button.a [
+                            prop.className "h-full"
                             prop.style [style.borderWidth 0; style.borderRadius 0]
                             if not searchable then Bulma.color.hasTextGreyLight
                             Bulma.button.isInverted
@@ -259,7 +265,7 @@ type TermSearch =
         ]
 
     [<ReactComponent>]
-    static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: TermTypes.Term option -> unit, show: bool) =
+    static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: TermTypes.Term option -> unit, show: bool, setAdvancedTermSearchActive) =
         let searchesAreComplete = searchNameState.SearchIs = SearchIs.Done && searchTreeState.SearchIs = SearchIs.Done
         let foundInBoth (term:TermTypes.Term) =
             (searchTreeState.Results |> Array.contains term)
@@ -267,7 +273,7 @@ type TermSearch =
         let matchSearchState (ss: SearchState) (isDirectedSearch: bool) =
             match ss with
             | {SearchIs = SearchIs.Done; Results = [||]} when not isDirectedSearch ->  
-                Components.termSeachNoResults
+                Components.termSeachNoResults setAdvancedTermSearchActive
             | {SearchIs = SearchIs.Done; Results = results} -> [
                     for term in results do
                         let setTerm = fun (e: MouseEvent) -> setTerm (Some term)
@@ -281,7 +287,10 @@ type TermSearch =
                             TermSearch.TermSelectItem (term, setTerm, isDirectedSearch)
                 ]
             | {SearchIs = SearchIs.Running; Results = _ } -> [
-                    Html.div  "loading.."
+                    Html.div [
+                        prop.className "px-3 py-2"
+                        prop.text "loading.."
+                    ]
                 ]
             | _ -> [
                     Html.none
@@ -390,9 +399,11 @@ type TermSearch =
                         e.stopPropagation()
                         match e.which with
                         | 27. -> //escape
-                            if onEscape.IsSome then onEscape.Value e
                             stopSearch()
+                            debounceStorage.current.ClearAndRun()
+                            if onEscape.IsSome then onEscape.Value e
                         | 13. -> //enter
+                            debounceStorage.current.ClearAndRun()
                             if onEnter.IsSome then onEnter.Value e
                         | 9. -> //tab
                             if searchableToggle then 
@@ -402,7 +413,7 @@ type TermSearch =
                             
                     )
                 ]
-                let TermSelectArea = TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching)
+                let TermSelectArea = TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching, (if advancedSearchDispatch.IsSome then Some setAdvancedSearchActive else None))
                 if portalTermSelectArea.IsSome then
                     ReactDOM.createPortal(TermSelectArea,portalTermSelectArea.Value)
                 elif ref.current.IsSome then

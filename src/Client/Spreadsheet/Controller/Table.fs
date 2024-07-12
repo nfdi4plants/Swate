@@ -1,4 +1,4 @@
-module Spreadsheet.Table.Controller
+module Spreadsheet.Controller.Table
 
 open System.Collections.Generic
 open Shared.TermTypes
@@ -141,7 +141,7 @@ let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet
         let cell = cell|> Option.defaultValue (column.GetDefaultEmptyCell())
         if i = columnIndex then
             for cellRowIndex in 0 .. column.Cells.Length-1 do
-                let cell = cell
+                let cell = cell.Copy()
                 state.ActiveTable.UpdateCellAt(columnIndex, cellRowIndex, cell)
     )
     {state with ArcFile = state.ArcFile}
@@ -165,13 +165,13 @@ let clearCells (indexArr: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet
 open Fable.Core
 open System
 
-let selectRelativeCell (index: int*int) (move: int*int) (table: ArcTable) =
+let selectRelativeCell (index: int*int) (move: int*int) (maxColumnIndex: int) (maxRowIndex: int) =
     //let index =
     //    match index with
     //    | U2.Case2 index -> index,-1
     //    | U2.Case1 index -> index
-    let columnIndex = Math.Min(Math.Max(fst index + fst move, 0), table.ColumnCount-1)
-    let rowIndex = Math.Min(Math.Max(snd index + snd move, 0), table.RowCount-1)
+    let columnIndex = Math.Min(Math.Max(fst index + fst move, 0), maxColumnIndex)
+    let rowIndex = Math.Min(Math.Max(snd index + snd move, 0), maxRowIndex)
     //if rowIndex = -1 then
     //    U2.Case2 columnIndex
     //else

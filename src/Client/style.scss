@@ -20,6 +20,14 @@ $primarye-invert: white;
 @tailwind components;
 @tailwind utilities;
 
+a {
+    color: var(--bulma-link-text);
+    cursor: pointer;
+    text-decoration: none;
+    transition-duration: var(--bulma-duration);
+    transition-property: background-color, border-color, color;
+}
+
 .my-grey-out {
     background-color: cv.getVar("scheme-main-ter");
     color: cv.getVar("link")

@@ -114,7 +114,7 @@ module private Helper =
                 Bulma.dropdownTrigger [
                     Bulma.button.span [
                         Bulma.button.isLarge
-                        Bulma.color.isLink
+                        Bulma.color.isPrimary
                         prop.onClick toggle
                         //prop.onClick(fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
                         prop.children [
