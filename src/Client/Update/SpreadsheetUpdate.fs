@@ -108,13 +108,12 @@ module Spreadsheet =
                 let cmd = Cmd.none
                 state, model, cmd
             | UpdateCell (index, cell) ->
-                let nextState = 
-                    state.ActiveTable.UpdateCellAt(fst index,snd index, cell)
-                    {state with ArcFile = state.ArcFile}
+                Controller.Generic.setCell index cell state
+                let nextState = {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
             | UpdateCells arr ->
+                Controller.Generic.setCells arr state
                 let nextState = 
-                    state.ActiveTable.SetCellsAt arr
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
             | UpdateHeader (index, header) ->
