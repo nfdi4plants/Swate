@@ -10,3 +10,7 @@ insert_final_newline = false
 [*.fs]
 fsharp_multiline_bracket_style = stroustrup
 fsharp_newline_before_multiline_computation_expression = false
+
+[*.fsproj]
+indent_style = space
+indent_size = 2

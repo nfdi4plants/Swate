@@ -100,9 +100,9 @@ module OfficeInterop =
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.createAnnotationTable  
-                    (false,tryUsePrevOutput)
-                    (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
+                    (false, tryUsePrevOutput)
+                    (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg) //success
+                    (curry GenericError Cmd.none >> DevMsg) //error
             state, model,cmd
 
         | AnnotationtableCreated ->

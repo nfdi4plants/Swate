@@ -3,8 +3,6 @@ module BuildingBlock.SearchComponent
 open Feliz
 open Feliz.Bulma
 open Shared
-open TermTypes
-open OfficeInteropTypes
 open Fable.Core.JsInterop
 open Elmish
 open Model.BuildingBlock
@@ -136,11 +134,12 @@ let private addBuildingBlockButton (model: Model) dispatch =
             prop.onClick (fun _ ->
                 let bodyCells =
                     if body.IsSome then // create as many body cells as there are rows in the active table
-                        Array.init (model.SpreadsheetModel.ActiveTable.RowCount) (fun _ -> body.Value)
+                        let rowCount = System.Math.Max(1,model.SpreadsheetModel.ActiveTable.RowCount)
+                        Array.init rowCount (fun _ -> body.Value)
                     else
                         Array.empty                    
                 let column = CompositeColumn.create(header, bodyCells)
-                let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
+                let index = Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
                 let id = $"Header_{index}_Main"
                 scrollIntoViewRetry id

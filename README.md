@@ -75,10 +75,10 @@ Swate runs on localhost:8080 (and swobup on localhost:8000).
 ```
 Usage: ./build.cmd <command>
 
-run (--nodb)                        Start .net backend server, vite frontend (and database, 
-                                    swobup with docker if not `--nodb`)
+run [db]                            Start .net backend server, vite frontend (and database, 
+                                    swobup with docker if `db`)
 
-release (pre)                       Run .net tests tag current branch and force push to 
+release [pre]                       Run .net tests tag current branch and force push to 
                                     release branch (nightly if `pre`), this will trigger
                                     Github release with docker image
 

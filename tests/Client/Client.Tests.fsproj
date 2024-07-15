@@ -15,5 +15,4 @@
     <ProjectReference Include="..\..\src\Client\Client.fsproj" />
     <ProjectReference Include="..\Shared\Shared.Tests.fsproj" />
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

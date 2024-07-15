@@ -84,6 +84,6 @@ module Graph =
         cy <- Some cy_ele
         //cy.Value.useJS(Cytoscape.JS.cxtMenu)
         centerOn(model.TargetAccession)
-        createClickEvent(fun e -> Browser.Dom.console.log( e.target?position() ) )
+        createClickEvent(fun e -> ())
         updateLayout()
         

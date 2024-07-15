@@ -99,21 +99,22 @@ let private addButton (model: Model, dispatch) =
 [<ReactComponent>]
 let Main (model:Model, dispatch) =
     let setTerm = fun (term: OntologyAnnotation option) -> TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
-    div [
-        OnSubmit    (fun e -> e.preventDefault())
-        OnKeyDown   (fun k -> if (int k.which) = 13 then k.preventDefault())
-    ] [
-        pageHeader "Ontology term search"
+    Html.div [
+        prop.onSubmit (fun e -> e.preventDefault())
+        prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
+        prop.children [
+            pageHeader "Ontology term search"
 
-        Bulma.label "Search for an ontology term to fill into the selected field(s)"
+            Bulma.label "Search for an ontology term to fill into the selected field(s)"
 
-        mainFunctionContainer [
-            Bulma.field.div [
-                Components.TermSearch.Input(setTerm, fullwidth=true, size=Bulma.input.isLarge, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch)
+            mainFunctionContainer [
+                Bulma.field.div [
+                    Components.TermSearch.Input(setTerm, fullwidth=true, size=Bulma.input.isLarge, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch)
+                ]
+                addButton(model, dispatch)
             ]
-            addButton(model, dispatch)
         ]
-
+    ]
         //simpleSearchComponent model dispatch
 
         //if model.TermSearchState.SelectedTerm.IsNone then
@@ -133,4 +134,3 @@ let Main (model:Model, dispatch) =
         //    str "No Parent Ontology selected"
         //else
         //    str model.TermSearchState.ParentOntology.Value
-    ]

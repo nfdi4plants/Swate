@@ -105,9 +105,7 @@ let swateCore (model:Model) dispatch =
     
 
 let settingsViewComponent (model:Model) dispatch =
-    div [
-        //Style [MaxWidth "500px"]
-    ] [
+    Html.div [
         pageHeader "Swate Settings"
 
         Bulma.label "Customize Swate"

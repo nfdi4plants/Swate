@@ -4,7 +4,7 @@ open Fable.React
 open Fable.React.Props
 open Shared
 open TermTypes
-open Thoth.Elmish
+open Feliz
 open Routing
 
 type WindowSize =
@@ -52,30 +52,35 @@ type LogItem =
         | InteropLogging.Error  -> Error(System.DateTime.UtcNow,msg.MessageTxt)
         | InteropLogging.Warning -> Warning(System.DateTime.UtcNow,msg.MessageTxt)
 
+    static member private DebugCell = Html.td [prop.style [style.color NFDIColors.LightBlue.Base; style.fontWeight.bold]; prop.text "Debug"]
+    static member private InfoCell = Html.td [prop.style [style.color NFDIColors.Mint.Base; style.fontWeight.bold]; prop.text "Info"]
+    static member private ErrorCell = Html.td [prop.style [style.color NFDIColors.Red.Base; style.fontWeight.bold]; prop.text "ERROR"]
+    static member private WarningCell = Html.td [prop.style [style.color NFDIColors.Yellow.Base; style.fontWeight.bold]; prop.text "Warning"]
+
     static member toTableRow = function
         | Debug (t,m) ->
-            tr [] [
-                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color NFDIColors.LightBlue.Base; FontWeight "bold"]] [str "Debug"]
-                td [] [str m]
+            Html.tr [
+                Html.td (sprintf "[%s]" (t.ToShortTimeString()))
+                LogItem.DebugCell
+                Html.td m
             ]
         | Info  (t,m) ->
-            tr [] [
-                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color NFDIColors.Mint.Base; FontWeight "bold"]] [str "Info"]
-                td [] [str m]
+            Html.tr [
+                Html.td (sprintf "[%s]" (t.ToShortTimeString()))
+                LogItem.InfoCell
+                Html.td m
             ]
         | Error (t,m) ->
-            tr [] [
-                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color NFDIColors.Red.Base; FontWeight "bold"]] [str "ERROR"]
-                td [] [str m]
+            Html.tr [
+                Html.td (sprintf "[%s]" (t.ToShortTimeString()))
+                LogItem.ErrorCell
+                Html.td m
             ]
         | Warning (t,m) ->
-            tr [] [
-                td [] [str (sprintf "[%s]" (t.ToShortTimeString()))]
-                td [Style [Color NFDIColors.Yellow.Base; FontWeight "bold"]] [str "Warning"]
-                td [] [str m]
+            Html.tr [
+                Html.td (sprintf "[%s]" (t.ToShortTimeString()))
+                LogItem.WarningCell
+                Html.td m
             ]
 
     static member ofStringNow (level:string) (message: string) =

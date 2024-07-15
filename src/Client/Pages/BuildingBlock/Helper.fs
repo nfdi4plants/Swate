@@ -1,7 +1,6 @@
 module BuildingBlock.Helper
 
 open Shared
-open OfficeInteropTypes
 open Model
 open Messages
 open ARCtrl

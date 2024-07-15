@@ -19,14 +19,12 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
                 )
             ]
             Html.h5 "Warning: No annotation table found in worksheet"
-            Bulma.field.div [
-                str "Your worksheet seems to contain no annotation table. You can create one by pressing the button below."
-            ]
+            Bulma.field.div "Your worksheet seems to contain no annotation table. You can create one by pressing the button below."
             Bulma.field.div [
                 Bulma.button.button [
                     Bulma.button.isFullWidth
                     prop.onClick (fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
-                    prop.text "create annotation table"
+                    prop.text "Create Annotation Table"
                 ]                
             ]
         ]

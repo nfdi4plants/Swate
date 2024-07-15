@@ -7,7 +7,7 @@ open Messages
 open Model
 open Update
 open Fable.Core.JsInterop
-let _ = importSideEffects "./style.scss"
+importSideEffects "./style.scss"
 
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
@@ -60,6 +60,7 @@ let ARCitect_subscription (initial: Model) : (SubId * Subscribe<Messages.Msg>) l
 open Elmish.Debug
 open Elmish.HMR
 #endif
+open Elmish.React
 
 //+:cnd:noEmit
 Program.mkProgram Init.init Update.update View
@@ -69,7 +70,7 @@ Program.mkProgram Init.init Update.update View
 #endif
 |> Program.withSubscription ARCitect_subscription
 |> Program.toNavigable (parsePath Routing.Routing.route) Update.urlUpdate
-|> Program.withReactSynchronous "elmish-app"
+|> Program.withReactBatched "elmish-app"
 #if DEBUG
 //|> Program.withDebuggerCoders CustomDebugger.modelEncoder CustomDebugger.modelDecoder
 |> Program.withDebugger

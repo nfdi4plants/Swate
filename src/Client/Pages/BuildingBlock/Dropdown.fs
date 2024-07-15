@@ -1,32 +1,43 @@
-﻿module BuildingBlock.Dropdown
+module BuildingBlock.Dropdown
 
 open Feliz
 open Feliz.Bulma
-open Shared
-open TermTypes
-open OfficeInteropTypes
-open Fable.Core.JsInterop
-open Elmish
 open Model.BuildingBlock
-open Model.TermSearch
 open Model
 open Messages
 open ARCtrl
-open BuildingBlock.Helper
-open Fable.Core
 
 
 [<ReactComponent>]
 let FreeTextInputElement(onSubmit: string -> unit) =
     let input, setInput = React.useState ""
-    Html.span [
-        Html.input [
-            prop.onClick (fun e -> e.stopPropagation())
-            prop.onChange (fun (v:string) -> setInput v)
-        ]
-        Html.button [
-            prop.onClick (fun e -> e.stopPropagation(); onSubmit input)
-            prop.text "✅"
+    Bulma.field.div [
+        field.isGrouped
+        prop.className "w-full"
+        prop.children [
+            Bulma.control.div [
+                control.isExpanded
+                prop.children [
+                    Bulma.input.text [
+                        prop.className "min-w-48 !rounded-none"
+                        Bulma.input.isSmall
+                        prop.onClick (fun e -> e.stopPropagation())
+                        prop.onChange (fun (v:string) -> setInput v)
+                        prop.onKeyDown(key.enter, fun e -> e.stopPropagation(); onSubmit input)
+                    ]
+                ]
+            ]
+            Bulma.control.div [
+                Bulma.button.span [
+                    button.isSmall
+                    prop.onClick (fun e -> e.stopPropagation(); onSubmit input)
+                    prop.children [
+                        Bulma.icon [
+                            Html.i [prop.className "fa-solid fa-check"]
+                        ]
+                    ]
+                ]
+            ]
         ]
     ]
 
@@ -99,7 +110,7 @@ module private DropdownElements =
         let setIO (ioType) = 
             { DropdownPage = DropdownPage.Main; DropdownIsActive = false } |> setUiState
             (headerType,ioType) |> BuildingBlock.UpdateHeaderWithIO |> BuildingBlockMsg |> dispatch
-        Bulma.dropdownItem.a [
+        Bulma.dropdownItem.button [
             match iotype with
             | IOType.FreeText s ->
                 let onSubmit = fun (v: string) -> 

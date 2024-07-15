@@ -1,7 +1,5 @@
 module JsonExporter.Core
 
-open Fable.React
-open Fable.React.Props
 open Fable.Core.JsInterop
 open Elmish
 
@@ -351,37 +349,37 @@ type FileExporter =
                         Html.ul [
                             Html.li [
                                 Html.b "ARCtrl"
-                                str ": A simple ARCtrl specific format."
+                                Html.text ": A simple ARCtrl specific format."
                             ]
                             Html.li [
                                 Html.b "ARCtrlCompressed"
-                                str ": A compressed ARCtrl specific format."
+                                Html.text ": A compressed ARCtrl specific format."
                             ]
                             Html.li [
                                 Html.b "ISA"
-                                str ": ISA-JSON format ("
+                                Html.text ": ISA-JSON format ("
                                 Html.a [
                                     prop.target.blank
                                     prop.href "https://isa-specs.readthedocs.io/en/latest/isajson.html#"
                                     prop.text "ISA-JSON"
                                 ]
-                                str ")."
+                                Html.text ")."
                             ]
                             Html.li [
                                 Html.b "ROCrate"
-                                str ": ROCrate format ("
+                                Html.text ": ROCrate format ("
                                 Html.a [
                                     prop.target.blank
                                     prop.href "https://www.researchobject.org/ro-crate/"
                                     prop.text "ROCrate"
                                 ]
-                                str ", "
+                                Html.text ", "
                                 Html.a [
                                     prop.target.blank
                                     prop.href "https://github.com/nfdi4plants/isa-ro-crate-profile/blob/main/profile/isa_ro_crate.md"
                                     prop.text "ISA-Profile"
                                 ]
-                                str ")."
+                                Html.text ")."
                             ]
                         ]
                     ]

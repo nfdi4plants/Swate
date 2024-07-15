@@ -23,21 +23,20 @@ open Feliz.Bulma
 type Templates =
 
     static member Main (model:Model, dispatch) =
-        div [ 
-            OnSubmit (fun e -> e.preventDefault())
-            // https://keycode.info/
-            OnKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-        ] [
-        
-            pageHeader "Templates"
+        Html.div [
+            prop.onSubmit (fun e -> e.preventDefault())
+            prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
+            prop.children [
+                pageHeader "Templates"
 
-            // Box 1
-            Bulma.label "Add template from database."
+                // Box 1
+                Bulma.label "Add template from database."
 
-            TemplateFromDB.Main(model, dispatch)
+                TemplateFromDB.Main(model, dispatch)
 
-            // Box 2
-            Bulma.label "Add template(s) from file."
+                // Box 2
+                Bulma.label "Add template(s) from file."
 
-            TemplateFromFile.Main(model, dispatch)
+                TemplateFromFile.Main(model, dispatch)
+            ]
         ]

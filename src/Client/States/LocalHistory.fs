@@ -88,7 +88,9 @@ module ConversionTypes =
                 let arcFile = 
                     match this.JsonArcFiles with
                     | JsonArcFiles.Investigation -> ArcInvestigation.fromCompressedJsonString this.JsonString |> ArcFiles.Investigation |> Some
-                    | JsonArcFiles.Study -> ArcStudy.fromCompressedJsonString this.JsonString |> fun s -> ArcFiles.Study(s, []) |> Some
+                    | JsonArcFiles.Study ->
+                        let s = ArcStudy.fromCompressedJsonString this.JsonString
+                        ArcFiles.Study(s, []) |> Some
                     | JsonArcFiles.Assay -> ArcAssay.fromCompressedJsonString this.JsonString |> ArcFiles.Assay |> Some
                     | JsonArcFiles.Template -> Template.fromJsonString this.JsonString |> ArcFiles.Template |> Some
                     | JsonArcFiles.None -> None

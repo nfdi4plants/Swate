@@ -28,12 +28,11 @@ let private StartAdvancedSearch (state: AdvancedSearch.Model) setState dispatch 
     AdvancedSearch.Msg.GetSearchResults {|config=state.AdvancedSearchOptions; responseSetter = setter|}  |> AdvancedSearchMsg |> dispatch
 
 let private createLinkOfAccession (accession:string) =
-    a [
-        let link = accession |> URLs.termAccessionUrlOfAccessionStr
-        Href link
-        Target "_Blank"
-    ] [
-        str accession
+    let link = accession |> URLs.termAccessionUrlOfAccessionStr
+    Html.a [
+        prop.href link
+        prop.target.blank
+        prop.text accession
     ]
 
 let private isValidAdancedSearchOptions (opt:AdvancedSearchOptions) =
@@ -109,24 +108,24 @@ module private ResultsTable =
                         prop.tabIndex 0
                         prop.className "suggestion"
                         prop.children [
-                            td [] [
-                                b [] [ str sugg.Name ]
-                            ]
+                            Html.td [Html.b sugg.Name ]
                             if sugg.IsObsolete then
-                                td [Style [Color "red"]] [str "obsolete"]
+                                Html.td [prop.style [style.color "red"]; prop.text "obsolete"]
                             else
-                                td [] []
-                            td [
-                                OnClick (
+                                Html.td []
+                            Html.td [
+                                prop.onClick (
                                     fun e ->
                                         e.stopPropagation()
                                 )
-                                Style [FontWeight "light"]
-                            ] [
-                                small [] [
-                                    createLinkOfAccession sugg.Accession
-                            ] ]
-                            td [] [
+                                prop.style [style.fontWeight.lighter]
+                                prop.children [
+                                    Html.small [
+                                        createLinkOfAccession sugg.Accession
+                                    ]
+                                ]
+                            ]
+                            Html.td [
                                 Bulma.buttons [
                                     Bulma.buttons.isRight
                                     prop.children [
@@ -176,10 +175,13 @@ module private ResultsTable =
                         prop.className "suggestion-details"
                         prop.style [if List.contains id state.ActiveDropdowns then style.visibility.visible else style.visibility.collapse]
                         prop.children [
-                            td [ColSpan 4] [
-                                Bulma.content [
-                                    b [] [ str "Definition: " ]
-                                    str sugg.Description
+                            Html.td [
+                                prop.colSpan 4
+                                prop.children [
+                                    Bulma.content [
+                                        Html.b "Definition: "
+                                        Html.text sugg.Description
+                                    ]
                                 ]
                             ]
                         ]
@@ -189,7 +191,7 @@ module private ResultsTable =
         else
             [|
                 Html.tr [
-                    td [] [str "No terms found matching your input."]
+                    Html.td "No terms found matching your input."
                 ]
             |]
 
@@ -217,8 +219,8 @@ module private ResultsTable =
                 Bulma.table [
                     Bulma.table.isFullWidth
                     prop.children [
-                        thead [] []
-                        tbody [] (
+                        Html.thead []
+                        Html.tbody (
                             chunked.[currentPageinationIndex] |> List.ofArray
                         )
                     ]
@@ -258,21 +260,25 @@ module private ResultsTable =
 
 let private keepObsoleteCheckradioElement (state:AdvancedSearch.Model) setState =
     let currentKeepObsolete = state.AdvancedSearchOptions.KeepObsolete
-    let checkradioName = "keepObsolete_checkradio"
-    let id = sprintf "%s"checkradioName
     Bulma.field.div [
-        Bulma.Checkradio.checkbox [
-            prop.name checkradioName
-            prop.id id
-            prop.isChecked (state.AdvancedSearchOptions.KeepObsolete)
-            prop.onChange (fun (e:bool) ->
-                {state with AdvancedSearch.Model.AdvancedSearchOptions.KeepObsolete = not currentKeepObsolete}
-                |> setState
-            )
-        ]
-        Html.label [
-            prop.htmlFor id
-            prop.text (if currentKeepObsolete then "yes" else "no")
+        Bulma.control.div [
+            Html.label [
+                prop.className "checkbox"
+                prop.children [
+                    Html.input [
+                        prop.type'.checkbox
+                        prop.isChecked (state.AdvancedSearchOptions.KeepObsolete)
+                        prop.onChange (fun (e:bool) ->
+                            {state with AdvancedSearch.Model.AdvancedSearchOptions.KeepObsolete = e}
+                            |> setState
+                        )
+                    ]
+                    Html.span [
+                        prop.className "is-unselectable"
+                        prop.text (if currentKeepObsolete then " yes" else " no")
+                    ]
+                ]
+            ]
         ]
     ]
 
@@ -360,9 +366,7 @@ let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.
         //]
         Bulma.field.div [
             Bulma.label "Keep obsolete terms"
-            Html.div [
-                keepObsoleteCheckradioElement state setState
-            ]
+            keepObsoleteCheckradioElement state setState
         ]
     ]
 

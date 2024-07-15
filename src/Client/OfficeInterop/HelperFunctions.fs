@@ -320,47 +320,45 @@ let findIndexNextNotHiddenCol (headerVals:obj option []) (startIndex:float) =
 //        )
 
 open System
-open Fable.SimpleXml
-open Fable.SimpleXml.Generator
 
-let getCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
-    promise {
-        let! getXml =
-            context.sync().``then``(fun e ->
-                let items = customXmlParts.items
-                let xmls = items |> Seq.map (fun x -> x.getXml() )
+//let getCustomXml (customXmlParts:CustomXmlPartCollection) (context:RequestContext) =
+//    promise {
+//        let! getXml =
+//            context.sync().``then``(fun e ->
+//                let items = customXmlParts.items
+//                let xmls = items |> Seq.map (fun x -> x.getXml() )
 
-                xmls |> Array.ofSeq
-            )
+//                xmls |> Array.ofSeq
+//            )
 
-        let! xml =
-            context.sync().``then``(fun e ->
+//        let! xml =
+//            context.sync().``then``(fun e ->
 
-                //let nOfItems = customXmlParts.items.Count
-                let vals = getXml |> Array.map (fun x -> x.value)
-                //sprintf "N = %A; items: %A" nOfItems vals
-                let xml = vals |> String.concat Environment.NewLine
-                xml
-            )
+//                //let nOfItems = customXmlParts.items.Count
+//                let vals = getXml |> Array.map (fun x -> x.value)
+//                //sprintf "N = %A; items: %A" nOfItems vals
+//                let xml = vals |> String.concat Environment.NewLine
+//                xml
+//            )
 
-        let xmlParsed =
-            let isRootElement = xml |> SimpleXml.tryParseElement
-            if xml = "" then
-                "<customXml></customXml>" |> SimpleXml.parseElement
-            elif isRootElement.IsSome then
-                isRootElement.Value
-            else
-                let isManyRootElements = xml |> SimpleXml.tryParseManyElements
-                if isManyRootElements.IsSome then
-                    isManyRootElements.Value
-                    |> List.tryFind (fun ele -> ele.Name = "customXml")
-                    |> fun customXmlOpt -> if customXmlOpt.IsSome then customXmlOpt.Value else failwith "Swate could not find expected '<customXml>..</customXml>' root tag."
-                else
-                    failwith "Swate could not parse Workbook Custom Xml Parts. Had neither one root nor many root elements. Please contact the developer."
-        if xmlParsed.Name <> "customXml" then failwith (sprintf "Swate found unexpected root xml element: %s" xmlParsed.Name)
+//        let xmlParsed =
+//            let isRootElement = xml |> SimpleXml.tryParseElement
+//            if xml = "" then
+//                "<customXml></customXml>" |> SimpleXml.parseElement
+//            elif isRootElement.IsSome then
+//                isRootElement.Value
+//            else
+//                let isManyRootElements = xml |> SimpleXml.tryParseManyElements
+//                if isManyRootElements.IsSome then
+//                    isManyRootElements.Value
+//                    |> List.tryFind (fun ele -> ele.Name = "customXml")
+//                    |> fun customXmlOpt -> if customXmlOpt.IsSome then customXmlOpt.Value else failwith "Swate could not find expected '<customXml>..</customXml>' root tag."
+//                else
+//                    failwith "Swate could not parse Workbook Custom Xml Parts. Had neither one root nor many root elements. Please contact the developer."
+//        if xmlParsed.Name <> "customXml" then failwith (sprintf "Swate found unexpected root xml element: %s" xmlParsed.Name)
 
-        return xmlParsed
-    }
+//        return xmlParsed
+//    }
 
 //let getAllSwateTableValidation (xmlParsed:XmlElement) =
 //    let protocolGroups = SimpleXml.findElementsByName Xml.ValidationTypes.ValidationXmlRoot xmlParsed

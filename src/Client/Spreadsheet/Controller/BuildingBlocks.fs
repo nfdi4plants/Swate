@@ -1,8 +1,7 @@
-module Spreadsheet.BuildingBlocks.Controller
+module Spreadsheet.Controller.BuildingBlocks
 
 open System.Collections.Generic
 open Shared.TermTypes
-open Shared.OfficeInteropTypes
 open Spreadsheet
 open Types
 open ARCtrl
@@ -70,17 +69,12 @@ let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptio
     {state with ArcFile = state.ArcFile}
 
 let insertTerm_IntoSelected (term:OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let table = state.ActiveTable
     let selected = state.SelectedCells |> Set.toArray
     SanityChecks.verifyOnlyOneColumnSelected selected
-    let column = table.GetColumn(fst selected[0]) //can use [0] as we verify we only have one column selected. 
     for (colIndex, rowIndex) in selected do
-        let c = table.TryGetCellAt(colIndex,rowIndex)
-        let newCell = 
-            match c with
-            | Some cc -> cc.UpdateWithOA term
-            | None -> column.GetDefaultEmptyCell().UpdateWithOA term
-        table.UpdateCellAt(colIndex,rowIndex, newCell)
+        let c = Generic.getCell (colIndex,rowIndex) state
+        let newCell = c.UpdateWithOA term
+        Controller.Generic.setCell (colIndex,rowIndex) newCell state
     {state with ArcFile = state.ArcFile}
 
 //let insertCells_IntoSelected (term:CompositeCell []) (state: Spreadsheet.Model) : Spreadsheet.Model =
