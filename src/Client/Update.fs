@@ -243,9 +243,9 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             nextModel, cmd
 
         | OfficeInteropMsg excelMsg ->
-            let nextState,nextModel0,nextCmd = Update.OfficeInterop.update model.ExcelState currentModel excelMsg
+            let nextState,nextModel0, nextCmd = Update.OfficeInterop.update model.ExcelState currentModel excelMsg
             let nextModel = {nextModel0 with ExcelState = nextState}
-            nextModel,nextCmd
+            nextModel, nextCmd
 
         | SpreadsheetMsg msg ->
             let nextState, nextModel, nextCmd = Update.Spreadsheet.update currentModel.SpreadsheetModel currentModel msg
@@ -256,7 +256,7 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             Update.Interface.update currentModel msg
 
         | TermSearchMsg termSearchMsg ->
-            let nextTermSearchState,nextCmd =
+            let nextTermSearchState, nextCmd =
                 currentModel.TermSearchState
                 |> TermSearch.update termSearchMsg
 
@@ -264,23 +264,23 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                 currentModel with
                     TermSearchState = nextTermSearchState
             }
-            nextModel,nextCmd
+            nextModel, nextCmd
         | AdvancedSearchMsg msg ->
             let nextModel, cmd = AdvancedSearch.update msg model
 
             nextModel, cmd
 
         | DevMsg msg ->
-            let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
+            let nextDevState, nextCmd = currentModel.DevState |> Dev.update msg
         
             let nextModel = {
                 currentModel with
                     DevState = nextDevState
             }
-            nextModel,nextCmd
+            nextModel, nextCmd
 
         | PersistentStorageMsg persistentStorageMsg ->
-            let nextPersistentStorageState,nextCmd =
+            let nextPersistentStorageState, nextCmd =
                 currentModel.PersistentStorageState
                 |> handlePersistenStorageMsg persistentStorageMsg
 
@@ -289,10 +289,10 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                     PersistentStorageState = nextPersistentStorageState
             }
 
-            nextModel,nextCmd
+            nextModel, nextCmd
 
         | FilePickerMsg filePickerMsg ->
-            let nextFilePickerState,nextCmd =
+            let nextFilePickerState, nextCmd =
                 currentModel.FilePickerState
                 |> FilePicker.update filePickerMsg
 
@@ -301,10 +301,10 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                     FilePickerState = nextFilePickerState
             }
 
-            nextModel,nextCmd
+            nextModel, nextCmd
 
         | BuildingBlockMsg addBuildingBlockMsg ->
-            let nextAddBuildingBlockState,nextCmd = 
+            let nextAddBuildingBlockState, nextCmd = 
                 currentModel.AddBuildingBlockState
                 |> BuildingBlock.Core.update addBuildingBlockMsg
 

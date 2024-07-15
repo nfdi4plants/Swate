@@ -27,14 +27,18 @@ module OfficeInteropExtensions =
         /// </summary>
         /// <param name="context"></param>
         /// <param name="tableName"></param>
-        static member getTableByName (context:RequestContext) (tableName:string) =
+        static member tryGetTableByName (context:RequestContext) (tableName:string) =
             let _ = context.workbook.load(U2.Case1 "tables")
             let annotationTable = context.workbook.tables.getItem(tableName)
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-            let annoBodyRange = annotationTable.getDataBodyRange()
-            let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
-            annotationTable, annoHeaderRange, annoBodyRange
+
+            if tableName = null || tableName = "" then
+                None
+            else 
+                let annoHeaderRange = annotationTable.getHeaderRowRange()
+                let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+                let annoBodyRange = annotationTable.getDataBodyRange()
+                let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+                Some (annotationTable, annoHeaderRange, annoBodyRange)
 
         /// <summary>
         /// Swaps 'Rows with column values' to 'Columns with row values'
@@ -100,31 +104,35 @@ module OfficeInteropExtensions =
 
                 columns
 
-        static member fromExcelTableName (tableName:string, context:RequestContext) =
+        static member tryFromExcelTableName (tableName:string, context:RequestContext) =
 
-            let _, headerRange, bodyRowRange = ExcelHelper.getTableByName context tableName
+            let result = ExcelHelper.tryGetTableByName context tableName
+
             promise {
-                let! inMemoryTable = context.sync().``then``(fun _ ->
-                    let headers =
-                        headerRange.values.[0]
-                        |> Seq.map (fun item ->
-                            item
-                            |> Option.map string
-                            |> Option.defaultValue ""
-                        )
-                    let bodyRows =
-                        bodyRowRange.values
-                        |> Seq.map (fun items ->
-                            items
+                if result.IsSome then
+                    let _, headerRange, bodyRowRange = result.Value
+                    let! inMemoryTable = context.sync().``then``(fun _ ->
+                        let headers =
+                            headerRange.values.[0]
                             |> Seq.map (fun item ->
                                 item
                                 |> Option.map string
                                 |> Option.defaultValue ""
                             )
-                        )
-                    ArcTable.fromStringSeqs(tableName, headers, bodyRows)
-                )
-                return inMemoryTable
+                        let bodyRows =
+                            bodyRowRange.values
+                            |> Seq.map (fun items ->
+                                items
+                                |> Seq.map (fun item ->
+                                    item
+                                    |> Option.map string
+                                    |> Option.defaultValue ""
+                                )
+                            )
+                        ArcTable.fromStringSeqs(tableName, headers, bodyRows)
+                    )
+                    return inMemoryTable
+                else return None
             }
 
 open OfficeInteropExtensions
@@ -201,7 +209,7 @@ let swateSync (context:RequestContext) =
     context.sync().``then``(fun _ -> ())
 
 /// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
-let getPrevAnnotationTableName (context:RequestContext) =
+let tryGetPrevAnnotationTableName (context:RequestContext) =
     promise {
     
         let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
@@ -221,8 +229,8 @@ let getPrevAnnotationTableName (context:RequestContext) =
                     else
                         None
                 )
-                |> Array.filter(fun (wp,tableName) -> activeWorksheetPosition - wp > 0.)
-                |> Array.sortBy(fun (wp,tableName) ->
+                |> Array.filter(fun (wp, _) -> activeWorksheetPosition - wp > 0.)
+                |> Array.sortBy(fun (wp, _) ->
                     activeWorksheetPosition - wp
                 )
                 |> Array.tryHead
@@ -238,17 +246,64 @@ let getPrevAnnotationTableName (context:RequestContext) =
 // I sort by the resulting lowest number (since the worksheet is then closest to the active one), I find the output column in the particular
 // annotationTable and use the values it contains for the new annotationTable in the active worksheet.
 
+/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
+let tryGetActiveAnnotationTableName (context:RequestContext) =
+    promise {
+    
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+        let tables = context.workbook.tables
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+
+        let! activeTableName = context.sync().``then``(fun _ ->
+            let activeWorksheetPosition = activeWorksheet.position
+            /// Get name of the table of currently active worksheet.
+            let activeTable =
+                tables.items
+                |> Seq.toArray
+                |> Array.tryFind (fun table ->
+                    table.name.StartsWith("annotationTable") && table.worksheet.position = activeWorksheetPosition
+                )
+
+            if activeTable.IsSome then
+                Some activeTable.Value.name
+            else
+                None
+        )
+
+        return activeTableName
+    }
+
+/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
+let tryGetAnnotationTableByName (context:RequestContext) (name:string)=
+    promise {
+    
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let tables = context.workbook.tables
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+
+        let! activeTable = context.sync().``then``(fun _ ->
+            tables.items
+            |> Seq.toArray
+            |> Array.tryFind (fun table ->
+                table.name = name
+            )
+        )
+
+        return activeTable
+    }
+
 /// <summary>
 /// Get the previous arc table to the active worksheet
 /// </summary>
 /// <param name="context"></param>
 let tryGetPrevTable (context:RequestContext) =
     promise {
-        let! prevTableName = getPrevAnnotationTableName context
+        let! prevTableName = tryGetPrevAnnotationTableName context
 
         if prevTableName.IsSome then
         
-            let! result = ArcTable.fromExcelTableName (prevTableName.Value, context)
+            let! result = ArcTable.tryFromExcelTableName (prevTableName.Value, context)
             return result
 
         else
@@ -583,7 +638,7 @@ let getBuildingBlocksAndSheets() =
 
             let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
             let tables = context.workbook.tables
-            let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "values"|]))
+            let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "values"|]))
 
             let! worksheetAnnotationTableNames = context.sync().``then``(fun _ ->
                 /// Get all names of all tables in the whole workbook.
@@ -680,9 +735,9 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
             // Ref. 2
             // This is necessary to place new columns next to selected col
             let annoHeaderRange = annotationTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
+            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"; "columnIndex"; "columnCount"; "rowIndex"|]))
             let tableRange = annotationTable.getRange()
-            let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+            let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount"; "rowCount"])))
             let selectedRange = context.workbook.getSelectedRange()
             let _ = selectedRange.load(U2.Case1 "columnIndex")
 
@@ -798,31 +853,109 @@ let replaceOutputColumn (annotationTableName:string) (existingOutputColumn: Buil
         }
     )
 
+let updateInputColumn (context:RequestContext) (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+    let inputColumnName = arcTable.TryGetInputColumn().Value.Header.ToString()
+
+    let columns = annotationTable.columns
+    let inputColumn =
+        columns.items
+        |> Array.ofSeq
+        |> Array.tryFind(fun col -> col.name = inputColumnName)
+
+    if inputColumn.IsSome then
+        
+        //let col =
+        //    inputColumn.Value.values.[0]
+        //    |> Array.ofSeq
+        //    |> Array.map (fun item ->
+        //        if item.IsSome then item.Value.ToString()
+        //        else "")
+        //    |> Array.map(fun value ->
+        //        createMatrixForTables 1 ((int) annotationTable.rows.count) value)
+        //    |> Array.head
+
+        //let rows =
+        //    bodyRange.values.[0]
+        //    |> Array.ofSeq
+        //    |> Array.map (fun item ->
+        //        if item.IsSome then item.Value.ToString()
+        //        else "")
+        //    |> Array.map(fun value ->
+        //        log("rows.value", value)
+        //        createMatrixForTables 1 ((int) annotationTable.rows.count) value)
+        //    |> Array.head
+
+        let oldInputColumn = annotationTable.columns.items.[(int) inputColumn.Value.index].name
+
+        if oldInputColumn <> newBB.Header.ToString() then
+            annotationTable.columns.items.[(int) inputColumn.Value.index].name <- newBB.Header.ToString()
+
+        let warningMsg =
+            if oldInputColumn = newBB.Header.ToString() then
+                $"Found existing input column \"{oldInputColumn}\". Did not change the column because the new input column is the same \"{annotationTable.columns.items.[(int) inputColumn.Value.index].name}\"."
+            else                
+                $"Found existing input column \"{oldInputColumn}\". Changed input column to \"{annotationTable.columns.items.[(int) inputColumn.Value.index].name}\"."
+
+        let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+
+        let loggingList = [
+            msg
+        ]
+
+        loggingList
+    else
+        failwith "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
+
+let addInputColumn (context:RequestContext) (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+
+    let msg = InteropLogging.Msg.create InteropLogging.Warning "Should not happen. We are testing Update at the moment."
+
+    let loggingList = [
+            msg
+    ]
+
+    loggingList
+
 /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
-let addAnnotationBlockHandler (newBB:InsertBuildingBlock) =
+let addAnnotationBlockHandler (newBB:CompositeColumn) =
     Excel.run(fun context ->
         promise {
 
-            let! annotationTableName = getActiveAnnotationTableName context
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
+            //let activeSheet = context.workbook.worksheets.getActiveWorksheet()
+            //Try to get the name of the currently active sheet
+            let! annotationTableName = tryGetActiveAnnotationTableName context
 
-            let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
+            //When a name is available get the annotation and arctable for easy access of indices and value adaption
+            //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
+            let! annotationTable =
+                if annotationTableName.IsSome then tryGetAnnotationTableByName context annotationTableName.Value
+                else tryGetAnnotationTableByName context ""
 
-            // comment out, to reenable inserting multiple duplicate building block
-            //checkIfBuildingBlockExisting newBB existingBuildingBlocks
+            //Arctable enables a fast check for the existence of input- and output-columns and their indices
+            let! arcTable =
+                if annotationTableName.IsSome then ArcTable.tryFromExcelTableName(annotationTableName.Value, context)
+                else ArcTable.tryFromExcelTableName("", context)
 
-            checkHasExistingInput newBB existingBuildingBlocks
-            checkIfBuildingBlockExisting newBB existingBuildingBlocks
-            // if newBB is output column and output column already exists in table this returns (Some outputcolumn-building-block), else None.
-            let outputColOpt = checkHasExistingOutput newBB existingBuildingBlocks
+            //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
+            if annotationTable.IsSome && arcTable.IsSome then
+                let bodyRange = annotationTable.Value.getDataBodyRange()
+                let _ =
+                    bodyRange.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
+                    annotationTable.Value.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
+                    annotationTable.Value.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
+                
+                let! result = context.sync().``then``(fun _ ->
+                    if newBB.Header.isInput then
+                        if arcTable.Value.TryGetInputColumn().IsSome then
+                            updateInputColumn context annotationTable.Value arcTable.Value newBB
+                        else addInputColumn context annotationTable.Value arcTable.Value newBB
 
-            let! res = 
-                match outputColOpt with
-                | Some existingOutputColumn -> replaceOutputColumn annotationTableName existingOutputColumn newBB 
-                | None -> addAnnotationBlock newBB
-
-            return res
+                    else
+                        failwith("New column should be input column")
+                )
+                return result
+            else
+                return [InteropLogging.Msg.create InteropLogging.Warning $"A table is missing! annotationTable: {annotationTable.IsSome}; arcTable: {arcTable.IsSome}"]
         } 
     )
 
@@ -1030,35 +1163,36 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
         return logging
     } 
 
-let addAnnotationBlocks (buildingBlocks:InsertBuildingBlock []) =
+let addAnnotationBlocks (buildingBlocks:CompositeColumn []) =
     Excel.run(fun context ->
 
         promise {
 
-            let! tryTable = tryFindActiveAnnotationTable()
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            //let! tryTable = tryFindActiveAnnotationTable()
+            //let sheet = context.workbook.worksheets.getActiveWorksheet()
 
-            let! annotationTable, logging =
-                match tryTable with
-                | Success table ->
-                    (
-                        sheet.tables.getItem(table),
-                        InteropLogging.Msg.create InteropLogging.Info "Found annotation table for template insert!"
-                    )
-                    |> JS.Constructors.Promise.resolve
-                | Error e ->
-                    let range =
-                        // not sure if this try...with is necessary as on creating a new worksheet it will autoselect the A1 cell.
-                        try
-                            context.workbook.getSelectedRange()
-                        with
-                            | e -> sheet.getUsedRange()
-                    createAnnotationTableAtRange(false,false,range,context)
+            //let! annotationTable, logging =
+            //    match tryTable with
+            //    | Success table ->
+            //        (
+            //            sheet.tables.getItem(table),
+            //            InteropLogging.Msg.create InteropLogging.Info "Found annotation table for template insert!"
+            //        )
+            //        |> JS.Constructors.Promise.resolve
+            //    | Error e ->
+            //        let range =
+            //            // not sure if this try...with is necessary as on creating a new worksheet it will autoselect the A1 cell.
+            //            try
+            //                context.workbook.getSelectedRange()
+            //            with
+            //                | e -> sheet.getUsedRange()
+            //        createAnnotationTableAtRange(false,false,range,context)
 
             
-            let! addBlocksLogging = addAnnotationBlocksToTable(buildingBlocks,annotationTable,context)
+            //let! addBlocksLogging = addAnnotationBlocksToTable(buildingBlocks,annotationTable,context)
 
-            return logging::addBlocksLogging
+            //return logging::addBlocksLogging
+            return [InteropLogging.Msg.create InteropLogging.Warning "Stop!"]
         } 
     )
 
