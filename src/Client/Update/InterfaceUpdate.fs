@@ -109,13 +109,13 @@ module Interface =
                 let cmd = Spreadsheet.AddAnnotationBlock minBuildingBlockInfo |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | AddAnnotationBlocks compositeColumn ->
+        | AddAnnotationBlocks compositeColumns ->
             match host with
             | Some Swatehost.Excel ->
-                let cmd = OfficeInterop.AddAnnotationBlocks compositeColumn |> OfficeInteropMsg |> Cmd.ofMsg
+                let cmd = OfficeInterop.AddAnnotationBlocks compositeColumns |> OfficeInteropMsg |> Cmd.ofMsg
                 model, cmd
             | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                let cmd = Spreadsheet.AddAnnotationBlocks compositeColumn |> SpreadsheetMsg |> Cmd.ofMsg
+                let cmd = Spreadsheet.AddAnnotationBlocks compositeColumns |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | JoinTable (table, index, options) ->

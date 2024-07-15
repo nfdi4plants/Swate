@@ -51,6 +51,14 @@ module OfficeInteropExtensions =
             |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
             |> Seq.toArray
 
+        static member addCollumn (annotationTable:Table) name rowCount value =
+            let col = createMatrixForTables 1 rowCount value
+            annotationTable.columns.add(
+                index   = -1.,
+                values  = U4.Case1 (col),
+                name    = name
+            )
+
     type ArcTable with
 
         /// <summary>
@@ -133,6 +141,38 @@ module OfficeInteropExtensions =
                     )
                     return inMemoryTable
                 else return None
+            }
+
+        static member tryGetFromExcelTable (annotationTable:Table, context:RequestContext) =
+
+            promise {
+                    //Get headers and body
+                    let headerRange = annotationTable.getHeaderRowRange()
+                    let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+                    let bodyRowRange = annotationTable.getDataBodyRange()
+                    let _ = bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+
+                    let! inMemoryTable = context.sync().``then``(fun _ ->
+                        let headers =
+                            headerRange.values.[0]
+                            |> Seq.map (fun item ->
+                                item
+                                |> Option.map string
+                                |> Option.defaultValue ""
+                            )
+                        let bodyRows =
+                            bodyRowRange.values
+                            |> Seq.map (fun items ->
+                                items
+                                |> Seq.map (fun item ->
+                                    item
+                                    |> Option.map string
+                                    |> Option.defaultValue ""
+                                )
+                            )
+                        ArcTable.fromStringSeqs(annotationTable.name, headers, bodyRows)
+                    )
+                    return inMemoryTable
             }
 
 open OfficeInteropExtensions
@@ -874,17 +914,15 @@ let updateInputColumn (annotationTable:Table) (arcTable:ArcTable) (newBB:Composi
 
     if inputColumn.IsSome then
 
-        let oldInputColumn = annotationTable.columns.items.[(int) inputColumn.Value.index].name
-
         //Only update the input column when it has a new value
-        if oldInputColumn <> newBB.Header.ToString() then
+        if inputColumnName <> newBB.Header.ToString() then
             annotationTable.columns.items.[(int) inputColumn.Value.index].name <- newBB.Header.ToString()
 
         let warningMsg =
-            if oldInputColumn = newBB.Header.ToString() then
-                $"Found existing input column \"{oldInputColumn}\". Did not change the column because the new input column is the same \"{annotationTable.columns.items.[(int) inputColumn.Value.index].name}\"."
+            if inputColumnName = newBB.Header.ToString() then
+                $"Found existing input column \"{inputColumnName}\". Did not change the column because the new input column is the same \"{annotationTable.columns.items.[(int) inputColumn.Value.index].name}\"."
             else                
-                $"Found existing input column \"{oldInputColumn}\". Changed input column to \"{annotationTable.columns.items.[(int) inputColumn.Value.index].name}\"."
+                $"Found existing input column \"{inputColumnName}\". Changed input column to \"{annotationTable.columns.items.[(int) inputColumn.Value.index].name}\"."
 
         let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
 
@@ -911,15 +949,7 @@ let addInputColumn (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeC
 
         let rowCount = arcTable.RowCount + 1
 
-        let createCol name =
-            let col value = createMatrixForTables 1 rowCount value
-            annotationTable.columns.add(
-                index   = -1.,
-                values  = U4.Case1 (col ""),
-                name    = name
-            )
-
-        let newColumn = createCol (newBB.Header.ToString())
+        let newColumn = ExcelHelper.addCollumn annotationTable (newBB.Header.ToString()) rowCount ""
         let columnBody = newColumn.getDataBodyRange()
         // Fit column width to content
         columnBody.format.autofitColumns()
@@ -953,17 +983,15 @@ let updateOutputColumn (annotationTable:Table) (arcTable:ArcTable) (newBB:Compos
 
     if outputColumn.IsSome then
 
-        let oldOutputColumn = annotationTable.columns.items.[(int) outputColumn.Value.index].name
-
         //Only update the output column when it has a new value
-        if oldOutputColumn <> newBB.Header.ToString() then
+        if outputColumnName <> newBB.Header.ToString() then
             annotationTable.columns.items.[(int) outputColumn.Value.index].name <- newBB.Header.ToString()
 
         let warningMsg =
-            if oldOutputColumn = newBB.Header.ToString() then
-                $"Found existing output column \"{oldOutputColumn}\". Did not change the column because the new output column is the same \"{annotationTable.columns.items.[(int) outputColumn.Value.index].name}\"."
+            if outputColumnName = newBB.Header.ToString() then
+                $"Found existing output column \"{outputColumnName}\". Did not change the column because the new output column is the same \"{annotationTable.columns.items.[(int) outputColumn.Value.index].name}\"."
             else                
-                $"Found existing output column \"{oldOutputColumn}\". Changed output column to \"{annotationTable.columns.items.[(int) outputColumn.Value.index].name}\"."
+                $"Found existing output column \"{outputColumnName}\". Changed output column to \"{annotationTable.columns.items.[(int) outputColumn.Value.index].name}\"."
 
         let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
 
@@ -990,15 +1018,7 @@ let addOutputColumn (annotationTable:Table) (arcTable:ArcTable) (newBB:Composite
 
         let rowCount = arcTable.RowCount + 1
 
-        let createCol name =
-            let col value = createMatrixForTables 1 rowCount value
-            annotationTable.columns.add(
-                index   = -1.,
-                values  = U4.Case1 (col ""),
-                name    = name
-            )
-
-        let newColumn = createCol (newBB.Header.ToString())
+        let newColumn = ExcelHelper.addCollumn annotationTable (newBB.Header.ToString()) rowCount ""
         let columnBody = newColumn.getDataBodyRange()
         // Fit column width to content
         columnBody.format.autofitColumns()
@@ -1024,32 +1044,45 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
             //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
             let! annotationTable =
                 if annotationTableName.IsSome then tryGetAnnotationTableByName context annotationTableName.Value
-                else tryGetAnnotationTableByName context ""
+                else promise { return None }
 
             //Arctable enables a fast check for the existence of input- and output-columns and their indices
             let! arcTable =
-                if annotationTableName.IsSome then ArcTable.tryFromExcelTableName(annotationTableName.Value, context)
-                else ArcTable.tryFromExcelTableName("", context)
+                
+                if annotationTable.IsSome then
+                    ArcTable.tryGetFromExcelTable(annotationTable.Value, context)
+                else promise { return None }
 
             //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
-            if annotationTable.IsSome && arcTable.IsSome then
+            if arcTable.IsSome then
                 let _ =
                     annotationTable.Value.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
                     annotationTable.Value.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
-                
-                let! result = context.sync().``then``(fun _ ->
-                    if newBB.Header.isInput then
-                        if arcTable.Value.TryGetInputColumn().IsSome then
-                            updateInputColumn annotationTable.Value arcTable.Value newBB
-                        else addInputColumn annotationTable.Value arcTable.Value newBB
 
-                    else
-                        if newBB.Header.isOutput then
-                            if arcTable.Value.TryGetOutputColumn().IsSome then
-                                updateOutputColumn annotationTable.Value arcTable.Value newBB
-                            else addOutputColumn annotationTable.Value arcTable.Value newBB
-                        else failwith("New column should be output column")
+                let (|Input|_|) (newBuildingBlock:CompositeColumn) =
+                    if newBuildingBlock.Header.isOutput then
+                        if arcTable.Value.TryGetInputColumn().IsSome then
+                            Some (updateInputColumn annotationTable.Value arcTable.Value newBuildingBlock)
+                        else Some (addInputColumn annotationTable.Value arcTable.Value newBuildingBlock)
+                    else None
+
+                let (|Output|_|) (newBuildingBlock:CompositeColumn) =
+                    if newBuildingBlock.Header.isOutput then
+                        if arcTable.Value.TryGetInputColumn().IsSome then
+                            Some (updateOutputColumn annotationTable.Value arcTable.Value newBuildingBlock)
+                        else Some (addOutputColumn annotationTable.Value arcTable.Value newBuildingBlock)
+                    else None
+
+                let getResult (newBuildingBlock:CompositeColumn) =
+                    match newBuildingBlock with
+                    | Input msg -> msg
+                    | Output msg -> msg
+                    | _ -> failwith "No result is available! This should not happen! Please report this as a bug to the developers."
+
+                let! result = context.sync().``then``(fun _ ->
+                    getResult newBB
                 )
+
                 return result
             else
                 return [InteropLogging.Msg.create InteropLogging.Warning $"A table is missing! annotationTable: {annotationTable.IsSome}; arcTable: {arcTable.IsSome}"]
