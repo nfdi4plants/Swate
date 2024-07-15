@@ -853,8 +853,18 @@ let replaceOutputColumn (annotationTableName:string) (existingOutputColumn: Buil
         }
     )
 
-let updateInputColumn (context:RequestContext) (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
-    let inputColumnName = arcTable.TryGetInputColumn().Value.Header.ToString()
+/// <summary>
+/// Update an existing inputcolumn of an annotation table
+/// </summary>
+/// <param name="annotationTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+let updateInputColumn (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+
+    let possibleInputColumn = arcTable.TryGetInputColumn()
+    let inputColumnName =
+        if possibleInputColumn.IsSome then possibleInputColumn.Value.Header.ToString()
+        else ""
 
     let columns = annotationTable.columns
     let inputColumn =
@@ -863,30 +873,10 @@ let updateInputColumn (context:RequestContext) (annotationTable:Table) (arcTable
         |> Array.tryFind(fun col -> col.name = inputColumnName)
 
     if inputColumn.IsSome then
-        
-        //let col =
-        //    inputColumn.Value.values.[0]
-        //    |> Array.ofSeq
-        //    |> Array.map (fun item ->
-        //        if item.IsSome then item.Value.ToString()
-        //        else "")
-        //    |> Array.map(fun value ->
-        //        createMatrixForTables 1 ((int) annotationTable.rows.count) value)
-        //    |> Array.head
-
-        //let rows =
-        //    bodyRange.values.[0]
-        //    |> Array.ofSeq
-        //    |> Array.map (fun item ->
-        //        if item.IsSome then item.Value.ToString()
-        //        else "")
-        //    |> Array.map(fun value ->
-        //        log("rows.value", value)
-        //        createMatrixForTables 1 ((int) annotationTable.rows.count) value)
-        //    |> Array.head
 
         let oldInputColumn = annotationTable.columns.items.[(int) inputColumn.Value.index].name
 
+        //Only update the input column when it has a new value
         if oldInputColumn <> newBB.Header.ToString() then
             annotationTable.columns.items.[(int) inputColumn.Value.index].name <- newBB.Header.ToString()
 
@@ -906,15 +896,120 @@ let updateInputColumn (context:RequestContext) (annotationTable:Table) (arcTable
     else
         failwith "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
 
-let addInputColumn (context:RequestContext) (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+/// <summary>
+/// Add a new inputcolumn to an annotation table
+/// </summary>
+/// <param name="annotationTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+let addInputColumn (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
 
-    let msg = InteropLogging.Msg.create InteropLogging.Warning "Should not happen. We are testing Update at the moment."
+    if arcTable.TryGetInputColumn().IsSome then
+        failwith "Something went wrong! The add input column is filled with data! Please report this as a bug to the developers."
 
-    let loggingList = [
+    else
+
+        let rowCount = arcTable.RowCount + 1
+
+        let createCol name =
+            let col value = createMatrixForTables 1 rowCount value
+            annotationTable.columns.add(
+                index   = -1.,
+                values  = U4.Case1 (col ""),
+                name    = name
+            )
+
+        let newColumn = createCol (newBB.Header.ToString())
+        let columnBody = newColumn.getDataBodyRange()
+        // Fit column width to content
+        columnBody.format.autofitColumns()
+
+        let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new input column: {newBB.Header}"
+
+        let loggingList = [
+                msg
+        ]
+
+        loggingList
+
+/// <summary>
+/// Update an existing outputcolumn of an annotation table
+/// </summary>
+/// <param name="annotationTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+let updateOutputColumn (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+
+    let possibleOutputColumn = arcTable.TryGetOutputColumn()
+    let outputColumnName =
+        if possibleOutputColumn.IsSome then possibleOutputColumn.Value.Header.ToString()
+        else ""
+
+    let columns = annotationTable.columns
+    let outputColumn =
+        columns.items
+        |> Array.ofSeq
+        |> Array.tryFind(fun col -> col.name = outputColumnName)
+
+    if outputColumn.IsSome then
+
+        let oldOutputColumn = annotationTable.columns.items.[(int) outputColumn.Value.index].name
+
+        //Only update the output column when it has a new value
+        if oldOutputColumn <> newBB.Header.ToString() then
+            annotationTable.columns.items.[(int) outputColumn.Value.index].name <- newBB.Header.ToString()
+
+        let warningMsg =
+            if oldOutputColumn = newBB.Header.ToString() then
+                $"Found existing output column \"{oldOutputColumn}\". Did not change the column because the new output column is the same \"{annotationTable.columns.items.[(int) outputColumn.Value.index].name}\"."
+            else                
+                $"Found existing output column \"{oldOutputColumn}\". Changed output column to \"{annotationTable.columns.items.[(int) outputColumn.Value.index].name}\"."
+
+        let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+
+        let loggingList = [
             msg
-    ]
+        ]
 
-    loggingList
+        loggingList
+    else
+        failwith "Something went wrong! The update output column is not filled with data! Please report this as a bug to the developers."
+
+/// <summary>
+/// Add a new outputcolumn to an annotation table
+/// </summary>
+/// <param name="annotationTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+let addOutputColumn (annotationTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+
+    if arcTable.TryGetOutputColumn().IsSome then
+        failwith "Something went wrong! The add output column is filled with data! Please report this as a bug to the developers."
+
+    else
+
+        let rowCount = arcTable.RowCount + 1
+
+        let createCol name =
+            let col value = createMatrixForTables 1 rowCount value
+            annotationTable.columns.add(
+                index   = -1.,
+                values  = U4.Case1 (col ""),
+                name    = name
+            )
+
+        let newColumn = createCol (newBB.Header.ToString())
+        let columnBody = newColumn.getDataBodyRange()
+        // Fit column width to content
+        columnBody.format.autofitColumns()
+
+        let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new output column: {newBB.Header}"
+
+        let loggingList = [
+                msg
+        ]
+
+        loggingList
 
 /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
 let addAnnotationBlockHandler (newBB:CompositeColumn) =
@@ -938,20 +1033,22 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
 
             //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
             if annotationTable.IsSome && arcTable.IsSome then
-                let bodyRange = annotationTable.Value.getDataBodyRange()
                 let _ =
-                    bodyRange.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
                     annotationTable.Value.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
                     annotationTable.Value.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
                 
                 let! result = context.sync().``then``(fun _ ->
                     if newBB.Header.isInput then
                         if arcTable.Value.TryGetInputColumn().IsSome then
-                            updateInputColumn context annotationTable.Value arcTable.Value newBB
-                        else addInputColumn context annotationTable.Value arcTable.Value newBB
+                            updateInputColumn annotationTable.Value arcTable.Value newBB
+                        else addInputColumn annotationTable.Value arcTable.Value newBB
 
                     else
-                        failwith("New column should be input column")
+                        if newBB.Header.isOutput then
+                            if arcTable.Value.TryGetOutputColumn().IsSome then
+                                updateOutputColumn annotationTable.Value arcTable.Value newBB
+                            else addOutputColumn annotationTable.Value arcTable.Value newBB
+                        else failwith("New column should be output column")
                 )
                 return result
             else
