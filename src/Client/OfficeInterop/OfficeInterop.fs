@@ -1060,7 +1060,7 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
                     annotationTable.Value.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
 
                 let (|Input|_|) (newBuildingBlock:CompositeColumn) =
-                    if newBuildingBlock.Header.isOutput then
+                    if newBuildingBlock.Header.isInput then
                         if arcTable.Value.TryGetInputColumn().IsSome then
                             Some (updateInputColumn annotationTable.Value arcTable.Value newBuildingBlock)
                         else Some (addInputColumn annotationTable.Value arcTable.Value newBuildingBlock)
@@ -1068,7 +1068,7 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
 
                 let (|Output|_|) (newBuildingBlock:CompositeColumn) =
                     if newBuildingBlock.Header.isOutput then
-                        if arcTable.Value.TryGetInputColumn().IsSome then
+                        if arcTable.Value.TryGetOutputColumn().IsSome then
                             Some (updateOutputColumn annotationTable.Value arcTable.Value newBuildingBlock)
                         else Some (addOutputColumn annotationTable.Value arcTable.Value newBuildingBlock)
                     else None
