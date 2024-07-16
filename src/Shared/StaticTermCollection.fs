@@ -16,3 +16,8 @@ let PublicationStatus = OntologyAnnotation("publication status","EFO","EFO:00017
 /// https://github.com/nfdi4plants/Swate/issues/409#issuecomment-2176134201
 /// </summary>
 let PersonRoleWithinExperiment = OntologyAnnotation("person role within the experiment","AGRO","AGRO:00000378")
+
+/// <summary>
+/// https://github.com/nfdi4plants/Swate/issues/483#issuecomment-2228372546
+/// </summary>
+let Unit = OntologyAnnotation("unit","UO","UO:0000000")

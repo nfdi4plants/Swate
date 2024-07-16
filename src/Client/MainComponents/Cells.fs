@@ -126,7 +126,8 @@ type Cell =
                             style.padding(length.em 0.5,length.em 0.75)
                         ]
                         prop.onBlur(fun _ -> 
-                            if isHeader then setter state; 
+                            if isHeader then setter state;
+                            debounceStorage.current.ClearAndRun()
                             makeIdle()
                         )
                         prop.onKeyDown(fun e ->

@@ -329,7 +329,12 @@ type TermSearch =
         let isSearching, setIsSearching = React.useState(false)
         let debounceStorage = React.useRef(newDebounceStorage())
         let ref = React.useElementRef()
-        if onBlur.IsSome then React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, onBlur.Value))
+        React.useLayoutEffectOnce(fun _ ->
+            ClickOutsideHandler.AddListener (ref, fun e ->
+                debounceStorage.current.ClearAndRun()
+                if onBlur.IsSome then onBlur.Value e
+            )
+        )
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
         let stopSearch() = 
             debounceStorage.current.Remove("TermSearch") |> ignore
