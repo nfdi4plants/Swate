@@ -29,6 +29,15 @@ with
         | DataMap -> 0
         | Metadata -> -1
 
+[<AutoOpen>]
+module ActivePattern =
+
+    let (|IsTable|IsDataMap|IsMetadata|) (input:ActiveView) =
+        match input with
+        | ActiveView.Table _ -> IsTable
+        | ActiveView.DataMap -> IsDataMap
+        | ActiveView.Metadata -> IsMetadata
+
 ///<summary>If you change this model, it will kill caching for users! if you apply changes to it, make sure to keep a version
 ///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>
 type Model = {

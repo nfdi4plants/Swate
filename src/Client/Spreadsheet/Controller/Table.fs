@@ -135,15 +135,11 @@ let moveColumn (current: int) (next: int) (state: Spreadsheet.Model) : Spreadshe
         SelectedCells = Set.empty }
 
 let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let cell = state.ActiveTable.TryGetCellAt index
+    let cell = Generic.getCell index state
     let columnIndex = fst index
-    state.ActiveTable.IteriColumns(fun i column ->
-        let cell = cell|> Option.defaultValue (column.GetDefaultEmptyCell())
-        if i = columnIndex then
-            for cellRowIndex in 0 .. column.Cells.Length-1 do
-                let cell = cell.Copy()
-                state.ActiveTable.UpdateCellAt(columnIndex, cellRowIndex, cell)
-    )
+    for ri in 0 .. Generic.getRowCount state - 1 do
+        let copy = cell.Copy()
+        Generic.setCell (columnIndex, ri) cell state
     {state with ArcFile = state.ArcFile}
 
 /// <summary>
@@ -152,14 +148,13 @@ let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet
 /// <param name="indexArr"></param>
 /// <param name="state"></param>
 let clearCells (indexArr: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let table = state.ActiveTable
     let newCells = [|
         for index in indexArr do
-            let cell = table.Values.[index]
+            let cell = Generic.getCell index state
             let emptyCell = cell.GetEmptyCell()
             index, emptyCell
     |]
-    table.SetCellsAt newCells
+    Generic.setCells newCells state
     state
 
 open Fable.Core

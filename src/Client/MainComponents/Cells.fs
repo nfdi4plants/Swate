@@ -155,9 +155,10 @@ type Cell =
         ]
 
     [<ReactComponent>]
-    static member HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    static member HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly: bool) =
+        let readonly = defaultArg readonly false
         let state = model.SpreadsheetModel
-        let isReadOnly = columnType = Unit
+        let isReadOnly = (columnType = Unit || readonly)
         let makeIdle() = UpdateActiveCell None |> SpreadsheetMsg |> dispatch
         let makeActive() = UpdateActiveCell (Some (!^columnIndex, columnType)) |> SpreadsheetMsg |> dispatch
         let isIdle = state.CellIsIdle (!^columnIndex, columnType)
@@ -166,6 +167,7 @@ type Cell =
             if columnType.IsRefColumn then Bulma.color.hasBackgroundGreyLighter
             prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
+            prop.readOnly readonly
             cellStyle []
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
             prop.className "main-contrast-bg"
@@ -194,7 +196,7 @@ type Cell =
             ]
         ]
 
-    static member Header(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    static member Header(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly: bool) =
         let cellValue = header.ToString()
         let setter =
             fun (s: string) -> 
@@ -207,22 +209,22 @@ type Cell =
                         | _ -> failwith "this should never happen"
                     nextHeader <- nextHeader.UpdateWithOA updatedOA
                 Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch
-        Cell.HeaderBase(Main, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
+        Cell.HeaderBase(Main, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
 
-    static member HeaderUnit(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    static member HeaderUnit(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly) =
         let cellValue = "Unit"
         let setter = fun (s: string) -> ()
-        Cell.HeaderBase(Unit, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
+        Cell.HeaderBase(Unit, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
 
-    static member HeaderTSR(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    static member HeaderTSR(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly) =
         let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermAccessionShort) |> Option.defaultValue ""
         let setter = fun (s: string) -> headerTANSetter(columnIndex, s, header, dispatch)
-        Cell.HeaderBase(TSR, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
+        Cell.HeaderBase(TSR, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
 
-    static member HeaderTAN(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+    static member HeaderTAN(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly) =
         let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermAccessionShort) |> Option.defaultValue ""
         let setter = fun (s: string) -> headerTANSetter(columnIndex, s, header, dispatch)
-        Cell.HeaderBase(TAN, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch)
+        Cell.HeaderBase(TAN, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
 
     static member Empty() =
         Html.td [ cellStyle []; prop.readOnly true; prop.children [
