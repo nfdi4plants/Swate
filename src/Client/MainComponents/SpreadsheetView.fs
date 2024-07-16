@@ -10,26 +10,7 @@ open ARCtrl
 open Shared
 open Model
 
-let private cellPlaceholder (c_opt: CompositeCell option) =
-    let tableCell (children: ReactElement list) = Html.td [
-        Html.div [
-            prop.style [style.minHeight (length.px 30); style.minWidth (length.px 100)]
-            prop.children children
-        ]
-    ]
-    Html.td [
-        match c_opt with
-        | Some c -> 
-            tableCell [
-                Html.span (c.GetContent().[0])
-            ]
-        | None ->
-            tableCell [
-                Html.span ""
-            ]
-    ]
-
-let private bodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
+let private BodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
     let table = model.SpreadsheetModel.ActiveTable
     Html.tr [
         CellStyles.RowLabel rowIndex
@@ -38,34 +19,52 @@ let private bodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Ms
             let cell = model.SpreadsheetModel.ActiveTable.Values.[index]
             Cells.Cell.Body (index, cell, model, dispatch)
             let isExtended = state.Contains columnIndex
-            if isExtended && (cell.isTerm || cell.isUnitized) then
+            let header = table.Headers.[columnIndex]
+            if (cell.isTerm || cell.isUnitized) && isExtended then
                 if cell.isUnitized then 
                     Cell.BodyUnit(index, cell, model, dispatch)
                 else
                     Cell.Empty()
                 Cell.BodyTSR(index, cell, model, dispatch)
                 Cell.BodyTAN(index, cell, model, dispatch)
+            elif header.IsDataColumn then
+                if cell.isData then
+                    Cell.BodyDataSelector(index, cell, model, dispatch)
+                    Cell.BodyDataFormat(index, cell, model, dispatch)
+                    Cell.BodyDataSelectorFormat(index, cell, model, dispatch)
+                else
+                    Cell.Empty()
+                    Cell.Empty()
+                    Cell.Empty()
     ]
 
-let private bodyRows (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
+let private BodyRows (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
     Html.tbody [
         for rowInd in 0 .. model.SpreadsheetModel.ActiveTable.RowCount-1 do
-            yield bodyRow rowInd state model dispatch 
+            yield BodyRow rowInd state model dispatch 
     ]
     
 
-let private headerRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
+let private HeaderRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
     let table = model.SpreadsheetModel.ActiveTable
     Html.tr [
         if table.ColumnCount > 0 then CellStyles.RowLabel -1
         for columnIndex in 0 .. (table.ColumnCount-1) do
             let header = table.Headers.[columnIndex]
             Cells.Cell.Header(columnIndex, header, state, setState, model, dispatch)
-            let isExtended = state.Contains columnIndex
-            if isExtended then
-                Cell.HeaderUnit(columnIndex, header, state, setState, model, dispatch)
-                Cell.HeaderTSR(columnIndex, header, state, setState, model, dispatch)
-                Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch)
+            if header.IsTermColumn then
+                let isExtended = state.Contains columnIndex
+                if isExtended then
+                    Cell.HeaderUnit(columnIndex, header, state, setState, model, dispatch)
+                    Cell.HeaderTSR(columnIndex, header, state, setState, model, dispatch)
+                    Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch)
+            elif header.IsDataColumn then
+                Cell.HeaderDataSelector(columnIndex, header, state, setState, model, dispatch)
+                Cell.HeaderDataFormat(columnIndex, header, state, setState, model, dispatch)
+                Cell.HeaderDataSelectorFormat(columnIndex, header, state, setState, model, dispatch)
+            else
+                ()
+                
     ]
 
 open Fable.Core.JsInterop
@@ -89,9 +88,9 @@ let Main (model:Model) (dispatch: Msg -> unit) =
                 prop.className "fixed_headers"
                 prop.children [
                     Html.thead [
-                        headerRow state setState model dispatch
+                        HeaderRow state setState model dispatch
                     ]
-                    bodyRows state model dispatch
+                    BodyRows state model dispatch
                 ]
             ]
         ]

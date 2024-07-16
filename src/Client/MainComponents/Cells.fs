@@ -164,13 +164,13 @@ type Cell =
         let isIdle = state.CellIsIdle (!^columnIndex, columnType)
         let isActive = not isIdle
         Html.th [
-            if columnType.IsRefColumn then Bulma.color.hasBackgroundGreyLighter
             prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
             prop.readOnly readonly
             cellStyle []
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
-            prop.className "main-contrast-bg"
+            if columnType.IsRefColumn then prop.className "bg-gray-300 dark:bg-gray-700"
+            //prop.className "main-contrast-bg"
             prop.children [
                 Html.div [
                     cellInnerContainerStyle [style.custom("backgroundColor","inherit")]
@@ -226,6 +226,24 @@ type Cell =
         let setter = fun (s: string) -> headerTANSetter(columnIndex, s, header, dispatch)
         Cell.HeaderBase(TAN, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
 
+    static member HeaderDataSelector(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let ct = ColumnType.DataSelector
+        let cellValue = ct.ToColumnHeader()
+        let setter = fun _ -> ()
+        Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
+
+    static member HeaderDataFormat(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let ct = ColumnType.DataFormat
+        let cellValue = ct.ToColumnHeader()
+        let setter = fun _ -> ()
+        Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
+
+    static member HeaderDataSelectorFormat(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let ct = ColumnType.DataSelectorFormat
+        let cellValue = ct.ToColumnHeader()
+        let setter = fun _ -> ()
+        Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
+  
     static member Empty() =
         Html.td [ cellStyle []; prop.readOnly true; prop.children [
             Html.div [
@@ -344,7 +362,7 @@ type Cell =
         ]
 
     static member Body(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.GetContent().[0]
+        let cellValue = cell.GetContentSwate().[0]
         let setter = fun (s: string) ->
             let nextCell = cell.UpdateMainField s
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
@@ -364,7 +382,7 @@ type Cell =
         Cell.BodyBase(Main, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
 
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.GetContent().[1]
+        let cellValue = cell.AsTerm.NameText
         let setter = fun (s: string) ->
             let oa = cell.ToOA()
             let newName = if s = "" then None else Some s
@@ -387,8 +405,7 @@ type Cell =
         Cell.BodyBase(Unit, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
 
     static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let contentIndex = if cell.isUnitized then 2 else 1
-        let cellValue = cell.GetContent().[contentIndex]
+        let cellValue = cell.AsTerm.TermSourceREF |> Option.defaultValue ""
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTSR = if s = "" then None else Some s
@@ -398,8 +415,7 @@ type Cell =
         Cell.BodyBase(TSR, cellValue, setter, index, model, dispatch)
 
     static member BodyTAN(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let contentIndex = if cell.isUnitized then 3 else 2
-        let cellValue = cell.GetContent().[contentIndex]
+        let cellValue = cell.AsTerm.TermAccessionNumber |> Option.defaultValue ""
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTAN = if s = "" then None else Some s
@@ -407,4 +423,34 @@ type Cell =
             let nextCell = cell.UpdateWithOA oa
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(TAN, cellValue, setter, index, model, dispatch)
+
+    static member BodyDataSelector(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let data = cell.AsData
+        let cellValue = data.Selector |> Option.defaultValue ""
+        let setter = fun (s: string) ->
+            let next = if s = "" then None else Some s
+            data.Selector <- next
+            let nextCell = cell.UpdateWithData data
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(ColumnType.DataSelector, cellValue, setter, index, model, dispatch)
+
+    static member BodyDataFormat(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let data = cell.AsData
+        let cellValue = data.Format |> Option.defaultValue ""
+        let setter = fun (s: string) ->
+            let next = if s = "" then None else Some s
+            data.Format <- next
+            let nextCell = cell.UpdateWithData data
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(ColumnType.DataFormat, cellValue, setter, index, model, dispatch)
+
+    static member BodyDataSelectorFormat(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let data = cell.AsData
+        let cellValue = data.SelectorFormat |> Option.defaultValue ""
+        let setter = fun (s: string) ->
+            let next = if s = "" then None else Some s
+            data.SelectorFormat <- next
+            let nextCell = cell.UpdateWithData data
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(ColumnType.DataSelectorFormat, cellValue, setter, index, model, dispatch)
         

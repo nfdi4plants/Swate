@@ -5,6 +5,7 @@
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="tailwind.config.js" />
     <Compile Include="Helper.fs" />
     <Compile Include="React.useListener.fs" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />

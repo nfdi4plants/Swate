@@ -8,5 +8,6 @@ module.exports = {
     theme: {
         extend: {},
     },
-    plugins: []
+    plugins: [],
+    darkMode: ['selector', '[data-theme="dark"]']
 }

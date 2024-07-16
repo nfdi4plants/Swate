@@ -139,7 +139,7 @@ let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet
     let columnIndex = fst index
     for ri in 0 .. Generic.getRowCount state - 1 do
         let copy = cell.Copy()
-        Generic.setCell (columnIndex, ri) cell state
+        Generic.setCell (columnIndex, ri) copy state
     {state with ArcFile = state.ArcFile}
 
 /// <summary>
