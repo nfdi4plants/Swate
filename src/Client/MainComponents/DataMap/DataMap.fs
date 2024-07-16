@@ -9,6 +9,8 @@ open Messages
 open Shared
 
 module private Components =
+    open Spreadsheet.Cells
+
     let NameIndex = -1
 
     let private BodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
@@ -29,13 +31,23 @@ module private Components =
                 let cell = model.SpreadsheetModel.DataMapOrDefault.GetCell(columnIndex, rowIndex)
                 Spreadsheet.Cells.Cell.Body (index, cell, model, dispatch)
                 let isExtended = state.Contains columnIndex
-                if isExtended && (cell.isTerm || cell.isUnitized) then
+                let header = Spreadsheet.Controller.Generic.getHeader columnIndex model.SpreadsheetModel
+                if (cell.isTerm || cell.isUnitized) && isExtended then
                     if cell.isUnitized then 
-                        Spreadsheet.Cells.Cell.BodyUnit(index, cell, model, dispatch)
+                        Cell.BodyUnit(index, cell, model, dispatch)
                     else
-                        Spreadsheet.Cells.Cell.Empty()
-                    Spreadsheet.Cells.Cell.BodyTSR(index, cell, model, dispatch)
-                    Spreadsheet.Cells.Cell.BodyTAN(index, cell, model, dispatch)
+                        Cell.Empty()
+                    Cell.BodyTSR(index, cell, model, dispatch)
+                    Cell.BodyTAN(index, cell, model, dispatch)
+                elif header.IsDataColumn then
+                    if cell.isData then
+                        Cell.BodyDataSelector(index, cell, model, dispatch)
+                        Cell.BodyDataFormat(index, cell, model, dispatch)
+                        Cell.BodyDataSelectorFormat(index, cell, model, dispatch)
+                    else
+                        Cell.Empty()
+                        Cell.Empty()
+                        Cell.Empty()
         ]
 
     let BodyRows (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
@@ -55,11 +67,18 @@ module private Components =
             for columnIndex in 0 .. (dtm.ColumnCount-1) do
                 let header = headers.[columnIndex]
                 Spreadsheet.Cells.Cell.Header(columnIndex, header, state, setState, model, dispatch, readonly = true)
-                let isExtended = state.Contains columnIndex
-                if isExtended then
-                    Spreadsheet.Cells.Cell.HeaderUnit(columnIndex, header, state, setState, model, dispatch, readonly = true)
-                    Spreadsheet.Cells.Cell.HeaderTSR(columnIndex, header, state, setState, model, dispatch, readonly = true)
-                    Spreadsheet.Cells.Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch, readonly = true)
+                if header.IsTermColumn then
+                    let isExtended = state.Contains columnIndex
+                    if isExtended then
+                        Cell.HeaderUnit(columnIndex, header, state, setState, model, dispatch)
+                        Cell.HeaderTSR(columnIndex, header, state, setState, model, dispatch)
+                        Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch)
+                elif header.IsDataColumn then
+                    Cell.HeaderDataSelector(columnIndex, header, state, setState, model, dispatch)
+                    Cell.HeaderDataFormat(columnIndex, header, state, setState, model, dispatch)
+                    Cell.HeaderDataSelectorFormat(columnIndex, header, state, setState, model, dispatch)
+                else
+                    ()
         ]
 
 type DataMap =

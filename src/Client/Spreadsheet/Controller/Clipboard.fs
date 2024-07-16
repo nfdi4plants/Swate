@@ -63,7 +63,7 @@ let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Sp
     promise {
         let! tab = navigator.clipboard.readText()
         let header = Generic.getHeader (fst index) state
-        let cell = CompositeCell.fromTabTxt tab |> Array.head |> _.ConvertToValidCell(header)
+        let cell = CompositeCell.fromTabTxt tab header |> Array.head
         Generic.setCell index cell state
         return state
     }
@@ -72,7 +72,7 @@ let pasteCellsByIndexExtend (index: int*int) (state: Spreadsheet.Model) : JS.Pro
     promise { 
         let! tab = navigator.clipboard.readText()
         let header = Generic.getHeader (fst index) state
-        let cells = CompositeCell.fromTabTxt tab |> Array.map _.ConvertToValidCell(header)
+        let cells = CompositeCell.fromTabTxt tab header
         let columnIndex, rowIndex = fst index, snd index
         let indexedCells = cells |> Array.indexed |> Array.map (fun (i,c) -> (columnIndex, rowIndex + i), c)
         Generic.setCells indexedCells state
@@ -95,7 +95,7 @@ let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.M
         promise {
             let! tab = navigator.clipboard.readText()
             let header = Generic.getHeader columnIndex state
-            let cells = CompositeCell.fromTabTxt tab |> Array.map _.ConvertToValidCell(header)
+            let cells = CompositeCell.fromTabTxt tab header
             if cells.Length = 1 then
                 let cell = cells.[0]
                 let newCells = selectedSingleColumnCells |> Array.ofSeq |> Array.map (fun index -> index, cell)

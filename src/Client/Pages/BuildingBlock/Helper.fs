@@ -35,10 +35,11 @@ let createCompositeHeaderFromState (state: BuildingBlock.Model) =
     | HeaderCellType.Output -> CompositeHeader.Output <| getIOType()
    
 let tryCreateCompositeCellFromState (state: BuildingBlock.Model) =
-    match state.BodyCellType, state.BodyArg with 
-    | BodyCellType.Term, Some (U2.Case2 oa) -> CompositeCell.createTerm (oa) |> Some
-    | BodyCellType.Unitized, Some (U2.Case2 oa) -> CompositeCell.createUnitized ("", oa) |> Some
-    | BodyCellType.Text, Some (U2.Case1 s) -> CompositeCell.createFreeText s |> Some
+    match state.HeaderArg, state.BodyCellType, state.BodyArg with
+    | Some (U2.Case2 IOType.Data), _, _ -> CompositeCell.emptyData |> Some
+    | _, BodyCellType.Term, Some (U2.Case2 oa) -> CompositeCell.createTerm (oa) |> Some
+    | _, BodyCellType.Unitized, Some (U2.Case2 oa) -> CompositeCell.createUnitized ("", oa) |> Some
+    | _, BodyCellType.Text, Some (U2.Case1 s) -> CompositeCell.createFreeText s |> Some
     | _ -> None
 
 let isValidColumn (header : CompositeHeader) =
