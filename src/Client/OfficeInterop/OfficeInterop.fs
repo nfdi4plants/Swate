@@ -27,14 +27,18 @@ module OfficeInteropExtensions =
         /// </summary>
         /// <param name="context"></param>
         /// <param name="tableName"></param>
-        static member getTableByName (context:RequestContext) (tableName:string) =
+        static member tryGetTableByName (context:RequestContext) (tableName:string) =
             let _ = context.workbook.load(U2.Case1 "tables")
-            let annotationTable = context.workbook.tables.getItem(tableName)
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-            let annoBodyRange = annotationTable.getDataBodyRange()
-            let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
-            annotationTable, annoHeaderRange, annoBodyRange
+            let excelTable = context.workbook.tables.getItem(tableName)
+
+            if tableName = null || tableName = "" then
+                None
+            else 
+                let annoHeaderRange = excelTable.getHeaderRowRange()
+                let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+                let annoBodyRange = excelTable.getDataBodyRange()
+                let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+                Some (excelTable, annoHeaderRange, annoBodyRange)
 
         /// <summary>
         /// Swaps 'Rows with column values' to 'Columns with row values'
@@ -46,6 +50,14 @@ module OfficeInteropExtensions =
             |> Seq.groupBy fst
             |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
             |> Seq.toArray
+
+        static member addColumn (excelTable:Table) name rowCount value =
+            let col = createMatrixForTables 1 rowCount value
+            excelTable.columns.add(
+                index   = -1.,
+                values  = U4.Case1 (col),
+                name    = name
+            )
 
     type ArcTable with
 
@@ -100,31 +112,67 @@ module OfficeInteropExtensions =
 
                 columns
 
-        static member fromExcelTableName (tableName:string, context:RequestContext) =
+        static member tryFromExcelTableName (tableName:string, context:RequestContext) =
 
-            let _, headerRange, bodyRowRange = ExcelHelper.getTableByName context tableName
+            let result = ExcelHelper.tryGetTableByName context tableName
+
             promise {
-                let! inMemoryTable = context.sync().``then``(fun _ ->
-                    let headers =
-                        headerRange.values.[0]
-                        |> Seq.map (fun item ->
-                            item
-                            |> Option.map string
-                            |> Option.defaultValue ""
-                        )
-                    let bodyRows =
-                        bodyRowRange.values
-                        |> Seq.map (fun items ->
-                            items
+                if result.IsSome then
+                    let _, headerRange, bodyRowRange = result.Value
+                    let! inMemoryTable = context.sync().``then``(fun _ ->
+                        let headers =
+                            headerRange.values.[0]
                             |> Seq.map (fun item ->
                                 item
                                 |> Option.map string
                                 |> Option.defaultValue ""
                             )
-                        )
-                    ArcTable.fromStringSeqs(tableName, headers, bodyRows)
-                )
-                return inMemoryTable
+                        let bodyRows =
+                            bodyRowRange.values
+                            |> Seq.map (fun items ->
+                                items
+                                |> Seq.map (fun item ->
+                                    item
+                                    |> Option.map string
+                                    |> Option.defaultValue ""
+                                )
+                            )
+                        ArcTable.fromStringSeqs(tableName, headers, bodyRows)
+                    )
+                    return inMemoryTable
+                else return None
+            }
+
+        static member tryGetFromExcelTable (excelTable:Table, context:RequestContext) =
+
+            promise {
+                    //Get headers and body
+                    let headerRange = excelTable.getHeaderRowRange()
+                    let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+                    let bodyRowRange = excelTable.getDataBodyRange()
+                    let _ = bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+
+                    let! inMemoryTable = context.sync().``then``(fun _ ->
+                        let headers =
+                            headerRange.values.[0]
+                            |> Seq.map (fun item ->
+                                item
+                                |> Option.map string
+                                |> Option.defaultValue ""
+                            )
+                        let bodyRows =
+                            bodyRowRange.values
+                            |> Seq.map (fun items ->
+                                items
+                                |> Seq.map (fun item ->
+                                    item
+                                    |> Option.map string
+                                    |> Option.defaultValue ""
+                                )
+                            )
+                        ArcTable.fromStringSeqs(excelTable.name, headers, bodyRows)
+                    )
+                    return inMemoryTable
             }
 
 open OfficeInteropExtensions
@@ -196,7 +244,7 @@ let swateSync (context:RequestContext) =
     context.sync().``then``(fun _ -> ())
 
 /// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
-let getPrevAnnotationTableName (context:RequestContext) =
+let tryGetPrevAnnotationTableName (context:RequestContext) =
     promise {
     
         let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
@@ -216,8 +264,8 @@ let getPrevAnnotationTableName (context:RequestContext) =
                     else
                         None
                 )
-                |> Array.filter(fun (wp,tableName) -> activeWorksheetPosition - wp > 0.)
-                |> Array.sortBy(fun (wp,tableName) ->
+                |> Array.filter(fun (wp, _) -> activeWorksheetPosition - wp > 0.)
+                |> Array.sortBy(fun (wp, _) ->
                     activeWorksheetPosition - wp
                 )
                 |> Array.tryHead
@@ -233,17 +281,64 @@ let getPrevAnnotationTableName (context:RequestContext) =
 // I sort by the resulting lowest number (since the worksheet is then closest to the active one), I find the output column in the particular
 // annotationTable and use the values it contains for the new annotationTable in the active worksheet.
 
+/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
+let tryGetActiveAnnotationTableName (context:RequestContext) =
+    promise {
+    
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+        let tables = context.workbook.tables
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+
+        let! activeTableName = context.sync().``then``(fun _ ->
+            let activeWorksheetPosition = activeWorksheet.position
+            /// Get name of the table of currently active worksheet.
+            let activeTable =
+                tables.items
+                |> Seq.toArray
+                |> Array.tryFind (fun table ->
+                    table.name.StartsWith("annotationTable") && table.worksheet.position = activeWorksheetPosition
+                )
+
+            if activeTable.IsSome then
+                Some activeTable.Value.name
+            else
+                None
+        )
+
+        return activeTableName
+    }
+
+/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
+let tryGetAnnotationTableByName (context:RequestContext) (name:string)=
+    promise {
+    
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let tables = context.workbook.tables
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+
+        let! activeTable = context.sync().``then``(fun _ ->
+            tables.items
+            |> Seq.toArray
+            |> Array.tryFind (fun table ->
+                table.name = name
+            )
+        )
+
+        return activeTable
+    }
+
 /// <summary>
 /// Get the previous arc table to the active worksheet
 /// </summary>
 /// <param name="context"></param>
 let tryGetPrevTable (context:RequestContext) =
     promise {
-        let! prevTableName = getPrevAnnotationTableName context
+        let! prevTableName = tryGetPrevAnnotationTableName context
 
         if prevTableName.IsSome then
         
-            let! result = ArcTable.fromExcelTableName (prevTableName.Value, context)
+            let! result = ArcTable.tryFromExcelTableName (prevTableName.Value, context)
             return result
 
         else
@@ -383,16 +478,16 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
 
             let tableStrings = inMemoryTable.ToExcelValues()
 
-            let annotationTable = activeSheet.tables.add(U2.Case1 newTableRange, true)
+            let excelTable = activeSheet.tables.add(U2.Case1 newTableRange, true)
 
             // Update annotationTable name
-            annotationTable.name <- newName
+            excelTable.name <- newName
 
             newTableRange.values <- tableStrings
 
             // Update annotationTable style
-            annotationTable.style <- style
-            annotationTable
+            excelTable.style <- style
+            excelTable
         )
         
         let _ = table.rows.load(propertyNames = U2.Case2 (ResizeArray[|"count"|]))
@@ -484,15 +579,15 @@ let tryFindActiveAnnotationTable() =
 /// The main goal is to improve readability of the table with this function.</summary>
 let autoFitTable (hideRefCols:bool) (context:RequestContext) =
     promise {
-        let! annotationTable = getActiveAnnotationTableName context
+        let! excelTable = getActiveAnnotationTableName context
 
         // Ref. 2
         let sheet = context.workbook.worksheets.getActiveWorksheet()
 
-        let annotationTable = sheet.tables.getItem(annotationTable)
-        let allCols = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
+        let excelTable = sheet.tables.getItem(excelTable)
+        let allCols = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
     
-        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let annoHeaderRange = excelTable.getHeaderRowRange()
         let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
 
         let r = context.runtime.load(U2.Case1 "enableEvents")
@@ -528,11 +623,11 @@ let autoFitTableHide (context:RequestContext) =
     autoFitTable true context
 
 // ExcelApi 1.2
-let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
+let autoFitTableByTable (excelTable:Table) (context:RequestContext) =
 
-    let allCols = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
+    let allCols = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
     
-    let annoHeaderRange = annotationTable.getHeaderRowRange()
+    let annoHeaderRange = excelTable.getHeaderRowRange()
     let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
 
     context.sync().``then``(fun _ ->
@@ -557,10 +652,10 @@ let autoFitTableByTable (annotationTable:Table) (context:RequestContext) =
 let getBuildingBlocksAndSheet() =
     Excel.run(fun context ->
         promise {
-            let! annotationTable = getActiveAnnotationTableName(context)
+            let! excelTable = getActiveAnnotationTableName(context)
             
             // Ref. 2
-            let! buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context annotationTable
+            let! buildingBlocks = BuildingBlockFunctions.getBuildingBlocks context excelTable
 
             let worksheet = context.workbook.worksheets.getActiveWorksheet()
             let _ = worksheet.load(U2.Case1 "name")
@@ -578,7 +673,7 @@ let getBuildingBlocksAndSheets() =
 
             let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
             let tables = context.workbook.tables
-            let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "values"|]))
+            let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "values"|]))
 
             let! worksheetAnnotationTableNames = context.sync().``then``(fun _ ->
                 /// Get all names of all tables in the whole workbook.
@@ -668,16 +763,16 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
     Excel.run(fun context ->
         promise {
 
-            let! annotationTableName = getActiveAnnotationTableName context
+            let! excelTableName = getActiveAnnotationTableName context
             let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
+            let excelTable = sheet.tables.getItem(excelTableName)
 
             // Ref. 2
             // This is necessary to place new columns next to selected col
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
-            let tableRange = annotationTable.getRange()
-            let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+            let annoHeaderRange = excelTable.getHeaderRowRange()
+            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"; "columnIndex"; "columnCount"; "rowIndex"|]))
+            let tableRange = excelTable.getRange()
+            let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount"; "rowCount"])))
             let selectedRange = context.workbook.getSelectedRange()
             let _ = selectedRange.load(U2.Case1 "columnIndex")
 
@@ -713,7 +808,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
                 let createAllCols =
                     let createCol index =
-                        annotationTable.columns.add(
+                        excelTable.columns.add(
                             index   = index,
                             values  = U4.Case1 (col "")
                         )
@@ -748,7 +843,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
                 columnNames.[0], formatChangedMsg
             )
 
-            let! fit = autoFitTableByTable annotationTable context
+            let! fit = autoFitTableByTable excelTable context
 
             let createColsMsg = InteropLogging.Msg.create InteropLogging.Info $"{mainColName} was added." 
 
@@ -763,14 +858,14 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
 // https://github.com/nfdi4plants/Swate/issues/203
 /// If an output column already exists it should be replaced by the new output column type.
-let replaceOutputColumn (annotationTableName:string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
+let replaceOutputColumn (excelTableName:string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
     Excel.run(fun context ->
         promise {
             // Ref. 2
             // This is necessary to place new columns next to selected col
             let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
+            let excelTable = sheet.tables.getItem(excelTableName)
+            let annoHeaderRange = excelTable.getHeaderRowRange()
             let existingOutputColCell = annoHeaderRange.getCell(0., float existingOutputColumn.MainColumn.Index)
             let _ = existingOutputColCell.load(U2.Case2 (ResizeArray[|"values"|]))
 
@@ -780,7 +875,7 @@ let replaceOutputColumn (annotationTableName:string) (existingOutputColumn: Buil
                 ()
             )
 
-            let! fit = autoFitTableByTable annotationTable context
+            let! fit = autoFitTableByTable excelTable context
             let warningMsg = $"Found existing output column \"{existingOutputColumn.MainColumn.Header.SwateColumnHeader}\". Changed output column to \"{newOutputcolumn.ColumnHeader.toAnnotationTableHeader()}\"."
 
             let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
@@ -793,31 +888,208 @@ let replaceOutputColumn (annotationTableName:string) (existingOutputColumn: Buil
         }
     )
 
+/// <summary>
+/// Update an existing inputcolumn of an annotation table
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+let updateInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+
+    let possibleInputColumn = arcTable.TryGetInputColumn()
+
+    if possibleInputColumn.IsSome then
+
+        let inputColumnName = possibleInputColumn.Value.Header.ToString()
+
+        let columns = excelTable.columns
+        let inputColumn =
+            columns.items
+            |> Array.ofSeq
+            |> Array.tryFind(fun col -> col.name = inputColumnName)
+
+        if inputColumn.IsSome then
+
+            //Only update the input column when it has a new value
+            if inputColumnName <> newBB.Header.ToString() then
+                excelTable.columns.items.[(int) inputColumn.Value.index].name <- newBB.Header.ToString()
+
+            let warningMsg =
+                if inputColumnName = newBB.Header.ToString() then
+                    $"Found existing input column \"{inputColumnName}\". Did not change the column because the new input column is the same \"{excelTable.columns.items.[(int) inputColumn.Value.index].name}\"."
+                else                
+                    $"Found existing input column \"{inputColumnName}\". Changed input column to \"{excelTable.columns.items.[(int) inputColumn.Value.index].name}\"."
+
+            let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+
+            let loggingList = [
+                msg
+            ]
+
+            loggingList
+        else
+            failwith "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
+    else
+        failwith "Something went wrong! The update input column does not exist! Please report this as a bug to the developers."
+
+/// <summary>
+/// Add a new inputcolumn to an annotation table
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+
+    if arcTable.TryGetInputColumn().IsSome then
+        failwith "Something went wrong! The add input column is filled with data! Please report this as a bug to the developers."
+
+    else
+
+        let rowCount = arcTable.RowCount + 1
+
+        let newColumn = ExcelHelper.addColumn excelTable (newBB.Header.ToString()) rowCount ""
+        let columnBody = newColumn.getDataBodyRange()
+        // Fit column width to content
+        columnBody.format.autofitColumns()
+
+        let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new input column: {newBB.Header}"
+
+        let loggingList = [
+                msg
+        ]
+
+        loggingList
+
+/// <summary>
+/// Update an existing outputcolumn of an annotation table
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+
+    let possibleOutputColumn = arcTable.TryGetOutputColumn()
+
+    if possibleOutputColumn.IsSome then
+
+        let outputColumnName = possibleOutputColumn.Value.Header.ToString()
+
+        let columns = excelTable.columns
+        let outputColumn =
+            columns.items
+            |> Array.ofSeq
+            |> Array.tryFind(fun col -> col.name = outputColumnName)
+
+        if outputColumn.IsSome then
+
+            //Only update the output column when it has a new value
+            if outputColumnName <> newBB.Header.ToString() then
+                excelTable.columns.items.[(int) outputColumn.Value.index].name <- newBB.Header.ToString()
+
+            let warningMsg =
+                if outputColumnName = newBB.Header.ToString() then
+                    $"Found existing output column \"{outputColumnName}\". Did not change the column because the new output column is the same \"{excelTable.columns.items.[(int) outputColumn.Value.index].name}\"."
+                else                
+                    $"Found existing output column \"{outputColumnName}\". Changed output column to \"{excelTable.columns.items.[(int) outputColumn.Value.index].name}\"."
+
+            let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+
+            let loggingList = [
+                msg
+            ]
+
+            loggingList
+        else
+            failwith "Something went wrong! The update output column is not filled with data! Please report this as a bug to the developers."
+    else
+        failwith "Something went wrong! The update output column does not exist! Please report this as a bug to the developers."
+
+/// <summary>
+/// Add a new outputcolumn to an annotation table
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+
+    if arcTable.TryGetOutputColumn().IsSome then
+
+        failwith "Something went wrong! The add output column is filled with data! Please report this as a bug to the developers."
+
+    else
+
+        let rowCount = arcTable.RowCount + 1
+
+        let newColumn = ExcelHelper.addColumn excelTable (newBB.Header.ToString()) rowCount ""
+        let columnBody = newColumn.getDataBodyRange()
+        // Fit column width to content
+        columnBody.format.autofitColumns()
+
+        let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new output column: {newBB.Header}"
+
+        let loggingList = [
+                msg
+        ]
+
+        loggingList
+
 /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
-let addAnnotationBlockHandler (newBB:InsertBuildingBlock) =
+let addAnnotationBlockHandler (newBB:CompositeColumn) =
     Excel.run(fun context ->
         promise {
 
-            let! annotationTableName = getActiveAnnotationTableName context
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
+            //let activeSheet = context.workbook.worksheets.getActiveWorksheet()
+            //Try to get the name of the currently active sheet
+            let! excelTableName = tryGetActiveAnnotationTableName context
 
-            let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable)
+            let excelTableName =
+                if excelTableName.IsSome then excelTableName.Value
+                else failwith "No excel table name has been found!"
 
-            // comment out, to reenable inserting multiple duplicate building block
-            //checkIfBuildingBlockExisting newBB existingBuildingBlocks
+            //When a name is available get the annotation and arctable for easy access of indices and value adaption
+            //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
+            let! excelTable = tryGetAnnotationTableByName context excelTableName
 
-            checkHasExistingInput newBB existingBuildingBlocks
-            checkIfBuildingBlockExisting newBB existingBuildingBlocks
-            // if newBB is output column and output column already exists in table this returns (Some outputcolumn-building-block), else None.
-            let outputColOpt = checkHasExistingOutput newBB existingBuildingBlocks
+            //Arctable enables a fast check for the existence of input- and output-columns and their indices
+            let! arcTable =
+                
+                if excelTable.IsSome then
+                    ArcTable.tryGetFromExcelTable(excelTable.Value, context)
+                else failwith "No excel table has been found!"
 
-            let! res = 
-                match outputColOpt with
-                | Some existingOutputColumn -> replaceOutputColumn annotationTableName existingOutputColumn newBB 
-                | None -> addAnnotationBlock newBB
+            //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
+            if arcTable.IsSome then
+                let _ =
+                    excelTable.Value.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
+                    excelTable.Value.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
 
-            return res
+                let (|Input|_|) (newBuildingBlock:CompositeColumn) =
+                    if newBuildingBlock.Header.isInput then
+                        if arcTable.Value.TryGetInputColumn().IsSome then
+                            Some (updateInputColumn excelTable.Value arcTable.Value newBuildingBlock)
+                        else Some (addInputColumn excelTable.Value arcTable.Value newBuildingBlock)
+                    else None
+
+                let (|Output|_|) (newBuildingBlock:CompositeColumn) =
+                    if newBuildingBlock.Header.isOutput then
+                        if arcTable.Value.TryGetOutputColumn().IsSome then
+                            Some (updateOutputColumn excelTable.Value arcTable.Value newBuildingBlock)
+                        else Some (addOutputColumn excelTable.Value arcTable.Value newBuildingBlock)
+                    else None
+
+                let getResult (newBuildingBlock:CompositeColumn) =
+                    match newBuildingBlock with
+                    | Input msg -> msg
+                    | Output msg -> msg
+                    | _ -> failwith "No result is available! This should not happen! Please report this as a bug to the developers."
+
+                let! result = context.sync().``then``(fun _ ->
+                    getResult newBB
+                )
+
+                return result
+            else
+                return [InteropLogging.Msg.create InteropLogging.Warning $"A table is missing! annotationTable: {excelTable.IsSome}; arcTable: {arcTable.IsSome}"]
         } 
     )
 
@@ -856,10 +1128,10 @@ let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount
 let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Table,context:RequestContext) =
     promise {
         
-        let annotationTable = table
-        let _ = annotationTable.load(U2.Case1 "name")
+        let excelTable = table
+        let _ = excelTable.load(U2.Case1 "name")
 
-        let! existingBuildingBlocks = BuildingBlock.getFromContext(context,annotationTable) 
+        let! existingBuildingBlocks = BuildingBlock.getFromContext(context, excelTable) 
 
         /// newBuildingBlocks -> will be added
         /// alreadyExistingBBs -> will be used for logging
@@ -883,9 +1155,9 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
     
         // Ref. 2
         // This is necessary to place new columns next to selected col
-        let annoHeaderRange = annotationTable.getHeaderRowRange()
+        let annoHeaderRange = excelTable.getHeaderRowRange()
         let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values";"columnIndex"; "columnCount"; "rowIndex"|]))
-        let tableRange = annotationTable.getRange()
+        let tableRange = excelTable.getRange()
         let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
         let selectedRange = context.workbook.getSelectedRange()
         let _ = selectedRange.load(U2.Case1 "columnIndex")
@@ -929,19 +1201,19 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
                     let! expandedTable,expandedTableRange = context.sync().``then``(fun _ ->
                         let newRowsValues = createMatrixForTables startColumnCount expandByNRows.Value ""
                         let newRows =
-                            annotationTable.rows.add(
+                            excelTable.rows.add(
                                 values = U4.Case1 newRowsValues
                             )
-                        let newTable = context.workbook.tables.getItem(annotationTable.name)
-                        let newTableRange = annotationTable.getRange()
+                        let newTable = context.workbook.tables.getItem(excelTable.name)
+                        let newTableRange = excelTable.getRange()
                         let _ = newTableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
-                        annotationTable,newTableRange
+                        excelTable,newTableRange
                     )
                     let! expandedRowCount = context.sync().``then``(fun _ -> int expandedTableRange.rowCount)
                     return (expandedTable, expandedRowCount)
                 }
             else
-                promise { return (annotationTable,tableRange.rowCount |> int) }
+                promise { return (excelTable,tableRange.rowCount |> int) }
     
     
         //create an empty column to insert
@@ -1025,35 +1297,36 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
         return logging
     } 
 
-let addAnnotationBlocks (buildingBlocks:InsertBuildingBlock []) =
+let addAnnotationBlocks (buildingBlocks:CompositeColumn []) =
     Excel.run(fun context ->
 
         promise {
 
-            let! tryTable = tryFindActiveAnnotationTable()
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
+            //let! tryTable = tryFindActiveAnnotationTable()
+            //let sheet = context.workbook.worksheets.getActiveWorksheet()
 
-            let! annotationTable, logging =
-                match tryTable with
-                | Success table ->
-                    (
-                        sheet.tables.getItem(table),
-                        InteropLogging.Msg.create InteropLogging.Info "Found annotation table for template insert!"
-                    )
-                    |> JS.Constructors.Promise.resolve
-                | Error e ->
-                    let range =
-                        // not sure if this try...with is necessary as on creating a new worksheet it will autoselect the A1 cell.
-                        try
-                            context.workbook.getSelectedRange()
-                        with
-                            | e -> sheet.getUsedRange()
-                    createAnnotationTableAtRange(false,false,range,context)
+            //let! annotationTable, logging =
+            //    match tryTable with
+            //    | Success table ->
+            //        (
+            //            sheet.tables.getItem(table),
+            //            InteropLogging.Msg.create InteropLogging.Info "Found annotation table for template insert!"
+            //        )
+            //        |> JS.Constructors.Promise.resolve
+            //    | Error e ->
+            //        let range =
+            //            // not sure if this try...with is necessary as on creating a new worksheet it will autoselect the A1 cell.
+            //            try
+            //                context.workbook.getSelectedRange()
+            //            with
+            //                | e -> sheet.getUsedRange()
+            //        createAnnotationTableAtRange(false,false,range,context)
 
             
-            let! addBlocksLogging = addAnnotationBlocksToTable(buildingBlocks,annotationTable,context)
+            //let! addBlocksLogging = addAnnotationBlocksToTable(buildingBlocks,annotationTable,context)
 
-            return logging::addBlocksLogging
+            //return logging::addBlocksLogging
+            return [InteropLogging.Msg.create InteropLogging.Warning "Stop!"]
         } 
     )
 
@@ -1077,12 +1350,12 @@ let addAnnotationBlocksInNewSheet activateWorksheet (worksheetName:string,buildi
         }
     )
 
-let addAnnotationBlocksInNewSheets (annotationTablesToAdd: (string*InsertBuildingBlock []) []) =
+let addAnnotationBlocksInNewSheets (excelTablesToAdd: (string*InsertBuildingBlock []) []) =
     // Use different context instances for individual worksheet creation.
     // Does not work with Excel.run at the beginning and passing the related context to subfunctions.
-    annotationTablesToAdd
+    excelTablesToAdd
     |> Array.mapi (fun i x ->
-        let acitvate = i = annotationTablesToAdd.Length-1
+        let acitvate = i = excelTablesToAdd.Length-1
         addAnnotationBlocksInNewSheet acitvate x
             
     )
@@ -1095,21 +1368,21 @@ let updateUnitForCells (unitTerm:TermMinimal) =
 
         promise {
 
-            let! annotationTableName = getActiveAnnotationTableName context
+            let! excelTableName = getActiveAnnotationTableName context
             
             let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
-            let _ = annotationTable.columns.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
+            let excelTable = sheet.tables.getItem(excelTableName)
+            let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
 
             let selectedRange = context.workbook.getSelectedRange()
             let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"rowIndex"; "rowCount";])))
 
-            let annoHeaderRange = annotationTable.getHeaderRowRange()
+            let annoHeaderRange = excelTable.getHeaderRowRange()
             let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
-            let tableRange = annotationTable.getRange()
+            let tableRange = excelTable.getRange()
             let _ = tableRange.load(U2.Case2 (ResizeArray(["rowCount"])))
 
-            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTableName
+            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context excelTableName
 
             let! headerVals = context.sync().``then``(fun _ ->
                 // Get an array of the headers
@@ -1139,14 +1412,14 @@ let updateUnitForCells (unitTerm:TermMinimal) =
                         let unitColName = OfficeInterop.Indexing.createUnit() |> Indexing.extendName allColHeaders
                         // add column at correct index
                         let unitColumn =
-                            annotationTable.columns.add(
+                            excelTable.columns.add(
                                 index = float selectedBuildingBlock.MainColumn.Index + 1.
                             )
                         // Add column name
                         unitColumn.name <- unitColName
                         // Change number format for main column
                         // Get main column table body range
-                        let mainCol = annotationTable.columns.items.[selectedBuildingBlock.MainColumn.Index].getDataBodyRange()
+                        let mainCol = excelTable.columns.items.[selectedBuildingBlock.MainColumn.Index].getDataBodyRange()
                         // Create unitTerm number format
                         let format = unitTerm.toNumberFormat
                         let formats = createValueMatrix 1 (int tableRange.rowCount - 1) format
@@ -1206,11 +1479,11 @@ let removeSelectedAnnotationBlock () =
 
         promise {
 
-            let! annotationTable = getActiveAnnotationTableName context
+            let! excelTable = getActiveAnnotationTableName context
 
-            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTable
+            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context excelTable
 
-            let! deleteCols = removeAnnotationBlock annotationTable selectedBuildingBlock context
+            let! deleteCols = removeAnnotationBlock excelTable selectedBuildingBlock context
 
             let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols})"  
 
@@ -1224,9 +1497,9 @@ let getAnnotationBlockDetails() =
     Excel.run(fun context ->
         promise {
 
-            let! annotationTable = getActiveAnnotationTableName context
+            let! excelTable = getActiveAnnotationTableName context
 
-            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context annotationTable
+            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context excelTable
 
             let searchTerms = selectedBuildingBlock |> fun bb -> OfficeInterop.BuildingBlockFunctions.toTermSearchable bb
 
@@ -1261,9 +1534,9 @@ let checkForDeprecation (buildingBlocks:BuildingBlock [])  =
 let getAllAnnotationBlockDetails() =
     Excel.run(fun context ->
         promise {
-            let! annotationTableName = getActiveAnnotationTableName context
+            let! excelTableName = getActiveAnnotationTableName context
 
-            let! buildingBlocks = OfficeInterop.BuildingBlockFunctions.getBuildingBlocks context annotationTableName
+            let! buildingBlocks = OfficeInterop.BuildingBlockFunctions.getBuildingBlocks context excelTableName
 
             let deprecationMsgs = checkForDeprecation buildingBlocks
 
@@ -1309,11 +1582,11 @@ let getParentTerm () =
 
         promise {
             try
-                let! annotationTable = getActiveAnnotationTableName context
+                let! excelTable = getActiveAnnotationTableName context
                 // Ref. 2
                 let sheet = context.workbook.worksheets.getActiveWorksheet()
-                let annotationTable = sheet.tables.getItem(annotationTable)
-                let tableRange = annotationTable.getRange()
+                let excelTable = sheet.tables.getItem(excelTable)
+                let tableRange = excelTable.getRange()
                 let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"; "values"|]))
                 let range = context.workbook.getSelectedRange()
                 let _ = range.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex"|]))
@@ -1512,15 +1785,15 @@ let UpdateTableByTermsSearchable (terms:TermSearchable []) =
         let createTANColName searchResultTermAccession columnHeaderId = $"{ColumnCoreNames.TermAccessionNumber.toString} ({searchResultTermAccession}{columnHeaderId})"
 
         promise {
-            let! annotationTableName = getActiveAnnotationTableName context
+            let! excelTableName = getActiveAnnotationTableName context
             // Ref. 2
             let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTableName)
+            let excelTable = sheet.tables.getItem(excelTableName)
             // Ref. 2
-            let tableBodyRange = annotationTable.getDataBodyRange()
+            let tableBodyRange = excelTable.getDataBodyRange()
             let _ = tableBodyRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
 
-            let tableHeaderRange = annotationTable.getHeaderRowRange()
+            let tableHeaderRange = excelTable.getHeaderRowRange()
             let _ = tableHeaderRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
 
             // Ref. 1
@@ -1529,7 +1802,7 @@ let UpdateTableByTermsSearchable (terms:TermSearchable []) =
             let bodyTerms = terms |> getBodyRows
             let headerTerms = terms |> getHeaderRows
 
-            let! buildingBlocks = OfficeInterop.BuildingBlockFunctions.getBuildingBlocks context annotationTableName
+            let! buildingBlocks = OfficeInterop.BuildingBlockFunctions.getBuildingBlocks context excelTableName
 
             let! resultMsg =
                 context.sync().``then``(fun _ ->
@@ -1704,18 +1977,18 @@ let getTableMetaData () =
 
         promise {
 
-            let! annotationTable = getActiveAnnotationTableName context
+            let! excelTable = getActiveAnnotationTableName context
             let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let annotationTable = sheet.tables.getItem(annotationTable)
-            let _ =annotationTable.columns.load(propertyNames = U2.Case1 "count") |> ignore
-            let _ =annotationTable.rows.load(propertyNames = U2.Case1 "count")    |> ignore
-            let rowRange = annotationTable.getRange()
+            let excelTable = sheet.tables.getItem(excelTable)
+            let _ =excelTable.columns.load(propertyNames = U2.Case1 "count") |> ignore
+            let _ =excelTable.rows.load(propertyNames = U2.Case1 "count")    |> ignore
+            let rowRange = excelTable.getRange()
             let _ = rowRange.load(U2.Case2 (ResizeArray(["address";"columnCount";"rowCount"]))) |> ignore
-            let headerRange = annotationTable.getHeaderRowRange()
+            let headerRange = excelTable.getHeaderRowRange()
             let _ = headerRange.load(U2.Case2 (ResizeArray(["address";"columnCount";"rowCount"]))) |> ignore
 
             let! res = context.sync().``then``(fun _ ->
-                let colCount,rowCount = annotationTable.columns.count, annotationTable.rows.count
+                let colCount,rowCount = excelTable.columns.count, excelTable.rows.count
                 let rowRangeAddr, rowRangeColCount, rowRangeRowCount = rowRange.address,rowRange.columnCount,rowRange.rowCount
                 let headerRangeAddr, headerRangeColCount, headerRangeRowCount = headerRange.address,headerRange.columnCount,headerRange.rowCount
 

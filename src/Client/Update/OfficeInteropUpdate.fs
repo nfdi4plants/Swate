@@ -51,20 +51,20 @@ module OfficeInterop =
                     (curry GenericError Cmd.none >> DevMsg)
             state, model, cmd
 
-        | AddAnnotationBlock (minBuildingBlockInfo) ->
+        | AddAnnotationBlock compositeColumn ->
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.addAnnotationBlockHandler  
-                    (minBuildingBlockInfo)
+                    (compositeColumn)
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
             state, model, cmd
 
-        | AddAnnotationBlocks minBuildingBlockInfos ->
+        | AddAnnotationBlocks compositeColumn ->
             let cmd =
                 Cmd.OfPromise.either
                     OfficeInterop.Core.addAnnotationBlocks
-                    minBuildingBlockInfos
+                    compositeColumn
                     (curry GenericInteropLogs Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
             state, model, cmd

@@ -416,6 +416,7 @@ module OfficeInteropTypes =
         member this.hasTerm = this.MainColumnTerm.IsSome
         member this.hasCompleteTerm = this.MainColumnTerm.IsSome && this.MainColumnTerm.Value.Name <> "" && this.MainColumnTerm.Value.TermAccession <> ""
 
+    [<Obsolete>]
     type InsertBuildingBlock = {
         ColumnHeader    : BuildingBlockNamePrePrint
         ColumnTerm      : TermMinimal option

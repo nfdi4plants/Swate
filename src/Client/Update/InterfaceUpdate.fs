@@ -121,20 +121,20 @@ module Interface =
             | _ -> failwith "not implemented"
         | AddAnnotationBlock minBuildingBlockInfo ->
             match host with
-            //| Swatehost.Excel _ ->
-            //    let cmd = OfficeInterop.AddAnnotationBlock minBuildingBlockInfo |> OfficeInteropMsg |> Cmd.ofMsg
-            //    model, cmd
+            | Some Swatehost.Excel ->
+                let cmd = OfficeInterop.AddAnnotationBlock minBuildingBlockInfo |> OfficeInteropMsg |> Cmd.ofMsg
+                model, cmd
             | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                 let cmd = Spreadsheet.AddAnnotationBlock minBuildingBlockInfo |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
-        | AddAnnotationBlocks minBuildingBlockInfos ->
+        | AddAnnotationBlocks compositeColumns ->
             match host with
-            //| Swatehost.Excel _ ->
-            //    let cmd = OfficeInterop.AddAnnotationBlocks minBuildingBlockInfos |> OfficeInteropMsg |> Cmd.ofMsg
-            //    model, cmd
+            | Some Swatehost.Excel ->
+                let cmd = OfficeInterop.AddAnnotationBlocks compositeColumns |> OfficeInteropMsg |> Cmd.ofMsg
+                model, cmd
             | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                let cmd = Spreadsheet.AddAnnotationBlocks minBuildingBlockInfos |> SpreadsheetMsg |> Cmd.ofMsg
+                let cmd = Spreadsheet.AddAnnotationBlocks compositeColumns |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
         | JoinTable (table, index, options) ->
