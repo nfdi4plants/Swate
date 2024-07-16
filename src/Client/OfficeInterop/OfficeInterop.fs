@@ -902,37 +902,40 @@ let replaceOutputColumn (excelTableName:string) (existingOutputColumn: BuildingB
 let updateInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
 
     let possibleInputColumn = arcTable.TryGetInputColumn()
-    let inputColumnName =
-        if possibleInputColumn.IsSome then possibleInputColumn.Value.Header.ToString()
-        else ""
 
-    let columns = excelTable.columns
-    let inputColumn =
-        columns.items
-        |> Array.ofSeq
-        |> Array.tryFind(fun col -> col.name = inputColumnName)
+    if possibleInputColumn.IsSome then
 
-    if inputColumn.IsSome then
+        let inputColumnName = possibleInputColumn.Value.Header.ToString()
 
-        //Only update the input column when it has a new value
-        if inputColumnName <> newBB.Header.ToString() then
-            excelTable.columns.items.[(int) inputColumn.Value.index].name <- newBB.Header.ToString()
+        let columns = excelTable.columns
+        let inputColumn =
+            columns.items
+            |> Array.ofSeq
+            |> Array.tryFind(fun col -> col.name = inputColumnName)
 
-        let warningMsg =
-            if inputColumnName = newBB.Header.ToString() then
-                $"Found existing input column \"{inputColumnName}\". Did not change the column because the new input column is the same \"{excelTable.columns.items.[(int) inputColumn.Value.index].name}\"."
-            else                
-                $"Found existing input column \"{inputColumnName}\". Changed input column to \"{excelTable.columns.items.[(int) inputColumn.Value.index].name}\"."
+        if inputColumn.IsSome then
 
-        let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+            //Only update the input column when it has a new value
+            if inputColumnName <> newBB.Header.ToString() then
+                excelTable.columns.items.[(int) inputColumn.Value.index].name <- newBB.Header.ToString()
 
-        let loggingList = [
-            msg
-        ]
+            let warningMsg =
+                if inputColumnName = newBB.Header.ToString() then
+                    $"Found existing input column \"{inputColumnName}\". Did not change the column because the new input column is the same \"{excelTable.columns.items.[(int) inputColumn.Value.index].name}\"."
+                else                
+                    $"Found existing input column \"{inputColumnName}\". Changed input column to \"{excelTable.columns.items.[(int) inputColumn.Value.index].name}\"."
 
-        loggingList
+            let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+
+            let loggingList = [
+                msg
+            ]
+
+            loggingList
+        else
+            failwith "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
     else
-        failwith "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
+        failwith "Something went wrong! The update input column does not exist! Please report this as a bug to the developers."
 
 /// <summary>
 /// Add a new inputcolumn to an annotation table
@@ -971,37 +974,40 @@ let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn
 let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
 
     let possibleOutputColumn = arcTable.TryGetOutputColumn()
-    let outputColumnName =
-        if possibleOutputColumn.IsSome then possibleOutputColumn.Value.Header.ToString()
-        else ""
 
-    let columns = excelTable.columns
-    let outputColumn =
-        columns.items
-        |> Array.ofSeq
-        |> Array.tryFind(fun col -> col.name = outputColumnName)
+    if possibleOutputColumn.IsSome then
 
-    if outputColumn.IsSome then
+        let outputColumnName = possibleOutputColumn.Value.Header.ToString()
 
-        //Only update the output column when it has a new value
-        if outputColumnName <> newBB.Header.ToString() then
-            excelTable.columns.items.[(int) outputColumn.Value.index].name <- newBB.Header.ToString()
+        let columns = excelTable.columns
+        let outputColumn =
+            columns.items
+            |> Array.ofSeq
+            |> Array.tryFind(fun col -> col.name = outputColumnName)
 
-        let warningMsg =
-            if outputColumnName = newBB.Header.ToString() then
-                $"Found existing output column \"{outputColumnName}\". Did not change the column because the new output column is the same \"{excelTable.columns.items.[(int) outputColumn.Value.index].name}\"."
-            else                
-                $"Found existing output column \"{outputColumnName}\". Changed output column to \"{excelTable.columns.items.[(int) outputColumn.Value.index].name}\"."
+        if outputColumn.IsSome then
 
-        let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+            //Only update the output column when it has a new value
+            if outputColumnName <> newBB.Header.ToString() then
+                excelTable.columns.items.[(int) outputColumn.Value.index].name <- newBB.Header.ToString()
 
-        let loggingList = [
-            msg
-        ]
+            let warningMsg =
+                if outputColumnName = newBB.Header.ToString() then
+                    $"Found existing output column \"{outputColumnName}\". Did not change the column because the new output column is the same \"{excelTable.columns.items.[(int) outputColumn.Value.index].name}\"."
+                else                
+                    $"Found existing output column \"{outputColumnName}\". Changed output column to \"{excelTable.columns.items.[(int) outputColumn.Value.index].name}\"."
 
-        loggingList
+            let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
+
+            let loggingList = [
+                msg
+            ]
+
+            loggingList
+        else
+            failwith "Something went wrong! The update output column is not filled with data! Please report this as a bug to the developers."
     else
-        failwith "Something went wrong! The update output column is not filled with data! Please report this as a bug to the developers."
+        failwith "Something went wrong! The update output column does not exist! Please report this as a bug to the developers."
 
 /// <summary>
 /// Add a new outputcolumn to an annotation table
@@ -1012,6 +1018,7 @@ let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCo
 let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
 
     if arcTable.TryGetOutputColumn().IsSome then
+
         failwith "Something went wrong! The add output column is filled with data! Please report this as a bug to the developers."
 
     else
@@ -1040,18 +1047,20 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
             //Try to get the name of the currently active sheet
             let! excelTableName = tryGetActiveAnnotationTableName context
 
+            let excelTableName =
+                if excelTableName.IsSome then excelTableName.Value
+                else failwith "No excel table name has been found!"
+
             //When a name is available get the annotation and arctable for easy access of indices and value adaption
             //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
-            let! excelTable =
-                if excelTableName.IsSome then tryGetAnnotationTableByName context excelTableName.Value
-                else promise { return None }
+            let! excelTable = tryGetAnnotationTableByName context excelTableName
 
             //Arctable enables a fast check for the existence of input- and output-columns and their indices
             let! arcTable =
                 
                 if excelTable.IsSome then
                     ArcTable.tryGetFromExcelTable(excelTable.Value, context)
-                else promise { return None }
+                else failwith "No excel table has been found!"
 
             //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
             if arcTable.IsSome then
