@@ -1,129 +1,110 @@
-module InfoView
+namespace Pages
 
-open Fable.React
-open Fable.React.Props
 open ExcelColors
 open Model
 open Messages
-open Browser
-open CustomComponents
-
-open Fable
-open Fable.Core
 open Feliz
 open Feliz.Bulma
 
-//let introductionElement model dispatch =
-//    p [Style [TextAlign TextAlignOptions.Justify]] [
-//        b [] [str "Swate"]
-//        str " is a "
-//        b [] [str "S"]
-//        str "wate "
-//        b [] [str "W"]
-//        str "orkflow "
-//        b [] [str "A"]
-//        str "nnotation "
-//        b [] [str "T"]
-//        str "ool for "
-//        b [] [str "E"]
-//        str "xcel. This tool provides an easy way to annotate experimental data in an excel application that every wet lab scientist is familiar with. If you are interested check out the full "
-//        a [Href Shared.URLs.SwateWiki; Target "_blank"] [str "documentation"]
-//        str " 📚."
-//    ]
-
-
-//let iconContainer (left: ReactElement list) (icon) =
-//    Bulma.field.div [
-//        prop.className "is-flex"
-//        prop.children [
-//            Html.div [
-//                prop.style [style.marginRight(length.rem 2)]
-//                prop.children left
-//            ]
-//            icon
-//        ]
-//    ]
-
-//let getInContactElement (model:Model) dispatch =
-//    Bulma.content [
-//        prop.style [style.textAlign.justify]
-//        prop.children [
-//            Bulma.label "Get In Contact With Us"
-
-//            Html.p "Swate is part of the DataPLANT organisation."
-//            Html.p [
-//                Html.a [prop.href "https://nfdi4plants.de/"]
-//                a [Href ; Target "_Blank"; Title "DataPLANT"; Class "nfdiIcon"; Style [Float FloatOptions.Right; MarginLeft "2em"]] [
-//                    img [Src "https://raw.githubusercontent.com/nfdi4plants/Branding/138420e3b6f9ec9e125c1ca8840874b2be2a1262/logos/DataPLANT_logo_minimal_square_bg_darkblue.svg"; Style [Width "54px"]]
-//                ]
-//                str "Services and infrastructures to support "
-//                a [Href "https://twitter.com/search?q=%23FAIRData&src=hashtag_click"] [ str "#FAIRData" ]
-//                str " science and good data management practices within the plant basic research community. "
-//                a [Href "https://twitter.com/search?q=%23NFDI&src=hashtag_click"] [ str "#NFDI" ]
-//            ]
-
-//            Html.p [
-//                str "Got a good idea or just want to get in touch? "
-//                a [Href Shared.URLs.Helpdesk.Url;Target "_Blank"] [str "Reach out to us!"]
-//            ]
-
-//            iconContainer
-//                ([
-//                    Html.span "Follow us on Twitter for the more up-to-date information about research data management! "
-//                    a [Href Shared.URLs.NFDITwitterUrl; Target "_Blank";] [str "@nfdi4plants"]
-//                ])
-//                (Bulma.icon [
-//                    prop.href Shared.URLs.NFDITwitterUrl;
-//                    prop.target "_Blank";
-//                    prop.title "@nfdi4plants on Twitter"
-//                    Bulma.icon.isLarge;
-//                    Html.i [prop.classes ["fa-brands fa-twitter"; "myFaBrand myFaTwitter"; "is-size-3"]]
-//                    |> prop.children
-//                ])
-
-//            iconContainer
-//                ([
-//                    str "You can find the Swate source code  "
-//                    a [Href Shared.URLs.SwateRepo; Target "_Blank"] [str "here"]
-//                    str ". Our developers are always happy to get in contact with you! If you don't have a GitHub account but want to reach out or want to snitch on some nasty bugs 🐛 you can tell us "
-//                    a [Href Shared.URLs.Helpdesk.UrlSwateTopic; Target "_Blank"] [str "here"]
-//                    str "."
-//                ])
-//                (Bulma.icon [
-//                    prop.href Shared.URLs.SwateRepo;
-//                    prop.target "_Blank";
-//                    prop.title "Swate on GitHub"
-//                    Bulma.icon.isLarge;
-//                    Html.i [prop.classes ["fa-brands fa-github"; "myFaBrand myFaGithub"; "is-size-3"]]
-//                    |> prop.children
-//                ])                
-//        ]
-//    ]
-
-let infoComponent (model : Model) (dispatch : Msg -> unit) =
-    Bulma.content [
-        pageHeader "Swate"
-        //Bulma.field.div [
-        //    introductionElement model dispatch
-        //]
-        //Bulma.field.div [
-        //    div [] [
-        //        Bulma.label "Documentation"
-
-        //        ul [] [
-        //            li [] [Html.p [ a [Href Shared.URLs.SwateWiki; Target "_blank"] [ str "User documentation"] ] ]
-        //            li [] [Html.p [
-        //                str "OpenApi docs for "
-        //                a [Href (Shared.URLs.Docs.OntologyApi Shared.URLs.Docs.Html); Target "_blank"] [ str "IOntologyAPI"]
-        //                str "." ]
-        //            ]
-        //        ]
-        //    ]
-        //]
-        //Bulma.field.div [
-        //    getInContactElement model dispatch
-        //]
+module private InfoHelper =
+    
+    let IntroductionElement =
         Bulma.field.div [
-            prop.text "WIP 🚧"
+            Bulma.content [
+                Html.p [
+                    Html.b "Swate"
+                    Html.text " is a "
+                    Html.b "S"
+                    Html.text "wate "
+                    Html.b "W"
+                    Html.text "orkflow "
+                    Html.b "A"
+                    Html.text "nnotation "
+                    Html.b "T"
+                    Html.text "ool for "
+                    Html.b "E"
+                    Html.text "xcel. This tool provides an easy way to annotate experimental data in an excel application that every wet lab scientist is familiar with. If you are interested check out the full "
+                    Html.a [prop.href Shared.URLs.SwateWiki; prop.target.blank; prop.text "documentation"]
+                    Html.text " 📚."
+                ]
+            ]
         ]
+
+
+    let MediaContainer (content: ReactElement list) (imageSrc: string) (imageUrl: string)=
+        Bulma.media [
+            Bulma.content content
+            Bulma.mediaRight [
+                Html.a [
+                    prop.href imageUrl
+                    prop.target.blank
+                    prop.children [
+                        Bulma.image [
+                            prop.className "bg-white p-2 rounded transition hover:scale-110 shadow-md hover:shadow-cyan-500/50"
+                            image.is64x64
+                            prop.children [
+                                Html.img [prop.src imageSrc]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+    let GetInContactElements =
+        Bulma.field.div [
+            Bulma.title [
+                title.is5
+                prop.text "Get In Contact With Us"
+            ]
+            MediaContainer
+                [
+                    Html.strong "DataPLANT"
+                    Html.br []
+                    Html.p "Swate is part of the DataPLANT organisation."
+                    Html.p [
+                        Html.text "Services and infrastructures to support "
+                        Html.a [prop.href "https://twitter.com/search?q=%23FAIRData&src=hashtag_click"; prop.target.blank; prop.text "#FAIRData" ]
+                        Html.text " science and good data management practices within the plant basic research community. "
+                        Html.a [prop.href "https://twitter.com/search?q=%23NFDI&src=hashtag_click"; prop.target.blank; prop.text "#NFDI" ]
+                    ]
+
+                    Html.p [
+                        Html.text "Got a good idea or just want to get in touch? "
+                        Html.a [prop.href Shared.URLs.Helpdesk.Url; prop.target.blank; prop.text "Reach out to us!"]
+                    ]
+                ]
+                "https://raw.githubusercontent.com/nfdi4plants/Branding/master/logos/DataPLANT/DataPLANT_logo_minimal_rounded_bg_transparent.svg"
+                Shared.URLs.NfdiWebsite
+
+            MediaContainer
+                [
+                    Html.strong "X - @nfdi4plants"
+                    Html.br []
+                    Html.span "Follow us on X for more up-to-date information about research data management! "
+                    Html.a [prop.href Shared.URLs.NFDITwitterUrl; prop.target.blank; prop.text "@nfdi4plants"]
+                ]
+                "/x-logo-black.png"
+                Shared.URLs.NFDITwitterUrl
+
+            MediaContainer
+                [
+                    Html.strong "GitHub"
+                    Html.br []
+                    Html.text "You can find the Swate source code  "
+                    Html.a [prop.href Shared.URLs.SwateRepo; prop.target.blank; prop.text "here"]
+                    Html.text ". Our developers are always happy to get in contact with you! If you don't have a GitHub account but want to reach out or want to snitch on some nasty bugs 🐛 you can tell us "
+                    Html.a [prop.href Shared.URLs.Helpdesk.UrlSwateTopic; prop.target.blank; prop.text "here"]
+                    Html.text "."
+                ]
+                "/github-mark.png"
+                Shared.URLs.SwateRepo
     ]
+
+type Info =
+    static member Main =
+        Html.div [
+            pageHeader "Swate"
+            InfoHelper.IntroductionElement
+            InfoHelper.GetInContactElements
+        ]

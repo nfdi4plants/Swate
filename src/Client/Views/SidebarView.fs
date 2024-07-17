@@ -174,7 +174,7 @@ type SidebarView =
             SettingsView.settingsViewComponent model dispatch
 
         | Routing.Route.Info ->
-            InfoView.infoComponent model dispatch
+            Pages.Info.Main
 
         | Routing.Route.NotFound ->
             NotFoundView.notFoundComponent model dispatch

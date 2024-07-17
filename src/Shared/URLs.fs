@@ -52,6 +52,9 @@ module URLs =
     [<LiteralAttribute>]
     let NFDITwitterUrl = @"https://twitter.com/nfdi4plants"
 
+    [<Literal>]
+    let NFDIGitHubUrl = @"https://github.com/nfdi4plants"
+
     [<LiteralAttribute>]
     let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"
 
