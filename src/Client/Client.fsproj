@@ -90,6 +90,7 @@
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />
     <Compile Include="MainComponents\MainViewContainer.fs" />
+    <Compile Include="MainComponents\Metadata\Generic.fs" />
     <Compile Include="MainComponents\Metadata\DatamapConfig.fs" />
     <Compile Include="MainComponents\Metadata\Forms.fs" />
     <Compile Include="MainComponents\Metadata\Template.fs" />
