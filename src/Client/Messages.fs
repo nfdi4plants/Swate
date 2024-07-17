@@ -104,6 +104,10 @@ type SettingsDataStewardMsg =
 type TopLevelMsg =
     | CloseSuggestions
 
+module DataAnnotator =
+    type Msg =
+        | UpdateDataFile of DataAnnotator.DataFile option
+
 type Msg =
 | DevMsg                of DevMsg
 | OntologyMsg           of Ontologies.Msg
@@ -116,6 +120,7 @@ type Msg =
 | ProtocolMsg           of Protocol.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | CytoscapeMsg          of Cytoscape.Msg
+| DataAnnotatorMsg      of DataAnnotator.Msg
 | SpreadsheetMsg        of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
 | InterfaceMsg          of SpreadsheetInterface.Msg

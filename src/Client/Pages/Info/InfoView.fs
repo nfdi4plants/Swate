@@ -33,17 +33,23 @@ module private InfoHelper =
 
     let MediaContainer (content: ReactElement list) (imageSrc: string) (imageUrl: string)=
         Bulma.media [
-            Bulma.content content
-            Bulma.mediaRight [
-                Html.a [
-                    prop.href imageUrl
-                    prop.target.blank
-                    prop.children [
-                        Bulma.image [
-                            prop.className "bg-white p-2 rounded transition hover:scale-110 shadow-md hover:shadow-cyan-500/50"
-                            image.is64x64
-                            prop.children [
-                                Html.img [prop.src imageSrc]
+            prop.className "w-full"
+            prop.children [
+                Bulma.content [
+                    prop.className "grow"
+                    prop.children content
+                ]
+                Bulma.mediaRight [
+                    Html.a [
+                        prop.href imageUrl
+                        prop.target.blank
+                        prop.children [
+                            Bulma.image [
+                                prop.className "bg-white p-2 rounded transition hover:scale-110 shadow-md hover:shadow-cyan-500/50"
+                                image.is64x64
+                                prop.children [
+                                    Html.img [prop.src imageSrc]
+                                ]
                             ]
                         ]
                     ]

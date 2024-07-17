@@ -95,6 +95,7 @@ type Widget =
     | _BuildingBlock
     | _Template
     | _FilePicker
+    | _DataAnnotator
 
     [<ReactComponent>]
     static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit, ?help: ReactElement) =
@@ -128,6 +129,8 @@ type Widget =
                     style.minWidth.minContent
                     if size.IsSome then
                         style.width size.Value.X
+                    else
+                        style.maxWidth 600
                         //style.height size.Value.Y
                     if position.IsNone then
                         //style.transform.translate (length.perc -50,length.perc -50)
@@ -251,5 +254,11 @@ type Widget =
                 FilePicker.insertButton model dispatch
         ]
         let prefix = FilePickerWidgets
-        let help = Html.div []
-        Widget.Base(content, prefix, rmv, help)
+        Widget.Base(content, prefix, rmv)
+
+    static member DataAnnotator (model, dispatch, rmv) =
+        let content = Html.div [
+            Pages.DataAnnotator.Main(model, dispatch)
+        ]
+        let prefix = DataAnnotatorWidgets
+        Widget.Base(content, prefix, rmv)

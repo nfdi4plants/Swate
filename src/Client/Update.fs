@@ -176,6 +176,15 @@ module Ontologies =
                     (curry GenericError Cmd.none >> DevMsg)
             model, cmd
 
+module DataAnnotator =
+    let update (msg: DataAnnotator.Msg) (state: DataAnnotator.Model) (model: Model.Model) =
+        match msg with
+        | DataAnnotator.UpdateDataFile dataFile ->
+            let nextState: DataAnnotator.Model = {
+                DataFile = dataFile
+            }
+            nextState, model, Cmd.none
+
 let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
         match msg with
@@ -352,6 +361,11 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             let nextModel =
                 {nextModel0 with
                     CytoscapeModel = nextState}
+            nextModel, nextCmd
+
+        | DataAnnotatorMsg msg ->
+            let nextState, nextModel0, nextCmd = DataAnnotator.update msg currentModel.DataAnnotatorModel currentModel
+            let nextModel = {nextModel0 with DataAnnotatorModel = nextState}
             nextModel, nextCmd
 
     /// This function is used to determine which msg should be logged to activity log.

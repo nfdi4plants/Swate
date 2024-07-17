@@ -107,6 +107,15 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                 ],
                 (fun _ -> addWidget Widget._FilePicker)
             ).toReactElement()
+            QuickAccessButton.create(
+                "Data Annotator",
+                [
+                    Bulma.icon [ 
+                        Html.i [prop.className "fa-solid fa-object-group" ]
+                    ]
+                ],
+                (fun _ -> addWidget Widget._DataAnnotator)
+            ).toReactElement()
         ]
     ]
 

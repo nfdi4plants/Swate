@@ -76,6 +76,7 @@ let Main (model: Model, dispatch) =
         | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget) 
         | Widget._Template -> Widget.Templates (model, dispatch, rmv widget)
         | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
+        | Widget._DataAnnotator -> Widget.DataAnnotator(model, dispatch, rmv widget)
         |> WidgetOrderContainer bringWidgetToFront
     let addWidget (widget: Widget) = 
         widget::widgets |> List.rev |> setWidgets

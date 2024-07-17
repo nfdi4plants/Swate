@@ -86,6 +86,7 @@
     <Compile Include="Pages\ActivityLog\ActivityLogView.fs" />
     <Compile Include="Pages\Settings\SettingsView.fs" />
     <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
+    <Compile Include="Pages\DataAnnotator\DataAnnotator.fs" />
     <Compile Include="MainComponents\CellStyles.fs" />
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />

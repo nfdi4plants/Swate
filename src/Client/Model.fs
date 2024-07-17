@@ -333,6 +333,30 @@ module Protocol =
             Templates               = [||]
         }
 
+module DataAnnotator =
+
+    type DataFile = {
+        DataFileName: string
+        DataFileType: string
+        DataContent: string
+        DataSize: float
+    } with
+        static member create(dfn, dft, dc, ds) = {
+            DataFileName = dfn
+            DataFileType = dft
+            DataContent = dc
+            DataSize = ds
+        }
+
+    type Model =
+        {
+            DataFile: DataFile option
+        }
+        static member init () = {
+            DataFile = None
+        }
+            
+
 type RequestBuildingBlockInfoStates =
 | Inactive
 | RequestExcelInformation
@@ -372,6 +396,8 @@ type Model = {
     ///Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
     CytoscapeModel              : Cytoscape.Model
+    ///
+    DataAnnotatorModel          : DataAnnotator.Model
     /// Contains all information about spreadsheet view
     SpreadsheetModel            : Spreadsheet.Model
     History                     : LocalHistory.Model

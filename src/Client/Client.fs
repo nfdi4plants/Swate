@@ -8,6 +8,7 @@ open Model
 open Update
 open Fable.Core.JsInterop
 importSideEffects "./style.scss"
+importSideEffects "./tailwindstyle.scss"
 
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
