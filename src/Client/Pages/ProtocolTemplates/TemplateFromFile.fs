@@ -36,7 +36,7 @@ type private TemplateFromFileState = {
 
 module private Helper =
     
-    let upload (uploadId: string) (state: TemplateFromFileState) setState dispatch (ev: File list) =
+    let upload (uploadId: string) (state: TemplateFromFileState) setState (dispatch: Msg -> unit) (ev: File list) =
         let fileList = ev //: FileList = ev.target?files
 
         if fileList.Length > 0 then
@@ -48,12 +48,17 @@ module private Helper =
                 let (r: string) = evt.target?result
                 async {
                     setState {state with Loading = true}
-                    let! af = Spreadsheet.IO.Json.readFromJson state.FileType state.JsonFormat r |> Async.AwaitPromise
-                    setState {state with UploadedFile = Some af; Loading = false}
+                    let p = Spreadsheet.IO.Json.readFromJson state.FileType state.JsonFormat r
+                    do!
+                        Promise.either
+                            (fun af -> setState {state with UploadedFile = Some af; Loading = false})
+                            (fun e -> GenericError (Cmd.none,e) |> DevMsg |> dispatch)
+                            p
+                        |> Async.AwaitPromise
                 } |> Async.StartImmediate
                                    
             reader.onerror <- fun evt ->
-                curry GenericLog Cmd.none ("Error", evt.Value) |> DevMsg |> dispatch
+                curry GenericError Cmd.none (exn evt.Value) |> DevMsg |> dispatch
 
             reader.readAsText(file)
         else
@@ -102,25 +107,6 @@ type TemplateFromFile =
     [<ReactComponent>]
     static member Main(model: Model, dispatch) =
         let state, setState = React.useState(TemplateFromFileState.init)
-        let af = React.useRef (
-            let a = ArcAssay.init("My Assay")
-            let t1 = a.InitTable("Template Table 1")
-            t1.AddColumns([|
-                CompositeColumn.create(CompositeHeader.Input IOType.Source, [| for i in 1 .. 5 do sprintf "Source _ %i" i |> CompositeCell.FreeText |])
-                CompositeColumn.create(CompositeHeader.Output IOType.Sample, [| for i in 1 .. 5 do sprintf "Sample _ %i" i |> CompositeCell.FreeText |])
-                CompositeColumn.create(CompositeHeader.Component (OntologyAnnotation("instrument model", "MS", "MS:19283")), [| for i in 1 .. 5 do OntologyAnnotation("SCIEX instrument model", "MS", "MS:21387189237") |> CompositeCell.Term |])
-                CompositeColumn.create(CompositeHeader.Factor (OntologyAnnotation("temperature", "UO", "UO:21387")), [| for i in 1 .. 5 do CompositeCell.createUnitized("", OntologyAnnotation("degree celcius", "UO", "UO:21387189237")) |])
-            |])
-            let t2 = a.InitTable("Template Table 2")
-            t2.AddColumns([|
-                CompositeColumn.create(CompositeHeader.Input IOType.Source, [| for i in 1 .. 5 do sprintf "Source2 _ %i" i |> CompositeCell.FreeText |])
-                CompositeColumn.create(CompositeHeader.Output IOType.Sample, [| for i in 1 .. 5 do sprintf "Sample2 _ %i" i |> CompositeCell.FreeText |])
-                CompositeColumn.create(CompositeHeader.Component (OntologyAnnotation("instrument", "MS", "MS:19283")), [| for i in 1 .. 5 do OntologyAnnotation("SCIEX instrument model", "MS", "MS:21387189237") |> CompositeCell.Term |])
-                CompositeColumn.create(CompositeHeader.Factor (OntologyAnnotation("temperature", "UO", "UO:21387")), [| for i in 1 .. 5 do CompositeCell.createUnitized("", OntologyAnnotation("degree celcius", "UO", "UO:21387189237")) |])
-            |])
-            let af = ArcFiles.Assay a
-            af
-        )
         let setJsonFormat = fun x -> setState { state with JsonFormat = x }
         let setFileType = fun x -> setState { state with FileType = x }
         let fileTypeDisabled (ft: ArcFilesDiscriminate) =
