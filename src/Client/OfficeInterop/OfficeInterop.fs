@@ -46,16 +46,16 @@ module OfficeInteropExtensions =
         /// <param name="rows"></param>
         static member viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
             rows
-            |> Seq.collect (fun x -> Seq.indexed x)
+            |> Seq.collect (fun row -> Seq.indexed row)
             |> Seq.groupBy fst
             |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
             |> Seq.toArray
 
-        static member addColumn (excelTable:Table) name rowCount value =
+        static member addColumn (index:float) (excelTable:Table) name rowCount value =
             let col = createMatrixForTables 1 rowCount value
             excelTable.columns.add(
-                index   = -1.,
-                values  = U4.Case1 (col),
+                index   = index,
+                values  = U4.Case1 col,
                 name    = name
             )
 
@@ -82,7 +82,7 @@ module OfficeInteropExtensions =
 
             let arcTable = 
                 ArcTable.init name
-                |> ArcTable.addColumns(compositeColumns,skipFillMissing = true)
+                |> ArcTable.addColumns(compositeColumns, skipFillMissing = true)
                 |> Some
 
             arcTable
@@ -104,8 +104,8 @@ module OfficeInteropExtensions =
                     |> List.sortBy classifyColumnOrder
                     |> List.collect CompositeColumn.toStringCellColumns
                     |> Seq.transpose
-                    |> Seq.map (fun x ->
-                        x |> Seq.map (box >> Some)
+                    |> Seq.map (fun column ->
+                        column |> Seq.map (box >> Some)
                         |> ResizeArray
                     )
                     |> ResizeArray                    
@@ -952,7 +952,7 @@ let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn
 
         let rowCount = arcTable.RowCount + 1
 
-        let newColumn = ExcelHelper.addColumn excelTable (newBB.Header.ToString()) rowCount ""
+        let newColumn = ExcelHelper.addColumn -1. excelTable (newBB.Header.ToString()) rowCount ""
         let columnBody = newColumn.getDataBodyRange()
         // Fit column width to content
         columnBody.format.autofitColumns()
@@ -1025,7 +1025,7 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
 
         let rowCount = arcTable.RowCount + 1
 
-        let newColumn = ExcelHelper.addColumn excelTable (newBB.Header.ToString()) rowCount ""
+        let newColumn = ExcelHelper.addColumn -1. excelTable (newBB.Header.ToString()) rowCount ""
         let columnBody = newColumn.getDataBodyRange()
         // Fit column width to content
         columnBody.format.autofitColumns()
@@ -1036,7 +1036,73 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
                 msg
         ]
 
-        loggingList
+        loggingList 
+
+let rebaseIndexToArcTable (index:float) (headers:ResizeArray<CompositeHeader>) =
+
+    let columns =
+        headers
+        |> Array.ofSeq
+
+    let terms =
+        columns
+        |> Array.where (fun column -> column.IsTermColumn)
+        |> Array.map (fun column -> column.ToTerm())
+
+    terms.[0]
+
+    ()
+
+let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) (headerRange:Excel.Range) (selectedRange:Excel.Range) =
+
+    let rowCount = arcTable.RowCount + 1
+
+    let buildingBlockCells = Spreadsheet.CompositeColumn.toStringCellColumns newBB
+
+    let targetIndex =
+        let excelIndex = (rebaseIndexToTable selectedRange headerRange) 
+        let index = excelIndex + 0.
+
+        let resizeArray = arcTable.ToExcelValues().[0].[(int) excelIndex]
+
+        log("resizeArray: ", resizeArray.ToString())
+
+
+        let columName = headerRange.values.[0].[(int) index].Value.ToString()
+        
+        let selectedColumn = Array.find (fun column -> column.Header.ToString() = columName) arcTable.Columns
+
+        if selectedColumn.Header.IsTermColumn then
+            //Only used for testing because you need to know the size of the building block of the excel table you are inserting in
+            index + (float) buildingBlockCells.Length
+        else
+            index + 1.
+
+    let headers =
+        headerRange.values[0]
+        |> List.ofSeq
+        |> List.map (fun header -> header.ToString())
+
+    let bb = 
+        buildingBlockCells
+        |> List.mapi(fun i bbCell ->
+            let mutable newHeader = bbCell.Head
+            //check and extend header to avoid duplicates
+            newHeader <- Indexing.extendName (headers |> List.toArray) bbCell.Head
+            let column = ExcelHelper.addColumn(targetIndex + (float) i) excelTable newHeader rowCount bbCell.Tail.Head
+            newHeader::headers |> ignore
+            column.getRange().format.autofitColumns()
+            if i > 0 then column.getRange().columnHidden <- true
+            column
+        )
+
+    let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new term column: {newBB.Header}"
+
+    let loggingList = [
+            msg
+    ]
+
+    loggingList
 
 /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
 let addAnnotationBlockHandler (newBB:CompositeColumn) =
@@ -1056,16 +1122,21 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
             let! excelTable = tryGetAnnotationTableByName context excelTableName
 
             //Arctable enables a fast check for the existence of input- and output-columns and their indices
-            let! arcTable =
-                
+            let! arcTable =                
                 if excelTable.IsSome then
                     ArcTable.tryGetFromExcelTable(excelTable.Value, context)
                 else failwith "No excel table has been found!"
 
             //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
             if arcTable.IsSome then
+
+                let selectedRange = context.workbook.getSelectedRange().getColumn(0)
+                let headerRange = excelTable.Value.getHeaderRowRange()
+
                 let _ =
                     excelTable.Value.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
+                    selectedRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"]))) |> ignore
+                    headerRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"; "values"]))) |> ignore
                     excelTable.Value.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
 
                 let (|Input|_|) (newBuildingBlock:CompositeColumn) =
@@ -1082,11 +1153,14 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
                         else Some (addOutputColumn excelTable.Value arcTable.Value newBuildingBlock)
                     else None
 
+                let addBuildingBlock (newBuildingBlock:CompositeColumn) =
+                    addBuildingBlock excelTable.Value arcTable.Value newBuildingBlock headerRange selectedRange
+
                 let getResult (newBuildingBlock:CompositeColumn) =
                     match newBuildingBlock with
                     | Input msg -> msg
                     | Output msg -> msg
-                    | _ -> failwith "No result is available! This should not happen! Please report this as a bug to the developers."
+                    | _ -> addBuildingBlock newBuildingBlock
 
                 let! result = context.sync().``then``(fun _ ->
                     getResult newBB
@@ -1200,7 +1274,7 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
                 None
     
         // Expand table by min rows, only done if necessary
-        let! expandedTable,expandedRowCount =
+        let! expandedTable, expandedRowCount =
             if expandByNRows.IsSome then
                 promise {
                     let! expandedTable,expandedTableRange = context.sync().``then``(fun _ ->
@@ -1211,14 +1285,14 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
                             )
                         let newTable = context.workbook.tables.getItem(excelTable.name)
                         let newTableRange = excelTable.getRange()
-                        let _ = newTableRange.load(U2.Case2 (ResizeArray(["columnCount";"rowCount"])))
+                        let _ = newTableRange.load(U2.Case2 (ResizeArray(["columnCount"; "rowCount"])))
                         excelTable,newTableRange
                     )
                     let! expandedRowCount = context.sync().``then``(fun _ -> int expandedTableRange.rowCount)
                     return (expandedTable, expandedRowCount)
                 }
             else
-                promise { return (excelTable,tableRange.rowCount |> int) }
+                promise { return (excelTable, tableRange.rowCount |> int) }
     
     
         //create an empty column to insert
