@@ -391,7 +391,7 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
     let rec findNewTableName allTableNames =
         let id = HumanReadableIds.tableName()
         let newTestName = $"annotationTable{id}"
-        let existsAlready = allTableNames |> Array.exists (fun x -> x = newTestName)
+        let existsAlready = allTableNames |> Array.exists (fun tableName -> tableName = newTestName)
         if existsAlready then
             findNewTableName allTableNames
         else
@@ -1036,22 +1036,7 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
                 msg
         ]
 
-        loggingList 
-
-let rebaseIndexToArcTable (index:float) (headers:ResizeArray<CompositeHeader>) =
-
-    let columns =
-        headers
-        |> Array.ofSeq
-
-    let terms =
-        columns
-        |> Array.where (fun column -> column.IsTermColumn)
-        |> Array.map (fun column -> column.ToTerm())
-
-    terms.[0]
-
-    ()
+        loggingList
 
 let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) (headerRange:Excel.Range) (selectedRange:Excel.Range) =
 
@@ -1060,23 +1045,42 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
     let buildingBlockCells = Spreadsheet.CompositeColumn.toStringCellColumns newBB
 
     let targetIndex =
-        let excelIndex = (rebaseIndexToTable selectedRange headerRange) 
-        let index = excelIndex + 0.
+        let excelIndex = rebaseIndexToTable selectedRange headerRange
 
-        let resizeArray = arcTable.ToExcelValues().[0].[(int) excelIndex]
+        let headers = arcTable.ToExcelValues().[0] |> Array.ofSeq |> Array.map (fun header -> header.ToString())
 
-        log("resizeArray: ", resizeArray.ToString())
+        if excelIndex < (float) (headers.Length - 1) then 
 
+            //We want to start looking after the chosen column in order to ignore the current column because it could be a main column
+            let headers = headers.[(int) excelIndex + 1..]
 
-        let columName = headerRange.values.[0].[(int) index].Value.ToString()
-        
-        let selectedColumn = Array.find (fun column -> column.Header.ToString() = columName) arcTable.Columns
+            let mainColumNames =
+                // Get all cases of the union
+                Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<CompositeHeader>)
+                |> Array.map (fun case -> case.Name)
 
-        if selectedColumn.Header.IsTermColumn then
-            //Only used for testing because you need to know the size of the building block of the excel table you are inserting in
-            index + (float) buildingBlockCells.Length
+            let indices =
+                mainColumNames
+                |> Array.map (fun name ->
+                                headers
+                                |> Array.tryFindIndex (fun header -> header.StartsWith(name)))
+                                |> Array.where (fun index -> index.IsSome)
+                                |> Array.map (fun index -> index.Value)
+
+            if indices.Length > 0 then
+
+                let indices =
+                    indices
+                    |> Array.sortBy(fun index -> index)
+
+                //The +1 makes sure, we add the column after the column we have currently chosen
+                excelIndex + (float indices.[0]) + 1.
+
+            //The +1 makes sure, we add the column after the column we have currently chosen
+            else excelIndex + 1.
         else
-            index + 1.
+            //Add the new building block to the end of the table
+            -1.
 
     let headers =
         headerRange.values[0]
@@ -1088,8 +1092,12 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
         |> List.mapi(fun i bbCell ->
             let mutable newHeader = bbCell.Head
             //check and extend header to avoid duplicates
-            newHeader <- Indexing.extendName (headers |> List.toArray) bbCell.Head
-            let column = ExcelHelper.addColumn(targetIndex + (float) i) excelTable newHeader rowCount bbCell.Tail.Head
+            newHeader <- Indexing.extendName (headers |> List.toArray) bbCell.Head            
+            let calIndex =
+                if targetIndex >= 0 then targetIndex + (float) i
+                else -1
+            log("calIndex", calIndex)
+            let column = ExcelHelper.addColumn(calIndex) excelTable newHeader rowCount bbCell.Tail.Head
             newHeader::headers |> ignore
             column.getRange().format.autofitColumns()
             if i > 0 then column.getRange().columnHidden <- true
