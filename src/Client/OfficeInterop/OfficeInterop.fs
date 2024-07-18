@@ -1082,28 +1082,6 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
             //Add the new building block to the end of the table
             -1.
 
-    let headers =
-        headerRange.values[0]
-        |> List.ofSeq
-        |> List.map (fun header -> header.ToString())
-
-    let bb = 
-        buildingBlockCells
-        |> List.mapi(fun i bbCell ->
-            let mutable newHeader = bbCell.Head
-            //check and extend header to avoid duplicates
-            newHeader <- Indexing.extendName (headers |> List.toArray) bbCell.Head            
-            let calIndex =
-                if targetIndex >= 0 then targetIndex + (float) i
-                else -1
-            log("calIndex", calIndex)
-            let column = ExcelHelper.addColumn(calIndex) excelTable newHeader rowCount bbCell.Tail.Head
-            newHeader::headers |> ignore
-            column.getRange().format.autofitColumns()
-            if i > 0 then column.getRange().columnHidden <- true
-            column
-        )
-
     let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new term column: {newBB.Header}"
 
     let loggingList = [
