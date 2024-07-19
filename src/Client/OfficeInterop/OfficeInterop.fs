@@ -208,6 +208,9 @@ open System
 
 open Fable.Core.JsInterop
 
+[<Literal>]
+let AppendIndex = -1.
+
 /// <summary>This is not used in production and only here for development. Its content is always changing to test functions for new features.</summary>
 let exampleExcelFunction1 () =
     Excel.run(fun context ->
@@ -952,7 +955,7 @@ let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn
 
         let rowCount = arcTable.RowCount + 1
 
-        let newColumn = ExcelHelper.addColumn -1. excelTable (newBB.Header.ToString()) rowCount ""
+        let newColumn = ExcelHelper.addColumn AppendIndex excelTable (newBB.Header.ToString()) rowCount ""
         let columnBody = newColumn.getDataBodyRange()
         // Fit column width to content
         columnBody.format.autofitColumns()
@@ -1025,7 +1028,7 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
 
         let rowCount = arcTable.RowCount + 1
 
-        let newColumn = ExcelHelper.addColumn -1. excelTable (newBB.Header.ToString()) rowCount ""
+        let newColumn = ExcelHelper.addColumn AppendIndex excelTable (newBB.Header.ToString()) rowCount ""
         let columnBody = newColumn.getDataBodyRange()
         // Fit column width to content
         columnBody.format.autofitColumns()
@@ -1074,10 +1077,10 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
                 excelIndex + (float) targetIndex.Value + 1.
 
             //The +1 makes sure, we add the column after the column we have currently chosen
-            else -1.
+            else AppendIndex
         else
             //Add the new building block to the end of the table
-            -1.
+            AppendIndex
 
     let headers =
         headerRange.values[0]
