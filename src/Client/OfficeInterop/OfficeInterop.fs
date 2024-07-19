@@ -1056,31 +1056,50 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 
             let mainColumNames =
                 // Get all cases of the union
-                Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<CompositeHeader>)
-                |> Array.map (fun case -> case.Name)
+                CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
 
-            let indices =
-                mainColumNames
-                |> Array.map (fun name ->
-                                headers
-                                |> Array.tryFindIndex (fun header -> header.StartsWith(name)))
-                                |> Array.where (fun index -> index.IsSome)
-                                |> Array.map (fun index -> index.Value)
+            let targetIndex =
+                [|
+                    for i in 0..headers.Length - 1 do
+                        let header = headers.[i]
+                        if mainColumNames |> Array.exists (fun cName -> header.StartsWith cName) then
+                            i
+                |]
+                |> Array.sortBy(fun index -> index)
+                |> Array.tryHead
 
-            if indices.Length > 0 then
-
-                let indices =
-                    indices
-                    |> Array.sortBy(fun index -> index)
+            if targetIndex.IsSome then
 
                 //The +1 makes sure, we add the column after the column we have currently chosen
-                excelIndex + (float indices.[0]) + 1.
+                excelIndex + (float) targetIndex.Value + 1.
 
             //The +1 makes sure, we add the column after the column we have currently chosen
-            else excelIndex + 1.
+            else -1.
         else
             //Add the new building block to the end of the table
             -1.
+
+    let headers =
+        headerRange.values[0]
+        |> List.ofSeq
+        |> List.map (fun header -> header.ToString())
+
+    let _ = 
+        buildingBlockCells
+        |> List.mapi(fun i bbCell ->
+            let mutable newHeader = bbCell.Head
+            //check and extend header to avoid duplicates
+            newHeader <- Indexing.extendName (headers |> List.toArray) bbCell.Head            
+            let calIndex =
+                if targetIndex >= 0 then targetIndex + (float) i
+                else -1
+            log("targetIndex", targetIndex)
+            log("calIndex", calIndex)
+            let column = ExcelHelper.addColumn(calIndex) excelTable newHeader rowCount bbCell.Tail.Head
+            newHeader::headers |> ignore
+            column.getRange().format.autofitColumns()
+            if i > 0 then column.getRange().columnHidden <- true
+        )
 
     let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new term column: {newBB.Header}"
 
