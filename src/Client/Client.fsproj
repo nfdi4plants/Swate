@@ -29,6 +29,7 @@
     <Compile Include="OfficeInterop\Functions\BuildingBlockFunctions.fs" />
     <Compile Include="OfficeInterop\HelperFunctions.fs" />
     <Compile Include="OfficeInterop\OfficeInterop.fs" />
+    <Compile Include="States\DataAnnotator.fs" />
     <Compile Include="States\ARCitect.fs" />
     <Compile Include="States\SpreadsheetInterface.fs" />
     <Compile Include="States\OfficeInteropState.fs" />
@@ -54,11 +55,13 @@
     <Compile Include="Modals\SelectiveImportModal.fs" />
     <Compile Include="Spreadsheet\IO.fs" />
     <Compile Include="Spreadsheet\Types.fs" />
+    <Compile Include="Spreadsheet\Controller\Cells.fs" />
     <Compile Include="Spreadsheet\Controller\Generic.fs" />
     <Compile Include="Spreadsheet\Controller\BuildingBlocks.fs" />
     <Compile Include="Spreadsheet\Controller\Table.fs" />
     <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
     <Compile Include="Spreadsheet\Controller\DataMap.fs" />
+    <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\AdvancedSearch.fs" />
     <Compile Include="SharedComponents\TermSearchInput.fs" />
@@ -103,11 +106,11 @@
     <Compile Include="MainComponents\Cells.fs" />
     <Compile Include="MainComponents\KeyboardShortcuts.fs" />
     <Compile Include="MainComponents\AddRows.fs" />
-    <Compile Include="MainComponents\DataMap\DataMap.fs" />
-    <Compile Include="MainComponents\SpreadsheetView.fs" />
+    <Compile Include="MainComponents\SpreadsheetView\Generic.fs" />
+    <Compile Include="MainComponents\SpreadsheetView\ArcTable.fs" />
+    <Compile Include="MainComponents\SpreadsheetView\DataMap.fs" />
     <Compile Include="MainComponents\Navbar.fs" />
     <Compile Include="MainComponents\FooterTabs.fs" />
-    <Compile Include="Views\XlsxFileView.fs" />
     <Compile Include="Views\SplitWindowView.fs" />
     <Compile Include="Views\NotFoundView.fs" />
     <Compile Include="Views\MainWindowView.fs" />

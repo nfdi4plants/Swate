@@ -180,8 +180,26 @@ module DataAnnotator =
     let update (msg: DataAnnotator.Msg) (state: DataAnnotator.Model) (model: Model.Model) =
         match msg with
         | DataAnnotator.UpdateDataFile dataFile ->
+            let parsedFile = dataFile |> Option.map (fun file ->
+                let s = file.ExpectedSeparator
+                DataAnnotator.ParsedDataFile.fromFileBySeparator s file
+            )
             let nextState: DataAnnotator.Model = {
                 DataFile = dataFile
+                ParsedFile = parsedFile
+            }
+            nextState, model, Cmd.none
+        | DataAnnotator.ToggleHeader ->
+            let nextState = 
+                { state with ParsedFile = state.ParsedFile |> Option.map (fun file -> file.ToggleHeader())}
+            nextState, model, Cmd.none
+        | DataAnnotator.UpdateSeperator newSep ->
+            let parsedFile = state.DataFile |> Option.map (fun file ->
+                DataAnnotator.ParsedDataFile.fromFileBySeparator newSep file
+            )
+            let nextState = {
+                state with
+                    ParsedFile = parsedFile
             }
             nextState, model, Cmd.none
 

@@ -15,6 +15,7 @@ type Route =
 | Protocol
 | ProtocolSearch
 | JsonExport
+| DataAnnotator
 | ActivityLog
 | Settings
 | NotFound
@@ -27,6 +28,7 @@ type Route =
         | Route.Protocol            -> "Templates"
         | Route.ProtocolSearch      -> "Template Search"
         | Route.JsonExport          -> "Json Export"
+        | Route.DataAnnotator       -> "Data Annotator"
         | Route.Info                -> "Info"
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
@@ -68,6 +70,8 @@ type Route =
             createElem [ Html.i [prop.className "fa-solid fa-timeline" ]] p.toStringRdbl
         | Route.Info                ->
             createElem [ Html.i [prop.className "fa-solid fa-question" ]] p.toStringRdbl
+        | Route.DataAnnotator       ->
+            createElem [ Html.i [prop.className "fa-solid fa-object-group" ]] p.toStringRdbl
         | _                         -> Html.i [prop.className "fa-question"]
 
 ///explained here: https://elmish.github.io/browser/routing.html

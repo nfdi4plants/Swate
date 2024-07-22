@@ -53,14 +53,12 @@ let private tabRow (model:Model) (tabs: seq<ReactElement>) =
 let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
     let isIEBrowser : bool = Browser.Dom.window.document?documentMode 
     tabRow model [
-        if not model.PageState.IsExpert then
-            createNavigationTab Routing.Route.BuildingBlock     model dispatch sidebarsize
-            createNavigationTab Routing.Route.TermSearch        model dispatch sidebarsize
-            createNavigationTab Routing.Route.Protocol          model dispatch sidebarsize
-            createNavigationTab Routing.Route.FilePicker        model dispatch sidebarsize
-            createNavigationTab Routing.Route.JsonExport        model dispatch sidebarsize
-        else
-            createNavigationTab Routing.Route.JsonExport        model dispatch sidebarsize
+        createNavigationTab Routing.Route.BuildingBlock     model dispatch sidebarsize
+        createNavigationTab Routing.Route.TermSearch        model dispatch sidebarsize
+        createNavigationTab Routing.Route.Protocol          model dispatch sidebarsize
+        createNavigationTab Routing.Route.FilePicker        model dispatch sidebarsize
+        createNavigationTab Routing.Route.DataAnnotator     model dispatch sidebarsize
+        createNavigationTab Routing.Route.JsonExport        model dispatch sidebarsize
     ]
 
 module private ResizeObserver =
@@ -160,6 +158,9 @@ type SidebarView =
 
         | Routing.Route.Protocol ->
             Protocol.Templates.Main (model, dispatch)
+
+        | Routing.Route.DataAnnotator ->
+            Pages.DataAnnotator.Main(model, dispatch)
 
         | Routing.Route.JsonExport ->
             JsonExporter.Core.FileExporter.Main(model, dispatch)

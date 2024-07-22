@@ -205,6 +205,8 @@ module Spreadsheet =
                             | _ -> (state.ActiveTable.ColumnCount-1), (state.ActiveTable.RowCount-1) // This does not matter
                         let nextIndex = Controller.Table.selectRelativeCell state.SelectedCells.MinimumElement moveBy maxColIndex maxRowIndex
                         let s = Set([nextIndex])
+                        let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
+                        MainComponents.CellStyles.ScrollToCellId <- Some cellId
                         UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
             | SetActiveCellFromSelected ->

@@ -104,10 +104,6 @@ type SettingsDataStewardMsg =
 type TopLevelMsg =
     | CloseSuggestions
 
-module DataAnnotator =
-    type Msg =
-        | UpdateDataFile of DataAnnotator.DataFile option
-
 type Msg =
 | DevMsg                of DevMsg
 | OntologyMsg           of Ontologies.Msg

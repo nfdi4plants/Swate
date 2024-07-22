@@ -87,6 +87,36 @@ let debouncel<'T> (storage:DebounceStorage) (key: string) (timeout: int) (setLoa
 
 let newDebounceStorage = fun () -> DebounceStorage()
 
+let debouncemin (fn: 'a -> unit, timeout: int) =
+    let mutable id = null: string
+    fun (arg: 'a) ->
+        match id with
+        | null -> ()
+        | id -> Fable.Core.JS.clearTimeout (int id)
+        let timeoutId = 
+            Fable.Core.JS.setTimeout
+                (fun () -> fn arg)
+                timeout
+        id <- string timeoutId
+
+let throttle (fn: 'a -> unit, interval: int) =
+    let mutable lastCall = System.DateTime.MinValue
+
+    fun (arg: 'a) ->
+        let now = System.DateTime.UtcNow
+        if (now - lastCall).TotalMilliseconds > float interval then
+            lastCall <- now
+            fn arg
+
+let throttleAndDebounce(fn: 'a -> unit, timespan: int) =
+    let throttleFn = throttle(fn, timespan)
+    let debounceFn = debouncemin(fn, timespan)
+
+    fun (arg: 'a) ->
+        throttleFn arg
+        debounceFn arg
+
+
 type Clipboard =
     abstract member writeText: string -> JS.Promise<unit>
     abstract member readText: unit -> JS.Promise<string>
