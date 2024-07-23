@@ -364,7 +364,7 @@ module Spreadsheet =
                 //let cmds = Cmd.batch [cmd; stateCmd]
                 //state, model, cmds
                 failwith "UpdateTermColumns is not implemented yet"
-                state,model,Cmd.none
+                state, model, Cmd.none
             | UpdateTermColumnsResponse terms ->
                 //let nextExcelState = {
                 //    model.ExcelState with
@@ -383,7 +383,7 @@ module Spreadsheet =
                 //        (curry GenericError (OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                 //state, nextModel, cmd
                 failwith "UpdateTermColumnsResponse is not implemented yet"
-                state,model,Cmd.none
+                state, model, Cmd.none
         try
             innerUpdate state model msg
             |> Helper.updateHistoryStorageMsg msg
