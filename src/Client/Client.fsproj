@@ -85,6 +85,7 @@
     <Compile Include="Pages\ProtocolTemplates\TemplateFromFile.fs" />
     <Compile Include="Pages\ProtocolTemplates\ProtocolView.fs" />
     <Compile Include="Pages\FilePicker\FilePickerView.fs" />
+    <Compile Include="Pages\Info\PrivacyPolicy.fs" />
     <Compile Include="Pages\Info\InfoView.fs" />
     <Compile Include="Pages\ActivityLog\ActivityLogView.fs" />
     <Compile Include="Pages\Settings\SettingsView.fs" />
@@ -138,6 +139,7 @@
     <PackageReference Include="Feliz" Version="2.8.0" />
     <PackageReference Include="Feliz.Bulma" Version="3.0.0" />
     <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
+    <PackageReference Include="Feliz.CompilerPlugins" Version="2.2.0" />
     <PackageReference Include="FsSpreadsheet.Js" Version="[6.2.0]" />
   </ItemGroup>
 </Project>

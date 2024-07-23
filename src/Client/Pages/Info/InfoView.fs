@@ -7,7 +7,7 @@ open Feliz
 open Feliz.Bulma
 
 module private InfoHelper =
-    
+
     let IntroductionElement =
         Bulma.field.div [
             Bulma.content [

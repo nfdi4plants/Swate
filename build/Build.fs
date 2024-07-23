@@ -318,13 +318,13 @@ let InstallClient() =
 let Bundle() =
     [
         "server", dotnet [ "publish"; "-c"; "Release"; "-o"; deployPath ] serverPath
-        "client", dotnet [ "fable"; "-o"; "output"; "-s"; "-e"; "fs.js"; "--run"; "npx"; "vite"; "build" ] clientPath
+        "client", dotnet [ "fable"; "-o"; "output"; "-s"; "-e"; "jsx"; "--run"; "npx"; "vite"; "build" ] clientPath
     ]
     |> runParallel
 
 let Run(db: bool) =
     [ "server", dotnet [ "watch"; "run" ] serverPath
-      "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "-e"; "fs.js"; "--run"; "npx"; "vite" ] clientPath
+      "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "-e"; "jsx"; "--run"; "npx"; "vite" ] clientPath
       if db then
         "database", dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
     ] |> runParallel

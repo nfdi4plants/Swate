@@ -95,7 +95,9 @@ let debouncemin (fn: 'a -> unit, timeout: int) =
         | id -> Fable.Core.JS.clearTimeout (int id)
         let timeoutId = 
             Fable.Core.JS.setTimeout
-                (fun () -> fn arg)
+                (fun () ->
+                    fn arg
+                )
                 timeout
         id <- string timeoutId
 
@@ -145,3 +147,13 @@ let takeFromArray (count: int) (array: 'a []) =
           takeRec tail newAcc (index+1)
 
     takeRec (Array.toList array) [] 0
+
+[<AutoOpen>]
+module JsxHelpers =
+    open Feliz
+
+    let inline toJsx (el: ReactElement) : JSX.Element = unbox el
+    let inline toReact (el: JSX.Element) : ReactElement = unbox el
+
+    /// Enables use of Feliz styles within a JSX hole
+    let inline toStyle (styles: IStyleAttribute list) : obj = JsInterop.createObj (unbox styles)

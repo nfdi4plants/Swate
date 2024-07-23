@@ -12,6 +12,7 @@ type Route =
 | TermSearch
 | FilePicker
 | Info
+| PrivacyPolicy
 | Protocol
 | ProtocolSearch
 | JsonExport
@@ -30,6 +31,7 @@ type Route =
         | Route.JsonExport          -> "Json Export"
         | Route.DataAnnotator       -> "Data Annotator"
         | Route.Info                -> "Info"
+        | Route.PrivacyPolicy       -> "Privacy Policy"
         | Route.ActivityLog         -> "Activity Log"
         | Route.Settings            -> "Settings"
         | Route.NotFound            -> "NotFound"
@@ -51,7 +53,7 @@ type Route =
             Bulma.icon [
                 prop.title name
                 prop.children icons
-            ] 
+            ]
 
         match p with
         | Route.TermSearch          ->
@@ -69,6 +71,8 @@ type Route =
         | Route.ActivityLog         ->
             createElem [ Html.i [prop.className "fa-solid fa-timeline" ]] p.toStringRdbl
         | Route.Info                ->
+            createElem [ Html.i [prop.className "fa-solid fa-question" ]] p.toStringRdbl
+        | Route.PrivacyPolicy                ->
             createElem [ Html.i [prop.className "fa-solid fa-question" ]] p.toStringRdbl
         | Route.DataAnnotator       ->
             createElem [ Html.i [prop.className "fa-solid fa-object-group" ]] p.toStringRdbl
@@ -90,6 +94,7 @@ module Routing =
             map Route.BuildingBlock         (s "BuildingBlock")
             map Route.FilePicker            (s "FilePicker")
             map Route.Info                  (s "Info")
+            map Route.PrivacyPolicy         (s "PrivacyPolicy")
             map Route.Protocol              (s "ProtocolInsert")
             map Route.ProtocolSearch        (s "Protocol" </> s "Search")
             map Route.JsonExport            (s "Experts" </> s "JsonExport")
