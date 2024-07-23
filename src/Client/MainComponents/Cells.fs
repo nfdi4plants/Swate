@@ -266,7 +266,6 @@ type Cell =
         let isSelected = state.SelectedCells.Contains index
         let isIdle = state.CellIsIdle (!^index, columnType)
         let isActive = not isIdle
-        //let ref = React.useElementRef()
         let displayValue = defaultArg displayValue cellValue
         let makeIdle() = 
             UpdateActiveCell None |> SpreadsheetMsg |> dispatch
@@ -275,14 +274,14 @@ type Cell =
         let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
         let cellId = Controller.Cells.mkCellId columnIndex rowIndex state
         let ref = React.useElementRef()
-        React.useEffect((fun _ ->
-            if ref.current.IsSome && CellStyles.ScrollToCellId = Some cellId then
-                //let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
-                //options.behavior <- Browser.Types.ScrollBehavior.Auto
-                //options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
-                //options.block <- Browser.Types.ScrollAlignment.Nearest
-                ref.current.Value.focus()
-        ), [|box CellStyles.ScrollToCellId|])
+        //React.useEffect((fun _ ->
+        //    if ref.current.IsSome && CellStyles.ScrollToCellId = Some cellId then
+        //        //let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
+        //        //options.behavior <- Browser.Types.ScrollBehavior.Auto
+        //        //options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
+        //        //options.block <- Browser.Types.ScrollAlignment.Nearest
+        //        ref.current.Value.focus()
+        //), [|box CellStyles.ScrollToCellId|])
         Html.td [
             if tooltip.IsSome then prop.title tooltip.Value
             prop.key cellId

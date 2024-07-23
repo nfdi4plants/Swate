@@ -125,20 +125,37 @@ module private DataAnnotatorHelper =
             Html.textf "Length %i - %s" file.DataContent.Length file.DataFileName
         ]
 
-    let CellButton (mkCell: IReactProperty list -> ReactElement, content: string, dtrgt: DataTarget, state: Set<DataTarget>, setState) =
-        let isActive = state.Contains dtrgt
+    let IsAddedIcon =
+        Bulma.icon [
+            prop.className "absolute top-0 right-0 has-text-success"
+            prop.children [
+                    Html.i [prop.className "fa-solid fa-square-plus fa-lg"]
+            ]
+        ]
+
+    let CellButton (isHeader:bool, content: string, dtrgt: DataTarget, state: Set<DataTarget>, setState) =
+        let isDirectlyActive = state.Contains dtrgt
+        let isActive =
+            match dtrgt with
+            | DataTarget.Column _ | DataTarget.Row _ -> isDirectlyActive
+            | DataTarget.Cell (ci, ri) -> state.Contains (DataTarget.Column ci) || state.Contains (DataTarget.Row ri)
+        let mkCell: IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
         mkCell [
             prop.className "p-0"
             prop.key "dtrgt"
             prop.children [
                 Bulma.button.button [
-                    prop.className "w-full rounded-none border-0"
-                    if isActive then button.isActive
+                    prop.className ["w-full rounded-none border-0 relative"; if not isHeader then "font-light"]
+                    if isDirectlyActive || isActive then color.isPrimary
                     prop.onClick(fun _ ->
-                        if isActive then state.Remove dtrgt else state.Add dtrgt
+                        if isDirectlyActive then state.Remove dtrgt else state.Add dtrgt
                         |> setState
                     )
-                    prop.text content
+                    prop.children [
+                        if isDirectlyActive then
+                            IsAddedIcon
+                        Html.text content
+                    ]
                 ]
             ]
         ]
@@ -153,23 +170,29 @@ type DataAnnotator =
     static member private FileViewComponent (file: DataAnnotator.ParsedDataFile) =
         let init: unit -> Set<DataTarget> = fun () -> Set.empty
         let state, setState = React.useState(init)
-        let headerRow = [
-            for ci in 0 .. file.HeaderRow.Value.Length-1 do
-                (
-                    (Html.th: IReactProperty list -> ReactElement),
-                    file.HeaderRow.Value.[ci],
-                    (DataTarget.Column ci),
-                    state,
-                    setState
-                )
-        ]
+        let headerRow =
+            file.HeaderRow
+            |> Option.map (fun headerRow ->
+                let data =
+                    [
+                        for ci in 0 .. headerRow.Length-1 do
+                            (
+                                true,
+                                file.HeaderRow.Value.[ci],
+                                (DataTarget.Column ci),
+                                state,
+                                setState
+                            )
+                    ]
+                {|data = data; createCell = CellButton|}
+            )
         let bodyRows = [|
             for ri in 0 .. file.BodyRows.Length-1 do
                 let row = file.BodyRows.[ri]
                 [
                     for ci in 0 .. row.Length-1 do
                         (
-                            (Html.td: IReactProperty list -> ReactElement),
+                            false,
                             row.[ci],
                             (DataTarget.Cell (ci, ri)),
                             state,
@@ -185,8 +208,8 @@ type DataAnnotator =
                     "DataAnnotatorFileView",
                     bodyRows,
                     CellButton,
-                    {|data = headerRow; createCell = CellButton|},
-                    rowHeight
+                    ?headerRow = headerRow,
+                    rowHeight=rowHeight
                 )
             ]
         ]

@@ -6,9 +6,6 @@ open Feliz
 open Feliz.Bulma
 open Fable.Core
 
-
-let mutable ScrollToCellId : string option = None
-
 let cellStyle (specificStyle: IStyleAttribute list) = prop.style [
         style.minWidth 100
         style.height 22

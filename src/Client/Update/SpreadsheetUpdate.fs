@@ -206,7 +206,9 @@ module Spreadsheet =
                         let nextIndex = Controller.Table.selectRelativeCell state.SelectedCells.MinimumElement moveBy maxColIndex maxRowIndex
                         let s = Set([nextIndex])
                         let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
-                        MainComponents.CellStyles.ScrollToCellId <- Some cellId
+                        match Browser.Dom.document.getElementById cellId with
+                        | null -> ()
+                        | ele -> ele.focus()
                         UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
             | SetActiveCellFromSelected ->

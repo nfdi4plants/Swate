@@ -43,7 +43,6 @@ type LazyLoadTable =
         React.useEffect((fun () ->
             if ref.current.IsSome then
                 let onScroll = throttleAndDebounce((fun _ ->
-                    log "throttleAndDebounce"
                     let scrollTop = ref.current.Value.scrollTop
                     if data.Length <> 0 then
                         setScrollPosition scrollTop
