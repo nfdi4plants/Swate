@@ -155,10 +155,17 @@ module private DataAnnotatorHelper =
         Bulma.block [
             Bulma.buttons [
                 prop.children [
-                    UpdateSeparatorButton dispatch
-                    UpdateIsHeaderCheckbox model dispatch
-                    UpdateTargetColumn target setTarget
-                    ResetButton model rmvFile
+                    match model.SpreadsheetModel.ActiveView with
+                    | Spreadsheet.ActivePattern.IsTable ->  
+                        UpdateSeparatorButton dispatch
+                        UpdateIsHeaderCheckbox model dispatch
+                        UpdateTargetColumn target setTarget
+                        ResetButton model rmvFile
+                    | Spreadsheet.ActivePattern.IsDataMap ->
+                        UpdateSeparatorButton dispatch
+                        UpdateIsHeaderCheckbox model dispatch
+                        ResetButton model rmvFile
+                    | _ -> Html.none
                 ]
             ]
         ]
