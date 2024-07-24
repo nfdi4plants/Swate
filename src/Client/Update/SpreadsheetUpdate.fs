@@ -90,6 +90,13 @@ module Spreadsheet =
             | AddAnnotationBlocks columns ->
                 let nextState = Controller.BuildingBlocks.addBuildingBlocks columns state
                 nextState, model, Cmd.none
+            | AddDataAnnotation data ->
+                let nextState =
+                    match state.ActiveView with
+                    | IsDataMap -> Controller.DataMap.addDataAnnotation data state
+                    | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
+                    | IsMetadata -> failwith "Unable to add data annotation in metadata view"
+                nextState, model, Cmd.none
             | JoinTable (table, index, options) ->
                 let nextState = Controller.BuildingBlocks.joinTable table index options state
                 nextState, model, Cmd.none

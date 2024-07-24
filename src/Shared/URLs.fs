@@ -2,6 +2,13 @@ namespace Shared
 
 module URLs =
 
+    module Data =
+
+        module SelectorFormat =
+
+            [<Literal>]
+            let csv = @"https://datatracker.ietf.org/doc/html/rfc7111"
+
     [<LiteralAttribute>]
     let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
 

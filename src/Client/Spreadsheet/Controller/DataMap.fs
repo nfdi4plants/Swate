@@ -59,3 +59,18 @@ let deleteRows (rows:int []) (state: Spreadsheet.Model) : Spreadsheet.Model =
         |> Array.sortDescending
         |> Array.iter (fun n -> state.DataMapOrDefault.DataContexts.RemoveAt n)
     {state with ArcFile = state.ArcFile}
+
+let addDataAnnotation (data: {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let inputLength = data.fragmentSelectors.Length
+    // Append rows if needed
+    if inputLength > state.DataMapOrDefault.DataContexts.Count then
+        let rows = Array.init (inputLength - state.DataMapOrDefault.DataContexts.Count) (fun _ -> DataContext())
+        state.DataMapOrDefault.DataContexts.AddRange(rows)
+    for i in 0 .. inputLength-1 do
+        let selector = data.fragmentSelectors.[i]
+        let dtx = state.DataMapOrDefault.DataContexts.[i]
+        dtx.FilePath <- Some data.fileName
+        dtx.Selector <- Some selector
+        dtx.Format <- Some data.fileType
+        dtx.SelectorFormat <- Some Shared.URLs.Data.SelectorFormat.csv
+    {state with ArcFile = state.ArcFile}

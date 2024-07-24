@@ -1,10 +1,34 @@
 namespace DataAnnotator
 
-[<RequireQualifiedAccessAttribute>]
+[<RequireQualifiedAccess>]
+type TargetColumn =
+    | Input
+    | Output
+    | Autodetect
+
+    static member fromString (str: string) =
+        match str.ToLower() with
+        | "input" -> Input
+        | "output" -> Output
+        | _ -> Autodetect
+
+[<RequireQualifiedAccess>]
 type DataTarget =
     | Cell of columnIndex:int * rowIndex: int
     | Row of int
     | Column of int
+
+    member this.ToFragmentSelectorString() =
+        match this with
+        | Row ri -> sprintf "row=%i" ri
+        | Column ci -> sprintf "col=%i" ci
+        | Cell (ci, ri) -> sprintf "cell=%i,%i" ri ci
+
+    member this.ToReactKey() =
+        match this with
+        | Row ri -> sprintf "row-%i" ri
+        | Column ci -> sprintf "col-%i" ci
+        | Cell (ci, ri) -> sprintf "cell-%i-%i" ri ci
 
 type DataFile = {
     DataFileName: string
