@@ -59,7 +59,7 @@ module OfficeInteropExtensions =
                 name    = name
             )
 
-        static member addRow (index:float) (excelTable:Table) rowCount value =
+        static member addRows (index:float) (excelTable:Table) rowCount value =
             let col = createMatrixForTables 1 rowCount value
             excelTable.rows.add(
                 index   = index,
@@ -1143,11 +1143,11 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
                 arcTable.Value.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)
 
                 let tableValues = arcTable.Value.ToExcelValues() |> Array.ofSeq                
-                let (headers, body) = Array.ofSeq(tableValues.[0]), ResizeArray[tableValues.[1]]                
+                let (headers, body) = Array.ofSeq(tableValues.[0]), tableValues.[1..]
 
                 let newTableRange = excelTable.Value.getRange()
                 
-                let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowIndex"; "columnIndex"; "columnCount"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "values"]))
+                let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowCount";]))
 
                 do! context.sync().``then``(fun _ ->
                     excelTable.Value.delete()
@@ -1155,7 +1155,7 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
 
                 let! (newTable, _) = createAnnotationTableAtRange(false, false, newTableRange, context)
 
-                let _ = newTable.load(propertyNames = U2.Case2 (ResizeArray["name"; "values"; "columns"]))
+                let _ = newTable.load(propertyNames = U2.Case2 (ResizeArray["name"; "values"; "columns";]))
 
                 do! context.sync().``then``(fun _ ->
 
@@ -1168,13 +1168,12 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
 
                     headerNames
                     |> Array.iteri(fun i header ->                        
-                        ExcelHelper.addColumn i newTable header (arcTable.Value.RowCount + 1) "" |> ignore)
+                        ExcelHelper.addColumn i newTable header (int newTableRange.rowCount) "" |> ignore)
                 )
 
                 let bodyRange = newTable.getDataBodyRange()
 
-                let _ = bodyRange.load(propertyNames = U2.Case2 (ResizeArray["columnCount"]))
-
+                let _ = bodyRange.load(propertyNames = U2.Case2 (ResizeArray["columnCount"; "rowCount"; "values"]))
 
                 do! context.sync().``then``(fun _ ->
 
@@ -1182,20 +1181,23 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
                     //As a result we create a new annotation table that has one column
                     //We delete the newly created column of the newly created table
                     newTable.columns.getItemAt(bodyRange.columnCount - 1.).delete()
-                    bodyRange.values <- body
-                    bodyRange.format.autofitColumns()
-                    bodyRange.format.autofitRows()
                 )
+
+                let newBodyRange = newTable.getDataBodyRange()
 
                 let _ =
                     newTable.columns.load(propertyNames = U2.Case2 (ResizeArray["name"; "items"])) |> ignore
-                    bodyRange.load(propertyNames = U2.Case2 (ResizeArray["name"; "columnCount"]))
+                    newBodyRange.load(propertyNames = U2.Case2 (ResizeArray["name"; "columnCount"; "values"]))
 
                 let mainColumNames =
                     // Get all cases of the union
                     CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
 
                 do! context.sync().``then``(fun _ ->
+
+                    newBodyRange.values <- ResizeArray body
+                    newBodyRange.format.autofitColumns()
+                    newBodyRange.format.autofitRows()
 
                     newTable.columns.items
                     |> Array.ofSeq
