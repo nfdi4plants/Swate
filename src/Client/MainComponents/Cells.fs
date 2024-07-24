@@ -388,7 +388,7 @@ type Cell =
         Cell.BodyBase(Main, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
 
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.AsTerm.NameText
+        let cellValue = cell.ToOA().NameText
         let setter = fun (s: string) ->
             let oa = cell.ToOA()
             let newName = if s = "" then None else Some s
@@ -411,7 +411,7 @@ type Cell =
         Cell.BodyBase(Unit, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
 
     static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.AsTerm.TermSourceREF |> Option.defaultValue ""
+        let cellValue = cell.ToOA().TermSourceREF |> Option.defaultValue ""
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTSR = if s = "" then None else Some s
@@ -421,7 +421,7 @@ type Cell =
         Cell.BodyBase(TSR, cellValue, setter, index, model, dispatch)
 
     static member BodyTAN(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.AsTerm.TermAccessionNumber |> Option.defaultValue ""
+        let cellValue = cell.ToOA().TermAccessionNumber |> Option.defaultValue ""
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTAN = if s = "" then None else Some s
