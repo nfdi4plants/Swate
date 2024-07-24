@@ -123,7 +123,6 @@ module Interface =
             | JoinTable (table, index, options) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    log("level:", 1)
                     let cmd = OfficeInterop.JoinTable (table, index, options) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->

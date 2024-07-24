@@ -59,6 +59,13 @@ module OfficeInteropExtensions =
                 name    = name
             )
 
+        static member addRow (index:float) (excelTable:Table) rowCount value =
+            let col = createMatrixForTables 1 rowCount value
+            excelTable.rows.add(
+                index   = index,
+                values  = U4.Case1 col
+            )
+
     type ArcTable with
 
         /// <summary>
@@ -1109,12 +1116,10 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 
     loggingList
 
-/// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
-let addAnnotationBlockHandler (newBB:CompositeColumn) =
+let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions option) =
     Excel.run(fun context ->
         promise {
 
-            //let activeSheet = context.workbook.worksheets.getActiveWorksheet()
             //Try to get the name of the currently active sheet
             let! excelTableName = tryGetActiveAnnotationTableName context
 
@@ -1128,6 +1133,103 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
 
             //Arctable enables a fast check for the existence of input- and output-columns and their indices
             let! arcTable =                
+                if excelTable.IsSome then
+                    ArcTable.tryGetFromExcelTable(excelTable.Value, context)
+                else failwith "No excel table has been found!"
+
+            //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
+            if arcTable.IsSome then
+
+                arcTable.Value.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)
+
+                let tableValues = arcTable.Value.ToExcelValues() |> Array.ofSeq                
+                let (headers, body) = Array.ofSeq(tableValues.[0]), ResizeArray[tableValues.[1]]                
+
+                let newTableRange = excelTable.Value.getRange()
+                
+                let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowIndex"; "columnIndex"; "columnCount"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "values"]))
+
+                do! context.sync().``then``(fun _ ->
+                    excelTable.Value.delete()
+                )
+
+                let! (newTable, _) = createAnnotationTableAtRange(false, false, newTableRange, context)
+
+                let _ = newTable.load(propertyNames = U2.Case2 (ResizeArray["name"; "values"; "columns"]))
+
+                do! context.sync().``then``(fun _ ->
+
+                    newTable.name <- excelTableName
+
+                    let headerNames =
+                        let names = headers |> Array.map (fun item -> item.Value.ToString())
+                        names
+                        |> Array.map (fun name -> Indexing.extendName names name)
+
+                    headerNames
+                    |> Array.iteri(fun i header ->                        
+                        ExcelHelper.addColumn i newTable header (arcTable.Value.RowCount + 1) "" |> ignore)
+                )
+
+                let bodyRange = newTable.getDataBodyRange()
+
+                let _ = bodyRange.load(propertyNames = U2.Case2 (ResizeArray["columnCount"]))
+
+
+                do! context.sync().``then``(fun _ ->
+
+                    //We delete the annotation table because we cannot overwrite an existing one
+                    //As a result we create a new annotation table that has one column
+                    //We delete the newly created column of the newly created table
+                    newTable.columns.getItemAt(bodyRange.columnCount - 1.).delete()
+                    bodyRange.values <- body
+                    bodyRange.format.autofitColumns()
+                    bodyRange.format.autofitRows()
+                )
+
+                let _ =
+                    newTable.columns.load(propertyNames = U2.Case2 (ResizeArray["name"; "items"])) |> ignore
+                    bodyRange.load(propertyNames = U2.Case2 (ResizeArray["name"; "columnCount"]))
+
+                let mainColumNames =
+                    // Get all cases of the union
+                    CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
+
+                do! context.sync().``then``(fun _ ->
+
+                    newTable.columns.items
+                    |> Array.ofSeq
+                    |> Array.iter (fun column ->
+                        if mainColumNames |> Array.exists (fun cName -> column.name.StartsWith cName) then
+                            ()
+                        else
+                            column.getRange().columnHidden <- true)
+                )
+
+                return [InteropLogging.Msg.create InteropLogging.Warning $"Joined template {tableToAdd.Name} to table {excelTableName}!"]
+            else
+                return [InteropLogging.Msg.create InteropLogging.Error "No arc table could be created! This should not happen at this stage! Please report this as a bug to the developers.!"]
+            }
+    )
+
+/// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
+let addAnnotationBlockHandler (newBB:CompositeColumn) =
+    Excel.run(fun context ->
+        promise {
+
+            //Try to get the name of the currently active sheet
+            let! excelTableName = tryGetActiveAnnotationTableName context
+
+            let excelTableName =
+                if excelTableName.IsSome then excelTableName.Value
+                else failwith "No excel table name has been found!"
+
+            //When a name is available get the annotation and arctable for easy access of indices and value adaption
+            //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
+            let! excelTable = tryGetAnnotationTableByName context excelTableName
+
+            //Arctable enables a fast check for the existence of input- and output-columns and their indices
+            let! arcTable =
                 if excelTable.IsSome then
                     ArcTable.tryGetFromExcelTable(excelTable.Value, context)
                 else failwith "No excel table has been found!"
@@ -1379,13 +1481,13 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
         ]
         
         return logging
-    } 
+    }
 
 let addAnnotationBlocks (buildingBlocks:CompositeColumn []) =
     Excel.run(fun context ->
 
         promise {
-
+            
             //let! tryTable = tryFindActiveAnnotationTable()
             //let sheet = context.workbook.worksheets.getActiveWorksheet()
 
@@ -1404,7 +1506,7 @@ let addAnnotationBlocks (buildingBlocks:CompositeColumn []) =
             //                context.workbook.getSelectedRange()
             //            with
             //                | e -> sheet.getUsedRange()
-            //        createAnnotationTableAtRange(false,false,range,context)
+            //        createAnnotationTableAtRange(false, false, range, context)
 
             
             //let! addBlocksLogging = addAnnotationBlocksToTable(buildingBlocks,annotationTable,context)
