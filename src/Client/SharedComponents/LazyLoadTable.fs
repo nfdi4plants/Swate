@@ -27,9 +27,9 @@ type LazyLoadTable =
         let setDisplayPositions = React.useCallback(
             (fun (scroll: float) ->
                 // we want to start rendering a bit above the visible screen
-                let scrollWithOffset = Math.Floor(scroll - rowsToRender - Offset / 2.);
+                let scrollWithOffset = Math.Ceiling(scroll - rowsToRender - Offset / 2.);
                 // start position should never be less than 0
-                let displayStartPosition = Math.Round(Math.Max(0., Math.Floor(scrollWithOffset / RowHeight)))
+                let displayStartPosition = Math.Round(Math.Max(0., Math.Ceiling(scrollWithOffset / RowHeight)))
                 // end position should never be larger than our data array
                 let displayEndPosition = Math.Round(Math.Min(displayStartPosition + rowsToRender, data.Length-1))
                 //

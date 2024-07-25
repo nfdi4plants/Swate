@@ -88,18 +88,19 @@ let debouncel<'T> (storage:DebounceStorage) (key: string) (timeout: int) (setLoa
 let newDebounceStorage = fun () -> DebounceStorage()
 
 let debouncemin (fn: 'a -> unit, timeout: int) =
-    let mutable id = null: string
+    let mutable id : int option = None
     fun (arg: 'a) ->
         match id with
-        | null -> ()
-        | id -> Fable.Core.JS.clearTimeout (int id)
+        | None -> ()
+        | Some id -> Fable.Core.JS.clearTimeout id
         let timeoutId = 
             Fable.Core.JS.setTimeout
                 (fun () ->
+                    log "debounce called"
                     fn arg
                 )
                 timeout
-        id <- string timeoutId
+        id <- Some timeoutId
 
 let throttle (fn: 'a -> unit, interval: int) =
     let mutable lastCall = System.DateTime.MinValue
@@ -107,16 +108,36 @@ let throttle (fn: 'a -> unit, interval: int) =
     fun (arg: 'a) ->
         let now = System.DateTime.UtcNow
         if (now - lastCall).TotalMilliseconds > float interval then
+            log "throttle called"
             lastCall <- now
             fn arg
 
 let throttleAndDebounce(fn: 'a -> unit, timespan: int) =
-    let throttleFn = throttle(fn, timespan)
-    let debounceFn = debouncemin(fn, timespan)
+    let mutable id : int option = None
+    let mutable lastCall = System.DateTime.MinValue
 
     fun (arg: 'a) ->
-        throttleFn arg
-        debounceFn arg
+        let now = System.DateTime.UtcNow
+        // determines if function was called after specified timespan
+        let isThrottled = (now - lastCall).TotalMilliseconds > float timespan
+        match isThrottled, id with
+        | true, Some id ->
+            log "throttle called"
+            Fable.Core.JS.clearTimeout id
+            lastCall <- now
+            fn arg
+        | _, Some id -> Fable.Core.JS.clearTimeout id
+        | _, None -> ()
+        let timeoutId = 
+            Fable.Core.JS.setTimeout
+                (fun () ->
+                    log "debounce called"
+                    fn arg
+                    id <- None
+                    lastCall <- now
+                )
+                timespan
+        id <- Some timeoutId
 
 
 type Clipboard =
