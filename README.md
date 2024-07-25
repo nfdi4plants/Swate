@@ -39,56 +39,18 @@ If you have any issues using Swate, missing features or found a nasty bug :bug: 
 - [GitHub Issues](https://github.com/nfdi4plants/Swate/issues)
 - [DataPLANT Helpdesk](https://support.nfdi4plants.org/?topic=Tools_Swate)
 
-## Dev
 
-These instructions are only relevant if you too want to participate in developing Swate!
+## Contributing
 
-### Requirements
+> [!IMPORTANT]
+> A quote i found years ago by @Thorium.
+>
+> > _Imposter syndrome disclaimer_: I want your help. No really, I do.
+> >
+> > There might be a little voice inside that tells you you're not ready; that you need to do one more tutorial, or learn another framework, or write a few more blog posts before you can help me with this project.
+> >
+> > I assure you, that's not the case.
+>
+> Any help is welcome, from a typo fix to a new feature. If you are unsure about anything, just ask. We are here to help you help us.
 
-- [.NET SDK](https://dotnet.microsoft.com/en-us/download), >= 8.0.0
-  - verify with `dotnet --version`
-- [nodejs](https://nodejs.org/en/download), >=18
-  - verify with `node --version`
-- npm, >=9
-  - likely part of nodejs installation
-  - verify with `npm --version`
-- [docker](https://docs.docker.com/engine/install/), >= 24
-  - verify with `docker --version`
-  - this is required for database setup
-
-### Setup
-
-- clone this repo
-- Run dotnet tool restore
-- Run npm install
-
-### Development
-
-#### Start
-
-`./build.cmd run`, to start up Swate (+ Database network)
-
-Swate runs on localhost:8080 (and swobup on localhost:8000).
-
-#### Available commands
-
-```
-Usage: ./build.cmd <command>
-
-run [db]                            Start .net backend server, vite frontend (and database, 
-                                    swobup with docker if `db`)
-
-release [pre]                       Run .net tests tag current branch and force push to 
-                                    release branch (nightly if `pre`), this will trigger
-                                    Github release with docker image
-
-bundle                              Create distributable, used in docker image creation.
-
-docker  
-    create                          Create new swate:new image
-                
-    test                            Start test instance of docker compose network from swate:new image
-
-version
-    create-file <version>           Create new `src/Server/Version.fs` with `<version>`.
-```
+If you want to contribute or just check out Swate on your local machine have a look at the [CONTRIBUTING.md](CONTRIBUTING.md) file.
