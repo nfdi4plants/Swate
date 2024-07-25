@@ -440,24 +440,37 @@ module FilterHelper =
         // As soon as it matches SearchFields it will be removed and can become 'query <> ""'
         if query <> "" && query.StartsWith("/") |> not
         then
+            let query = query.ToLower()
             let queryBigram = query |> Shared.SorensenDice.createBigrams
             let createScore (str:string) =
                 str
                 |> Shared.SorensenDice.createBigrams
                 |> Shared.SorensenDice.calculateDistance queryBigram
+            // https://github.com/nfdi4plants/Swate/issues/490
+            let adjustScore (compareString: string) (score: float) =
+                let compareString = compareString.ToLower()
+                if compareString.StartsWith query then
+                    score + 0.5
+                elif compareString.Contains query then
+                    score + 0.3
+                else
+                    score
             let scoredTemplate =
                 protocol
                 |> Array.map (fun template ->
                     let score =
                         match searchfield with
                         | SearchFields.Name          ->
-                            createScore template.Name
+                            let s = template.Name
+                            createScore s
+                            |> adjustScore s
                         | SearchFields.Organisation  ->
-                            createScore (template.Organisation.ToString())
+                            let s = (template.Organisation.ToString())
+                            createScore s
+                            |> adjustScore s
                         | SearchFields.Authors       ->
-                            let query' = query.ToLower()
                             let scores = template.Authors |> Seq.filter (fun author -> 
-                                (createAuthorStringHelper author).ToLower().Contains query'
+                                (createAuthorStringHelper author).ToLower().Contains query
                                 || (author.ORCID.IsSome && author.ORCID.Value = query)
                             )
                             if Seq.isEmpty scores then 0.0 else 1.0
