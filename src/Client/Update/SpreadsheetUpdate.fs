@@ -90,6 +90,13 @@ module Spreadsheet =
             | AddAnnotationBlocks columns ->
                 let nextState = Controller.BuildingBlocks.addBuildingBlocks columns state
                 nextState, model, Cmd.none
+            | AddDataAnnotation data ->
+                let nextState =
+                    match state.ActiveView with
+                    | IsDataMap -> Controller.DataMap.addDataAnnotation data state
+                    | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
+                    | IsMetadata -> failwith "Unable to add data annotation in metadata view"
+                nextState, model, Cmd.none
             | JoinTable (table, index, options) ->
                 let nextState = Controller.BuildingBlocks.joinTable table index options state
                 nextState, model, Cmd.none
@@ -205,6 +212,10 @@ module Spreadsheet =
                             | _ -> (state.ActiveTable.ColumnCount-1), (state.ActiveTable.RowCount-1) // This does not matter
                         let nextIndex = Controller.Table.selectRelativeCell state.SelectedCells.MinimumElement moveBy maxColIndex maxRowIndex
                         let s = Set([nextIndex])
+                        let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
+                        match Browser.Dom.document.getElementById cellId with
+                        | null -> ()
+                        | ele -> ele.focus()
                         UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
             | SetActiveCellFromSelected ->

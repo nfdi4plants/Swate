@@ -157,7 +157,7 @@ let clearCells (indexArr: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet
     Generic.setCells newCells state
     state
 
-open Fable.Core
+open Fable.Core.JsInterop
 open System
 
 let selectRelativeCell (index: int*int) (move: int*int) (maxColumnIndex: int) (maxRowIndex: int) =
@@ -172,6 +172,7 @@ let selectRelativeCell (index: int*int) (move: int*int) (maxColumnIndex: int) (m
     //else
     //    U2.Case1 (columnIndex, rowIndex)
     columnIndex, rowIndex
+
 
 // Ui depends on main column name, maybe change this to depends on BuildingBlockType?
 // Header main column name must be updated

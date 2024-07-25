@@ -170,8 +170,10 @@ type Cell =
             prop.readOnly readonly
             cellStyle []
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
-            if columnType.IsRefColumn then prop.className "bg-gray-300 dark:bg-gray-700"
-            //prop.className "main-contrast-bg"
+            if columnType.IsRefColumn then
+                prop.className "bg-gray-300 dark:bg-gray-700"
+            else
+                prop.className "bg-white dark:bg-black-800"
             prop.children [
                 Html.div [
                     cellInnerContainerStyle [style.custom("backgroundColor","inherit")]
@@ -264,30 +266,43 @@ type Cell =
         let isSelected = state.SelectedCells.Contains index
         let isIdle = state.CellIsIdle (!^index, columnType)
         let isActive = not isIdle
-        let ref = React.useElementRef()
         let displayValue = defaultArg displayValue cellValue
         let makeIdle() = 
             UpdateActiveCell None |> SpreadsheetMsg |> dispatch
             let ele = Browser.Dom.document.getElementById("SPREADSHEET_MAIN_VIEW")
             ele.focus()
         let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
-        React.useEffect((fun () -> 
-            if isSelected then
-                let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
-                options.behavior <- Browser.Types.ScrollBehavior.Auto
-                options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
-                options.block <- Browser.Types.ScrollAlignment.Nearest
-                if ref.current.IsSome then ref.current.Value.scrollIntoView(options)), 
-                [|box isSelected|]
-        )
+        let cellId = Controller.Cells.mkCellId columnIndex rowIndex state
+        let ref = React.useElementRef()
+        // ---
+        // Not sure if we can delete this comment,
+        // i am not 100% happy with the scroll logic.
+        // Previously the code in this comment made the browser scroll zu the cell whenever it was updated to selected with arrow key navigation.
+
+        // I had some issues (and still have some issues) with this logic and the lazy load table.1
+        // But for now i updated the logic to use focus.
+        //
+        // For now i would leave the comment to reenable the logic when working for a permanent clean solution
+        // ---
+        //React.useEffect((fun _ ->
+        //    if ref.current.IsSome && CellStyles.ScrollToCellId = Some cellId then
+        //        //let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
+        //        //options.behavior <- Browser.Types.ScrollBehavior.Auto
+        //        //options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
+        //        //options.block <- Browser.Types.ScrollAlignment.Nearest
+        //        ref.current.Value.focus()
+        //), [|box CellStyles.ScrollToCellId|])
         Html.td [
             if tooltip.IsSome then prop.title tooltip.Value
-            prop.key $"Cell_{state.ActiveView.TableIndex}-{columnIndex}-{rowIndex}"
+            prop.key cellId
+            prop.id cellId // This is used for scrollintoview on keyboard navigation
+            prop.ref ref
+            prop.tabIndex 0 
             cellStyle [
                 if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
             ]
             prop.readOnly readonly
-            prop.ref ref
+            //prop.ref ref
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
             prop.children [
                 Html.div [
@@ -383,7 +398,7 @@ type Cell =
         Cell.BodyBase(Main, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
 
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.AsTerm.NameText
+        let cellValue = cell.ToOA().NameText
         let setter = fun (s: string) ->
             let oa = cell.ToOA()
             let newName = if s = "" then None else Some s
@@ -406,7 +421,7 @@ type Cell =
         Cell.BodyBase(Unit, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
 
     static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.AsTerm.TermSourceREF |> Option.defaultValue ""
+        let cellValue = cell.ToOA().TermSourceREF |> Option.defaultValue ""
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTSR = if s = "" then None else Some s
@@ -416,7 +431,7 @@ type Cell =
         Cell.BodyBase(TSR, cellValue, setter, index, model, dispatch)
 
     static member BodyTAN(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.AsTerm.TermAccessionNumber |> Option.defaultValue ""
+        let cellValue = cell.ToOA().TermAccessionNumber |> Option.defaultValue ""
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTAN = if s = "" then None else Some s

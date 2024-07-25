@@ -13,7 +13,7 @@ let Main (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.id "ExpandTable"
         prop.style [
-            style.flexGrow 1; style.justifyContent.center; style.display.inheritFromParent; style.padding(length.rem 1)
+            style.flexGrow 0; style.justifyContent.center; style.display.inheritFromParent; style.padding(length.rem 1)
             style.position.sticky; style.left 0
         ]
         prop.children [

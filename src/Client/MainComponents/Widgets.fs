@@ -95,6 +95,7 @@ type Widget =
     | _BuildingBlock
     | _Template
     | _FilePicker
+    | _DataAnnotator
 
     [<ReactComponent>]
     static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit, ?help: ReactElement) =
@@ -128,6 +129,8 @@ type Widget =
                     style.minWidth.minContent
                     if size.IsSome then
                         style.width size.Value.X
+                    else
+                        style.maxWidth 600
                         //style.height size.Value.Y
                     if position.IsNone then
                         //style.transform.translate (length.perc -50,length.perc -50)
@@ -197,7 +200,7 @@ type Widget =
                 Html.li "If no cell is selected, a new Building Block is appended at the right end of the table."
             ]
         ]
-        let prefix = BuildingBlockWidgets
+        let prefix = WidgetLiterals.BuildingBlock
         Widget.Base(content, prefix, rmv, help)
         
 
@@ -232,7 +235,7 @@ type Widget =
             ]
         
         let help = Protocol.Search.InfoField()
-        let prefix = TemplatesWidgets
+        let prefix = WidgetLiterals.Templates
         Widget.Base(content, prefix, rmv, help)
 
     static member FilePicker (model, dispatch, rmv) =
@@ -250,6 +253,12 @@ type Widget =
                 //fileNameElements model dispatch
                 FilePicker.insertButton model dispatch
         ]
-        let prefix = FilePickerWidgets
-        let help = Html.div []
-        Widget.Base(content, prefix, rmv, help)
+        let prefix = WidgetLiterals.FilePicker
+        Widget.Base(content, prefix, rmv)
+
+    static member DataAnnotator (model, dispatch, rmv) =
+        let content = Html.div [
+            Pages.DataAnnotator.Main(model, dispatch)
+        ]
+        let prefix = WidgetLiterals.DataAnnotator
+        Widget.Base(content, prefix, rmv)

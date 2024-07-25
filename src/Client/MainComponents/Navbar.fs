@@ -73,40 +73,63 @@ let private quickAccessButtonListEnd (model: Model) dispatch =
     ]
 
 let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
+    let addBuildingBlock =
+        QuickAccessButton.create(
+            "Add Building Block",
+            [
+                Bulma.icon [ 
+                    Html.i [prop.className "fa-solid fa-circle-plus" ]
+                    Html.i [prop.className "fa-solid fa-table-columns" ]
+                ]
+            ],
+            (fun _ -> addWidget Widget._BuildingBlock)
+        ).toReactElement()
+    let addTemplate =
+        QuickAccessButton.create(
+            "Add Template",
+            [
+                Bulma.icon [ 
+                    Html.i [prop.className "fa-solid fa-circle-plus" ]
+                    Html.i [prop.className "fa-solid fa-table" ]
+                ]
+            ],
+            (fun _ -> addWidget Widget._Template)
+        ).toReactElement()
+    let filePicker =
+        QuickAccessButton.create(
+            "File Picker",
+            [
+                Bulma.icon [ 
+                    Html.i [prop.className "fa-solid fa-file-signature" ]
+                ]
+            ],
+            (fun _ -> addWidget Widget._FilePicker)
+        ).toReactElement()
+    let dataAnnotator =
+        QuickAccessButton.create(
+            "Data Annotator",
+            [
+                Bulma.icon [ 
+                    Html.i [prop.className "fa-solid fa-object-group" ]
+                ]
+            ],
+            (fun _ -> addWidget Widget._DataAnnotator)
+        ).toReactElement()
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
-            QuickAccessButton.create(
-                "Add Building Block",
-                [
-                    Bulma.icon [ 
-                        Html.i [prop.className "fa-solid fa-circle-plus" ]
-                        Html.i [prop.className "fa-solid fa-table-columns" ]
-                    ]
-                ],
-                (fun _ -> addWidget Widget._BuildingBlock)
-            ).toReactElement()
-            QuickAccessButton.create(
-                "Add Template",
-                [
-                    Bulma.icon [ 
-                        Html.i [prop.className "fa-solid fa-circle-plus" ]
-                        Html.i [prop.className "fa-solid fa-table" ]
-                    ]
-                ],
-                (fun _ -> addWidget Widget._Template)
-            ).toReactElement()
-            QuickAccessButton.create(
-                "File Picker",
-                [
-                    Bulma.icon [ 
-                        Html.i [prop.className "fa-solid fa-file-signature" ]
-                    ]
-                ],
-                (fun _ -> addWidget Widget._FilePicker)
-            ).toReactElement()
+            match model.SpreadsheetModel.ActiveView with
+            | Spreadsheet.ActivePattern.IsTable ->
+                addBuildingBlock
+                addTemplate
+                filePicker
+                dataAnnotator
+            | Spreadsheet.ActivePattern.IsDataMap ->
+                dataAnnotator
+            | Spreadsheet.ActivePattern.IsMetadata ->
+                Html.none
         ]
     ]
 
@@ -155,7 +178,7 @@ let Main(model: Model, dispatch, widgets, setWidgets) =
                             prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                             prop.children [
                                 quickAccessButtonListStart model.History dispatch
-                                if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, addWidget)
+                                WidgetNavbarList(model, dispatch, addWidget)
                             ]
                         ]
                         Bulma.navbarEnd.div [

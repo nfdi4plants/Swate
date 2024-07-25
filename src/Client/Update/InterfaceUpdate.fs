@@ -137,6 +137,16 @@ module Interface =
                 let cmd = Spreadsheet.AddAnnotationBlocks compositeColumns |> SpreadsheetMsg |> Cmd.ofMsg
                 model, cmd
             | _ -> failwith "not implemented"
+        | AddDataAnnotation data ->
+            match host with
+            | Some Swatehost.Excel ->
+                //let cmd = OfficeInterop.AddDataAnnotation data |> OfficeInteropMsg |> Cmd.ofMsg
+                failwith "AddDataAnnotation is not implemented" 
+                model, Cmd.none
+            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                let cmd = Spreadsheet.AddDataAnnotation data |> SpreadsheetMsg |> Cmd.ofMsg
+                model, cmd
+            | _ -> failwith "not implemented"
         | JoinTable (table, index, options) ->
             match host with
             | Some Swatehost.Browser | Some Swatehost.ARCitect ->

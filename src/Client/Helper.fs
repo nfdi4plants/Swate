@@ -87,6 +87,57 @@ let debouncel<'T> (storage:DebounceStorage) (key: string) (timeout: int) (setLoa
 
 let newDebounceStorage = fun () -> DebounceStorage()
 
+let debouncemin (fn: 'a -> unit, timeout: int) =
+    let mutable id : int option = None
+    fun (arg: 'a) ->
+        match id with
+        | None -> ()
+        | Some id -> Fable.Core.JS.clearTimeout id
+        let timeoutId = 
+            Fable.Core.JS.setTimeout
+                (fun () ->
+                    log "debounce called"
+                    fn arg
+                )
+                timeout
+        id <- Some timeoutId
+
+let throttle (fn: 'a -> unit, interval: int) =
+    let mutable lastCall = System.DateTime.MinValue
+
+    fun (arg: 'a) ->
+        let now = System.DateTime.UtcNow
+        if (now - lastCall).TotalMilliseconds > float interval then
+            log "throttle called"
+            lastCall <- now
+            fn arg
+
+let throttleAndDebounce(fn: 'a -> unit, timespan: int) =
+    let mutable id : int option = None
+    let mutable lastCall = System.DateTime.MinValue
+
+    fun (arg: 'a) ->
+        let now = System.DateTime.UtcNow
+        // determines if function was called after specified timespan
+        let isThrottled = (now - lastCall).TotalMilliseconds > float timespan
+        match isThrottled, id with
+        | true, Some id ->
+            Fable.Core.JS.clearTimeout id
+            lastCall <- now
+            fn arg
+        | _, Some id -> Fable.Core.JS.clearTimeout id
+        | _, None -> ()
+        let timeoutId = 
+            Fable.Core.JS.setTimeout
+                (fun () ->
+                    fn arg
+                    id <- None
+                    lastCall <- now
+                )
+                timespan
+        id <- Some timeoutId
+
+
 type Clipboard =
     abstract member writeText: string -> JS.Promise<unit>
     abstract member readText: unit -> JS.Promise<string>

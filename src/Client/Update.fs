@@ -176,6 +176,33 @@ module Ontologies =
                     (curry GenericError Cmd.none >> DevMsg)
             model, cmd
 
+module DataAnnotator =
+    let update (msg: DataAnnotator.Msg) (state: DataAnnotator.Model) (model: Model.Model) =
+        match msg with
+        | DataAnnotator.UpdateDataFile dataFile ->
+            let parsedFile = dataFile |> Option.map (fun file ->
+                let s = file.ExpectedSeparator
+                DataAnnotator.ParsedDataFile.fromFileBySeparator s file
+            )
+            let nextState: DataAnnotator.Model = {
+                DataFile = dataFile
+                ParsedFile = parsedFile
+            }
+            nextState, model, Cmd.none
+        | DataAnnotator.ToggleHeader ->
+            let nextState = 
+                { state with ParsedFile = state.ParsedFile |> Option.map (fun file -> file.ToggleHeader())}
+            nextState, model, Cmd.none
+        | DataAnnotator.UpdateSeperator newSep ->
+            let parsedFile = state.DataFile |> Option.map (fun file ->
+                DataAnnotator.ParsedDataFile.fromFileBySeparator newSep file
+            )
+            let nextState = {
+                state with
+                    ParsedFile = parsedFile
+            }
+            nextState, model, Cmd.none
+
 let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
         match msg with
@@ -352,6 +379,11 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             let nextModel =
                 {nextModel0 with
                     CytoscapeModel = nextState}
+            nextModel, nextCmd
+
+        | DataAnnotatorMsg msg ->
+            let nextState, nextModel0, nextCmd = DataAnnotator.update msg currentModel.DataAnnotatorModel currentModel
+            let nextModel = {nextModel0 with DataAnnotatorModel = nextState}
             nextModel, nextCmd
 
     /// This function is used to determine which msg should be logged to activity log.
