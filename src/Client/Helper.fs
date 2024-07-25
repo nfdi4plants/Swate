@@ -122,7 +122,6 @@ let throttleAndDebounce(fn: 'a -> unit, timespan: int) =
         let isThrottled = (now - lastCall).TotalMilliseconds > float timespan
         match isThrottled, id with
         | true, Some id ->
-            log "throttle called"
             Fable.Core.JS.clearTimeout id
             lastCall <- now
             fn arg
@@ -131,7 +130,6 @@ let throttleAndDebounce(fn: 'a -> unit, timespan: int) =
         let timeoutId = 
             Fable.Core.JS.setTimeout
                 (fun () ->
-                    log "debounce called"
                     fn arg
                     id <- None
                     lastCall <- now
