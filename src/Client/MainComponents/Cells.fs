@@ -274,6 +274,16 @@ type Cell =
         let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
         let cellId = Controller.Cells.mkCellId columnIndex rowIndex state
         let ref = React.useElementRef()
+        // ---
+        // Not sure if we can delete this comment,
+        // i am not 100% happy with the scroll logic.
+        // Previously the code in this comment made the browser scroll zu the cell whenever it was updated to selected with arrow key navigation.
+
+        // I had some issues (and still have some issues) with this logic and the lazy load table.1
+        // But for now i updated the logic to use focus.
+        //
+        // For now i would leave the comment to reenable the logic when working for a permanent clean solution
+        // ---
         //React.useEffect((fun _ ->
         //    if ref.current.IsSome && CellStyles.ScrollToCellId = Some cellId then
         //        //let options = createEmpty<Browser.Types.ScrollIntoViewOptions>

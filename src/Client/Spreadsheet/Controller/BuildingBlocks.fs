@@ -72,8 +72,8 @@ let addDataAnnotation (data: {| fragmentSelectors: string []; fileName: string; 
         | Some _, Some _    -> failwith "Both Input and Output columns exist and no target column was specified"
     let newHeader =
         match data.targetColumn with
-        | DataAnnotator.TargetColumn.Input -> CompositeHeader.Input IOType.Data
-        | DataAnnotator.TargetColumn.Output -> CompositeHeader.Output IOType.Data
+        | DataAnnotator.TargetColumn.Input      -> CompositeHeader.Input IOType.Data
+        | DataAnnotator.TargetColumn.Output     -> CompositeHeader.Output IOType.Data
         | DataAnnotator.TargetColumn.Autodetect -> tryIfNone()
     let values = [|
         for selector in data.fragmentSelectors do

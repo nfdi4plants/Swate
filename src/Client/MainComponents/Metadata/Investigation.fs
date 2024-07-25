@@ -77,6 +77,7 @@ let Main(inv: ArcInvestigation, model: Model, dispatch: Msg -> unit) =
                         inv.OntologySourceReferences <- ResizeArray oas
                         inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
                 )
+                // This code might become relevant in the future. We decided to use implicit registrations for now. If this results in issues we can switch back to explicit registrations.
                 //FormComponents.TextInputs(
                 //    Array.ofSeq inv.RegisteredStudyIdentifiers,
                 //    "RegisteredStudyIdentifiers",

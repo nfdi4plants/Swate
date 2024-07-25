@@ -216,14 +216,14 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                     ]
                                 ]
                                 Bulma.navbarItem.a [
-                                    prop.onClick (fun e ->
+                                    prop.onClick (fun _ ->
                                         setState {state with BurgerActive = not state.BurgerActive}
                                         UpdatePageState (Some Routing.Route.Info) |> dispatch
                                     )
                                     prop.text Routing.Route.Info.toStringRdbl
                                 ]
                                 Bulma.navbarItem.a [
-                                    prop.onClick (fun e ->
+                                    prop.onClick (fun _ ->
                                         setState {state with BurgerActive = not state.BurgerActive}
                                         UpdatePageState (Some Routing.Route.PrivacyPolicy) |> dispatch
                                     )
