@@ -200,7 +200,7 @@ type Widget =
                 Html.li "If no cell is selected, a new Building Block is appended at the right end of the table."
             ]
         ]
-        let prefix = BuildingBlockWidgets
+        let prefix = WidgetLiterals.BuildingBlock
         Widget.Base(content, prefix, rmv, help)
         
 
@@ -235,7 +235,7 @@ type Widget =
             ]
         
         let help = Protocol.Search.InfoField()
-        let prefix = TemplatesWidgets
+        let prefix = WidgetLiterals.Templates
         Widget.Base(content, prefix, rmv, help)
 
     static member FilePicker (model, dispatch, rmv) =
@@ -253,12 +253,12 @@ type Widget =
                 //fileNameElements model dispatch
                 FilePicker.insertButton model dispatch
         ]
-        let prefix = FilePickerWidgets
+        let prefix = WidgetLiterals.FilePicker
         Widget.Base(content, prefix, rmv)
 
     static member DataAnnotator (model, dispatch, rmv) =
         let content = Html.div [
             Pages.DataAnnotator.Main(model, dispatch)
         ]
-        let prefix = DataAnnotatorWidgets
+        let prefix = WidgetLiterals.DataAnnotator
         Widget.Base(content, prefix, rmv)

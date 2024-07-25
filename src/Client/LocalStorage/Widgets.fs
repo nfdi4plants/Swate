@@ -17,10 +17,20 @@ type Rect = {
 
 open Fable.SimpleJson
 
-let [<Literal>] BuildingBlockWidgets = "BuildingBlock"
-let [<Literal>] TemplatesWidgets = "Templates"
-let [<Literal>] FilePickerWidgets = "FilerPicker"
-let [<Literal>] DataAnnotatorWidgets = "DataAnnotator"
+[<RequireQualifiedAccess>]
+module WidgetLiterals =
+
+    [<Literal>]
+    let BuildingBlock = "BuildingBlock"
+
+    [<Literal>]
+    let Templates = "Templates"
+
+    [<Literal>]
+    let FilePicker = "FilerPicker"
+
+    [<Literal>]
+    let DataAnnotator = "DataAnnotator"
 
 [<RequireQualifiedAccess>]
 module Position =
