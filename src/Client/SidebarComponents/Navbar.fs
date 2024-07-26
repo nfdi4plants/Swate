@@ -169,7 +169,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                 prop.style [style.width 100; style.cursor.pointer; style.padding (0,length.rem 0.4)]
                                 let path = if model.PageState.IsExpert then "_e" else ""
                                 Bulma.image [ Html.img [
-                                    prop.style [style.maxHeight(length.perc 100)]
+                                    prop.style [style.maxHeight(length.perc 100); style.width 100]
                                     prop.src @$"assets\Swate_logo_for_excel{path}.svg"
                                 ] ]
                                 |> prop.children
