@@ -1127,9 +1127,7 @@ let prepareTemplateInMemory (tableToAdd:ArcTable) =
             let activeTables = activeSheet.tables.load(propertyNames=U2.Case1 "items")
 
             // sync with proxy objects after loading values from excel
-            do! context.sync().``then``( fun _ ->
-                ()
-            )
+            do! context.sync().``then``( fun _ -> ())
 
             // Filter all names of tables on the active worksheet for names starting with "annotationTable".
             let annoTables =
@@ -1165,9 +1163,7 @@ let prepareTemplateInMemory (tableToAdd:ArcTable) =
                 selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
 
             // sync with proxy objects after loading values from excel
-            do! context.sync().``then``( fun _ ->
-                ()
-            )
+            do! context.sync().``then``( fun _ -> ())
 
             let targetIndex =
                 let adaptedStartIndex = selectedRange.columnIndex - tableStartIndex.columnIndex
