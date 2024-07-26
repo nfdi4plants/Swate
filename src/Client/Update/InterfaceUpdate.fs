@@ -120,6 +120,16 @@ module Interface =
                     let cmd = Spreadsheet.AddAnnotationBlocks compositeColumns |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+
+            | AddTemplate table ->
+                match host with
+                | Some Swatehost.Excel ->
+                    let cmd = OfficeInterop.AddTemplate table |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                    let cmd = Spreadsheet.AddTemplate table |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
             | JoinTable (table, index, options) ->
                 match host with
                 | Some Swatehost.Excel ->

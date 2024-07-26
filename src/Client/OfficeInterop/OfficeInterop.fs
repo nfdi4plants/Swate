@@ -441,8 +441,7 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
     
             match annoTables.Length with
             //Create a new annotation table in the active worksheet
-            | 0 ->
-                ()
+            | 0 -> ()
             //Create a mew worksheet with a new annotation table when the active worksheet already contains one
             | x when x = 1 ->
                 //Create new worksheet and set it active
@@ -566,7 +565,6 @@ let tryFindActiveAnnotationTable() =
     Excel.run(fun context ->
 
         // Ref. 2
-
         let sheet = context.workbook.worksheets.getActiveWorksheet()
         let t = sheet.load(U2.Case2 (ResizeArray[|"tables"|]))
         let tableItems = t.tables.load(propertyNames=U2.Case1 "items")
@@ -1072,7 +1070,9 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
                 [|
                     for i in 0..headers.Length - 1 do
                         let header = headers.[i]
-                        if mainColumNames |> Array.exists (fun cName -> header.StartsWith cName) then
+                        if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> header.StartsWith cName) then
+                            ()
+                        else
                             i
                 |]
                 |> Array.sortBy(fun index -> index)
@@ -1105,7 +1105,9 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
         let column = ExcelHelper.addColumn(calIndex) excelTable newHeader rowCount bbCell.Tail.Head
         newHeader::headers |> ignore
         column.getRange().format.autofitColumns()
-        if i > 0 then column.getRange().columnHidden <- true
+
+        if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> newHeader.StartsWith cName) then
+            column.getRange().columnHidden <- true
     )
 
     let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new term column: {newBB.Header}"
@@ -1115,6 +1117,66 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
     ]
 
     loggingList
+
+let prepareTemplateInMemory (tableToAdd:ArcTable) =
+    Excel.run(fun context ->
+        promise {
+
+            let activeSheet = context.workbook.worksheets.getActiveWorksheet()
+            let _ = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
+            let activeTables = activeSheet.tables.load(propertyNames=U2.Case1 "items")
+
+            // sync with proxy objects after loading values from excel
+            do! context.sync().``then``( fun _ ->
+                ()
+            )
+
+            // Filter all names of tables on the active worksheet for names starting with "annotationTable".
+            let annoTables =
+                activeTables.items
+                |> Seq.toArray
+                |> Array.filter (fun table -> table.name.StartsWith "annotationTable")
+
+            match annoTables.Length with
+            //Create a new annotation table in the active worksheet
+            | 0 ->
+                failwith "The active worksheet must contain one active annotation table to add a template."
+            //Create a mew worksheet with a new annotation table when the active worksheet already contains one
+            | x when x = 1 -> ()
+            // Fail the function if there are more than 1 annotation table in the active worksheet.
+            // This check is done, to only have one annotationTable per workSheet.
+            | x when x > 1 ->
+                failwith "The active worksheet contains more than one annotationTable. This should not happen. Please report this as a bug to the developers."
+            | _ ->
+                failwith "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers."
+
+            let! originTable = ArcTable.tryGetFromExcelTable(annoTables.[0], context)
+
+            if originTable.IsNone then failwith $"Failed to create arc table for table {annoTables.[0].name}"
+
+            let finalTable = Table.selectiveTablePrepare originTable.Value tableToAdd
+
+            let selectedRange = context.workbook.getSelectedRange()
+
+            let tableStartIndex = annoTables.[0].getRange()
+
+            let _ =
+                tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
+                selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
+
+            // sync with proxy objects after loading values from excel
+            do! context.sync().``then``( fun _ ->
+                ()
+            )
+
+            let targetIndex =
+                let adaptedStartIndex = selectedRange.columnIndex - tableStartIndex.columnIndex
+                if adaptedStartIndex > float (originTable.Value.ColumnCount) then originTable.Value.ColumnCount
+                else int adaptedStartIndex + 1
+
+            return (finalTable, Some (targetIndex))
+        }
+    )
 
 let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions option) =
     Excel.run(fun context ->
@@ -1140,7 +1202,7 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
             //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
             if arcTable.IsSome then
 
-                arcTable.Value.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)
+                arcTable.Value.Join(tableToAdd, ?index=index, ?joinOptions=options, forceReplace=true)
 
                 let tableValues = arcTable.Value.ToExcelValues() |> Array.ofSeq                
                 let (headers, body) = Array.ofSeq(tableValues.[0]), tableValues.[1..]
@@ -1189,10 +1251,6 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
                     newTable.columns.load(propertyNames = U2.Case2 (ResizeArray["name"; "items"])) |> ignore
                     newBodyRange.load(propertyNames = U2.Case2 (ResizeArray["name"; "columnCount"; "values"]))
 
-                let mainColumNames =
-                    // Get all cases of the union
-                    CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
-
                 do! context.sync().``then``(fun _ ->
 
                     newBodyRange.values <- ResizeArray body
@@ -1201,10 +1259,8 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
 
                     newTable.columns.items
                     |> Array.ofSeq
-                    |> Array.iter (fun column ->
-                        if mainColumNames |> Array.exists (fun cName -> column.name.StartsWith cName) then
-                            ()
-                        else
+                    |> Array.iter (fun column ->                        
+                        if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> column.name.StartsWith cName) then
                             column.getRange().columnHidden <- true)
                 )
 

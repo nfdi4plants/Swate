@@ -7,6 +7,7 @@ open OfficeInterop
 open Shared
 open OfficeInteropTypes
 open Model
+open ARCtrl
 
 module OfficeInterop = 
     let update (state: OfficeInterop.Model) (model:Model) (msg: OfficeInterop.Msg) : OfficeInterop.Model * Model * Cmd<Messages.Msg> =
@@ -79,6 +80,16 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, nextCmd
+
+            | AddTemplate table ->
+                let msg = fun (t, i) -> JoinTable(t, i, Some ARCtrl.TableJoinOptions.WithValues) |> OfficeInteropMsg
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.prepareTemplateInMemory
+                        (table)
+                        (msg)                        
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
 
             | JoinTable (table, index, options) ->
                 let cmd =

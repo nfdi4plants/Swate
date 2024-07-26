@@ -33,11 +33,13 @@ type TemplateFromDB =
                             prop.onClick (fun _ ->
                                 if model.ProtocolState.TemplateSelected.IsNone then
                                     failwith "No template selected!"
-                                /// Filter out existing building blocks and keep input/output values.
-                                let joinConfig = ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
-                                let preparedTemplate = Table.selectiveTablePrepare model.SpreadsheetModel.ActiveTable model.ProtocolState.TemplateSelected.Value.Table
-                                let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
-                                SpreadsheetInterface.JoinTable (preparedTemplate, Some index, Some joinConfig) |> InterfaceMsg |> dispatch
+
+                                if model.ExcelState.HasAnnotationTable then
+                                    let preparedTemplate = Table.selectiveTablePrepare model.SpreadsheetModel.ActiveTable model.ProtocolState.TemplateSelected.Value.Table
+                                    OfficeInterop.AddTemplate(preparedTemplate) |> OfficeInteropMsg |> dispatch
+                                else
+                                    let preparedTemplate = Table.selectiveTablePrepare model.SpreadsheetModel.ActiveTable model.ProtocolState.TemplateSelected.Value.Table
+                                    SpreadsheetInterface.AddTemplate(preparedTemplate) |> InterfaceMsg |> dispatch
                             )
                             prop.text "Add template"
                         ]
