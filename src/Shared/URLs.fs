@@ -2,6 +2,13 @@ namespace Shared
 
 module URLs =
 
+    module Data =
+
+        module SelectorFormat =
+
+            [<Literal>]
+            let csv = @"https://datatracker.ietf.org/doc/html/rfc7111"
+
     [<LiteralAttribute>]
     let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
 
@@ -51,6 +58,9 @@ module URLs =
 
     [<LiteralAttribute>]
     let NFDITwitterUrl = @"https://twitter.com/nfdi4plants"
+
+    [<Literal>]
+    let NFDIGitHubUrl = @"https://github.com/nfdi4plants"
 
     [<LiteralAttribute>]
     let CSBWebsiteUrl = @"https://csb.bio.uni-kl.de/"

@@ -206,11 +206,6 @@ open OfficeInteropExtensions
 // 'Featured column'        -> A featured column can be abstracted as a "term column" and is a pre-implemented usecase.
 //                              Such a block will contain TSR and TAN and can be used for directed Term search.
 
-
-
-[<Emit("console.log($0)")>]
-let consoleLog (message: string): unit = jsNative
-
 open System
 
 open Fable.Core.JsInterop

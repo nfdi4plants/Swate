@@ -1,8 +1,7 @@
-module Spreadsheet.BuildingBlocks.Controller
+module Spreadsheet.Controller.BuildingBlocks
 
 open System.Collections.Generic
 open Shared.TermTypes
-open Shared.OfficeInteropTypes
 open Spreadsheet
 open Types
 open ARCtrl
@@ -64,23 +63,42 @@ let addBuildingBlocks(newColumns: CompositeColumn []) (state: Spreadsheet.Model)
     table.AddColumns(newColumns,nextIndex)
     {state with ArcFile = state.ArcFile}
 
+let addDataAnnotation (data: {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let tryIfNone() =
+        match state.ActiveTable.TryGetInputColumn(), state.ActiveTable.TryGetOutputColumn() with
+        | Some _, None
+        | None, None        -> CompositeHeader.Output IOType.Data
+        | None, Some _      -> CompositeHeader.Input IOType.Data
+        | Some _, Some _    -> failwith "Both Input and Output columns exist and no target column was specified"
+    let newHeader =
+        match data.targetColumn with
+        | DataAnnotator.TargetColumn.Input      -> CompositeHeader.Input IOType.Data
+        | DataAnnotator.TargetColumn.Output     -> CompositeHeader.Output IOType.Data
+        | DataAnnotator.TargetColumn.Autodetect -> tryIfNone()
+    let values = [|
+        for selector in data.fragmentSelectors do
+            let d = Data()
+            d.FilePath <- Some data.fileName
+            d.Selector <- Some selector
+            d.Format <- Some data.fileType
+            d.SelectorFormat <- Some Shared.URLs.Data.SelectorFormat.csv
+            CompositeCell.createData d
+    |]
+    state.ActiveTable.AddColumn(newHeader, values, forceReplace=true)
+    {state with ArcFile = state.ArcFile}
+
 let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptions option) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     table.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)
     {state with ArcFile = state.ArcFile}
 
 let insertTerm_IntoSelected (term:OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let table = state.ActiveTable
     let selected = state.SelectedCells |> Set.toArray
     SanityChecks.verifyOnlyOneColumnSelected selected
-    let column = table.GetColumn(fst selected[0]) //can use [0] as we verify we only have one column selected. 
     for (colIndex, rowIndex) in selected do
-        let c = table.TryGetCellAt(colIndex,rowIndex)
-        let newCell = 
-            match c with
-            | Some cc -> cc.UpdateWithOA term
-            | None -> column.GetDefaultEmptyCell().UpdateWithOA term
-        table.UpdateCellAt(colIndex,rowIndex, newCell)
+        let c = Generic.getCell (colIndex,rowIndex) state
+        let newCell = c.UpdateWithOA term
+        Controller.Generic.setCell (colIndex,rowIndex) newCell state
     {state with ArcFile = state.ArcFile}
 
 //let insertCells_IntoSelected (term:CompositeCell []) (state: Spreadsheet.Model) : Spreadsheet.Model =

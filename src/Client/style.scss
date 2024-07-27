@@ -16,9 +16,14 @@ $primarye-invert: white;
 @use "bulma/sass" with ( $primary: $nfdi-blue-dark, $success: $nfdi-mint, $info: $nfdi-blue-light, $danger: $nfdi-red, $warning: $nfdi-yellow, $custom-colors: ( "primarye":($primarye, $primarye-invert)), );
 @forward "bulma/sass/themes";
 @use "bulma/sass/utilities/css-variables" as cv;
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+a {
+    color: var(--bulma-link-text);
+    cursor: pointer;
+    text-decoration: none;
+    transition-duration: var(--bulma-duration);
+    transition-property: background-color, border-color, color;
+}
 
 .my-grey-out {
     background-color: cv.getVar("scheme-main-ter");
@@ -45,8 +50,12 @@ $primarye-invert: white;
     --bulma-duration: 0.1s;
 }
 
-.main-contrast-bg {
+.main-bg {
     background-color: cv.getVar("scheme-main")
+}
+
+.main-bg-darker {
+    background-color: cv.getVar("scheme-main-ter")
 }
 
 .template-filter-container {
@@ -174,7 +183,6 @@ $primarye-invert: white;
 .fixed_headers {
     border-collapse: collapse;
     width: max-content;
-    border-style: hidden
 }
 
 .fixed_headers td,

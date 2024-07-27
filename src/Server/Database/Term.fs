@@ -31,7 +31,7 @@ type Queries =
 
     static member TermReturn (nodeName: string) = $"""RETURN {nodeName}.accession, {nodeName}.name, {nodeName}.definition, {nodeName}.is_obsolete"""
 
-    static member Limit(i:int) = $"""LIMIT {i}"""
+    static member Limit = """LIMIT $Limit"""
 
     static member NameQueryExact (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: int) =
         let sb = new StringBuilder()
@@ -40,19 +40,19 @@ type Queries =
             sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
         sb.AppendLine(Queries.TermReturn nodeName) |> ignore
         if limit.IsSome then
-            sb.AppendLine (Queries.Limit limit.Value) |> ignore
+            sb.AppendLine (Queries.Limit) |> ignore
         sb.ToString()
 
-    static member NameQueryFullText (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: int) =
+    static member NameQueryFullText (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: bool) =
         let sb = new StringBuilder()
-        sb.AppendLine $"""CALL db.index.fulltext.queryNodes("TermName",$Name)
+        sb.AppendLine $"""CALL db.index.fulltext.queryNodes("TermName",$Query)
 YIELD {nodeName}""" |> ignore
         if ontologyFilter.IsSome then
             sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
         sb.AppendLine(Queries.TermReturn nodeName) |> ignore
         sb.AppendLine($"""ORDER BY apoc.text.distance(toLower({nodeName}.name), toLower($Name))""") |> ignore
         if limit.IsSome then 
-            sb.AppendLine(Queries.Limit(limit.Value)) |> ignore
+            sb.AppendLine(Queries.Limit) |> ignore
         sb.ToString()
             
 
@@ -77,15 +77,16 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// Searchtype defaults to "get term suggestions with auto complete".
     member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology, ?limit: int) =
         let nodeName = "node"
-        let fulltextSearchStr =
+        let escaped, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
                 FullTextSearch.PerformanceComplete.ofQueryString termName
-        let query = Queries.NameQueryFullText (nodeName, ?ontologyFilter=sourceOntologyName, ?limit = limit)
+        let query = Queries.NameQueryFullText (nodeName, ?ontologyFilter=sourceOntologyName, limit = limit.IsSome)
         let parameters =
             Map [
-                "Name",fulltextSearchStr |> box
+                "Query", fulltextSearchStr |> box
+                "Name", escaped |> box
                 if sourceOntologyName.IsSome then sourceOntologyName.Value.toParamTuple
                 if limit.IsSome then "Limit", box limit.Value
             ] |> Some
@@ -96,7 +97,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// </summary>
     member this.searchByParentStepwise(query: string, parentId: string, ?searchType:FullTextSearch, ?limit: int) =
         let limit = defaultArg limit 5
-        let searchNameQuery = Queries.NameQueryFullText ("node", limit=limit)
+        let searchNameQuery = Queries.NameQueryFullText ("node", limit=true)
         let searchTreeQuery =
           """MATCH (node:Term)
     WHERE node.accession IN $AccessionList
@@ -112,7 +113,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     // parent: "DPBO:1000161"  raw_query: "growth prot"
     // parent: "OBI:0100026" raw_query: "arabidopsis"
     //     (node)-[*]->(endNode)
-        let fulltextSearchStr =
+        let escaped, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString query
             else
@@ -125,7 +126,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 session.RunAsync(
                     searchNameQuery, 
                     System.Collections.Generic.Dictionary<string,obj>([
-                        KeyValuePair("Name", box fulltextSearchStr);
+                        KeyValuePair("Name", box escaped);
+                        KeyValuePair("Query", box fulltextSearchStr);
                         // KeyValuePair("Accession", box parentId);
                         KeyValuePair("Limit", box limit)
                     ]),
@@ -142,6 +144,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 let parameters = System.Collections.Generic.Dictionary<string,obj>([
                     KeyValuePair("Parent", box parentId);
                     KeyValuePair("AccessionList", box names_results)
+                    KeyValuePair("Limit", box limit)
                 ])
                 session.RunAsync(searchTreeQuery, parameters, config)
             let! tree_records = tree_query.ToListAsync() 
@@ -292,7 +295,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// Searchtype defaults to "get child term suggestions with auto complete"
     member this.getByNameAndParent(termName:string,parentAccession:string,?searchType:FullTextSearch) =
-        let fulltextSearchStr =
+        let _, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
@@ -306,7 +309,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// Searchtype defaults to "get child term suggestions with auto complete"
     member this.getByNameAndParent(term:TermMinimal,parent:TermMinimal,?searchType:FullTextSearch) =
-        let fulltextSearchStr =
+        let _, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString term.Name
             else
@@ -333,7 +336,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     // Searchtype defaults to "get child term suggestions with auto complete"
     member this.getByNameAndParent(termName:string,parentAccession:TermMinimal,?searchType:FullTextSearch) =
-        let fulltextSearchStr =
+        let _, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
@@ -343,24 +346,16 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 "Accession", box parentAccession.TermAccession; 
                 "Search", box fulltextSearchStr
             ] |> Some
-        printfn "%A" param
-        if session.IsSome then
-            Neo4j.runQuery(
-                Term.byParentQuery_Accession,
-                param,
-                (Term.asTerm("node")),
-                session = session.Value
-            )
-        else
-            Neo4j.runQuery(
-                Term.byParentQuery_Accession,
-                param,
-                (Term.asTerm("node")),
-                credentials.Value
-            )
+        Neo4j.runQuery(
+            Term.byParentQuery_Accession,
+            param,
+            (Term.asTerm("node")),
+            ?credentials=credentials,
+            ?session = session
+        )
 
     member this.getByNameAndParent_Name(termName:string,parentName:string,?searchType:FullTextSearch) =
-        let fulltextSearchStr =
+        let _, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
@@ -418,7 +413,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// Searchtype defaults to "get child term suggestions with auto complete"
     member this.getByNameAndChild(termName:string,childAccession:string,?searchType:FullTextSearch) =
-        let fulltextSearchStr =
+        let _, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
@@ -451,7 +446,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// Searchtype defaults to "get child term suggestions with auto complete"
     member this.getByNameAndChild_Name(termName:string,childName:string,?searchType:FullTextSearch) =
-        let fulltextSearchStr =
+        let _, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else
@@ -485,7 +480,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 type TermQuery = 
 
     static member getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology) =
-        let fulltextSearchStr =
+        let _, fulltextSearchStr =
             if searchType.IsSome then
                 searchType.Value.ofQueryString termName
             else

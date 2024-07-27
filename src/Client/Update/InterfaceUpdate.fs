@@ -92,6 +92,25 @@ module Interface =
                     let cmd = Spreadsheet.CreateAnnotationTable usePrevOutput |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | UpdateDatamap datamapOption ->
+                match host with
+                | Some Swatehost.Excel ->
+                    failwith "UpdateDatamap not implemented for Excel"
+                    model, Cmd.none
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                    let cmd = Spreadsheet.UpdateDatamap datamapOption |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
+            | UpdateDataMapDataContextAt (index,dc) ->
+                match host with
+                | Some Swatehost.Excel ->
+                    //let cmd = OfficeInterop.UpdateDataContextAt (dc, index) |> OfficeInteropMsg |> Cmd.ofMsg
+                    failwith "UpdateDataContextAt not implemented for Excel"
+                    model, Cmd.none
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                    let cmd = Spreadsheet.UpdateDataMapDataContextAt (index, dc) |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
             | AddTable table ->
                 match host with
                 | Some Swatehost.Excel ->

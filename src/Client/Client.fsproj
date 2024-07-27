@@ -5,6 +5,7 @@
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="tailwind.config.js" />
     <Compile Include="Helper.fs" />
     <Compile Include="React.useListener.fs" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
@@ -28,6 +29,7 @@
     <Compile Include="OfficeInterop\Functions\BuildingBlockFunctions.fs" />
     <Compile Include="OfficeInterop\HelperFunctions.fs" />
     <Compile Include="OfficeInterop\OfficeInterop.fs" />
+    <Compile Include="States\DataAnnotator.fs" />
     <Compile Include="States\ARCitect.fs" />
     <Compile Include="States\SpreadsheetInterface.fs" />
     <Compile Include="States\OfficeInteropState.fs" />
@@ -53,9 +55,13 @@
     <Compile Include="Modals\SelectiveImportModal.fs" />
     <Compile Include="Spreadsheet\IO.fs" />
     <Compile Include="Spreadsheet\Types.fs" />
-    <Compile Include="Spreadsheet\Clipboard.Controller.fs" />
-    <Compile Include="Spreadsheet\Table.Controller.fs" />
-    <Compile Include="Spreadsheet\BuildingBlocks.Controller.fs" />
+    <Compile Include="Spreadsheet\Controller\Cells.fs" />
+    <Compile Include="Spreadsheet\Controller\Generic.fs" />
+    <Compile Include="Spreadsheet\Controller\BuildingBlocks.fs" />
+    <Compile Include="Spreadsheet\Controller\Table.fs" />
+    <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
+    <Compile Include="Spreadsheet\Controller\DataMap.fs" />
+    <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\AdvancedSearch.fs" />
     <Compile Include="SharedComponents\TermSearchInput.fs" />
@@ -79,13 +85,18 @@
     <Compile Include="Pages\ProtocolTemplates\TemplateFromFile.fs" />
     <Compile Include="Pages\ProtocolTemplates\ProtocolView.fs" />
     <Compile Include="Pages\FilePicker\FilePickerView.fs" />
+    <Compile Include="Pages\Info\PrivacyPolicy.fs" />
     <Compile Include="Pages\Info\InfoView.fs" />
     <Compile Include="Pages\ActivityLog\ActivityLogView.fs" />
     <Compile Include="Pages\Settings\SettingsView.fs" />
     <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
+    <Compile Include="Pages\DataAnnotator\DataAnnotator.fs" />
+    <Compile Include="MainComponents\CellStyles.fs" />
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />
     <Compile Include="MainComponents\MainViewContainer.fs" />
+    <Compile Include="MainComponents\Metadata\Generic.fs" />
+    <Compile Include="MainComponents\Metadata\DatamapConfig.fs" />
     <Compile Include="MainComponents\Metadata\Forms.fs" />
     <Compile Include="MainComponents\Metadata\Template.fs" />
     <Compile Include="MainComponents\Metadata\Assay.fs" />
@@ -96,10 +107,11 @@
     <Compile Include="MainComponents\Cells.fs" />
     <Compile Include="MainComponents\KeyboardShortcuts.fs" />
     <Compile Include="MainComponents\AddRows.fs" />
-    <Compile Include="MainComponents\SpreadsheetView.fs" />
+    <Compile Include="MainComponents\SpreadsheetView\Generic.fs" />
+    <Compile Include="MainComponents\SpreadsheetView\ArcTable.fs" />
+    <Compile Include="MainComponents\SpreadsheetView\DataMap.fs" />
     <Compile Include="MainComponents\Navbar.fs" />
     <Compile Include="MainComponents\FooterTabs.fs" />
-    <Compile Include="Views\XlsxFileView.fs" />
     <Compile Include="Views\SplitWindowView.fs" />
     <Compile Include="Views\NotFoundView.fs" />
     <Compile Include="Views\MainWindowView.fs" />

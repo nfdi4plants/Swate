@@ -27,15 +27,20 @@ let Main (dispatch) (rmv: _ -> unit) =
                     Bulma.field.div [prop.innerHtml "If you only want to delete one sheet, right-click the sheet at the bottom and select `delete`"]
                 ]
                 Bulma.modalCardFoot [
-                    Bulma.button.a [
-                        prop.onClick rmv
-                        Bulma.color.isInfo
-                        prop.text "Back"
-                    ]
-                    Bulma.button.a [
-                        prop.onClick reset
-                        Bulma.color.isDanger
-                        prop.text "Delete"
+                    Bulma.buttons [
+                        prop.className "grow justify-between"
+                        prop.children [
+                            Bulma.button.a [
+                                prop.onClick rmv
+                                Bulma.color.isInfo
+                                prop.text "Back"
+                            ]
+                            Bulma.button.a [
+                                prop.onClick reset
+                                Bulma.color.isDanger
+                                prop.text "Delete"
+                            ]
+                        ]
                     ]
                 ]
             ]

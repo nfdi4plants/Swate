@@ -1,4 +1,4 @@
-module Spreadsheet.Clipboard.Controller
+module Spreadsheet.Controller.Clipboard
 
 open Fable.Core
 open ARCtrl
@@ -13,12 +13,11 @@ let copyCells (cells: CompositeCell []) : JS.Promise<unit> =
     navigator.clipboard.writeText(tab)
 
 let copyCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<unit> =
-    let cell = state.ActiveTable.Values.[index]
+    let cell = Generic.getCell index state
     copyCell cell
 
 let copyCellsByIndex (indices: (int*int) []) (state: Spreadsheet.Model) : JS.Promise<unit> =
-    let cells = [|for index in indices do yield state.ActiveTable.Values.[index] |]
-    log cells
+    let cells = [| for index in indices do yield Generic.getCell index state |]
     copyCells cells
 
 let copySelectedCell (state: Spreadsheet.Model) : JS.Promise<unit> =
@@ -32,21 +31,20 @@ let copySelectedCells (state: Spreadsheet.Model) : JS.Promise<unit> =
     copyCellsByIndex indices state
 
 let cutCellByIndex (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let cell = state.ActiveTable.Values.[index]
+    let cell = Generic.getCell index state
     // Remove selected cell value
     let emptyCell = cell.GetEmptyCell()
-    state.ActiveTable.UpdateCellAt(fst index,snd index, emptyCell) 
+    Generic.setCell index emptyCell state
     copyCell cell |> Promise.start
     state
 
 let cutCellsByIndices (indices: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    log "HIT"
     let cells = ResizeArray()
     for index in indices do
-        let cell = state.ActiveTable.Values.[index]
+        let cell = Generic.getCell index state
         // Remove selected cell value
         let emptyCell = cell.GetEmptyCell()
-        state.ActiveTable.UpdateCellAt(fst index,snd index, emptyCell) 
+        Generic.setCell index emptyCell state
         cells.Add(cell)
     copyCells (Array.ofSeq cells) |> Promise.start
     state
@@ -64,20 +62,20 @@ let cutSelectedCells (state: Spreadsheet.Model) : Spreadsheet.Model =
 let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
     promise {
         let! tab = navigator.clipboard.readText()
-        let header = state.ActiveTable.Headers.[fst index]
-        let cell = CompositeCell.fromTabTxt tab |> Array.head |> _.ConvertToValidCell(header)
-        state.ActiveTable.SetCellAt(fst index, snd index, cell)
+        let header = Generic.getHeader (fst index) state
+        let cell = CompositeCell.fromTabTxt tab header |> Array.head
+        Generic.setCell index cell state
         return state
     }
 
 let pasteCellsByIndexExtend (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
     promise { 
         let! tab = navigator.clipboard.readText()
-        let header = state.ActiveTable.Headers.[fst index]
-        let cells = CompositeCell.fromTabTxt tab |> Array.map _.ConvertToValidCell(header)
+        let header = Generic.getHeader (fst index) state
+        let cells = CompositeCell.fromTabTxt tab header
         let columnIndex, rowIndex = fst index, snd index
         let indexedCells = cells |> Array.indexed |> Array.map (fun (i,c) -> (columnIndex, rowIndex + i), c)
-        state.ActiveTable.SetCellsAt indexedCells
+        Generic.setCells indexedCells state
         return state 
     }
 
@@ -92,23 +90,22 @@ let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.M
     if state.SelectedCells.IsEmpty then
         promise {return state}
     else
-        log "here"
         let columnIndex = state.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
         let selectedSingleColumnCells = state.SelectedCells |> Set.filter (fun index -> fst index = columnIndex)
         promise {
             let! tab = navigator.clipboard.readText()
-            let header = state.ActiveTable.Headers.[columnIndex]
-            let cells = CompositeCell.fromTabTxt tab |> Array.map _.ConvertToValidCell(header)
+            let header = Generic.getHeader columnIndex state
+            let cells = CompositeCell.fromTabTxt tab header
             if cells.Length = 1 then
                 let cell = cells.[0]
                 let newCells = selectedSingleColumnCells |> Array.ofSeq |> Array.map (fun index -> index, cell)
-                state.ActiveTable.SetCellsAt newCells
+                Generic.setCells newCells state
                 return state
             else
                 let rowCount = selectedSingleColumnCells.Count
                 let cellsTrimmed = cells |> takeFromArray rowCount
                 let indicesTrimmed = (Set.toArray selectedSingleColumnCells).[0..cellsTrimmed.Length-1]
                 let indexedCellsTrimmed = Array.zip indicesTrimmed cellsTrimmed
-                state.ActiveTable.SetCellsAt indexedCellsTrimmed
+                Generic.setCells indexedCellsTrimmed state
                 return state
         }

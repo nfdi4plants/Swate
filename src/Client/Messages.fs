@@ -116,6 +116,7 @@ type Msg =
 | ProtocolMsg           of Protocol.Msg
 | BuildingBlockDetails  of BuildingBlockDetailsMsg
 | CytoscapeMsg          of Cytoscape.Msg
+| DataAnnotatorMsg      of DataAnnotator.Msg
 | SpreadsheetMsg        of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
 | InterfaceMsg          of SpreadsheetInterface.Msg

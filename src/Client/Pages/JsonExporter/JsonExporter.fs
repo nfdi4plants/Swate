@@ -286,9 +286,7 @@ type private JsonExportState = {
 type FileExporter =
 
     static member private FileFormat(efm: JsonExportFormat, state: JsonExportState, setState) =
-        let isSelected = efm = state.ExportFormat
         Html.option [
-            prop.selected isSelected
             prop.text (string efm)
         ]
 
@@ -310,6 +308,7 @@ type FileExporter =
                                             ExportFormat = jef }
                                         |> setState
                                     )
+                                    prop.defaultValue(string state.ExportFormat)
                                     prop.children [
                                         FileExporter.FileFormat(JsonExportFormat.ROCrate, state, setState)
                                         FileExporter.FileFormat(JsonExportFormat.ISA, state, setState)

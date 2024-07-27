@@ -9,6 +9,12 @@ type Msg =
 | Initialize            of Swatehost
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | RemoveBuildingBlock
+| UpdateDatamap of DataMap option
+| UpdateDataMapDataContextAt of index: int * DataContext
+| AddTable of ArcTable
+| AddAnnotationBlock of CompositeColumn
+| AddAnnotationBlocks of CompositeColumn []
+| AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}
 | AddTable              of ArcTable
 | AddAnnotationBlock    of CompositeColumn
 | AddAnnotationBlocks   of CompositeColumn []

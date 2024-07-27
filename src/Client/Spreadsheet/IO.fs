@@ -15,11 +15,11 @@ module Xlsx =
             let ws = fswb.GetWorksheets()
             let arcfile =
                 match ws with
-                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcAssay.metaDataSheetName = ws.Name ) -> 
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcAssay.metaDataSheetName = ws.Name || ARCtrl.Spreadsheet.ArcAssay.obsoleteMetaDataSheetName = ws.Name) -> 
                     ArcAssay.fromFsWorkbook fswb |> Assay 
-                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcStudy.metaDataSheetName = ws.Name ) -> 
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcStudy.metaDataSheetName = ws.Name || ARCtrl.Spreadsheet.ArcStudy.obsoleteMetaDataSheetName = ws.Name) -> 
                     ArcStudy.fromFsWorkbook fswb |> Study
-                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcInvestigation.metaDataSheetName = ws.Name ) -> 
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcInvestigation.metaDataSheetName = ws.Name) -> 
                     ArcInvestigation.fromFsWorkbook fswb |> Investigation
                 | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.Template.metaDataSheetName = ws.Name ) -> 
                     ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template

@@ -19,7 +19,6 @@ module private Attribute =
 module private BrowserSetting =
     let getDefault() =
         let m : bool = Browser.Dom.window?matchMedia("(prefers-color-scheme: dark)")?matches
-        // Browser.Dom.console.log(m)
         if m then Dark else Light
 
 [<RequireQualifiedAccess>]

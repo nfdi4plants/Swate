@@ -372,6 +372,8 @@ type Model = {
     ///Used to show selected building block information
     BuildingBlockDetailsState   : BuildingBlockDetailsState
     CytoscapeModel              : Cytoscape.Model
+    ///
+    DataAnnotatorModel          : DataAnnotator.Model
     /// Contains all information about spreadsheet view
     SpreadsheetModel            : Spreadsheet.Model
     History                     : LocalHistory.Model

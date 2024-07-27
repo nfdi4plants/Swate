@@ -118,7 +118,7 @@ let private scrollIntoViewRetry (id: string) =
     loop 0
     
 
-let private addBuildingBlockButton (model: Model) dispatch =
+let private AddBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState
     Bulma.field.div [
         Bulma.button.button  [
@@ -135,11 +135,11 @@ let private addBuildingBlockButton (model: Model) dispatch =
                 let bodyCells =
                     if body.IsSome then // create as many body cells as there are rows in the active table
                         let rowCount = System.Math.Max(1,model.SpreadsheetModel.ActiveTable.RowCount)
-                        Array.init rowCount (fun _ -> body.Value)
+                        Array.init rowCount (fun _ -> body.Value.Copy())
                     else
                         Array.empty                    
                 let column = CompositeColumn.create(header, bodyCells)
-                let index = Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
+                let index = Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
                 let id = $"Header_{index}_Main"
                 scrollIntoViewRetry id
@@ -157,5 +157,5 @@ let Main (model: Model) dispatch =
         SearchBuildingBlockHeaderElement (state_bb, setState_bb, model, dispatch)
         if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
             SearchBuildingBlockBodyElement (model, dispatch)
-        addBuildingBlockButton model dispatch
+        AddBuildingBlockButton model dispatch
     ]
