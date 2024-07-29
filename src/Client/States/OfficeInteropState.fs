@@ -36,6 +36,8 @@ type Msg =
     | AddAnnotationBlock                    of CompositeColumn
     | AddAnnotationBlocks                   of CompositeColumn [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | ImportFile                            of (string*InsertBuildingBlock []) []
+    | AddTemplate                           of ArcTable
+    | JoinTable                             of ArcTable * index: int option * options: TableJoinOptions option
     | RemoveBuildingBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | AutoFitTable                          of hideRefCols:bool

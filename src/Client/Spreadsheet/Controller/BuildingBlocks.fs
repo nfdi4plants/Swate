@@ -7,6 +7,9 @@ open Types
 open ARCtrl
 open Shared
 
+open ExcelJS.Fable
+open Excel
+open GlobalBindings
 
 module SidebarControllerAux =
 
