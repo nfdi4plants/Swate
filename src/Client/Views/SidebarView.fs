@@ -23,7 +23,7 @@ type private SidebarStyle = {
             Size = Model.WindowSize.Tablet
         }
 
-let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) (sidebarsize: Model.WindowSize) = 
+let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) (sidebarsize: Model.WindowSize) =
     let isActive = pageLink.isActive(model.PageState.CurrentPage)
     Bulma.tab [
         if isActive then Bulma.tab.isActive
@@ -31,9 +31,9 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
             prop.className "navigation" // this class does not do anything, but disables <a> styling.
             prop.onClick (fun e -> e.preventDefault(); UpdatePageState (Some pageLink) |> dispatch)
             match sidebarsize with
-            | Mini | MobileMini -> 
+            | Mini | MobileMini ->
                 prop.children (pageLink |> Routing.Route.toIcon)
-            | _ -> 
+            | _ ->
                 prop.text pageLink.toStringRdbl
         ]
         |> prop.children
@@ -51,16 +51,14 @@ let private tabRow (model:Model) (tabs: seq<ReactElement>) =
     ]
 
 let private tabs (model:Model) dispatch (sidebarsize: Model.WindowSize) =
-    let isIEBrowser : bool = Browser.Dom.window.document?documentMode 
+    let isIEBrowser : bool = Browser.Dom.window.document?documentMode
     tabRow model [
-        if not model.PageState.IsExpert then
-            createNavigationTab Routing.Route.BuildingBlock     model dispatch sidebarsize
-            createNavigationTab Routing.Route.TermSearch        model dispatch sidebarsize
-            createNavigationTab Routing.Route.Protocol          model dispatch sidebarsize
-            createNavigationTab Routing.Route.FilePicker        model dispatch sidebarsize
-            createNavigationTab Routing.Route.JsonExport        model dispatch sidebarsize
-        else
-            createNavigationTab Routing.Route.JsonExport        model dispatch sidebarsize
+        createNavigationTab Routing.Route.BuildingBlock     model dispatch sidebarsize
+        createNavigationTab Routing.Route.TermSearch        model dispatch sidebarsize
+        createNavigationTab Routing.Route.Protocol          model dispatch sidebarsize
+        createNavigationTab Routing.Route.FilePicker        model dispatch sidebarsize
+        createNavigationTab Routing.Route.DataAnnotator     model dispatch sidebarsize
+        createNavigationTab Routing.Route.JsonExport        model dispatch sidebarsize
     ]
 
 module private ResizeObserver =
@@ -128,7 +126,7 @@ type SidebarView =
 
     [<ReactComponent>]
     static member private footer (model:Model, dispatch) =
-        React.useEffectOnce(fun () -> 
+        React.useEffectOnce(fun () ->
             async {
                 let! versionResponse = Api.serviceApi.getAppVersion()
                 PersistentStorage.UpdateAppVersion versionResponse |> PersistentStorageMsg |> dispatch
@@ -161,6 +159,9 @@ type SidebarView =
         | Routing.Route.Protocol ->
             Protocol.Templates.Main (model, dispatch)
 
+        | Routing.Route.DataAnnotator ->
+            Pages.DataAnnotator.Main(model, dispatch)
+
         | Routing.Route.JsonExport ->
             JsonExporter.Core.FileExporter.Main(model, dispatch)
 
@@ -174,11 +175,14 @@ type SidebarView =
             SettingsView.settingsViewComponent model dispatch
 
         | Routing.Route.Info ->
-            InfoView.infoComponent model dispatch
+            Pages.Info.Main
+
+        | Routing.Route.PrivacyPolicy ->
+            Pages.PrivacyPolicy.Main()
 
         | Routing.Route.NotFound ->
             NotFoundView.notFoundComponent model dispatch
-        
+
     /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
     [<ReactComponent>]
     static member Main (model: Model, dispatch: Msg -> unit) =

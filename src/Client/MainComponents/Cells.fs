@@ -126,7 +126,8 @@ type Cell =
                             style.padding(length.em 0.5,length.em 0.75)
                         ]
                         prop.onBlur(fun _ -> 
-                            if isHeader then setter state; 
+                            if isHeader then setter state;
+                            debounceStorage.current.ClearAndRun()
                             makeIdle()
                         )
                         prop.onKeyDown(fun e ->
@@ -164,13 +165,15 @@ type Cell =
         let isIdle = state.CellIsIdle (!^columnIndex, columnType)
         let isActive = not isIdle
         Html.th [
-            if columnType.IsRefColumn then Bulma.color.hasBackgroundGreyLighter
             prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
             prop.readOnly readonly
             cellStyle []
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
-            prop.className "main-contrast-bg"
+            if columnType.IsRefColumn then
+                prop.className "bg-gray-300 dark:bg-gray-700"
+            else
+                prop.className "bg-white dark:bg-black-800"
             prop.children [
                 Html.div [
                     cellInnerContainerStyle [style.custom("backgroundColor","inherit")]
@@ -226,6 +229,24 @@ type Cell =
         let setter = fun (s: string) -> headerTANSetter(columnIndex, s, header, dispatch)
         Cell.HeaderBase(TAN, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
 
+    static member HeaderDataSelector(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let ct = ColumnType.DataSelector
+        let cellValue = ct.ToColumnHeader()
+        let setter = fun _ -> ()
+        Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
+
+    static member HeaderDataFormat(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let ct = ColumnType.DataFormat
+        let cellValue = ct.ToColumnHeader()
+        let setter = fun _ -> ()
+        Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
+
+    static member HeaderDataSelectorFormat(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
+        let ct = ColumnType.DataSelectorFormat
+        let cellValue = ct.ToColumnHeader()
+        let setter = fun _ -> ()
+        Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
+  
     static member Empty() =
         Html.td [ cellStyle []; prop.readOnly true; prop.children [
             Html.div [
@@ -245,30 +266,43 @@ type Cell =
         let isSelected = state.SelectedCells.Contains index
         let isIdle = state.CellIsIdle (!^index, columnType)
         let isActive = not isIdle
-        let ref = React.useElementRef()
         let displayValue = defaultArg displayValue cellValue
         let makeIdle() = 
             UpdateActiveCell None |> SpreadsheetMsg |> dispatch
             let ele = Browser.Dom.document.getElementById("SPREADSHEET_MAIN_VIEW")
             ele.focus()
         let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
-        React.useEffect((fun () -> 
-            if isSelected then
-                let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
-                options.behavior <- Browser.Types.ScrollBehavior.Auto
-                options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
-                options.block <- Browser.Types.ScrollAlignment.Nearest
-                if ref.current.IsSome then ref.current.Value.scrollIntoView(options)), 
-                [|box isSelected|]
-        )
+        let cellId = Controller.Cells.mkCellId columnIndex rowIndex state
+        let ref = React.useElementRef()
+        // ---
+        // Not sure if we can delete this comment,
+        // i am not 100% happy with the scroll logic.
+        // Previously the code in this comment made the browser scroll zu the cell whenever it was updated to selected with arrow key navigation.
+
+        // I had some issues (and still have some issues) with this logic and the lazy load table.1
+        // But for now i updated the logic to use focus.
+        //
+        // For now i would leave the comment to reenable the logic when working for a permanent clean solution
+        // ---
+        //React.useEffect((fun _ ->
+        //    if ref.current.IsSome && CellStyles.ScrollToCellId = Some cellId then
+        //        //let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
+        //        //options.behavior <- Browser.Types.ScrollBehavior.Auto
+        //        //options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
+        //        //options.block <- Browser.Types.ScrollAlignment.Nearest
+        //        ref.current.Value.focus()
+        //), [|box CellStyles.ScrollToCellId|])
         Html.td [
             if tooltip.IsSome then prop.title tooltip.Value
-            prop.key $"Cell_{state.ActiveView.TableIndex}-{columnIndex}-{rowIndex}"
+            prop.key cellId
+            prop.id cellId // This is used for scrollintoview on keyboard navigation
+            prop.ref ref
+            prop.tabIndex 0 
             cellStyle [
                 if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
             ]
             prop.readOnly readonly
-            prop.ref ref
+            //prop.ref ref
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
             prop.children [
                 Html.div [
@@ -344,7 +378,7 @@ type Cell =
         ]
 
     static member Body(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.GetContent().[0]
+        let cellValue = cell.GetContentSwate().[0]
         let setter = fun (s: string) ->
             let nextCell = cell.UpdateMainField s
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
@@ -364,7 +398,7 @@ type Cell =
         Cell.BodyBase(Main, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
 
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let cellValue = cell.GetContent().[1]
+        let cellValue = cell.ToOA().NameText
         let setter = fun (s: string) ->
             let oa = cell.ToOA()
             let newName = if s = "" then None else Some s
@@ -387,8 +421,7 @@ type Cell =
         Cell.BodyBase(Unit, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
 
     static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let contentIndex = if cell.isUnitized then 2 else 1
-        let cellValue = cell.GetContent().[contentIndex]
+        let cellValue = cell.ToOA().TermSourceREF |> Option.defaultValue ""
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTSR = if s = "" then None else Some s
@@ -398,8 +431,7 @@ type Cell =
         Cell.BodyBase(TSR, cellValue, setter, index, model, dispatch)
 
     static member BodyTAN(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
-        let contentIndex = if cell.isUnitized then 3 else 2
-        let cellValue = cell.GetContent().[contentIndex]
+        let cellValue = cell.ToOA().TermAccessionNumber |> Option.defaultValue ""
         let setter = fun (s: string) ->
             let oa = cell.ToOA() 
             let newTAN = if s = "" then None else Some s
@@ -407,4 +439,34 @@ type Cell =
             let nextCell = cell.UpdateWithOA oa
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(TAN, cellValue, setter, index, model, dispatch)
+
+    static member BodyDataSelector(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let data = cell.AsData
+        let cellValue = data.Selector |> Option.defaultValue ""
+        let setter = fun (s: string) ->
+            let next = if s = "" then None else Some s
+            data.Selector <- next
+            let nextCell = cell.UpdateWithData data
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(ColumnType.DataSelector, cellValue, setter, index, model, dispatch)
+
+    static member BodyDataFormat(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let data = cell.AsData
+        let cellValue = data.Format |> Option.defaultValue ""
+        let setter = fun (s: string) ->
+            let next = if s = "" then None else Some s
+            data.Format <- next
+            let nextCell = cell.UpdateWithData data
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(ColumnType.DataFormat, cellValue, setter, index, model, dispatch)
+
+    static member BodyDataSelectorFormat(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
+        let data = cell.AsData
+        let cellValue = data.SelectorFormat |> Option.defaultValue ""
+        let setter = fun (s: string) ->
+            let next = if s = "" then None else Some s
+            data.SelectorFormat <- next
+            let nextCell = cell.UpdateWithData data
+            Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+        Cell.BodyBase(ColumnType.DataSelectorFormat, cellValue, setter, index, model, dispatch)
         

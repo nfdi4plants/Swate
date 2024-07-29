@@ -9,7 +9,26 @@ type ColumnType =
 | Unit
 | TSR
 | TAN
+| DataSelector
+| DataFormat
+| DataSelectorFormat
 with
+    member this.AsNumber = 
+        match this with
+        | Main -> 0
+        | Unit| DataSelector -> 1
+        | TSR | DataFormat -> 2
+        | TAN | DataSelectorFormat -> 3
+    /// <summary>
+    /// Use this function to get static column header names, such as "Unit", "Data Selector", etc.
+    /// </summary>
+    member this.ToColumnHeader() =
+        match this with
+        | Unit -> "Unit"
+        | DataSelector -> "Data Selector"
+        | DataFormat -> "Data Format"
+        | DataSelectorFormat -> "Data Selector Format"
+        | anyElse -> failwithf "Error. Unable to call `ColumnType.ToColumnHeader()` on %A!" anyElse
     member this.IsMainColumn = match this with | Main -> true | _ -> false
     member this.IsRefColumn = not this.IsMainColumn 
 
@@ -51,6 +70,8 @@ type Model = {
         | Some (U2.Case1 (headerIndex), ct), U2.Case1 (targetIndex) -> headerIndex = targetIndex && ct = columnType
         | Some (U2.Case2 (ci, ri), ct), U2.Case2 targetIndex -> (ci,ri) = targetIndex && ct = columnType
         | _ -> false
+    member this.CellIsSelected(index: int*int) =
+        this.SelectedCells.Contains((index))
     member this.CellIsIdle(index: U2<int, int*int>, columnType) =
         this.CellIsActive(index, columnType) |> not
     static member init() =
@@ -93,15 +114,8 @@ type Model = {
         | Some (Assay a) when a.DataMap.IsSome -> a.DataMap.Value
         | Some (Study (s,_)) when s.DataMap.IsSome -> s.DataMap.Value
         | _ -> DataMap.init()
-    member this.getSelectedColumnHeader =
-        if this.SelectedCells.IsEmpty then None else
-            let columnIndex = this.SelectedCells |> Set.toList |> List.minBy fst |> fst
-            let header = this.ActiveTable.GetColumn(columnIndex).Header
-            Some header
     member this.GetAssay() =
         match this.ArcFile with | Some (Assay a) -> a | _ -> ArcAssay.init("ASSAY_NULL")
-    member this.headerIsSelected =
-        not this.SelectedCells.IsEmpty && this.SelectedCells |> Seq.exists (fun (c,r) -> r = 0)
     member this.CanHaveTables() = 
         match this.ArcFile with 
         | Some (ArcFiles.Assay _) | Some (ArcFiles.Study _) -> true
@@ -167,6 +181,8 @@ type Msg =
 | CreateAnnotationTable of tryUsePrevOutput:bool
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
+| AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}
+| AddTemplate of ArcTable
 | JoinTable of ArcTable * index: int option * options: TableJoinOptions option
 | UpdateArcFile of ArcFiles
 | InitFromArcFile of ArcFiles

@@ -1,6 +1,7 @@
 namespace OfficeInterop
 
 open Shared
+open ARCtrl
 open TermTypes
 open OfficeInteropTypes
 
@@ -32,9 +33,11 @@ type Msg =
     | TryFindAnnotationTable
     | AnnotationTableExists                 of TryFindAnnoTableResult
     | InsertOntologyTerm                    of TermMinimal
-    | AddAnnotationBlock                    of InsertBuildingBlock
-    | AddAnnotationBlocks                   of InsertBuildingBlock [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
+    | AddAnnotationBlock                    of CompositeColumn
+    | AddAnnotationBlocks                   of CompositeColumn [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | ImportFile                            of (string*InsertBuildingBlock []) []
+    | AddTemplate                           of ArcTable
+    | JoinTable                             of ArcTable * index: int option * options: TableJoinOptions option
     | RemoveBuildingBlock
     | UpdateUnitForCells                    of unitTerm:TermMinimal
     | AutoFitTable                          of hideRefCols:bool

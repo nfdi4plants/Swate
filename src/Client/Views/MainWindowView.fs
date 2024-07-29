@@ -76,6 +76,7 @@ let Main (model: Model, dispatch) =
         | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget) 
         | Widget._Template -> Widget.Templates (model, dispatch, rmv widget)
         | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
+        | Widget._DataAnnotator -> Widget.DataAnnotator(model, dispatch, rmv widget)
         |> WidgetOrderContainer bringWidgetToFront
     let addWidget (widget: Widget) = 
         widget::widgets |> List.rev |> setWidgets
@@ -93,13 +94,7 @@ let Main (model: Model, dispatch) =
             ModalDisplay (widgets, displayWidget)
             Html.div [
                 prop.id "TableContainer"
-                prop.style [
-                    style.width.inheritFromParent
-                    style.height.inheritFromParent
-                    style.overflowX.auto
-                    style.display.flex
-                    style.flexDirection.column
-                ]
+                prop.className "flex grow flex-col h-full overflow-y-hidden"
                 prop.children [
                     //
                     match state.ArcFile with
@@ -109,10 +104,41 @@ let Main (model: Model, dispatch) =
                     | Some (ArcFiles.Study _)
                     | Some (ArcFiles.Investigation _) 
                     | Some (ArcFiles.Template _) ->
-                        Html.none
-                        XlsxFileView.Main (model, dispatch, (fun () -> addWidget Widget._BuildingBlock), (fun () -> addWidget Widget._Template))
-                    if state.Tables.TableCount > 0 && state.ActiveTable.ColumnCount > 0 && state.ActiveView <> Spreadsheet.ActiveView.Metadata then
-                        MainComponents.AddRows.Main dispatch
+                        match model.SpreadsheetModel.ActiveView with
+                        | Spreadsheet.ActiveView.Table _ ->
+                            match model.SpreadsheetModel.ActiveTable.ColumnCount with
+                            | 0 ->
+                                let openBuildingBlockWidget = fun () -> addWidget Widget._BuildingBlock
+                                let openTemplateWidget = fun () -> addWidget Widget._Template
+                                MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget)
+                            | _ ->
+                                MainComponents.SpreadsheetView.ArcTable.Main(model, dispatch)
+                                MainComponents.AddRows.Main dispatch
+                        | Spreadsheet.ActiveView.Metadata ->
+                            Bulma.section [
+                                prop.className "overflow-y-auto h-full"
+                                prop.children [
+                                    Bulma.container [
+                                        prop.className "is-max-desktop"
+                                        prop.children [
+                                            match model.SpreadsheetModel.ArcFile with
+                                            | Some (ArcFiles.Assay a) ->
+                                                MainComponents.Metadata.Assay.Main(a, model, dispatch)
+                                            | Some (ArcFiles.Study (s,aArr)) ->
+                                                MainComponents.Metadata.Study.Main(s, aArr, model, dispatch)
+                                            | Some (ArcFiles.Investigation inv) ->
+                                                MainComponents.Metadata.Investigation.Main(inv, model, dispatch)
+                                            | Some (ArcFiles.Template t) ->
+                                                MainComponents.Metadata.Template.Main(t, model, dispatch)
+                                            | None ->
+                                                Html.none
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        | Spreadsheet.ActiveView.DataMap ->
+                            MainComponents.SpreadsheetView.DataMap.Main(model, dispatch)
+                            MainComponents.AddRows.Main dispatch
                 ]
             ]
             if state.ArcFile.IsSome then 

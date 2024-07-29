@@ -43,8 +43,8 @@ services:
   swate:
     image: swate:new
     container_name: swate_new
-    ports: 
-      - 8080:8080
+    ports:
+      - 5000:5000
     extra_hosts:
     # cat /etc/hosts , as bash command in container
       - "host.docker.internal:host-gateway"

@@ -90,6 +90,23 @@ module Spreadsheet =
             | AddAnnotationBlocks columns ->
                 let nextState = Controller.BuildingBlocks.addBuildingBlocks columns state
                 nextState, model, Cmd.none
+            | AddDataAnnotation data ->
+                let nextState =
+                    match state.ActiveView with
+                    | IsDataMap -> Controller.DataMap.addDataAnnotation data state
+                    | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
+                    | IsMetadata -> failwith "Unable to add data annotation in metadata view"
+                nextState, model, Cmd.none
+            | AddTemplate table ->
+                let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
+                /// Filter out existing building blocks and keep input/output values.
+                let options = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
+                let msg = fun t -> JoinTable(t, index, options) |> SpreadsheetMsg
+                let cmd =
+                        Table.selectiveTablePrepare state.ActiveTable table
+                        |> msg                     
+                        |> Cmd.ofMsg
+                state, model, cmd
             | JoinTable (table, index, options) ->
                 let nextState = Controller.BuildingBlocks.joinTable table index options state
                 nextState, model, Cmd.none
@@ -205,6 +222,10 @@ module Spreadsheet =
                             | _ -> (state.ActiveTable.ColumnCount-1), (state.ActiveTable.RowCount-1) // This does not matter
                         let nextIndex = Controller.Table.selectRelativeCell state.SelectedCells.MinimumElement moveBy maxColIndex maxRowIndex
                         let s = Set([nextIndex])
+                        let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
+                        match Browser.Dom.document.getElementById cellId with
+                        | null -> ()
+                        | ele -> ele.focus()
                         UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
             | SetActiveCellFromSelected ->
@@ -384,7 +405,7 @@ module Spreadsheet =
                 //let cmds = Cmd.batch [cmd; stateCmd]
                 //state, model, cmds
                 failwith "UpdateTermColumns is not implemented yet"
-                state,model,Cmd.none
+                state, model, Cmd.none
             | UpdateTermColumnsResponse terms ->
                 //let nextExcelState = {
                 //    model.ExcelState with
@@ -403,7 +424,7 @@ module Spreadsheet =
                 //        (curry GenericError (OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                 //state, nextModel, cmd
                 failwith "UpdateTermColumnsResponse is not implemented yet"
-                state,model,Cmd.none
+                state, model, Cmd.none
         try
             innerUpdate state model msg
             |> Helper.updateHistoryStorageMsg msg

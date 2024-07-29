@@ -156,8 +156,11 @@ module TermSearchAux =
                 prop.children [
                     Html.i [
                         prop.style [style.width (length.px 20)]
-                        if isDirectedSearchResult then 
-                            prop.classes ["fa-solid fa-share-nodes"; "is-flex"; "is-align-items-center"]
+                        if term.IsObsolete then
+                            prop.classes ["fa-solid fa-link-slash"; "is-flex"; "is-align-items-center"; "has-text-danger"]
+                            prop.title "Obsolete"
+                        elif isDirectedSearchResult then 
+                            prop.classes ["fa-solid fa-diagram-project"; "is-flex"; "is-align-items-center"]
                             prop.title "Related Term"
                     ]
                     Html.div [
@@ -329,7 +332,12 @@ type TermSearch =
         let isSearching, setIsSearching = React.useState(false)
         let debounceStorage = React.useRef(newDebounceStorage())
         let ref = React.useElementRef()
-        if onBlur.IsSome then React.useLayoutEffectOnce(fun _ -> ClickOutsideHandler.AddListener (ref, onBlur.Value))
+        React.useLayoutEffectOnce(fun _ ->
+            ClickOutsideHandler.AddListener (ref, fun e ->
+                debounceStorage.current.ClearAndRun()
+                if onBlur.IsSome then onBlur.Value e
+            )
+        )
         React.useEffect((fun () -> setState input), dependencies=[|box input|])
         let stopSearch() = 
             debounceStorage.current.Remove("TermSearch") |> ignore
@@ -375,10 +383,12 @@ type TermSearch =
                     prop.onDoubleClick(fun e ->
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
+                            log "Double click empty + parent"
                             if searchable then 
                                 startSearch()
                                 allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         elif s.Trim() <> "" then
+                            log "Double click not empty"
                             if searchable then 
                                 startSearch ()
                                 mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)

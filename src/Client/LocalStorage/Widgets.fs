@@ -1,4 +1,4 @@
-﻿module LocalStorage.Widgets
+module LocalStorage.Widgets
 
 open Feliz
 open Fable.Core.JsInterop
@@ -17,9 +17,20 @@ type Rect = {
 
 open Fable.SimpleJson
 
-let [<Literal>] BuildingBlockWidgets = "BuildingBlock"
-let [<Literal>] TemplatesWidgets = "Templates"
-let [<Literal>] FilePickerWidgets = "FilerPicker"
+[<RequireQualifiedAccess>]
+module WidgetLiterals =
+
+    [<Literal>]
+    let BuildingBlock = "BuildingBlock"
+
+    [<Literal>]
+    let Templates = "Templates"
+
+    [<Literal>]
+    let FilePicker = "FilerPicker"
+
+    [<Literal>]
+    let DataAnnotator = "DataAnnotator"
 
 [<RequireQualifiedAccess>]
 module Position =

@@ -9,7 +9,7 @@ open Model
 module private Shared =
 
     let isUnitOrTermCell (cell: CompositeCell option) =
-        cell.IsSome && not cell.Value.isFreeText
+        cell.IsSome && (cell.Value.isTerm || cell.Value.isUnitized)
 
     let isHeader (rowIndex: int) = rowIndex < 0
 
@@ -64,7 +64,7 @@ module Table =
         ColumnIndex     : int
     }
 
-    let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (contextCell: CompositeCell option) (rmv: _ -> unit) =
+    let private contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (contextCell: CompositeCell option) (header: CompositeHeader) (rmv: _ -> unit) =
         /// This element will remove the contextmenu when clicking anywhere else
         let isHeader = Shared.isHeader funcs.RowIndex
         let buttonList = [
@@ -73,6 +73,9 @@ module Table =
                 Shared.button ("Fill Column", "fa-solid fa-pen", funcs.FillColumn rmv, [])
                 if Shared.isUnitOrTermCell contextCell then
                     let text = if contextCell.Value.isTerm then "As Unit Cell" else "As Term Cell"
+                    Shared.button (text, "fa-solid fa-arrow-right-arrow-left", funcs.TransformCell rmv, [])
+                elif header.IsDataColumn then
+                    let text = if contextCell.Value.isFreeText then "As Data Cell" else "As Free Text Cell"
                     Shared.button (text, "fa-solid fa-arrow-right-arrow-left", funcs.TransformCell rmv, [])
                 else
                     Shared.button ("Update Column", "fa-solid fa-ellipsis-vertical", funcs.UpdateAllCells rmv, [])
@@ -119,6 +122,7 @@ module Table =
             else
                 Spreadsheet.DeleteRow (ri) |> Messages.SpreadsheetMsg |> dispatch
         let cell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(ci, ri)
+        let header = model.SpreadsheetModel.ActiveTable.Headers.[ci]
         let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
         //let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
         let triggerMoveColumnModal _ = Modals.Controller.renderModal("MoveColumn_Modal", Modals.MoveColumn.Main(ci, model, dispatch))
@@ -152,12 +156,16 @@ module Table =
                 if cell.IsSome && (cell.Value.isTerm || cell.Value.isUnitized) then
                     let nextCell = if cell.Value.isTerm then cell.Value.ToUnitizedCell() else cell.Value.ToTermCell()
                     rmv e; Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
+                elif cell.IsSome && header.IsDataColumn then
+                    let nextCell = if cell.Value.isFreeText then cell.Value.ToDataCell() else cell.Value.ToFreeTextCell()
+                    rmv e; Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
+                        
             UpdateAllCells = fun rmv e -> rmv e; triggerUpdateColumnModal e
             //EditColumn      = fun rmv e -> rmv e; editColumnEvent e
             RowIndex        = snd index
             ColumnIndex     = fst index
         }
-        let child = contextmenu mousePosition funcs cell
+        let child = contextmenu mousePosition funcs cell header
         let name = $"context_{mousePosition}"
         Modals.Controller.renderModal(name, child)
 

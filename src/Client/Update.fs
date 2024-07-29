@@ -176,6 +176,33 @@ module Ontologies =
                     (curry GenericError Cmd.none >> DevMsg)
             model, cmd
 
+module DataAnnotator =
+    let update (msg: DataAnnotator.Msg) (state: DataAnnotator.Model) (model: Model.Model) =
+        match msg with
+        | DataAnnotator.UpdateDataFile dataFile ->
+            let parsedFile = dataFile |> Option.map (fun file ->
+                let s = file.ExpectedSeparator
+                DataAnnotator.ParsedDataFile.fromFileBySeparator s file
+            )
+            let nextState: DataAnnotator.Model = {
+                DataFile = dataFile
+                ParsedFile = parsedFile
+            }
+            nextState, model, Cmd.none
+        | DataAnnotator.ToggleHeader ->
+            let nextState = 
+                { state with ParsedFile = state.ParsedFile |> Option.map (fun file -> file.ToggleHeader())}
+            nextState, model, Cmd.none
+        | DataAnnotator.UpdateSeperator newSep ->
+            let parsedFile = state.DataFile |> Option.map (fun file ->
+                DataAnnotator.ParsedDataFile.fromFileBySeparator newSep file
+            )
+            let nextState = {
+                state with
+                    ParsedFile = parsedFile
+            }
+            nextState, model, Cmd.none
+
 let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
         match msg with
@@ -243,9 +270,9 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             nextModel, cmd
 
         | OfficeInteropMsg excelMsg ->
-            let nextState,nextModel0,nextCmd = Update.OfficeInterop.update model.ExcelState currentModel excelMsg
+            let nextState,nextModel0, nextCmd = Update.OfficeInterop.update model.ExcelState currentModel excelMsg
             let nextModel = {nextModel0 with ExcelState = nextState}
-            nextModel,nextCmd
+            nextModel, nextCmd
 
         | SpreadsheetMsg msg ->
             let nextState, nextModel, nextCmd = Update.Spreadsheet.update currentModel.SpreadsheetModel currentModel msg
@@ -256,7 +283,7 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             Update.Interface.update currentModel msg
 
         | TermSearchMsg termSearchMsg ->
-            let nextTermSearchState,nextCmd =
+            let nextTermSearchState, nextCmd =
                 currentModel.TermSearchState
                 |> TermSearch.update termSearchMsg
 
@@ -264,23 +291,23 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                 currentModel with
                     TermSearchState = nextTermSearchState
             }
-            nextModel,nextCmd
+            nextModel, nextCmd
         | AdvancedSearchMsg msg ->
             let nextModel, cmd = AdvancedSearch.update msg model
 
             nextModel, cmd
 
         | DevMsg msg ->
-            let nextDevState,nextCmd = currentModel.DevState |> Dev.update msg
+            let nextDevState, nextCmd = currentModel.DevState |> Dev.update msg
         
             let nextModel = {
                 currentModel with
                     DevState = nextDevState
             }
-            nextModel,nextCmd
+            nextModel, nextCmd
 
         | PersistentStorageMsg persistentStorageMsg ->
-            let nextPersistentStorageState,nextCmd =
+            let nextPersistentStorageState, nextCmd =
                 currentModel.PersistentStorageState
                 |> handlePersistenStorageMsg persistentStorageMsg
 
@@ -289,10 +316,10 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                     PersistentStorageState = nextPersistentStorageState
             }
 
-            nextModel,nextCmd
+            nextModel, nextCmd
 
         | FilePickerMsg filePickerMsg ->
-            let nextFilePickerState,nextCmd =
+            let nextFilePickerState, nextCmd =
                 currentModel.FilePickerState
                 |> FilePicker.update filePickerMsg
 
@@ -301,10 +328,10 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                     FilePickerState = nextFilePickerState
             }
 
-            nextModel,nextCmd
+            nextModel, nextCmd
 
         | BuildingBlockMsg addBuildingBlockMsg ->
-            let nextAddBuildingBlockState,nextCmd = 
+            let nextAddBuildingBlockState, nextCmd = 
                 currentModel.AddBuildingBlockState
                 |> BuildingBlock.Core.update addBuildingBlockMsg
 
@@ -352,6 +379,11 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             let nextModel =
                 {nextModel0 with
                     CytoscapeModel = nextState}
+            nextModel, nextCmd
+
+        | DataAnnotatorMsg msg ->
+            let nextState, nextModel0, nextCmd = DataAnnotator.update msg currentModel.DataAnnotatorModel currentModel
+            let nextModel = {nextModel0 with DataAnnotatorModel = nextState}
             nextModel, nextCmd
 
     /// This function is used to determine which msg should be logged to activity log.

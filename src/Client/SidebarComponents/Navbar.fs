@@ -62,7 +62,7 @@ let private shortCutIconList model dispatch =
         )
         QuickAccessButton.create(
             "Remove Building Block",
-            [ 
+            [
                 Html.i [prop.className "fa-solid fa-minus pr-1"]
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
@@ -70,7 +70,7 @@ let private shortCutIconList model dispatch =
         )
         QuickAccessButton.create(
             "Get Building Block Information",
-            [ 
+            [
                 Html.i [prop.className "fa-solid fa-question pr-1"]
                 Html.span model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg
                 Html.i [prop.className "fa-solid fa-table-columns"]
@@ -78,7 +78,7 @@ let private shortCutIconList model dispatch =
             (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
         )
     ]
-    
+
 let private navbarShortCutIconList model dispatch =
     [
         for icon in shortCutIconList model dispatch do
@@ -131,7 +131,7 @@ let private quickAccessDropdownElement model dispatch (state: NavbarState) (setS
                                         prop.className "fa-solid fa-ellipsis"
                                     ]
                                 ]
-                            ]                            
+                            ]
                         ]
                     ]
                 ]
@@ -169,7 +169,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                 prop.style [style.width 100; style.cursor.pointer; style.padding (0,length.rem 0.4)]
                                 let path = if model.PageState.IsExpert then "_e" else ""
                                 Bulma.image [ Html.img [
-                                    prop.style [style.maxHeight(length.perc 100)]
+                                    prop.style [style.maxHeight(length.perc 100); style.width 100]
                                     prop.src @$"assets\Swate_logo_for_excel{path}.svg"
                                 ] ]
                                 |> prop.children
@@ -184,7 +184,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                             | _,_ -> Html.none
 
                             Bulma.navbarBurger [
-                                if state.BurgerActive then Bulma.navbarBurger.isActive 
+                                if state.BurgerActive then Bulma.navbarBurger.isActive
                                 prop.onClick (fun _ -> setState {state with BurgerActive = not state.BurgerActive})
                                 Bulma.color.hasTextWhite
                                 prop.role "button"
@@ -200,7 +200,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                             ]
                         ]
                     ]
-                    Bulma.navbarMenu [ 
+                    Bulma.navbarMenu [
                         prop.style [if state.BurgerActive then style.display.block]
                         prop.id "navbarMenu"
                         prop.className (if state.BurgerActive then "navbar-menu is-active" else "navbar-menu")
@@ -212,15 +212,22 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                     prop.target "_Blank";
                                     prop.children [
                                         Html.span "News "
-                                        Html.i [prop.className "fa-brands fa-twitter"; prop.style [style.color "#1DA1F2"; style.marginLeft 2]] 
+                                        Html.i [prop.className "fa-brands fa-twitter"; prop.style [style.color "#1DA1F2"; style.marginLeft 2]]
                                     ]
                                 ]
                                 Bulma.navbarItem.a [
-                                    prop.onClick (fun e ->
+                                    prop.onClick (fun _ ->
                                         setState {state with BurgerActive = not state.BurgerActive}
                                         UpdatePageState (Some Routing.Route.Info) |> dispatch
                                     )
                                     prop.text Routing.Route.Info.toStringRdbl
+                                ]
+                                Bulma.navbarItem.a [
+                                    prop.onClick (fun _ ->
+                                        setState {state with BurgerActive = not state.BurgerActive}
+                                        UpdatePageState (Some Routing.Route.PrivacyPolicy) |> dispatch
+                                    )
+                                    prop.text Routing.Route.PrivacyPolicy.toStringRdbl
                                 ]
                                 Bulma.navbarItem.a [
                                     prop.href Shared.URLs.SwateWiki ;
@@ -229,7 +236,7 @@ let NavbarComponent (model : Model) (dispatch : Msg -> unit) (sidebarsize: Model
                                 ]
                                 Bulma.navbarItem.a [
                                     prop.href Shared.URLs.Helpdesk.Url;
-                                    prop.target "_Blank"; 
+                                    prop.target "_Blank";
                                     prop.text "Contact us!"
                                 ]
                                 Bulma.navbarItem.a [
