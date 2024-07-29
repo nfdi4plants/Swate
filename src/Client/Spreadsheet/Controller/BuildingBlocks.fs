@@ -90,51 +90,6 @@ let addDataAnnotation (data: {| fragmentSelectors: string []; fileName: string; 
     state.ActiveTable.AddColumn(newHeader, values, forceReplace=true)
     {state with ArcFile = state.ArcFile}
 
-/// <summary>
-/// This function is meant to prepare a table for joining with another table.
-///
-/// It removes columns that are already present in the active table.
-/// It removes all values from the new table.
-/// It also fills new Input/Output columns with the input/output values of the active table.
-///
-/// The output of this function can be used with the SpreadsheetInterface.JoinTable Message. 
-/// </summary>
-/// <param name="activeTable">The active/current table</param>
-/// <param name="toJoinTable">The new table, which will be added to the existing one.</param>
-let prepareTemplateInMemory (activeTable: ArcTable, toJoinTable: ArcTable, model: Spreadsheet.Model) =
-    // Remove existing columns
-    let mutable columnsToRemove = []
-    // find duplicate columns
-    let tablecopy = toJoinTable.Copy()
-    for header in activeTable.Headers do
-        let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
-        if containsAtIndex.IsSome then
-            columnsToRemove <- containsAtIndex.Value::columnsToRemove
-    tablecopy.RemoveColumns (Array.ofList columnsToRemove)
-    tablecopy.IteriColumns(fun i c0 ->
-        let c1 = {c0 with Cells = [||]}
-        let c2 =
-            if c1.Header.isInput then
-                match activeTable.TryGetInputColumn() with
-                | Some ic ->
-                    {c1 with Cells = ic.Cells}
-                | _ -> c1
-            elif c1.Header.isOutput then
-                match activeTable.TryGetOutputColumn() with
-                | Some oc ->
-                    {c1 with Cells = oc.Cells}
-                | _ -> c1
-            else
-                c1
-        tablecopy.UpdateColumn(i, c2.Header, c2.Cells)
-    )
-
-    let index = Some (SidebarControllerAux.getNextColumnIndex model)
-    /// Filter out existing building blocks and keep input/output values.
-    let options = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
-
-    promise { return (tablecopy, index, options) }
-
 let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptions option) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     table.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)

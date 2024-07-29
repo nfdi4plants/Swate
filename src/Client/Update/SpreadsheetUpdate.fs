@@ -98,13 +98,14 @@ module Spreadsheet =
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
                 nextState, model, Cmd.none
             | AddTemplate table ->
-                let msg = fun (t, i, o) -> JoinTable(t, i, o) |> SpreadsheetMsg
+                let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
+                /// Filter out existing building blocks and keep input/output values.
+                let options = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
+                let msg = fun t -> JoinTable(t, index, options) |> SpreadsheetMsg
                 let cmd =
-                    Cmd.OfPromise.either
-                        Controller.BuildingBlocks.prepareTemplateInMemory
-                        (state.ActiveTable, table, model.SpreadsheetModel)
-                        (msg)                        
-                        (curry GenericError Cmd.none >> DevMsg)
+                        Table.selectiveTablePrepare state.ActiveTable table
+                        |> msg                     
+                        |> Cmd.ofMsg
                 state, model, cmd
             | JoinTable (table, index, options) ->
                 let nextState = Controller.BuildingBlocks.joinTable table index options state
