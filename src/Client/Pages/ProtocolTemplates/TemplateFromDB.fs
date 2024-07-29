@@ -34,12 +34,7 @@ type TemplateFromDB =
                                 if model.ProtocolState.TemplateSelected.IsNone then
                                     failwith "No template selected!"
 
-                                if model.ExcelState.HasAnnotationTable then
-                                    let preparedTemplate = Table.selectiveTablePrepare model.SpreadsheetModel.ActiveTable model.ProtocolState.TemplateSelected.Value.Table
-                                    OfficeInterop.AddTemplate(preparedTemplate) |> OfficeInteropMsg |> dispatch
-                                else
-                                    let preparedTemplate = Table.selectiveTablePrepare model.SpreadsheetModel.ActiveTable model.ProtocolState.TemplateSelected.Value.Table
-                                    SpreadsheetInterface.AddTemplate(preparedTemplate) |> InterfaceMsg |> dispatch
+                                SpreadsheetInterface.AddTemplate(model.ProtocolState.TemplateSelected.Value.Table) |> InterfaceMsg |> dispatch
                             )
                             prop.text "Add template"
                         ]
