@@ -1117,41 +1117,23 @@ let prepareTemplateInMemory (tableToAdd:ArcTable) =
     Excel.run(fun context ->
         promise {
 
-            let activeSheet = context.workbook.worksheets.getActiveWorksheet()
-            let _ = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
-            let activeTables = activeSheet.tables.load(propertyNames=U2.Case1 "items")
+            let! tableName = tryGetActiveAnnotationTableName(context)
 
-            // sync with proxy objects after loading values from excel
-            do! context.sync().``then``( fun _ -> ())
+            let! table =
+                if tableName.IsSome then tryGetAnnotationTableByName context tableName.Value
+                else failwith "The active worksheet must contain one active annotation table to add a template."
 
-            // Filter all names of tables on the active worksheet for names starting with "annotationTable".
-            let annoTables =
-                activeTables.items
-                |> Seq.toArray
-                |> Array.filter (fun table -> table.name.StartsWith "annotationTable")
+            if table.IsNone then failwith "The active worksheet must contain one active annotation table to add a template."
 
-            match annoTables.Length with
-            //Create a new annotation table in the active worksheet
-            | 0 ->
-                failwith "The active worksheet must contain one active annotation table to add a template."
-            //Create a mew worksheet with a new annotation table when the active worksheet already contains one
-            | x when x = 1 -> ()
-            // Fail the function if there are more than 1 annotation table in the active worksheet.
-            // This check is done, to only have one annotationTable per workSheet.
-            | x when x > 1 ->
-                failwith "The active worksheet contains more than one annotationTable. This should not happen. Please report this as a bug to the developers."
-            | _ ->
-                failwith "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers."
+            let! originTable = ArcTable.tryGetFromExcelTable(table.Value, context)
 
-            let! originTable = ArcTable.tryGetFromExcelTable(annoTables.[0], context)
-
-            if originTable.IsNone then failwith $"Failed to create arc table for table {annoTables.[0].name}"
+            if originTable.IsNone then failwith $"Failed to create arc table for table {tableName.Value}"
 
             let finalTable = Table.selectiveTablePrepare originTable.Value tableToAdd
 
             let selectedRange = context.workbook.getSelectedRange()
 
-            let tableStartIndex = annoTables.[0].getRange()
+            let tableStartIndex = table.Value.getRange()
 
             let _ =
                 tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore

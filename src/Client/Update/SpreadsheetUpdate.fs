@@ -98,15 +98,11 @@ module Spreadsheet =
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
                 nextState, model, Cmd.none
             | AddTemplate table ->               
-                let index = Some (Spreadsheet.BuildingBlocks.Controller.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
+                let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
                 /// Filter out existing building blocks and keep input/output values.
                 let options = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
                 let msg t i o = JoinTable(t, i, o)
-                let nextState =
-                    let _ =
-                        msg table index options |> ignore
-                        {state with ArcFile = state.ArcFile}
-                    state
+                let nextState = Controller.BuildingBlocks.joinTable table index options state
                 nextState, model, Cmd.none
             | JoinTable (table, index, options) ->
                 let nextState = Controller.BuildingBlocks.joinTable table index options state
