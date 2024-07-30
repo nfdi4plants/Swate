@@ -66,6 +66,27 @@ module OfficeInteropExtensions =
                 values  = U4.Case1 col
             )
 
+
+
+        static member adoptTableFormats (table:Table, context:RequestContext) =
+            promise {
+
+                let _ = table.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
+
+                do! context.sync().``then``( fun _ -> ())
+
+                let range = table.getRange()
+
+                range.format.autofitColumns()
+                range.format.autofitRows()
+
+                table.columns.items
+                |> Array.ofSeq
+                |> Array.iter (fun column ->                        
+                    if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> column.name.StartsWith cName) then
+                        column.getRange().columnHidden <- true)
+            }
+
     type ArcTable with
 
         /// <summary>
@@ -166,6 +187,7 @@ module OfficeInteropExtensions =
                                 item
                                 |> Option.map string
                                 |> Option.defaultValue ""
+                                |> (fun s -> s.TrimEnd())
                             )
                         let bodyRows =
                             bodyRowRange.values
@@ -718,7 +740,7 @@ let getBuildingBlocksAndSheets() =
 
 // ExcelApi 1.1
 /// <summary>Selected ranged returns indices always from a worksheet perspective but we need the related table index. This is calculated here.</summary>
-let rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) =
+let private rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) =
     let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex |> int
     let vals = annoHeaderRange.columnCount |> int
     let maxLength = vals-1
@@ -1057,10 +1079,6 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
             //We want to start looking after the chosen column in order to ignore the current column because it could be a main column
             let headers = headers.[(int) excelIndex + 1..]
 
-            let mainColumNames =
-                // Get all cases of the union
-                CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
-
             let targetIndex =
                 [|
                     for i in 0..headers.Length - 1 do
@@ -1308,6 +1326,146 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
             else
                 return [InteropLogging.Msg.create InteropLogging.Warning $"A table is missing! annotationTable: {excelTable.IsSome}; arcTable: {arcTable.IsSome}"]
         } 
+    )
+
+/// <summary>
+/// Get the indices of a building block when the index of the main column is given
+/// </summary>
+/// <param name="columns"></param>
+/// <param name="selectedIndex"></param>
+let getBuildingBlockIndices (columns:TableColumnCollection) (mainColumnIndex: int) =
+
+    let potTargetColumns = columns.items |> Array.ofSeq |> (fun item -> item.[mainColumnIndex + 1..])
+    let potTargetIndices =
+        [|
+            for i in 0..potTargetColumns.Length - 1 do
+                let header = potTargetColumns.[i]
+                if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> header.name.StartsWith cName) then
+                    i
+                else
+                    ()
+        |]
+        |> Array.sortBy(fun index -> index)
+    [|
+        mainColumnIndex
+        for i = 0 to potTargetIndices.Length - 1 do
+            //Add 1 to the selected index because the properties after the main column start with index 0
+            if potTargetIndices.[i] - i = 0 then potTargetIndices.[i] + mainColumnIndex + 1
+            else ()
+    |]
+
+/// <summary>
+/// Delete the annotation block of the selected column in excel
+/// </summary>
+let removeSelectedAnnotationBlock () =
+    Excel.run(fun context ->
+
+        promise {
+
+            //Try to get the name of the currently active sheet
+            let! excelTableName = tryGetActiveAnnotationTableName context
+
+            let excelTableName =
+                if excelTableName.IsSome then excelTableName.Value
+                else failwith "No excel table name has been found!"
+
+            //When a name is available get the annotation and arctable for easy access of indices and value adaption
+            //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
+            let! excelTable = tryGetAnnotationTableByName context excelTableName
+
+            let selectedRange = context.workbook.getSelectedRange()
+
+            let tableStartIndex = excelTable.Value.getRange()
+
+            let mainColumNames =
+                // Get all cases of the union
+                CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
+
+            let columns = excelTable.Value.columns
+
+            let _ =
+                columns.load(propertyNames=U2.Case2 (ResizeArray[|"count"; "items"; "name";|])) |> ignore
+                tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
+                selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
+
+            // sync with proxy objects after loading values from excel
+            do! context.sync().``then``( fun _ -> ())
+
+            let selectedIndex = selectedRange.columnIndex - tableStartIndex.columnIndex
+
+            //Determine the column type
+            //Check for both colums required because free text columns are neither of them
+            let isPropertyColumn =
+                columns.items.Item (int selectedIndex)
+                |> (fun column ->                        
+                    if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> column.name.StartsWith cName) then true
+                    else false)
+
+            let isMainColumn =
+                columns.items.Item (int selectedIndex)
+                |> (fun column ->                        
+                    if mainColumNames |> Array.exists (fun cName ->
+                        //Problem: Protocol columns contain in cases no empty spaces -> must be reomoved for checking
+                        let name = column.name.Replace(" ", "")
+                        name.StartsWith cName) then true
+                    else false)
+
+            if isMainColumn then
+                if selectedIndex = (columns.count - 1.) then
+                    let targetColumn = columns.items.Item (int selectedIndex)
+                    targetColumn.delete()
+                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context)
+                    return [InteropLogging.Msg.create InteropLogging.Warning $"The main column {targetColumn.name} has been deleted"]
+                else
+                    let targetIndices = getBuildingBlockIndices columns (int selectedIndex)
+                    
+                    let columNames =
+                        targetIndices
+                        |> Array.map (fun i ->
+                            let targetColumn = columns.items.Item i
+                            targetColumn.delete()
+                            targetColumn.name
+                        )
+
+                    let mainColumn = columns.items.Item (int selectedIndex)
+                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context)
+                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {columNames.[1..]}"]
+
+            else if isPropertyColumn then
+
+                let mainColumnIndex = 
+                    [|
+                        for i = int selectedIndex - 1 downto 0 do
+                            let column = columns.items.Item i
+                            let name = column.name.Replace(" ", "")
+                            if mainColumNames |> Array.exists (fun cName ->                                
+                                //Problem: Protocol columns contain in cases no empty spaces -> must be reomoved for checking
+                                name.StartsWith cName) then i else ()
+                    |]
+                    |> Array.tryHead
+
+                if mainColumnIndex.IsSome then
+                    let targetIndices = getBuildingBlockIndices columns mainColumnIndex.Value
+                    
+                    let columNames =
+                        targetIndices
+                        |> Array.map (fun i ->
+                            let targetColumn = columns.items.Item i
+                            targetColumn.delete()
+                            targetColumn.name
+                        )
+
+                    let mainColumn = columns.items.Item mainColumnIndex.Value
+                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context)
+                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {columNames.[1..]}"]
+                else
+                    return failwith "Something went wrong! A property column cannot be without a main column! Please report this as a bug to the developers."
+            else
+                let targetColumn = columns.items.Item (int selectedIndex)
+                targetColumn.delete()
+                let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context)
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The free tex column {targetColumn.name} has been deleted"]
+        }
     )
 
 let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
@@ -1691,24 +1849,24 @@ let removeAnnotationBlock (tableName:string) (annotationBlock:BuildingBlock) (co
 //    |> Array.map (removeAnnotationBlock tableName)
 //    |> Promise.all
 
-let removeSelectedAnnotationBlock () =
-    Excel.run(fun context ->
+//let removeSelectedAnnotationBlock () =
+//    Excel.run(fun context ->
 
-        promise {
+//        promise {
 
-            let! excelTable = getActiveAnnotationTableName context
+//            let! excelTable = getActiveAnnotationTableName context
 
-            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context excelTable
+//            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context excelTable
 
-            let! deleteCols = removeAnnotationBlock excelTable selectedBuildingBlock context
+//            let! deleteCols = removeAnnotationBlock excelTable selectedBuildingBlock context
 
-            let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols})"  
+//            let resultMsg = InteropLogging.Msg.create InteropLogging.Info $"Delete Building Block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader} (Cols: {deleteCols})"  
 
-            let! format = autoFitTableHide context
+//            let! format = autoFitTableHide context
 
-            return [resultMsg]
-        }
-    )
+//            return [resultMsg]
+//        }
+//    )
 
 let getAnnotationBlockDetails() =
     Excel.run(fun context ->
