@@ -66,9 +66,7 @@ module OfficeInteropExtensions =
                 values  = U4.Case1 col
             )
 
-
-
-        static member adoptTableFormats (table:Table, context:RequestContext) =
+        static member adoptTableFormats (table:Table, context:RequestContext, shallHide:bool) =
             promise {
 
                 let _ = table.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
@@ -84,7 +82,7 @@ module OfficeInteropExtensions =
                 |> Array.ofSeq
                 |> Array.iter (fun column ->                        
                     if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> column.name.StartsWith cName) then
-                        column.getRange().columnHidden <- true)
+                        column.getRange().columnHidden <- shallHide)
             }
 
     type ArcTable with
@@ -1384,9 +1382,9 @@ let removeSelectedAnnotationBlock () =
             let columns = excelTable.Value.columns
 
             let _ =
-                columns.load(propertyNames=U2.Case2 (ResizeArray[|"count"; "items"; "name";|])) |> ignore
-                tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
-                selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
+                columns.load(propertyNames=U2.Case2 (ResizeArray[|"count"; "items"; "name";|])) |> ignore                
+                selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
+                tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
 
             // sync with proxy objects after loading values from excel
             do! context.sync().``then``( fun _ -> ())
@@ -1411,12 +1409,14 @@ let removeSelectedAnnotationBlock () =
                     else false)
 
             if isMainColumn then
+                //When main column is the last column, skipp looking for building block and delete it
                 if selectedIndex = (columns.count - 1.) then
                     let targetColumn = columns.items.Item (int selectedIndex)
                     targetColumn.delete()
-                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context)
+                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
                     return [InteropLogging.Msg.create InteropLogging.Warning $"The main column {targetColumn.name} has been deleted"]
                 else
+
                     let targetIndices = getBuildingBlockIndices columns (int selectedIndex)
                     
                     let columNames =
@@ -1428,11 +1428,12 @@ let removeSelectedAnnotationBlock () =
                         )
 
                     let mainColumn = columns.items.Item (int selectedIndex)
-                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context)
+                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
                     return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {columNames.[1..]}"]
 
             else if isPropertyColumn then
 
+                //Get the index of the closes main column before the chosen property column, it is the start point of building block
                 let mainColumnIndex = 
                     [|
                         for i = int selectedIndex - 1 downto 0 do
@@ -1456,14 +1457,14 @@ let removeSelectedAnnotationBlock () =
                         )
 
                     let mainColumn = columns.items.Item mainColumnIndex.Value
-                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context)
+                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
                     return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {columNames.[1..]}"]
                 else
                     return failwith "Something went wrong! A property column cannot be without a main column! Please report this as a bug to the developers."
             else
                 let targetColumn = columns.items.Item (int selectedIndex)
                 targetColumn.delete()
-                let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context)
+                let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The free tex column {targetColumn.name} has been deleted"]
         }
     )
