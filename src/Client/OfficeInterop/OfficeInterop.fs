@@ -17,6 +17,21 @@ open ARCtrl
 open ARCtrl.Spreadsheet
 
 module OfficeInteropExtensions =
+    
+    let isReferenceColumn (name: string) =
+        ARCtrl.Spreadsheet.ArcTable.helperColumnStrings
+        |> Seq.exists (fun cName -> name.StartsWith cName)
+
+    let groupToBuildingBlocks (headers: string []) =
+        let ra: ResizeArray<ResizeArray<int*string>> = ResizeArray()
+        headers
+        |> Array.iteri (fun i header ->
+            if isReferenceColumn header then
+                ra.[ra.Count-1].Add(i, header)
+            else
+                ra.Add(ResizeArray([(i, header)]))
+        )
+        ra
 
     open ARCtrl.Spreadsheet.ArcTable
 
@@ -273,6 +288,11 @@ let exampleExcelFunction2 () =
 let swateSync (context:RequestContext) =
     context.sync().``then``(fun _ -> ())
 
+// I retrieve the index of the currently opened worksheet, here the new table should be created.
+// I retrieve all annotationTables in the workbook. I filter out all annotationTables that are on a worksheet with a lower index than the index of the currently opened worksheet.
+// I subtract from the index of the current worksheet the indices of the other found worksheets with annotationTable.
+// I sort by the resulting lowest number (since the worksheet is then closest to the active one), I find the output column in the particular
+// annotationTable and use the values it contains for the new annotationTable in the active worksheet.
 /// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
 let tryGetPrevAnnotationTableName (context:RequestContext) =
     promise {
@@ -305,14 +325,8 @@ let tryGetPrevAnnotationTableName (context:RequestContext) =
         return prevTable
     }
 
-// I retrieve the index of the currently opened worksheet, here the new table should be created.
-// I retrieve all annotationTables in the workbook. I filter out all annotationTables that are on a worksheet with a lower index than the index of the currently opened worksheet.
-// I subtract from the index of the current worksheet the indices of the other found worksheets with annotationTable.
-// I sort by the resulting lowest number (since the worksheet is then closest to the active one), I find the output column in the particular
-// annotationTable and use the values it contains for the new annotationTable in the active worksheet.
 
-/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
-let tryGetActiveAnnotationTableName (context:RequestContext) =
+let tryGetActiveAnnotationTable (context: RequestContext) =
     promise {
     
         let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
@@ -320,7 +334,7 @@ let tryGetActiveAnnotationTableName (context:RequestContext) =
         let tables = context.workbook.tables
         let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
 
-        let! activeTableName = context.sync().``then``(fun _ ->
+        let! activeTable = context.sync().``then``(fun _ ->
             let activeWorksheetPosition = activeWorksheet.position
             /// Get name of the table of currently active worksheet.
             let activeTable =
@@ -330,13 +344,28 @@ let tryGetActiveAnnotationTableName (context:RequestContext) =
                     table.name.StartsWith("annotationTable") && table.worksheet.position = activeWorksheetPosition
                 )
 
-            if activeTable.IsSome then
-                Some activeTable.Value.name
-            else
-                None
+            activeTable
         )
 
-        return activeTableName
+        return activeTable
+    }
+
+let getActiveAnnotationTable (context: RequestContext) =
+    promise {
+        let! table = tryGetActiveAnnotationTable context
+        return
+            match table with
+            | None -> failwith "The active worksheet must contain one annotation table to perform this action."
+            | Some t -> t
+    }
+
+/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
+let tryGetActiveAnnotationTableName (context:RequestContext) : JS.Promise<string option> =
+    promise {
+    
+        let! table = tryGetActiveAnnotationTable context
+
+        return table |> Option.map (fun x -> x.name)
     }
 
 /// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
@@ -740,8 +769,8 @@ let getBuildingBlocksAndSheets() =
 /// <summary>Selected ranged returns indices always from a worksheet perspective but we need the related table index. This is calculated here.</summary>
 let private rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Excel.Range) =
     let diff = selectedRange.columnIndex - annoHeaderRange.columnIndex |> int
-    let vals = annoHeaderRange.columnCount |> int
-    let maxLength = vals-1
+    let columnCount = annoHeaderRange.columnCount |> int
+    let maxLength = columnCount-1
     if diff < 0 then
         maxLength
     elif diff > maxLength then
@@ -1133,23 +1162,17 @@ let prepareTemplateInMemory (tableToAdd:ArcTable) =
     Excel.run(fun context ->
         promise {
 
-            let! tableName = tryGetActiveAnnotationTableName(context)
+            let! table = getActiveAnnotationTable context
 
-            let! table =
-                if tableName.IsSome then tryGetAnnotationTableByName context tableName.Value
-                else failwith "The active worksheet must contain one active annotation table to add a template."
+            let! originTable = ArcTable.tryGetFromExcelTable(table, context)
 
-            if table.IsNone then failwith "The active worksheet must contain one active annotation table to add a template."
-
-            let! originTable = ArcTable.tryGetFromExcelTable(table.Value, context)
-
-            if originTable.IsNone then failwith $"Failed to create arc table for table {tableName.Value}"
+            if originTable.IsNone then failwith $"Failed to create arc table for table {table.name}"
 
             let finalTable = Table.selectiveTablePrepare originTable.Value tableToAdd
 
             let selectedRange = context.workbook.getSelectedRange()
 
-            let tableStartIndex = table.Value.getRange()
+            let tableStartIndex = table.getRange()
 
             let _ =
                 tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
@@ -1171,22 +1194,13 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
     Excel.run(fun context ->
         promise {
 
-            //Try to get the name of the currently active sheet
-            let! excelTableName = tryGetActiveAnnotationTableName context
-
-            let excelTableName =
-                if excelTableName.IsSome then excelTableName.Value
-                else failwith "No excel table name has been found!"
-
             //When a name is available get the annotation and arctable for easy access of indices and value adaption
             //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
-            let! excelTable = tryGetAnnotationTableByName context excelTableName
+            let! excelTable = getActiveAnnotationTable context
 
             //Arctable enables a fast check for the existence of input- and output-columns and their indices
             let! arcTable =                
-                if excelTable.IsSome then
-                    ArcTable.tryGetFromExcelTable(excelTable.Value, context)
-                else failwith "No excel table has been found!"
+                ArcTable.tryGetFromExcelTable(excelTable, context)
 
             //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
             if arcTable.IsSome then
@@ -1196,12 +1210,12 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
                 let tableValues = arcTable.Value.ToExcelValues() |> Array.ofSeq                
                 let (headers, body) = Array.ofSeq(tableValues.[0]), tableValues.[1..]
 
-                let newTableRange = excelTable.Value.getRange()
+                let newTableRange = excelTable.getRange()
                 
                 let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowCount";]))
 
                 do! context.sync().``then``(fun _ ->
-                    excelTable.Value.delete()
+                    excelTable.delete()
                 )
 
                 let! (newTable, _) = createAnnotationTableAtRange(false, false, newTableRange, context)
@@ -1210,7 +1224,7 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
 
                 do! context.sync().``then``(fun _ ->
 
-                    newTable.name <- excelTableName
+                    newTable.name <- excelTable.name
 
                     let headerNames =
                         let names = headers |> Array.map (fun item -> item.Value.ToString())
@@ -1253,7 +1267,7 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
                             column.getRange().columnHidden <- true)
                 )
 
-                return [InteropLogging.Msg.create InteropLogging.Warning $"Joined template {tableToAdd.Name} to table {excelTableName}!"]
+                return [InteropLogging.Msg.create InteropLogging.Warning $"Joined template {tableToAdd.Name} to table {excelTable.name}!"]
             else
                 return [InteropLogging.Msg.create InteropLogging.Error "No arc table could be created! This should not happen at this stage! Please report this as a bug to the developers.!"]
             }
@@ -1264,51 +1278,39 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
     Excel.run(fun context ->
         promise {
 
-            //Try to get the name of the currently active sheet
-            let! excelTableName = tryGetActiveAnnotationTableName context
-
-            let excelTableName =
-                if excelTableName.IsSome then excelTableName.Value
-                else failwith "No excel table name has been found!"
-
-            //When a name is available get the annotation and arctable for easy access of indices and value adaption
-            //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
-            let! excelTable = tryGetAnnotationTableByName context excelTableName
+            let! excelTable = getActiveAnnotationTable context
 
             //Arctable enables a fast check for the existence of input- and output-columns and their indices
-            let! arcTable =
-                if excelTable.IsSome then
-                    ArcTable.tryGetFromExcelTable(excelTable.Value, context)
-                else failwith "No excel table has been found!"
+            let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
 
             //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
             if arcTable.IsSome then
 
                 let selectedRange = context.workbook.getSelectedRange().getColumn(0)
-                let headerRange = excelTable.Value.getHeaderRowRange()
+                let headerRange = excelTable.getHeaderRowRange()
 
                 let _ =
-                    excelTable.Value.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
+                    excelTable.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
                     selectedRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"]))) |> ignore
                     headerRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"; "values"]))) |> ignore
-                    excelTable.Value.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
+                    excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
 
                 let (|Input|_|) (newBuildingBlock:CompositeColumn) =
                     if newBuildingBlock.Header.isInput then
                         if arcTable.Value.TryGetInputColumn().IsSome then
-                            Some (updateInputColumn excelTable.Value arcTable.Value newBuildingBlock)
-                        else Some (addInputColumn excelTable.Value arcTable.Value newBuildingBlock)
+                            Some (updateInputColumn excelTable arcTable.Value newBuildingBlock)
+                        else Some (addInputColumn excelTable arcTable.Value newBuildingBlock)
                     else None
 
                 let (|Output|_|) (newBuildingBlock:CompositeColumn) =
                     if newBuildingBlock.Header.isOutput then
                         if arcTable.Value.TryGetOutputColumn().IsSome then
-                            Some (updateOutputColumn excelTable.Value arcTable.Value newBuildingBlock)
-                        else Some (addOutputColumn excelTable.Value arcTable.Value newBuildingBlock)
+                            Some (updateOutputColumn excelTable arcTable.Value newBuildingBlock)
+                        else Some (addOutputColumn excelTable arcTable.Value newBuildingBlock)
                     else None
 
                 let addBuildingBlock (newBuildingBlock:CompositeColumn) =
-                    addBuildingBlock excelTable.Value arcTable.Value newBuildingBlock headerRange selectedRange
+                    addBuildingBlock excelTable arcTable.Value newBuildingBlock headerRange selectedRange
 
                 let getResult (newBuildingBlock:CompositeColumn) =
                     match newBuildingBlock with
@@ -1322,36 +1324,38 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
 
                 return result
             else
-                return [InteropLogging.Msg.create InteropLogging.Warning $"A table is missing! annotationTable: {excelTable.IsSome}; arcTable: {arcTable.IsSome}"]
+                return [InteropLogging.Msg.create InteropLogging.Warning $"A table is missing! annotationTable: {excelTable.name}; arcTable: {arcTable.IsSome}"]
         } 
     )
 
 /// <summary>
-/// Get the indices of a building block when the index of the main column is given
+/// Returns a ResizeArray of indices and header names for the selected building block.
+///
+/// The indices are rebased to the excel annotation table.
 /// </summary>
 /// <param name="columns"></param>
 /// <param name="selectedIndex"></param>
-let getBuildingBlockIndices (columns:TableColumnCollection) (mainColumnIndex: int) =
+let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
 
-    // Get all property columns and their indices after the main column because we do not know its length
-    let potTargetColumns = columns.items |> Array.ofSeq |> (fun item -> item.[mainColumnIndex + 1..])
-    let potTargetIndices =
-        [|
-            for i in 0..potTargetColumns.Length - 1 do
-                let header = potTargetColumns.[i]
-                if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> header.name.StartsWith cName) then
-                    i
-                else
-                    ()
-        |]
+    promise {
 
-    [|
-        mainColumnIndex
-        for i = 0 to potTargetIndices.Length - 1 do
-            //Add 1 to the selected index because the properties after the main column start with index 0
-            if potTargetIndices.[i] - i = 0 then potTargetIndices.[i] + mainColumnIndex + 1
-            else ()
-    |]
+        let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
+
+        let headerRange = table.getHeaderRowRange()
+        let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+
+        return! context.sync().``then``(fun _ ->
+            let rebasedIndex = selectedRange.columnIndex - headerRange.columnIndex |> int
+            if rebasedIndex < 0 || rebasedIndex >= (int headerRange.columnCount) then
+                failwith "Cannot select building block outside of annotation table!"
+            let headers: string [] = [|for v in headerRange.values.[0] do v.Value :?> string|]
+            let selectedHeader = rebasedIndex, headers.[rebasedIndex]
+            let buildingBlockGroups = groupToBuildingBlocks headers
+            let selectedBuildingBlock =
+                buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
+            selectedBuildingBlock
+        )
+    }
 
 /// <summary>
 /// Delete the annotation block of the selected column in excel
@@ -1361,116 +1365,17 @@ let removeSelectedAnnotationBlock () =
 
         promise {
 
-            //Try to get the name of the currently active sheet
-            let! excelTableName = tryGetActiveAnnotationTableName context
+            let! excelTable = getActiveAnnotationTable context
 
-            let excelTableName =
-                if excelTableName.IsSome then excelTableName.Value
-                else failwith "No excel table name has been found!"
+            let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
 
-            //When a name is available get the annotation and arctable for easy access of indices and value adaption
-            //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
-            let! excelTable = tryGetAnnotationTableByName context excelTableName
+            // iterate DESCENDING to avoid index shift
+            for i, _ in Seq.sortByDescending fst selectedBuildingBlock do
+                let column = excelTable.columns.getItemAt(i)
+                log $"delete column {i}"
+                column.delete()
 
-            let selectedRange = context.workbook.getSelectedRange()
-
-            let tableStartIndex = excelTable.Value.getRange()
-
-            let mainColumNames =
-                // Get all cases of the union
-                CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
-
-            let columns = excelTable.Value.columns
-
-            let _ =
-                columns.load(propertyNames=U2.Case2 (ResizeArray[|"count"; "items"; "name";|])) |> ignore                
-                selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
-                tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
-
-            // sync with proxy objects after loading values from excel
-            do! context.sync().``then``( fun _ -> ())
-
-            let selectedIndex = selectedRange.columnIndex - tableStartIndex.columnIndex
-
-            //Determine the column type
-            //Check for both colums required because free text columns are neither of them
-            let isPropertyColumn =
-                columns.items.Item (int selectedIndex)
-                |> (fun column ->                        
-                    if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> column.name.StartsWith cName) then true
-                    else false)
-
-            let isMainColumn =
-                columns.items.Item (int selectedIndex)
-                |> (fun column ->                        
-                    if mainColumNames |> Array.exists (fun cName ->
-                        //Problem: Protocol columns contain in cases no empty spaces -> must be reomoved for checking
-                        let name = column.name.Replace(" ", "")
-                        name.StartsWith cName) then true
-                    else false)
-
-            if isMainColumn then
-                //When main column is the last column, skip looking for building block and delete it
-                if selectedIndex = (columns.count - 1.) then
-                    let targetColumn = columns.items.Item (int selectedIndex)
-                    targetColumn.delete()
-                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"The main column {targetColumn.name} has been deleted"]
-                else
-
-                    let targetIndices = getBuildingBlockIndices columns (int selectedIndex)
-
-                    //Get the names of the deleted columns
-                    let deletedColumns =
-                        targetIndices
-                        |> Array.map (fun i ->
-                            let targetColumn = columns.items.Item i
-                            targetColumn.delete()
-                            targetColumn.name
-                        )
-
-                    let mainColumn = columns.items.Item (int selectedIndex)
-                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {deletedColumns.[1..]}"]
-
-            else if isPropertyColumn then
-
-                //Get the index of the closes main column before the chosen property column, it is the start point of building block
-                let mainColumnIndex = 
-                    [|
-                        for i = int selectedIndex - 1 downto 0 do
-                            let column = columns.items.Item i
-                            let name = column.name.Replace(" ", "")
-                            if mainColumNames |> Array.exists (fun cName ->                                
-                                //Problem: Protocol columns contain in cases no empty spaces -> must be reomoved for checking
-                                name.StartsWith cName) then i else ()
-                    |]
-                    |> Array.tryHead
-
-                if mainColumnIndex.IsSome then
-
-                    let targetIndices = getBuildingBlockIndices columns mainColumnIndex.Value
-
-                    //Get the names of the deleted columns
-                    let deletedColumns =
-                        targetIndices
-                        |> Array.map (fun i ->
-                            let targetColumn = columns.items.Item i
-                            targetColumn.delete()
-                            targetColumn.name
-                        )
-
-                    let mainColumn = columns.items.Item mainColumnIndex.Value
-                    let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {deletedColumns.[1..]}"]
-                else
-                    return failwith "Something went wrong! A property column cannot be without a main column! Please report this as a bug to the developers."
-            else
-                //The selected column is a free text column that contains no associated columns and can be deleted directly
-                let targetColumn = columns.items.Item (int selectedIndex)
-                targetColumn.delete()
-                let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
-                return [InteropLogging.Msg.create InteropLogging.Warning $"The free tex column {targetColumn.name} has been deleted"]
+            return []
         }
     )
 
