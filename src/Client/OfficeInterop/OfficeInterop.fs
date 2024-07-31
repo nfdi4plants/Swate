@@ -1333,6 +1333,7 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
 /// <param name="selectedIndex"></param>
 let getBuildingBlockIndices (columns:TableColumnCollection) (mainColumnIndex: int) =
 
+    // Get all property columns and their indices after the main column because we do not know its length
     let potTargetColumns = columns.items |> Array.ofSeq |> (fun item -> item.[mainColumnIndex + 1..])
     let potTargetIndices =
         [|
@@ -1343,7 +1344,7 @@ let getBuildingBlockIndices (columns:TableColumnCollection) (mainColumnIndex: in
                 else
                     ()
         |]
-        |> Array.sortBy(fun index -> index)
+
     [|
         mainColumnIndex
         for i = 0 to potTargetIndices.Length - 1 do
@@ -1409,7 +1410,7 @@ let removeSelectedAnnotationBlock () =
                     else false)
 
             if isMainColumn then
-                //When main column is the last column, skipp looking for building block and delete it
+                //When main column is the last column, skip looking for building block and delete it
                 if selectedIndex = (columns.count - 1.) then
                     let targetColumn = columns.items.Item (int selectedIndex)
                     targetColumn.delete()
@@ -1418,8 +1419,9 @@ let removeSelectedAnnotationBlock () =
                 else
 
                     let targetIndices = getBuildingBlockIndices columns (int selectedIndex)
-                    
-                    let columNames =
+
+                    //Get the names of the deleted columns
+                    let deletedColumns =
                         targetIndices
                         |> Array.map (fun i ->
                             let targetColumn = columns.items.Item i
@@ -1429,7 +1431,7 @@ let removeSelectedAnnotationBlock () =
 
                     let mainColumn = columns.items.Item (int selectedIndex)
                     let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {columNames.[1..]}"]
+                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {deletedColumns.[1..]}"]
 
             else if isPropertyColumn then
 
@@ -1446,9 +1448,11 @@ let removeSelectedAnnotationBlock () =
                     |> Array.tryHead
 
                 if mainColumnIndex.IsSome then
+
                     let targetIndices = getBuildingBlockIndices columns mainColumnIndex.Value
-                    
-                    let columNames =
+
+                    //Get the names of the deleted columns
+                    let deletedColumns =
                         targetIndices
                         |> Array.map (fun i ->
                             let targetColumn = columns.items.Item i
@@ -1458,10 +1462,11 @@ let removeSelectedAnnotationBlock () =
 
                     let mainColumn = columns.items.Item mainColumnIndex.Value
                     let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {columNames.[1..]}"]
+                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation block associated with main column {mainColumn.name} has been deleted. The property block consisted of: {deletedColumns.[1..]}"]
                 else
                     return failwith "Something went wrong! A property column cannot be without a main column! Please report this as a bug to the developers."
             else
+                //The selected column is a free text column that contains no associated columns and can be deleted directly
                 let targetColumn = columns.items.Item (int selectedIndex)
                 targetColumn.delete()
                 let! _ = ExcelHelper.adoptTableFormats(excelTable.Value, context, true)
