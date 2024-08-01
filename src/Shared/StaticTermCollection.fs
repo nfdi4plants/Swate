@@ -27,3 +27,8 @@ let Unit = OntologyAnnotation("unit","UO","UO:0000000")
 /// https://github.com/nfdi4plants/Swate/issues/483#issuecomment-2228372546
 /// </summary>
 let ObjectType = OntologyAnnotation("Object Type", "NCIT", "NCIT:C42645")
+
+/// <summary>
+/// https://github.com/nfdi4plants/Swate/issues/483#issuecomment-2260176815
+/// </summary>/// <summary>
+let Explication = OntologyAnnotation("Explication", "DPBO", "DPBO:0000111")

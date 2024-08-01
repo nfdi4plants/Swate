@@ -41,7 +41,7 @@ let private CreateBodyCells(columnIndex, rowIndex, state: Set<int>, model, dispa
 let private CreateHeaderCells(columnIndex, state, setState, model, dispatch) =
     let header = DataMap.getHeader columnIndex
     [
-        Spreadsheet.Cells.Cell.Header(columnIndex, header, state, setState, model, dispatch, readonly = true)
+        Cell.Header(columnIndex, header, state, setState, model, dispatch, readonly = true)
         if header.IsTermColumn then
             let isExtended = state.Contains columnIndex
             if isExtended then
