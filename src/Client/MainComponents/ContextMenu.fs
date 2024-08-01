@@ -5,6 +5,7 @@ open Feliz.Bulma
 open Spreadsheet
 open ARCtrl
 open Model
+open Shared
 
 module private Shared =
 
@@ -59,6 +60,7 @@ module Table =
         Clear           : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
         TransformCell   : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
         UpdateAllCells  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        GetTermDetails  : OntologyAnnotation -> (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
         //EditColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
         RowIndex        : int
         ColumnIndex     : int
@@ -68,7 +70,11 @@ module Table =
         /// This element will remove the contextmenu when clicking anywhere else
         let isHeader = Shared.isHeader funcs.RowIndex
         let buttonList = [
-            //button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
+            if (isHeader && header.IsTermColumn) || Shared.isUnitOrTermCell contextCell then
+                let oa = if isHeader then header.ToTerm() else contextCell.Value.ToOA()
+                if oa.TermAccessionShort <> "" then
+                    Shared.button ("Details", "fa-solid fa-magnifying-glass", funcs.GetTermDetails oa rmv, [])
+                //Shared.button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
             if not isHeader then
                 Shared.button ("Fill Column", "fa-solid fa-pen", funcs.FillColumn rmv, [])
                 if Shared.isUnitOrTermCell contextCell then
@@ -106,8 +112,6 @@ module Table =
             ]
         ]
 
-    open Shared
-
     let onContextMenu (index: int*int, model: Model, dispatch) = fun (e: Browser.Types.MouseEvent) ->
         e.stopPropagation()
         e.preventDefault()
@@ -130,6 +134,8 @@ module Table =
             let columnIndex = fst index
             let column = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
             Modals.Controller.renderModal("UpdateColumn_Modal", Modals.UpdateColumn.Main(ci, column, dispatch))
+        let triggerTermModal oa _ =
+            Modals.Controller.renderModal("TermDetails_Modal", Modals.TermModal.Main(oa, dispatch))
         let funcs = {
             DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
             DeleteColumn    = fun rmv e -> rmv e; Spreadsheet.DeleteColumn (ci) |> Messages.SpreadsheetMsg |> dispatch
@@ -161,6 +167,7 @@ module Table =
                     rmv e; Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
                         
             UpdateAllCells = fun rmv e -> rmv e; triggerUpdateColumnModal e
+            GetTermDetails = fun oa rmv e -> rmv e; triggerTermModal oa e
             //EditColumn      = fun rmv e -> rmv e; editColumnEvent e
             RowIndex        = snd index
             ColumnIndex     = fst index

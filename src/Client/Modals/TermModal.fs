@@ -3,33 +3,49 @@ module Modals.TermModal
 open Shared.TermTypes
 open Feliz
 open Feliz.Bulma
+open ARCtrl
 
-let l = 200
+let private l = 200
 
 let private isTooLong (str:string) = str.Length > l
 
-type private UI = {
-    DescriptionTooLong: bool
-    IsExpanded: bool
-    DescriptionShort: string
-    DescriptionLong: string
-} with
-    static member init(description: string) =
-        let isTooLong = isTooLong description
-        let descriptionShort =
-            if isTooLong then description.Substring(0,l).Trim() + ".. " else description
-        {
-            IsExpanded = false
-            DescriptionTooLong = isTooLong
-            DescriptionShort = descriptionShort
-            DescriptionLong = description
-        }
+type private State =
+    | Loading
+    | Found of Term
+    | NotFound
+
+//type private UI = {
+//    DescriptionTooLong: bool
+//    IsExpanded: bool
+//    DescriptionShort: string
+//    DescriptionLong: string
+//} with
+//    static member init(description: string) =
+//        let isTooLong = isTooLong description
+//        let descriptionShort =
+//            if isTooLong then description.Substring(0,l).Trim() + ".. " else description
+//        {
+//            IsExpanded = false
+//            DescriptionTooLong = isTooLong
+//            DescriptionShort = descriptionShort
+//            DescriptionLong = description
+//        }
 
 
 [<ReactComponent>]
-let Main (term: Term, dispatch) (rmv: _ -> unit) =
+let Main (oa: OntologyAnnotation, dispatch) (rmv: _ -> unit) =
 
-    let state, setState = React.useState(UI.init(term.Description))
+    let state, setState = React.useState(State.Loading)
+
+    React.useEffectOnce (fun _ ->
+        async {
+            let! term = Api.ontology.getTermById(oa.TermAccessionShort)
+            match term with
+            | Some t -> Found t |> setState
+            | None -> NotFound |> setState
+        }
+        |> Async.StartImmediate
+    )
 
     Bulma.modal [
         Bulma.modal.isActive
@@ -45,8 +61,7 @@ let Main (term: Term, dispatch) (rmv: _ -> unit) =
                         prop.className "p-2"
                         prop.children [
                             Bulma.modalCardTitle [
-                                Bulma.size.isSize6
-                                prop.text $"{term.Name} ({term.Accession})" 
+                                prop.textf "%s - %s" oa.NameText oa.TermAccessionShort 
                             ]
                             Bulma.delete [
                                 Bulma.delete.isSmall
@@ -58,31 +73,22 @@ let Main (term: Term, dispatch) (rmv: _ -> unit) =
                         prop.className "p-2 has-text-justified"
                         prop.children [
                             Bulma.content [
-                                Html.p [
-                                    Html.span ( if state.IsExpanded then state.DescriptionLong else state.DescriptionShort)
-                                    if state.DescriptionTooLong && not state.IsExpanded then
-                                        Html.a [
-                                            prop.onClick(fun _ -> setState {state with IsExpanded = true})
-                                            prop.text "(more)"
-                                        ]
-                                ]
-                                //if term.IsObsolete then
-                                Html.div [
-                                    prop.style [style.display.flex; style.justifyContent.spaceBetween]
-                                    prop.children [
-                                        Html.span [
-                                            Html.a [
-                                                prop.href (Shared.URLs.OntobeeOntologyPrefix + term.FK_Ontology)
-                                                prop.text "Source"
-                                            ]
-                                        ]
-                                        if term.IsObsolete then
-                                            Html.span [
-                                                Bulma.color.hasTextDanger
-                                                prop.text "obsolete"
-                                            ]
+                                match state with
+                                | Loading -> Html.p "loading .."
+                                | NotFound ->
+                                    Html.p [
+                                        prop.dangerouslySetInnerHTML $"Unable to find term with id <b>{oa.TermAccessionShort}</b> in database."
                                     ]
-                                ]
+                                | Found term ->
+                                    Html.h6 "Description"
+                                    Html.p term.Description
+                                    Html.h6 "Source Ontology"
+                                    Html.p term.FK_Ontology
+                                    if term.IsObsolete then
+                                        Html.p [
+                                            color.hasTextDanger
+                                            prop.text "Obsolete"
+                                        ] 
                             ]
                         ]
                     ]

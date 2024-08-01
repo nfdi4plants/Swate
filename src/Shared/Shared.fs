@@ -135,6 +135,8 @@ type IOntologyAPIv3 = {
     /// ontologies currently unused
     searchTermsByParent:
         {| limit: int; query: string; parentTAN: string |} -> Async<Term []>
+    getTermById:
+        string -> Async<Term option>
 }
 
 type ITemplateAPIv1 = {
