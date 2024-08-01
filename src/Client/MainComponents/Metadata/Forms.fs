@@ -879,8 +879,8 @@ type FormComponents =
                             state.Roles <- ResizeArray(oas)
                             state |> setter
                         ),
-                        showTextLabels = false
-                        //parent=Shared.TermCollection.PersonRoleWithinExperiment
+                        showTextLabels = false,
+                        parent=Shared.TermCollection.PersonRoleWithinExperiment
                     )
                     if deletebutton.IsSome then
                         Helper.deleteButton deletebutton.Value
