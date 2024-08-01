@@ -37,11 +37,14 @@ let View (model : Model) (dispatch : Msg -> unit) =
     let v = {colorstate with SetTheme = setColorstate}
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
         Html.div [
-            match model.PersistentStorageState.Host with
-            | Some Swatehost.Excel ->
-                SidebarView.SidebarView.Main(model, dispatch)
-            | _ ->
-                split_container model dispatch
+            prop.className "flex grow"
+            prop.children [
+                match model.PersistentStorageState.Host with
+                | Some Swatehost.Excel ->
+                    SidebarView.SidebarView.Main(model, dispatch)
+                | _ ->
+                    split_container model dispatch
+            ]
         ]
     )
             
