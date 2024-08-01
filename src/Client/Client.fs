@@ -37,7 +37,7 @@ let View (model : Model) (dispatch : Msg -> unit) =
     let v = {colorstate with SetTheme = setColorstate}
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
         Html.div [
-            prop.className "flex grow"
+            prop.className "flex grow w-full h-full"
             prop.children [
                 match model.PersistentStorageState.Host with
                 | Some Swatehost.Excel ->
