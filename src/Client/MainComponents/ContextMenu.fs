@@ -61,7 +61,7 @@ module Table =
         TransformCell   : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
         UpdateAllCells  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
         GetTermDetails  : OntologyAnnotation -> (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
-        //EditColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        EditColumn      : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
         RowIndex        : int
         ColumnIndex     : int
     }
@@ -70,11 +70,11 @@ module Table =
         /// This element will remove the contextmenu when clicking anywhere else
         let isHeader = Shared.isHeader funcs.RowIndex
         let buttonList = [
+            Shared.button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
             if (isHeader && header.IsTermColumn) || Shared.isUnitOrTermCell contextCell then
                 let oa = if isHeader then header.ToTerm() else contextCell.Value.ToOA()
                 if oa.TermAccessionShort <> "" then
                     Shared.button ("Details", "fa-solid fa-magnifying-glass", funcs.GetTermDetails oa rmv, [])
-                //Shared.button ("Edit Column", "fa-solid fa-table-columns", funcs.EditColumn rmv, [])
             if not isHeader then
                 Shared.button ("Fill Column", "fa-solid fa-pen", funcs.FillColumn rmv, [])
                 if Shared.isUnitOrTermCell contextCell then
@@ -128,7 +128,7 @@ module Table =
         let cell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(ci, ri)
         let header = model.SpreadsheetModel.ActiveTable.Headers.[ci]
         let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
-        //let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
+        let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
         let triggerMoveColumnModal _ = Modals.Controller.renderModal("MoveColumn_Modal", Modals.MoveColumn.Main(ci, model, dispatch))
         let triggerUpdateColumnModal _ = 
             let columnIndex = fst index
@@ -168,7 +168,7 @@ module Table =
                         
             UpdateAllCells = fun rmv e -> rmv e; triggerUpdateColumnModal e
             GetTermDetails = fun oa rmv e -> rmv e; triggerTermModal oa e
-            //EditColumn      = fun rmv e -> rmv e; editColumnEvent e
+            EditColumn      = fun rmv e -> rmv e; editColumnEvent e
             RowIndex        = snd index
             ColumnIndex     = fst index
         }
