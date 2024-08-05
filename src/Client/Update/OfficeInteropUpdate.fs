@@ -109,11 +109,11 @@ module OfficeInterop =
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
 
-            | UpdateUnitForCells (unitTerm) ->
+            | UpdateUnitForCells ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.updateUnitForCells
-                        unitTerm
+                        OfficeInterop.Core.updateUnitForColumn
+                        ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
