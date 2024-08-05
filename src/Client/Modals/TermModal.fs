@@ -5,32 +5,10 @@ open Feliz
 open Feliz.Bulma
 open ARCtrl
 
-let private l = 200
-
-let private isTooLong (str:string) = str.Length > l
-
 type private State =
     | Loading
     | Found of Term
     | NotFound
-
-//type private UI = {
-//    DescriptionTooLong: bool
-//    IsExpanded: bool
-//    DescriptionShort: string
-//    DescriptionLong: string
-//} with
-//    static member init(description: string) =
-//        let isTooLong = isTooLong description
-//        let descriptionShort =
-//            if isTooLong then description.Substring(0,l).Trim() + ".. " else description
-//        {
-//            IsExpanded = false
-//            DescriptionTooLong = isTooLong
-//            DescriptionShort = descriptionShort
-//            DescriptionLong = description
-//        }
-
 
 [<ReactComponent>]
 let Main (oa: OntologyAnnotation, dispatch) (rmv: _ -> unit) =
@@ -55,22 +33,20 @@ let Main (oa: OntologyAnnotation, dispatch) (rmv: _ -> unit) =
                 prop.style [style.backgroundColor.transparent]
             ]
             Bulma.modalCard [
-                prop.style [style.maxWidth 300; style.border (1,borderStyle.solid,NFDIColors.black); style.borderRadius 0]
+                prop.className "shadow"
                 prop.children [
                     Bulma.modalCardHead [
-                        prop.className "p-2"
-                        prop.children [
-                            Bulma.modalCardTitle [
-                                prop.textf "%s - %s" oa.NameText oa.TermAccessionShort 
-                            ]
-                            Bulma.delete [
-                                Bulma.delete.isSmall
-                                prop.onClick rmv
-                            ]
+                        Bulma.modalCardTitle [
+                            Bulma.title.h4 oa.NameText
+                            Bulma.subtitle.h6 oa.TermAccessionShort
+                        ]
+                        Bulma.delete [
+                            Bulma.delete.isSmall
+                            prop.onClick rmv
                         ]
                     ]
                     Bulma.modalCardBody [
-                        prop.className "p-2 has-text-justified"
+                        prop.className "has-text-justified"
                         prop.children [
                             Bulma.content [
                                 match state with
