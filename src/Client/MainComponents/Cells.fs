@@ -170,10 +170,13 @@ type Cell =
             prop.readOnly readonly
             cellStyle []
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
-            if columnType.IsRefColumn then
-                prop.className "bg-gray-300 dark:bg-gray-700"
-            else
-                prop.className "bg-white dark:bg-black-800"
+            prop.className [
+                "w-[300px]" // horizontal resize property sets width, but cannot override style.width. Therefore we set width as class, which makes it overridable by resize property.
+                if columnType.IsRefColumn then
+                    "bg-gray-300 dark:bg-gray-700"
+                else
+                    "bg-white dark:bg-black-800"
+            ]
             prop.children [
                 Html.div [
                     cellInnerContainerStyle [style.custom("backgroundColor","inherit")]
@@ -191,7 +194,7 @@ type Cell =
                                 match columnType with
                                 | TSR | TAN -> $"{columnType} ({cellValue})" 
                                 | _ -> cellValue
-                            basicValueDisplayCell cellValue
+                            basicValueDisplayCell cellValue true
                         if columnType = Main && not header.IsSingleColumn then 
                             extendHeaderButton(state_extend, columnIndex, setState_extend)
                     ]
@@ -335,7 +338,7 @@ type Cell =
                             if columnType = Main && oasetter.IsSome then
                                 CellStyles.compositeCellDisplay oasetter.Value.oa displayValue
                             else
-                                basicValueDisplayCell displayValue
+                                basicValueDisplayCell displayValue false
                     ]
                 ]
             ]
