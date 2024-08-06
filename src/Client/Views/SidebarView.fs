@@ -119,7 +119,7 @@ type SidebarView =
             prop.children [
                 Html.div [
                     Html.text "Swate Release Version "
-                    Html.a [prop.href "https://github.com/nfdi4plants/Swate/releases"; prop.target.blank; prop.text model.PersistentStorageState.AppVersion]
+                    Html.a [prop.href "https://github.com/nfdi4plants/Swate/releases"; prop.target.blank; prop.text model.PersistentStorageState.AppVersion; color.hasTextLink]
                     Html.text " Host "
                     Html.a [prop.style [style.cursor.defaultCursor]; prop.text (sprintf "%O" model.PersistentStorageState.Host)]
                 ]
