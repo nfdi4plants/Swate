@@ -1,211 +1,224 @@
 module Modals.EditColumn
 
-//open Feliz
-//open Feliz.Bulma
-//open ExcelColors
-//open Model
-//open Messages
-//open Shared
-//open OfficeInteropTypes
-//open TermTypes
-//open Spreadsheet
+open Feliz
+open Feliz.Bulma
+open ExcelColors
+open Messages
+open Shared
+open TermTypes
+open Spreadsheet
+open Model
 
-//type private ColumnType =
-//| Freetext
-//| Unit
-//| Term
+open ARCtrl
 
-//type private EditState = {
-//    NextType: ColumnType
-//    BuildingBlockType: BuildingBlockType option
-//} with
-//    static member init(columnHeader: HeaderCell) =
-//        let b_type, c_type =
-//            match columnHeader with
-//            | unit when columnHeader.HasUnit -> Some columnHeader.BuildingBlockType, Unit
-//            | term when columnHeader.Term.IsSome -> Some columnHeader.BuildingBlockType, Term
-//            | ft -> Some columnHeader.BuildingBlockType, Freetext
-//        {
-//            NextType = c_type
-//            BuildingBlockType = b_type
-//        }
+type private State =
+    {
+        NextHeaderType: BuildingBlock.HeaderCellType option
+        NextIOType: IOType option
+    } with
+        static member init() = {
+            NextHeaderType = None
+            NextIOType = None
+        }
 
-//let private updateField state setState =
-//    Bulma.field.div [
-//        Bulma.label [prop.text "Column type"]
-//        Bulma.control.div [
-//            prop.style [style.display.inlineFlex; style.justifyContent.spaceEvenly;]
-//            prop.children [
-//                Html.label [
-//                    prop.className "radio pl-1 pr-1 nonSelectText"
-//                    prop.children [
-//                        Html.input [
-//                            prop.isChecked (state.NextType = Freetext)
-//                            prop.type' "radio"; prop.name "c_type"
-//                            prop.onChange(fun (e:Browser.Types.Event) ->
-//                                setState {state with NextType = Freetext}
-//                            )
-//                        ]
-//                        Html.text " Freetext"
-//                    ]
-//                ]
-//                Html.label [
-//                    prop.className "radio pl-1 pr-1 nonSelectText"
-//                    prop.children [
-//                        Html.input [
-//                            prop.isChecked (state.NextType = Term)
-//                            prop.type' "radio"; prop.name "c_type"
-//                            prop.onChange(fun (e:Browser.Types.Event) ->
-//                                setState {state with NextType = Term}
-//                            )
-//                        ]
-//                        Html.text " Term"
-//                    ]
-//                ]
-//                Html.label [
-//                    prop.className "radio pl-1 pr-1 nonSelectText"
-//                    prop.children [
-//                        Html.input [
-//                            prop.isChecked (state.NextType = Unit)
-//                            prop.type' "radio"; prop.name "c_type"
-//                            prop.onChange(fun (e:Browser.Types.Event) ->
-//                                setState {state with NextType = Unit}
-//                            )
-//                        ]
-//                        Html.span " Unit"
-//                    ]
-//                ]
-//            ]
-//        ]
-//    ]
+module private EditColumnComponents =
 
-//open Fable.Core.JsInterop
+    let BackButton cancel =
+        Bulma.button.button [
+            prop.onClick cancel
+            color.isWarning
+            prop.text "Back"
+        ]
 
-//let private buildingBlockField (state: EditState) (setState: EditState -> unit) =
-//    let options = BuildingBlockType.TermColumns
-//    Bulma.field.div [
-//        Bulma.label [prop.text "Select building block type"]
-//        Bulma.select [
-//            prop.value (Option.defaultValue BuildingBlockType.Parameter state.BuildingBlockType |> fun x -> x.toString)
-//            prop.onChange(fun (e: Browser.Types.Event) ->
-//                let b_type = string e.target?value |> BuildingBlockType.ofString
-//                let nextState = {state with BuildingBlockType = Some b_type}
-//                setState nextState
-//            )
-//            prop.children [
-//                for termColumn in options do
-//                    yield Html.option [
-//                        prop.value termColumn.toString
-//                        prop.text termColumn.toString
-//                    ]
-//            ]
-//        ]
-//    ]
+    let SubmitButton(submit) =
+        Bulma.button.button [
+            color.isSuccess
+            prop.text "Submit"
+            prop.onClick submit
+        ]
 
-//let private previewField (column : (int*SwateCell) []) state =
-//    Bulma.field.div [
-//        Bulma.label [prop.text "Preview"]
-//        Bulma.tableContainer [
-//            Bulma.table [
-//                prop.style [style.height (length.percent 50)]
-//                Bulma.table.isStriped
-//                prop.children [
-//                    Html.thead [
-//                        Html.tr [
-//                            let header = (snd column.[0])
-//                            let headerUpdated =
-//                                match state.NextType, state.BuildingBlockType with
-//                                | Unit, Some bb -> header.toUnitHeader(bb)
-//                                | Unit, None -> header.toUnitHeader()
-//                                | Term, Some bb -> header.toTermHeader(bb)
-//                                | Term, None -> header.toTermHeader()
-//                                | Freetext, Some bb -> header.toFreetextHeader(bb)
-//                                | Freetext, None -> header.toFreetextHeader()
-//                            match state.NextType with
-//                            | Freetext -> 
-//                                Html.th $"{headerUpdated.DisplayValue}"
-//                            | Term ->
-//                                let uid = headerUpdated.Term.Value.TermAccession
-//                                Html.th $"{headerUpdated.DisplayValue}"
-//                                Html.th $"{ColumnCoreNames.TermAccessionNumber.toString} ({uid})"
-//                            | Unit ->
-//                                let uid = headerUpdated.Term.Value.TermAccession
-//                                Html.th $"{headerUpdated.DisplayValue}"
-//                                Html.th $"{ColumnCoreNames.Unit.toString}"
-//                                Html.th $"{ColumnCoreNames.TermAccessionNumber.toString} ({uid})"
-//                        ]
-//                    ]
-//                    Html.tbody [
-//                        prop.children [
-//                            for _,cell in Array.skip 1 column |> Array.truncate 9 do
-//                                let cellUpdated =
-//                                    match state.NextType with
-//                                    | Unit -> cell.toUnitCell()
-//                                    | Freetext -> cell.toFreetextCell()
-//                                    | Term -> cell.toTermCell()
-//                                Html.tr [
-//                                    match state.NextType with
-//                                    | Unit ->
-//                                        Html.td $"{cellUpdated.Unit.Value}"
-//                                        Html.td $"{cellUpdated.Unit.Unit.Name}"
-//                                        Html.td $"{cellUpdated.Unit.Unit.TermAccession}"
-//                                    | Freetext -> 
-//                                        Html.td $"{cellUpdated.Freetext.Value}"
-//                                    | Term -> 
-//                                        Html.td $"{cellUpdated.Term.Term.Name}"
-//                                        Html.td $"{cellUpdated.Term.Term.TermAccession}"
-//                                ]
-//                        ]
-//                    ]
-//                ]
-//            ]
-//        ]
-//    ]
+    let SelectHeaderTypeOption(headerType: BuildingBlock.HeaderCellType) =
+        let txt = headerType.ToString()
+        Html.option [
+            prop.value txt
+            prop.text txt
+        ]
 
-//let private footer columnIndex rmv (lastState: EditState) (state: EditState) dispatch =
-//    Bulma.modalCardFoot [
-//        Bulma.button.a [
-//            prop.onClick rmv
-//            Bulma.color.isInfo
-//            prop.text "Back"
-//        ]
-//        Bulma.button.a [
-//            prop.disabled <| (state = lastState)
-//            prop.onClick (fun e ->
-//                let nt = match state.NextType with | Unit -> SwateCell.emptyUnit | Term -> SwateCell.emptyTerm | Freetext -> SwateCell.emptyFreetext
-//                Spreadsheet.EditColumn (columnIndex, nt, state.BuildingBlockType) |> SpreadsheetMsg |> dispatch
-//                rmv e;
-//            )
-//            Bulma.color.isSuccess
-//            prop.text "Update"
-//        ]
-//    ]
+    let SelectHeaderType(state, setState) =
+        Bulma.select [
+            prop.onChange (fun (e: string) -> {state with NextHeaderType = Some (BuildingBlock.HeaderCellType.fromString e)} |> setState )
+            prop.children [
+                // -- term columns --
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Characteristic
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Component
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Factor
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Parameter
+                // -- io columns --
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Input
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Output
+                // -- single columns --
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Date
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Performer
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolDescription
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolREF
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolType
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolUri
+                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolVersion
+            ]
+        ]
 
-//[<ReactComponent>]
-//let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
-//    let column : (int*SwateCell) [] = model.SpreadsheetModel.getColumn(columnIndex)
-//    let header = column |> Array.sortBy fst |> Array.head |> snd |> fun header -> header.Header
-//    let last = EditState.init(header)
-//    let state, setState = React.useState(EditState.init(header))
-//    Bulma.modal [
-//        Bulma.modal.isActive
-//        prop.children [
-//            Bulma.modalBackground [ prop.onClick rmv ]
-//            Bulma.modalCard [
-//                prop.style [style.maxHeight(length.percent 70)]
-//                prop.children [
-//                    Bulma.modalCardHead [
-//                        Bulma.modalCardTitle "Update Column"
-//                        Bulma.delete [ prop.onClick rmv ]
-//                    ]
-//                    Bulma.modalCardBody [
-//                        updateField state setState
-//                        if state.NextType = Unit || state.NextType = Term then
-//                            buildingBlockField state setState
-//                        previewField column state
-//                    ]
-//                    footer columnIndex rmv last state dispatch
-//                ]
-//            ]
-//        ]
-//    ]
+    let SelectIOTypeOption(ioType: IOType) =
+        let txt = ioType.ToString()
+        Html.option [
+            prop.value txt
+            prop.text txt
+        ]
+
+    let SelectIOType(state, setState) =
+        Bulma.select [
+            prop.onChange (fun (e: string) -> {state with NextIOType = Some (IOType.ofString e)} |> setState )
+            prop.children [
+                SelectIOTypeOption IOType.Source
+                SelectIOTypeOption IOType.Sample
+                SelectIOTypeOption IOType.Material
+                SelectIOTypeOption IOType.Data
+            ]
+        ]
+
+    let Preview(column: CompositeColumn) =
+        let parsedStrList = ARCtrl.Spreadsheet.CompositeColumn.toStringCellColumns column |> List.transpose
+        let headers, body =
+            if column.Cells.Length >= 2 then
+                parsedStrList.[0], parsedStrList.[1..]
+            else
+                parsedStrList.[0], []
+        Bulma.tableContainer [
+            prop.style [style.overflowY.auto; style.flexGrow 1]
+            prop.children [
+                Bulma.table [
+                    table.isFullWidth
+                    prop.children [
+                        Html.thead [
+                            Html.tr [
+                                for header in headers do
+                                    Html.th header 
+                            ]
+                        ]
+                        Html.tbody [
+                            for row in body do
+                                Html.tr [
+                                    for cell in row do
+                                        Html.td cell
+                                ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+
+
+
+open EditColumnComponents
+
+[<ReactComponent>]
+let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
+    let column0 = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
+    let state, setState = React.useState(State.init)
+    let cellsToTermCells(column:CompositeColumn) =
+        [|for c in column.Cells do if c.isUnitized || c.isTerm then c else c.ToTermCell()|]
+    let cellsToFreeText(column) =
+        [|for c in column.Cells do if c.isFreeText then c else c.ToFreeTextCell()|]
+    let cellsToDataOrFreeText(column) =
+        [|for c in column.Cells do if c.isFreeText || c.isData then c else c.ToDataCell()|]
+    let updateColumn (column: CompositeColumn) =
+        let header = column0.Header
+        match state.NextHeaderType, state.NextIOType with
+        | None, _ -> column
+        // -- term columns --
+        | Some BuildingBlock.HeaderCellType.Characteristic, _  ->
+            CompositeColumn.create(CompositeHeader.Characteristic (header.ToTerm()), cellsToTermCells(column))
+        | Some BuildingBlock.HeaderCellType.Parameter, _ ->
+            CompositeColumn.create(CompositeHeader.Parameter (header.ToTerm()), cellsToTermCells(column))
+        | Some BuildingBlock.HeaderCellType.Component, _ ->
+            CompositeColumn.create(CompositeHeader.Component (header.ToTerm()), cellsToTermCells(column))
+        | Some BuildingBlock.HeaderCellType.Factor, _ ->
+            CompositeColumn.create(CompositeHeader.Factor (header.ToTerm()), cellsToTermCells(column))
+        // -- input columns --
+        | Some BuildingBlock.HeaderCellType.Input, Some IOType.Data ->
+            CompositeColumn.create(CompositeHeader.Input IOType.Data, cellsToDataOrFreeText(column))
+        | Some BuildingBlock.HeaderCellType.Input, Some io ->
+            CompositeColumn.create(CompositeHeader.Input io, cellsToFreeText(column))
+        | Some BuildingBlock.HeaderCellType.Input, None ->
+            CompositeColumn.create(CompositeHeader.Input IOType.Sample, cellsToFreeText(column))
+        // -- output columns --
+        | Some BuildingBlock.HeaderCellType.Output, Some IOType.Data ->
+            CompositeColumn.create(CompositeHeader.Output IOType.Data, cellsToDataOrFreeText(column))
+        | Some BuildingBlock.HeaderCellType.Output, Some io ->
+            CompositeColumn.create(CompositeHeader.Output io, cellsToFreeText(column))
+        | Some BuildingBlock.HeaderCellType.Output, None ->
+            CompositeColumn.create(CompositeHeader.Output IOType.Sample, cellsToFreeText(column))
+        // -- single columns --
+        | Some BuildingBlock.HeaderCellType.ProtocolREF, _ ->
+            CompositeColumn.create(CompositeHeader.ProtocolREF, cellsToFreeText(column))
+        | Some BuildingBlock.HeaderCellType.Date, _ ->
+            CompositeColumn.create(CompositeHeader.Date, cellsToFreeText(column))
+        | Some BuildingBlock.HeaderCellType.Performer, _ ->
+            CompositeColumn.create(CompositeHeader.Performer, cellsToFreeText(column))
+        | Some BuildingBlock.HeaderCellType.ProtocolDescription, _ ->
+            CompositeColumn.create(CompositeHeader.ProtocolDescription, cellsToFreeText(column))
+        | Some BuildingBlock.HeaderCellType.ProtocolType, _ ->
+            CompositeColumn.create(CompositeHeader.ProtocolType, cellsToTermCells(column))
+        | Some BuildingBlock.HeaderCellType.ProtocolUri, _ ->
+            CompositeColumn.create(CompositeHeader.ProtocolUri, cellsToFreeText(column))
+        | Some BuildingBlock.HeaderCellType.ProtocolVersion, _ ->
+            CompositeColumn.create(CompositeHeader.ProtocolVersion, cellsToFreeText(column))
+    let submit (e) =
+        let nxtCol = updateColumn column0
+        Spreadsheet.SetColumn (columnIndex, nxtCol) |> SpreadsheetMsg |> dispatch
+        rmv(e)
+    let previewColumn =
+        let cells = Array.takeSafe 10 column0.Cells
+        updateColumn {column0 with Cells = cells}
+
+    Bulma.modal [
+        Bulma.modal.isActive
+        prop.children [
+            Bulma.modalBackground [ prop.onClick rmv ]
+            Bulma.modalCard [
+                prop.style [style.maxHeight(length.percent 70)]
+                prop.children [
+                    Bulma.modalCardHead [
+                        Bulma.modalCardTitle "Update Column"
+                        Bulma.delete [ prop.onClick rmv ]
+                    ]
+                    Bulma.modalCardBody [
+                        Bulma.field.div [
+                            Bulma.buttons [
+                                prop.children [
+                                    SelectHeaderType(state, setState)
+                                    match state.NextHeaderType with
+                                    | Some BuildingBlock.HeaderCellType.Output | Some BuildingBlock.HeaderCellType.Input ->
+                                        SelectIOType(state, setState)
+                                    | _ -> Html.none
+                                ]
+                            ]
+                        ]
+                        Bulma.field.div [
+                            prop.style [style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex]
+                            prop.children [
+                                Preview(previewColumn)
+                            ]
+                        ]
+                    ]
+                    Bulma.modalCardFoot [
+                        prop.className "flex grow justify-between"
+                        prop.children [
+                            BackButton rmv
+                            SubmitButton submit
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]

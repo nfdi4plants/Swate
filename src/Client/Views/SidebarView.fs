@@ -43,7 +43,6 @@ let private tabRow (model:Model) (tabs: seq<ReactElement>) =
     Bulma.tabs [
         Bulma.tabs.isCentered; Bulma.tabs.isFullWidth; Bulma.tabs.isBoxed
         prop.style [
-            //style.custom ("overflow","visible
             style.paddingTop(length.rem 1); style.borderBottom (2, borderStyle.solid, NFDIColors.Mint.Base)
         ]
         tabs
@@ -103,24 +102,6 @@ module private ResizeObserver =
         )
 
 
-let private viewContainer (model: Model) (dispatch: Msg -> unit) (state: SidebarStyle) (setState: SidebarStyle -> unit) (children: ReactElement list) =
-
-    Html.div [
-        prop.id Sidebar_Id
-        prop.onLoad(fun e ->
-            let ele = Browser.Dom.document.getElementById(Sidebar_Id)
-            ResizeObserver.observer(state, setState).observe(ele)
-        )
-        prop.style [
-            style.display.flex
-            style.flexGrow 1
-            style.flexDirection.column
-            style.position.relative
-            style.maxWidth (length.perc 100)
-            style.overflowY.auto
-        ]
-        prop.children children
-    ]
 
 type SidebarView =
 
@@ -187,33 +168,40 @@ type SidebarView =
     [<ReactComponent>]
     static member Main (model: Model, dispatch: Msg -> unit) =
         let state, setState = React.useState(SidebarStyle.init)
-        viewContainer model dispatch state setState [
-            SidebarComponents.Navbar.NavbarComponent model dispatch state.Size
+        Html.div [
+            prop.className "grow overflow-auto h-full"
+            prop.id Sidebar_Id
+            prop.onLoad(fun e ->
+                let ele = Browser.Dom.document.getElementById(Sidebar_Id)
+                ResizeObserver.observer(state, setState).observe(ele)
+            )
+            prop.children [
 
-            Bulma.container [
-                Bulma.container.isFluid
-                prop.className "pl-4 pr-4"
-                prop.children [
-                    tabs model dispatch state.Size
+                SidebarComponents.Navbar.NavbarComponent model dispatch state.Size
+                Html.div [
+                    prop.className "pl-4 pr-4 h-full"
+                    prop.children [
+                        tabs model dispatch state.Size
 
-                    //str <| state.Size.ToString()
+                        //str <| state.Size.ToString()
 
-                    //Button.button [
-                    //    Button.OnClick (fun _ ->
-                    //        //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
-                    //        //()
-                    //        //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
-                    //        ()
-                    //    )
-                    //] [ str "Test button" ]
+                        //Button.button [
+                        //    Button.OnClick (fun _ ->
+                        //        //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
+                        //        //()
+                        //        //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
+                        //        ()
+                        //    )
+                        //] [ str "Test button" ]
 
-                    match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
-                    | Some Swatehost.Excel, true ->
-                        SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
-                    | _ -> ()
+                        match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
+                        | Some Swatehost.Excel, true ->
+                            SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
+                        | _ -> ()
 
-                    SidebarView.content model dispatch
+                        SidebarView.content model dispatch
+                    ]
                 ]
+                SidebarView.footer (model, dispatch)
             ]
-            SidebarView.footer (model, dispatch)
         ]

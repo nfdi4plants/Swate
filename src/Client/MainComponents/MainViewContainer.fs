@@ -1,4 +1,4 @@
-﻿module MainComponents.MainViewContainer
+module MainComponents.MainViewContainer
 
 
 open Feliz
