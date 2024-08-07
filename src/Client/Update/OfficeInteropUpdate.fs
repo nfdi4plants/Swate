@@ -112,7 +112,7 @@ module OfficeInterop =
             | UpdateUnitForCells ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.updateUnitForColumn
+                        OfficeInterop.Core.convertBuildingBlock
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)

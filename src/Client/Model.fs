@@ -226,6 +226,7 @@ module BuildingBlock =
     | Term
     | Unitized
     | Text
+    | Data
 
     [<RequireQualifiedAccess>]
     type DropdownPage =

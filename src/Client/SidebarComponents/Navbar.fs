@@ -36,17 +36,6 @@ let private shortCutIconList model dispatch =
                 SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
             )
         )
-        QuickAccessButton.create(
-            "Update Term Building Block to Unit",
-            [
-                Html.i [prop.className "fa-solid fa-arrow-right-arrow-left pr-1"]
-                Html.i [prop.className "fa-solid fa-table-columns"]
-            ],
-            (fun e ->
-                e.preventDefault()
-                SpreadsheetInterface.UpdateUnitForCells |> InterfaceMsg |> dispatch
-            )
-        )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
             QuickAccessButton.create(

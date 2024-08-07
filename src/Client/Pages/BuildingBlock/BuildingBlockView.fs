@@ -97,12 +97,10 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
             mainFunctionContainer [
                 SearchComponent.Main model dispatch
             ]
+            // Input forms, etc related to add building block.
+            Bulma.label "Convert existing cell types."
+            mainFunctionContainer [
+                CellConvertComponent.Main ()
+            ]
         ]
-
-        //match model.PersistentStorageState.Host with
-        //| Some Swatehost.Excel ->
-        //    Bulma.label "Add/Update unit reference to existing building block."
-        //    // Input forms, etc related to add unit to existing building block.
-        //    addUnitToExistingBlockElements model dispatch
-        //| _ -> Html.none
     ]
