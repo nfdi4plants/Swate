@@ -1409,6 +1409,21 @@ let getArcMainColumn () =
         }
     )
 
+let convertToFreeTextColumn (column: CompositeColumn) =
+    let freeTextCells = column.Cells |> Array.map (fun c -> c.ToFreeTextCell())
+    freeTextCells
+    |> Array.iteri (fun i _ -> column.Cells.[i] <- freeTextCells.[i])
+
+let convertToDataColumn (column: CompositeColumn) =
+    let dataCells = column.Cells |> Array.map (fun c -> c.ToDataCell())
+    dataCells
+    |> Array.iteri (fun i _ -> column.Cells.[i] <- dataCells.[i])
+
+let convertToUnitColumn (column: CompositeColumn) =
+    let unitCells = column.Cells |> Array.map (fun c -> c.ToUnitizedCell())
+    unitCells
+    |> Array.iteri (fun i _ -> column.Cells.[i] <- unitCells.[i])
+
 let convertToTermColumn (column: CompositeColumn) =
     let termCells = column.Cells |> Array.map (fun c -> c.ToTermCell())
     termCells
@@ -1465,13 +1480,17 @@ let convertBuildingBlock () =
             let excelMainColumnIndex = fst selectedBuildingBlock.[0]
             let! arcMainColumn = getArcMainColumn()
 
+            let msgText = 
+                match arcMainColumn with
+                | amc when amc.Header.isInput -> $"Input column {snd selectedBuildingBlock.[0]} cannot be converted"
+                | amc when amc.Header.isOutput -> $"Output column {snd selectedBuildingBlock.[0]} cannot be converted"
+                | _ -> ""
+
             match arcMainColumn with
-            | x when arcMainColumn.Header.isInput -> ()
-            | x when arcMainColumn.Header.isOutput -> ()
-            | x when arcMainColumn.Cells.[0].isUnitized -> convertToTermColumn arcMainColumn
-            | x when arcMainColumn.Cells.[0].isTerm -> ()
-            | x when arcMainColumn.Cells.[0].isData -> ()
-            | x when arcMainColumn.Cells.[0].isFreeText -> ()
+            | amc when amc.Cells.[0].isUnitized -> convertToTermColumn amc
+            | amc when amc.Cells.[0].isTerm -> convertToUnitColumn amc
+            | amc when amc.Cells.[0].isData -> convertToDataColumn amc
+            | amc when amc.Cells.[0].isFreeText -> convertToFreeTextColumn amc
             | _ -> ()
 
             deleteSelectedExcelColumns (selectedBuildingBlock |> Seq.map (fun (i, _) -> i)) excelTable
@@ -1480,7 +1499,13 @@ let convertBuildingBlock () =
 
             do! addBuildingBlockAt excelMainColumnIndex arcMainColumn excelTable context
 
-            return [InteropLogging.Msg.create InteropLogging.Warning $"Converted building block of {snd selectedBuildingBlock.[0]} to unit"]
+            do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+
+            let msg =
+                if String.IsNullOrEmpty(msgText) then $"Converted building block of {snd selectedBuildingBlock.[0]} to unit"
+                else msgText
+
+            return [InteropLogging.Msg.create InteropLogging.Warning msg]
         }
     )
 

@@ -2,10 +2,8 @@ namespace BuildingBlock
 
 open Feliz
 open Feliz.Bulma
-open Fable.Core
 
 open OfficeInterop.Core
-open OfficeInteropExtensions
 
 module private CellConvertComponentHelpers =
 
