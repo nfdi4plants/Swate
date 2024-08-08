@@ -1,5 +1,7 @@
 module OfficeInterop.Core
 
+open System.Collections.Generic
+
 open Fable.Core
 open ExcelJS.Fable
 open Excel
@@ -68,10 +70,19 @@ module OfficeInteropExtensions =
 
         static member addColumn (index:float) (excelTable:Table) name rowCount value =
             let col = createMatrixForTables 1 rowCount value
+
             excelTable.columns.add(
                 index   = index,
                 values  = U4.Case1 col,
                 name    = name
+            )
+
+        //Add only the row values of the column you are adding
+        static member addColumnAndRows (columnIndex:float) (excelTable:Table) columnName rows =
+            excelTable.columns.add(
+                index   = columnIndex,
+                values  = U4.Case1 rows,
+                name    = columnName
             )
 
         static member addRows (index:float) (excelTable:Table) rowCount value =
@@ -149,49 +160,20 @@ module OfficeInteropExtensions =
                         column |> Seq.map (box >> Some)
                         |> ResizeArray
                     )
-                    |> ResizeArray                    
+                    |> ResizeArray
 
                 columns
-
-        static member tryFromExcelTableName (tableName:string, context:RequestContext) =
-
-            let result = ExcelHelper.tryGetTableByName context tableName
-
-            promise {
-                if result.IsSome then
-                    let _, headerRange, bodyRowRange = result.Value
-                    let! inMemoryTable = context.sync().``then``(fun _ ->
-                        let headers =
-                            headerRange.values.[0]
-                            |> Seq.map (fun item ->
-                                item
-                                |> Option.map string
-                                |> Option.defaultValue ""
-                            )
-                        let bodyRows =
-                            bodyRowRange.values
-                            |> Seq.map (fun items ->
-                                items
-                                |> Seq.map (fun item ->
-                                    item
-                                    |> Option.map string
-                                    |> Option.defaultValue ""
-                                )
-                            )
-                        ArcTable.fromStringSeqs(tableName, headers, bodyRows)
-                    )
-                    return inMemoryTable
-                else return None
-            }
 
         static member tryGetFromExcelTable (excelTable:Table, context:RequestContext) =
 
             promise {
                     //Get headers and body
                     let headerRange = excelTable.getHeaderRowRange()
-                    let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
                     let bodyRowRange = excelTable.getDataBodyRange()
-                    let _ = bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+                    let _ =
+                        excelTable.load(U2.Case2 (ResizeArray [|"name"|])) |> ignore
+                        headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+                        bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
 
                     let! inMemoryTable = context.sync().``then``(fun _ ->
                         let headers =
@@ -215,6 +197,18 @@ module OfficeInteropExtensions =
                         ArcTable.fromStringSeqs(excelTable.name, headers, bodyRows)
                     )
                     return inMemoryTable
+            }
+
+        static member tryGetFromExcelTableName (tableName:string, context:RequestContext) =
+
+            let result = ExcelHelper.tryGetTableByName context tableName
+
+            promise {
+                if result.IsSome then
+                    let table, _, _ = result.Value
+                    let! inMemoryTable = ArcTable.tryGetFromExcelTable(table, context)
+                    return inMemoryTable
+                else return None
             }
 
 open OfficeInteropExtensions
@@ -397,7 +391,7 @@ let tryGetPrevTable (context:RequestContext) =
 
         if prevTableName.IsSome then
         
-            let! result = ArcTable.tryFromExcelTableName (prevTableName.Value, context)
+            let! result = ArcTable.tryGetFromExcelTableName (prevTableName.Value, context)
             return result
 
         else
@@ -1119,7 +1113,6 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
                 |> Array.tryHead
 
             if targetIndex.IsSome then
-
                 //The +1 makes sure, we add the column after the column we have currently chosen
                 excelIndex + (float) targetIndex.Value + 1.
 
@@ -1142,7 +1135,7 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
         let calIndex =
             if targetIndex >= 0 then targetIndex + (float) i
             else AppendIndex
-        let column = ExcelHelper.addColumn(calIndex) excelTable newHeader rowCount bbCell.Tail.Head
+        let column = ExcelHelper.addColumn calIndex excelTable newHeader rowCount bbCell.Tail.Head
         newHeader::headers |> ignore
         column.getRange().format.autofitColumns()
 
@@ -1322,6 +1315,8 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
                     getResult newBB
                 )
 
+                do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+
                 return result
             else
                 return [InteropLogging.Msg.create InteropLogging.Warning $"A table is missing! annotationTable: {excelTable.name}; arcTable: {arcTable.IsSome}"]
@@ -1366,7 +1361,6 @@ let removeSelectedAnnotationBlock () =
         promise {
 
             let! excelTable = getActiveAnnotationTable context
-
             let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
 
             // iterate DESCENDING to avoid index shift
@@ -1376,6 +1370,142 @@ let removeSelectedAnnotationBlock () =
                 column.delete()
 
             return []
+        }
+    )
+
+let getArcMainColumn () =
+    Excel.run (fun context ->
+        promise {
+            let! excelTable = getActiveAnnotationTable context            
+            let! selectedBlock = getSelectedBuildingBlock excelTable context
+
+            let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
+
+            let protoHeaders = excelTable.getHeaderRowRange()
+            let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
+
+            do! context.sync().``then``(fun _ -> ())
+
+            let headers = protoHeaders.values.Item 0 |> Array.ofSeq |> Array.map (fun c -> c.ToString())
+
+            let arcTableIndices = (groupToBuildingBlocks headers) |> Array.ofSeq |> Array.map (fun i -> i |> Array.ofSeq)
+
+            let arcTableIndex =
+                let potResult = arcTableIndices |> Array.mapi (fun i c -> i, c |> Array.tryFind (fun (_, s) -> s = snd selectedBlock.[0]))
+                let result = potResult |> Array.filter (fun (_, c) -> c.IsSome) |> Array.map (fun (i, c) -> i, c.Value)
+                Array.tryHead result
+
+            let arcTableIndex, columnName =
+                if arcTableIndex.IsSome then
+                    fst arcTableIndex.Value, snd (snd arcTableIndex.Value)
+                else failwith "Could not find a fitting arc table index"
+
+            let targetColumn =
+                let potColumn = arcTable.Value.GetColumn arcTableIndex
+                if columnName.Contains(potColumn.Header.ToString()) then potColumn
+                else failwith "Could not find a fitting arc table index with matchin name"
+
+            return targetColumn
+        }
+    )
+
+let convertToFreeTextColumn (column: CompositeColumn) =
+    let freeTextCells = column.Cells |> Array.map (fun c -> c.ToFreeTextCell())
+    freeTextCells
+    |> Array.iteri (fun i _ -> column.Cells.[i] <- freeTextCells.[i])
+
+let convertToDataColumn (column: CompositeColumn) =
+    let dataCells = column.Cells |> Array.map (fun c -> c.ToDataCell())
+    dataCells
+    |> Array.iteri (fun i _ -> column.Cells.[i] <- dataCells.[i])
+
+let convertToUnitColumn (column: CompositeColumn) =
+    let unitCells = column.Cells |> Array.map (fun c -> c.ToUnitizedCell())
+    unitCells
+    |> Array.iteri (fun i _ -> column.Cells.[i] <- unitCells.[i])
+
+let convertToTermColumn (column: CompositeColumn) =
+    let termCells = column.Cells |> Array.map (fun c -> c.ToTermCell())
+    termCells
+    |> Array.iteri (fun i _ -> column.Cells.[i] <- termCells.[i])
+
+let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable:Table) =
+    // iterate DESCENDING to avoid index shift
+    for i in Seq.sortByDescending (fun x -> x) selectedColumns do
+        let column = excelTable.columns.getItemAt(i)
+        log $"delete column {i}"
+        column.delete()
+
+let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) (context: RequestContext)=
+    promise {
+
+        let headers = table.getHeaderRowRange()
+        let _ = headers.load(U2.Case2 (ResizeArray [|"values"|]))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let stringHeaders = headers.values |> Array.ofSeq |> Array.collect (fun i -> Array.ofSeq i |> Array.map (fun ii -> ii.Value.ToString()))
+
+        let buildingBlockCells = Spreadsheet.CompositeColumn.toStringCellColumns newBB
+
+        let headers =
+            buildingBlockCells
+            |> List.map (fun bbc -> bbc.[0])
+            |> List.map (fun s -> Indexing.extendName stringHeaders s)
+        let body =
+            buildingBlockCells
+            |> List.map (fun bbc -> bbc.[1..])            
+
+        //Create a matrix for tabes that contains the right value for each cell
+        let bodyValues =
+            buildingBlockCells
+            |> Array.ofSeq
+            |> Array.map (fun bc ->
+                bc
+                |> Array.ofSeq
+                |> Array.map (fun br -> [|U3<bool, string, float>.Case2 br|] :> IList<U3<bool, string, float>>))
+
+        headers
+        |> List.iteri (fun ci header -> ExcelHelper.addColumnAndRows (float (excelIndex + ci)) table header bodyValues.[ci] |> ignore)
+        ()
+    }
+
+/// This function is used to add unit reference columns to an existing building block without unit reference columns
+let convertBuildingBlock () =
+    Excel.run(fun context ->
+        promise {
+
+            let! excelTable = getActiveAnnotationTable context
+            let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
+            let excelMainColumnIndex = fst selectedBuildingBlock.[0]
+            let! arcMainColumn = getArcMainColumn()
+
+            let msgText = 
+                match arcMainColumn with
+                | amc when amc.Header.isInput -> $"Input column {snd selectedBuildingBlock.[0]} cannot be converted"
+                | amc when amc.Header.isOutput -> $"Output column {snd selectedBuildingBlock.[0]} cannot be converted"
+                | _ -> ""
+
+            match arcMainColumn with
+            | amc when amc.Cells.[0].isUnitized -> convertToTermColumn amc
+            | amc when amc.Cells.[0].isTerm -> convertToUnitColumn amc
+            | amc when amc.Cells.[0].isData -> convertToDataColumn amc
+            | amc when amc.Cells.[0].isFreeText -> convertToFreeTextColumn amc
+            | _ -> ()
+
+            deleteSelectedExcelColumns (selectedBuildingBlock |> Seq.map (fun (i, _) -> i)) excelTable
+
+            do! context.sync().``then``(fun _ -> ())
+
+            do! addBuildingBlockAt excelMainColumnIndex arcMainColumn excelTable context
+
+            do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+
+            let msg =
+                if String.IsNullOrEmpty(msgText) then $"Converted building block of {snd selectedBuildingBlock.[0]} to unit"
+                else msgText
+
+            return [InteropLogging.Msg.create InteropLogging.Warning msg]
         }
     )
 
@@ -1648,78 +1778,78 @@ let addAnnotationBlocksInNewSheets (excelTablesToAdd: (string*InsertBuildingBloc
     |> Promise.all
     |> Promise.map List.concat
 
-/// This function is used to add unit reference columns to an existing building block without unit reference columns
-let updateUnitForCells (unitTerm:TermMinimal) =
-    Excel.run(fun context ->
+///// This function is used to add unit reference columns to an existing building block without unit reference columns
+//let updateUnitForCells (unitTerm:TermMinimal) =
+//    Excel.run(fun context ->
 
-        promise {
+//        promise {
 
-            let! excelTableName = getActiveAnnotationTableName context
+//            let! excelTableName = getActiveAnnotationTableName context
             
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let excelTable = sheet.tables.getItem(excelTableName)
-            let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
+//            let sheet = context.workbook.worksheets.getActiveWorksheet()
+//            let excelTable = sheet.tables.getItem(excelTableName)
+//            let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray(["items"])))
 
-            let selectedRange = context.workbook.getSelectedRange()
-            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"rowIndex"; "rowCount";])))
+//            let selectedRange = context.workbook.getSelectedRange()
+//            let _ = selectedRange.load(U2.Case2 (ResizeArray(["values";"rowIndex"; "rowCount";])))
 
-            let annoHeaderRange = excelTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
-            let tableRange = excelTable.getRange()
-            let _ = tableRange.load(U2.Case2 (ResizeArray(["rowCount"])))
+//            let annoHeaderRange = excelTable.getHeaderRowRange()
+//            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"|]))
+//            let tableRange = excelTable.getRange()
+//            let _ = tableRange.load(U2.Case2 (ResizeArray(["rowCount"])))
 
-            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context excelTableName
+//            let! selectedBuildingBlock = OfficeInterop.BuildingBlockFunctions.findSelectedBuildingBlock context excelTableName
 
-            let! headerVals = context.sync().``then``(fun _ ->
-                // Get an array of the headers
-                annoHeaderRange.values.[0] |> Array.ofSeq
-            )
+//            let! headerVals = context.sync().``then``(fun _ ->
+//                // Get an array of the headers
+//                annoHeaderRange.values.[0] |> Array.ofSeq
+//            )
 
-            // Check if building block has existing unit
-            let! updateWithUnit =
-                // is unit column already exists we want to update selected cells
-                if selectedBuildingBlock.hasUnit then
-                    context.sync().``then``(fun _ ->
+//            // Check if building block has existing unit
+//            let! updateWithUnit =
+//                // is unit column already exists we want to update selected cells
+//                if selectedBuildingBlock.hasUnit then
+//                    context.sync().``then``(fun _ ->
                         
-                        let format = unitTerm.toNumberFormat
-                        let formats = createValueMatrix 1 (int selectedRange.rowCount) format
-                        selectedRange.numberFormat <- formats
-                        InteropLogging.Msg.create InteropLogging.Info $"Updated specified cells with unit: {format}."
-                    )
-                // if no unit column exists for the selected building block we want to add a unit column and update the whole main column with the unit.
-                elif selectedBuildingBlock.hasCompleteTSRTAN && selectedBuildingBlock.hasUnit |> not then
-                    context.sync().``then``(fun _ ->
-                        // Create unit column
-                        // Create unit column name
-                        let allColHeaders =
-                            headerVals
-                            |> Array.choose id
-                            |> Array.map string
-                        let unitColName = OfficeInterop.Indexing.createUnit() |> Indexing.extendName allColHeaders
-                        // add column at correct index
-                        let unitColumn =
-                            excelTable.columns.add(
-                                index = float selectedBuildingBlock.MainColumn.Index + 1.
-                            )
-                        // Add column name
-                        unitColumn.name <- unitColName
-                        // Change number format for main column
-                        // Get main column table body range
-                        let mainCol = excelTable.columns.items.[selectedBuildingBlock.MainColumn.Index].getDataBodyRange()
-                        // Create unitTerm number format
-                        let format = unitTerm.toNumberFormat
-                        let formats = createValueMatrix 1 (int tableRange.rowCount - 1) format
-                        mainCol.numberFormat <- formats
+//                        let format = unitTerm.toNumberFormat
+//                        let formats = createValueMatrix 1 (int selectedRange.rowCount) format
+//                        selectedRange.numberFormat <- formats
+//                        InteropLogging.Msg.create InteropLogging.Info $"Updated specified cells with unit: {format}."
+//                    )
+//                // if no unit column exists for the selected building block we want to add a unit column and update the whole main column with the unit.
+//                elif selectedBuildingBlock.hasCompleteTSRTAN && selectedBuildingBlock.hasUnit |> not then
+//                    context.sync().``then``(fun _ ->
+//                        // Create unit column
+//                        // Create unit column name
+//                        let allColHeaders =
+//                            headerVals
+//                            |> Array.choose id
+//                            |> Array.map string
+//                        let unitColName = OfficeInterop.Indexing.createUnit() |> Indexing.extendName allColHeaders
+//                        // add column at correct index
+//                        let unitColumn =
+//                            excelTable.columns.add(
+//                                index = float selectedBuildingBlock.MainColumn.Index + 1.
+//                            )
+//                        // Add column name
+//                        unitColumn.name <- unitColName
+//                        // Change number format for main column
+//                        // Get main column table body range
+//                        let mainCol = excelTable.columns.items.[selectedBuildingBlock.MainColumn.Index].getDataBodyRange()
+//                        // Create unitTerm number format
+//                        let format = unitTerm.toNumberFormat
+//                        let formats = createValueMatrix 1 (int tableRange.rowCount - 1) format
+//                        mainCol.numberFormat <- formats
                         
-                        InteropLogging.Msg.create InteropLogging.Info $"Created Unit Column {unitColName} for building block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader}."
-                    )
-                else
-                    failwith $"You can only add unit to building blocks of the type: {BuildingBlockType.TermColumns}"
-            let! _ = autoFitTable true context
-            return [updateWithUnit]
-        }
+//                        InteropLogging.Msg.create InteropLogging.Info $"Created Unit Column {unitColName} for building block {selectedBuildingBlock.MainColumn.Header.SwateColumnHeader}."
+//                    )
+//                else
+//                    failwith $"You can only add unit to building blocks of the type: {BuildingBlockType.TermColumns}"
+//            let! _ = autoFitTable true context
+//            return [updateWithUnit]
+//        }
 
-    )
+//    )
 
 /// <summary>This function removes a given building block from a given annotation table.
 /// It returns the affected column indices.</summary>
@@ -2218,7 +2348,7 @@ let insertFileNamesFromFilePicker (fileNameList:string list) =
 
         // Ref. 2
         let range = context.workbook.getSelectedRange()
-        let _ = range.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "columnCount"])))
+        let _ = range.load(U2.Case2 (ResizeArray(["values"; "columnIndex"; "columnCount"])))
 
         // Ref. 1
         let r = context.runtime.load(U2.Case1 "enableEvents")

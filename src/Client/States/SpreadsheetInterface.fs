@@ -1,6 +1,7 @@
 namespace SpreadsheetInterface
 
 open Shared
+open TermTypes
 
 open ARCtrl
 
@@ -27,5 +28,6 @@ type Msg =
 | ImportXlsx of byte []
 /// Starts chain to export active table to isa json
 | ExportJson of ArcFiles * JsonExportFormat
+| UpdateUnitForCells
 | UpdateTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []

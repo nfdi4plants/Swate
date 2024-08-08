@@ -116,7 +116,6 @@ let private scrollIntoViewRetry (id: string) =
                 //log headerelement
                 headerelement.scrollIntoView(config)
     loop 0
-    
 
 let private AddBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState

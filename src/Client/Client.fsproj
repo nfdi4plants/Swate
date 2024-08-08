@@ -73,6 +73,7 @@
     <Compile Include="SidebarComponents\Navbar.fs" />
     <Compile Include="Pages\Cytoscape\CytoscapeGraph.fs" />
     <Compile Include="Pages\Cytoscape\CytoscapeUpdate.fs" />
+    <Compile Include="Pages\BuildingBlock\CellConvertComponent.fs" />
     <Compile Include="Pages\BuildingBlock\Helper.fs" />
     <Compile Include="Pages\BuildingBlock\Dropdown.fs" />
     <Compile Include="Pages\BuildingBlock\SearchComponent.fs" />

@@ -39,7 +39,7 @@ type Msg =
     | AddTemplate                           of ArcTable
     | JoinTable                             of ArcTable * index: int option * options: TableJoinOptions option
     | RemoveBuildingBlock
-    | UpdateUnitForCells                    of unitTerm:TermMinimal
+    | UpdateUnitForCells
     | AutoFitTable                          of hideRefCols:bool
     // Term search functions
     | GetParentTerm
