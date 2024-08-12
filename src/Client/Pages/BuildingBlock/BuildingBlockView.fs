@@ -90,7 +90,7 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
             ]
             if model.PersistentStorageState.Host.IsSome && model.PersistentStorageState.Host.Value = Swatehost.Excel then
                 // Input forms, etc related to add building block.
-                Bulma.label "Convert existing cell types."
+                Bulma.label "Convert existing Building Block."
                 mainFunctionContainer [
                     CellConvertComponent.Main ()
                 ]
