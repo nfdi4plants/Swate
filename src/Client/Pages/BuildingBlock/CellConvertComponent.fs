@@ -27,6 +27,15 @@ module private CellConvertComponentHelpers =
             setState result
         }
 
+    let getTargetConversionType (cellType:Model.BuildingBlock.BodyCellType option) =
+        if cellType.IsSome then
+            match cellType.Value with
+            | Model.BuildingBlock.BodyCellType.Unitized -> Model.BuildingBlock.BodyCellType.Term |> Some
+            | Model.BuildingBlock.BodyCellType.Term -> Model.BuildingBlock.BodyCellType.Unitized |> Some
+            | Model.BuildingBlock.BodyCellType.Text -> Model.BuildingBlock.BodyCellType.Data |> Some
+            | Model.BuildingBlock.BodyCellType.Data -> Model.BuildingBlock.BodyCellType.Text |> Some
+            | _ -> None
+        else None
 
 type CellConvertComponent =
 
@@ -55,7 +64,10 @@ type CellConvertComponent =
                     if state.IsSome then
                         Bulma.color.isSuccess
                         prop.disabled false
-                        prop.text $"Convert {state.Value}"
+                        prop.text $"Convert {state.Value} to"
+
+
+
                     else
                         Bulma.color.isDanger
                         prop.disabled true
@@ -64,6 +76,6 @@ type CellConvertComponent =
                         CellConvertComponentHelpers.getSelectedCellType setState |> ignore
                         convertBuildingBlock () |> Promise.start)                    
                 ]
-                Html.div (string state)
+                Html.div (string (CellConvertComponentHelpers.getTargetConversionType state))
             ]
         ]
