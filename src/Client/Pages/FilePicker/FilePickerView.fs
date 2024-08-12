@@ -15,7 +15,7 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
     match filePickerMsg with
     | LoadNewFiles fileNames ->
         let nextState : FilePicker.Model = {
-            FileNames = fileNames |> List.mapi (fun i x -> i+1,x)
+            FileNames = fileNames |> List.mapi (fun i x -> i + 1,x)
         }
         let nextCmd = UpdatePageState (Some Routing.Route.FilePicker) |> Cmd.ofMsg
         nextState, nextCmd
