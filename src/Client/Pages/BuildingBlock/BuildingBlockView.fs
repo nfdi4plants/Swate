@@ -1,16 +1,8 @@
 module BuildingBlock.Core
 
-open Fable.React
-open Fable.React.Props
-open Fable.Core.JsInterop
-
-open ExcelColors
 open Model
 open Messages
 open Messages.BuildingBlock
-open Shared
-open TermTypes
-open CustomComponents
 
 open Elmish
 
@@ -50,7 +42,6 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
         let nextState = { state with BodyCellType = next }
         nextState, Cmd.none
 
-open SidebarComponents
 open Feliz
 open Feliz.Bulma
 
@@ -97,12 +88,11 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
             mainFunctionContainer [
                 SearchComponent.Main model dispatch
             ]
+            if model.PersistentStorageState.Host.IsSome && model.PersistentStorageState.Host.Value = Swatehost.Excel then
+                // Input forms, etc related to add building block.
+                Bulma.label "Convert existing Building Block."
+                mainFunctionContainer [
+                    CellConvertComponent.Main ()
+                ]
         ]
-
-        //match model.PersistentStorageState.Host with
-        //| Some Swatehost.Excel ->
-        //    Bulma.label "Add/Update unit reference to existing building block."
-        //    // Input forms, etc related to add unit to existing building block.
-        //    addUnitToExistingBlockElements model dispatch
-        //| _ -> Html.none
     ]

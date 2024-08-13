@@ -243,6 +243,12 @@ module Interface =
                 //    let cmd = Cmd.ofEffect (fun dispatch -> Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main selectedIndex model dispatch))
                 //    model, cmd
                 | _ -> failwith "not implemented"
+            | UpdateUnitForCells ->
+                match host with
+                | Some Swatehost.Excel ->
+                    let cmd = OfficeInterop.UpdateUnitForCells |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
             | UpdateTermColumns ->
                 match host with
                 | Some Swatehost.Excel ->
@@ -251,8 +257,7 @@ module Interface =
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.UpdateTermColumns |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
-                | _ ->
-                    failwith "not implemented"
+                | _ -> failwith "not implemented"
             | UpdateTermColumnsResponse terms ->
                 match host with
                 | Some Swatehost.Excel ->
