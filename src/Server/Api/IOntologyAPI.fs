@@ -65,6 +65,15 @@ module V3 =
                         |> Array.ofSeq
                     return dbSearchRes
                 }
+            getTermById = fun id  ->
+                async {
+                    let dbSearchRes = Term.Term(credentials).getByAccession id
+                    return 
+                        match Seq.length dbSearchRes with
+                        | 1 -> dbSearchRes |> Seq.head |> Some
+                        | 0 -> None
+                        | _ -> failwith $"Found multiple terms with the same accession: {id}" // must be multiples as negative cannot exist for length
+                }
         }
 
     let createIOntologyApi credentials =

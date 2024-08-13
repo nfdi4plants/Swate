@@ -13,7 +13,7 @@ Swate aims to provide a low-friction workflow annotation experience that makes t
 ## Table of contents
 
 - [Docs](#docs)
-- [Install/Use](#installuse)
+<!-- - [Install/Use](#installuse) -->
 - [Contact](#contact)
 
 <!-- /TOC -->
@@ -28,9 +28,11 @@ Try our [quickstart](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/doc
 
 For a full in-depth view of all Swate features check the [documentation](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/SwateManual/index.html).
 
+<!--
 ## Install/Use
 
 [Swate installation](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/SwateManual/Docs01-Installing-Swate.html)
+-->
 
 ## Contact
 

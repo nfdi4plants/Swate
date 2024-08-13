@@ -182,7 +182,8 @@ module BuildingBlock =
 
     open ARCtrl
 
-    type [<RequireQualifiedAccess>] HeaderCellType =
+    [<RequireQualifiedAccess>]
+    type HeaderCellType =
     | Component
     | Characteristic
     | Factor
@@ -222,7 +223,26 @@ module BuildingBlock =
             | Output -> true
             | _ -> false
 
-    type [<RequireQualifiedAccess>] BodyCellType =
+        static member fromString(str: string) =
+            match str with
+            | "Component"           -> Component
+            | "Characteristic"      -> Characteristic
+            | "Factor"              -> Factor
+            | "Parameter"           -> Parameter
+            | "ProtocolType"        -> ProtocolType
+            | "ProtocolDescription" -> ProtocolDescription
+            | "ProtocolUri"         -> ProtocolUri
+            | "ProtocolVersion"     -> ProtocolVersion
+            | "ProtocolREF"         -> ProtocolREF
+            | "Performer"           -> Performer
+            | "Date"                -> Date
+            | "Input"               -> Input
+            | "Output"              -> Output
+            | anyElse -> failwithf "BuildingBlock.HeaderCellType.fromString: '%s' is not a valid HeaderCellType" anyElse
+
+
+    [<RequireQualifiedAccess>]
+    type BodyCellType =
     | Term
     | Unitized
     | Text

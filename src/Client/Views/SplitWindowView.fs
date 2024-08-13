@@ -106,9 +106,8 @@ let Main (left:seq<ReactElement>) (right:seq<ReactElement>) (mainModel:Model) (d
     React.useEffect(model.WriteToLocalStorage, [|box model|])
     React.useEffectOnce(fun _ -> Browser.Dom.window.addEventListener("resize", onResize_event model setModel))
     Html.div [
-        prop.style [
-            style.display.flex
-        ]
+        prop.id "SplitWindowView"
+        prop.className "flex overflow-auto grow"
         prop.children [
             MainComponents.MainViewContainer.Main(minWidth, left)
             if mainModel.SpreadsheetModel.TableViewIsActive() && mainModel.PersistentStorageState.ShowSideBar then

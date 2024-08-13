@@ -85,7 +85,7 @@ module private Components =
                     ]
                     Html.tbody [
                         let previewCount = 5
-                        let preview = takeFromArray previewCount cellValues 
+                        let preview = Array.takeSafe previewCount cellValues 
                         for i in 0 .. (preview.Length-1) do
                             let cell0 = column.Cells.[i].ToString()
                             let cell = preview.[i]

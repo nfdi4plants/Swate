@@ -103,7 +103,7 @@ let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.M
                 return state
             else
                 let rowCount = selectedSingleColumnCells.Count
-                let cellsTrimmed = cells |> takeFromArray rowCount
+                let cellsTrimmed = cells |> Array.takeSafe rowCount
                 let indicesTrimmed = (Set.toArray selectedSingleColumnCells).[0..cellsTrimmed.Length-1]
                 let indexedCellsTrimmed = Array.zip indicesTrimmed cellsTrimmed
                 Generic.setCells indexedCellsTrimmed state

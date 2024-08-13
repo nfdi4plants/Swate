@@ -148,21 +148,13 @@ type Navigator =
 [<Emit("navigator")>]
 let navigator : Navigator = jsNative
 
-/// <summary>
-/// take "count" many items from array if existing. if not enough items return as many as possible
-/// </summary>
-/// <param name="count"></param>
-/// <param name="array"></param>
-let takeFromArray (count: int) (array: 'a []) =
-    let exit (acc: 'a list) = List.rev acc |> Array.ofList
-    let rec takeRec (l2: 'a list) (acc: 'a list) index =
-      if index >= count then 
-        exit acc
-      else
-        match l2 with
-        | [] -> exit acc
-        | item::tail ->
-          let newAcc = item::acc
-          takeRec tail newAcc (index+1)
+module Array =
 
-    takeRec (Array.toList array) [] 0
+    /// <summary>
+    /// Take "count" many items from array if existing. if not enough items return as many as possible
+    /// </summary>
+    /// <param name="count"></param>
+    /// <param name="array"></param>
+    let takeSafe (count: int) (array: 'a []) =
+       let count = System.Math.Min(count, array.Length)
+       Array.take count array

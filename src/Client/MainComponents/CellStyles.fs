@@ -7,8 +7,10 @@ open Feliz.Bulma
 open Fable.Core
 
 let cellStyle (specificStyle: IStyleAttribute list) = prop.style [
-        style.minWidth 100
-        style.height 22
+        style.minWidth 200
+        style.maxWidth 600
+        style.height 35
+        style.minHeight(35)
         style.border(length.px 1, borderStyle.solid, "darkgrey")
         yield! specificStyle
     ]
@@ -17,15 +19,20 @@ let cellInnerContainerStyle (specificStyle: IStyleAttribute list) = prop.style [
         style.display.flex;
         style.justifyContent.spaceBetween;
         style.height(length.percent 100);
-        style.minHeight(35)
         style.width(length.percent 100)
-        style.alignItems.center
         yield! specificStyle
     ]
 
-let basicValueDisplayCell (v: string) =
+let basicValueDisplayCell (v: string) (isHeader: bool) =
     Html.span [
+        if v.Length > 60 then
+            prop.title v
         prop.style [
+            style.textOverflow.ellipsis
+            style.overflow.hidden
+            //style.whitespace.nowrap
+            if not isHeader then
+                style.maxHeight 35
             style.flexGrow 1
             style.padding(length.em 0.5,length.em 0.75)
         ]
