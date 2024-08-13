@@ -2363,16 +2363,16 @@ let insertFileNamesFromFilePicker (fileNameList:string list) =
             // create new values for selected Range.
             let newVals = ResizeArray([
                 // iterate over the rows of the selected range (there can only be one column as we fail if more are selected)
-                for rowInd in 0 .. range.values.Count-1 do
+                for rowInd in 0 .. range.values.Count - 1 do
                     let tmp =
                         // Iterate over col values (1).
                         range.values.[rowInd] |> Seq.map (
                             // Ignore prevValue as it will be replaced anyways.
-                            fun prevValue ->
+                            fun _ ->
                                 // This part is a design choice.
                                 // Should the user select less cells than we have items in the 'fileNameList' then we only fill the selected cells.
                                 // Should the user select more cells than we have items in the 'fileNameList' then we fill the leftover cells with none.
-                                let fileName = if fileNameList.Length-1 < rowInd then None else List.item rowInd fileNameList |> box |> Some
+                                let fileName = if fileNameList.Length - 1 < rowInd then None else List.item rowInd fileNameList |> box |> Some
                                 fileName
                         )
                     ResizeArray(tmp)
