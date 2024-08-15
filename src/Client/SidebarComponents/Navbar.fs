@@ -1,9 +1,5 @@
 module SidebarComponents.Navbar
 
-open Fable.React
-open Fable.React.Props
-
-open ExcelColors
 open Model
 open Messages
 
@@ -76,6 +72,15 @@ let private shortCutIconList model dispatch =
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
             (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
+        )
+        QuickAccessButton.create(
+            "Validate Annotation Table",
+            [
+                Html.i [prop.className "fa-solid fa-check"]
+                Html.i [prop.className "fa-solid fa-table"]
+            ],
+            (fun _ -> SpreadsheetInterface.ValidateAnnotationTable |> InterfaceMsg |> dispatch
+            )
         )
     ]
 

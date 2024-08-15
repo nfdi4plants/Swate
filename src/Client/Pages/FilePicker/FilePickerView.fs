@@ -1,9 +1,6 @@
 module FilePicker
 
-open ExcelColors
-open Api
 open Model
-open Shared
 open Browser.Types
 open Elmish
 open Messages.FilePicker
@@ -15,7 +12,7 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
     match filePickerMsg with
     | LoadNewFiles fileNames ->
         let nextState : FilePicker.Model = {
-            FileNames = fileNames |> List.mapi (fun i x -> i + 1,x)
+            FileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
         }
         let nextCmd = UpdatePageState (Some Routing.Route.FilePicker) |> Cmd.ofMsg
         nextState, nextCmd
@@ -57,7 +54,7 @@ let uploadButton (model:Model) dispatch =
                         Bulma.button.button [
                             Bulma.color.isInfo
                             Bulma.button.isFullWidth
-                            prop.onClick(fun e ->
+                            prop.onClick(fun _ ->
                                 ARCitect.RequestPaths false |> ARCitect.ARCitect.send
                             )
                             prop.text "Pick Files"
@@ -65,7 +62,7 @@ let uploadButton (model:Model) dispatch =
                         Bulma.button.button [
                             Bulma.color.isInfo
                             Bulma.button.isFullWidth
-                            prop.onClick(fun e ->
+                            prop.onClick(fun _ ->
                                 ARCitect.RequestPaths true |> ARCitect.ARCitect.send
                             )
                             prop.text "Pick Directories"
@@ -76,7 +73,7 @@ let uploadButton (model:Model) dispatch =
                 Bulma.button.button [
                     Bulma.color.isInfo
                     Bulma.button.isFullWidth
-                    prop.onClick(fun e ->
+                    prop.onClick(fun _ ->
                         let getUploadElement = Browser.Dom.document.getElementById inputId
                         getUploadElement.click()
                     )
@@ -138,11 +135,11 @@ let fileSortElements (model:Model) dispatch =
                 Bulma.buttons.hasAddons
                 prop.style [style.custom("marginLeft", "auto")]
                 prop.children [
-                    sortButton "fa-solid fa-arrow-down-a-z" (fun e ->
+                    sortButton "fa-solid fa-arrow-down-a-z" (fun _ ->
                         let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
                         UpdateFileNames sortedList |> FilePickerMsg |> dispatch
                     )
-                    sortButton "fa-solid fa-arrow-down-z-a" (fun e ->
+                    sortButton "fa-solid fa-arrow-down-z-a" (fun _ ->
                         let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i+1,snd x)
                         UpdateFileNames sortedList |> FilePickerMsg |> dispatch
                     )

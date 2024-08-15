@@ -28,7 +28,8 @@ type Model = {
 
 type Msg =
     // create and update table element functions
-    | CreateAnnotationTable                 of tryUsePrevOutput:bool 
+    | CreateAnnotationTable                 of tryUsePrevOutput:bool
+    | ValidateAnnotationTable
     | AnnotationtableCreated
     | TryFindAnnotationTable
     | AnnotationTableExists                 of TryFindAnnoTableResult

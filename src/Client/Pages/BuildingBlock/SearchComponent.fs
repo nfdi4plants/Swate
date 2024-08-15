@@ -2,15 +2,11 @@ module BuildingBlock.SearchComponent
 
 open Feliz
 open Feliz.Bulma
-open Shared
 open Fable.Core.JsInterop
-open Elmish
 open Model.BuildingBlock
-open Model.TermSearch
 open Model
 open Messages
 open ARCtrl
-open BuildingBlock.Helper
 
 let private termOrUnitizedSwitch (model:Model) dispatch =
         

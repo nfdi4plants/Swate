@@ -127,6 +127,15 @@ module OfficeInterop =
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model,cmd
 
+            | ValidateAnnotationTable ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.validateAnnotationTable  
+                        ()
+                        (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg) //success
+                        (curry GenericError Cmd.none >> DevMsg) //error
+                state, model,cmd
+
             | AnnotationtableCreated ->
                 let nextState = {
                     model.ExcelState with
