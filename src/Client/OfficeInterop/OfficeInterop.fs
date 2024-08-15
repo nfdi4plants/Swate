@@ -253,8 +253,6 @@ module OfficeInteropExtensions =
             let errorIndices =
                 indexedError
                 |> Array.map (fun (ex, bi) ->
-                    //log("bi", bi)
-                    //log("groupedColumns.[0..bi]", groupedColumns.[0..bi - 1])
                     ex,
                     groupedColumns.[0..bi]
                     |> Array.map (fun bb -> bb.Length)
