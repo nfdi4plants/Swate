@@ -207,7 +207,7 @@ module OfficeInteropExtensions =
         /// </summary>
         /// <param name="headers"></param>
         /// <param name="rows"></param>
-        static member validateStringSeqs(headers:#seq<string>, rows:#seq<#seq<string>>) =
+        static member validateAnnotationTable(headers:#seq<string>, rows:#seq<#seq<string>>) =
 
             let columns = 
                 Seq.append [headers] rows 
@@ -294,7 +294,7 @@ module OfficeInteropExtensions =
                                 )
                             )
 
-                        ArcTable.validateStringSeqs(headers, bodyRows)
+                        ArcTable.validateAnnotationTable(headers, bodyRows)
                     )
                     return inMemoryTable
             }
