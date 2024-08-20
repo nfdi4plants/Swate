@@ -142,7 +142,14 @@ module OfficeInterop =
                         HasAnnotationTable = true
                 }
                 nextState, model, Cmd.none
-
+            | ValidateBuildingBlock ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.validateSelectedAndNeighbouringBuildingBlock
+                        ()
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
 
             | GetParentTerm ->
                 let cmd =

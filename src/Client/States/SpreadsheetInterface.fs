@@ -14,6 +14,7 @@ type Msg =
 | UpdateDatamap of DataMap option
 | UpdateDataMapDataContextAt of index: int * DataContext
 | AddTable of ArcTable
+| ValidateBuildingBlock
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
 | AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}

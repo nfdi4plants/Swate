@@ -139,6 +139,12 @@ module Interface =
                     let cmd = Spreadsheet.AddAnnotationBlock minBuildingBlockInfo |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | ValidateBuildingBlock ->
+                match host with
+                | Some Swatehost.Excel ->
+                    let cmd = OfficeInterop.ValidateBuildingBlock |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
             | AddAnnotationBlocks compositeColumns ->
                 match host with
                 | Some Swatehost.Excel ->
