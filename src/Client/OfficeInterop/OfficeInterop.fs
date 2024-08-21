@@ -1954,8 +1954,8 @@ let validateAnnotationTable () =
                     indexedErrors
                     |> List.ofArray
                     |> List.collect (fun (ex, header ) ->
-                        [InteropLogging.Msg.create InteropLogging.Warning $"Table is not a valid ARC table / ISA table: {ex.Message}";
-                         InteropLogging.Msg.create InteropLogging.Warning $"The column {header} is not valid! It needs further inspection what causes the error"])
+                        [InteropLogging.Msg.create InteropLogging.Warning $"Table is not a valid ARC table / ISA table: {ex.Message}. The column {header} is not valid! It needs further inspection what causes the error.";
+                        ])
                 else
                     [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
 
