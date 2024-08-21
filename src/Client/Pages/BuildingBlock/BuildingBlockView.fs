@@ -87,10 +87,6 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
                 SearchComponent.Main model dispatch
             ]
             if model.PersistentStorageState.Host.IsSome && model.PersistentStorageState.Host.Value = Swatehost.Excel then
-                // Validate selected building block and those next to it.
-                mainFunctionContainer [
-                    ValidateBuildingBlocksComponent.Main dispatch
-                ]
                 // Input forms, etc related to add building block.
                 Bulma.label "Convert existing Building Block."
                 mainFunctionContainer [

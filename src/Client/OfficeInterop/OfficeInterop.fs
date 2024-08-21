@@ -284,13 +284,10 @@ module OfficeInteropExtensions =
                 groupedColumns
                 |> Array.mapi (fun i c ->
                     try
-                        log("c", c)
                         let _ = CompositeColumn.fromStringCellColumns c
-                        log("Worked", "worked")
                         None
                     with
                     | ex ->
-                        log("ex", ex.Message)
                         //The target index must be adapted depending on the position of the error column
                         //because the columns were group based on potential main columns
                         let hasMainColumn =
@@ -1497,7 +1494,7 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
     )
 
 /// <summary>
-/// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
+/// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
 /// </summary>
 /// <param name="newBB"></param>
 let addAnnotationBlockHandler (newBB:CompositeColumn) =
@@ -1557,8 +1554,7 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
     )
 
 /// <summary>
-/// Returns a ResizeArray of indices and header names for the selected building block.
-///
+/// Returns a ResizeArray of indices and header names for the selected building block
 /// The indices are rebased to the excel annotation table.
 /// </summary>
 /// <param name="columns"></param>
@@ -1743,10 +1739,7 @@ let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) 
         let headers =
             buildingBlockCells
             |> List.map (fun bbc -> bbc.[0])
-            |> List.map (fun s -> Indexing.extendName stringHeaders s)
-        let body =
-            buildingBlockCells
-            |> List.map (fun bbc -> bbc.[1..])            
+            |> List.map (fun s -> Indexing.extendName stringHeaders s)     
 
         //Create a matrix for tabes that contains the right value for each cell
         let bodyValues =
@@ -1759,7 +1752,6 @@ let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) 
 
         headers
         |> List.iteri (fun ci header -> ExcelHelper.addColumnAndRows (float (excelIndex + ci)) table header bodyValues.[ci] |> ignore)
-        ()
     }
 
 /// <summary>
@@ -1890,8 +1882,6 @@ let validateBuildingBlock (excelTable:Table, context:RequestContext) =
                 headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
                 bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
 
-            do! context.sync().``then``(fun _ -> ())
-
             let mutable errors:list<exn*string> = []
 
             if isMainColumn then
@@ -1927,7 +1917,7 @@ let validateBuildingBlock (excelTable:Table, context:RequestContext) =
 /// <summary>
 /// Checks whether the annotation table is a valid arc table or not
 /// </summary>
-let validateSelectedAndNeighbouringBuildingBlock () =
+let validateSelectedAndNeighbouringBuildingBlocks () =
     Excel.run(fun context ->
         promise {
 

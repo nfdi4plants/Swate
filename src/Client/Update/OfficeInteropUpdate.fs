@@ -145,7 +145,7 @@ module OfficeInterop =
             | ValidateBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.validateSelectedAndNeighbouringBuildingBlock
+                        OfficeInterop.Core.validateSelectedAndNeighbouringBuildingBlocks
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)

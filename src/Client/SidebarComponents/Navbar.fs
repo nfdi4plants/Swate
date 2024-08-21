@@ -48,13 +48,16 @@ let private shortCutIconList model dispatch =
         | _ ->
             ()
         QuickAccessButton.create(
-            "Update Ontology Terms",
+            "Validate / Update Ontology Terms",
             [
                 Html.i [prop.className "fa-solid fa-spell-check"]
                 Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
                 Html.i [prop.className "fa-solid fa-pen"]
             ],
-            (fun _ -> SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch)
+            (fun _ ->
+                SpreadsheetInterface.ValidateAnnotationTable |> InterfaceMsg |> dispatch
+                SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch                
+            )
         )
         QuickAccessButton.create(
             "Remove Building Block",
@@ -72,15 +75,6 @@ let private shortCutIconList model dispatch =
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
             (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
-        )
-        QuickAccessButton.create(
-            "Validate Annotation Table",
-            [
-                Html.i [prop.className "fa-solid fa-check"]
-                Html.i [prop.className "fa-solid fa-table"]
-            ],
-            (fun _ -> SpreadsheetInterface.ValidateAnnotationTable |> InterfaceMsg |> dispatch
-            )
         )
     ]
 
