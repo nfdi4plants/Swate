@@ -19,11 +19,19 @@ open ARCtrl
 open ARCtrl.Spreadsheet
 
 module OfficeInteropExtensions =
-    
+
+    /// <summary>
+    /// Check whether the selected column is a reference column or not
+    /// </summary>
+    /// <param name="name"></param>
     let isReferenceColumn (name: string) =
         ARCtrl.Spreadsheet.ArcTable.helperColumnStrings
         |> Seq.exists (fun cName -> name.StartsWith cName)
 
+    /// <summary>
+    /// Group the columns to building blocks
+    /// </summary>
+    /// <param name="headers"></param>
     let groupToBuildingBlocks (headers: string []) =
         let ra: ResizeArray<ResizeArray<int*string>> = ResizeArray()
         headers
@@ -34,6 +42,34 @@ module OfficeInteropExtensions =
                 ra.Add(ResizeArray([(i, header)]))
         )
         ra
+
+    /// <summary>
+    /// Get the building block associated with the given column index
+    /// </summary>
+    /// <param name="table"></param>
+    /// <param name="columnIndex"></param>
+    /// <param name="context"></param>
+    let getChosenBuildingBlock (table: Table) (columnIndex: float) (context: RequestContext) =
+
+        promise {
+
+            let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
+
+            let headerRange = table.getHeaderRowRange()
+            let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+
+            return! context.sync().``then``(fun _ ->
+                let rebasedIndex = columnIndex - headerRange.columnIndex |> int
+                if rebasedIndex < 0 || rebasedIndex >= (int headerRange.columnCount) then
+                    failwith "Cannot select building block outside of annotation table!"
+                let headers: string [] = [|for v in headerRange.values.[0] do v.Value :?> string|]
+                let selectedHeader = rebasedIndex, headers.[rebasedIndex]
+                let buildingBlockGroups = groupToBuildingBlocks headers
+                let selectedBuildingBlock =
+                    buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
+                selectedBuildingBlock
+            )
+        }
 
     open ARCtrl.Spreadsheet.ArcTable
 
@@ -77,7 +113,13 @@ module OfficeInteropExtensions =
                 name    = name
             )
 
-        //Add only the row values of the column you are adding
+        /// <summary>
+        /// Add only the row values of the column you are adding
+        /// </summary>
+        /// <param name="columnIndex"></param>
+        /// <param name="excelTable"></param>
+        /// <param name="columnName"></param>
+        /// <param name="rows"></param>
         static member addColumnAndRows (columnIndex:float) (excelTable:Table) columnName rows =
             excelTable.columns.add(
                 index   = columnIndex,
@@ -85,6 +127,13 @@ module OfficeInteropExtensions =
                 name    = columnName
             )
 
+        /// <summary>
+        /// Add new rows with the same value to the table
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="excelTable"></param>
+        /// <param name="rowCount"></param>
+        /// <param name="value"></param>
         static member addRows (index:float) (excelTable:Table) rowCount value =
             let col = createMatrixForTables 1 rowCount value
             excelTable.rows.add(
@@ -92,6 +141,12 @@ module OfficeInteropExtensions =
                 values  = U4.Case1 col
             )
 
+        /// <summary>
+        /// Adopt the tables, columns, and values
+        /// </summary>
+        /// <param name="table"></param>
+        /// <param name="context"></param>
+        /// <param name="shallHide"></param>
         static member adoptTableFormats (table:Table, context:RequestContext, shallHide:bool) =
             promise {
 
@@ -164,6 +219,11 @@ module OfficeInteropExtensions =
 
                 columns
 
+        /// <summary>
+        /// Try to create an arc table from an excel table
+        /// </summary>
+        /// <param name="excelTable"></param>
+        /// <param name="context"></param>
         static member tryGetFromExcelTable (excelTable:Table, context:RequestContext) =
 
             promise {
@@ -176,6 +236,7 @@ module OfficeInteropExtensions =
                         bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
 
                     let! inMemoryTable = context.sync().``then``(fun _ ->
+
                         let headers =
                             headerRange.values.[0]
                             |> Seq.map (fun item ->
@@ -184,6 +245,7 @@ module OfficeInteropExtensions =
                                 |> Option.defaultValue ""
                                 |> (fun s -> s.TrimEnd())
                             )
+
                         let bodyRows =
                             bodyRowRange.values
                             |> Seq.map (fun items ->
@@ -194,11 +256,121 @@ module OfficeInteropExtensions =
                                     |> Option.defaultValue ""
                                 )
                             )
+
                         ArcTable.fromStringSeqs(excelTable.name, headers, bodyRows)
                     )
                     return inMemoryTable
             }
 
+        /// <summary>
+        /// Checks whether the string seqs are part of a valid arc table or not and returns potential errors and index of them in the annotation table
+        /// </summary>
+        /// <param name="headers"></param>
+        /// <param name="rows"></param>
+        static member validateAnnotationTable(headers:#seq<string>, rows:#seq<#seq<string>>) =
+
+            let columns = 
+                Seq.append [headers] rows 
+                |> Seq.transpose
+
+            let columnsArray = 
+                columns 
+                |> Seq.toArray
+                |> Array.map (Seq.toArray)
+
+            let groupedColumns = columnsArray |> ArcTable.groupColumnsByHeader
+
+            let indexedError =
+                groupedColumns
+                |> Array.mapi (fun i c ->
+                    try
+                        let _ = CompositeColumn.fromStringCellColumns c
+                        None
+                    with
+                    | ex ->
+                        //The target index must be adapted depending on the position of the error column
+                        //because the columns were group based on potential main columns
+                        let hasMainColumn =
+                            groupedColumns.[i]
+                            |> Array.map (fun gc ->
+                                CompositeHeader.Cases
+                                |> Array.exists (fun (_, header) -> gc.[0].StartsWith(header))
+                            )
+                            |> Array.contains true
+
+                        if hasMainColumn then Some (ex, i)
+                        else Some (ex, i - 1)
+                )
+                |> Array.filter (fun i -> i.IsSome)
+
+            let indexedError =
+                if indexedError.Length > 0 then indexedError |> Array.map (fun i -> i.Value)
+                else [||]
+
+            let newHeaders = headers |> Array.ofSeq
+
+            let errorIndices =
+                indexedError
+                |> Array.map (fun (ex, bi) ->
+                    ex,
+                    groupedColumns.[0..bi]
+                    |> Array.map (fun bb -> bb.Length)
+                    |> Array.sum
+                    |> (fun i -> newHeaders.[i])
+                )
+
+            errorIndices
+
+        /// <summary>
+        /// Validate whether the selected excel table is a valid ARC / ISA table
+        /// </summary>
+        /// <param name="excelTable"></param>
+        /// <param name="context"></param>
+        static member validateExcelTable (excelTable:Table, context:RequestContext) =
+            
+            promise {
+                    //Get headers and body
+                    let headerRange = excelTable.getHeaderRowRange()
+                    let bodyRowRange = excelTable.getDataBodyRange()
+
+                    let _ =
+                        headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+                        bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+
+                    do! context.sync().``then``(fun _ -> ())
+
+                    let inMemoryTable = 
+
+                        let headers =
+                            headerRange.values.[0]
+                            |> Seq.map (fun item ->
+                                item
+                                |> Option.map string
+                                |> Option.defaultValue ""
+                                |> (fun s -> s.TrimEnd())
+                            )
+
+                        let bodyRows =
+                            bodyRowRange.values
+                            |> Seq.map (fun items ->
+                                items
+                                |> Seq.map (fun item ->
+                                    item
+                                    |> Option.map string
+                                    |> Option.defaultValue ""
+                                )
+                            )
+
+                        ArcTable.validateAnnotationTable(headers, bodyRows)
+                    
+                    return inMemoryTable
+            }
+
+        /// <summary>
+        /// Try to get a arc table from excel file based on excel table name
+        /// </summary>
+        /// <param name="tableName"></param>
+        /// <param name="context"></param>
         static member tryGetFromExcelTableName (tableName:string, context:RequestContext) =
 
             let result = ExcelHelper.tryGetTableByName context tableName
@@ -287,7 +459,10 @@ let swateSync (context:RequestContext) =
 // I subtract from the index of the current worksheet the indices of the other found worksheets with annotationTable.
 // I sort by the resulting lowest number (since the worksheet is then closest to the active one), I find the output column in the particular
 // annotationTable and use the values it contains for the new annotationTable in the active worksheet.
-/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
+/// <summary>
+/// Will return Some tableName if any annotationTable exists in a worksheet before the active one
+/// </summary>
+/// <param name="context"></param>
 let tryGetPrevAnnotationTableName (context:RequestContext) =
     promise {
     
@@ -319,7 +494,10 @@ let tryGetPrevAnnotationTableName (context:RequestContext) =
         return prevTable
     }
 
-
+/// <summary>
+/// Try select the annotation table from the current active work sheet
+/// </summary>
+/// <param name="context"></param>
 let tryGetActiveAnnotationTable (context: RequestContext) =
     promise {
     
@@ -344,6 +522,10 @@ let tryGetActiveAnnotationTable (context: RequestContext) =
         return activeTable
     }
 
+/// <summary>
+/// Select the annotation table from the current active work sheet
+/// </summary>
+/// <param name="context"></param>
 let getActiveAnnotationTable (context: RequestContext) =
     promise {
         let! table = tryGetActiveAnnotationTable context
@@ -353,7 +535,10 @@ let getActiveAnnotationTable (context: RequestContext) =
             | Some t -> t
     }
 
-/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
+/// <summary>
+/// Will return Some tableName if any annotationTable exists in a worksheet before the active one
+/// </summary>
+/// <param name="context"></param>
 let tryGetActiveAnnotationTableName (context:RequestContext) : JS.Promise<string option> =
     promise {
     
@@ -362,7 +547,11 @@ let tryGetActiveAnnotationTableName (context:RequestContext) : JS.Promise<string
         return table |> Option.map (fun x -> x.name)
     }
 
-/// <summary>Will return Some tableName if any annotationTable exists in a worksheet before the active one.</summary>
+/// <summary>
+/// Will return Some tableName if any annotationTable exists in a worksheet before the active one
+/// </summary>
+/// <param name="context"></param>
+/// <param name="name"></param>
 let tryGetAnnotationTableByName (context:RequestContext) (name:string)=
     promise {
     
@@ -430,8 +619,13 @@ let tryGetPrevTableOutput (context:RequestContext) =
             return None
     }
 
-/// <summary>This function is used to create a new annotation table.
-/// 'isDark' refers to the current styling of excel (darkmode, or not).</summary>
+/// <summary>
+/// This function is used to create a new annotation table. 'isDark' refers to the current styling of excel (darkmode, or not).
+/// </summary>
+/// <param name="isDark"></param>
+/// <param name="tryUseLastOutput"></param>
+/// <param name="range"></param>
+/// <param name="context"></param>
 let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, range:Excel.Range, context: RequestContext) =
 
     // This function is used to create the "next" annotationTable name.
@@ -585,8 +779,11 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
         return (table, logging)
     }
 
-/// <summary>This function is used to create a new annotation table.
-/// 'isDark' refers to the current styling of excel (darkmode, or not).</summary>
+/// <summary>
+/// This function is used to create a new annotation table. 'isDark' refers to the current styling of excel (darkmode, or not)
+/// </summary>
+/// <param name="isDark"></param>
+/// <param name="tryUseLastOutput"></param>
 let createAnnotationTable (isDark:bool, tryUseLastOutput:bool) =
     Excel.run (fun context ->
         let selectedRange = context.workbook.getSelectedRange()
@@ -598,7 +795,9 @@ let createAnnotationTable (isDark:bool, tryUseLastOutput:bool) =
         }
     )
 
-/// <summary>This function is used before most excel interop messages to get the active annotationTable.</summary>
+/// <summary>
+/// This function is used before most excel interop messages to get the active annotationTable
+/// </summary>
 let tryFindActiveAnnotationTable() =
     Excel.run(fun context ->
 
@@ -626,8 +825,12 @@ let tryFindActiveAnnotationTable() =
         )
     )
 
-/// <summary>This function is used to hide all reference columns and to fit rows and columns to their values.
-/// The main goal is to improve readability of the table with this function.</summary>
+/// <summary>
+/// This function is used to hide all reference columns and to fit rows and columns to their values.
+/// The main goal is to improve readability of the table with this function.
+/// </summary>
+/// <param name="hideRefCols"></param>
+/// <param name="context"></param>
 let autoFitTable (hideRefCols:bool) (context:RequestContext) =
     promise {
         let! excelTable = getActiveAnnotationTableName context
@@ -668,12 +871,19 @@ let autoFitTable (hideRefCols:bool) (context:RequestContext) =
         return res
     }
 
-/// <summary>This function is used to hide all reference columns and to fit rows and columns to their values.
-/// The main goal is to improve readability of the table with this function.</summary>
+/// <summary>
+/// This function is used to hide all reference columns and to fit rows and columns to their values.
+/// The main goal is to improve readability of the table with this function.
+/// </summary>
+/// <param name="context"></param>
 let autoFitTableHide (context:RequestContext) =
     autoFitTable true context
 
-// ExcelApi 1.2
+/// <summary>
+/// Autofit on all tables, columns, and their values for ExcelApi 1.2
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="context"></param>
 let autoFitTableByTable (excelTable:Table) (context:RequestContext) =
 
     let allCols = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
@@ -1084,6 +1294,14 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
 
         loggingList
 
+/// <summary>
+/// Add a building block at the desired index to the given annotation table
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="newBB"></param>
+/// <param name="headerRange"></param>
+/// <param name="selectedRange"></param>
 let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) (headerRange:Excel.Range) (selectedRange:Excel.Range) =
 
     let rowCount = arcTable.RowCount + 1
@@ -1151,6 +1369,10 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 
     loggingList
 
+/// <summary>
+/// Prepare the given table to be joined with the currently active annotation table
+/// </summary>
+/// <param name="tableToAdd"></param>
 let prepareTemplateInMemory (tableToAdd:ArcTable) =
     Excel.run(fun context ->
         promise {
@@ -1183,6 +1405,12 @@ let prepareTemplateInMemory (tableToAdd:ArcTable) =
         }
     )
 
+/// <summary>
+/// Add the given arc table to the active annotation table at the desired index
+/// </summary>
+/// <param name="tableToAdd"></param>
+/// <param name="index"></param>
+/// <param name="options"></param>
 let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions option) =
     Excel.run(fun context ->
         promise {
@@ -1192,8 +1420,7 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
             let! excelTable = getActiveAnnotationTable context
 
             //Arctable enables a fast check for the existence of input- and output-columns and their indices
-            let! arcTable =                
-                ArcTable.tryGetFromExcelTable(excelTable, context)
+            let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
 
             //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
             if arcTable.IsSome then
@@ -1266,7 +1493,10 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
             }
     )
 
-/// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition.
+/// <summary>
+/// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
+/// </summary>
+/// <param name="newBB"></param>
 let addAnnotationBlockHandler (newBB:CompositeColumn) =
     Excel.run(fun context ->
         promise {
@@ -1324,8 +1554,7 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
     )
 
 /// <summary>
-/// Returns a ResizeArray of indices and header names for the selected building block.
-///
+/// Returns a ResizeArray of indices and header names for the selected building block
 /// The indices are rebased to the excel annotation table.
 /// </summary>
 /// <param name="columns"></param>
@@ -1341,6 +1570,34 @@ let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
 
         return! context.sync().``then``(fun _ ->
             let rebasedIndex = selectedRange.columnIndex - headerRange.columnIndex |> int
+            if rebasedIndex < 0 || rebasedIndex >= (int headerRange.columnCount) then
+                failwith "Cannot select building block outside of annotation table!"
+            let headers: string [] = [|for v in headerRange.values.[0] do v.Value :?> string|]
+            let selectedHeader = rebasedIndex, headers.[rebasedIndex]
+            let buildingBlockGroups = groupToBuildingBlocks headers
+            let selectedBuildingBlock =
+                buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
+            selectedBuildingBlock
+        )
+    }
+
+/// <summary>
+/// Select a building block, shifted by adaptedIndex from the selected building block 
+/// </summary>
+/// <param name="table"></param>
+/// <param name="adaptedIndex"></param>
+/// <param name="context"></param>
+let getAdaptedSelectedBuildingBlock (table: Table) (adaptedIndex: float) (context: RequestContext) =
+
+    promise {
+
+        let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
+
+        let headerRange = table.getHeaderRowRange()
+        let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+
+        return! context.sync().``then``(fun _ ->
+            let rebasedIndex = selectedRange.columnIndex - headerRange.columnIndex + adaptedIndex |> int
             if rebasedIndex < 0 || rebasedIndex >= (int headerRange.columnCount) then
                 failwith "Cannot select building block outside of annotation table!"
             let headers: string [] = [|for v in headerRange.values.[0] do v.Value :?> string|]
@@ -1373,6 +1630,9 @@ let removeSelectedAnnotationBlock () =
         }
     )
 
+/// <summary>
+/// Get the main column of the arc table of the selected building block of the active annotation table
+/// </summary>
 let getArcMainColumn () =
     Excel.run (fun context ->
         promise {
@@ -1409,26 +1669,47 @@ let getArcMainColumn () =
         }
     )
 
+/// <summary>
+/// Convert the body of the given column into free text
+/// </summary>
+/// <param name="column"></param>
 let convertToFreeTextColumn (column: CompositeColumn) =
     let freeTextCells = column.Cells |> Array.map (fun c -> c.ToFreeTextCell())
     freeTextCells
     |> Array.iteri (fun i _ -> column.Cells.[i] <- freeTextCells.[i])
 
+/// <summary>
+/// Convert the body of the given column into data
+/// </summary>
+/// <param name="column"></param>
 let convertToDataColumn (column: CompositeColumn) =
     let dataCells = column.Cells |> Array.map (fun c -> c.ToDataCell())
     dataCells
     |> Array.iteri (fun i _ -> column.Cells.[i] <- dataCells.[i])
 
+/// <summary>
+/// Convert the body of the given column into unit
+/// </summary>
+/// <param name="column"></param>
 let convertToUnitColumn (column: CompositeColumn) =
     let unitCells = column.Cells |> Array.map (fun c -> c.ToUnitizedCell())
     unitCells
     |> Array.iteri (fun i _ -> column.Cells.[i] <- unitCells.[i])
 
+/// <summary>
+/// Convert the body of the given column into term
+/// </summary>
+/// <param name="column"></param>
 let convertToTermColumn (column: CompositeColumn) =
     let termCells = column.Cells |> Array.map (fun c -> c.ToTermCell())
     termCells
     |> Array.iteri (fun i _ -> column.Cells.[i] <- termCells.[i])
 
+/// <summary>
+/// Delete columns of at the given indices of the table
+/// </summary>
+/// <param name="selectedColumns"></param>
+/// <param name="excelTable"></param>
 let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable:Table) =
     // iterate DESCENDING to avoid index shift
     for i in Seq.sortByDescending (fun x -> x) selectedColumns do
@@ -1436,6 +1717,13 @@ let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable:Table) =
         log $"delete column {i}"
         column.delete()
 
+/// <summary>
+/// Add a building block at a specified position to the given table
+/// </summary>
+/// <param name="excelIndex"></param>
+/// <param name="newBB"></param>
+/// <param name="table"></param>
+/// <param name="context"></param>
 let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) (context: RequestContext)=
     promise {
 
@@ -1451,10 +1739,7 @@ let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) 
         let headers =
             buildingBlockCells
             |> List.map (fun bbc -> bbc.[0])
-            |> List.map (fun s -> Indexing.extendName stringHeaders s)
-        let body =
-            buildingBlockCells
-            |> List.map (fun bbc -> bbc.[1..])            
+            |> List.map (fun s -> Indexing.extendName stringHeaders s)     
 
         //Create a matrix for tabes that contains the right value for each cell
         let bodyValues =
@@ -1467,10 +1752,12 @@ let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) 
 
         headers
         |> List.iteri (fun ci header -> ExcelHelper.addColumnAndRows (float (excelIndex + ci)) table header bodyValues.[ci] |> ignore)
-        ()
     }
 
-/// This function is used to add unit reference columns to an existing building block without unit reference columns
+/// <summary>
+/// This function is used to convert building blocks that can be converted. Data building blocks can be converted into free text, free text into data,
+/// terms into units and units into terms
+/// </summary>
 let convertBuildingBlock () =
     Excel.run(fun context ->
         promise {
@@ -1508,6 +1795,175 @@ let convertBuildingBlock () =
             return [InteropLogging.Msg.create InteropLogging.Warning msg]
         }
     )
+
+/// <summary>
+/// Validate the selected columns
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="selectedIndex"></param>
+/// <param name="targetIndex"></param>
+/// <param name="context"></param>
+let validateColumns (excelTable:Table, selectedIndex:int, targetIndex:int, context:RequestContext) =
+
+    promise {
+
+        let headerRange = excelTable.getHeaderRowRange()
+        let bodyRowRange = excelTable.getDataBodyRange()
+
+        let _ =
+            headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+            bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+
+        let! inMemoryTable = context.sync().``then``(fun _ ->
+
+            let getRange (ti:int) (si:int) (range:array<'a>) =
+                if ti < si then range.[ti..si]
+                else range.[si..ti]
+
+            let headerRow =
+                headerRange.values.[0]
+                |> Array.ofSeq
+                |> getRange targetIndex selectedIndex
+                |> Seq.map (fun item ->
+                    item
+                    |> Option.map string
+                    |> Option.defaultValue ""
+                    |> (fun s -> s.TrimEnd())
+                )
+
+            let bodyRows =
+                bodyRowRange.values
+                |> Seq.map (fun items ->
+                    items
+                    |> Array.ofSeq
+                    |> getRange targetIndex selectedIndex
+                    |> Seq.map (fun item ->
+                        item
+                        |> Option.map string
+                        |> Option.defaultValue ""
+                    )
+                )
+
+            ArcTable.validateAnnotationTable(headerRow, bodyRows)
+        )
+        return inMemoryTable
+    }
+
+/// <summary>
+/// Validate the selected building block and those next to it
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="context"></param>
+let validateBuildingBlock (excelTable:Table, context:RequestContext) =
+
+    let columns = excelTable.columns
+    let selectedRange = context.workbook.getSelectedRange()
+
+    let _ =
+        columns.load(propertyNames = U2.Case2 (ResizeArray[|"count"; "items"; "name"|])) |> ignore
+        selectedRange.load(U2.Case2 (ResizeArray [|"values"; "columnIndex"|]))
+
+    promise {
+
+            do! context.sync().``then``( fun _ -> ())
+
+            let columnIndex = selectedRange.columnIndex
+            let selectedColumns = columns.items |> Array.ofSeq
+            let selectedColumn = selectedColumns.[int columnIndex]
+
+            let isMainColumn =
+                CompositeHeader.Cases
+                |> Array.exists (fun (_, header) -> selectedColumn.name.StartsWith(header))
+
+            let headerRange = excelTable.getHeaderRowRange()
+            let bodyRowRange = excelTable.getDataBodyRange()
+
+            let _ =
+                headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+                bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+
+            let mutable errors:list<exn*string> = []
+
+            if isMainColumn then
+                let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
+                let targetIndex = fst (selectedBuildingBlock.Item (selectedBuildingBlock.Count - 1))
+                let! result = validateColumns(excelTable, int columnIndex, targetIndex, context)
+
+                errors <- result |> List.ofArray
+
+            if columnIndex > 0 && errors.IsEmpty then
+                let! selectedBuildingBlock = getAdaptedSelectedBuildingBlock excelTable -1. context
+                let targetIndex = selectedBuildingBlock |> Array.ofSeq
+                let! result = validateColumns(excelTable, fst targetIndex.[0], fst targetIndex.[targetIndex.Length - 1], context)
+
+                result
+                |> Array.iter (fun r ->
+                    errors <- r :: errors
+                )
+
+            if columnIndex < columns.count && errors.IsEmpty then
+                let! selectedBuildingBlock = getAdaptedSelectedBuildingBlock excelTable 1. context
+                let targetIndex = selectedBuildingBlock |> Array.ofSeq
+                let! result = validateColumns(excelTable, fst targetIndex.[0], fst targetIndex.[targetIndex.Length - 1], context)
+
+                result
+                |> Array.iter (fun r ->
+                    errors <- r :: errors
+                )
+
+            return (Array.ofList errors)
+    }
+
+/// <summary>
+/// Checks whether the annotation table is a valid arc table or not
+/// </summary>
+let validateSelectedAndNeighbouringBuildingBlocks () =
+    Excel.run(fun context ->
+        promise {
+
+            let! excelTable = getActiveAnnotationTable context
+
+            let! indexedErrors = validateBuildingBlock(excelTable, context)
+
+            let messages =
+                if indexedErrors.Length > 0 then
+                    indexedErrors
+                    |> List.ofArray
+                    |> List.collect (fun (ex, header ) ->
+                        [InteropLogging.Msg.create InteropLogging.Warning $"The building block is not valid for a ARC table / ISA table: {ex.Message}";
+                         InteropLogging.Msg.create InteropLogging.Warning $"The column {header} is not valid! It needs further inspection what causes the error"])
+                else
+                    [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+
+            return messages
+        }
+    )
+
+/// <summary>
+/// Checks whether the selected building block and those next to it are valid
+/// </summary>
+let validateAnnotationTable () =
+    Excel.run(fun context ->
+        promise {
+
+            let! excelTable = getActiveAnnotationTable context
+            let! indexedErrors = ArcTable.validateExcelTable(excelTable, context)
+
+            let messages =
+                if indexedErrors.Length > 0 then
+                    indexedErrors
+                    |> List.ofArray
+                    |> List.collect (fun (ex, header ) ->
+                        [InteropLogging.Msg.create InteropLogging.Warning $"Table is not a valid ARC table / ISA table: {ex.Message}";
+                         InteropLogging.Msg.create InteropLogging.Warning $"The column {header} is not valid! It needs further inspection what causes the error"])
+                else
+                    [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+
+            return messages
+        }
+    )
+
+// Old stuff, mostly deprecated
 
 let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
     let createList (rowCount:int) (values:string []) =

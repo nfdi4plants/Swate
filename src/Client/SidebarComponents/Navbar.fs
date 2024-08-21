@@ -1,9 +1,5 @@
 module SidebarComponents.Navbar
 
-open Fable.React
-open Fable.React.Props
-
-open ExcelColors
 open Model
 open Messages
 
@@ -52,13 +48,16 @@ let private shortCutIconList model dispatch =
         | _ ->
             ()
         QuickAccessButton.create(
-            "Update Ontology Terms",
+            "Validate / Update Ontology Terms",
             [
                 Html.i [prop.className "fa-solid fa-spell-check"]
                 Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
                 Html.i [prop.className "fa-solid fa-pen"]
             ],
-            (fun _ -> SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch)
+            (fun _ ->
+                SpreadsheetInterface.ValidateAnnotationTable |> InterfaceMsg |> dispatch
+                SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch                
+            )
         )
         QuickAccessButton.create(
             "Remove Building Block",

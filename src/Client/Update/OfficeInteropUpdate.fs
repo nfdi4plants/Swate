@@ -127,13 +127,29 @@ module OfficeInterop =
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model,cmd
 
+            | ValidateAnnotationTable ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.validateAnnotationTable  
+                        ()
+                        (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg) //success
+                        (curry GenericError Cmd.none >> DevMsg) //error
+                state, model,cmd
+
             | AnnotationtableCreated ->
                 let nextState = {
                     model.ExcelState with
                         HasAnnotationTable = true
                 }
                 nextState, model, Cmd.none
-
+            | ValidateBuildingBlock ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.validateSelectedAndNeighbouringBuildingBlocks
+                        ()
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
 
             | GetParentTerm ->
                 let cmd =

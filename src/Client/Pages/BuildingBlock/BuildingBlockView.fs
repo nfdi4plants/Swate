@@ -74,8 +74,6 @@ open Feliz.Bulma
 //        ]
 //    ]
 
-
-
 let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
     Html.div [
         prop.onSubmit (fun e -> e.preventDefault())

@@ -28,11 +28,13 @@ type Model = {
 
 type Msg =
     // create and update table element functions
-    | CreateAnnotationTable                 of tryUsePrevOutput:bool 
+    | CreateAnnotationTable                 of tryUsePrevOutput:bool
+    | ValidateAnnotationTable
     | AnnotationtableCreated
     | TryFindAnnotationTable
     | AnnotationTableExists                 of TryFindAnnoTableResult
     | InsertOntologyTerm                    of TermMinimal
+    | ValidateBuildingBlock
     | AddAnnotationBlock                    of CompositeColumn
     | AddAnnotationBlocks                   of CompositeColumn [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | ImportFile                            of (string*InsertBuildingBlock []) []

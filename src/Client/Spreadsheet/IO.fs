@@ -2,9 +2,7 @@ module Spreadsheet.IO
 
 open ARCtrl
 open ARCtrl.Spreadsheet
-open FsSpreadsheet.Js
 open Shared
-open FsSpreadsheet
 
 module Xlsx =
 
@@ -29,8 +27,6 @@ module Xlsx =
 
 module Json =
 
-    open ARCtrlHelper
-    open ARCtrl
     open ARCtrl.Json
 
     let readFromJson (fileType: ArcFilesDiscriminate) (jsonType: JsonExportFormat) (json: string) =
