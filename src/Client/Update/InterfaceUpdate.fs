@@ -254,7 +254,7 @@ module Interface =
                 | Some Swatehost.Excel ->
                     failwith "ExportJson not implemented for Excel"
                     model, Cmd.none
-                | Some Swatehost.Browser ->
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = SpreadsheetMsg (Spreadsheet.ExportJson (arcfile, jef)) |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
