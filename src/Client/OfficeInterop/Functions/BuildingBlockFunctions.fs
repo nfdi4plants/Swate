@@ -298,10 +298,10 @@ let toTermSearchable (buildingBlock:BuildingBlock) =
             // get all units from cells
             |> Array.map (fun cell -> cell.Unit, cell.Index)
             // filter units to unique
-            |> Array.choose (fun (unitName,rowInd) -> if unitName.IsSome then Some (unitName.Value,rowInd) else None)
+            |> Array.choose (fun (unitName, rowInd) -> if unitName.IsSome then Some (unitName.Value, rowInd) else None)
             |> Array.groupBy fst
             // get only units where unit.isSome
-            |> Array.map (fun (unitTerm,cellInfoArr) ->
+            |> Array.map (fun (unitTerm, cellInfoArr) ->
                 let cellRowIndices = cellInfoArr |> Array.map snd |> Array.distinct
                 // will not contain termAccession
                 TermSearchable.create unitTerm None true colIndex cellRowIndices
@@ -314,10 +314,10 @@ let toTermSearchable (buildingBlock:BuildingBlock) =
             // get all terms from cells
             |> Array.map (fun cell -> cell.Value, cell.Index)
             // get only values where value.isSome
-            |> Array.choose (fun (valueName,rowInd) -> if valueName.IsSome then Some (valueName.Value,rowInd) else None)
+            |> Array.choose (fun (valueName, rowInd) -> if valueName.IsSome then Some (valueName.Value, rowInd) else None)
             |> Array.groupBy fst
             // filter terms to unique
-            |> Array.map (fun (valueName,cellInfoArr) ->
+            |> Array.map (fun (valueName, cellInfoArr) ->
                 let cellRowIndices = cellInfoArr |> Array.map snd |> Array.distinct
                 let tryFindAccession =
                     buildingBlock.TAN.Value.Cells

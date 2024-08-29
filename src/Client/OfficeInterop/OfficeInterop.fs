@@ -49,11 +49,9 @@ module OfficeInteropExtensions =
     /// <param name="table"></param>
     /// <param name="columnIndex"></param>
     /// <param name="context"></param>
-    let getChosenBuildingBlock (table: Table) (columnIndex: float) (context: RequestContext) =
+    let getBuildingBlockByIndex (table: Table) (columnIndex: float) (context: RequestContext) =
 
         promise {
-
-            let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
 
             let headerRange = table.getHeaderRowRange()
             let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
@@ -104,6 +102,14 @@ module OfficeInteropExtensions =
             |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
             |> Seq.toArray
 
+        /// <summary>
+        /// Add a new column at the given index
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="excelTable"></param>
+        /// <param name="name"></param>
+        /// <param name="rowCount"></param>
+        /// <param name="value"></param>
         static member addColumn (index:float) (excelTable:Table) name rowCount value =
             let col = createMatrixForTables 1 rowCount value
 
@@ -1136,14 +1142,13 @@ let replaceOutputColumn (excelTableName:string) (existingOutputColumn: BuildingB
                 ()
             )
 
-            let! fit = autoFitTableByTable excelTable context
+            let! _ = autoFitTableByTable excelTable context
+
             let warningMsg = $"Found existing output column \"{existingOutputColumn.MainColumn.Header.SwateColumnHeader}\". Changed output column to \"{newOutputcolumn.ColumnHeader.toAnnotationTableHeader()}\"."
 
             let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
 
-            let loggingList = [
-                msg
-            ]
+            let loggingList = [ msg ]
 
             return loggingList
         }
@@ -1183,9 +1188,7 @@ let updateInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCol
 
             let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
 
-            let loggingList = [
-                msg
-            ]
+            let loggingList = [ msg ]
 
             loggingList
         else
@@ -1215,9 +1218,7 @@ let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn
 
         let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new input column: {newBB.Header}"
 
-        let loggingList = [
-                msg
-        ]
+        let loggingList = [ msg ]
 
         loggingList
 
@@ -1255,9 +1256,7 @@ let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCo
 
             let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
 
-            let loggingList = [
-                msg
-            ]
+            let loggingList = [ msg ]
 
             loggingList
         else
@@ -1288,9 +1287,7 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
 
         let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new output column: {newBB.Header}"
 
-        let loggingList = [
-                msg
-        ]
+        let loggingList = [ msg ]
 
         loggingList
 
@@ -1347,13 +1344,15 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 
     buildingBlockCells
     |> List.iteri(fun i bbCell ->
-        let mutable newHeader = bbCell.Head
-        //check and extend header to avoid duplicates
-        newHeader <- Indexing.extendName (headers |> List.toArray) bbCell.Head            
+        //check and extend header to avoid duplicates        
+        let newHeader = Indexing.extendName (headers |> List.toArray) bbCell.Head        
         let calIndex =
             if targetIndex >= 0 then targetIndex + (float) i
             else AppendIndex
-        let column = ExcelHelper.addColumn calIndex excelTable newHeader rowCount bbCell.Tail.Head
+        let value =
+            if bbCell.Tail.IsEmpty then ""
+            else bbCell.Tail.Head
+        let column = ExcelHelper.addColumn calIndex excelTable newHeader rowCount value
         newHeader::headers |> ignore
         column.getRange().format.autofitColumns()
 
@@ -1363,9 +1362,7 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 
     let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new term column: {newBB.Header}"
 
-    let loggingList = [
-            msg
-    ]
+    let loggingList = [ msg ]
 
     loggingList
 
@@ -1963,6 +1960,141 @@ let validateAnnotationTable () =
         }
     )
 
+let fillEmptyBuildingBlocks () =
+    Excel.run(fun context ->
+        promise {
+
+            let! excelTable = getActiveAnnotationTable context
+
+            //Arctable enables a fast check for term and unit building blocks
+            let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
+
+            let mutable msg = []
+
+            let arcTable =
+                if arcTable.IsSome then arcTable.Value
+                else failwith "No arc table is available"
+
+            let columns = arcTable.Columns
+
+            let cells =
+                columns
+                |> Array.map (fun item -> item.Header.ToString(), item.Cells)
+
+            /// Get all 
+            let termsWithValues =
+                cells
+                |> Array.map (fun c ->
+                    fst c,
+                    snd c
+                    |> Array.choose (fun r ->
+                        if r.isTerm && not(String.IsNullOrEmpty(r.ToString())) then
+                            Some r.AsTerm
+                        else
+                            None)
+                )
+                |> Array.filter (fun (_, c) -> c.Length > 0)
+
+            //Check whether all values, including name, term source ref and accession number of a building block are the same or not
+            let _ =
+                termsWithValues
+                |> Array.iter (fun c ->
+                    let distinctByNames =
+                        snd c
+                        |> Array.distinctBy (fun r ->
+                            r.Name
+                        )
+                        |> Array.map (fun r -> r.Name)
+                    let distinctBySourceRefs =
+                        snd c
+                        |> Array.distinctBy (fun r ->
+                            r.TermSourceREF
+                        )
+                        |> Array.map (fun r -> r.TermSourceREF)
+                    let distinctByAccessionNumbers =
+                        snd c
+                        |> Array.distinctBy (fun r ->
+                            r.TermAccessionNumber
+                        )
+                        |> Array.map (fun r -> r.TermAccessionNumber)
+
+                    if distinctByNames.Length > 1 then
+                        msg <- InteropLogging.Msg.create InteropLogging.Error $"The building block of column {fst c} is not valid! Different names are used: {distinctByNames}" :: msg
+                    if distinctBySourceRefs.Length > 1 then
+                        msg <- InteropLogging.Msg.create InteropLogging.Error $"The building block of column {fst c} is not valid! Different source refs are used: {distinctBySourceRefs}" :: msg
+                    if distinctByAccessionNumbers.Length > 1 then
+                        msg <- InteropLogging.Msg.create InteropLogging.Error $"The building block of column {fst c} is not valid! Different accession numbers are used: {distinctByAccessionNumbers}" :: msg
+                )
+
+            //When msg > 0 there is an error and we can skip the filling of the rows because the columns are not valid
+            if msg.Length > 0 then return msg
+            else 
+                let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"count"; "items"; "name"; "values"; "rowCount"|]))
+
+                do! context.sync().``then``(fun _ -> ())
+
+                let items = excelTable.columns.items
+
+                do! context.sync().``then``(fun _ -> ())
+
+                let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
+
+                let columns =
+                    items
+                    |> Array.ofSeq
+                    |> Array.map (fun c ->
+                        c.values
+                        |> Array.ofSeq
+                        |> Array.collect (fun cc ->
+                            cc
+                            |> Array.ofSeq
+                            |> Array.choose (fun r -> if r.IsSome then Some (r.ToString()) else None)
+                        )
+                    )
+
+                let body = excelTable.getDataBodyRange()
+
+                let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
+
+                do! context.sync().``then``(fun _ -> ())
+
+                for i in 0..columns.Length-1 do
+                    let column = columns.[i]
+                    if Array.contains (column.[0].Trim()) termAndUnitHeaders then
+                        let! buildingBlock = getBuildingBlockByIndex excelTable i context                        
+                        buildingBlock
+                        |> Array.ofSeq
+                        |> Array.iter (fun (index, _) ->
+                            let bbColumn = excelTable.columns.items.Item index
+                            let columnValues =
+                                bbColumn.values
+                                |> Array.ofSeq
+                                |> Array.collect (fun c ->
+                                    c
+                                    |> Array.ofSeq
+                                    |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
+                                    |> Array.filter (fun cc -> not (String.IsNullOrEmpty(cc.ToString())))
+                                )
+
+                            if columnValues.Length > 1 && columnValues.Length < (arcTable.RowCount + 1) then
+                                let value = columnValues.[1]
+
+                                let bodyValues =
+                                    let values = Array.create (arcTable.RowCount + 1) value
+                                    values.[0] <- columnValues.[0]
+                                    values
+                                    |> Array.map (box >> Some)
+                                    |> Array.map (fun c -> ResizeArray[c])
+                                    |> ResizeArray
+
+                                excelTable.columns.items.[index].values <- bodyValues
+                            ()
+                        )
+
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+        }
+    )
+
 // Old stuff, mostly deprecated
 
 let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
@@ -1997,7 +2129,7 @@ let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount
             let tans      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTAN))
             [|termNames; tsrs; tans|]
 
-let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Table,context:RequestContext) =
+let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Table, context:RequestContext) =
     promise {
         
         let excelTable = table
@@ -2009,7 +2141,7 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
         /// alreadyExistingBBs -> will be used for logging
         let newBuildingBlocks, alreadyExistingBBs =
             let newSet = buildingBlocks |> Array.map (fun x -> x.ColumnHeader) |> Set.ofArray
-            let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint )|> Set.ofArray
+            let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint) |> Set.ofArray
             let bbsToAdd = Set.difference newSet prevSet |> Set.toArray
             // These building blocks do not exist in table and will be added
             let newBuildingBlocks =
@@ -2394,8 +2526,7 @@ let checkForDeprecation (buildingBlocks:BuildingBlock [])  =
             let message = InteropLogging.Msg.create InteropLogging.Warning m
             msgList <- message::msgList
             buildingBlocks
-        | None ->
-            buildingBlocks
+        | None -> buildingBlocks
     // Chain all deprecation checks
     buildingBlocks
     |> deprecated_DataFileName
