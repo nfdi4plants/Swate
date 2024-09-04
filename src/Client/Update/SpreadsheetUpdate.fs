@@ -4,11 +4,9 @@ open Messages
 open Elmish
 open Spreadsheet
 open LocalHistory
-open Spreadsheet
 open Model
 open Shared
 open Fable.Remoting.Client
-open FsSpreadsheet
 open FsSpreadsheet.Js
 open ARCtrl
 open ARCtrl.Spreadsheet
@@ -17,10 +15,6 @@ open ARCtrl.Json
 module Spreadsheet =
 
     module Helper =
-        open Browser
-        open Fable.Core
-        open Fable.Core.JS
-        open Fable.Core.JsInterop
 
         let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
 

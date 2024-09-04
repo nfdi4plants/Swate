@@ -1954,7 +1954,7 @@ let validateAnnotationTable () =
                         [InteropLogging.Msg.create InteropLogging.Warning $"Table is not a valid ARC table / ISA table: {ex.Message}. The column {header} is not valid! It needs further inspection what causes the error.";
                         ])
                 else
-                    [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+                    []
 
             return messages
         }
@@ -1964,71 +1964,23 @@ let fillEmptyBuildingBlocks () =
     Excel.run(fun context ->
         promise {
 
-            let! excelTable = getActiveAnnotationTable context
-
-            //Arctable enables a fast check for term and unit building blocks
-            let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
-
-            let mutable msg = []
-
-            let arcTable =
-                if arcTable.IsSome then arcTable.Value
-                else failwith "No arc table is available"
-
-            let columns = arcTable.Columns
-
-            let cells =
-                columns
-                |> Array.map (fun item -> item.Header.ToString(), item.Cells)
-
-            /// Get all 
-            let termsWithValues =
-                cells
-                |> Array.map (fun c ->
-                    fst c,
-                    snd c
-                    |> Array.choose (fun r ->
-                        if r.isTerm && not(String.IsNullOrEmpty(r.ToString())) then
-                            Some r.AsTerm
-                        else
-                            None)
-                )
-                |> Array.filter (fun (_, c) -> c.Length > 0)
-
-            //Check whether all values, including name, term source ref and accession number of a building block are the same or not
-            let _ =
-                termsWithValues
-                |> Array.iter (fun c ->
-                    let distinctByNames =
-                        snd c
-                        |> Array.distinctBy (fun r ->
-                            r.Name
-                        )
-                        |> Array.map (fun r -> r.Name)
-                    let distinctBySourceRefs =
-                        snd c
-                        |> Array.distinctBy (fun r ->
-                            r.TermSourceREF
-                        )
-                        |> Array.map (fun r -> r.TermSourceREF)
-                    let distinctByAccessionNumbers =
-                        snd c
-                        |> Array.distinctBy (fun r ->
-                            r.TermAccessionNumber
-                        )
-                        |> Array.map (fun r -> r.TermAccessionNumber)
-
-                    if distinctByNames.Length > 1 then
-                        msg <- InteropLogging.Msg.create InteropLogging.Error $"The building block of column {fst c} is not valid! Different names are used: {distinctByNames}" :: msg
-                    if distinctBySourceRefs.Length > 1 then
-                        msg <- InteropLogging.Msg.create InteropLogging.Error $"The building block of column {fst c} is not valid! Different source refs are used: {distinctBySourceRefs}" :: msg
-                    if distinctByAccessionNumbers.Length > 1 then
-                        msg <- InteropLogging.Msg.create InteropLogging.Error $"The building block of column {fst c} is not valid! Different accession numbers are used: {distinctByAccessionNumbers}" :: msg
-                )
+            let! msg = validateAnnotationTable ()
+            let mutable messages = msg
 
             //When msg > 0 there is an error and we can skip the filling of the rows because the columns are not valid
-            if msg.Length > 0 then return msg
+            if messages.Length > 0 then return messages
             else 
+                let! excelTable = getActiveAnnotationTable context
+
+                //Arctable enables a fast check for term and unit building blocks
+                let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
+
+                let arcTable =
+                    if arcTable.IsSome then arcTable.Value
+                    else failwith "No arc table is available"
+
+                let columns = arcTable.Columns
+
                 let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"count"; "items"; "name"; "values"; "rowCount"|]))
 
                 do! context.sync().``then``(fun _ -> ())
@@ -2061,35 +2013,64 @@ let fillEmptyBuildingBlocks () =
                 for i in 0..columns.Length-1 do
                     let column = columns.[i]
                     if Array.contains (column.[0].Trim()) termAndUnitHeaders then
-                        let! buildingBlock = getBuildingBlockByIndex excelTable i context                        
-                        buildingBlock
-                        |> Array.ofSeq
-                        |> Array.iter (fun (index, _) ->
-                            let bbColumn = excelTable.columns.items.Item index
-                            let columnValues =
-                                bbColumn.values
+                        let! potBuildingBlock = getBuildingBlockByIndex excelTable i context
+                        let buildingBlock = potBuildingBlock |> Array.ofSeq
+
+                        // Check whether building block is unit or not
+                        // When it is unit, then delete the property column values only when the unit is empty, independent of the main column
+                        // When it is a term, then delete the property column values when the main column is empty
+                        let mainColumn =
+                            if snd buildingBlock.[1] = "Unit" then
+                                excelTable.columns.items.Item (fst buildingBlock.[1])
+                            else excelTable.columns.items.Item (fst buildingBlock.[0])
+                        let potPropertyColumns =
+                            buildingBlock.[1..]
+                            |> Array.map (fun (index, _) -> index, excelTable.columns.items.Item index)
+
+                        let propertyColumns =
+                            potPropertyColumns
+                            |> Array.map (fun (index, c) ->
+                                index,
+                                c.values
                                 |> Array.ofSeq
-                                |> Array.collect (fun c ->
-                                    c
+                                |> Array.collect (fun pc ->
+                                    pc
                                     |> Array.ofSeq
-                                    |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
-                                    |> Array.filter (fun cc -> not (String.IsNullOrEmpty(cc.ToString())))
+                                    |> Array.choose (fun pcv -> if pcv.IsSome then Some (pcv.ToString()) else None)
                                 )
+                            )
 
-                            if columnValues.Length > 1 && columnValues.Length < (arcTable.RowCount + 1) then
-                                let value = columnValues.[1]
+                        let mainColumnHasValues =                           
+                            mainColumn.values
+                            |> Array.ofSeq
+                            |> Array.collect (fun c ->
+                                c
+                                |> Array.ofSeq
+                                |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
+                                |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
+                            )
 
-                                let bodyValues =
-                                    let values = Array.create (arcTable.RowCount + 1) value
-                                    values.[0] <- columnValues.[0]
-                                    values
-                                    |> Array.map (box >> Some)
-                                    |> Array.map (fun c -> ResizeArray[c])
-                                    |> ResizeArray
+                        //Check whether value of property colum is fitting for value of main column and adapt if not
+                        //Delete values of property columns when main column is empty
+                        propertyColumns
+                        |> Array.iter (fun (pIndex, pcv) ->
+                            let values = Array.create (arcTable.RowCount + 1) ""
+                            mainColumnHasValues
+                            |> Array.iteri (fun mainIndex (mc, isNull) ->                                
+                                //if isNull for main column, then use empty string as value for properties
+                                if not isNull then
+                                    values.[mainIndex] <- pcv.[mainIndex]
+                            )
 
-                                excelTable.columns.items.[index].values <- bodyValues
-                            ()
+                            let bodyValues =
+                                values
+                                |> Array.map (box >> Some)
+                                |> Array.map (fun c -> ResizeArray[c])
+                                |> ResizeArray
+                            excelTable.columns.items.[pIndex].values <- bodyValues
                         )
+
+                //do! ExcelHelper.adoptTableFormats(excelTable, context, true)
 
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
         }

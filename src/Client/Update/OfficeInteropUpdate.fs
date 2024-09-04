@@ -7,7 +7,6 @@ open OfficeInterop
 open Shared
 open OfficeInteropTypes
 open Model
-open ARCtrl
 
 module OfficeInterop = 
     let update (state: OfficeInterop.Model) (model:Model) (msg: OfficeInterop.Msg) : OfficeInterop.Model * Model * Cmd<Messages.Msg> =
@@ -166,7 +165,7 @@ module OfficeInterop =
                 //    Cmd.OfPromise.either
                 //        OfficeInterop.Core.getAllAnnotationBlockDetails 
                 //        ()
-                //        (fun (searchTerms,deprecationLogs) ->
+                //        (fun (searchTerms, deprecationLogs) ->
                 //            // Push possible deprecation messages by piping through "GenericInteropLogs"
                 //            GenericInteropLogs (
                 //                // This will be executed after "deprecationLogs" are handled by "GenericInteropLogs"

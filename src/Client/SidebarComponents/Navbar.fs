@@ -55,7 +55,7 @@ let private shortCutIconList model dispatch =
                 Html.i [prop.className "fa-solid fa-pen"]
             ],
             (fun _ ->
-                SpreadsheetInterface.ValidateAnnotationTable |> InterfaceMsg |> dispatch
+                //SpreadsheetInterface.ValidateAnnotationTable |> InterfaceMsg |> dispatch
                 SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch                
             )
         )
