@@ -43,7 +43,7 @@ type ExcelMetadataState = {
         Template = None
     }
 
-let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
+let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.style [
             style.display.flex
@@ -57,12 +57,12 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (closeModal
                     setExcelMetadataType {
                         excelMetadataType with
                             Identifier = Some investigation.Identifier
+                            MetadataType = Some ArcFilesDiscriminate.Investigation
                             Investigation = Some investigation
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcFilesDiscriminate.Investigation)
                     |> OfficeInteropMsg
                     |> dispatch
-                    closeModal()
                 )
                 prop.text "Investigation"
             ]
@@ -74,12 +74,12 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (closeModal
                     setExcelMetadataType {
                         excelMetadataType with
                             Identifier = Some study.Identifier
+                            MetadataType = Some ArcFilesDiscriminate.Study
                             Study = Some (study, [])
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcFilesDiscriminate.Study)                            
                     |> OfficeInteropMsg
                     |> dispatch
-                    closeModal()
                 )
                 prop.text "Study"
             ]
@@ -91,12 +91,12 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (closeModal
                     setExcelMetadataType {
                         excelMetadataType with
                             Identifier = Some assay.Identifier
+                            MetadataType = Some ArcFilesDiscriminate.Assay
                             Assay = Some assay
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcFilesDiscriminate.Assay)
                     |> OfficeInteropMsg
                     |> dispatch
-                    closeModal()
                 )
                 prop.text "Assay"
             ]
@@ -111,12 +111,12 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (closeModal
                     setExcelMetadataType {
                         excelMetadataType with
                             Identifier = Some template.Name
+                            MetadataType = Some ArcFilesDiscriminate.Template
                             Template = Some template
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcFilesDiscriminate.Template)                            
                     |> OfficeInteropMsg
                     |> dispatch
-                    closeModal()
                 )
                 prop.text "Template"
             ]
@@ -140,7 +140,7 @@ let createMetadataDialog excelMetadataType setExcelMetadataType (ref: IRefValue<
                         prop.children [
                             Bulma.title.h2 "Create Top Level Metadata"
                             Html.p "Choose one of the following top level meta data types to create"
-                            createMetaDataTypeButtons excelMetadataType setExcelMetadataType closeModal dispatch
+                            createMetaDataTypeButtons excelMetadataType setExcelMetadataType dispatch
                         ]
                     ]
                 ]
@@ -154,8 +154,7 @@ let createMetadataDialog excelMetadataType setExcelMetadataType (ref: IRefValue<
     ]
 
 // Define a modal dialog component
-[<ReactComponent>]
-let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (closeModal: unit -> unit) (model: Model) (dispatch: Messages.Msg -> unit) =
+let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
     let ref = React.useInputRef()
     Bulma.modal [
         if isActive then
@@ -183,6 +182,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                             setExcelMetadataType {
                                                 excelMetadataType with
                                                     Identifier = Some assay.Identifier
+                                                    MetadataType = Some ArcFilesDiscriminate.Assay
                                                     Assay = Some assay
                                             }
                                         let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
@@ -194,6 +194,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                             setExcelMetadataType {
                                                 excelMetadataType with
                                                     Identifier = Some study.Identifier
+                                                    MetadataType = Some ArcFilesDiscriminate.Study
                                                     Study = Some (study, assays)
                                             }
                                         let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
@@ -204,6 +205,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                             setExcelMetadataType {
                                                 excelMetadataType with
                                                     Identifier = Some investigation.Identifier
+                                                    MetadataType = Some ArcFilesDiscriminate.Investigation
                                                     Investigation = Some investigation
                                             }
                                         Investigation.Main(excelMetadataType.Investigation.Value, setInvestigation)
@@ -212,6 +214,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                             setExcelMetadataType {
                                                 excelMetadataType with
                                                     Identifier = Some (template.Name.ToString())
+                                                    MetadataType = Some ArcFilesDiscriminate.Template
                                                     Template = Some template
                                             }
                                         Template.Main(excelMetadataType.Template.Value, setTemplate)
@@ -291,7 +294,6 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
                         excelMetadataType
                         setExcelMetadataType
                         (fun () -> setModalActive(if excelMetadataType.Identifier.IsNone then NavbarState.init else { isModalActive with SwateExcelHandleMetadataModal = not isModalActive.SwateExcelHandleMetadataModal }))
-                        model
                         dispatch
                 ]
             ],
@@ -337,7 +339,7 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
                                                 templateIdentifier)
                                             )
                                 }
-                            | _ -> log("result.Value", result.Value)
+                            | _ -> failwith $"No metadata of type {result.Value} has been implemented yet!"
                     }
 
                 //OfficeInterop.HandleMetadata state.SwateExcelHandleMetadataModal
