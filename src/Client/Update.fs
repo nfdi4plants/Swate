@@ -410,4 +410,4 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             model
 
     logg msg model
-    |> innerUpdate msg 
+    |> innerUpdate msg

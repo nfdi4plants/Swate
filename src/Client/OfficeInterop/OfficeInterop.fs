@@ -2070,9 +2070,73 @@ let fillEmptyBuildingBlocks () =
                             excelTable.columns.items.[pIndex].values <- bodyValues
                         )
 
-                //do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+                do! ExcelHelper.adoptTableFormats(excelTable, context, true)
 
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+        }
+    )
+
+let tryGetTopLevelMetadata () =
+    Excel.run(fun context ->
+        promise {
+            let worksheets = context.workbook.worksheets
+
+            let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+
+            do! context.sync().``then``(fun _ -> ())
+
+            let worksheetItems = worksheets.items |> Array.ofSeq
+
+            let metadata =
+                worksheetItems
+                |> Array.choose (fun item -> if item.name.Contains("Metadata") then Some item else None)
+
+            let potMetadata =
+                if metadata.Length < 1 then None
+                elif metadata.Length > 1 then failwith "More than one metadata sheet has been found! This cannot be! Please report this as a bug to the developers.!"
+                else Some metadata.[0].name
+
+            return potMetadata
+        }
+    )
+
+let createTopLevelMetadata (metadataType:ArcFilesDiscriminate) =
+    Excel.run(fun context ->
+        promise {
+            let newIdentifier = $"Metadata_{metadataType.ToString()}"
+            let newWorkSheet = context.workbook.worksheets.add(newIdentifier)
+            newWorkSheet.activate()
+            do! context.sync().``then``(fun _ -> ())
+            let! result = tryGetTopLevelMetadata()
+            if result.IsSome then
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {result.Value} has been created"]
+            else
+                return [InteropLogging.Msg.create InteropLogging.Error $"The work sheet {newIdentifier} could not be created"]
+        }
+    )
+
+let deleteTopLevelMetadata (identifier:string option) =
+    Excel.run(fun context ->
+        promise {
+
+            if identifier.IsNone then
+                return [InteropLogging.Msg.create InteropLogging.Error $"No identifier for the metadat top level sheet is available"]
+            else
+                let worksheets = context.workbook.worksheets
+
+                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+
+                do! context.sync().``then``(fun _ -> ())
+
+                let metadataSheet = context.workbook.worksheets.getItem(identifier.Value)
+
+                let _ = metadataSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
+
+                metadataSheet.delete()
+
+                do! context.sync().``then``(fun _ -> ())
+
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {metadataSheet.name} has been deleted"]
         }
     )
 

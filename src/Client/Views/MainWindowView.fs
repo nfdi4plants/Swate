@@ -124,7 +124,7 @@ let Main (model: Model, dispatch) =
                                             match model.SpreadsheetModel.ArcFile with
                                             | Some (ArcFiles.Assay a) ->
                                                 MainComponents.Metadata.Assay.Main(a, model, dispatch)
-                                            | Some (ArcFiles.Study (s,aArr)) ->
+                                            | Some (ArcFiles.Study (s, aArr)) ->
                                                 MainComponents.Metadata.Study.Main(s, aArr, model, dispatch)
                                             | Some (ArcFiles.Investigation inv) ->
                                                 MainComponents.Metadata.Investigation.Main(inv, model, dispatch)

@@ -44,7 +44,7 @@ module OfficeInterop =
                 }
                 nextState, model, Cmd.none
 
-            | InsertOntologyTerm (term) ->
+            | InsertOntologyTerm term ->
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.insertOntologyTerm  
@@ -117,7 +117,7 @@ module OfficeInterop =
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
 
-            | CreateAnnotationTable(tryUsePrevOutput) ->
+            | CreateAnnotationTable tryUsePrevOutput ->
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.createAnnotationTable  
@@ -186,7 +186,7 @@ module OfficeInterop =
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
 
-            | FillHiddenColumns (termsWithSearchResult) ->
+            | FillHiddenColumns termsWithSearchResult ->
                 let nextState = {
                     model.ExcelState with
                         FillHiddenColsStateStore = FillHiddenColsState.ExcelWriteFoundTerms
@@ -207,7 +207,7 @@ module OfficeInterop =
                 }
                 nextState, model, Cmd.none
             //
-            | InsertFileNames (fileNameList) ->
+            | InsertFileNames fileNameList ->
                 let cmd = 
                     Cmd.OfPromise.either
                         OfficeInterop.Core.insertFileNamesFromFilePicker 
@@ -231,6 +231,22 @@ module OfficeInterop =
                         )
                         (curry GenericError (UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails |> Cmd.ofMsg) >> DevMsg)
                 state, model, cmd
+            | CreateTopLevelMetadata metadataType ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.createTopLevelMetadata
+                        (metadataType)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg) //error
+                state, model, cmd
+            | DeleteTopLevelMetadata identifier ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.deleteTopLevelMetadata
+                        (identifier)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg) //error
+                state, model, cmd
 
             // DEV
             | TryExcel  ->
@@ -238,7 +254,7 @@ module OfficeInterop =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.exampleExcelFunction1
                         ()
-                        ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> DevMsg)
+                        ((fun x -> curry GenericLog Cmd.none ("Debug", x)) >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
             | TryExcel2 ->
@@ -246,7 +262,7 @@ module OfficeInterop =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.exampleExcelFunction2 
                         ()
-                        ((fun x -> curry GenericLog Cmd.none ("Debug",x)) >> DevMsg)
+                        ((fun x -> curry GenericLog Cmd.none ("Debug", x)) >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
         try

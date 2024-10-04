@@ -57,6 +57,8 @@ type Msg =
     //
     ///
     | InsertFileNames                       of fileNameList:string list
+    | CreateTopLevelMetadata                of ArcFilesDiscriminate
+    | DeleteTopLevelMetadata                of string option
     // Development
     | TryExcel
     | TryExcel2
