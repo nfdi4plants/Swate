@@ -7,7 +7,6 @@ open OfficeInterop
 open Shared
 open OfficeInteropTypes
 open Model
-open ARCtrl
 
 module OfficeInterop = 
     let update (state: OfficeInterop.Model) (model:Model) (msg: OfficeInterop.Msg) : OfficeInterop.Model * Model * Cmd<Messages.Msg> =
@@ -126,16 +125,6 @@ module OfficeInterop =
                         (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg) //success
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model,cmd
-
-            | ValidateAnnotationTable ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.validateAnnotationTable  
-                        ()
-                        (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg) //success
-                        (curry GenericError Cmd.none >> DevMsg) //error
-                state, model,cmd
-
             | AnnotationtableCreated ->
                 let nextState = {
                     model.ExcelState with
@@ -159,14 +148,14 @@ module OfficeInterop =
                         (fun tmin -> tmin |> Option.map (fun t -> ARCtrl.OntologyAnnotation.fromTerm t.toTerm) |> TermSearch.UpdateParentTerm |> TermSearchMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
-            //
-            | FillHiddenColsRequest ->
-                failwith "FillHiddenColsRequest Not implemented yet"
+
+            | RectifyTermColumns ->
+                //failwith "FillHiddenColsRequest Not implemented yet"
                 //let cmd =
                 //    Cmd.OfPromise.either
                 //        OfficeInterop.Core.getAllAnnotationBlockDetails 
                 //        ()
-                //        (fun (searchTerms,deprecationLogs) ->
+                //        (fun (searchTerms, deprecationLogs) ->
                 //            // Push possible deprecation messages by piping through "GenericInteropLogs"
                 //            GenericInteropLogs (
                 //                // This will be executed after "deprecationLogs" are handled by "GenericInteropLogs"
@@ -179,7 +168,13 @@ module OfficeInterop =
                 //        (curry GenericError (UpdateFillHiddenColsState FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
                 //let stateCmd = UpdateFillHiddenColsState FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
                 //let cmds = Cmd.batch [cmd; stateCmd]
-                state, model, Cmd.none
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.rectifyTermColumns
+                        ()
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
 
             | FillHiddenColumns (termsWithSearchResult) ->
                 let nextState = {

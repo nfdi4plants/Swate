@@ -49,11 +49,9 @@ module OfficeInteropExtensions =
     /// <param name="table"></param>
     /// <param name="columnIndex"></param>
     /// <param name="context"></param>
-    let getChosenBuildingBlock (table: Table) (columnIndex: float) (context: RequestContext) =
+    let getBuildingBlockByIndex (table: Table) (columnIndex: float) (context: RequestContext) =
 
         promise {
-
-            let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
 
             let headerRange = table.getHeaderRowRange()
             let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
@@ -104,6 +102,14 @@ module OfficeInteropExtensions =
             |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
             |> Seq.toArray
 
+        /// <summary>
+        /// Add a new column at the given index
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="excelTable"></param>
+        /// <param name="name"></param>
+        /// <param name="rowCount"></param>
+        /// <param name="value"></param>
         static member addColumn (index:float) (excelTable:Table) name rowCount value =
             let col = createMatrixForTables 1 rowCount value
 
@@ -225,18 +231,17 @@ module OfficeInteropExtensions =
         /// <param name="excelTable"></param>
         /// <param name="context"></param>
         static member tryGetFromExcelTable (excelTable:Table, context:RequestContext) =
-
             promise {
                     //Get headers and body
                     let headerRange = excelTable.getHeaderRowRange()
                     let bodyRowRange = excelTable.getDataBodyRange()
+                        
                     let _ =
                         excelTable.load(U2.Case2 (ResizeArray [|"name"|])) |> ignore
-                        headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-                        bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+                        bodyRowRange.load(U2.Case2 (ResizeArray [|"numberFormat"; "values";|])) |> ignore
+                        headerRange.load(U2.Case2 (ResizeArray [|"columnCount"; "columnIndex"; "rowIndex"; "values"; |]))
 
                     let! inMemoryTable = context.sync().``then``(fun _ ->
-
                         let headers =
                             headerRange.values.[0]
                             |> Seq.map (fun item ->
@@ -245,7 +250,6 @@ module OfficeInteropExtensions =
                                 |> Option.defaultValue ""
                                 |> (fun s -> s.TrimEnd())
                             )
-
                         let bodyRows =
                             bodyRowRange.values
                             |> Seq.map (fun items ->
@@ -256,7 +260,6 @@ module OfficeInteropExtensions =
                                     |> Option.defaultValue ""
                                 )
                             )
-
                         ArcTable.fromStringSeqs(excelTable.name, headers, bodyRows)
                     )
                     return inMemoryTable
@@ -1136,14 +1139,13 @@ let replaceOutputColumn (excelTableName:string) (existingOutputColumn: BuildingB
                 ()
             )
 
-            let! fit = autoFitTableByTable excelTable context
+            let! _ = autoFitTableByTable excelTable context
+
             let warningMsg = $"Found existing output column \"{existingOutputColumn.MainColumn.Header.SwateColumnHeader}\". Changed output column to \"{newOutputcolumn.ColumnHeader.toAnnotationTableHeader()}\"."
 
             let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
 
-            let loggingList = [
-                msg
-            ]
+            let loggingList = [ msg ]
 
             return loggingList
         }
@@ -1183,9 +1185,7 @@ let updateInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCol
 
             let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
 
-            let loggingList = [
-                msg
-            ]
+            let loggingList = [ msg ]
 
             loggingList
         else
@@ -1215,9 +1215,7 @@ let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn
 
         let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new input column: {newBB.Header}"
 
-        let loggingList = [
-                msg
-        ]
+        let loggingList = [ msg ]
 
         loggingList
 
@@ -1255,9 +1253,7 @@ let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCo
 
             let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
 
-            let loggingList = [
-                msg
-            ]
+            let loggingList = [ msg ]
 
             loggingList
         else
@@ -1288,9 +1284,7 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
 
         let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new output column: {newBB.Header}"
 
-        let loggingList = [
-                msg
-        ]
+        let loggingList = [ msg ]
 
         loggingList
 
@@ -1347,13 +1341,15 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 
     buildingBlockCells
     |> List.iteri(fun i bbCell ->
-        let mutable newHeader = bbCell.Head
-        //check and extend header to avoid duplicates
-        newHeader <- Indexing.extendName (headers |> List.toArray) bbCell.Head            
+        //check and extend header to avoid duplicates        
+        let newHeader = Indexing.extendName (headers |> List.toArray) bbCell.Head        
         let calIndex =
             if targetIndex >= 0 then targetIndex + (float) i
             else AppendIndex
-        let column = ExcelHelper.addColumn calIndex excelTable newHeader rowCount bbCell.Tail.Head
+        let value =
+            if bbCell.Tail.IsEmpty then ""
+            else bbCell.Tail.Head
+        let column = ExcelHelper.addColumn calIndex excelTable newHeader rowCount value
         newHeader::headers |> ignore
         column.getRange().format.autofitColumns()
 
@@ -1363,9 +1359,7 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 
     let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new term column: {newBB.Header}"
 
-    let loggingList = [
-            msg
-    ]
+    let loggingList = [ msg ]
 
     loggingList
 
@@ -1942,24 +1936,142 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
 /// <summary>
 /// Checks whether the selected building block and those next to it are valid
 /// </summary>
-let validateAnnotationTable () =
+let validateAnnotationTable context =
+    promise {
+
+        let! excelTable = getActiveAnnotationTable context
+        let! indexedErrors = ArcTable.validateExcelTable(excelTable, context)
+
+        let messages =
+            if indexedErrors.Length > 0 then
+                indexedErrors
+                |> List.ofArray
+                |> List.collect (fun (ex, header ) ->
+                    [InteropLogging.Msg.create InteropLogging.Warning
+                        $"Table is not a valid ARC table / ISA table: {ex.Message}. The column {header} is not valid! It needs further inspection what causes the error.";
+                    ])
+            else
+                []
+
+        if messages.IsEmpty then
+            return Result.Ok excelTable
+        else
+            return Result.Error messages
+    }
+
+/// <summary>
+/// Validates the arc table of the currently selected work sheet
+/// When the validations returns an error, an error is returned to the user
+/// When the arc table is valid one or more of the following processes happen:
+/// * When the main column of term or unit is empty, then the Term Source REF and Term Accession Number are emptied
+/// * When the main column of term or unit contains a value, the Term Source REF and Term Accession Number are filled
+/// with the correct value
+/// The later is not implemented yet
+/// </summary>
+let rectifyTermColumns () =
     Excel.run(fun context ->
         promise {
+            let! result = validateAnnotationTable context
 
-            let! excelTable = getActiveAnnotationTable context
-            let! indexedErrors = ArcTable.validateExcelTable(excelTable, context)
+            //When there are messages, then there is an error and further processes can be skipped because the annotation table is not valid
+            match result with
+            | Result.Error messages -> return messages
+            | Result.Ok excelTable ->
+                //Arctable enables a fast check for term and unit building blocks
+                let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
 
-            let messages =
-                if indexedErrors.Length > 0 then
-                    indexedErrors
-                    |> List.ofArray
-                    |> List.collect (fun (ex, header ) ->
-                        [InteropLogging.Msg.create InteropLogging.Warning $"Table is not a valid ARC table / ISA table: {ex.Message}. The column {header} is not valid! It needs further inspection what causes the error.";
-                        ])
-                else
-                    [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+                let arcTable = arcTable.Value
+                let columns = arcTable.Columns
+                let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "values"; "rowCount"|]))
 
-            return messages
+                do! context.sync().``then``(fun _ -> ())
+                let items = excelTable.columns.items
+                do! context.sync().``then``(fun _ -> ())
+
+                let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
+
+                let columns =
+                    items
+                    |> Array.ofSeq
+                    |> Array.map (fun c ->
+                        c.values
+                        |> Array.ofSeq
+                        |> Array.collect (fun cc ->
+                            cc
+                            |> Array.ofSeq
+                            |> Array.choose (fun r -> if r.IsSome then Some (r.ToString()) else None)
+                        )
+                    )
+
+                let body = excelTable.getDataBodyRange()
+
+                let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
+
+                do! context.sync().``then``(fun _ -> ())
+
+                for i in 0..columns.Length-1 do
+                    let column = columns.[i]
+                    if Array.contains (column.[0].Trim()) termAndUnitHeaders then
+                        let! potBuildingBlock = getBuildingBlockByIndex excelTable i context
+                        let buildingBlock = potBuildingBlock |> Array.ofSeq
+
+                        // Check whether building block is unit or not
+                        // When it is unit, then delete the property column values only when the unit is empty, independent of the main column
+                        // When it is a term, then delete the property column values when the main column is empty
+                        let mainColumn =
+                            if snd buildingBlock.[1] = "Unit" then
+                                excelTable.columns.items.Item (fst buildingBlock.[1])
+                            else excelTable.columns.items.Item (fst buildingBlock.[0])
+                        let potPropertyColumns =
+                            buildingBlock.[1..]
+                            |> Array.map (fun (index, _) -> index, excelTable.columns.items.Item index)
+
+                        let propertyColumns =
+                            potPropertyColumns
+                            |> Array.map (fun (index, c) ->
+                                index,
+                                c.values
+                                |> Array.ofSeq
+                                |> Array.collect (fun pc ->
+                                    pc
+                                    |> Array.ofSeq
+                                    |> Array.choose (fun pcv -> if pcv.IsSome then Some (pcv.ToString()) else None)
+                                )
+                            )
+
+                        let mainColumnHasValues =                           
+                            mainColumn.values
+                            |> Array.ofSeq
+                            |> Array.collect (fun c ->
+                                c
+                                |> Array.ofSeq
+                                |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
+                                |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
+                            )
+
+                        //Check whether value of property colum is fitting for value of main column and adapt if not
+                        //Delete values of property columns when main column is empty
+                        propertyColumns
+                        |> Array.iter (fun (pIndex, pcv) ->
+                            let values = Array.create (arcTable.RowCount + 1) ""
+                            mainColumnHasValues
+                            |> Array.iteri (fun mainIndex (mc, isNull) ->                                
+                                //if isNull for main column, then use empty string as value for properties
+                                if not isNull then
+                                    values.[mainIndex] <- pcv.[mainIndex]
+                            )
+
+                            let bodyValues =
+                                values
+                                |> Array.map (box >> Some)
+                                |> Array.map (fun c -> ResizeArray[c])
+                                |> ResizeArray
+                            excelTable.columns.items.[pIndex].values <- bodyValues
+                        )
+
+                do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
         }
     )
 
@@ -1997,7 +2109,7 @@ let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount
             let tans      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTAN))
             [|termNames; tsrs; tans|]
 
-let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Table,context:RequestContext) =
+let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Table, context:RequestContext) =
     promise {
         
         let excelTable = table
@@ -2009,7 +2121,7 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
         /// alreadyExistingBBs -> will be used for logging
         let newBuildingBlocks, alreadyExistingBBs =
             let newSet = buildingBlocks |> Array.map (fun x -> x.ColumnHeader) |> Set.ofArray
-            let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint )|> Set.ofArray
+            let prevSet = existingBuildingBlocks |> Array.choose (fun x -> x.MainColumn.Header.toBuildingBlockNamePrePrint) |> Set.ofArray
             let bbsToAdd = Set.difference newSet prevSet |> Set.toArray
             // These building blocks do not exist in table and will be added
             let newBuildingBlocks =
@@ -2394,8 +2506,7 @@ let checkForDeprecation (buildingBlocks:BuildingBlock [])  =
             let message = InteropLogging.Msg.create InteropLogging.Warning m
             msgList <- message::msgList
             buildingBlocks
-        | None ->
-            buildingBlocks
+        | None -> buildingBlocks
     // Chain all deprecation checks
     buildingBlocks
     |> deprecated_DataFileName
