@@ -170,7 +170,7 @@ module OfficeInterop =
                 //let cmds = Cmd.batch [cmd; stateCmd]
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.autoCompleteFromExistingTerms
+                        OfficeInterop.Core.rectifyTermColumns
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)

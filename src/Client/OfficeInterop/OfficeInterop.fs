@@ -1968,7 +1968,7 @@ let validateAnnotationTable context =
 /// with the correct value
 /// The later is not implemented yet
 /// </summary>
-let autoCompleteFromExistingTerms () =
+let rectifyTermColumns () =
     Excel.run(fun context ->
         promise {
             let! result = validateAnnotationTable context
