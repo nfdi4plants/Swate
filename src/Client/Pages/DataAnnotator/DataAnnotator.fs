@@ -317,7 +317,7 @@ type DataAnnotator =
                                 prop.onClick(fun e ->
                                     match model.DataAnnotatorModel.DataFile with
                                     | Some dtf ->
-                                        let selectors = [|for x in state do x.ToFragmentSelectorString()|]
+                                        let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
                                         let name = dtf.DataFileName
                                         let dt = dtf.DataFileType
                                         SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}

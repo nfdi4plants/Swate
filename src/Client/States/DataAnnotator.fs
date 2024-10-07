@@ -18,9 +18,10 @@ type DataTarget =
     | Row of int
     | Column of int
 
-    member this.ToFragmentSelectorString() =
+    member this.ToFragmentSelectorString(hasHeader: bool) =
+        let rowOffset = if hasHeader then 2 else 1 // header counts and is 1-based
         match this with
-        | Row ri -> sprintf "row=%i" ri
+        | Row ri -> sprintf "row=%i" (ri + rowOffset)
         | Column ci -> sprintf "col=%i" ci
         | Cell (ci, ri) -> sprintf "cell=%i,%i" ri ci
 
