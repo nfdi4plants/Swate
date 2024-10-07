@@ -2069,7 +2069,7 @@ let autoCompleteFromExistingTerms () =
                             excelTable.columns.items.[pIndex].values <- bodyValues
                         )
 
-                //do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+                do! ExcelHelper.adoptTableFormats(excelTable, context, true)
 
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
         }

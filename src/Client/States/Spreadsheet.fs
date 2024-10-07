@@ -188,7 +188,7 @@ type Msg =
 | InitFromArcFile of ArcFiles
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertOntologyAnnotations of OntologyAnnotation []
-| UpdateTermColumns
+| RectifyTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []
 /// Starts chain to export active table to isa json
 | ExportJson of ArcFiles * JsonExportFormat

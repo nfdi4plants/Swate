@@ -30,5 +30,5 @@ type Msg =
 /// Starts chain to export active table to isa json
 | ExportJson of ArcFiles * JsonExportFormat
 | UpdateUnitForCells
-| UpdateTermColumns
+| RectifyTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []
