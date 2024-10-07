@@ -164,23 +164,17 @@ let Main(model: Model, dispatch, widgets, setWidgets) =
                 ]
                 prop.ariaLabel "menu"
                 prop.children [
+                    Bulma.navbarStart.div [
+                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
+                        prop.children [
+                            quickAccessButtonListStart model.History dispatch
+                            WidgetNavbarList(model, dispatch, addWidget)
+                        ]
+                    ]
                     match model.PersistentStorageState.Host with
                     | Some (Swatehost.ARCitect) ->
-                        Bulma.navbarStart.div [
-                            prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
-                            prop.children [
-                                quickAccessButtonListStart model.History dispatch
-                                if model.SpreadsheetModel.TableViewIsActive() then WidgetNavbarList(model, dispatch, addWidget)
-                            ]
-                        ]
+                        Html.none
                     | Some _ ->
-                        Bulma.navbarStart.div [
-                            prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
-                            prop.children [
-                                quickAccessButtonListStart model.History dispatch
-                                WidgetNavbarList(model, dispatch, addWidget)
-                            ]
-                        ]
                         Bulma.navbarEnd.div [
                             prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("marginLeft", "auto")]
                             prop.children [
