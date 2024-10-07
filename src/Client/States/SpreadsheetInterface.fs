@@ -9,7 +9,6 @@ open ARCtrl
 type Msg =
 | Initialize            of Swatehost
 | CreateAnnotationTable of tryUsePrevOutput:bool
-| ValidateAnnotationTable
 | RemoveBuildingBlock
 | UpdateDatamap of DataMap option
 | UpdateDataMapDataContextAt of index: int * DataContext
