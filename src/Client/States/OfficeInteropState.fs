@@ -58,6 +58,10 @@ type Msg =
     ///
     | InsertFileNames                       of fileNameList:string list
     | CreateTopLevelMetadata                of ArcFilesDiscriminate
+    | UpdateTopLevelAssay                   of ArcAssay option
+    | UpdateTopLevelInvestigation           of ArcInvestigation option
+    | UpdateTopLevelStudy                   of (ArcStudy * ArcAssay list) option
+    | UpdateTopLevelTemplate                of Template option
     | DeleteTopLevelMetadata                of string option
     // Development
     | TryExcel

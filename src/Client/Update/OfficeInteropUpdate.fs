@@ -239,6 +239,38 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd
+            | UpdateTopLevelAssay assay ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.updateTopLevelAssay
+                        (assay)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg) //error
+                state, model, cmd
+            | UpdateTopLevelInvestigation investigation ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.updateTopLevelInvestigation
+                        (investigation)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg) //error
+                state, model, cmd
+            | UpdateTopLevelStudy study ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.updateTopLevelStudy
+                        (study)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg) //error
+                state, model, cmd
+            | UpdateTopLevelTemplate template ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.updateTopLevelTemplate
+                        (template)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg) //error
+                state, model, cmd
             | DeleteTopLevelMetadata identifier ->
                 let cmd =
                     Cmd.OfPromise.either

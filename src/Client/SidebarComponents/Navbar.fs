@@ -153,6 +153,14 @@ let createMetadataDialog excelMetadataType setExcelMetadataType (ref: IRefValue<
         ]
     ]
 
+let updateTopLevelMetadata (metadataType: ExcelMetadataState) dispatch =
+    match metadataType.MetadataType with
+    | Some ArcFilesDiscriminate.Assay           -> OfficeInterop.UpdateTopLevelAssay(metadataType.Assay)                    |> OfficeInteropMsg |> dispatch
+    | Some ArcFilesDiscriminate.Investigation   -> OfficeInterop.UpdateTopLevelInvestigation(metadataType.Investigation)    |> OfficeInteropMsg |> dispatch
+    | Some ArcFilesDiscriminate.Study           -> OfficeInterop.UpdateTopLevelStudy(metadataType.Study)                    |> OfficeInteropMsg |> dispatch
+    | Some ArcFilesDiscriminate.Template        -> OfficeInterop.UpdateTopLevelTemplate(metadataType.Template)              |> OfficeInteropMsg |> dispatch
+    | None                                      -> failwith "No top level metadata type has been selected"
+
 // Define a modal dialog component
 let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
     let ref = React.useInputRef()
@@ -243,9 +251,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                                         ]
                                                         prop.text "Update Metadata Type"
                                                         prop.onClick (fun _ ->                                    
-                                                            //Spreadsheet.Reset
-                                                            //|> SpreadsheetMsg
-                                                            //|> dispatch
+                                                            updateTopLevelMetadata excelMetadataType dispatch
                                                             closeModal()
                                                         )
                                                     ]
@@ -299,53 +305,47 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
             ],
             (fun _ ->
                 setModalActive { isModalActive with SwateExcelHandleMetadataModal = not isModalActive.SwateExcelHandleMetadataModal }
-                let _ =
-                    promise {
-                        let! result = OfficeInterop.Core.tryGetTopLevelMetadata()
-                        if result.IsSome then
-                            match result.Value with
-                            | assayIdentifier when assayIdentifier.ToLower().Contains("assay") ->
-                                setExcelMetadataType {
-                                    excelMetadataType with
-                                        MetadataType = Some ArcFilesDiscriminate.Assay
-                                        Identifier = Some assayIdentifier
-                                        Assay = Some (new ArcAssay(assayIdentifier))
-                                }
-                            | investigationIdentifier when investigationIdentifier.ToLower().Contains("investigation") ->
-                                setExcelMetadataType {
-                                    excelMetadataType with
-                                        MetadataType = Some ArcFilesDiscriminate.Investigation
-                                        Identifier = Some investigationIdentifier
-                                        Investigation = Some (new ArcInvestigation(investigationIdentifier))
-                                }
-                            | studyIdentifier when studyIdentifier.ToLower().Contains("study") ->
-                                setExcelMetadataType {
-                                    excelMetadataType with
-                                        MetadataType = Some ArcFilesDiscriminate.Study
-                                        Identifier = Some studyIdentifier
-                                        Study = Some (new ArcStudy(studyIdentifier), [])
-                                }
-                            | templateIdentifier when templateIdentifier.ToLower().Contains("template") ->
-                                setExcelMetadataType {
-                                    excelMetadataType with
-                                        MetadataType = Some ArcFilesDiscriminate.Template
-                                        Identifier = Some templateIdentifier
-                                        Template =
-                                            Some (
-                                                new Template(Guid.NewGuid(),
-                                                new ArcTable("new Table",
-                                                    new ResizeArray<CompositeHeader>(), new Dictionary<(int * int), CompositeCell>()
-                                                ),
-                                                templateIdentifier)
-                                            )
-                                }
-                            | _ -> failwith $"No metadata of type {result.Value} has been implemented yet!"
-                    }
-
-                //OfficeInterop.HandleMetadata state.SwateExcelHandleMetadataModal
-                //|> OfficeInteropMsg
-                //|> dispatch
-                ()
+                promise {
+                    let! result = OfficeInterop.Core.tryGetTopLevelMetadata()
+                    if result.IsSome then
+                        match result.Value with
+                        | assayIdentifier when assayIdentifier.ToLower().Contains("assay") ->
+                            setExcelMetadataType {
+                                excelMetadataType with
+                                    MetadataType = Some ArcFilesDiscriminate.Assay
+                                    Identifier = Some assayIdentifier
+                                    Assay = Some (new ArcAssay(assayIdentifier))
+                            }
+                        | investigationIdentifier when investigationIdentifier.ToLower().Contains("investigation") ->
+                            setExcelMetadataType {
+                                excelMetadataType with
+                                    MetadataType = Some ArcFilesDiscriminate.Investigation
+                                    Identifier = Some investigationIdentifier
+                                    Investigation = Some (new ArcInvestigation(investigationIdentifier))
+                            }
+                        | studyIdentifier when studyIdentifier.ToLower().Contains("study") ->
+                            setExcelMetadataType {
+                                excelMetadataType with
+                                    MetadataType = Some ArcFilesDiscriminate.Study
+                                    Identifier = Some studyIdentifier
+                                    Study = Some (new ArcStudy(studyIdentifier), [])
+                            }
+                        | templateIdentifier when templateIdentifier.ToLower().Contains("template") ->
+                            setExcelMetadataType {
+                                excelMetadataType with
+                                    MetadataType = Some ArcFilesDiscriminate.Template
+                                    Identifier = Some templateIdentifier
+                                    Template =
+                                        Some (
+                                            new Template(Guid.NewGuid(),
+                                            new ArcTable("new Table",
+                                                new ResizeArray<CompositeHeader>(), new Dictionary<(int * int), CompositeCell>()
+                                            ),
+                                            templateIdentifier)
+                                        )
+                            }
+                        | _ -> failwith $"No metadata of type {result.Value} has been implemented yet!"
+                } |> ignore
             )
         )
 

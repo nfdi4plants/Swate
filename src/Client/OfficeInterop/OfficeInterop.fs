@@ -2089,7 +2089,7 @@ let tryGetTopLevelMetadata () =
 
             let metadata =
                 worksheetItems
-                |> Array.choose (fun item -> if item.name.Contains("Metadata") then Some item else None)
+                |> Array.choose (fun item -> if item.name.Contains("isa_") then Some item else None)
 
             let potMetadata =
                 if metadata.Length < 1 then None
@@ -2103,15 +2103,15 @@ let tryGetTopLevelMetadata () =
 let createTopLevelMetadata (metadataType:ArcFilesDiscriminate) =
     Excel.run(fun context ->
         promise {
-            let newIdentifier = $"Metadata_{metadataType.ToString()}"
-            let newWorkSheet = context.workbook.worksheets.add(newIdentifier)
+            let workSheetName = $"isa_{metadataType.ToString().ToLower()}"
+            let newWorkSheet = context.workbook.worksheets.add(workSheetName)
             newWorkSheet.activate()
             do! context.sync().``then``(fun _ -> ())
             let! result = tryGetTopLevelMetadata()
             if result.IsSome then
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {result.Value} has been created"]
             else
-                return [InteropLogging.Msg.create InteropLogging.Error $"The work sheet {newIdentifier} could not be created"]
+                return [InteropLogging.Msg.create InteropLogging.Error $"The work sheet {workSheetName} could not be created"]
         }
     )
 
@@ -2140,7 +2140,47 @@ let deleteTopLevelMetadata (identifier:string option) =
         }
     )
 
-// Old stuff, mostly deprecated
+let updateTopLevelAssay (assay: ArcAssay option) =
+    Excel.run(fun context ->
+        promise {
+            if assay.IsSome then
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The Assay has beeen updated"]
+            else
+                return [InteropLogging.Msg.create InteropLogging.Error $"No Assay is available"]
+        }
+    )
+
+let updateTopLevelInvestigation (investigation: ArcInvestigation option) =
+    Excel.run(fun context ->
+        promise {
+            if investigation.IsSome then
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The Investigation has beeen updated"]
+            else
+                return [InteropLogging.Msg.create InteropLogging.Error $"No Investigation is available"]
+        }
+    )
+
+let updateTopLevelStudy (study: (ArcStudy * ArcAssay list) option) =
+    Excel.run(fun context ->
+        promise {
+            if study.IsSome then
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The Study has beeen updated"]
+            else
+                return [InteropLogging.Msg.create InteropLogging.Error $"No Study is available"]
+        }
+    )
+
+let updateTopLevelTemplate (template: Template option) =
+    Excel.run(fun context ->
+        promise {
+            if template.IsSome then
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The Template has beeen updated"]
+            else
+                return [InteropLogging.Msg.create InteropLogging.Error $"No Template is available"]
+        }
+    )
+
+// Old stuff, mostly deprecated 
 
 let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
     let createList (rowCount:int) (values:string []) =
