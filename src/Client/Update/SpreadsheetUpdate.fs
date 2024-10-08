@@ -376,7 +376,7 @@ module Spreadsheet =
             | ExportXlsxDownload (name,xlsxBytes) ->
                 let _ = Helper.download (name ,xlsxBytes)
                 state, model, Cmd.none
-            | UpdateTermColumns ->
+            | RectifyTermColumns ->
                 //let getUpdateTermColumns() = promise {
                 //    return Controller.getUpdateTermColumns state
                 //}

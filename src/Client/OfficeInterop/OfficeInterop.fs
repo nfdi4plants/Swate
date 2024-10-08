@@ -231,18 +231,17 @@ module OfficeInteropExtensions =
         /// <param name="excelTable"></param>
         /// <param name="context"></param>
         static member tryGetFromExcelTable (excelTable:Table, context:RequestContext) =
-
             promise {
                     //Get headers and body
                     let headerRange = excelTable.getHeaderRowRange()
                     let bodyRowRange = excelTable.getDataBodyRange()
+                        
                     let _ =
                         excelTable.load(U2.Case2 (ResizeArray [|"name"|])) |> ignore
-                        headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-                        bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+                        bodyRowRange.load(U2.Case2 (ResizeArray [|"numberFormat"; "values";|])) |> ignore
+                        headerRange.load(U2.Case2 (ResizeArray [|"columnCount"; "columnIndex"; "rowIndex"; "values"; |]))
 
                     let! inMemoryTable = context.sync().``then``(fun _ ->
-
                         let headers =
                             headerRange.values.[0]
                             |> Seq.map (fun item ->
@@ -251,7 +250,6 @@ module OfficeInteropExtensions =
                                 |> Option.defaultValue ""
                                 |> (fun s -> s.TrimEnd())
                             )
-
                         let bodyRows =
                             bodyRowRange.values
                             |> Seq.map (fun items ->
@@ -262,7 +260,6 @@ module OfficeInteropExtensions =
                                     |> Option.defaultValue ""
                                 )
                             )
-
                         ArcTable.fromStringSeqs(excelTable.name, headers, bodyRows)
                     )
                     return inMemoryTable
@@ -1939,54 +1936,56 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
 /// <summary>
 /// Checks whether the selected building block and those next to it are valid
 /// </summary>
-let validateAnnotationTable () =
+let validateAnnotationTable context =
+    promise {
+
+        let! excelTable = getActiveAnnotationTable context
+        let! indexedErrors = ArcTable.validateExcelTable(excelTable, context)
+
+        let messages =
+            if indexedErrors.Length > 0 then
+                indexedErrors
+                |> List.ofArray
+                |> List.collect (fun (ex, header ) ->
+                    [InteropLogging.Msg.create InteropLogging.Warning
+                        $"Table is not a valid ARC table / ISA table: {ex.Message}. The column {header} is not valid! It needs further inspection what causes the error.";
+                    ])
+            else
+                []
+
+        if messages.IsEmpty then
+            return Result.Ok excelTable
+        else
+            return Result.Error messages
+    }
+
+/// <summary>
+/// Validates the arc table of the currently selected work sheet
+/// When the validations returns an error, an error is returned to the user
+/// When the arc table is valid one or more of the following processes happen:
+/// * When the main column of term or unit is empty, then the Term Source REF and Term Accession Number are emptied
+/// * When the main column of term or unit contains a value, the Term Source REF and Term Accession Number are filled
+/// with the correct value
+/// The later is not implemented yet
+/// </summary>
+let rectifyTermColumns () =
     Excel.run(fun context ->
         promise {
+            let! result = validateAnnotationTable context
 
-            let! excelTable = getActiveAnnotationTable context
-            let! indexedErrors = ArcTable.validateExcelTable(excelTable, context)
-
-            let messages =
-                if indexedErrors.Length > 0 then
-                    indexedErrors
-                    |> List.ofArray
-                    |> List.collect (fun (ex, header ) ->
-                        [InteropLogging.Msg.create InteropLogging.Warning $"Table is not a valid ARC table / ISA table: {ex.Message}. The column {header} is not valid! It needs further inspection what causes the error.";
-                        ])
-                else
-                    []
-
-            return messages
-        }
-    )
-
-let fillEmptyBuildingBlocks () =
-    Excel.run(fun context ->
-        promise {
-
-            let! msg = validateAnnotationTable ()
-            let mutable messages = msg
-
-            //When msg > 0 there is an error and we can skip the filling of the rows because the columns are not valid
-            if messages.Length > 0 then return messages
-            else 
-                let! excelTable = getActiveAnnotationTable context
-
+            //When there are messages, then there is an error and further processes can be skipped because the annotation table is not valid
+            match result with
+            | Result.Error messages -> return messages
+            | Result.Ok excelTable ->
                 //Arctable enables a fast check for term and unit building blocks
                 let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
 
-                let arcTable =
-                    if arcTable.IsSome then arcTable.Value
-                    else failwith "No arc table is available"
-
+                let arcTable = arcTable.Value
                 let columns = arcTable.Columns
-
-                let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"count"; "items"; "name"; "values"; "rowCount"|]))
+                let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "values"; "rowCount"|]))
 
                 do! context.sync().``then``(fun _ -> ())
-
                 let items = excelTable.columns.items
-
                 do! context.sync().``then``(fun _ -> ())
 
                 let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)

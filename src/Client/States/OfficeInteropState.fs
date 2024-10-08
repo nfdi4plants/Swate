@@ -47,7 +47,7 @@ type Msg =
     | GetParentTerm
     // table+database interconnected functions
     /// 
-    | FillHiddenColsRequest
+    | RectifyTermColumns
     ///
     | FillHiddenColumns                     of TermSearchable []
     ///

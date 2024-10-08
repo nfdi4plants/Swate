@@ -384,8 +384,7 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
                 Html.i [prop.className "fa-solid fa-pen"]
             ],
             (fun _ ->
-                //SpreadsheetInterface.ValidateAnnotationTable |> InterfaceMsg |> dispatch
-                SpreadsheetInterface.UpdateTermColumns |> InterfaceMsg |> dispatch                
+                SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch                
             )
         )
         QuickAccessButton.create(
