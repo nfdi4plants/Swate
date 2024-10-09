@@ -376,30 +376,6 @@ module Spreadsheet =
             | ExportXlsxDownload (name,xlsxBytes) ->
                 let _ = Helper.download (name ,xlsxBytes)
                 state, model, Cmd.none
-            | RectifyTermColumns ->
-                //let getUpdateTermColumns() = promise {
-                //    return Controller.getUpdateTermColumns state
-                //}
-                //let cmd =
-                //    Cmd.OfPromise.either
-                //        getUpdateTermColumns
-                //        ()
-                //        (fun (searchTerms,deprecationLogs) ->
-                //            // Push possible deprecation messages by piping through "GenericInteropLogs"
-                //            Messages.GenericInteropLogs (
-                //                // This will be executed after "deprecationLogs" are handled by "GenericInteropLogs"
-                //                Messages.SearchForInsertTermsRequest searchTerms |> Messages.Request |> Messages.Api |> Cmd.ofMsg,
-                //                // This will be pushed to Activity logs, or as wanring modal to user in case of LogIdentifier.Warning
-                //                deprecationLogs
-                //            )
-                //            |> Messages.DevMsg
-                //        )
-                //        (Messages.curry Messages.GenericError (OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
-                //let stateCmd = OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.ExcelCheckHiddenCols |> OfficeInteropMsg |> Cmd.ofMsg
-                //let cmds = Cmd.batch [cmd; stateCmd]
-                //state, model, cmds
-                failwith "UpdateTermColumns is not implemented yet"
-                state, model, Cmd.none
             | UpdateTermColumnsResponse terms ->
                 //let nextExcelState = {
                 //    model.ExcelState with

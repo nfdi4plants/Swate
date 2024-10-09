@@ -272,9 +272,6 @@ module Interface =
                 | Some Swatehost.Excel ->
                     let cmd = OfficeInterop.RectifyTermColumns |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
-                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.RectifyTermColumns |> SpreadsheetMsg |> Cmd.ofMsg
-                    model, cmd
                 | _ -> failwith "not implemented"
             | UpdateTermColumnsResponse terms ->
                 match host with
