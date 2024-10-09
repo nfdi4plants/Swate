@@ -45,9 +45,9 @@ type DataFile = {
     }
 
     member this.ExpectedSeparator =
-        if this.DataFileType.Contains("csv") then
+        if this.DataFileName.EndsWith(".csv") then
             ","
-        elif this.DataFileType.Contains("tsv") then
+        elif this.DataFileName.EndsWith(".tsv") then
             "\t"
         else
             ","
@@ -57,8 +57,19 @@ type ParsedDataFile = {
     BodyRows: string [] []
 } with
     static member fromFileBySeparator (separator: string) (file: DataFile) =
+        let sanatizedSeparator =
+            match separator with
+            | "\\t" -> "\t"
+            | "\\n" -> "\n"
+            | "\\f" -> "\f"
+            | "\\r" -> "\r"
+            | "\\r\\n" -> "\r\n"
+            | "\\v" -> "\v"
+            | _ -> separator
         let rows = file.DataContent.Split("\n")
-        let splitRows = rows |> Array.map (fun row -> row.Split(separator))
+        let splitRows = rows |> Array.map (fun row ->
+            row.Split(sanatizedSeparator)
+        )
         if splitRows.Length > 1 then
             let headers = Some splitRows.[0]
             let data = splitRows.[1..]
