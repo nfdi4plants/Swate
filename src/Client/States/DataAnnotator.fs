@@ -22,8 +22,8 @@ type DataTarget =
         let rowOffset = if hasHeader then 2 else 1 // header counts and is 1-based
         match this with
         | Row ri -> sprintf "row=%i" (ri + rowOffset)
-        | Column ci -> sprintf "col=%i" ci
-        | Cell (ci, ri) -> sprintf "cell=%i,%i" ri ci
+        | Column ci -> sprintf "col=%i" (ci+1)
+        | Cell (ci, ri) -> sprintf "cell=%i,%i" (ri + rowOffset) (ci+1)
 
     member this.ToReactKey() =
         match this with
