@@ -179,7 +179,7 @@ module Interface =
                     //let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
                     Browser.Dom.window.alert "Not implemented"
                     model, Cmd.none
-                | Some Swatehost.Browser ->
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.UpdateArcFile tables |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
