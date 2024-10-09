@@ -9,7 +9,6 @@ open ARCtrl
 type Msg =
 | Initialize            of Swatehost
 | CreateAnnotationTable of tryUsePrevOutput:bool
-| ValidateAnnotationTable
 | RemoveBuildingBlock
 | UpdateDatamap of DataMap option
 | UpdateDataMapDataContextAt of index: int * DataContext
@@ -31,5 +30,5 @@ type Msg =
 /// Starts chain to export active table to isa json
 | ExportJson of ArcFiles * JsonExportFormat
 | UpdateUnitForCells
-| UpdateTermColumns
+| RectifyTermColumns
 | UpdateTermColumnsResponse of TermTypes.TermSearchable []

@@ -92,15 +92,6 @@ module Interface =
                     let cmd = Spreadsheet.CreateAnnotationTable usePrevOutput |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-            | ValidateAnnotationTable ->
-                match host with
-                | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.ValidateAnnotationTable |> OfficeInteropMsg |> Cmd.ofMsg
-                    model, cmd
-                //| Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                //    let cmd = Spreadsheet.CreateAnnotationTable usePrevOutput |> SpreadsheetMsg |> Cmd.ofMsg
-                //    model, cmd
-                | _ -> failwith "not implemented"
             | UpdateDatamap datamapOption ->
                 match host with
                 | Some Swatehost.Excel ->
@@ -276,13 +267,13 @@ module Interface =
                     let cmd = OfficeInterop.UpdateUnitForCells |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-            | UpdateTermColumns ->
+            | RectifyTermColumns ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.FillHiddenColsRequest |> OfficeInteropMsg |> Cmd.ofMsg
+                    let cmd = OfficeInterop.RectifyTermColumns |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.UpdateTermColumns |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.RectifyTermColumns |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | UpdateTermColumnsResponse terms ->
