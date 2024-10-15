@@ -221,11 +221,11 @@ module OfficeInterop =
                         )
                         (curry GenericError (UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails |> Cmd.ofMsg) >> DevMsg)
                 state, model, cmd
-            | CreateTopLevelMetadata metadataType ->
+            | CreateTopLevelMetadata workSheetName ->
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.createTopLevelMetadata
-                        (metadataType)
+                        (workSheetName)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd

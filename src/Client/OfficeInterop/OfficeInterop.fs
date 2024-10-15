@@ -929,8 +929,6 @@ let getBuildingBlocksAndSheet() =
         }
     )
 
-open BuildingBlockFunctions
-
 let getBuildingBlocksAndSheets() =
     Excel.run(fun context ->
         promise {
@@ -2099,10 +2097,10 @@ let tryGetTopLevelMetadata () =
         }
     )
 
-let createTopLevelMetadata (metadataType:ArcFilesDiscriminate) =
+let createTopLevelMetadata name =
     Excel.run(fun context ->
         promise {
-            let workSheetName = $"isa_{metadataType.ToString().ToLower()}"
+            let workSheetName = $"{name}"
             let newWorkSheet = context.workbook.worksheets.add(workSheetName)
             newWorkSheet.activate()
             do! context.sync().``then``(fun _ -> ())
@@ -2143,6 +2141,42 @@ let updateTopLevelAssay (assay: ArcAssay option) =
     Excel.run(fun context ->
         promise {
             if assay.IsSome then
+
+                let assayWorkseet = ArcAssay.toMetadataSheet(assay.Value)
+
+                let worksheet = context.workbook.worksheets.getItem(assayWorkseet.Name)
+
+                log("assayWorkseet.MaxColumnIndex", assayWorkseet.MaxColumnIndex)
+                log("assayWorkseet.MaxRowIndex", assayWorkseet.MaxRowIndex)
+
+                let range = worksheet.getRangeByIndexes(0, 0, assayWorkseet.MaxRowIndex, assayWorkseet.MaxColumnIndex)
+
+                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values";]))
+
+                do! context.sync().``then``(fun _ -> ())
+
+                let columns = assayWorkseet.Columns |> Array.ofSeq
+                let column = columns.[0].Cells |> Array.ofSeq
+                log("columns.Length", columns.Length)
+                log("columns.[0].columns.Length", column.Length)
+                log("range.values", range.values)
+
+                range.values
+                |> Seq.iteri (fun rowIndex row ->
+                    log("rowIndex", rowIndex + 1)
+                    row
+                    |> Seq.iteri (fun columnIndex _ ->
+                            log("columnIndex", columnIndex + 1)
+                            let x = row.Item (columnIndex + 1)
+                            log("row.Item", x.IsSome)
+                            //(row.Item (columnIndex + 1)) <- Some columns.[columnIndex + 1].[rowIndex + 1]
+                    )
+                )
+
+                worksheet.activate()
+                do! context.sync().``then``(fun _ -> ())
+                let! result = tryGetTopLevelMetadata()
+
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The Assay has beeen updated"]
             else
                 return [InteropLogging.Msg.create InteropLogging.Error $"No Assay is available"]
@@ -2153,6 +2187,9 @@ let updateTopLevelInvestigation (investigation: ArcInvestigation option) =
     Excel.run(fun context ->
         promise {
             if investigation.IsSome then
+
+                //let newWorksheet = ArcInvestigation.toMetadataSheet(investigation.Value)
+
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The Investigation has beeen updated"]
             else
                 return [InteropLogging.Msg.create InteropLogging.Error $"No Investigation is available"]
@@ -2163,6 +2200,13 @@ let updateTopLevelStudy (study: (ArcStudy * ArcAssay list) option) =
     Excel.run(fun context ->
         promise {
             if study.IsSome then
+
+                let study, assays = study.Value
+
+                let assays = if assays.IsEmpty then None else Some assays
+
+                let newWorksheet = ArcStudy.toMetadataSheet study assays
+
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The Study has beeen updated"]
             else
                 return [InteropLogging.Msg.create InteropLogging.Error $"No Study is available"]
@@ -2173,6 +2217,9 @@ let updateTopLevelTemplate (template: Template option) =
     Excel.run(fun context ->
         promise {
             if template.IsSome then
+
+                let newWorksheet = Template.toMetadataSheet(template.Value)
+
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The Template has beeen updated"]
             else
                 return [InteropLogging.Msg.create InteropLogging.Error $"No Template is available"]

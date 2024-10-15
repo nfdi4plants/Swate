@@ -12,6 +12,7 @@ open Feliz.Bulma
 open Components.QuickAccessButton
 open Browser.Types
 open ARCtrl
+open ARCtrl.Spreadsheet
 open Shared
 open Components.Metadata
 
@@ -29,6 +30,7 @@ type private NavbarState = {
 type ExcelMetadataState = {
     MetadataType: ArcFilesDiscriminate option
     Identifier: string option
+    WorkSheetName: string option
     Assay: ArcAssay option
     Investigation: ArcInvestigation option
     Study: (ArcStudy * ArcAssay list) option
@@ -37,6 +39,7 @@ type ExcelMetadataState = {
     static member init = {
         MetadataType = None
         Identifier = None
+        WorkSheetName = None
         Assay = None
         Investigation = None
         Study = None
@@ -60,7 +63,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                             MetadataType = Some ArcFilesDiscriminate.Investigation
                             Investigation = Some investigation
                     }
-                    OfficeInterop.CreateTopLevelMetadata(ArcFilesDiscriminate.Investigation)
+                    OfficeInterop.CreateTopLevelMetadata(investigation.Identifier)
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -71,13 +74,15 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     let study = ArcStudy.init("New Study")
                     let table = study.InitTable("New Study Table")
                     study.Tables.Add(table)
+                    let studyWorkseet = ArcStudy.toMetadataSheet study None
                     setExcelMetadataType {
                         excelMetadataType with
                             Identifier = Some study.Identifier
                             MetadataType = Some ArcFilesDiscriminate.Study
+                            WorkSheetName = Some studyWorkseet.Name
                             Study = Some (study, [])
                     }
-                    OfficeInterop.CreateTopLevelMetadata(ArcFilesDiscriminate.Study)                            
+                    OfficeInterop.CreateTopLevelMetadata(studyWorkseet.Name)                            
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -88,13 +93,15 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     let assay = ArcAssay.init("New Assay")
                     let table = assay.InitTable("New Assay Table")
                     assay.Tables.Add(table)
+                    let assayWorkseet = ArcAssay.toMetadataSheet assay
                     setExcelMetadataType {
                         excelMetadataType with
                             Identifier = Some assay.Identifier
                             MetadataType = Some ArcFilesDiscriminate.Assay
+                            WorkSheetName = Some assayWorkseet.Name
                             Assay = Some assay
                     }
-                    OfficeInterop.CreateTopLevelMetadata(ArcFilesDiscriminate.Assay)
+                    OfficeInterop.CreateTopLevelMetadata(assayWorkseet.Name)
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -108,13 +115,15 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     template.Version <- "0.0.0"
                     template.Id <- System.Guid.NewGuid()
                     template.LastUpdated <- System.DateTime.Now
+                    let templateWorkseet = Template.toMetadataSheet template
                     setExcelMetadataType {
                         excelMetadataType with
                             Identifier = Some template.Name
                             MetadataType = Some ArcFilesDiscriminate.Template
+                            WorkSheetName = Some templateWorkseet.Name
                             Template = Some template
                     }
-                    OfficeInterop.CreateTopLevelMetadata(ArcFilesDiscriminate.Template)                            
+                    OfficeInterop.CreateTopLevelMetadata(templateWorkseet.Name)                            
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -262,7 +271,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                                         ]
                                                         prop.text "Delete Metadata Type"
                                                         prop.onClick (fun _ ->
-                                                            OfficeInterop.DeleteTopLevelMetadata excelMetadataType.Identifier
+                                                            OfficeInterop.DeleteTopLevelMetadata excelMetadataType.WorkSheetName
                                                             |> OfficeInteropMsg
                                                             |> dispatch
                                                             setExcelMetadataType(ExcelMetadataState.init)
