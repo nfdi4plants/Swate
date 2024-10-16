@@ -7,6 +7,7 @@ open Messages
 open Model
 open Update
 open Fable.Core.JsInterop
+
 importSideEffects "./style.scss"
 importSideEffects "./tailwindstyle.scss"
 

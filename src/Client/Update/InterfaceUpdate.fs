@@ -170,7 +170,7 @@ module Interface =
                     //let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
                     Browser.Dom.window.alert "Not implemented"
                     model, Cmd.none
-                | Some Swatehost.Browser ->
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.UpdateArcFile arcFiles |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
@@ -205,10 +205,12 @@ module Interface =
                         let mutable rowIndex = rowIndex
                         let cells = [|
                             for name in fileNames do
-                                let c0 = model.SpreadsheetModel.ActiveTable.TryGetCellAt(columnIndex,rowIndex).Value
-                                let cell = c0.UpdateMainField name
-                                (columnIndex, rowIndex), cell
-                                rowIndex <- rowIndex + 1
+                                match model.SpreadsheetModel.ActiveTable.TryGetCellAt(columnIndex,rowIndex) with
+                                | Some c ->
+                                    let cell = c.UpdateMainField name
+                                    (columnIndex, rowIndex), cell
+                                    rowIndex <- rowIndex + 1
+                                | None -> ()
                         |]
                         let cmd = Spreadsheet.UpdateCells cells |> SpreadsheetMsg |> Cmd.ofMsg
                         model, cmd
@@ -269,9 +271,6 @@ module Interface =
                 match host with
                 | Some Swatehost.Excel ->
                     let cmd = OfficeInterop.RectifyTermColumns |> OfficeInteropMsg |> Cmd.ofMsg
-                    model, cmd
-                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.RectifyTermColumns |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | UpdateTermColumnsResponse terms ->
