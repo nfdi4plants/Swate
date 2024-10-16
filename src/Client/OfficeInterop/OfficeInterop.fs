@@ -78,7 +78,7 @@ module OfficeInteropExtensions =
         /// </summary>
         /// <param name="context"></param>
         /// <param name="tableName"></param>
-        static member tryGetTableByName (context:RequestContext) (tableName:string) =
+        static member tryGetTableByName (context: RequestContext) (tableName: string) =
             let _ = context.workbook.load(U2.Case1 "tables")
             let excelTable = context.workbook.tables.getItem(tableName)
 
@@ -95,7 +95,7 @@ module OfficeInteropExtensions =
         /// Swaps 'Rows with column values' to 'Columns with row values'
         /// </summary>
         /// <param name="rows"></param>
-        static member viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
+        static member viewRowsByColumns (rows: ResizeArray<ResizeArray<'a>>) =
             rows
             |> Seq.collect (fun row -> Seq.indexed row)
             |> Seq.groupBy fst
@@ -110,7 +110,7 @@ module OfficeInteropExtensions =
         /// <param name="name"></param>
         /// <param name="rowCount"></param>
         /// <param name="value"></param>
-        static member addColumn (index:float) (excelTable:Table) name rowCount value =
+        static member addColumn (index: float) (excelTable: Table) name rowCount value =
             let col = createMatrixForTables 1 rowCount value
 
             excelTable.columns.add(
@@ -126,7 +126,7 @@ module OfficeInteropExtensions =
         /// <param name="excelTable"></param>
         /// <param name="columnName"></param>
         /// <param name="rows"></param>
-        static member addColumnAndRows (columnIndex:float) (excelTable:Table) columnName rows =
+        static member addColumnAndRows (columnIndex: float) (excelTable: Table) columnName rows =
             excelTable.columns.add(
                 index   = columnIndex,
                 values  = U4.Case1 rows,
@@ -140,7 +140,7 @@ module OfficeInteropExtensions =
         /// <param name="excelTable"></param>
         /// <param name="rowCount"></param>
         /// <param name="value"></param>
-        static member addRows (index:float) (excelTable:Table) rowCount value =
+        static member addRows (index: float) (excelTable: Table) rowCount value =
             let col = createMatrixForTables 1 rowCount value
             excelTable.rows.add(
                 index   = index,
@@ -153,7 +153,7 @@ module OfficeInteropExtensions =
         /// <param name="table"></param>
         /// <param name="context"></param>
         /// <param name="shallHide"></param>
-        static member adoptTableFormats (table:Table, context:RequestContext, shallHide:bool) =
+        static member adoptTableFormats (table: Table, context: RequestContext, shallHide: bool) =
             promise {
 
                 let _ = table.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
@@ -180,7 +180,7 @@ module OfficeInteropExtensions =
         /// <param name="name"></param>
         /// <param name="headers"></param>
         /// <param name="rows"></param>
-        static member fromStringSeqs(name:string, headers:#seq<string>, rows:#seq<#seq<string>>) =
+        static member fromStringSeqs(name: string, headers: #seq<string>, rows: #seq<#seq<string>>) =
 
             let columns = 
                 Seq.append [headers] rows 
@@ -1120,7 +1120,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
 // https://github.com/nfdi4plants/Swate/issues/203
 /// If an output column already exists it should be replaced by the new output column type.
-let replaceOutputColumn (excelTableName:string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
+let replaceOutputColumn (excelTableName: string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
     Excel.run(fun context ->
         promise {
             // Ref. 2
@@ -1155,7 +1155,7 @@ let replaceOutputColumn (excelTableName:string) (existingOutputColumn: BuildingB
 /// <param name="excelTable"></param>
 /// <param name="arcTable"></param>
 /// <param name="newBB"></param>
-let updateInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+let updateInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     let possibleInputColumn = arcTable.TryGetInputColumn()
 
@@ -1197,7 +1197,7 @@ let updateInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCol
 /// <param name="excelTable"></param>
 /// <param name="arcTable"></param>
 /// <param name="newBB"></param>
-let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+let addInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     if arcTable.TryGetInputColumn().IsSome then
         failwith "Something went wrong! The add input column is filled with data! Please report this as a bug to the developers."
@@ -1223,7 +1223,7 @@ let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn
 /// <param name="excelTable"></param>
 /// <param name="arcTable"></param>
 /// <param name="newBB"></param>
-let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+let updateOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     let possibleOutputColumn = arcTable.TryGetOutputColumn()
 
@@ -1265,7 +1265,7 @@ let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCo
 /// <param name="excelTable"></param>
 /// <param name="arcTable"></param>
 /// <param name="newBB"></param>
-let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+let addOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     if arcTable.TryGetOutputColumn().IsSome then
 
@@ -1294,7 +1294,7 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
 /// <param name="newBB"></param>
 /// <param name="headerRange"></param>
 /// <param name="selectedRange"></param>
-let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) (headerRange:Excel.Range) (selectedRange:Excel.Range) =
+let addBuildingBlock (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) (headerRange: Excel.Range) (selectedRange: Excel.Range) =
 
     let rowCount = arcTable.RowCount + 1
 
@@ -1365,7 +1365,7 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 /// Prepare the given table to be joined with the currently active annotation table
 /// </summary>
 /// <param name="tableToAdd"></param>
-let prepareTemplateInMemory (tableToAdd:ArcTable) =
+let prepareTemplateInMemory (tableToAdd: ArcTable) =
     Excel.run(fun context ->
         promise {
 
@@ -1403,7 +1403,7 @@ let prepareTemplateInMemory (tableToAdd:ArcTable) =
 /// <param name="tableToAdd"></param>
 /// <param name="index"></param>
 /// <param name="options"></param>
-let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions option) =
+let joinTable (tableToAdd: ArcTable, index: int option, options: TableJoinOptions option) =
     Excel.run(fun context ->
         promise {
 
@@ -1489,7 +1489,7 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
 /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
 /// </summary>
 /// <param name="newBB"></param>
-let addAnnotationBlockHandler (newBB:CompositeColumn) =
+let addAnnotationBlockHandler (newBB: CompositeColumn) =
     Excel.run(fun context ->
         promise {
 
@@ -1552,7 +1552,6 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
 /// <param name="columns"></param>
 /// <param name="selectedIndex"></param>
 let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
-
     promise {
 
         let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
@@ -1580,7 +1579,6 @@ let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
 /// <param name="adaptedIndex"></param>
 /// <param name="context"></param>
 let getAdaptedSelectedBuildingBlock (table: Table) (adaptedIndex: float) (context: RequestContext) =
-
     promise {
 
         let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
@@ -1606,7 +1604,6 @@ let getAdaptedSelectedBuildingBlock (table: Table) (adaptedIndex: float) (contex
 /// </summary>
 let removeSelectedAnnotationBlock () =
     Excel.run(fun context ->
-
         promise {
 
             let! excelTable = getActiveAnnotationTable context
@@ -1702,7 +1699,7 @@ let convertToTermColumn (column: CompositeColumn) =
 /// </summary>
 /// <param name="selectedColumns"></param>
 /// <param name="excelTable"></param>
-let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable:Table) =
+let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable: Table) =
     // iterate DESCENDING to avoid index shift
     for i in Seq.sortByDescending (fun x -> x) selectedColumns do
         let column = excelTable.columns.getItemAt(i)
@@ -1716,9 +1713,8 @@ let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable:Table) =
 /// <param name="newBB"></param>
 /// <param name="table"></param>
 /// <param name="context"></param>
-let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) (context: RequestContext)=
+let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table: Table) (context: RequestContext)=
     promise {
-
         let headers = table.getHeaderRowRange()
         let _ = headers.load(U2.Case2 (ResizeArray [|"values"|]))
 
@@ -1753,7 +1749,6 @@ let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) 
 let convertBuildingBlock () =
     Excel.run(fun context ->
         promise {
-
             let! excelTable = getActiveAnnotationTable context
             let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
             let excelMainColumnIndex = fst selectedBuildingBlock.[0]
@@ -1795,10 +1790,9 @@ let convertBuildingBlock () =
 /// <param name="selectedIndex"></param>
 /// <param name="targetIndex"></param>
 /// <param name="context"></param>
-let validateColumns (excelTable:Table, selectedIndex:int, targetIndex:int, context:RequestContext) =
+let validateColumns (excelTable: Table, selectedIndex: int, targetIndex: int, context: RequestContext) =
 
     promise {
-
         let headerRange = excelTable.getHeaderRowRange()
         let bodyRowRange = excelTable.getDataBodyRange()
 
@@ -1846,7 +1840,7 @@ let validateColumns (excelTable:Table, selectedIndex:int, targetIndex:int, conte
 /// </summary>
 /// <param name="excelTable"></param>
 /// <param name="context"></param>
-let validateBuildingBlock (excelTable:Table, context:RequestContext) =
+let validateBuildingBlock (excelTable: Table, context: RequestContext) =
 
     let columns = excelTable.columns
     let selectedRange = context.workbook.getSelectedRange()
@@ -1856,7 +1850,6 @@ let validateBuildingBlock (excelTable:Table, context:RequestContext) =
         selectedRange.load(U2.Case2 (ResizeArray [|"values"; "columnIndex"|]))
 
     promise {
-
             do! context.sync().``then``( fun _ -> ())
 
             let columnIndex = selectedRange.columnIndex
@@ -1912,7 +1905,6 @@ let validateBuildingBlock (excelTable:Table, context:RequestContext) =
 let validateSelectedAndNeighbouringBuildingBlocks () =
     Excel.run(fun context ->
         promise {
-
             let! excelTable = getActiveAnnotationTable context
 
             let! indexedErrors = validateBuildingBlock(excelTable, context)
@@ -1936,7 +1928,6 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
 /// </summary>
 let validateAnnotationTable context =
     promise {
-
         let! excelTable = getActiveAnnotationTable context
         let! indexedErrors = ArcTable.validateExcelTable(excelTable, context)
 
@@ -2112,10 +2103,30 @@ let createTopLevelMetadata name =
         }
     )
 
-let deleteTopLevelMetadata (identifier:string option) =
+let getTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq -> 'T)=
     Excel.run(fun context ->
         promise {
+            let assayWorkSheet = context.workbook.worksheets.getItem(identifier)
+            let range = assayWorkSheet.getUsedRange true
+            let _ =
+                assayWorkSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|])) |> ignore
+                range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
+            do! context.sync().``then``(fun _ -> ())
+
+            let values =
+                range.values
+                |> Seq.map (fun x ->
+                    x
+                    |> Seq.map (fun xx -> if xx.IsSome && not (String.IsNullOrEmpty(xx.Value.ToString())) then Some (xx.Value.ToString()) else None))
+
+            return parseToMetadata values
+        }
+    )
+
+let deleteTopLevelMetadata (identifier: string option) =
+    Excel.run(fun context ->
+        promise {
             if identifier.IsNone then
                 return [InteropLogging.Msg.create InteropLogging.Error $"No identifier for the metadat top level sheet is available"]
             else
@@ -2137,79 +2148,114 @@ let deleteTopLevelMetadata (identifier:string option) =
         }
     )
 
+let private convertToResizeArrays metadataValues =
+
+    let maxLength = metadataValues |> Seq.maxBy Seq.length |> Seq.length
+    metadataValues
+    |> Seq.map (fun row ->
+        let endRow = if Seq.length row < maxLength then Seq.append row (seq { None }) else row
+        endRow
+        |> Seq.map (fun column -> if column.IsSome then Some (column.Value :> obj) else None)
+        |> ResizeArray
+    )
+    |> ResizeArray
+
 let updateTopLevelAssay (assay: ArcAssay option) =
     Excel.run(fun context ->
         promise {
             if assay.IsSome then
-
-                let assayWorkseet = ArcAssay.toMetadataSheet(assay.Value)
-
-                let worksheet = context.workbook.worksheets.getItem(assayWorkseet.Name)
-
-                log("assayWorkseet.MaxColumnIndex", assayWorkseet.MaxColumnIndex)
-                log("assayWorkseet.MaxRowIndex", assayWorkseet.MaxRowIndex)
-
-                let range = worksheet.getRangeByIndexes(0, 0, assayWorkseet.MaxRowIndex, assayWorkseet.MaxColumnIndex)
-
-                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values";]))
+                let assayWorksheet = ArcAssay.toMetadataSheet(assay.Value)
+                let worksheet = context.workbook.worksheets.getItem(assayWorksheet.Name)
+                let seqOfSeqs = ArcAssay.toMetadataCollection assay.Value
+                let values = convertToResizeArrays seqOfSeqs
+                let range = worksheet.getRangeByIndexes(0, 0, assayWorksheet.MaxRowIndex, assayWorksheet.MaxColumnIndex)
+                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
                 do! context.sync().``then``(fun _ -> ())
 
-                let columns = assayWorkseet.Columns |> Array.ofSeq
-                let column = columns.[0].Cells |> Array.ofSeq
-                log("columns.Length", columns.Length)
-                log("columns.[0].columns.Length", column.Length)
-                log("range.values", range.values)
-
-                range.values
-                |> Seq.iteri (fun rowIndex row ->
-                    log("rowIndex", rowIndex + 1)
-                    row
-                    |> Seq.iteri (fun columnIndex _ ->
-                            log("columnIndex", columnIndex + 1)
-                            let x = row.Item (columnIndex + 1)
-                            log("row.Item", x.IsSome)
-                            //(row.Item (columnIndex + 1)) <- Some columns.[columnIndex + 1].[rowIndex + 1]
-                    )
-                )
+                range.values <- values
 
                 worksheet.activate()
+
+                range.format.autofitColumns()
+                range.format.autofitRows()
+
                 do! context.sync().``then``(fun _ -> ())
+
                 let! result = tryGetTopLevelMetadata()
 
-                return [InteropLogging.Msg.create InteropLogging.Warning $"The Assay has beeen updated"]
+                if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The assay {result.Value} has been updated"]
+                else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the assay"]
             else
-                return [InteropLogging.Msg.create InteropLogging.Error $"No Assay is available"]
+                return [InteropLogging.Msg.create InteropLogging.Error $"No assay is available"]
         }
     )
 
-let updateTopLevelInvestigation (investigation: ArcInvestigation option) =
+let updateTopLevelInvestigation (investigation: ArcInvestigation option, workSheetName) =
     Excel.run(fun context ->
         promise {
             if investigation.IsSome then
+                let investigationWorkbook = ArcInvestigation.toFsWorkbook investigation.Value
+                let investigationWorksheet = investigationWorkbook.GetWorksheetByName(workSheetName)
+                let worksheet = context.workbook.worksheets.getItem(investigationWorksheet.Name)
+                let seqOfSeqs = ArcInvestigation.toMetadataCollection investigation.Value
+                let values = convertToResizeArrays seqOfSeqs
+                let range = worksheet.getRangeByIndexes(0, 0, investigationWorksheet.MaxRowIndex, investigationWorksheet.MaxColumnIndex)
+                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
-                //let newWorksheet = ArcInvestigation.toMetadataSheet(investigation.Value)
+                do! context.sync().``then``(fun _ -> ())
 
-                return [InteropLogging.Msg.create InteropLogging.Warning $"The Investigation has beeen updated"]
+                range.values <- values
+
+                worksheet.activate()
+
+                range.format.autofitColumns()
+                range.format.autofitRows()
+
+                do! context.sync().``then``(fun _ -> ())
+
+                let! result = tryGetTopLevelMetadata()
+
+                if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The investigation {result.Value} has been updated"]
+                else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the investigation"]
             else
-                return [InteropLogging.Msg.create InteropLogging.Error $"No Investigation is available"]
+                return [InteropLogging.Msg.create InteropLogging.Error $"No investigation is available"]
         }
     )
 
-let updateTopLevelStudy (study: (ArcStudy * ArcAssay list) option) =
+let updateTopLevelStudy (studyCompilation: (ArcStudy * ArcAssay list) option) =
     Excel.run(fun context ->
         promise {
-            if study.IsSome then
+            if studyCompilation.IsSome then
+                let study = fst studyCompilation.Value
+                let assays =
+                    let result = snd studyCompilation.Value
+                    if result.IsEmpty then None
+                    else Some result
+                let studyWorksheet = ArcStudy.toMetadataSheet study assays
+                let worksheet = context.workbook.worksheets.getItem(studyWorksheet.Name)
+                let seqOfSeqs = ArcStudy.toMetadataCollection study assays
+                let values = convertToResizeArrays seqOfSeqs
+                let range = worksheet.getRangeByIndexes(0, 0, studyWorksheet.MaxRowIndex, studyWorksheet.MaxColumnIndex)
+                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
-                let study, assays = study.Value
+                do! context.sync().``then``(fun _ -> ())
 
-                let assays = if assays.IsEmpty then None else Some assays
+                range.values <- values
 
-                let newWorksheet = ArcStudy.toMetadataSheet study assays
+                worksheet.activate()
 
-                return [InteropLogging.Msg.create InteropLogging.Warning $"The Study has beeen updated"]
+                range.format.autofitColumns()
+                range.format.autofitRows()
+
+                do! context.sync().``then``(fun _ -> ())
+
+                let! result = tryGetTopLevelMetadata()
+
+                if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The study {result.Value} has been updated"]
+                else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the study"]
             else
-                return [InteropLogging.Msg.create InteropLogging.Error $"No Study is available"]
+                return [InteropLogging.Msg.create InteropLogging.Error $"No study is available"]
         }
     )
 
@@ -2217,12 +2263,30 @@ let updateTopLevelTemplate (template: Template option) =
     Excel.run(fun context ->
         promise {
             if template.IsSome then
+                let templateWorksheet = Template.toMetadataSheet(template.Value)
+                let worksheet = context.workbook.worksheets.getItem(templateWorksheet.Name)
+                let seqOfSeqs = Template.toMetadataCollection template.Value
+                let values = convertToResizeArrays seqOfSeqs
+                let range = worksheet.getRangeByIndexes(0, 0, templateWorksheet.MaxRowIndex, templateWorksheet.MaxColumnIndex)
+                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
-                let newWorksheet = Template.toMetadataSheet(template.Value)
+                do! context.sync().``then``(fun _ -> ())
 
-                return [InteropLogging.Msg.create InteropLogging.Warning $"The Template has beeen updated"]
+                range.values <- values
+
+                worksheet.activate()
+
+                range.format.autofitColumns()
+                range.format.autofitRows()
+
+                do! context.sync().``then``(fun _ -> ())
+
+                let! result = tryGetTopLevelMetadata()
+
+                if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The template {result.Value} has been updated"]
+                else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the template"]
             else
-                return [InteropLogging.Msg.create InteropLogging.Error $"No Template is available"]
+                return [InteropLogging.Msg.create InteropLogging.Error $"No template is available"]
         }
     )
 

@@ -30,7 +30,6 @@ type private NavbarState = {
 type ExcelMetadataState = {
     MetadataType: ArcFilesDiscriminate option
     Identifier: string option
-    WorkSheetName: string option
     Assay: ArcAssay option
     Investigation: ArcInvestigation option
     Study: (ArcStudy * ArcAssay list) option
@@ -39,12 +38,17 @@ type ExcelMetadataState = {
     static member init = {
         MetadataType = None
         Identifier = None
-        WorkSheetName = None
         Assay = None
         Investigation = None
         Study = None
         Template = None
     }
+
+type WorkSheetNames =
+    static member assay = "isa_assay"
+    static member investigation = "isa_investigation"
+    static member study = "isa_study"
+    static member template = "isa_template"
 
 let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: Messages.Msg -> unit) =
     Html.div [
@@ -59,11 +63,11 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     let investigation = ArcInvestigation.init("New Investigation")
                     setExcelMetadataType {
                         excelMetadataType with
-                            Identifier = Some investigation.Identifier
+                            Identifier = Some WorkSheetNames.investigation
                             MetadataType = Some ArcFilesDiscriminate.Investigation
                             Investigation = Some investigation
                     }
-                    OfficeInterop.CreateTopLevelMetadata(investigation.Identifier)
+                    OfficeInterop.CreateTopLevelMetadata(WorkSheetNames.investigation)
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -74,15 +78,13 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     let study = ArcStudy.init("New Study")
                     let table = study.InitTable("New Study Table")
                     study.Tables.Add(table)
-                    let studyWorkseet = ArcStudy.toMetadataSheet study None
                     setExcelMetadataType {
                         excelMetadataType with
-                            Identifier = Some study.Identifier
+                            Identifier = Some WorkSheetNames.study
                             MetadataType = Some ArcFilesDiscriminate.Study
-                            WorkSheetName = Some studyWorkseet.Name
                             Study = Some (study, [])
                     }
-                    OfficeInterop.CreateTopLevelMetadata(studyWorkseet.Name)                            
+                    OfficeInterop.CreateTopLevelMetadata(WorkSheetNames.study)                            
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -93,15 +95,13 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     let assay = ArcAssay.init("New Assay")
                     let table = assay.InitTable("New Assay Table")
                     assay.Tables.Add(table)
-                    let assayWorkseet = ArcAssay.toMetadataSheet assay
                     setExcelMetadataType {
                         excelMetadataType with
-                            Identifier = Some assay.Identifier
+                            Identifier = Some WorkSheetNames.assay
                             MetadataType = Some ArcFilesDiscriminate.Assay
-                            WorkSheetName = Some assayWorkseet.Name
                             Assay = Some assay
                     }
-                    OfficeInterop.CreateTopLevelMetadata(assayWorkseet.Name)
+                    OfficeInterop.CreateTopLevelMetadata(WorkSheetNames.assay)
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -115,15 +115,13 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     template.Version <- "0.0.0"
                     template.Id <- System.Guid.NewGuid()
                     template.LastUpdated <- System.DateTime.Now
-                    let templateWorkseet = Template.toMetadataSheet template
                     setExcelMetadataType {
                         excelMetadataType with
-                            Identifier = Some template.Name
+                            Identifier = Some WorkSheetNames.template
                             MetadataType = Some ArcFilesDiscriminate.Template
-                            WorkSheetName = Some templateWorkseet.Name
                             Template = Some template
                     }
-                    OfficeInterop.CreateTopLevelMetadata(templateWorkseet.Name)                            
+                    OfficeInterop.CreateTopLevelMetadata(WorkSheetNames.template)                            
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -133,7 +131,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
     ]
 
 [<ReactComponent>]
-let createMetadataDialog excelMetadataType setExcelMetadataType (ref: IRefValue<HTMLInputElement option>) (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
+let private CreateMetadataDialog excelMetadataType setExcelMetadataType (ref: IRefValue<HTMLInputElement option>) (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.children [            
             // Modal background to close the dialog
@@ -164,10 +162,10 @@ let createMetadataDialog excelMetadataType setExcelMetadataType (ref: IRefValue<
 
 let updateTopLevelMetadata (metadataType: ExcelMetadataState) dispatch =
     match metadataType.MetadataType with
-    | Some ArcFilesDiscriminate.Assay           -> OfficeInterop.UpdateTopLevelAssay(metadataType.Assay)                    |> OfficeInteropMsg |> dispatch
-    | Some ArcFilesDiscriminate.Investigation   -> OfficeInterop.UpdateTopLevelInvestigation(metadataType.Investigation)    |> OfficeInteropMsg |> dispatch
-    | Some ArcFilesDiscriminate.Study           -> OfficeInterop.UpdateTopLevelStudy(metadataType.Study)                    |> OfficeInteropMsg |> dispatch
-    | Some ArcFilesDiscriminate.Template        -> OfficeInterop.UpdateTopLevelTemplate(metadataType.Template)              |> OfficeInteropMsg |> dispatch
+    | Some ArcFilesDiscriminate.Assay           -> OfficeInterop.UpdateTopLevelAssay(metadataType.Assay)                                                |> OfficeInteropMsg |> dispatch
+    | Some ArcFilesDiscriminate.Investigation   -> OfficeInterop.UpdateTopLevelInvestigation(metadataType.Investigation, WorkSheetNames.investigation)  |> OfficeInteropMsg |> dispatch
+    | Some ArcFilesDiscriminate.Study           -> OfficeInterop.UpdateTopLevelStudy(metadataType.Study)                                                |> OfficeInteropMsg |> dispatch
+    | Some ArcFilesDiscriminate.Template        -> OfficeInterop.UpdateTopLevelTemplate(metadataType.Template)                                          |> OfficeInteropMsg |> dispatch
     | None                                      -> failwith "No top level metadata type has been selected"
 
 // Define a modal dialog component
@@ -179,7 +177,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
             Bulma.modal.isActive
             if excelMetadataType.MetadataType.IsNone then
                 prop.children [
-                    createMetadataDialog excelMetadataType setExcelMetadataType ref closeModal dispatch
+                    CreateMetadataDialog excelMetadataType setExcelMetadataType ref closeModal dispatch
                 ]
             else
                 prop.children [
@@ -198,7 +196,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                         let setAssay (assay: ArcAssay) =
                                             setExcelMetadataType {
                                                 excelMetadataType with
-                                                    Identifier = Some assay.Identifier
+                                                    Identifier = Some WorkSheetNames.assay
                                                     MetadataType = Some ArcFilesDiscriminate.Assay
                                                     Assay = Some assay
                                             }
@@ -210,7 +208,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                         let setStudy (study: ArcStudy, assays: ArcAssay list) =
                                             setExcelMetadataType {
                                                 excelMetadataType with
-                                                    Identifier = Some study.Identifier
+                                                    Identifier = Some WorkSheetNames.study
                                                     MetadataType = Some ArcFilesDiscriminate.Study
                                                     Study = Some (study, assays)
                                             }
@@ -221,7 +219,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                         let setInvestigation (investigation: ArcInvestigation) =
                                             setExcelMetadataType {
                                                 excelMetadataType with
-                                                    Identifier = Some investigation.Identifier
+                                                    Identifier = Some WorkSheetNames.investigation
                                                     MetadataType = Some ArcFilesDiscriminate.Investigation
                                                     Investigation = Some investigation
                                             }
@@ -230,7 +228,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                         let setTemplate (template: Template) =
                                             setExcelMetadataType {
                                                 excelMetadataType with
-                                                    Identifier = Some (template.Name.ToString())
+                                                    Identifier = Some WorkSheetNames.template
                                                     MetadataType = Some ArcFilesDiscriminate.Template
                                                     Template = Some template
                                             }
@@ -271,7 +269,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                                         ]
                                                         prop.text "Delete Metadata Type"
                                                         prop.onClick (fun _ ->
-                                                            OfficeInterop.DeleteTopLevelMetadata excelMetadataType.WorkSheetName
+                                                            OfficeInterop.DeleteTopLevelMetadata excelMetadataType.Identifier
                                                             |> OfficeInteropMsg
                                                             |> dispatch
                                                             setExcelMetadataType(ExcelMetadataState.init)
@@ -308,7 +306,11 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
                         isModalActive.SwateExcelHandleMetadataModal
                         excelMetadataType
                         setExcelMetadataType
-                        (fun () -> setModalActive(if excelMetadataType.Identifier.IsNone then NavbarState.init else { isModalActive with SwateExcelHandleMetadataModal = not isModalActive.SwateExcelHandleMetadataModal }))
+                        (fun () -> setModalActive(
+                            if
+                                excelMetadataType.Identifier.IsNone then NavbarState.init
+                            else
+                                { isModalActive with SwateExcelHandleMetadataModal = not isModalActive.SwateExcelHandleMetadataModal }))
                         dispatch
                 ]
             ],
@@ -319,41 +321,40 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
                     if result.IsSome then
                         match result.Value with
                         | assayIdentifier when assayIdentifier.ToLower().Contains("assay") ->
+                            let! assay = OfficeInterop.Core.getTopLeveMetadata (assayIdentifier.ToLower()) ArcAssay.fromMetadataCollection
                             setExcelMetadataType {
                                 excelMetadataType with
                                     MetadataType = Some ArcFilesDiscriminate.Assay
                                     Identifier = Some assayIdentifier
-                                    Assay = Some (new ArcAssay(assayIdentifier))
+                                    Assay = Some assay
                             }
                         | investigationIdentifier when investigationIdentifier.ToLower().Contains("investigation") ->
+                            let! investigation = OfficeInterop.Core.getTopLeveMetadata (investigationIdentifier.ToLower()) ArcInvestigation.fromMetadataCollection
                             setExcelMetadataType {
                                 excelMetadataType with
                                     MetadataType = Some ArcFilesDiscriminate.Investigation
                                     Identifier = Some investigationIdentifier
-                                    Investigation = Some (new ArcInvestigation(investigationIdentifier))
+                                    Investigation = Some investigation
                             }
                         | studyIdentifier when studyIdentifier.ToLower().Contains("study") ->
+                            let! study = OfficeInterop.Core.getTopLeveMetadata (studyIdentifier.ToLower()) ArcStudy.fromMetadataCollection
                             setExcelMetadataType {
                                 excelMetadataType with
                                     MetadataType = Some ArcFilesDiscriminate.Study
                                     Identifier = Some studyIdentifier
-                                    Study = Some (new ArcStudy(studyIdentifier), [])
+                                    Study = Some study
                             }
                         | templateIdentifier when templateIdentifier.ToLower().Contains("template") ->
+                            let! templateInfo, ers, tags, authors = OfficeInterop.Core.getTopLeveMetadata (templateIdentifier.ToLower()) Template.fromMetadataCollection
+                            let template = Template.fromParts templateInfo ers tags authors (ArcTable.init "New Template") DateTime.Now
                             setExcelMetadataType {
                                 excelMetadataType with
                                     MetadataType = Some ArcFilesDiscriminate.Template
                                     Identifier = Some templateIdentifier
-                                    Template =
-                                        Some (
-                                            new Template(Guid.NewGuid(),
-                                            new ArcTable("new Table",
-                                                new ResizeArray<CompositeHeader>(), new Dictionary<(int * int), CompositeCell>()
-                                            ),
-                                            templateIdentifier)
-                                        )
+                                    Template = Some template
                             }
                         | _ -> failwith $"No metadata of type {result.Value} has been implemented yet!"
+                    else setExcelMetadataType(ExcelMetadataState.init)
                 } |> ignore
             )
         )

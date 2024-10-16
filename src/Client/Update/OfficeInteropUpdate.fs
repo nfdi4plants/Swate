@@ -237,11 +237,11 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd
-            | UpdateTopLevelInvestigation investigation ->
+            | UpdateTopLevelInvestigation (investigation, worksheetName) ->
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.updateTopLevelInvestigation
-                        (investigation)
+                        (investigation, worksheetName)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd

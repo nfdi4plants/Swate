@@ -29,7 +29,6 @@ type Model = {
 type Msg =
     // create and update table element functions
     | CreateAnnotationTable                 of tryUsePrevOutput:bool
-    | ValidateAnnotationTable
     | AnnotationtableCreated
     | TryFindAnnotationTable
     | AnnotationTableExists                 of TryFindAnnoTableResult
@@ -59,7 +58,7 @@ type Msg =
     | InsertFileNames                       of fileNameList:string list
     | CreateTopLevelMetadata                of string
     | UpdateTopLevelAssay                   of ArcAssay option
-    | UpdateTopLevelInvestigation           of ArcInvestigation option
+    | UpdateTopLevelInvestigation           of ArcInvestigation option * string
     | UpdateTopLevelStudy                   of (ArcStudy * ArcAssay list) option
     | UpdateTopLevelTemplate                of Template option
     | DeleteTopLevelMetadata                of string option

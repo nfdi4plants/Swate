@@ -104,10 +104,6 @@ type SettingsDataStewardMsg =
 type TopLevelMsg =
     | CloseSuggestions
 
-module SwateExcelCreateMetadata =
-    type Msg =
-        | SwateExcelCreateMetadata of bool
-
 type Msg =
 | DevMsg                        of DevMsg
 | OntologyMsg                   of Ontologies.Msg
@@ -130,7 +126,6 @@ type Msg =
 | Batch                         of seq<Messages.Msg>
 | Run                           of (unit -> unit)
 | UpdateHistory                 of LocalHistory.Model
-| SwateExcelCreateMetadataMsg   of SwateExcelCreateMetadata.Msg
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI
