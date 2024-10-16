@@ -1,4 +1,4 @@
-﻿module ARCitect.Interop
+module ARCitect.Interop
 
 open Fable.Core.JsInterop
 open Model.ARCitect
@@ -33,7 +33,7 @@ let inline runApiFromName (apiHandler: 'E) (apiName: string) (data: 'A) =
 let inline postMessageToARCitect (msg: 'A, data) =
     let methodName = getUnionCaseName msg
     let createContent (data) = {|swate = true; api = methodName; data = data|}
-    Browser.Dom.window.top.postMessage(createContent data, "*")
+    Browser.Dom.window.parent.postMessage(createContent data, "*")
 
 /// <summary>
 /// Returns a function to remove the event listener
