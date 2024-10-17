@@ -172,6 +172,26 @@ module OfficeInteropExtensions =
                         column.getRange().columnHidden <- shallHide)
             }
 
+        /// <summary>
+        /// Converts a sequence of sequence of excel data into a resizearray, compatible with Excel.Range
+        /// </summary>
+        /// <param name="metadataValues"></param>
+        static member convertToResizeArrays (metadataValues:seq<seq<string option>>) =
+
+            //Selects the longest sequence of the metadata values
+            //In the next step, determines the length of the longest metadata value sequence
+            let maxLength = metadataValues |> Seq.maxBy Seq.length |> Seq.length
+
+            //Adapts the length of the smaller sequences to the length of the longest sequence in order to avoid problems with the insertion into excel.Range
+            let ra = ResizeArray()
+            for seq in metadataValues do
+                //Parse string to obj option
+                let ira = ResizeArray (seq |> Seq.map (fun column -> if column.IsSome then Some (column.Value :> obj) else None))
+                if ira.Count < maxLength then            
+                    ira.AddRange (Array.create (maxLength - ira.Count) None)
+                ra.Add ira
+            ra
+
     type ArcTable with
 
         /// <summary>
@@ -2126,11 +2146,9 @@ let tryGetTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq
 
             let values =
                 range.values
-                |> Seq.map (fun x ->
-                    x
-                    |> Seq.map (fun xx ->
-                        xx
-                        |> Option.map string
+                |> Seq.map (fun row ->
+                    row
+                    |> Seq.map (fun column -> Option.map string column
                     )
                 )
 
@@ -2167,23 +2185,6 @@ let deleteTopLevelMetadata (identifier: string option) =
         }
     )
 
-/// <summary>
-/// Converts a sequence of sequence of excel data into a resizearray, compatible with Excel.Range
-/// </summary>
-/// <param name="metadataValues"></param>
-let private convertToResizeArrays metadataValues =
-
-    let maxLength = metadataValues |> Seq.maxBy Seq.length |> Seq.length
-
-    metadataValues
-    |> Seq.map (fun row ->
-        let endRow = if Seq.length row < maxLength then Seq.append row (seq { None }) else row
-        endRow
-        |> Seq.map (fun column -> if column.IsSome then Some (column.Value :> obj) else None)
-        |> ResizeArray
-    )
-    |> ResizeArray
-
 open FsSpreadsheet
 
 /// <summary>
@@ -2209,7 +2210,7 @@ let private updateWorkSheet (context:RequestContext) (fsWorkSheet:FsWorksheet) (
 
         do! context.sync().``then``(fun _ -> ())
 
-        let values = convertToResizeArrays seqOfSeqs
+        let values = ExcelHelper.convertToResizeArrays(seqOfSeqs)
 
         range.values <- values
 
@@ -2281,8 +2282,6 @@ let updateTopLevelStudy (studyCompilation: (ArcStudy * ArcAssay list) option) =
                 let seqOfSeqs = ArcStudy.toMetadataCollection study assays
 
                 do! updateWorkSheet context studyWorksheet seqOfSeqs
-
-                do! context.sync().``then``(fun _ -> ())
 
                 let! result = tryGetTopLevelMetadataSheetName context
 
