@@ -2064,6 +2064,9 @@ let rectifyTermColumns () =
         }
     )
 
+/// <summary>
+/// Tries to get the name of the top level excel worksheet of top level metadata
+/// </summary>
 let tryGetTopLevelMetadataSheetName () =
     Excel.run(fun context ->
         promise {
@@ -2088,6 +2091,10 @@ let tryGetTopLevelMetadataSheetName () =
         }
     )
 
+/// <summary>
+/// Creates excel worksheet with name for top level metadata
+/// </summary>
+/// <param name="name"></param>
 let createTopLevelMetadata name =
     Excel.run(fun context ->
         promise {
@@ -2103,6 +2110,11 @@ let createTopLevelMetadata name =
         }
     )
 
+/// <summary>
+/// try to get the values of top level meta data from excel worksheet
+/// </summary>
+/// <param name="identifier"></param>
+/// <param name="parseToMetadata"></param>
 let tryGetTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq -> 'T)=
     Excel.run(fun context ->
         promise {
@@ -2125,6 +2137,10 @@ let tryGetTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq
         }
     )
 
+/// <summary>
+/// Delete excel worksheet that contains top level metadata
+/// </summary>
+/// <param name="identifier"></param>
 let deleteTopLevelMetadata (identifier: string option) =
     Excel.run(fun context ->
         promise {
@@ -2149,6 +2165,10 @@ let deleteTopLevelMetadata (identifier: string option) =
         }
     )
 
+/// <summary>
+/// Converts a sequence of sequence of excel data into a resizearray, compatible with Excel.Range
+/// </summary>
+/// <param name="metadataValues"></param>
 let private convertToResizeArrays metadataValues =
 
     let maxLength = metadataValues |> Seq.maxBy Seq.length |> Seq.length
@@ -2163,6 +2183,12 @@ let private convertToResizeArrays metadataValues =
 
 open FsSpreadsheet
 
+/// <summary>
+/// Deletes the data contained in the selected worksheet and fills it afterwards with the given new data
+/// </summary>
+/// <param name="context"></param>
+/// <param name="fsWorkSheet"></param>
+/// <param name="seqOfSeqs"></param>
 let private updateWorkSheet (context:RequestContext) (fsWorkSheet:FsWorksheet) (seqOfSeqs:seq<seq<string option>>) =
     promise {
         let worksheet = context.workbook.worksheets.getItem(fsWorkSheet.Name)
@@ -2190,7 +2216,10 @@ let private updateWorkSheet (context:RequestContext) (fsWorkSheet:FsWorksheet) (
         do! context.sync().``then``(fun _ -> ())
     }
 
-
+/// <summary>
+/// Updates top level metadata excel worksheet of assays
+/// </summary>
+/// <param name="assay"></param>
 let updateTopLevelAssay (assay: ArcAssay option) =
     Excel.run(fun context ->
         promise {
@@ -2209,6 +2238,10 @@ let updateTopLevelAssay (assay: ArcAssay option) =
         }
     )
 
+/// <summary>
+/// Updates top level metadata excel worksheet of investigations
+/// </summary>
+/// <param name="assay"></param>
 let updateTopLevelInvestigation (investigation: ArcInvestigation option, workSheetName) =
     Excel.run(fun context ->
         promise {
@@ -2228,6 +2261,10 @@ let updateTopLevelInvestigation (investigation: ArcInvestigation option, workShe
         }
     )
 
+/// <summary>
+/// Updates top level metadata excel worksheet of studies
+/// </summary>
+/// <param name="assay"></param>
 let updateTopLevelStudy (studyCompilation: (ArcStudy * ArcAssay list) option) =
     Excel.run(fun context ->
         promise {
@@ -2253,6 +2290,10 @@ let updateTopLevelStudy (studyCompilation: (ArcStudy * ArcAssay list) option) =
         }
     )
 
+/// <summary>
+/// Updates top level metadata excel worksheet of templates
+/// </summary>
+/// <param name="assay"></param>
 let updateTopLevelTemplate (template: Template option) =
     Excel.run(fun context ->
         promise {
