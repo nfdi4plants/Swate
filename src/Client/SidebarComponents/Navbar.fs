@@ -317,41 +317,45 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
             (fun _ ->
                 setModalActive { isModalActive with SwateExcelHandleMetadataModal = not isModalActive.SwateExcelHandleMetadataModal }
                 promise {
-                    let! result = OfficeInterop.Core.tryGetTopLevelMetadata()
+                    let! result = OfficeInterop.Core.tryGetTopLevelMetadataSheetName()
                     if result.IsSome then
                         match result.Value with
                         | assayIdentifier when assayIdentifier.ToLower().Contains("assay") ->
-                            let! assay = OfficeInterop.Core.getTopLeveMetadata (assayIdentifier.ToLower()) ArcAssay.fromMetadataCollection
+                            let! assay = OfficeInterop.Core.tryGetTopLeveMetadata (assayIdentifier.ToLower()) ArcAssay.fromMetadataCollection
                             setExcelMetadataType {
                                 excelMetadataType with
                                     MetadataType = Some ArcFilesDiscriminate.Assay
                                     Identifier = Some assayIdentifier
-                                    Assay = Some assay
+                                    Assay = if assay.IsSome then assay else Some (new ArcAssay("New Assay"))
                             }
                         | investigationIdentifier when investigationIdentifier.ToLower().Contains("investigation") ->
-                            let! investigation = OfficeInterop.Core.getTopLeveMetadata (investigationIdentifier.ToLower()) ArcInvestigation.fromMetadataCollection
+                            let! investigation = OfficeInterop.Core.tryGetTopLeveMetadata (investigationIdentifier.ToLower()) ArcInvestigation.fromMetadataCollection
                             setExcelMetadataType {
                                 excelMetadataType with
                                     MetadataType = Some ArcFilesDiscriminate.Investigation
                                     Identifier = Some investigationIdentifier
-                                    Investigation = Some investigation
+                                    Investigation = if investigation.IsSome then investigation else Some (new ArcInvestigation("New Investigation"))
                             }
                         | studyIdentifier when studyIdentifier.ToLower().Contains("study") ->
-                            let! study = OfficeInterop.Core.getTopLeveMetadata (studyIdentifier.ToLower()) ArcStudy.fromMetadataCollection
+                            let! study = OfficeInterop.Core.tryGetTopLeveMetadata (studyIdentifier.ToLower()) ArcStudy.fromMetadataCollection
                             setExcelMetadataType {
                                 excelMetadataType with
                                     MetadataType = Some ArcFilesDiscriminate.Study
                                     Identifier = Some studyIdentifier
-                                    Study = Some study
+                                    Study = if study.IsSome then study else Some (new ArcStudy("New Study"), [])
                             }
                         | templateIdentifier when templateIdentifier.ToLower().Contains("template") ->
-                            let! templateInfo, ers, tags, authors = OfficeInterop.Core.getTopLeveMetadata (templateIdentifier.ToLower()) Template.fromMetadataCollection
-                            let template = Template.fromParts templateInfo ers tags authors (ArcTable.init "New Template") DateTime.Now
+                            let! topLevelTemplateInfo = OfficeInterop.Core.tryGetTopLeveMetadata (templateIdentifier.ToLower()) Template.fromMetadataCollection
+                            let template =
+                                if topLevelTemplateInfo.IsSome then 
+                                    let templateInfo, ers, tags, authors = topLevelTemplateInfo.Value                                
+                                    Some (Template.fromParts templateInfo ers tags authors (ArcTable.init "New Template") DateTime.Now)
+                                else Some (new Template(Guid.NewGuid(), (ArcTable.init "New Template")))
                             setExcelMetadataType {
                                 excelMetadataType with
                                     MetadataType = Some ArcFilesDiscriminate.Template
                                     Identifier = Some templateIdentifier
-                                    Template = Some template
+                                    Template = template
                             }
                         | _ -> failwith $"No metadata of type {result.Value} has been implemented yet!"
                     else setExcelMetadataType(ExcelMetadataState.init)

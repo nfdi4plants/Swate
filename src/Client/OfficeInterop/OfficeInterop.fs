@@ -2064,7 +2064,7 @@ let rectifyTermColumns () =
         }
     )
 
-let tryGetTopLevelMetadata () =
+let tryGetTopLevelMetadataSheetName () =
     Excel.run(fun context ->
         promise {
             let worksheets = context.workbook.worksheets
@@ -2095,7 +2095,7 @@ let createTopLevelMetadata name =
             let newWorkSheet = context.workbook.worksheets.add(workSheetName)
             newWorkSheet.activate()
             do! context.sync().``then``(fun _ -> ())
-            let! result = tryGetTopLevelMetadata()
+            let! result = tryGetTopLevelMetadataSheetName()
             if result.IsSome then
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {result.Value} has been created"]
             else
@@ -2103,7 +2103,7 @@ let createTopLevelMetadata name =
         }
     )
 
-let getTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq -> 'T)=
+let tryGetTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq -> 'T)=
     Excel.run(fun context ->
         promise {
             let assayWorkSheet = context.workbook.worksheets.getItem(identifier)
@@ -2120,7 +2120,8 @@ let getTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq ->
                     x
                     |> Seq.map (fun xx -> if xx.IsSome && not (String.IsNullOrEmpty(xx.Value.ToString())) then Some (xx.Value.ToString()) else None))
 
-            return parseToMetadata values
+            if Seq.length values > 1 then return Some (parseToMetadata values)
+            else return None
         }
     )
 
@@ -2160,29 +2161,46 @@ let private convertToResizeArrays metadataValues =
     )
     |> ResizeArray
 
+open FsSpreadsheet
+
+let private updateWorkSheet (context:RequestContext) (fsWorkSheet:FsWorksheet) (seqOfSeqs:seq<seq<string option>>) =
+    promise {
+        let worksheet = context.workbook.worksheets.getItem(fsWorkSheet.Name)
+        let range = worksheet.getUsedRange true
+        let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        range.values <- null
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let range = worksheet.getRangeByIndexes(0, 0, fsWorkSheet.MaxRowIndex, fsWorkSheet.MaxColumnIndex)
+        let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let values = convertToResizeArrays seqOfSeqs
+
+        range.values <- values
+
+        range.format.autofitColumns()
+        range.format.autofitRows()
+
+        do! context.sync().``then``(fun _ -> ())
+    }
+
+
 let updateTopLevelAssay (assay: ArcAssay option) =
     Excel.run(fun context ->
         promise {
             if assay.IsSome then
                 let assayWorksheet = ArcAssay.toMetadataSheet(assay.Value)
-                let worksheet = context.workbook.worksheets.getItem(assayWorksheet.Name)
                 let seqOfSeqs = ArcAssay.toMetadataCollection assay.Value
-                let values = convertToResizeArrays seqOfSeqs
-                let range = worksheet.getRangeByIndexes(0, 0, assayWorksheet.MaxRowIndex, assayWorksheet.MaxColumnIndex)
-                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
-                do! context.sync().``then``(fun _ -> ())
+                do! updateWorkSheet context assayWorksheet seqOfSeqs
 
-                range.values <- values
-
-                worksheet.activate()
-
-                range.format.autofitColumns()
-                range.format.autofitRows()
-
-                do! context.sync().``then``(fun _ -> ())
-
-                let! result = tryGetTopLevelMetadata()
+                let! result = tryGetTopLevelMetadataSheetName()
 
                 if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The assay {result.Value} has been updated"]
                 else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the assay"]
@@ -2197,24 +2215,11 @@ let updateTopLevelInvestigation (investigation: ArcInvestigation option, workShe
             if investigation.IsSome then
                 let investigationWorkbook = ArcInvestigation.toFsWorkbook investigation.Value
                 let investigationWorksheet = investigationWorkbook.GetWorksheetByName(workSheetName)
-                let worksheet = context.workbook.worksheets.getItem(investigationWorksheet.Name)
                 let seqOfSeqs = ArcInvestigation.toMetadataCollection investigation.Value
-                let values = convertToResizeArrays seqOfSeqs
-                let range = worksheet.getRangeByIndexes(0, 0, investigationWorksheet.MaxRowIndex, investigationWorksheet.MaxColumnIndex)
-                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
-                do! context.sync().``then``(fun _ -> ())
+                do! updateWorkSheet context investigationWorksheet seqOfSeqs
 
-                range.values <- values
-
-                worksheet.activate()
-
-                range.format.autofitColumns()
-                range.format.autofitRows()
-
-                do! context.sync().``then``(fun _ -> ())
-
-                let! result = tryGetTopLevelMetadata()
+                let! result = tryGetTopLevelMetadataSheetName()
 
                 if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The investigation {result.Value} has been updated"]
                 else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the investigation"]
@@ -2233,24 +2238,13 @@ let updateTopLevelStudy (studyCompilation: (ArcStudy * ArcAssay list) option) =
                     if result.IsEmpty then None
                     else Some result
                 let studyWorksheet = ArcStudy.toMetadataSheet study assays
-                let worksheet = context.workbook.worksheets.getItem(studyWorksheet.Name)
                 let seqOfSeqs = ArcStudy.toMetadataCollection study assays
-                let values = convertToResizeArrays seqOfSeqs
-                let range = worksheet.getRangeByIndexes(0, 0, studyWorksheet.MaxRowIndex, studyWorksheet.MaxColumnIndex)
-                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
+
+                do! updateWorkSheet context studyWorksheet seqOfSeqs
 
                 do! context.sync().``then``(fun _ -> ())
 
-                range.values <- values
-
-                worksheet.activate()
-
-                range.format.autofitColumns()
-                range.format.autofitRows()
-
-                do! context.sync().``then``(fun _ -> ())
-
-                let! result = tryGetTopLevelMetadata()
+                let! result = tryGetTopLevelMetadataSheetName()
 
                 if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The study {result.Value} has been updated"]
                 else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the study"]
@@ -2264,24 +2258,11 @@ let updateTopLevelTemplate (template: Template option) =
         promise {
             if template.IsSome then
                 let templateWorksheet = Template.toMetadataSheet(template.Value)
-                let worksheet = context.workbook.worksheets.getItem(templateWorksheet.Name)
                 let seqOfSeqs = Template.toMetadataCollection template.Value
-                let values = convertToResizeArrays seqOfSeqs
-                let range = worksheet.getRangeByIndexes(0, 0, templateWorksheet.MaxRowIndex, templateWorksheet.MaxColumnIndex)
-                let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
-                do! context.sync().``then``(fun _ -> ())
+                do! updateWorkSheet context templateWorksheet seqOfSeqs
 
-                range.values <- values
-
-                worksheet.activate()
-
-                range.format.autofitColumns()
-                range.format.autofitRows()
-
-                do! context.sync().``then``(fun _ -> ())
-
-                let! result = tryGetTopLevelMetadata()
+                let! result = tryGetTopLevelMetadataSheetName()
 
                 if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The template {result.Value} has been updated"]
                 else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the template"]
