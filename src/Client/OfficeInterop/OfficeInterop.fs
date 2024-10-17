@@ -2067,29 +2067,27 @@ let rectifyTermColumns () =
 /// <summary>
 /// Tries to get the name of the top level excel worksheet of top level metadata
 /// </summary>
-let tryGetTopLevelMetadataSheetName () =
-    Excel.run(fun context ->
-        promise {
-            let worksheets = context.workbook.worksheets
+let tryGetTopLevelMetadataSheetName (context:RequestContext) =
+    promise {
+        let worksheets = context.workbook.worksheets
 
-            let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+        let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
 
-            do! context.sync().``then``(fun _ -> ())
+        do! context.sync().``then``(fun _ -> ())
 
-            let worksheetItems = worksheets.items |> Array.ofSeq
+        let worksheetItems = worksheets.items |> Array.ofSeq
 
-            let metadata =
-                worksheetItems
-                |> Array.choose (fun item -> if item.name.Contains("isa_") then Some item else None)
+        let metadata =
+            worksheetItems
+            |> Array.choose (fun item -> if item.name.Contains("isa_") then Some item else None)
 
-            let potMetadata =
-                if metadata.Length < 1 then None
-                elif metadata.Length > 1 then failwith "More than one metadata sheet has been found! This cannot be! Please report this as a bug to the developers.!"
-                else Some metadata.[0].name
+        let potMetadata =
+            if metadata.Length < 1 then None
+            elif metadata.Length > 1 then failwith "More than one metadata sheet has been found! This cannot be! Please report this as a bug to the developers.!"
+            else Some metadata.[0].name
 
-            return potMetadata
-        }
-    )
+        return potMetadata
+    }
 
 /// <summary>
 /// Creates excel worksheet with name for top level metadata
@@ -2102,7 +2100,7 @@ let createTopLevelMetadata name =
             let newWorkSheet = context.workbook.worksheets.add(workSheetName)
             newWorkSheet.activate()
             do! context.sync().``then``(fun _ -> ())
-            let! result = tryGetTopLevelMetadataSheetName()
+            let! result = tryGetTopLevelMetadataSheetName context
             if result.IsSome then
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {result.Value} has been created"]
             else
@@ -2130,7 +2128,11 @@ let tryGetTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq
                 range.values
                 |> Seq.map (fun x ->
                     x
-                    |> Seq.map (fun xx -> if xx.IsSome && not (String.IsNullOrEmpty(xx.Value.ToString())) then Some (xx.Value.ToString()) else None))
+                    |> Seq.map (fun xx ->
+                        xx
+                        |> Option.map string
+                    )
+                )
 
             if Seq.length values > 1 then return Some (parseToMetadata values)
             else return None
@@ -2145,7 +2147,7 @@ let deleteTopLevelMetadata (identifier: string option) =
     Excel.run(fun context ->
         promise {
             if identifier.IsNone then
-                return [InteropLogging.Msg.create InteropLogging.Error $"No identifier for the metadat top level sheet is available"]
+                return [InteropLogging.Msg.create InteropLogging.Error $"No identifier for the metadat top level sheet is available. This should not happen. Please report this as a bug to the developers."]
             else
                 let worksheets = context.workbook.worksheets
 
@@ -2172,6 +2174,7 @@ let deleteTopLevelMetadata (identifier: string option) =
 let private convertToResizeArrays metadataValues =
 
     let maxLength = metadataValues |> Seq.maxBy Seq.length |> Seq.length
+
     metadataValues
     |> Seq.map (fun row ->
         let endRow = if Seq.length row < maxLength then Seq.append row (seq { None }) else row
@@ -2229,7 +2232,7 @@ let updateTopLevelAssay (assay: ArcAssay option) =
 
                 do! updateWorkSheet context assayWorksheet seqOfSeqs
 
-                let! result = tryGetTopLevelMetadataSheetName()
+                let! result = tryGetTopLevelMetadataSheetName context
 
                 if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The assay {result.Value} has been updated"]
                 else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the assay"]
@@ -2252,7 +2255,7 @@ let updateTopLevelInvestigation (investigation: ArcInvestigation option, workShe
 
                 do! updateWorkSheet context investigationWorksheet seqOfSeqs
 
-                let! result = tryGetTopLevelMetadataSheetName()
+                let! result = tryGetTopLevelMetadataSheetName context
 
                 if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The investigation {result.Value} has been updated"]
                 else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the investigation"]
@@ -2281,7 +2284,7 @@ let updateTopLevelStudy (studyCompilation: (ArcStudy * ArcAssay list) option) =
 
                 do! context.sync().``then``(fun _ -> ())
 
-                let! result = tryGetTopLevelMetadataSheetName()
+                let! result = tryGetTopLevelMetadataSheetName context
 
                 if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The study {result.Value} has been updated"]
                 else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the study"]
@@ -2303,7 +2306,7 @@ let updateTopLevelTemplate (template: Template option) =
 
                 do! updateWorkSheet context templateWorksheet seqOfSeqs
 
-                let! result = tryGetTopLevelMetadataSheetName()
+                let! result = tryGetTopLevelMetadataSheetName context
 
                 if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The template {result.Value} has been updated"]
                 else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the template"]
