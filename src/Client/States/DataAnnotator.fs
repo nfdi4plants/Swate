@@ -14,7 +14,7 @@ type TargetColumn =
 
 [<RequireQualifiedAccess>]
 type DataTarget =
-    | Cell of columnIndex:int * rowIndex: int
+    | Cell of columnIndex: int * rowIndex: int
     | Row of int
     | Column of int
 

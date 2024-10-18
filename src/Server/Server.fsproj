@@ -21,6 +21,7 @@
     <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="ARCtrl" Version="2.1.0-alpha.4" />
     <PackageReference Include="Saturn" Version="0.16.1" />
     <PackageReference Include="Fable.Remoting.Giraffe" Version="5.19.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />

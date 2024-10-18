@@ -425,9 +425,9 @@ type TermSearch =
                 ]
                 let TermSelectArea = TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching, (if advancedSearchDispatch.IsSome then Some setAdvancedSearchActive else None))
                 if portalTermSelectArea.IsSome then
-                    ReactDOM.createPortal(TermSelectArea,portalTermSelectArea.Value)
+                    ReactDOM.createPortal(TermSelectArea, portalTermSelectArea.Value)
                 elif ref.current.IsSome then
-                    ReactDOM.createPortal(TermSelectArea,ref.current.Value)
+                    ReactDOM.createPortal(TermSelectArea, ref.current.Value)
                 else
                     TermSelectArea
                 if not searchableToggle then Components.searchIcon

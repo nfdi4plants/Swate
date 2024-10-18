@@ -137,7 +137,6 @@ module Helper =
 module Extensions =
 
     open Helper
-    open ARCtrl.Template
     open ArcTableAux
 
     [<RequireQualifiedAccess>]

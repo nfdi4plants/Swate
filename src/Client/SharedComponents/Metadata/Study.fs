@@ -1,13 +1,11 @@
-module MainComponents.Metadata.Study
+module Components.Metadata.Study
 
-open Feliz
 open Feliz.Bulma
-open Messages
 open ARCtrl
-open Shared
-open Model
+open Components
+open Components.Forms
 
-let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch: Msg -> unit) = 
+let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy * ArcAssay list) -> unit, setDatamap: ArcStudy -> DataMap option -> unit) = 
     Bulma.section [
         Generic.BoxedField
             "Study Metadata"
@@ -17,8 +15,9 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch:
                     study.Identifier,
                     "Identifier", 
                     (fun s -> 
-                        let nextAssay = IdentifierSetters.setStudyIdentifier s study
-                        (nextAssay, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        let nextStudy = IdentifierSetters.setStudyIdentifier s study
+                        //(nextStudy, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        setArcStudy (nextStudy , assignedAssays)),
                     fullwidth=true
                 )
                 FormComponents.TextInput (
@@ -27,7 +26,8 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch:
                     (fun s -> 
                         let s = if s = "" then None else Some s
                         study.Description <- s
-                        (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        //(study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        setArcStudy (study , assignedAssays)),
                     fullwidth=true,
                     isarea=true
                 )
@@ -36,14 +36,16 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch:
                     "Contacts",
                     fun persons ->
                         study.Contacts <- ResizeArray(persons)
-                        (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
+                        //(study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        setArcStudy (study , assignedAssays)
                 )
                 FormComponents.PublicationsInput (
                     Array.ofSeq study.Publications,
                     "Publications",
                     fun pubs -> 
                         study.Publications <- ResizeArray(pubs)
-                        (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        //(study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        setArcStudy (study , assignedAssays)
                 )
                 FormComponents.DateTimeInput(
                     Option.defaultValue "" study.SubmissionDate,
@@ -51,7 +53,8 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch:
                     fun s -> 
                         let s = if s = "" then None else Some s
                         study.SubmissionDate <- s
-                        (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        //(study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        setArcStudy (study , assignedAssays)
                 )
                 FormComponents.DateTimeInput (
                     Option.defaultValue "" study.PublicReleaseDate,
@@ -59,14 +62,16 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch:
                     fun s -> 
                         let s = if s = "" then None else Some s
                         study.PublicReleaseDate <- s
-                        (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        //(study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        setArcStudy (study , assignedAssays)
                 )
                 FormComponents.OntologyAnnotationsInput(
                     Array.ofSeq study.StudyDesignDescriptors,
                     "Study Design Descriptors",
                     fun oas ->
                         study.StudyDesignDescriptors <- ResizeArray(oas)
-                        (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        //(study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        setArcStudy (study , assignedAssays)
                 )
                 //FormComponents.TextInputs(
                 //    Array.ofSeq study.RegisteredAssayIdentifiers,
@@ -80,12 +85,14 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, model: Model, dispatch:
                     "Comments",
                     fun comments ->
                         study.Comments <- ResizeArray(comments)
-                        (study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
+                        //(study, assignedAssays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        setArcStudy (study , assignedAssays)
                 )
             ]
-        DatamapConfig.Main(
+        Datamap.DatamapConfig.Main(
             study.DataMap,
-            fun dtm ->
-                dtm |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+            fun dataMap ->
+                //dtm |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+                setDatamap study dataMap
         )
     ]

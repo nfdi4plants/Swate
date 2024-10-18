@@ -14,12 +14,7 @@
     <Compile Include="Shared.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="ARCtrl" Version="[2.0.0-beta.8.swate]" />
-    <PackageReference Include="ARCtrl.Contract" Version="[2.0.0-beta.8.swate]" />
-    <PackageReference Include="ARCtrl.Core" Version="[2.0.0-beta.8.swate]" />
-    <PackageReference Include="ARCtrl.CWL" Version="[2.0.0-beta.8.swate]" />
-    <PackageReference Include="ARCtrl.FileSystem" Version="[2.0.0-beta.8.swate]" />
-    <PackageReference Include="ARCtrl.Json" Version="[2.0.0-beta.8.swate]" />
-    <PackageReference Include="ARCtrl.Spreadsheet" Version="[2.0.0-beta.8.swate]" />
+    <PackageReference Include="ARCtrl.Core" Version="2.1.0-alpha.4" />
+    <PackageReference Include="ARCtrl.Json" Version="2.1.0-alpha.4" />
   </ItemGroup>
 </Project>

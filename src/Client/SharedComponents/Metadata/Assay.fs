@@ -1,14 +1,14 @@
-module MainComponents.Metadata.Assay
+module Components.Metadata.Assay
 
 open Feliz
 open Feliz.Bulma
-open Messages
 open ARCtrl
 open Shared
-open Model
+open Components
+open Components.Forms
 
 [<ReactComponent>]
-let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) = 
+let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit) = 
     Bulma.section [
         Generic.BoxedField
             "Assay Metadata"
@@ -19,7 +19,8 @@ let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) =
                     "Identifier", 
                     (fun s -> 
                         let nextAssay = IdentifierSetters.setAssayIdentifier s assay
-                        nextAssay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        //nextAssay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        setArcAssay nextAssay),
                     fullwidth=true
                 )
                 FormComponents.OntologyAnnotationInput(
@@ -27,7 +28,8 @@ let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) =
                     (fun oa -> 
                         let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                         assay.MeasurementType <- oa
-                        assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        setArcAssay assay),
                     "Measurement Type"
                 )
                 FormComponents.OntologyAnnotationInput(
@@ -35,7 +37,8 @@ let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) =
                     (fun oa -> 
                         let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                         assay.TechnologyType <- oa
-                        assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        setArcAssay assay),
                     "Technology Type"
                 )
                 FormComponents.OntologyAnnotationInput(
@@ -43,7 +46,8 @@ let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) =
                     (fun oa -> 
                         let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
                         assay.TechnologyPlatform <- oa
-                        assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
+                        setArcAssay assay),
                     "Technology Platform"
                 )
                 FormComponents.PersonsInput(
@@ -51,19 +55,21 @@ let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) =
                     "Performers",
                     fun persons ->
                         assay.Performers <- ResizeArray persons
-                        assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
+                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        setArcAssay assay
                 )
                 FormComponents.CommentsInput(
                     Array.ofSeq assay.Comments,
                     "Comments",
                     fun comments ->
                         assay.Comments <- ResizeArray comments
-                        assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch 
+                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                        setArcAssay assay
                 )
             ]
-        DatamapConfig.Main(
+        Datamap.DatamapConfig.Main(
             assay.DataMap,
-            fun dtm ->
+            fun dataMap ->
                 //logw "HARDCODED DTM EXTENSION!"
                 //let create_Datacontext (i:int) =
                 //    DataContext(
@@ -84,6 +90,8 @@ let Main(assay: ArcAssay, model: Model, dispatch: Msg -> unit) =
                 //    for i in 0 .. 5 do
                 //        dtm.DataContexts.Add (create_Datacontext i)
                 //)
-                dtm |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+
+                //dtm |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+                setDatamap assay dataMap
         )
     ]
