@@ -137,7 +137,7 @@ let private CreateMetadataDialog excelMetadataType setExcelMetadataType (ref: IR
                 ]
             ]
             // Close button in the top-right corner
-            Bulma.modalClose [                
+            Bulma.modalClose [
                 prop.onClick (fun _ ->
                     closeModal())
             ]
@@ -243,7 +243,7 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                                         ]
                                                         prop.text "Delete Metadata Type"
                                                         prop.onClick (fun _ ->
-                                                            OfficeInterop.DeleteTopLevelMetadata excelMetadataType.WorkSheetName
+                                                            OfficeInterop.DeleteTopLevelMetadata
                                                             |> OfficeInteropMsg
                                                             |> dispatch
                                                             setExcelMetadataType(ExcelMetadataState.init)

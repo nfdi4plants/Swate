@@ -237,11 +237,11 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd
-            | DeleteTopLevelMetadata identifier ->
+            | DeleteTopLevelMetadata ->
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.deleteTopLevelMetadata
-                        (identifier)
+                        ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd

@@ -2159,35 +2159,35 @@ let tryGetTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq
         }
     )
 
+open FsSpreadsheet
+
 /// <summary>
 /// Delete excel worksheet that contains top level metadata
 /// </summary>
 /// <param name="identifier"></param>
-let deleteTopLevelMetadata (identifier: string option) =
+let deleteTopLevelMetadata () =
     Excel.run(fun context ->
         promise {
-            if identifier.IsNone then
-                return [InteropLogging.Msg.create InteropLogging.Error $"No identifier for the metadat top level sheet is available. This should not happen. Please report this as a bug to the developers."]
-            else
-                let worksheets = context.workbook.worksheets
+            let worksheets = context.workbook.worksheets
 
-                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+            let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
 
-                do! context.sync().``then``(fun _ -> ())
+            do! context.sync().``then``(fun _ -> ())              
 
-                let metadataSheet = context.workbook.worksheets.getItem(identifier.Value)
+            worksheets.items
+            |> Seq.iter (fun worksheet ->
+                match worksheet.name with
+                | name when ArcAssay.isMetadataSheetName name -> worksheet.delete()
+                | name when ArcInvestigation.isMetadataSheetName name -> worksheet.delete()
+                | name when ArcStudy.isMetadataSheetName name -> worksheet.delete()
+                | Template.metaDataSheetName -> worksheet.delete()
+                | Template.obsoletemetaDataSheetName  -> worksheet.delete()
+                | _ -> ()
+            )
 
-                let _ = metadataSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
-
-                metadataSheet.delete()
-
-                do! context.sync().``then``(fun _ -> ())
-
-                return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {metadataSheet.name} has been deleted"]
+            return [InteropLogging.Msg.create InteropLogging.Warning $"The top level metadata work sheet has been deleted"]
         }
     )
-
-open FsSpreadsheet
 
 /// <summary>
 /// Deletes the data contained in the selected worksheet and fills it afterwards with the given new data

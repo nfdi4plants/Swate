@@ -61,7 +61,7 @@ type Msg =
     | UpdateTopLevelInvestigation           of ArcInvestigation option * string
     | UpdateTopLevelStudy                   of (ArcStudy * ArcAssay list) option
     | UpdateTopLevelTemplate                of Template option
-    | DeleteTopLevelMetadata                of string option
+    | DeleteTopLevelMetadata
     // Development
     | TryExcel
     | TryExcel2
