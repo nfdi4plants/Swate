@@ -57,7 +57,7 @@ type Msg =
     ///
     | InsertFileNames                       of fileNameList:string list
     | CreateTopLevelMetadata                of string
-    | UpdateTopLevelAssay                   of ArcAssay option
+    | UpdateTopLevelMetadata                of ArcFiles
     | UpdateTopLevelInvestigation           of ArcInvestigation option * string
     | UpdateTopLevelStudy                   of (ArcStudy * ArcAssay list) option
     | UpdateTopLevelTemplate                of Template option

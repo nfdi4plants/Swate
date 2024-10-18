@@ -184,9 +184,11 @@ module OfficeInteropExtensions =
 
             //Adapts the length of the smaller sequences to the length of the longest sequence in order to avoid problems with the insertion into excel.Range
             let ra = ResizeArray()
+            let parseToObj (input: string) : obj =
+                box input
             for seq in metadataValues do
                 //Parse string to obj option
-                let ira = ResizeArray (seq |> Seq.map (fun column -> if column.IsSome then Some (column.Value :> obj) else None))
+                let ira = ResizeArray (seq |> Seq.map (fun column -> column |> Option.map parseToObj))
                 if ira.Count < maxLength then            
                     ira.AddRange (Array.create (maxLength - ira.Count) None)
                 ra.Add ira
@@ -2224,93 +2226,35 @@ let private updateWorkSheet (context:RequestContext) (fsWorkSheet:FsWorksheet) (
 /// Updates top level metadata excel worksheet of assays
 /// </summary>
 /// <param name="assay"></param>
-let updateTopLevelAssay (assay: ArcAssay option) =
+let updateTopLevelMetadata (arcFiles: ArcFiles) =
     Excel.run(fun context ->
         promise {
-            if assay.IsSome then
-                let assayWorksheet = ArcAssay.toMetadataSheet(assay.Value)
-                let seqOfSeqs = ArcAssay.toMetadataCollection assay.Value
+            let worksheet, seqOfSeqs =
+                match arcFiles with
+                | ArcFiles.Assay assay ->
+                    let assayWorksheet = ArcAssay.toMetadataSheet assay
+                    let seqOfSeqs = ArcAssay.toMetadataCollection assay
+                    assayWorksheet, seqOfSeqs
+                | ArcFiles.Investigation investigation ->
+                    let investigationWorkbook = ArcInvestigation.toFsWorkbook investigation
+                    let investigationWorksheet = investigationWorkbook.GetWorksheetByName(ArcInvestigation.metadataSheetName)
+                    let seqOfSeqs = ArcInvestigation.toMetadataCollection investigation
+                    investigationWorksheet, seqOfSeqs
+                | ArcFiles.Study (study, assays) ->
+                    let assays =
+                        if assays.IsEmpty then None
+                        else Some assays
+                    let studyWorksheet = ArcStudy.toMetadataSheet study assays
+                    let seqOfSeqs = ArcStudy.toMetadataCollection study assays
+                    studyWorksheet, seqOfSeqs
+                | ArcFiles.Template template ->
+                    let templateWorksheet = Template.toMetadataSheet template
+                    let seqOfSeqs = Template.toMetadataCollection template
+                    templateWorksheet, seqOfSeqs
 
-                do! updateWorkSheet context assayWorksheet seqOfSeqs
+            do! updateWorkSheet context worksheet seqOfSeqs
 
-                let! result = tryGetTopLevelMetadataSheetName context
-
-                if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The assay {result.Value} has been updated"]
-                else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the assay"]
-            else
-                return [InteropLogging.Msg.create InteropLogging.Error $"No assay is available"]
-        }
-    )
-
-/// <summary>
-/// Updates top level metadata excel worksheet of investigations
-/// </summary>
-/// <param name="assay"></param>
-let updateTopLevelInvestigation (investigation: ArcInvestigation option, workSheetName) =
-    Excel.run(fun context ->
-        promise {
-            if investigation.IsSome then
-                let investigationWorkbook = ArcInvestigation.toFsWorkbook investigation.Value
-                let investigationWorksheet = investigationWorkbook.GetWorksheetByName(workSheetName)
-                let seqOfSeqs = ArcInvestigation.toMetadataCollection investigation.Value
-
-                do! updateWorkSheet context investigationWorksheet seqOfSeqs
-
-                let! result = tryGetTopLevelMetadataSheetName context
-
-                if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The investigation {result.Value} has been updated"]
-                else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the investigation"]
-            else
-                return [InteropLogging.Msg.create InteropLogging.Error $"No investigation is available"]
-        }
-    )
-
-/// <summary>
-/// Updates top level metadata excel worksheet of studies
-/// </summary>
-/// <param name="assay"></param>
-let updateTopLevelStudy (studyCompilation: (ArcStudy * ArcAssay list) option) =
-    Excel.run(fun context ->
-        promise {
-            if studyCompilation.IsSome then
-                let study = fst studyCompilation.Value
-                let assays =
-                    let result = snd studyCompilation.Value
-                    if result.IsEmpty then None
-                    else Some result
-                let studyWorksheet = ArcStudy.toMetadataSheet study assays
-                let seqOfSeqs = ArcStudy.toMetadataCollection study assays
-
-                do! updateWorkSheet context studyWorksheet seqOfSeqs
-
-                let! result = tryGetTopLevelMetadataSheetName context
-
-                if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The study {result.Value} has been updated"]
-                else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the study"]
-            else
-                return [InteropLogging.Msg.create InteropLogging.Error $"No study is available"]
-        }
-    )
-
-/// <summary>
-/// Updates top level metadata excel worksheet of templates
-/// </summary>
-/// <param name="assay"></param>
-let updateTopLevelTemplate (template: Template option) =
-    Excel.run(fun context ->
-        promise {
-            if template.IsSome then
-                let templateWorksheet = Template.toMetadataSheet(template.Value)
-                let seqOfSeqs = Template.toMetadataCollection template.Value
-
-                do! updateWorkSheet context templateWorksheet seqOfSeqs
-
-                let! result = tryGetTopLevelMetadataSheetName context
-
-                if result.IsSome then return [InteropLogging.Msg.create InteropLogging.Warning $"The template {result.Value} has been updated"]
-                else return [InteropLogging.Msg.create InteropLogging.Error "Something went wrong while updating the template"]
-            else
-                return [InteropLogging.Msg.create InteropLogging.Error $"No template is available"]
+            return [InteropLogging.Msg.create InteropLogging.Warning $"The worksheet {worksheet.Name} has been updated"]
         }
     )
 

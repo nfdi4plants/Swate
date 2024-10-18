@@ -229,35 +229,11 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd
-            | UpdateTopLevelAssay assay ->
+            | UpdateTopLevelMetadata arcFiles ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.updateTopLevelAssay
-                        (assay)
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg) //error
-                state, model, cmd
-            | UpdateTopLevelInvestigation (investigation, worksheetName) ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.updateTopLevelInvestigation
-                        (investigation, worksheetName)
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg) //error
-                state, model, cmd
-            | UpdateTopLevelStudy study ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.updateTopLevelStudy
-                        (study)
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg) //error
-                state, model, cmd
-            | UpdateTopLevelTemplate template ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.updateTopLevelTemplate
-                        (template)
+                        OfficeInterop.Core.updateTopLevelMetadata
+                        (arcFiles)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd
