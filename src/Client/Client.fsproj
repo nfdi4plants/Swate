@@ -103,13 +103,6 @@
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />
     <Compile Include="MainComponents\MainViewContainer.fs" />
-    <Compile Include="MainComponents\Metadata\Generic.fs" />
-    <Compile Include="MainComponents\Metadata\DatamapConfig.fs" />
-    <Compile Include="MainComponents\Metadata\Forms.fs" />
-    <Compile Include="MainComponents\Metadata\Template.fs" />
-    <Compile Include="MainComponents\Metadata\Assay.fs" />
-    <Compile Include="MainComponents\Metadata\Study.fs" />
-    <Compile Include="MainComponents\Metadata\Investigation.fs" />
     <Compile Include="MainComponents\NoFileElement.fs" />
     <Compile Include="MainComponents\ContextMenu.fs" />
     <Compile Include="MainComponents\Cells.fs" />

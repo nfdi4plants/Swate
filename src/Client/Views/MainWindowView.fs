@@ -122,14 +122,26 @@ let Main (model: Model, dispatch) =
                                         prop.className "is-max-desktop"
                                         prop.children [
                                             match model.SpreadsheetModel.ArcFile with
-                                            | Some (ArcFiles.Assay a) ->
-                                                MainComponents.Metadata.Assay.Main(a, model, dispatch)
-                                            | Some (ArcFiles.Study (s, aArr)) ->
-                                                MainComponents.Metadata.Study.Main(s, aArr, model, dispatch)
-                                            | Some (ArcFiles.Investigation inv) ->
-                                                MainComponents.Metadata.Investigation.Main(inv, model, dispatch)
-                                            | Some (ArcFiles.Template t) ->
-                                                MainComponents.Metadata.Template.Main(t, model, dispatch)
+                                            | Some (ArcFiles.Assay assay) ->
+                                                let setAssay assay =
+                                                    assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                                                let setAssayDataMap assay dataMap =
+                                                    dataMap |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+                                                Components.Metadata.Assay.Main(assay, setAssay, setAssayDataMap)
+                                            | Some (ArcFiles.Study (study, assays)) ->
+                                                let setStudy (study, assays) =
+                                                    (study, assays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                                                let setStudyDataMap study dataMap =
+                                                    dataMap |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+                                                Components.Metadata.Study.Main(study, assays, setStudy, setStudyDataMap)
+                                            | Some (ArcFiles.Investigation investigation) ->
+                                                let setInvesigation investigation =
+                                                    investigation |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                                                Components.Metadata.Investigation.Main(investigation, setInvesigation)
+                                            | Some (ArcFiles.Template template) ->
+                                                let setTemplate template =
+                                                    template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                                                Components.Metadata.Template.Main(template, setTemplate)
                                             | None ->
                                                 Html.none
                                         ]
