@@ -102,8 +102,6 @@ module private Helper =
             ]
         ]
 
-    open ARCtrl.Template
-
     let createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
     
         Bulma.dropdown [

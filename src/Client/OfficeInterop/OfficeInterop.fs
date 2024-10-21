@@ -78,7 +78,7 @@ module OfficeInteropExtensions =
         /// </summary>
         /// <param name="context"></param>
         /// <param name="tableName"></param>
-        static member tryGetTableByName (context:RequestContext) (tableName:string) =
+        static member tryGetTableByName (context: RequestContext) (tableName: string) =
             let _ = context.workbook.load(U2.Case1 "tables")
             let excelTable = context.workbook.tables.getItem(tableName)
 
@@ -95,7 +95,7 @@ module OfficeInteropExtensions =
         /// Swaps 'Rows with column values' to 'Columns with row values'
         /// </summary>
         /// <param name="rows"></param>
-        static member viewRowsByColumns (rows:ResizeArray<ResizeArray<'a>>) =
+        static member viewRowsByColumns (rows: ResizeArray<ResizeArray<'a>>) =
             rows
             |> Seq.collect (fun row -> Seq.indexed row)
             |> Seq.groupBy fst
@@ -110,7 +110,7 @@ module OfficeInteropExtensions =
         /// <param name="name"></param>
         /// <param name="rowCount"></param>
         /// <param name="value"></param>
-        static member addColumn (index:float) (excelTable:Table) name rowCount value =
+        static member addColumn (index: float) (excelTable: Table) name rowCount value =
             let col = createMatrixForTables 1 rowCount value
 
             excelTable.columns.add(
@@ -126,7 +126,7 @@ module OfficeInteropExtensions =
         /// <param name="excelTable"></param>
         /// <param name="columnName"></param>
         /// <param name="rows"></param>
-        static member addColumnAndRows (columnIndex:float) (excelTable:Table) columnName rows =
+        static member addColumnAndRows (columnIndex: float) (excelTable: Table) columnName rows =
             excelTable.columns.add(
                 index   = columnIndex,
                 values  = U4.Case1 rows,
@@ -140,7 +140,7 @@ module OfficeInteropExtensions =
         /// <param name="excelTable"></param>
         /// <param name="rowCount"></param>
         /// <param name="value"></param>
-        static member addRows (index:float) (excelTable:Table) rowCount value =
+        static member addRows (index: float) (excelTable: Table) rowCount value =
             let col = createMatrixForTables 1 rowCount value
             excelTable.rows.add(
                 index   = index,
@@ -153,7 +153,7 @@ module OfficeInteropExtensions =
         /// <param name="table"></param>
         /// <param name="context"></param>
         /// <param name="shallHide"></param>
-        static member adoptTableFormats (table:Table, context:RequestContext, shallHide:bool) =
+        static member adoptTableFormats (table: Table, context: RequestContext, shallHide: bool) =
             promise {
 
                 let _ = table.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
@@ -172,6 +172,28 @@ module OfficeInteropExtensions =
                         column.getRange().columnHidden <- shallHide)
             }
 
+        /// <summary>
+        /// Converts a sequence of sequence of excel data into a resizearray, compatible with Excel.Range
+        /// </summary>
+        /// <param name="metadataValues"></param>
+        static member convertToResizeArrays (metadataValues:seq<seq<string option>>) =
+
+            //Selects the longest sequence of the metadata values
+            //In the next step, determines the length of the longest metadata value sequence
+            let maxLength = metadataValues |> Seq.maxBy Seq.length |> Seq.length
+
+            //Adapts the length of the smaller sequences to the length of the longest sequence in order to avoid problems with the insertion into excel.Range
+            let ra = ResizeArray()
+            let parseToObj (input: string) : obj =
+                box input
+            for seq in metadataValues do
+                //Parse string to obj option
+                let ira = ResizeArray (seq |> Seq.map (fun column -> column |> Option.map parseToObj))
+                if ira.Count < maxLength then            
+                    ira.AddRange (Array.create (maxLength - ira.Count) None)
+                ra.Add ira
+            ra
+
     type ArcTable with
 
         /// <summary>
@@ -180,7 +202,7 @@ module OfficeInteropExtensions =
         /// <param name="name"></param>
         /// <param name="headers"></param>
         /// <param name="rows"></param>
-        static member fromStringSeqs(name:string, headers:#seq<string>, rows:#seq<#seq<string>>) =
+        static member fromStringSeqs(name: string, headers: #seq<string>, rows: #seq<#seq<string>>) =
 
             let columns = 
                 Seq.append [headers] rows 
@@ -929,8 +951,6 @@ let getBuildingBlocksAndSheet() =
         }
     )
 
-open BuildingBlockFunctions
-
 let getBuildingBlocksAndSheets() =
     Excel.run(fun context ->
         promise {
@@ -1122,7 +1142,7 @@ let addAnnotationBlock (newBB:InsertBuildingBlock) =
 
 // https://github.com/nfdi4plants/Swate/issues/203
 /// If an output column already exists it should be replaced by the new output column type.
-let replaceOutputColumn (excelTableName:string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
+let replaceOutputColumn (excelTableName: string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
     Excel.run(fun context ->
         promise {
             // Ref. 2
@@ -1157,7 +1177,7 @@ let replaceOutputColumn (excelTableName:string) (existingOutputColumn: BuildingB
 /// <param name="excelTable"></param>
 /// <param name="arcTable"></param>
 /// <param name="newBB"></param>
-let updateInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+let updateInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     let possibleInputColumn = arcTable.TryGetInputColumn()
 
@@ -1199,7 +1219,7 @@ let updateInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCol
 /// <param name="excelTable"></param>
 /// <param name="arcTable"></param>
 /// <param name="newBB"></param>
-let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+let addInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     if arcTable.TryGetInputColumn().IsSome then
         failwith "Something went wrong! The add input column is filled with data! Please report this as a bug to the developers."
@@ -1225,7 +1245,7 @@ let addInputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn
 /// <param name="excelTable"></param>
 /// <param name="arcTable"></param>
 /// <param name="newBB"></param>
-let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+let updateOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     let possibleOutputColumn = arcTable.TryGetOutputColumn()
 
@@ -1267,7 +1287,7 @@ let updateOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeCo
 /// <param name="excelTable"></param>
 /// <param name="arcTable"></param>
 /// <param name="newBB"></param>
-let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) =
+let addOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     if arcTable.TryGetOutputColumn().IsSome then
 
@@ -1296,7 +1316,7 @@ let addOutputColumn (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColum
 /// <param name="newBB"></param>
 /// <param name="headerRange"></param>
 /// <param name="selectedRange"></param>
-let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColumn) (headerRange:Excel.Range) (selectedRange:Excel.Range) =
+let addBuildingBlock (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) (headerRange: Excel.Range) (selectedRange: Excel.Range) =
 
     let rowCount = arcTable.RowCount + 1
 
@@ -1367,7 +1387,7 @@ let addBuildingBlock (excelTable:Table) (arcTable:ArcTable) (newBB:CompositeColu
 /// Prepare the given table to be joined with the currently active annotation table
 /// </summary>
 /// <param name="tableToAdd"></param>
-let prepareTemplateInMemory (tableToAdd:ArcTable) =
+let prepareTemplateInMemory (tableToAdd: ArcTable) =
     Excel.run(fun context ->
         promise {
 
@@ -1405,7 +1425,7 @@ let prepareTemplateInMemory (tableToAdd:ArcTable) =
 /// <param name="tableToAdd"></param>
 /// <param name="index"></param>
 /// <param name="options"></param>
-let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions option) =
+let joinTable (tableToAdd: ArcTable, index: int option, options: TableJoinOptions option) =
     Excel.run(fun context ->
         promise {
 
@@ -1491,7 +1511,7 @@ let joinTable (tableToAdd:ArcTable, index: int option, options: TableJoinOptions
 /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
 /// </summary>
 /// <param name="newBB"></param>
-let addAnnotationBlockHandler (newBB:CompositeColumn) =
+let addAnnotationBlockHandler (newBB: CompositeColumn) =
     Excel.run(fun context ->
         promise {
 
@@ -1554,7 +1574,6 @@ let addAnnotationBlockHandler (newBB:CompositeColumn) =
 /// <param name="columns"></param>
 /// <param name="selectedIndex"></param>
 let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
-
     promise {
 
         let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
@@ -1582,7 +1601,6 @@ let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
 /// <param name="adaptedIndex"></param>
 /// <param name="context"></param>
 let getAdaptedSelectedBuildingBlock (table: Table) (adaptedIndex: float) (context: RequestContext) =
-
     promise {
 
         let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
@@ -1608,7 +1626,6 @@ let getAdaptedSelectedBuildingBlock (table: Table) (adaptedIndex: float) (contex
 /// </summary>
 let removeSelectedAnnotationBlock () =
     Excel.run(fun context ->
-
         promise {
 
             let! excelTable = getActiveAnnotationTable context
@@ -1704,7 +1721,7 @@ let convertToTermColumn (column: CompositeColumn) =
 /// </summary>
 /// <param name="selectedColumns"></param>
 /// <param name="excelTable"></param>
-let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable:Table) =
+let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable: Table) =
     // iterate DESCENDING to avoid index shift
     for i in Seq.sortByDescending (fun x -> x) selectedColumns do
         let column = excelTable.columns.getItemAt(i)
@@ -1718,9 +1735,8 @@ let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable:Table) =
 /// <param name="newBB"></param>
 /// <param name="table"></param>
 /// <param name="context"></param>
-let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) (context: RequestContext)=
+let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table: Table) (context: RequestContext)=
     promise {
-
         let headers = table.getHeaderRowRange()
         let _ = headers.load(U2.Case2 (ResizeArray [|"values"|]))
 
@@ -1755,7 +1771,6 @@ let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table:Table) 
 let convertBuildingBlock () =
     Excel.run(fun context ->
         promise {
-
             let! excelTable = getActiveAnnotationTable context
             let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
             let excelMainColumnIndex = fst selectedBuildingBlock.[0]
@@ -1797,10 +1812,9 @@ let convertBuildingBlock () =
 /// <param name="selectedIndex"></param>
 /// <param name="targetIndex"></param>
 /// <param name="context"></param>
-let validateColumns (excelTable:Table, selectedIndex:int, targetIndex:int, context:RequestContext) =
+let validateColumns (excelTable: Table, selectedIndex: int, targetIndex: int, context: RequestContext) =
 
     promise {
-
         let headerRange = excelTable.getHeaderRowRange()
         let bodyRowRange = excelTable.getDataBodyRange()
 
@@ -1848,7 +1862,7 @@ let validateColumns (excelTable:Table, selectedIndex:int, targetIndex:int, conte
 /// </summary>
 /// <param name="excelTable"></param>
 /// <param name="context"></param>
-let validateBuildingBlock (excelTable:Table, context:RequestContext) =
+let validateBuildingBlock (excelTable: Table, context: RequestContext) =
 
     let columns = excelTable.columns
     let selectedRange = context.workbook.getSelectedRange()
@@ -1858,7 +1872,6 @@ let validateBuildingBlock (excelTable:Table, context:RequestContext) =
         selectedRange.load(U2.Case2 (ResizeArray [|"values"; "columnIndex"|]))
 
     promise {
-
             do! context.sync().``then``( fun _ -> ())
 
             let columnIndex = selectedRange.columnIndex
@@ -1914,7 +1927,6 @@ let validateBuildingBlock (excelTable:Table, context:RequestContext) =
 let validateSelectedAndNeighbouringBuildingBlocks () =
     Excel.run(fun context ->
         promise {
-
             let! excelTable = getActiveAnnotationTable context
 
             let! indexedErrors = validateBuildingBlock(excelTable, context)
@@ -1938,7 +1950,6 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
 /// </summary>
 let validateAnnotationTable context =
     promise {
-
         let! excelTable = getActiveAnnotationTable context
         let! indexedErrors = ArcTable.validateExcelTable(excelTable, context)
 
@@ -2075,7 +2086,183 @@ let rectifyTermColumns () =
         }
     )
 
-// Old stuff, mostly deprecated
+/// <summary>
+/// Tries to get the name of the top level excel worksheet of top level metadata
+/// </summary>
+let tryGetTopLevelMetadataSheetName (context:RequestContext) =
+    promise {
+        let worksheets = context.workbook.worksheets
+
+        let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let metadata =
+            worksheets.items
+            |> Seq.choose (fun worksheet ->
+                match worksheet.name with
+                | name when ArcAssay.isMetadataSheetName name -> Some worksheet.name
+                | name when ArcInvestigation.isMetadataSheetName name -> Some worksheet.name
+                | name when ArcStudy.isMetadataSheetName name -> Some worksheet.name
+                | Template.metaDataSheetName -> Some worksheet.name
+                | Template.obsoletemetaDataSheetName -> Some worksheet.name
+                | _ -> None
+            )
+            |> Array.ofSeq
+
+        match metadata with
+        | name when name.Length = 1 -> return Some name.[0]
+        | array when Array.isEmpty array -> return None
+        | _ -> return (failwith "More than one metadata sheet has been found! This cannot be! Please report this as a bug to the developers!")
+    }
+
+/// <summary>
+/// Creates excel worksheet with name for top level metadata
+/// </summary>
+/// <param name="name"></param>
+let createTopLevelMetadata workSheetName =
+    Excel.run(fun context ->
+        promise {
+            let newWorkSheet = context.workbook.worksheets.add(workSheetName)
+
+            try
+                newWorkSheet.activate()
+                do! context.sync().``then``(fun _ -> ())
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {workSheetName} has been created"]
+            with
+                | err -> return [InteropLogging.Msg.create InteropLogging.Error err.Message]
+        }
+    )
+
+/// <summary>
+/// try to get the values of top level meta data from excel worksheet
+/// </summary>
+/// <param name="identifier"></param>
+/// <param name="parseToMetadata"></param>
+let tryGetTopLeveMetadata<'T> identifier (parseToMetadata: string option seq seq -> 'T)=
+    Excel.run(fun context ->
+        promise {
+            let assayWorkSheet = context.workbook.worksheets.getItem(identifier)
+            let range = assayWorkSheet.getUsedRange true
+            let _ =
+                assayWorkSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|])) |> ignore
+                range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
+
+            do! context.sync().``then``(fun _ -> ())
+
+            let values =
+                range.values
+                |> Seq.map (fun row ->
+                    row
+                    |> Seq.map (fun column -> Option.map string column
+                    )
+                )
+
+            if Seq.length values > 1 then return Some (parseToMetadata values)
+            else return None
+        }
+    )
+
+open FsSpreadsheet
+
+/// <summary>
+/// Delete excel worksheet that contains top level metadata
+/// </summary>
+/// <param name="identifier"></param>
+let deleteTopLevelMetadata () =
+    Excel.run(fun context ->
+        promise {
+            let worksheets = context.workbook.worksheets
+
+            let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+
+            do! context.sync().``then``(fun _ -> ())              
+
+            worksheets.items
+            |> Seq.iter (fun worksheet ->
+                match worksheet.name with
+                | name when ArcAssay.isMetadataSheetName name -> worksheet.delete()
+                | name when ArcInvestigation.isMetadataSheetName name -> worksheet.delete()
+                | name when ArcStudy.isMetadataSheetName name -> worksheet.delete()
+                | Template.metaDataSheetName -> worksheet.delete()
+                | Template.obsoletemetaDataSheetName  -> worksheet.delete()
+                | _ -> ()
+            )
+
+            return [InteropLogging.Msg.create InteropLogging.Warning $"The top level metadata work sheet has been deleted"]
+        }
+    )
+
+/// <summary>
+/// Deletes the data contained in the selected worksheet and fills it afterwards with the given new data
+/// </summary>
+/// <param name="context"></param>
+/// <param name="fsWorkSheet"></param>
+/// <param name="seqOfSeqs"></param>
+let private updateWorkSheet (context:RequestContext) (fsWorkSheet:FsWorksheet) (seqOfSeqs:seq<seq<string option>>) =
+    promise {
+        let worksheet = context.workbook.worksheets.getItem(fsWorkSheet.Name)
+        let range = worksheet.getUsedRange true
+        let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        range.values <- null
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let range = worksheet.getRangeByIndexes(0, 0, fsWorkSheet.MaxRowIndex, fsWorkSheet.MaxColumnIndex)
+        let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let values = ExcelHelper.convertToResizeArrays(seqOfSeqs)
+
+        range.values <- values
+
+        range.format.autofitColumns()
+        range.format.autofitRows()
+
+        do! context.sync().``then``(fun _ -> ())
+    }
+
+/// <summary>
+/// Updates top level metadata excel worksheet of assays
+/// </summary>
+/// <param name="assay"></param>
+let updateTopLevelMetadata (arcFiles: ArcFiles) =
+    Excel.run(fun context ->
+        promise {
+            let worksheet, seqOfSeqs =
+                match arcFiles with
+                | ArcFiles.Assay assay ->
+                    let assayWorksheet = ArcAssay.toMetadataSheet assay
+                    let seqOfSeqs = ArcAssay.toMetadataCollection assay
+                    assayWorksheet, seqOfSeqs
+                | ArcFiles.Investigation investigation ->
+                    let investigationWorkbook = ArcInvestigation.toFsWorkbook investigation
+                    let investigationWorksheet = investigationWorkbook.GetWorksheetByName(ArcInvestigation.metadataSheetName)
+                    let seqOfSeqs = ArcInvestigation.toMetadataCollection investigation
+                    investigationWorksheet, seqOfSeqs
+                | ArcFiles.Study (study, assays) ->
+                    let assays =
+                        if assays.IsEmpty then None
+                        else Some assays
+                    let studyWorksheet = ArcStudy.toMetadataSheet study assays
+                    let seqOfSeqs = ArcStudy.toMetadataCollection study assays
+                    studyWorksheet, seqOfSeqs
+                | ArcFiles.Template template ->
+                    let templateWorksheet = Template.toMetadataSheet template
+                    let seqOfSeqs = Template.toMetadataCollection template
+                    templateWorksheet, seqOfSeqs
+
+            do! updateWorkSheet context worksheet seqOfSeqs
+
+            return [InteropLogging.Msg.create InteropLogging.Warning $"The worksheet {worksheet.Name} has been updated"]
+        }
+    )
+
+// Old stuff, mostly deprecated 
 
 let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
     let createList (rowCount:int) (values:string []) =

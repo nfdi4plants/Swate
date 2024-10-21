@@ -164,14 +164,14 @@ module Interface =
                     let cmd = Spreadsheet.JoinTable (table, index, options) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-            | UpdateArcFile tables ->
+            | UpdateArcFile arcFiles ->
                 match host with
                 | Some Swatehost.Excel ->
                     //let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
                     Browser.Dom.window.alert "Not implemented"
                     model, Cmd.none
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.UpdateArcFile tables |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.UpdateArcFile arcFiles |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | ImportXlsx bytes ->

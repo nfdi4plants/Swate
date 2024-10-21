@@ -1,4 +1,4 @@
-module MainComponents.Metadata.Generic
+module Components.Generic
 
 open Feliz.Bulma
 open Feliz
