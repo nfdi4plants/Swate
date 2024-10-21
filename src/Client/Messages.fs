@@ -105,27 +105,27 @@ type TopLevelMsg =
     | CloseSuggestions
 
 type Msg =
-| DevMsg                of DevMsg
-| OntologyMsg           of Ontologies.Msg
-| TermSearchMsg         of TermSearch.Msg
-| AdvancedSearchMsg     of AdvancedSearch.Msg
-| OfficeInteropMsg      of OfficeInterop.Msg
-| PersistentStorageMsg  of PersistentStorage.Msg
-| FilePickerMsg         of FilePicker.Msg
-| BuildingBlockMsg      of BuildingBlock.Msg
-| ProtocolMsg           of Protocol.Msg
-| BuildingBlockDetails  of BuildingBlockDetailsMsg
-| CytoscapeMsg          of Cytoscape.Msg
-| DataAnnotatorMsg      of DataAnnotator.Msg
-| SpreadsheetMsg        of Spreadsheet.Msg
+| DevMsg                        of DevMsg
+| OntologyMsg                   of Ontologies.Msg
+| TermSearchMsg                 of TermSearch.Msg
+| AdvancedSearchMsg             of AdvancedSearch.Msg
+| OfficeInteropMsg              of OfficeInterop.Msg
+| PersistentStorageMsg          of PersistentStorage.Msg
+| FilePickerMsg                 of FilePicker.Msg
+| BuildingBlockMsg              of BuildingBlock.Msg
+| ProtocolMsg                   of Protocol.Msg
+| BuildingBlockDetails          of BuildingBlockDetailsMsg
+| CytoscapeMsg                  of Cytoscape.Msg
+| DataAnnotatorMsg              of DataAnnotator.Msg
+| SpreadsheetMsg                of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
-| InterfaceMsg          of SpreadsheetInterface.Msg
+| InterfaceMsg                  of SpreadsheetInterface.Msg
 //| SettingsProtocolMsg   of SettingsProtocolMsg
-| UpdatePageState       of Routing.Route option
-| UpdateIsExpert        of bool
-| Batch                 of seq<Messages.Msg>
-| Run                   of (unit -> unit)
-| UpdateHistory         of LocalHistory.Model
+| UpdatePageState               of Routing.Route option
+| UpdateIsExpert                of bool
+| Batch                         of seq<Messages.Msg>
+| Run                           of (unit -> unit)
+| UpdateHistory                 of LocalHistory.Model
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI

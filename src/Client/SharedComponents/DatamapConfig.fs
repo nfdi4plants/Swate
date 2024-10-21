@@ -1,8 +1,9 @@
-namespace MainComponents.Metadata
+namespace Components.Datamap
 
 open ARCtrl
 open Feliz
 open Feliz.Bulma
+open Components
 
 type DatamapConfig =
 

@@ -1,4 +1,4 @@
-namespace MainComponents.Metadata
+namespace Components.Forms
 
 open Feliz
 open Feliz.Bulma
@@ -11,6 +11,7 @@ open ARCtrl
 open Shared
 open Fetch
 open ARCtrl.Json
+open Components
 
 module private API =
 
@@ -580,7 +581,27 @@ type FormComponents =
                         ]
                     ]
                 ]
-                Html.small "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Allowed are a-f, A-F and numbers."
+                Bulma.content [
+                    prop.className "has-text-left"  // Bulma class for left text alignment
+                    prop.children [
+                        Html.p [
+                            prop.className "is-size-7"  // Bulma's class for small text
+                            prop.style [
+                                style.lineHeight 1.2  // Reduce line height
+                                style.marginBottom 4  // Reduce space between paragraphs
+                            ]
+                            prop.text "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx."
+                        ]
+                        Html.p [
+                            prop.className "is-size-7"
+                            prop.style [
+                                style.lineHeight 1.2  // Reduce line height
+                                style.marginBottom 4  // Reduce space between paragraphs
+                            ]
+                            prop.text "Allowed are a-f, A-F and numbers."
+                        ]
+                    ]
+                ]
             ]
         ]
 
@@ -728,7 +749,7 @@ type FormComponents =
                                             if oaOpt.IsSome then 
                                                 setter oaOpt.Value
                                                 setState oaOpt.Value
-                                    Components.TermSearch.Input(
+                                    TermSearch.Input(
                                         innersetter,
                                         input=state,
                                         fullwidth=true,
