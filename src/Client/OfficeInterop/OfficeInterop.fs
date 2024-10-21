@@ -2130,7 +2130,7 @@ let createTopLevelMetadata workSheetName =
                 do! context.sync().``then``(fun _ -> ())
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {workSheetName} has been created"]
             with
-                | err -> return [InteropLogging.Msg.create InteropLogging.Error $"The work sheet {workSheetName} could not be created"]
+                | err -> return [InteropLogging.Msg.create InteropLogging.Error err.Message]
         }
     )
 
