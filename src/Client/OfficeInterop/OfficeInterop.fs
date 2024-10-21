@@ -2097,36 +2097,40 @@ let tryGetTopLevelMetadataSheetName (context:RequestContext) =
 
         do! context.sync().``then``(fun _ -> ())
 
-        let worksheetItems = worksheets.items |> Array.ofSeq
-
         let metadata =
-            worksheetItems
-            |> Array.choose (fun item -> if item.name.Contains("isa_") then Some item else None)
+            worksheets.items
+            |> Seq.choose (fun worksheet ->
+                match worksheet.name with
+                | name when ArcAssay.isMetadataSheetName name -> Some worksheet.name
+                | name when ArcInvestigation.isMetadataSheetName name -> Some worksheet.name
+                | name when ArcStudy.isMetadataSheetName name -> Some worksheet.name
+                | Template.metaDataSheetName -> Some worksheet.name
+                | Template.obsoletemetaDataSheetName -> Some worksheet.name
+                | _ -> None
+            )
+            |> Array.ofSeq
 
-        let potMetadata =
-            if metadata.Length < 1 then None
-            elif metadata.Length > 1 then failwith "More than one metadata sheet has been found! This cannot be! Please report this as a bug to the developers.!"
-            else Some metadata.[0].name
-
-        return potMetadata
+        match metadata with
+        | name when name.Length = 1 -> return Some name.[0]
+        | array when Array.isEmpty array -> return None
+        | _ -> return (failwith "More than one metadata sheet has been found! This cannot be! Please report this as a bug to the developers!")
     }
 
 /// <summary>
 /// Creates excel worksheet with name for top level metadata
 /// </summary>
 /// <param name="name"></param>
-let createTopLevelMetadata name =
+let createTopLevelMetadata workSheetName =
     Excel.run(fun context ->
         promise {
-            let workSheetName = $"{name}"
             let newWorkSheet = context.workbook.worksheets.add(workSheetName)
-            newWorkSheet.activate()
-            do! context.sync().``then``(fun _ -> ())
-            let! result = tryGetTopLevelMetadataSheetName context
-            if result.IsSome then
-                return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {result.Value} has been created"]
-            else
-                return [InteropLogging.Msg.create InteropLogging.Error $"The work sheet {workSheetName} could not be created"]
+
+            try
+                newWorkSheet.activate()
+                do! context.sync().``then``(fun _ -> ())
+                return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {workSheetName} has been created"]
+            with
+                | :? Error -> return [InteropLogging.Msg.create InteropLogging.Error $"The work sheet {workSheetName} could not be created"]
         }
     )
 
