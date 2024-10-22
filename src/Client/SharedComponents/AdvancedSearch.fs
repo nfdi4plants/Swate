@@ -19,16 +19,16 @@ open AdvancedSearch
 open Messages
 
 let private StartAdvancedSearch (state: AdvancedSearch.Model) setState dispatch =
-    let setter (terms: Term []) = 
-        setState 
-            { state with 
+    let setter (terms: Term []) =
+        setState
+            { state with
                 AdvancedSearchTermResults = terms
                 Subpage = AdvancedSearch.AdvancedSearchSubpages.ResultsSubpage
             }
     AdvancedSearch.Msg.GetSearchResults {|config=state.AdvancedSearchOptions; responseSetter = setter|}  |> AdvancedSearchMsg |> dispatch
 
 let private createLinkOfAccession (accession:string) =
-    let link = accession |> URLs.termAccessionUrlOfAccessionStr
+    let link = ARCtrl.OntologyAnnotation(tan=accession).TermAccessionOntobeeUrl
     Html.a [
         prop.href link
         prop.target.blank
@@ -82,18 +82,18 @@ module private ResultsTable =
             prop.text (string (pageIndex+1))
         ]
 
-    let pageinateDynamic (updatePageIndex:int->unit) (currentPageinationIndex: int) (pageCount:int)  = 
+    let pageinateDynamic (updatePageIndex:int->unit) (currentPageinationIndex: int) (pageCount:int)  =
         (*[0 .. pageCount-1].*)
         [(max 1 (currentPageinationIndex-2)) .. (min (currentPageinationIndex+2) (pageCount-1)) ]
         |> List.map (
             fun index -> createPaginationLinkFromIndex updatePageIndex index currentPageinationIndex
-        ) 
+        )
 
     let private createAdvancedTermSearchResultRows (state:TableModel) (setState:TableModel -> unit) (resetAdvancedSearchState: unit -> unit) =
         if state.Data |> Array.isEmpty |> not then
             state.Data
             |> Array.collect (fun sugg ->
-                let id = sprintf "isHidden_advanced_%s" sugg.Accession 
+                let id = sprintf "isHidden_advanced_%s" sugg.Accession
                 [|
                     Html.tr [
                         prop.onClick (fun e ->
@@ -201,20 +201,20 @@ module private ResultsTable =
 
     [<ReactComponent>]
     let paginatedTableComponent (state:AdvancedSearch.Model) setState (data: TableModel) =
-        
+
         let resetAdvancedSearchState = fun _ -> AdvancedSearch.Model.init() |> setState
         let handlerState, setState = React.useState data
         let updatePageIndex (model:TableModel) (ind:int) =
             let nextState = {model with PageIndex = ind}
             setState nextState
 
-        if data.Data.Length > 0 then 
+        if data.Data.Length > 0 then
 
             let tableRows = createAdvancedTermSearchResultRows handlerState setState resetAdvancedSearchState
             let currentPageinationIndex = handlerState.PageIndex
             let chunked = tableRows |> Array.chunkBySize data.ElementsPerPage
-            let len = chunked.Length 
-    
+            let len = chunked.Length
+
             Bulma.container [
                 Bulma.table [
                     Bulma.table.isFullWidth
@@ -231,7 +231,7 @@ module private ResultsTable =
                         Bulma.paginationPrevious.button [
                             prop.style [style.cursor.pointer]
                             prop.onClick (fun _ ->
-                                max (currentPageinationIndex - 1) 0 |> updatePageIndex handlerState 
+                                max (currentPageinationIndex - 1) 0 |> updatePageIndex handlerState
                             )
                             prop.disabled <| (currentPageinationIndex = 0)
                             prop.text "Prev"
@@ -303,7 +303,7 @@ let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.
                                 e.stopPropagation();
                                 let isValid = isValidAdancedSearchOptions state.AdvancedSearchOptions
                                 if isValid then
-                                    setState 
+                                    setState
                                         { state with
                                             Subpage                         = AdvancedSearchSubpages.ResultsSubpage
                                             HasAdvancedSearchResultsLoading = true
@@ -312,7 +312,7 @@ let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.
                             | _ -> ()
                         )
                     ]
-                ] 
+                ]
             ]
         ]
         Bulma.field.div [
@@ -336,9 +336,9 @@ let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.
                         )
                         prop.valueOrDefault state.AdvancedSearchOptions.TermDefinition
                     ]
-                ] 
+                ]
             ]
-        ] 
+        ]
         //Bulma.field.div [
         //    Bulma.label "Ontology"
         //    Bulma.control.div [
@@ -397,7 +397,7 @@ let private resultsPage (resultHandler: Term -> unit) (state: AdvancedSearch.Mod
 let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit, dispatch) =
     let state, setState = React.useState(AdvancedSearch.Model.init)
     React.useEffect(
-        (fun _ -> AdvancedSearch.Model.init() |> setState), 
+        (fun _ -> AdvancedSearch.Model.init() |> setState),
         [|box isActive|]
     )
     Bulma.modal [
@@ -439,7 +439,7 @@ let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit
                             prop.children [
                                 if state.Subpage <> AdvancedSearchSubpages.InputFormSubpage then
                                     Bulma.levelItem [
-                                        Bulma.button.button [   
+                                        Bulma.button.button [
                                             Bulma.color.isDanger
                                             Bulma.button.isFullWidth
                                             prop.onClick (fun e -> e.stopPropagation(); e.preventDefault(); setState {state with Subpage = InputFormSubpage })

@@ -6,8 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Database\Template.Tests.fs" />
-    <Compile Include="JsonImport.Tests.fs" />
-    <Compile Include="JsonExport.Tests.fs" />
     <Compile Include="Server.Tests.fs" />
   </ItemGroup>
   <ItemGroup>

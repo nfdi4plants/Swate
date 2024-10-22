@@ -9,14 +9,6 @@ module URLs =
             [<Literal>]
             let csv = @"https://datatracker.ietf.org/doc/html/rfc7111"
 
-    [<LiteralAttribute>]
-    let TermAccessionBaseUrl = @"http://purl.obolibrary.org/obo/"
-
-    /// accession string needs to have format: PO:0007131
-    let termAccessionUrlOfAccessionStr (accessionStr:string) =
-        let replaced = accessionStr.Replace(":","_")
-        TermAccessionBaseUrl + replaced
-
     [<RequireQualifiedAccessAttribute>]
     module Docs =
 
@@ -29,11 +21,11 @@ module URLs =
                 | Html -> ".html"
                 | Yaml -> ".yaml"
 
-        
+
         let private Base = "/docs"
 
         let OntologyApi (filetype: FileType)= Base + "/IOntologyAPIv2" + filetype.toStr
-        
+
 
     type Helpdesk =
         static member Url = @"https://support.nfdi4plants.org"
