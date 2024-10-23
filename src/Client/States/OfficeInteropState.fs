@@ -62,6 +62,8 @@ type Msg =
     | UpdateTopLevelStudy                   of (ArcStudy * ArcAssay list) option
     | UpdateTopLevelTemplate                of Template option
     | DeleteTopLevelMetadata
+    | SendErrorsToFront                     of InteropLogging.Msg list
+    | ExportJson                            of ArcFiles * JsonExportFormat
     // Development
     | TryExcel
     | TryExcel2
