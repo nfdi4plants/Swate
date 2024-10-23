@@ -2027,7 +2027,6 @@ let rectifyTermColumns () =
                         // Check whether building block is unit or not
                         // When it is unit, then delete the property column values only when the unit is empty, independent of the main column
                         // When it is a term, then delete the property column values when the main column is empty
-
                         let mainColumn =
                             if buildingBlock.Length > 1 && snd buildingBlock.[1] = "Unit" then
                                 excelTable.columns.items.Item (fst buildingBlock.[1])

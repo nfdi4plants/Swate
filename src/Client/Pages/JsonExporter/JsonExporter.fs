@@ -373,29 +373,9 @@ type FileExporter =
                                                             else
                                                                 OfficeInterop.SendErrorsToFront errors |> OfficeInteropMsg |> dispatch
                                                         | _ -> failwith $"No top level metadata for arc assay available"
-                                                    | templateIdentifier when ARCtrl.Spreadsheet.Template.metaDataSheetName = templateIdentifier ->
-                                                        let! topLevelTemplateInfo = OfficeInterop.Core.tryGetTopLeveMetadata (templateIdentifier.ToLower()) Template.fromMetadataCollection
-                                                        let template =
-                                                            if topLevelTemplateInfo.IsSome then 
-                                                                let templateInfo, ers, tags, authors = topLevelTemplateInfo.Value                                
-                                                                Some (Template.fromParts templateInfo ers tags authors (ArcTable.init "New Template") DateTime.Now)
-                                                            else Some (new Template(Guid.NewGuid(), (ArcTable.init "New Template")))
-                                                        match template with
-                                                        | Some template ->
-                                                            let! (tables, errors) = OfficeInterop.Core.getExcelAnnotationTables context
-                                                            if List.isEmpty errors then
-                                                                match tables.Length with
-                                                                | 0 -> ()
-                                                                | 1 -> template.Table <- tables.[0]
-                                                                | _ ->
-                                                                    let msg = [InteropLogging.Msg.create InteropLogging.Error $"Only 1 annotation table is allowed for templates but {tables.Length} are present"]
-                                                                    OfficeInterop.SendErrorsToFront msg |> OfficeInteropMsg |> dispatch                                                                    
-                                                                let arcFile = ArcFiles.Template template
-                                                                SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
-                                                            else
-                                                                OfficeInterop.SendErrorsToFront errors |> OfficeInteropMsg |> dispatch
-                                                        | _ -> failwith $"No top level metadata for arc assay available"
-                                                    | templateIdentifier when ARCtrl.Spreadsheet.Template.obsoletemetaDataSheetName = templateIdentifier ->
+                                                    | ARCtrl.Spreadsheet.Template.metaDataSheetName
+                                                    | ARCtrl.Spreadsheet.Template.obsoletemetaDataSheetName ->
+                                                        let templateIdentifier = result.Value
                                                         let! topLevelTemplateInfo = OfficeInterop.Core.tryGetTopLeveMetadata (templateIdentifier.ToLower()) Template.fromMetadataCollection
                                                         let template =
                                                             if topLevelTemplateInfo.IsSome then 
