@@ -351,9 +351,8 @@ module OfficeInteropExtensions =
         /// </summary>
         /// <param name="excelTable"></param>
         /// <param name="context"></param>
-        static member validateExcelTable (excelTable:Table, context:RequestContext) =
-            
-            promise {
+        static member validateExcelTable (excelTable:Table, context:RequestContext) =            
+            promise {                    
                     //Get headers and body
                     let headerRange = excelTable.getHeaderRowRange()
                     let bodyRowRange = excelTable.getDataBodyRange()
@@ -450,7 +449,6 @@ let exampleExcelFunction1 () =
 /// <summary>This is not used in production and only here for development. Its content is always changing to test functions for new features.</summary>
 let exampleExcelFunction2 () =
     Excel.run(fun context ->
-
         promise {
 
             let workbook = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"customXmlParts"|]))
@@ -1946,11 +1944,10 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
     )
 
 /// <summary>
-/// Checks whether the selected building block and those next to it are valid
+/// Checks whether the active excel table is valid or not
 /// </summary>
-let validateAnnotationTable context =
+let validateAnnotationTable excelTable context =
     promise {
-        let! excelTable = getActiveAnnotationTable context
         let! indexedErrors = ArcTable.validateExcelTable(excelTable, context)
 
         let messages =
@@ -1982,7 +1979,8 @@ let validateAnnotationTable context =
 let rectifyTermColumns () =
     Excel.run(fun context ->
         promise {
-            let! result = validateAnnotationTable context
+            let! excelTable = getActiveAnnotationTable context
+            let! result = validateAnnotationTable excelTable context
 
             //When there are messages, then there is an error and further processes can be skipped because the annotation table is not valid
             match result with
@@ -2029,8 +2027,9 @@ let rectifyTermColumns () =
                         // Check whether building block is unit or not
                         // When it is unit, then delete the property column values only when the unit is empty, independent of the main column
                         // When it is a term, then delete the property column values when the main column is empty
+
                         let mainColumn =
-                            if snd buildingBlock.[1] = "Unit" then
+                            if buildingBlock.Length > 1 && snd buildingBlock.[1] = "Unit" then
                                 excelTable.columns.items.Item (fst buildingBlock.[1])
                             else excelTable.columns.items.Item (fst buildingBlock.[0])
                         let potPropertyColumns =
@@ -2261,6 +2260,41 @@ let updateTopLevelMetadata (arcFiles: ArcFiles) =
             return [InteropLogging.Msg.create InteropLogging.Warning $"The worksheet {worksheet.Name} has been updated"]
         }
     )
+
+let getExcelAnnotationTables (context: RequestContext) =
+    promise {
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let tables = context.workbook.tables
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+
+        let! annotationTables = context.sync().``then``(fun _ ->
+            tables.items
+            |> Seq.toArray
+            |> Array.filter (fun table ->
+                table.name.StartsWith("annotationTable")
+            )
+        )
+
+        let inMemoryTables = Array.init annotationTables.Length (fun _ -> None)
+        let mutable errors = List.empty
+
+        for i in 0 .. annotationTables.Length-1 do
+            let! potErrors = validateAnnotationTable annotationTables.[i] context
+            match potErrors with
+            | Result.Ok _ ->
+                let! result = ArcTable.tryGetFromExcelTable(annotationTables.[i], context)
+                inMemoryTables. [i] <- result                
+            | Result.Error messages ->
+                messages
+                |> List.iter (fun message ->
+                    errors <- message::errors)
+
+        let results =
+            inMemoryTables
+            |> Array.choose (fun x -> x)
+
+        return (results, errors)
+    }
 
 // Old stuff, mostly deprecated 
 

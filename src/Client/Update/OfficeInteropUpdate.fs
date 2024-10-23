@@ -149,6 +149,10 @@ module OfficeInterop =
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
 
+            | SendErrorsToFront msgs ->
+                let cmd = Cmd.ofMsg(curry GenericInteropLogs Cmd.none msgs |> DevMsg)
+                state, model, cmd
+
             | RectifyTermColumns ->
                 //failwith "FillHiddenColsRequest Not implemented yet"
                 //let cmd =
