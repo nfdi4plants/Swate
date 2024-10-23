@@ -267,7 +267,6 @@ type TermSearch =
             ]
         ]
 
-    [<ReactComponent>]
     static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: TermTypes.Term option -> unit, show: bool, setAdvancedTermSearchActive) =
         let searchesAreComplete = searchNameState.SearchIs = SearchIs.Done && searchTreeState.SearchIs = SearchIs.Done
         let foundInBoth (term:TermTypes.Term) =
@@ -278,16 +277,16 @@ type TermSearch =
             | {SearchIs = SearchIs.Done; Results = [||]} when not isDirectedSearch ->
                 Components.termSeachNoResults setAdvancedTermSearchActive
             | {SearchIs = SearchIs.Done; Results = results} -> [
-                    for term in results do
-                        let setTerm = fun (e: MouseEvent) -> setTerm (Some term)
-                        // Term is found in both: Do not show in real directed search, update first search hit instead
-                        if searchesAreComplete && foundInBoth term then
-                            if isDirectedSearch then
-                                Html.none
-                            else
-                                TermSearch.TermSelectItem (term, setTerm, true)
+                for term in results do
+                    let setTerm = fun (e: MouseEvent) -> setTerm (Some term)
+                    // Term is found in both: Do not show in real directed search, update first search hit instead
+                    if searchesAreComplete && foundInBoth term then
+                        if isDirectedSearch then
+                            Html.none
                         else
-                            TermSearch.TermSelectItem (term, setTerm, isDirectedSearch)
+                            TermSearch.TermSelectItem (term, setTerm, true)
+                    else
+                        TermSearch.TermSelectItem (term, setTerm, isDirectedSearch)
                 ]
             | {SearchIs = SearchIs.Running; Results = _ } -> [
                     Html.div [
@@ -312,7 +311,7 @@ type TermSearch =
     static member Input (
         setter: OntologyAnnotation option -> unit,
         ?input: OntologyAnnotation, ?parent: OntologyAnnotation,
-        ?debounceSetter: int, ?searchableToggle: bool,
+        ?searchableToggle: bool,
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
@@ -325,20 +324,26 @@ type TermSearch =
         let advancedSearchActive, setAdvancedSearchActive = React.useState(false)
         let fullwidth = defaultArg fullwidth false
         let loading, setLoading = React.useState(false)
-        let state, setState = React.useState(input)
         let searchable, setSearchable = React.useState(true)
         let searchNameState, setSearchNameState = React.useState(SearchState.init)
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
         let debounceStorage = React.useRef(newDebounceStorage())
         let ref = React.useElementRef()
+        let inputRef = React.useInputRef()
+        React.useEffect(
+            (fun () ->
+                if inputRef.current.IsSome && input.IsSome
+                    then inputRef.current.Value.value <- input.Value.NameText
+            ),
+            [|box input|]
+        )
         React.useLayoutEffectOnce(fun _ ->
             ClickOutsideHandler.AddListener (ref, fun e ->
                 debounceStorage.current.ClearAndRun()
                 if onBlur.IsSome then onBlur.Value e
             )
         )
-        React.useEffect((fun () -> setState input), dependencies=[|box input|])
         let stopSearch() =
             debounceStorage.current.Remove("TermSearch") |> ignore
             setLoading false
@@ -347,18 +352,22 @@ type TermSearch =
             setSearchNameState {searchNameState with SearchIs = SearchIs.Idle}
         let selectTerm (t:TermTypes.Term option) =
             let oaOpt = t |> Option.map OntologyAnnotation.fromTerm
-            setState oaOpt
             setter oaOpt
+            if inputRef.current.IsSome then
+                inputRef.current.Value.value <- oaOpt |> Option.map (fun oa -> oa.Name) |> Option.flatten |> Option.defaultValue ""
             setIsSearching false
         let startSearch() =
             setLoading true
             setSearchNameState <| SearchState.init()
             setSearchTreeState <| SearchState.init()
             setIsSearching true
-        let registerChange(queryString: string option) =
-            let oaOpt = queryString |> Option.map (fun s -> OntologyAnnotation(s) )
-            dsetter(oaOpt,setter,debounceStorage.current,setLoading,debounceSetter)
-            setState oaOpt
+        //let registerChange(queryString: string option) =
+        //    let oaOpt = queryString |> Option.map (fun s ->
+        //        let oa = input |> Option.defaultValue (OntologyAnnotation.empty())
+        //        oa.Name <- Some s
+        //        oa
+        //    )
+        //    dsetter(oaOpt,setter,debounceStorage.current,setLoading,debounceSetter)
         Bulma.control.div [
             if isExpanded then Bulma.control.isExpanded
             if size.IsSome then size.Value
@@ -378,7 +387,8 @@ type TermSearch =
                         if border.IsSome then style.custom("border", border.Value)
                     ]
                     if size.IsSome then size.Value
-                    if state.IsSome then prop.valueOrDefault state.Value.NameText
+                    if input.IsSome then prop.valueOrDefault input.Value.NameText
+                    prop.ref inputRef
                     prop.onMouseDown(fun e -> e.stopPropagation())
                     prop.onDoubleClick(fun e ->
                         let s : string = e.target?value
@@ -396,11 +406,11 @@ type TermSearch =
                             ()
                     )
                     prop.onChange(fun (s: string) ->
-                        if s.Trim() = "" then
-                            registerChange(None)
+                        if System.String.IsNullOrWhiteSpace s then
+                            //registerChange(None)
                             stopSearch() // When deleting text this should stop search from completing
                         else
-                            registerChange(Some s)
+                            //registerChange(Some s)
                             if searchable then
                                 startSearch()
                                 mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
@@ -420,7 +430,6 @@ type TermSearch =
                                 e.preventDefault()
                                 setSearchable (not searchable)
                         | _ -> ()
-
                     )
                 ]
                 let TermSelectArea = TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching, (if advancedSearchDispatch.IsSome then Some setAdvancedSearchActive else None))
@@ -431,7 +440,7 @@ type TermSearch =
                 else
                     TermSelectArea
                 if not searchableToggle then Components.searchIcon
-                if state.IsSome && state.Value.Name.IsSome && state.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
+                if input.IsSome && input.Value.Name.IsSome && input.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                 // Optional elements
                 Html.div [
                     prop.classes ["is-flex"]
@@ -462,5 +471,3 @@ type TermSearch =
             else
                 main
 
-
-    //static member InputWithSearchToggle() =

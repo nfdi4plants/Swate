@@ -65,6 +65,11 @@ module TermTypes =
         static member fromOntologyAnnotation (oa: OntologyAnnotation) =
             TermMinimal.create oa.NameText oa.TermAccessionShort
 
+        member this.ToOntologyAnnotation() =
+            let name = this.Name |> Option.where String.IsNullOrWhiteSpace
+            let tan = this.TermAccession |> Option.where String.IsNullOrWhiteSpace
+            OntologyAnnotation(?name=name, ?tan=tan)
+
         /// The numberFormat attribute in Excel allows to create automatic unit extensions.
         /// It uses a special input format which is created by this function and should be used for unit terms.
         member this.toNumberFormat = $"0.00 \"{this.Name}\""

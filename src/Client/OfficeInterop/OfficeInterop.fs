@@ -2264,37 +2264,37 @@ let updateTopLevelMetadata (arcFiles: ArcFiles) =
 
 // Old stuff, mostly deprecated
 
-let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
-    let createList (rowCount:int) (values:string []) =
-        ResizeArray [|
-            // tableRowCount-2 because -1 to match index-level and -1 to substract header from count
-            for i in 0 .. tableRowCount-2 do
-                yield ResizeArray [|
-                    if i <= rowCount-1 then
-                        box values.[i] |> Some
-                    else
-                        None
-                |]
-        |]
-    match insertBB.HasValues with
-    | false -> [||]
-    | true ->
-        let rowCount = insertBB.Rows.Length
-        if insertBB.ColumnHeader.Type.isSingleColumn then
-            let values          = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
-            [|values|]
-        elif insertBB.HasUnit then
-            let unitTermRowArr  = Array.init rowCount (fun _ -> insertBB.UnitTerm.Value)
-            let values          = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
-            let unitTermNames   = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.Name))
-            let tsrs            = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.accessionToTSR))
-            let tans            = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.accessionToTAN))
-            [|values; unitTermNames; tsrs; tans|]
-        else
-            let termNames = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
-            let tsrs      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTSR))
-            let tans      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTAN))
-            [|termNames; tsrs; tans|]
+//let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
+//    let createList (rowCount:int) (values:string []) =
+//        ResizeArray [|
+//            // tableRowCount-2 because -1 to match index-level and -1 to substract header from count
+//            for i in 0 .. tableRowCount-2 do
+//                yield ResizeArray [|
+//                    if i <= rowCount-1 then
+//                        box values.[i] |> Some
+//                    else
+//                        None
+//                |]
+//        |]
+//    match insertBB.HasValues with
+//    | false -> [||]
+//    | true ->
+//        let rowCount = insertBB.Rows.Length
+//        if insertBB.ColumnHeader.Type.isSingleColumn then
+//            let values          = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
+//            [|values|]
+//        elif insertBB.HasUnit then
+//            let unitTermRowArr  = Array.init rowCount (fun _ -> insertBB.UnitTerm.Value)
+//            let values          = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
+//            let unitTermNames   = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.Name))
+//            let tsrs            = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.accessionToTSR))
+//            let tans            = createList rowCount (unitTermRowArr |> Array.map (fun tm -> tm.accessionToTAN))
+//            [|values; unitTermNames; tsrs; tans|]
+//        else
+//            let termNames = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.Name))
+//            let tsrs      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTSR))
+//            let tans      = createList rowCount (insertBB.Rows |> Array.map (fun tm -> tm.accessionToTAN))
+//            [|termNames; tsrs; tans|]
 
 let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Table, context:RequestContext) =
     promise {
@@ -2428,9 +2428,9 @@ let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Tab
                         let format = $"General"
                         let formats = createValueMatrix 1 (expandedRowCount-1) format
                         columnBody.numberFormat <- formats
-                    if buildingBlock.HasValues then
-                        let values = createColumnBodyValues buildingBlock expandedRowCount
-                        columnBody.values <- values.[i]
+                    //if buildingBlock.HasValues then
+                    //    let values = createColumnBodyValues buildingBlock expandedRowCount
+                    //    columnBody.values <- values.[i]
                     // hide freshly created column if it is a reference column
                     if colName <> columnNames.[0] then
                         columnBody.columnHidden <- true
@@ -2806,7 +2806,7 @@ let getParentTerm () =
 /// 'term' is the value that will be written into the main column.
 /// 'termBackground' needs to be spearate from 'term' in case the user uses the fill function for a custom term.
 /// Should the user write a real term with this function 'termBackground'.isSome and can be used to fill TSR and TAN.</summary>
-let insertOntologyTerm (term:TermMinimal) =
+let insertOntologyTerm (term:OntologyAnnotation) =
     Excel.run(fun context ->
         // Ref. 2
         let range = context.workbook.getSelectedRange()
@@ -2896,15 +2896,15 @@ let insertOntologyTerm (term:TermMinimal) =
                             nextColsRange.values.[ind]
                             // iterate over cols
                             |> Seq.mapi (fun i _ ->
-                                match i, term.TermAccession = String.Empty with
+                                match i, term.TermAccessionShort = String.Empty with
                                 | 0, true | 1, true ->
-                                    Some ("user-specific" |> box)
+                                    None
                                 | 0, false ->
                                     //add "Term Source REF"
-                                    Some (term.accessionToTSR |> box)
+                                    term.TermSourceREF |> Option.map box
                                 | 1, false ->
                                     //add "Term Accession Number"
-                                    Some ( term.accessionToTAN |> box )
+                                    Some ( term.TermAccessionOntobeeUrl |> box )
                                 | _, _ ->
                                     r.enableEvents <- true
                                     failwith "The insert should never add more than two extra columns."
