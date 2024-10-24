@@ -336,67 +336,12 @@ type FileExporter =
                                     let host = model.PersistentStorageState.Host
                                     match host with
                                     | Some Swatehost.Excel ->
-                                        Excel.run(fun context ->
                                             promise {                     
-                                                let! result = OfficeInterop.Core.tryGetTopLevelMetadataSheetName context
-                                                if result.IsSome then
-                                                    match result.Value with
-                                                    | assayIdentifier when ArcAssay.isMetadataSheetName assayIdentifier ->
-                                                        let! assay = OfficeInterop.Core.tryGetTopLeveMetadata (assayIdentifier.ToLower()) ArcAssay.fromMetadataCollection
-                                                        match assay with
-                                                        | Some assay ->
-                                                            let! (tables, errors) = OfficeInterop.Core.getExcelAnnotationTables context
-                                                            if List.isEmpty errors then
-                                                                assay.Tables <- (tables |> ResizeArray)
-                                                                let arcFile = ArcFiles.Assay assay
-                                                                SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
-                                                            else
-                                                                OfficeInterop.SendErrorsToFront errors |> OfficeInteropMsg |> dispatch
-                                                        | _ -> failwith $"No top level metadata for arc assay available"                                                        
-                                                    | investigationIdentifier when ArcInvestigation.isMetadataSheetName investigationIdentifier ->
-                                                        let! investigation = OfficeInterop.Core.tryGetTopLeveMetadata (investigationIdentifier.ToLower()) ArcInvestigation.fromMetadataCollection
-                                                        match investigation with
-                                                        | Some investigation ->
-                                                            let arcFile = ArcFiles.Investigation investigation
-                                                            SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
-                                                        | _ -> failwith $"No top level metadata for arc assay available"
-                                                    | studyIdentifier when ArcStudy.isMetadataSheetName studyIdentifier ->
-                                                        let! studyCollection = OfficeInterop.Core.tryGetTopLeveMetadata (studyIdentifier.ToLower()) ArcStudy.fromMetadataCollection
-                                                        match studyCollection with
-                                                        | Some studyCollection ->
-                                                            let study, assays = studyCollection
-                                                            let! (tables, errors) = OfficeInterop.Core.getExcelAnnotationTables context
-                                                            if List.isEmpty errors then
-                                                                study.Tables <- (tables |> ResizeArray)
-                                                                let arcFile = ArcFiles.Study (study, assays)
-                                                                SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
-                                                            else
-                                                                OfficeInterop.SendErrorsToFront errors |> OfficeInteropMsg |> dispatch
-                                                        | _ -> failwith $"No top level metadata for arc assay available"
-                                                    | ARCtrl.Spreadsheet.Template.metaDataSheetName
-                                                    | ARCtrl.Spreadsheet.Template.obsoletemetaDataSheetName ->
-                                                        let templateIdentifier = result.Value
-                                                        let! topLevelTemplateInfo = OfficeInterop.Core.tryGetTopLeveMetadata (templateIdentifier.ToLower()) Template.fromMetadataCollection
-                                                        let template =
-                                                            if topLevelTemplateInfo.IsSome then 
-                                                                let templateInfo, ers, tags, authors = topLevelTemplateInfo.Value                                
-                                                                Some (Template.fromParts templateInfo ers tags authors (ArcTable.init "New Template") DateTime.Now)
-                                                            else Some (new Template(Guid.NewGuid(), (ArcTable.init "New Template")))
-                                                        match template with
-                                                        | Some template ->
-                                                            let! (tables, errors) = OfficeInterop.Core.getExcelAnnotationTables context
-                                                            if List.isEmpty errors then
-                                                                if not (Array.isEmpty tables) then
-                                                                    template.Table <- tables.[0]
-                                                                let arcFile = ArcFiles.Template template
-                                                                SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
-                                                            else
-                                                                OfficeInterop.SendErrorsToFront errors |> OfficeInteropMsg |> dispatch
-                                                        | _ -> failwith $"No top level metadata for arc assay available"
-                                                    | _ -> failwith $"No metadata of type {result.Value} has been implemented yet!"
-                                                else failwith "No valid data available"
-                                            } 
-                                        ) |> ignore
+                                                let! result = OfficeInterop.Core.tryParseExcelMetadataToArcFile ()
+                                                match result with
+                                                | Result.Ok arcFile -> SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
+                                                | Result.Error msgs -> OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
+                                            } |> ignore
                                     | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                                         if model.SpreadsheetModel.ArcFile.IsSome then
                                             SpreadsheetInterface.ExportJson (model.SpreadsheetModel.ArcFile.Value, state.ExportFormat) |> InterfaceMsg |> dispatch

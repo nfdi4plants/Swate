@@ -81,20 +81,19 @@ module OfficeInterop =
                 state, model, nextCmd
 
             | AddTemplate table ->
-                let msg = fun (t, i) -> JoinTable(t, i, Some ARCtrl.TableJoinOptions.WithValues) |> OfficeInteropMsg
-                let cmd =
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.prepareTemplateInMemory
-                        (table)
-                        (msg)                        
-                        (curry GenericError Cmd.none >> DevMsg)
-                state, model, cmd
-
-            | JoinTable (table, index, options) ->
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.joinTable
-                        (table, index, options)
+                        (table, Some ARCtrl.TableJoinOptions.WithValues)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+
+            | JoinTable (table, options) ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.joinTable
+                        (table, options)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd

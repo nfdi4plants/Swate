@@ -158,7 +158,7 @@ module Interface =
             | JoinTable (table, index, options) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.JoinTable (table, index, options) |> OfficeInteropMsg |> Cmd.ofMsg
+                    let cmd = OfficeInterop.JoinTable (table, options) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.JoinTable (table, index, options) |> SpreadsheetMsg |> Cmd.ofMsg
