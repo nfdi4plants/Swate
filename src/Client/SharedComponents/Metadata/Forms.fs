@@ -286,38 +286,133 @@ module private Helper =
                 ]
             ]
         ]
-        
+
+open JsBindings
 
 type FormComponents =
 
     [<ReactComponent>]
-    static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, ?label: string) =
-        Bulma.field.div [
-            if label.IsSome then Bulma.label label.Value
-            Bulma.field.div [
-                Html.orderedList [
-                    prop.className "grid grid-cols-1 gap-2"
+    static member InputSequenceElement(key: string, id: string, listComponent: ReactElement) =
+        let sortable = JsBindings.DndKit.useSortable({|id = id|})
+        let style = {|
+          transform = DndKit.CSS.Transform.toString(sortable.transform)
+          transition = sortable.transition
+        |}
+        Html.div [
+            prop.ref sortable.setNodeRef
+            prop.id id
+            for attr in Object.keys sortable.attributes do
+                prop.custom(attr, sortable.attributes.get attr)
+            prop.className "flex flex-row gap-2"
+            prop.custom("style", style)
+            prop.children [
+                Html.span [
+                    for listener in Object.keys sortable.listeners do
+                        prop.custom(listener, sortable.listeners.get listener)
+                    prop.className "cursor-grab flex items-center"
                     prop.children [
-                        for i in 0 .. inputs.Count - 1 do
-                            let input = inputs.[i]
-                            Html.li [
-                                inputComponent(
-                                    input,
-                                    (fun v -> 
-                                        inputs.[i] <- v
-                                        inputs |> setter 
-                                    ),
-                                    (fun _ ->
-                                        inputs.RemoveAt i
-                                        inputs |> setter
-                                    )
-                                )
-                            ]
+                        Bulma.icon [
+                            Html.i [ prop.className "fa-solid fa-grip-vertical fa-lg" ]
+                        ]
                     ]
                 ]
+                Html.div [
+                    prop.className "grow"
+                    prop.children listComponent
+                ]
             ]
+        ]
+
+    [<ReactComponent>]
+    static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, ?label: string) =
+        let sensors = DndKit.useSensors [| 
+            DndKit.useSensor(DndKit.PointerSensor) 
+        |]
+        let guids = ResizeArray [for _ in inputs do Guid.NewGuid()]
+        let mkId index = guids.[index].ToString()
+        let getIndexFromId (id:string) = guids.FindIndex (fun x -> x = Guid(id))
+        let handleDragEnd = fun (event: DndKit.IDndKitEvent) -> 
+            let active = event.active
+            let over = event.over
+            if (active?id <> over?id) then
+                let oldIndex = getIndexFromId (active?id)
+                let newIndex = getIndexFromId (over?id)
+                DndKit.arrayMove(inputs, oldIndex, newIndex)
+                |> setter
+            ()
+        Html.div [
+            if label.IsSome then Bulma.label label.Value
+            DndKit.DndContext(
+                sensors = sensors,
+                onDragEnd = handleDragEnd,
+                collisionDetection = DndKit.closestCenter,
+                children = [
+                    DndKit.SortableContext(
+                        items = guids,
+                        strategy = DndKit.verticalListSortingStrategy,
+                        children = ResizeArray [
+                            Html.div [
+                                prop.className "space-y-2"
+                                prop.children [
+                                    for i in 0 .. (inputs.Count-1) do
+                                        let item = inputs.[i]
+                                        let id = mkId i
+                                        FormComponents.InputSequenceElement(
+                                            id,
+                                            id,
+                                            (
+                                                inputComponent(
+                                                    item,
+                                                    (fun v -> 
+                                                        inputs.[i] <- v
+                                                        inputs |> setter 
+                                                    ),
+                                                    (fun _ ->
+                                                        inputs.RemoveAt i
+                                                        inputs |> setter
+                                                    )
+                                                )
+                                            )
+                                        )
+                                ]
+                            ]
+                        ]
+                    )
+                    //Html.orderedList [
+                    //    prop.className "grid grid-cols-1 gap-2"
+                    //    prop.children [
+                    //        for i in 0 .. inputs.Count - 1 do
+                    //            let input = inputs.[i]
+                    //            Html.li [
+                    //                prop.className "relative ml-4"
+                    //                prop.children [
+                    //                    Html.div [
+                    //                        prop.className "absolute inset-y-0 -left-6 z-1 flex items-center cursor-move"
+                    //                        prop.children [
+                    //                            Bulma.icon [
+                    //                                Html.i [ prop.className "fa-solid fa-grip-vertical fa-lg" ]
+                    //                            ]
+                    //                        ]
+                    //                    ]
+                    //                    inputComponent(
+                    //                        input,
+                    //                        (fun v -> 
+                    //                            inputs.[i] <- v
+                    //                            inputs |> setter 
+                    //                        ),
+                    //                        (fun _ ->
+                    //                            inputs.RemoveAt i
+                    //                            inputs |> setter
+                    //                        )
+                    //                    )
+                    //                ]
+                    //            ]
+                    //    ]
+                    //]
+                ]
+            )
             Html.div [
-                prop.className "flex justify-center w-full"
+                prop.className "flex justify-center w-full mt-2"
                 prop.children [
                     Helper.addButton (fun _ ->
                         inputs.Add (constructor()) 
