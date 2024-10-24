@@ -13,6 +13,9 @@ let BoxedField (title: string) (description: string option) (content: ReactEleme
                         Html.p description.Value
                 ]
             ]
-            Bulma.block content
+            Bulma.block [
+                prop.className "space-y-2"
+                prop.children content
+            ]
         ]
     ]
