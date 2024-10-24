@@ -48,7 +48,7 @@ module OfficeInterop =
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.insertOntologyTerm  
-                        term
+                        (term.ToOntologyAnnotation())
                         (curry GenericLog Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd

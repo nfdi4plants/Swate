@@ -6,9 +6,6 @@
   <ItemGroup>
     <Content Include="index.html" />
     <None Include="vite.config.mts" />
-    <Compile Include="OfficeInterop.Indexing.Tests.fs" />
-    <Compile Include="FilePickerView.Tests.fs" />
-    <Compile Include="BuildingBlockFunctions.Tests.fs" />
     <Compile Include="Client.Tests.fs" />
   </ItemGroup>
   <ItemGroup>

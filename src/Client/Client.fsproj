@@ -66,9 +66,9 @@
     <Compile Include="SharedComponents\AdvancedSearch.fs" />
     <Compile Include="SharedComponents\TermSearchInput.fs" />
     <Compile Include="SharedComponents\QuickAccessButton.fs" />
-    <Compile Include="SharedComponents\Generic.fs" />
-    <Compile Include="SharedComponents\Forms.fs" />
-    <Compile Include="SharedComponents\DatamapConfig.fs" />
+    <Compile Include="SharedComponents\Metadata\Generic.fs" />
+    <Compile Include="SharedComponents\Metadata\Forms.fs" />
+    <Compile Include="SharedComponents\Metadata\DatamapConfig.fs" />
     <Compile Include="SharedComponents\Metadata\Assay.fs" />
     <Compile Include="SharedComponents\Metadata\Investigation.fs" />
     <Compile Include="SharedComponents\Metadata\Study.fs" />

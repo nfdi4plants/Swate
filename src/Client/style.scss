@@ -90,30 +90,6 @@ a {
     }
 }
 
-.form-container {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    column-gap: 10px;
-    flex-grow: 1;
-
-    .form-input-term-search-positioner {
-        position: absolute;
-        top: calc(100% - 10px);
-        z-index: 20;
-        width: 100%;
-    }
-
-    @media only screen and (max-width: 694px) {
-        .form-input-term-search-positioner {
-            position: relative;
-            z-index: 20;
-            top: -10px
-        }
-    }
-}
-
 .term-select-area {
     position: absolute;
     width: 100%;
