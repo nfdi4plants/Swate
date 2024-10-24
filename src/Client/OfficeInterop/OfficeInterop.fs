@@ -691,7 +691,6 @@ let private createAnnotationTableAtRange (isDark:bool, tryUseLastOutput:bool, ra
     let mutable hasCreatedNewWorkSheet = false
 
     promise {
-
         // sync with proxy objects after loading values from excel
         do! context.sync().``then``( fun _ ->
     
@@ -2136,6 +2135,10 @@ let parseToTopLevelMetadata<'T> identifier (parseToMetadata: string option seq s
         else return None
     }
 
+/// <summary>
+/// Get all annotation tables of the excel file
+/// </summary>
+/// <param name="context"></param>
 let getExcelAnnotationTables (context: RequestContext) =
     promise {
         let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
@@ -2169,10 +2172,19 @@ let getExcelAnnotationTables (context: RequestContext) =
         | _ -> return Result.Error msgs
     }
 
+/// <summary>
+/// Use this function because template lacks isMetadataSheet method at the moment to avoid code duplication
+/// </summary>
+/// <param name="collection"></param>
 let private parseTempatleToArcFile collection =
     let templateInfo, ers, tags, authors = Template.fromMetadataCollection collection
     Template.fromParts templateInfo ers tags authors (ArcTable.init "New Template") DateTime.Now
 
+/// <summary>
+/// Get template and avoid excel annotation tables
+/// </summary>
+/// <param name="worksheetName"></param>
+/// <param name="context"></param>
 let private handleTemplateParsingWithoutTable worksheetName context =
     promise {
         let! template = parseToTopLevelMetadata worksheetName parseTempatleToArcFile context
@@ -2240,6 +2252,12 @@ let tryParseExcelMetadataToArcFileWihoutTables () =
         }
     )
 
+/// <summary>
+/// Handle parsing of template and check whether there are more than 1 annotation table in the excel file or not
+/// Used to avoid code duplication because template lacks the isMetadatasheet method at the moment
+/// </summary>
+/// <param name="worksheetName"></param>
+/// <param name="context"></param>
 let private handleTemplateParsing worksheetName context =
     promise {
         let! template = parseToTopLevelMetadata worksheetName parseTempatleToArcFile context
