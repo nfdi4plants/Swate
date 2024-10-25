@@ -323,12 +323,34 @@ type FormComponents =
             ]
         ]
 
+    /// <summary>
+    /// A rather complicated function. A generic list container for form components.
+    ///
+    /// Uses dnd-kit to allow drag and drop reordering of the list.
+    /// </summary>
+    /// <param name="inputs"></param>
+    /// <param name="constructor"></param>
+    /// <param name="setter"></param>
+    /// <param name="inputComponent"></param>
+    /// <param name="label"></param>
     [<ReactComponent>]
     static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, ?label: string) =
+        // dnd-kit requires an id for each element in the list.
+        // The id is used to keep track of the order of the elements in the list.
+        // Because most of our classes do not have a unique id, we generate a new guid for each element in the list.
         let sensors = DndKit.useSensors [| 
             DndKit.useSensor(DndKit.PointerSensor) 
         |]
-        let guids = ResizeArray [for _ in inputs do Guid.NewGuid()]
+        /// This is guid is used to force a rerender of the list when the order of the elements changes.
+        let OrderId = React.useRef (System.Guid.NewGuid())
+        /// This is a list of guids that are used to keep track of the order of the elements in the list.
+        /// We use "React.useMemo" to keep the guids stable unless items are added/removed or reorder happens.
+        /// Without this children would be rerendered on every change (e.g. expanded publications close on publication change).
+        let guids = React.useMemo (
+            (fun () ->
+                ResizeArray [for _ in inputs do Guid.NewGuid()]),
+            [|box inputs.Count; box OrderId.current|]
+        )
         let mkId index = guids.[index].ToString()
         let getIndexFromId (id:string) = guids.FindIndex (fun x -> x = Guid(id))
         let handleDragEnd = fun (event: DndKit.IDndKitEvent) -> 
@@ -339,6 +361,8 @@ type FormComponents =
                 let newIndex = getIndexFromId (over?id)
                 DndKit.arrayMove(inputs, oldIndex, newIndex)
                 |> setter
+                // trigger rerender
+                OrderId.current <- System.Guid.NewGuid()
             ()
         Html.div [
             if label.IsSome then Bulma.label label.Value
@@ -378,37 +402,6 @@ type FormComponents =
                             ]
                         ]
                     )
-                    //Html.orderedList [
-                    //    prop.className "grid grid-cols-1 gap-2"
-                    //    prop.children [
-                    //        for i in 0 .. inputs.Count - 1 do
-                    //            let input = inputs.[i]
-                    //            Html.li [
-                    //                prop.className "relative ml-4"
-                    //                prop.children [
-                    //                    Html.div [
-                    //                        prop.className "absolute inset-y-0 -left-6 z-1 flex items-center cursor-move"
-                    //                        prop.children [
-                    //                            Bulma.icon [
-                    //                                Html.i [ prop.className "fa-solid fa-grip-vertical fa-lg" ]
-                    //                            ]
-                    //                        ]
-                    //                    ]
-                    //                    inputComponent(
-                    //                        input,
-                    //                        (fun v -> 
-                    //                            inputs.[i] <- v
-                    //                            inputs |> setter 
-                    //                        ),
-                    //                        (fun _ ->
-                    //                            inputs.RemoveAt i
-                    //                            inputs |> setter
-                    //                        )
-                    //                    )
-                    //                ]
-                    //            ]
-                    //    ]
-                    //]
                 ]
             )
             Html.div [

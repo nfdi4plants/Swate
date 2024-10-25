@@ -76,6 +76,10 @@ type DndKit =
     static member DndContext (?onDragEnd, ?sensors, ?collisionDetection, ?children: seq<ReactElement>) = React.imported()
     
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
-    static member SortableContext (items, strategy, children: seq<ReactElement>) = React.imported()
+    static member SortableContext(items:ResizeArray<string>, strategy, children: seq<ReactElement>) = React.imported()
+      // Interop.reactApi.createElement (import "SortableContext" "@dnd-kit/sortable", props, children)
+
+    [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
+    static member SortableContext(items:ResizeArray<System.Guid>, strategy, children: seq<ReactElement>) = React.imported()
       // Interop.reactApi.createElement (import "SortableContext" "@dnd-kit/sortable", props, children)
     
