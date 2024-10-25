@@ -12,11 +12,11 @@ module TermTypes =
         LastUpdated : DateTime
         Author      : string
     } with
-        static member create name version lastUpdated authors = {     
-            Name         = name          
+        static member create name version lastUpdated authors = {
+            Name         = name
             Version      = version
-            LastUpdated  = lastUpdated   
-            Author       = authors        
+            LastUpdated  = lastUpdated
+            Author       = authors
         }
 
     type Term = {
@@ -27,11 +27,11 @@ module TermTypes =
         FK_Ontology     : string
     }
 
-    let createTerm accession name description isObsolete ontologyName= {          
-        Accession   = accession    
-        Name        = name         
-        Description = description   
-        IsObsolete  = isObsolete   
+    let createTerm accession name description isObsolete ontologyName= {
+        Accession   = accession
+        Name        = name
+        Description = description
+        IsObsolete  = isObsolete
         FK_Ontology = ontologyName
     }
 
@@ -65,6 +65,11 @@ module TermTypes =
         static member fromOntologyAnnotation (oa: OntologyAnnotation) =
             TermMinimal.create oa.NameText oa.TermAccessionShort
 
+        member this.ToOntologyAnnotation() =
+            let name = this.Name |> Option.where String.IsNullOrWhiteSpace
+            let tan = this.TermAccession |> Option.where String.IsNullOrWhiteSpace
+            OntologyAnnotation(?name=name, ?tan=tan)
+
         /// The numberFormat attribute in Excel allows to create automatic unit extensions.
         /// It uses a special input format which is created by this function and should be used for unit terms.
         member this.toNumberFormat = $"0.00 \"{this.Name}\""
@@ -88,17 +93,10 @@ module TermTypes =
             if this.TermAccession = "" then
                 ""
             else
-                try 
+                try
                     this.TermAccession.Split(@":").[0]
                 with
                     | exn -> ""
-
-        /// Returns empty string if no accession is found
-        member this.accessionToTAN =
-            if this.TermAccession = "" then
-                ""
-            else
-                URLs.TermAccessionBaseUrl + this.TermAccession.Replace(@":",@"_")
 
     type TermSearchable = {
         // Contains information about the term to search itself. If term accession is known, search result is 100% correct.

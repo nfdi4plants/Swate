@@ -16,9 +16,6 @@ let all =
 #if FABLE_COMPILER // This preprocessor directive makes editor happy
             Shared.Tests.shared
 #endif
-            BuildingBlockFunctions.Tests.tests_buildingBlockFunctions
-            FilePickerView.Tests.tests_FilePickerView_PathRerooting
-            OfficeInterop.Indexing.Tests.tests_OfficeInterop_Indexing
             client
         ]
 

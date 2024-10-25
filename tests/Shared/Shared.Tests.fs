@@ -6,11 +6,6 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open System
-open System.Text.RegularExpressions
-
-open Shared
-open Shared.Regex
 
 
 let example_tests = testList "example" [

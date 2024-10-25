@@ -1,11 +1,13 @@
 module Components.Metadata.Template
 
+open Feliz
 open Feliz.Bulma
 open ARCtrl
 open Components
 open Components.Forms
 
-let Main(template: Template, setTemplate: Template -> unit) = 
+[<ReactComponent>]
+let Main(template: Template, setTemplate: Template -> unit) =
     Bulma.section [
         Generic.BoxedField
             "Template Metadata"
@@ -13,81 +15,74 @@ let Main(template: Template, setTemplate: Template -> unit) =
             [
                 FormComponents.GUIDInput (
                     template.Id,
-                    "Identifier", 
-                    (fun (s:string) -> 
-                        template.Id <- System.Guid(s)
-                        //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
-                        setTemplate template),
-                    fullwidth=true
+                    (fun guid ->
+                        template.Id <- guid
+                        setTemplate template
+                    ),
+                    "Identifier"
                 )
                 FormComponents.TextInput (
                     template.Name,
-                    "Name",
                     (fun (s:string) -> 
                         template.Name <- s
-                        //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
                         setTemplate template),
-                    fullwidth=true
+                    "Name"
                 )
                 FormComponents.TextInput (
                     template.Description,
-                    "Description",
                     (fun (s:string) -> 
                         template.Description <- s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
                         setTemplate template),
-                    fullwidth=true,
+                    "Description",
                     isarea=true
                 )
                 FormComponents.TextInput (
                     template.Organisation.ToString(),
-                    "Organisation",
                     (fun (s:string) -> 
                         template.Organisation <- Organisation.ofString(s)
-                        //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
                         setTemplate template),
-                    fullwidth=true
+                    "Organisation"
                 )
                 FormComponents.TextInput(
                     template.Version,
-                    "Version",
                     (fun (s:string) -> 
                         template.Version <- s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
                         setTemplate template),
-                    fullwidth=true
+                    "Version"
                 )
                 FormComponents.DateTimeInput(
                     template.LastUpdated,
-                    "Last Updated",
                     (fun dt -> 
                         template.LastUpdated <- dt
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                        setTemplate template)
+                        setTemplate template),
+                    "Last Updated"
                 )
                 FormComponents.OntologyAnnotationsInput(
-                    Array.ofSeq template.Tags,
-                    "Tags",
+                    template.Tags,
                     (fun (s) -> 
                         template.Tags <- ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                        setTemplate template)
+                        setTemplate template),
+                    "Tags"
                 )
                 FormComponents.OntologyAnnotationsInput(
-                    Array.ofSeq template.EndpointRepositories,
-                    "Endpoint Repositories",
+                    template.EndpointRepositories,
                     (fun (s) -> 
                         template.EndpointRepositories <- ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                        setTemplate template)
+                        setTemplate template),
+                    "Endpoint Repositories"
                 )
                 FormComponents.PersonsInput(
-                    Array.ofSeq template.Authors,
-                    "Authors",
+                    template.Authors,
                     (fun (s) -> 
                         template.Authors <-ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                        setTemplate template)
+                        setTemplate template),
+                    "Authors"
                 )
             ]
     ]

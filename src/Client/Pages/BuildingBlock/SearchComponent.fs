@@ -48,7 +48,7 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                 BuildingBlock.UpdateBodyArg case |> BuildingBlockMsg |> dispatch
             let parent = model.AddBuildingBlockState.TryHeaderOA()
             let input = model.AddBuildingBlockState.TryBodyOA()
-            Components.TermSearch.Input(setter, fullwidth=true, ?input=input, ?parent=parent, displayParent=false, ?portalTermSelectArea=element.current, debounceSetter=1000)
+            Components.TermSearch.Input(setter, fullwidth=true, ?input=input, ?parent=parent, displayParent=false, ?portalTermSelectArea=element.current)
         ]
     ]
 
@@ -71,7 +71,7 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                     BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
                     //selectHeader ui setUi h |> dispatch 
                 let input = model.AddBuildingBlockState.TryHeaderOA()
-                Components.TermSearch.Input(setter, fullwidth=true, ?input=input, isExpanded=true, ?portalTermSelectArea=element.current, debounceSetter=1000)
+                Components.TermSearch.Input(setter, fullwidth=true, ?input=input, isExpanded=true, ?portalTermSelectArea=element.current)
             elif state.HeaderCellType.HasIOType() then
                 Bulma.control.div [
                     Bulma.control.isExpanded

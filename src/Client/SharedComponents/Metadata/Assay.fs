@@ -8,63 +8,59 @@ open Components
 open Components.Forms
 
 [<ReactComponent>]
-let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit) = 
+let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit) =
     Bulma.section [
         Generic.BoxedField
             "Assay Metadata"
             None
-            [
+            [                
                 FormComponents.TextInput (
                     assay.Identifier,
-                    "Identifier", 
-                    (fun s -> 
-                        let nextAssay = IdentifierSetters.setAssayIdentifier s assay
-                        //nextAssay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
-                        setArcAssay nextAssay),
-                    fullwidth=true
+                    (fun v -> 
+                        let nextAssay = IdentifierSetters.setAssayIdentifier v assay
+                        setArcAssay nextAssay
+                    ),
+                    "Identifier",
+                    validator = {| fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s); msg = "Invalid Identifier" |}
                 )
+
                 FormComponents.OntologyAnnotationInput(
-                    assay.MeasurementType |> Option.defaultValue (OntologyAnnotation.empty()),
+                    assay.MeasurementType |> Option.defaultValue (OntologyAnnotation()),
                     (fun oa -> 
-                        let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
-                        assay.MeasurementType <- oa
-                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
-                        setArcAssay assay),
+                        assay.MeasurementType <- oa |> Option.whereNot _.isEmpty()
+                        setArcAssay <| assay
+                    ),
                     "Measurement Type"
                 )
                 FormComponents.OntologyAnnotationInput(
                     assay.TechnologyType |> Option.defaultValue (OntologyAnnotation.empty()),
                     (fun oa -> 
-                        let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
-                        assay.TechnologyType <- oa
-                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
-                        setArcAssay assay),
+                        assay.TechnologyType <- oa |> Option.whereNot _.isEmpty()
+                        setArcAssay <| assay
+                    ),
                     "Technology Type"
                 )
                 FormComponents.OntologyAnnotationInput(
                     assay.TechnologyPlatform |> Option.defaultValue (OntologyAnnotation.empty()),
-                    (fun oa -> 
-                        let oa = if oa = (OntologyAnnotation.empty()) then None else Some oa
-                        assay.TechnologyPlatform <- oa
-                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
-                        setArcAssay assay),
+                    (fun oa ->
+                        assay.TechnologyPlatform <- oa |> Option.whereNot _.isEmpty()
+                        setArcAssay <| assay
+                    ),
                     "Technology Platform"
                 )
                 FormComponents.PersonsInput(
-                    Array.ofSeq assay.Performers,
-                    "Performers",
-                    fun persons ->
-                        assay.Performers <- ResizeArray persons
-                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-                        setArcAssay assay
+                    assay.Performers,
+                    (fun persons ->
+                        assay.Performers <- persons
+                        setArcAssay assay),
+                    "Performers"
                 )
                 FormComponents.CommentsInput(
-                    Array.ofSeq assay.Comments,
-                    "Comments",
-                    fun comments ->
+                    assay.Comments,
+                    (fun comments ->
                         assay.Comments <- ResizeArray comments
-                        //assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-                        setArcAssay assay
+                        setArcAssay assay),
+                    "Comments"
                 )
             ]
         Datamap.DatamapConfig.Main(

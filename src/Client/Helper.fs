@@ -88,19 +88,18 @@ let debouncel<'T> (storage:DebounceStorage) (key: string) (timeout: int) (setLoa
 let newDebounceStorage = fun () -> DebounceStorage()
 
 let debouncemin (fn: 'a -> unit, timeout: int) =
-    let mutable id : int option = None
+    let ids : ResizeArray<int> = ResizeArray()
     fun (arg: 'a) ->
-        match id with
-        | None -> ()
-        | Some id -> Fable.Core.JS.clearTimeout id
+        for id in ids do
+            Fable.Core.JS.clearTimeout id
+        ids.Clear()
         let timeoutId = 
             Fable.Core.JS.setTimeout
                 (fun () ->
-                    log "debounce called"
                     fn arg
                 )
                 timeout
-        id <- Some timeoutId
+        ids.Add timeoutId
 
 let throttle (fn: 'a -> unit, interval: int) =
     let mutable lastCall = System.DateTime.MinValue
@@ -108,7 +107,6 @@ let throttle (fn: 'a -> unit, interval: int) =
     fun (arg: 'a) ->
         let now = System.DateTime.UtcNow
         if (now - lastCall).TotalMilliseconds > float interval then
-            log "throttle called"
             lastCall <- now
             fn arg
 
@@ -147,14 +145,3 @@ type Navigator =
 
 [<Emit("navigator")>]
 let navigator : Navigator = jsNative
-
-module Array =
-
-    /// <summary>
-    /// Take "count" many items from array if existing. if not enough items return as many as possible
-    /// </summary>
-    /// <param name="count"></param>
-    /// <param name="array"></param>
-    let takeSafe (count: int) (array: 'a []) =
-       let count = System.Math.Min(count, array.Length)
-       Array.take count array
