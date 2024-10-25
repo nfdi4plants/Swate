@@ -3,6 +3,7 @@ namespace JsBindings
 open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
+open Browser.Types
 
 type IObject = 
 
@@ -13,7 +14,7 @@ type IObject =
 module Object =
 
     [<Emit("Object.keys($0)")>]
-    let keys (o: IObject) = jsNative    
+    let keys (o: IObject) = jsNative
 
 module DndKit =
 
@@ -32,9 +33,12 @@ module DndKit =
       abstract member transform: obj
       abstract member transition: obj
 
+    /// <summary>
+    /// Not 100% sure that active and over are in fact HTMLElements. But currently we only use id.
+    /// </summary>
     type IDndKitEvent =
-      abstract member active: obj
-      abstract member over: obj
+      abstract member active: HTMLElement
+      abstract member over: HTMLElement
 
     [<Import("closestCenter", "@dnd-kit/core")>]
     let closestCenter : obj = jsNative

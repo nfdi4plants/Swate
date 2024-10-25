@@ -356,9 +356,9 @@ type FormComponents =
         let handleDragEnd = fun (event: DndKit.IDndKitEvent) -> 
             let active = event.active
             let over = event.over
-            if (active?id <> over?id) then
-                let oldIndex = getIndexFromId (active?id)
-                let newIndex = getIndexFromId (over?id)
+            if (active.id <> over.id) then
+                let oldIndex = getIndexFromId (active.id)
+                let newIndex = getIndexFromId (over.id)
                 DndKit.arrayMove(inputs, oldIndex, newIndex)
                 |> setter
                 // trigger rerender
