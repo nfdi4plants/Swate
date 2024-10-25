@@ -312,7 +312,7 @@ type FormComponents =
                     prop.className "cursor-grab flex items-center"
                     prop.children [
                         Bulma.icon [
-                            Html.i [ prop.className "fa-solid fa-grip-vertical fa-lg" ]
+                            Html.i [ prop.className "fa-solid fa-arrows-up-down fa-lg" ]
                         ]
                     ]
                 ]
