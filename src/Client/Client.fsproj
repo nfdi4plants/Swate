@@ -19,6 +19,7 @@
     <Compile Include="LocalStorage\Darkmode.fs" />
     <Compile Include="Colors\NFDIColors.fs" />
     <Compile Include="Colors\ExcelColors.fs" />
+    <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="JsBindings\Cytoscape.fs" />
     <Compile Include="JsBindings\HumanReadableIds.fs" />
     <Compile Include="Host.fs" />

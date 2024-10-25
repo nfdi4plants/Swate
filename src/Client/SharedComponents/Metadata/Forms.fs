@@ -286,38 +286,126 @@ module private Helper =
                 ]
             ]
         ]
-        
+
+open JsBindings
 
 type FormComponents =
 
     [<ReactComponent>]
-    static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, ?label: string) =
-        Bulma.field.div [
-            if label.IsSome then Bulma.label label.Value
-            Bulma.field.div [
-                Html.orderedList [
-                    prop.className "grid grid-cols-1 gap-2"
+    static member InputSequenceElement(key: string, id: string, listComponent: ReactElement) =
+        let sortable = JsBindings.DndKit.useSortable({|id = id|})
+        let style = {|
+          transform = DndKit.CSS.Transform.toString(sortable.transform)
+          transition = sortable.transition
+        |}
+        Html.div [
+            prop.ref sortable.setNodeRef
+            prop.id id
+            for attr in Object.keys sortable.attributes do
+                prop.custom(attr, sortable.attributes.get attr)
+            prop.className "flex flex-row gap-2"
+            prop.custom("style", style)
+            prop.children [
+                Html.span [
+                    for listener in Object.keys sortable.listeners do
+                        prop.custom(listener, sortable.listeners.get listener)
+                    prop.className "cursor-grab flex items-center"
                     prop.children [
-                        for i in 0 .. inputs.Count - 1 do
-                            let input = inputs.[i]
-                            Html.li [
-                                inputComponent(
-                                    input,
-                                    (fun v -> 
-                                        inputs.[i] <- v
-                                        inputs |> setter 
-                                    ),
-                                    (fun _ ->
-                                        inputs.RemoveAt i
-                                        inputs |> setter
-                                    )
-                                )
-                            ]
+                        Bulma.icon [
+                            Html.i [ prop.className "fa-solid fa-arrows-up-down fa-lg" ]
+                        ]
                     ]
                 ]
+                Html.div [
+                    prop.className "grow"
+                    prop.children listComponent
+                ]
             ]
+        ]
+
+    /// <summary>
+    /// A rather complicated function. A generic list container for form components.
+    ///
+    /// Uses dnd-kit to allow drag and drop reordering of the list.
+    /// </summary>
+    /// <param name="inputs"></param>
+    /// <param name="constructor"></param>
+    /// <param name="setter"></param>
+    /// <param name="inputComponent"></param>
+    /// <param name="label"></param>
+    [<ReactComponent>]
+    static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, ?label: string) =
+        // dnd-kit requires an id for each element in the list.
+        // The id is used to keep track of the order of the elements in the list.
+        // Because most of our classes do not have a unique id, we generate a new guid for each element in the list.
+        let sensors = DndKit.useSensors [| 
+            DndKit.useSensor(DndKit.PointerSensor) 
+        |]
+        /// This is guid is used to force a rerender of the list when the order of the elements changes.
+        let OrderId = React.useRef (System.Guid.NewGuid())
+        /// This is a list of guids that are used to keep track of the order of the elements in the list.
+        /// We use "React.useMemo" to keep the guids stable unless items are added/removed or reorder happens.
+        /// Without this children would be rerendered on every change (e.g. expanded publications close on publication change).
+        let guids = React.useMemo (
+            (fun () ->
+                ResizeArray [for _ in inputs do Guid.NewGuid()]),
+            [|box inputs.Count; box OrderId.current|]
+        )
+        let mkId index = guids.[index].ToString()
+        let getIndexFromId (id:string) = guids.FindIndex (fun x -> x = Guid(id))
+        let handleDragEnd = fun (event: DndKit.IDndKitEvent) -> 
+            let active = event.active
+            let over = event.over
+            if (active.id <> over.id) then
+                let oldIndex = getIndexFromId (active.id)
+                let newIndex = getIndexFromId (over.id)
+                DndKit.arrayMove(inputs, oldIndex, newIndex)
+                |> setter
+                // trigger rerender
+                OrderId.current <- System.Guid.NewGuid()
+            ()
+        Html.div [
+            if label.IsSome then Bulma.label label.Value
+            DndKit.DndContext(
+                sensors = sensors,
+                onDragEnd = handleDragEnd,
+                collisionDetection = DndKit.closestCenter,
+                children = [
+                    DndKit.SortableContext(
+                        items = guids,
+                        strategy = DndKit.verticalListSortingStrategy,
+                        children = ResizeArray [
+                            Html.div [
+                                prop.className "space-y-2"
+                                prop.children [
+                                    for i in 0 .. (inputs.Count-1) do
+                                        let item = inputs.[i]
+                                        let id = mkId i
+                                        FormComponents.InputSequenceElement(
+                                            id,
+                                            id,
+                                            (
+                                                inputComponent(
+                                                    item,
+                                                    (fun v -> 
+                                                        inputs.[i] <- v
+                                                        inputs |> setter 
+                                                    ),
+                                                    (fun _ ->
+                                                        inputs.RemoveAt i
+                                                        inputs |> setter
+                                                    )
+                                                )
+                                            )
+                                        )
+                                ]
+                            ]
+                        ]
+                    )
+                ]
+            )
             Html.div [
-                prop.className "flex justify-center w-full"
+                prop.className "flex justify-center w-full mt-2"
                 prop.children [
                     Helper.addButton (fun _ ->
                         inputs.Add (constructor()) 
