@@ -290,48 +290,17 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
             ],
             (fun _ ->
                 setModalActive { isModalActive with SwateExcelHandleMetadataModal = not isModalActive.SwateExcelHandleMetadataModal }
-                Excel.run(fun context ->
-                    promise {                     
-                        let! result = OfficeInterop.Core.tryGetTopLevelMetadataSheetName context
-                        if result.IsSome then
-                            match result.Value with
-                            | assayIdentifier when assayIdentifier.ToLower().Contains("assay") ->
-                                let! assay = OfficeInterop.Core.tryGetTopLeveMetadata (assayIdentifier.ToLower()) ArcAssay.fromMetadataCollection
-                                setExcelMetadataType {
-                                    excelMetadataType with
-                                        TopLevelMetadata = if assay.IsSome then Some (ArcFiles.Assay assay.Value) else Some (ArcFiles.Assay (new ArcAssay("New Assay")))
-                                        WorkSheetName = Some assayIdentifier
-                                }
-                            | investigationIdentifier when investigationIdentifier.ToLower().Contains("investigation") ->
-                                let! investigation = OfficeInterop.Core.tryGetTopLeveMetadata (investigationIdentifier.ToLower()) ArcInvestigation.fromMetadataCollection
-                                setExcelMetadataType {
-                                    excelMetadataType with
-                                        TopLevelMetadata = if investigation.IsSome then Some (ArcFiles.Investigation investigation.Value) else Some (ArcFiles.Investigation (new ArcInvestigation("New Investigation")))
-                                        WorkSheetName = Some investigationIdentifier
-                                }
-                            | studyIdentifier when studyIdentifier.ToLower().Contains("study") ->
-                                let! study = OfficeInterop.Core.tryGetTopLeveMetadata (studyIdentifier.ToLower()) ArcStudy.fromMetadataCollection
-                                setExcelMetadataType {
-                                    excelMetadataType with
-                                        TopLevelMetadata = if study.IsSome then Some (ArcFiles.Study study.Value) else Some (ArcFiles.Study (new ArcStudy("New Study"), []))
-                                        WorkSheetName = Some studyIdentifier
-                                }
-                            | templateIdentifier when templateIdentifier.ToLower().Contains("template") ->
-                                let! topLevelTemplateInfo = OfficeInterop.Core.tryGetTopLeveMetadata (templateIdentifier.ToLower()) Template.fromMetadataCollection
-                                let template =
-                                    if topLevelTemplateInfo.IsSome then 
-                                        let templateInfo, ers, tags, authors = topLevelTemplateInfo.Value                                
-                                        Some (ArcFiles.Template (Template.fromParts templateInfo ers tags authors (ArcTable.init "New Template") DateTime.Now))
-                                    else Some (ArcFiles.Template (new Template(Guid.NewGuid(), (ArcTable.init "New Template"))))
-                                setExcelMetadataType {
-                                    excelMetadataType with
-                                        TopLevelMetadata = template
-                                        WorkSheetName = Some templateIdentifier
-                                }
-                            | _ -> failwith $"No metadata of type {result.Value} has been implemented yet!"
-                        else setExcelMetadataType(ExcelMetadataState.init)
-                    }
-                )  |> ignore
+                promise {
+                    let! result = OfficeInterop.Core.tryParseExcelMetadataToArcFileWihoutTables ()
+                    match result with
+                    | Result.Ok (arcFile, workSheetName) ->
+                        setExcelMetadataType {
+                            excelMetadataType with
+                                TopLevelMetadata = Some arcFile
+                                WorkSheetName = Some workSheetName
+                        }
+                    | Result.Error _ -> setExcelMetadataType(ExcelMetadataState.init)
+                } |> ignore
             )
         )
 

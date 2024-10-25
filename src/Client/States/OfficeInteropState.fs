@@ -38,7 +38,7 @@ type Msg =
     | AddAnnotationBlocks                   of CompositeColumn [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
     | ImportFile                            of (string*InsertBuildingBlock []) []
     | AddTemplate                           of ArcTable
-    | JoinTable                             of ArcTable * index: int option * options: TableJoinOptions option
+    | JoinTable                             of ArcTable * options: TableJoinOptions option
     | RemoveBuildingBlock
     | UpdateUnitForCells
     | AutoFitTable                          of hideRefCols:bool
@@ -62,6 +62,8 @@ type Msg =
     | UpdateTopLevelStudy                   of (ArcStudy * ArcAssay list) option
     | UpdateTopLevelTemplate                of Template option
     | DeleteTopLevelMetadata
+    | SendErrorsToFront                     of InteropLogging.Msg list
+    | ExportJson                            of ArcFiles * JsonExportFormat
     // Development
     | TryExcel
     | TryExcel2

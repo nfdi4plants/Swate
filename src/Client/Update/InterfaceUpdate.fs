@@ -158,7 +158,7 @@ module Interface =
             | JoinTable (table, index, options) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.JoinTable (table, index, options) |> OfficeInteropMsg |> Cmd.ofMsg
+                    let cmd = OfficeInterop.JoinTable (table, options) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.JoinTable (table, index, options) |> SpreadsheetMsg |> Cmd.ofMsg
@@ -245,8 +245,8 @@ module Interface =
             | ExportJson (arcfile, jef) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    failwith "ExportJson not implemented for Excel"
-                    model, Cmd.none
+                    let cmd = SpreadsheetMsg (Spreadsheet.ExportJson (arcfile, jef)) |> Cmd.ofMsg
+                    model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = SpreadsheetMsg (Spreadsheet.ExportJson (arcfile, jef)) |> Cmd.ofMsg
                     model, cmd

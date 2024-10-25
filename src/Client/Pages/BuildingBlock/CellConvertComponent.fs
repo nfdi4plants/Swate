@@ -8,20 +8,19 @@ open OfficeInterop.Core
 module private CellConvertComponentHelpers =
 
     let getSelectedCellType (setState: Model.BuildingBlock.BodyCellType option -> unit) =
-
         promise {
             //Write function to access current header state of excel
 
-            let! mainColumn = getArcMainColumn ()
+            let! mainColumn = tryGetArcMainColumnFromFrontEnd ()
 
             let result =
                 match mainColumn with
-                | x when x.Header.isInput -> None
-                | x when x.Header.isOutput -> None
-                | x when x.Cells.[0].isUnitized -> Model.BuildingBlock.BodyCellType.Unitized |> Some
-                | x when x.Cells.[0].isTerm -> Model.BuildingBlock.BodyCellType.Term |> Some
-                | x when x.Cells.[0].isFreeText -> Model.BuildingBlock.BodyCellType.Text |> Some
-                | x when x.Cells.[0].isData -> Model.BuildingBlock.BodyCellType.Data |> Some
+                | Some column when column.Header.isInput -> None
+                | Some column when column.Header.isOutput -> None
+                | Some column when column.Cells.[0].isUnitized -> Model.BuildingBlock.BodyCellType.Unitized |> Some
+                | Some column when column.Cells.[0].isTerm -> Model.BuildingBlock.BodyCellType.Term |> Some
+                | Some column when column.Cells.[0].isFreeText -> Model.BuildingBlock.BodyCellType.Text |> Some
+                | Some column when column.Cells.[0].isData -> Model.BuildingBlock.BodyCellType.Data |> Some
                 | _ -> None
 
             setState result

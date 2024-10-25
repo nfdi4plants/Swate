@@ -1,5 +1,6 @@
 module JsonExporter.Core
 
+open System
 open Fable.Core.JsInterop
 open Elmish
 
@@ -11,6 +12,15 @@ open Model
 open Messages
 
 open Browser.Dom
+
+open Feliz
+open Feliz.Bulma
+
+open ExcelJS.Fable
+open GlobalBindings
+
+open ARCtrl
+open ARCtrl.Spreadsheet
 
 let download(filename, text) =
   let element = document.createElement("a");
@@ -273,9 +283,6 @@ let download(filename, text) =
     //    ]
     //]
 
-open Feliz
-open Feliz.Bulma
-
 type private JsonExportState = {
     ExportFormat: JsonExportFormat
 } with
@@ -326,8 +333,19 @@ type FileExporter =
                                 Bulma.button.isFullWidth
                                 prop.text "Download"
                                 prop.onClick (fun _ ->
-                                    if model.SpreadsheetModel.ArcFile.IsSome then
-                                        SpreadsheetInterface.ExportJson (model.SpreadsheetModel.ArcFile.Value, state.ExportFormat) |> InterfaceMsg |> dispatch
+                                    let host = model.PersistentStorageState.Host
+                                    match host with
+                                    | Some Swatehost.Excel ->
+                                            promise {                     
+                                                let! result = OfficeInterop.Core.tryParseExcelMetadataToArcFile ()
+                                                match result with
+                                                | Result.Ok arcFile -> SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
+                                                | Result.Error msgs -> OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
+                                            } |> ignore
+                                    | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                                        if model.SpreadsheetModel.ArcFile.IsSome then
+                                            SpreadsheetInterface.ExportJson (model.SpreadsheetModel.ArcFile.Value, state.ExportFormat) |> InterfaceMsg |> dispatch
+                                    | _ -> failwith "not implemented"
                                 )
                             ]
                         ]
