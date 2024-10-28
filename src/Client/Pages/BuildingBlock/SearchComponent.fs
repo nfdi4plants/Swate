@@ -7,6 +7,7 @@ open Model.BuildingBlock
 open Model
 open Messages
 open ARCtrl
+open Shared
 
 let private termOrUnitizedSwitch (model:Model) dispatch =
         
@@ -16,16 +17,16 @@ let private termOrUnitizedSwitch (model:Model) dispatch =
         prop.style [style.flexWrap.nowrap; style.marginBottom 0; style.marginRight (length.rem 1)]
         prop.children [
             Bulma.button.a [
-                let isActive = state.BodyCellType = BodyCellType.Term
+                let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
                 if isActive then Bulma.color.isSuccess
-                prop.onClick (fun _ -> BuildingBlock.UpdateBodyCellType BodyCellType.Term |> BuildingBlockMsg |> dispatch)
+                prop.onClick (fun _ -> BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Term |> BuildingBlockMsg |> dispatch)
                 prop.classes ["pr-2 pl-2 mb-0"; if isActive then "is-selected"]
                 prop.text "Term"
             ]
             Bulma.button.a [
-                let isActive = state.BodyCellType = BodyCellType.Unitized
+                let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
                 if isActive then Bulma.color.isSuccess
-                prop.onClick (fun _ -> BuildingBlock.UpdateBodyCellType BodyCellType.Unitized |> BuildingBlockMsg |> dispatch)
+                prop.onClick (fun _ -> BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Unitized |> BuildingBlockMsg |> dispatch)
                 prop.classes ["pr-2 pl-2 mb-0"; if isActive then "is-selected"]
                 prop.text "Unit"
             ]

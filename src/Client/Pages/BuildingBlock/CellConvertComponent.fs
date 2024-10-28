@@ -4,10 +4,12 @@ open Feliz
 open Feliz.Bulma
 
 open OfficeInterop.Core
+open Shared
+open ARCtrl.Helper
 
 module private CellConvertComponentHelpers =
 
-    let getSelectedCellType (setState: Model.BuildingBlock.BodyCellType option -> unit) =
+    let getSelectedCellType (setState: CompositeCellDiscriminate option -> unit) =
         promise {
             //Write function to access current header state of excel
 
@@ -17,22 +19,22 @@ module private CellConvertComponentHelpers =
                 match mainColumn with
                 | Some column when column.Header.isInput -> None
                 | Some column when column.Header.isOutput -> None
-                | Some column when column.Cells.[0].isUnitized -> Model.BuildingBlock.BodyCellType.Unitized |> Some
-                | Some column when column.Cells.[0].isTerm -> Model.BuildingBlock.BodyCellType.Term |> Some
-                | Some column when column.Cells.[0].isFreeText -> Model.BuildingBlock.BodyCellType.Text |> Some
-                | Some column when column.Cells.[0].isData -> Model.BuildingBlock.BodyCellType.Data |> Some
+                | Some column when column.Cells.[0].isUnitized -> CompositeCellDiscriminate.Unitized |> Some
+                | Some column when column.Cells.[0].isTerm -> CompositeCellDiscriminate.Term |> Some
+                | Some column when column.Cells.[0].isFreeText -> CompositeCellDiscriminate.Text |> Some
+                | Some column when column.Cells.[0].isData -> CompositeCellDiscriminate.Data |> Some
                 | _ -> None
 
             setState result
         }
 
-    let getTargetConversionType (cellType: Model.BuildingBlock.BodyCellType option) =
+    let getTargetConversionType (cellType: CompositeCellDiscriminate option) =
         if cellType.IsSome then
             match cellType.Value with
-            | Model.BuildingBlock.BodyCellType.Unitized -> Model.BuildingBlock.BodyCellType.Term |> Some
-            | Model.BuildingBlock.BodyCellType.Term -> Model.BuildingBlock.BodyCellType.Unitized |> Some
-            | Model.BuildingBlock.BodyCellType.Text -> Model.BuildingBlock.BodyCellType.Data |> Some
-            | Model.BuildingBlock.BodyCellType.Data -> Model.BuildingBlock.BodyCellType.Text |> Some
+            | CompositeCellDiscriminate.Unitized -> CompositeCellDiscriminate.Term |> Some
+            | CompositeCellDiscriminate.Term -> CompositeCellDiscriminate.Unitized |> Some
+            | CompositeCellDiscriminate.Text -> CompositeCellDiscriminate.Data |> Some
+            | CompositeCellDiscriminate.Data -> CompositeCellDiscriminate.Text |> Some
         else None
 
 type CellConvertComponent =
@@ -40,7 +42,7 @@ type CellConvertComponent =
     [<ReactComponent>]
     static member Main () =
 
-        let (state: Model.BuildingBlock.BodyCellType option), setState = React.useState(None)
+        let (state: CompositeCellDiscriminate option), setState = React.useState(None)
 
         React.useEffectOnce(fun () ->
             CellConvertComponentHelpers.getSelectedCellType setState

@@ -36,8 +36,6 @@ let uploadButton (model:Model) dispatch =
                 let fileNames =
                     files |> List.map (fun f -> f.name)
 
-                Browser.Dom.console.log fileNames
-
                 fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
 
                 //let picker = Browser.Dom.document.getElementById(inputId)

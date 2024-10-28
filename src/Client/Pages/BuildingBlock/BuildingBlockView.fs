@@ -3,6 +3,7 @@ module BuildingBlock.Core
 open Model
 open Messages
 open Messages.BuildingBlock
+open Shared
 
 open Elmish
 
@@ -16,12 +17,12 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
         nextState, Cmd.none
     | UpdateHeaderCellType next ->
         let nextState = 
-            if Helper.isSameMajorHeaderCellType state.HeaderCellType next then
+            if Helper.isSameMajorCompositeHeaderDiscriminate state.HeaderCellType next then
                 { state with 
                     HeaderCellType = next 
                 }
             else
-                let nextBodyCellType = if next.IsTermColumn() then BuildingBlock.BodyCellType.Term else BuildingBlock.BodyCellType.Text
+                let nextBodyCellType = if next.IsTermColumn() then CompositeCellDiscriminate.Term else CompositeCellDiscriminate.Text
                 { state with 
                     HeaderCellType = next
                     BodyCellType = nextBodyCellType
@@ -35,7 +36,7 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
                 HeaderCellType = hct
                 HeaderArg = Some (Fable.Core.U2.Case2 iotype)
                 BodyArg = None
-                BodyCellType = BuildingBlock.BodyCellType.Text
+                BodyCellType = CompositeCellDiscriminate.Text
         }
         nextState, Cmd.none
     | UpdateBodyCellType next ->
