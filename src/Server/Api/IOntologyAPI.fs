@@ -12,7 +12,7 @@ module Helper =
 
     let getSearchModeFromQuery (query: string) =
         let searchTextLength = query.Length
-        let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+        let searchmode = if searchTextLength < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
         searchmode
 
     let getOntologiesModeFromList (ontologiesList: string list) =
@@ -23,47 +23,53 @@ module Helper =
         else
             Term.AnyOfOntology.Multiples ontologiesList |> Some
 
+
+    module V3 =
+        open ARCtrl.Helper.Regex.ActivePatterns
+
+        let searchSingleTerm credentials (content: TermQuery) =
+            async {
+                let dbSearchRes =
+                    match content.query.Trim() with
+                    | TermAnnotationShort taninfo ->
+                        Term.Term(credentials).getByAccession $"{taninfo.IDSpace}:{taninfo.LocalID}"
+                    // This suggests we search for a term name
+                    | notAnAccession ->
+                        let searchmode = content.searchMode |> Option.defaultWith (fun () -> getSearchModeFromQuery content.query)
+                        let ontologies = content.ontologies |> Option.defaultValue [] |> getOntologiesModeFromList 
+                        match content.parentTermId with
+                        | None ->
+                            Term.Term(credentials).getByName(notAnAccession, searchmode, ?limit=content.limit, ?sourceOntologyName = ontologies)
+                        | Some tan ->
+                            Term.Term(credentials).searchByParentStepwise(notAnAccession, tan, searchmode, ?limit=content.limit)
+                    |> Array.ofSeq
+                return dbSearchRes
+            }
+
 open Helper
 
 [<RequireQualifiedAccess>]
 module V3 =
-
-    open ARCtrl.Helper.Regex.ActivePatterns
 
     let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv3 =
         {
             //Development
             getTestNumber = 
                 fun () -> async { return 42 }
-            searchTerms = fun content -> 
+            searchTerm = fun content -> 
                 async {
-                    let dbSearchRes =
-                        match content.query with
-                        | TermAnnotationShort taninfo ->
-                            Term.Term(credentials).getByAccession $"{taninfo.IDSpace}:{taninfo.LocalID}"
-                        // This suggests we search for a term name
-                        | notAnAccession ->
-                            let searchmode = getSearchModeFromQuery content.query
-                            let ontologies = getOntologiesModeFromList content.ontologies
-                            Term.Term(credentials).getByName(notAnAccession, searchmode, ?sourceOntologyName = ontologies, limit=content.limit)
-                        |> Array.ofSeq
-                    return dbSearchRes
+                    let! results = Helper.V3.searchSingleTerm credentials content
+                    return results
                 }
-            searchTermsByParent = fun content ->
+            searchTerms = fun queries ->
                 async {
-                    let dbSearchRes =
-                        match content.query.Trim() with
-                        | TermAnnotationShort taninfo ->
-                            Term.Term(credentials).getByAccession $"{taninfo.IDSpace}:{taninfo.LocalID}"
-                        | notAnAccession ->
-                            let searchmode = getSearchModeFromQuery notAnAccession
-                            match content.parentTAN.Trim() with
-                            | "" ->
-                                Term.Term(credentials).getByName(notAnAccession, searchmode, limit=content.limit)
-                            | parentTAN ->
-                                Term.Term(credentials).searchByParentStepwise(notAnAccession, parentTAN, searchmode, limit=content.limit)
-                        |> Array.ofSeq
-                    return dbSearchRes
+                    let asyncQueries = [
+                        for query in queries do
+                            Helper.V3.searchSingleTerm credentials query
+                    ]
+                    let! results = asyncQueries |> Async.Parallel
+                    let zipped = Array.map2 (fun a b -> TermQueryResults.create(a,b)) queries results
+                    return zipped
                 }
             getTermById = fun id  ->
                 async {
@@ -117,7 +123,7 @@ module V1 =
                         // This suggests we search for a term name
                         | notAnAccession ->
                             let searchTextLength = typedSoFar.Length
-                            let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+                            let searchmode = if searchTextLength < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
                             Term.Term(credentials).getByName(notAnAccession, searchmode)
                         |> Array.ofSeq
                     let arr = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -131,7 +137,7 @@ module V1 =
                         | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Database.Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
-                            let searchmode = if typedSoFar.Length < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+                            let searchmode = if typedSoFar.Length < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
                             if parentTerm.TermAccession = ""
                             then
                                 Term.Term(credentials).getByNameAndParent_Name(typedSoFar, parentTerm.Name, searchmode)
@@ -158,9 +164,9 @@ module V1 =
                         | _ ->
                             if childTerm.TermAccession = ""
                             then
-                                Term.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name,Helper.FullTextSearch.PerformanceComplete)
+                                Term.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name,FullTextSearch.PerformanceComplete)
                             else
-                                Term.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession,Helper.FullTextSearch.PerformanceComplete)
+                                Term.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession,FullTextSearch.PerformanceComplete)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -209,10 +215,10 @@ module V1 =
                                 Term.TermQuery.getByAccession searchTerm.Term.TermAccession
                             // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
                             elif searchTerm.IsUnit then
-                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact, sourceOntologyName= Term.AnyOfOntology.Single "uo")
+                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=FullTextSearch.Exact, sourceOntologyName= Term.AnyOfOntology.Single "uo")
                             // if none of the above apply we do a standard term search
                             else
-                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact)
+                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=FullTextSearch.Exact)
                         )
                     let result =
                         Helper.Neo4j.runQueries(queries,credentials)
@@ -289,7 +295,7 @@ module V2 =
                         // This suggests we search for a term name
                         | notAnAccession ->
                             let searchTextLength = inp.query.Length
-                            let searchmode = if searchTextLength < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+                            let searchmode = if searchTextLength < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
                             Term.Term(credentials).getByName(notAnAccession, searchmode, ?sourceOntologyName = Option.map Term.AnyOfOntology.Single inp.ontology)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
@@ -307,7 +313,7 @@ module V2 =
                             Database.Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
                             printfn "[getTermSuggestionsByParentTerm] Hit default search"
-                            let searchmode = if inp.query.Length < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+                            let searchmode = if inp.query.Length < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
                             printfn "[getTermSuggestionsByParentTerm] searchmode: %A" searchmode
                             if inp.parent_term.TermAccession = ""
                             then
@@ -337,7 +343,7 @@ module V2 =
                         | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
-                            let searchmode = if inp.query.Length < 3 then Database.Helper.FullTextSearch.Exact else Database.Helper.FullTextSearch.PerformanceComplete
+                            let searchmode = if inp.query.Length < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
                             if inp.child_term.TermAccession = ""
                             then
                                 Term.Term(credentials).getByNameAndChild_Name (inp.query,inp.child_term.Name,searchmode)
@@ -392,10 +398,10 @@ module V2 =
                                 Term.TermQuery.getByAccession searchTerm.Term.TermAccession
                             // if term is a unit it should be contained inside the unit ontology, if not it is most likely free text input.
                             elif searchTerm.IsUnit then
-                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact, sourceOntologyName = Term.AnyOfOntology.Multiples ["uo"; "dpbo"])
+                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=FullTextSearch.Exact, sourceOntologyName = Term.AnyOfOntology.Multiples ["uo"; "dpbo"])
                             // if none of the above apply we do a standard term search
                             else
-                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=Helper.FullTextSearch.Exact)
+                                Term.TermQuery.getByName(searchTerm.Term.Name, searchType=FullTextSearch.Exact)
                         )
                     let result =
                         Helper.Neo4j.runQueries(queries,credentials)

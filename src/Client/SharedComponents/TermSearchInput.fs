@@ -5,6 +5,7 @@ open Feliz.Bulma
 open Browser.Types
 open ARCtrl
 open Shared
+open Shared.TermTypes
 open Fable.Core.JsInterop
 
 module TermSearchAux =
@@ -28,13 +29,15 @@ module TermSearchAux =
 
     let searchByName(query: string, setResults: TermTypes.Term [] -> unit) =
         async {
-            let! terms = Api.ontology.searchTerms {|limit = 10; ontologies = []; query=query|}
+            let query = TermQuery.create(query, 10)
+            let! terms = Api.ontology.searchTerm query
             setResults terms
         }
 
     let searchByParent(query: string, parentTAN: string, setResults: TermTypes.Term [] -> unit) =
         async {
-            let! terms = Api.ontology.searchTermsByParent {|limit = 50; parentTAN = parentTAN; query = query|}
+            let query = TermQuery.create(query, 50, parentTAN)
+            let! terms = Api.ontology.searchTerm query
             setResults terms
         }
 
