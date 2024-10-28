@@ -2,6 +2,7 @@ module Database.Term
 
 open Neo4j.Driver
 open Shared.TermTypes
+open Shared.Database
 open Helper
 open System.Text
 open System

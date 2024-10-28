@@ -128,19 +128,14 @@ type IOntologyAPIv2 = {
 
 type IOntologyAPIv3 = {
     // Development
-    getTestNumber : 
-        unit -> Async<int>
-    searchTerms: 
-        {| limit: int; query: string; ontologies: string list |}    -> Async<Term []>
-    /// ontologies currently unused
-    searchTermsByParent:
-        {| limit: int; query: string; parentTAN: string |}          -> Async<Term []>
-    getTermById:
-        string                                                      -> Async<Term option>
+    getTestNumber : unit -> Async<int>
+    searchTerm: TermQuery -> Async<Term []>
+    searchTerms: TermQuery[] -> Async<TermQueryResults[]>
+    getTermById: string -> Async<Term option>
 }
 
 type ITemplateAPIv1 = {
     // must return template as string, fable remoting cannot do conversion automatically
-    getTemplates                    : unit      -> Async<string> 
+    getTemplates                    : unit      -> Async<string>
     getTemplateById                 : string    -> Async<string>
 }

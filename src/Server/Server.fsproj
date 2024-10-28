@@ -10,7 +10,6 @@
     <Compile Include="Database\Helper.fs" />
     <Compile Include="Database\Ontology.fs" />
     <Compile Include="Database\Term.fs" />
-    <Compile Include="Database\Template.fs" />
     <Compile Include="Database\TreeSearch.fs" />
     <Compile Include="Api\Helper.fs" />
     <Compile Include="Api\IOntologyAPI.fs" />

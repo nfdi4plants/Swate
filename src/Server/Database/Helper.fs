@@ -2,47 +2,10 @@ module Database.Helper
 
 open System
 open Neo4j.Driver
-
-module Regex =
-    [<Literal>]
-    let EscapePattern = @"(?<!\\)[\+\-\&\&\|\|\!\(\)\{\}\[\]\^""\~\*\?\:]{1}"
+open Shared.Database
 
 let defaultOutputWith<'a> (def:'a) (neo4jReturnVal:obj) =
     if isNull neo4jReturnVal then def else neo4jReturnVal.As<'a>()
-
-
-/// <summary>
-/// Cypher full text search is based on Apache lucene syntax. Which in turn uses certain special characters to apply advanced logic to the query.
-/// This function escapes these special characters so they can be used in the query without being interpreted as special logic characters.
-///
-/// https://github.com/nfdi4plants/Swate/issues/491
-/// </summary>
-/// <param name="query"></param>
-let escapeQuery (query: string) =
-    let eval = System.Text.RegularExpressions.MatchEvaluator(fun m -> "\\" + m.Value)
-    let regex = System.Text.RegularExpressions.Regex(Regex.EscapePattern)
-    regex.Replace(query, eval)
-
-type FullTextSearch =
-| Exact
-| Complete
-| PerformanceComplete
-| Fuzzy
-with
-    member this.ofQueryString(queryString:string) =
-        let escaped = escapeQuery queryString
-        match this with
-        | Exact         -> queryString
-        | Complete      -> queryString + "*"
-        | PerformanceComplete ->
-            let singleWordArr = escaped.Split(" ", StringSplitOptions.RemoveEmptyEntries)
-            let count = singleWordArr.Length
-            singleWordArr
-            // add "+" to every word so the fulltext search must include the previous word, this highly improves search performance
-            |> Array.mapi (fun i str -> if i <> count-1 then "+" + str else str)
-            |> String.concat " "
-        | Fuzzy         -> queryString.Replace(" ","~ ") + "~"
-        |> fun x -> escaped, x
             
 type Neo4JCredentials = {
     User        : string
@@ -54,6 +17,39 @@ type Neo4JCredentials = {
     static member PwVarString = "DB_PASSWORD"
     static member UriVarString = "DB_URL"
     static member DBNameVarString = "DB_NAME"
+
+
+module Regex =
+    [<Literal>]
+    let EscapePattern = @"(?<!\\)[\+\-\&\&\|\|\!\(\)\{\}\[\]\^""\~\*\?\:]{1}"
+
+    /// <summary>
+    /// Cypher full text search is based on Apache lucene syntax. Which in turn uses certain special characters to apply advanced logic to the query.
+    /// This function escapes these special characters so they can be used in the query without being interpreted as special logic characters.
+    ///
+    /// https://github.com/nfdi4plants/Swate/issues/491
+    /// </summary>
+    /// <param name="query"></param>
+    let escapeQuery (query: string) =
+        let eval = System.Text.RegularExpressions.MatchEvaluator(fun m -> "\\" + m.Value)
+        let regex = System.Text.RegularExpressions.Regex(EscapePattern)
+        regex.Replace(query, eval)
+
+type FullTextSearch with
+    member this.ofQueryString(queryString:string) =
+        let escaped = Regex.escapeQuery queryString
+        match this with
+        | Exact         -> queryString
+        | Complete      -> queryString + "*"
+        | PerformanceComplete ->
+            let singleWordArr = escaped.Split(" ", System.StringSplitOptions.RemoveEmptyEntries)
+            let count = singleWordArr.Length
+            singleWordArr
+            // add "+" to every word so the fulltext search must include the previous word, this highly improves search performance
+            |> Array.mapi (fun i str -> if i <> count-1 then "+" + str else str)
+            |> String.concat " "
+        | Fuzzy         -> queryString.Replace(" ","~ ") + "~"
+        |> fun x -> escaped, x
 
 type Neo4j =
     
