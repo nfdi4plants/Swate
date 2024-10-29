@@ -13,7 +13,7 @@ open ARCtrl
 
 type private State =
     {
-        NextHeaderType: BuildingBlock.HeaderCellType option
+        NextHeaderType: CompositeHeaderDiscriminate option
         NextIOType: IOType option
     } with
         static member init() = {
@@ -37,33 +37,34 @@ module private EditColumnComponents =
             prop.onClick submit
         ]
 
-    let SelectHeaderTypeOption(headerType: BuildingBlock.HeaderCellType) =
+    let SelectHeaderTypeOption(headerType: CompositeHeaderDiscriminate) =
         let txt = headerType.ToString()
         Html.option [
             prop.value txt
             prop.text txt
         ]
 
-    let SelectHeaderType(state, setState) =
+    let SelectHeaderType(header, state, setState) =
         Bulma.select [
-            prop.onChange (fun (e: string) -> {state with NextHeaderType = Some (BuildingBlock.HeaderCellType.fromString e)} |> setState )
+            prop.value (header.ToString())
+            prop.onChange (fun (e: string) -> {state with NextHeaderType = Some (CompositeHeaderDiscriminate.fromString e)} |> setState )
             prop.children [
                 // -- term columns --
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Characteristic
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Component
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Factor
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Parameter
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.Characteristic
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.Component
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.Factor
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.Parameter
                 // -- io columns --
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Input
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Output
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.Input
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.Output
                 // -- single columns --
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Date
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.Performer
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolDescription
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolREF
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolType
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolUri
-                SelectHeaderTypeOption BuildingBlock.HeaderCellType.ProtocolVersion
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.Date
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.Performer
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolDescription
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolREF
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolType
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolUri
+                SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolVersion
             ]
         ]
 
@@ -136,43 +137,44 @@ let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
         match state.NextHeaderType, state.NextIOType with
         | None, _ -> column
         // -- term columns --
-        | Some BuildingBlock.HeaderCellType.Characteristic, _  ->
+        | Some CompositeHeaderDiscriminate.Characteristic, _  ->
             CompositeColumn.create(CompositeHeader.Characteristic (header.ToTerm()), cellsToTermCells(column))
-        | Some BuildingBlock.HeaderCellType.Parameter, _ ->
+        | Some CompositeHeaderDiscriminate.Parameter, _ ->
             CompositeColumn.create(CompositeHeader.Parameter (header.ToTerm()), cellsToTermCells(column))
-        | Some BuildingBlock.HeaderCellType.Component, _ ->
+        | Some CompositeHeaderDiscriminate.Component, _ ->
             CompositeColumn.create(CompositeHeader.Component (header.ToTerm()), cellsToTermCells(column))
-        | Some BuildingBlock.HeaderCellType.Factor, _ ->
+        | Some CompositeHeaderDiscriminate.Factor, _ ->
             CompositeColumn.create(CompositeHeader.Factor (header.ToTerm()), cellsToTermCells(column))
         // -- input columns --
-        | Some BuildingBlock.HeaderCellType.Input, Some IOType.Data ->
+        | Some CompositeHeaderDiscriminate.Input, Some IOType.Data ->
             CompositeColumn.create(CompositeHeader.Input IOType.Data, cellsToDataOrFreeText(column))
-        | Some BuildingBlock.HeaderCellType.Input, Some io ->
+        | Some CompositeHeaderDiscriminate.Input, Some io ->
             CompositeColumn.create(CompositeHeader.Input io, cellsToFreeText(column))
-        | Some BuildingBlock.HeaderCellType.Input, None ->
+        | Some CompositeHeaderDiscriminate.Input, None ->
             CompositeColumn.create(CompositeHeader.Input IOType.Sample, cellsToFreeText(column))
         // -- output columns --
-        | Some BuildingBlock.HeaderCellType.Output, Some IOType.Data ->
+        | Some CompositeHeaderDiscriminate.Output, Some IOType.Data ->
             CompositeColumn.create(CompositeHeader.Output IOType.Data, cellsToDataOrFreeText(column))
-        | Some BuildingBlock.HeaderCellType.Output, Some io ->
+        | Some CompositeHeaderDiscriminate.Output, Some io ->
             CompositeColumn.create(CompositeHeader.Output io, cellsToFreeText(column))
-        | Some BuildingBlock.HeaderCellType.Output, None ->
+        | Some CompositeHeaderDiscriminate.Output, None ->
             CompositeColumn.create(CompositeHeader.Output IOType.Sample, cellsToFreeText(column))
         // -- single columns --
-        | Some BuildingBlock.HeaderCellType.ProtocolREF, _ ->
+        | Some CompositeHeaderDiscriminate.ProtocolREF, _ ->
             CompositeColumn.create(CompositeHeader.ProtocolREF, cellsToFreeText(column))
-        | Some BuildingBlock.HeaderCellType.Date, _ ->
+        | Some CompositeHeaderDiscriminate.Date, _ ->
             CompositeColumn.create(CompositeHeader.Date, cellsToFreeText(column))
-        | Some BuildingBlock.HeaderCellType.Performer, _ ->
+        | Some CompositeHeaderDiscriminate.Performer, _ ->
             CompositeColumn.create(CompositeHeader.Performer, cellsToFreeText(column))
-        | Some BuildingBlock.HeaderCellType.ProtocolDescription, _ ->
+        | Some CompositeHeaderDiscriminate.ProtocolDescription, _ ->
             CompositeColumn.create(CompositeHeader.ProtocolDescription, cellsToFreeText(column))
-        | Some BuildingBlock.HeaderCellType.ProtocolType, _ ->
+        | Some CompositeHeaderDiscriminate.ProtocolType, _ ->
             CompositeColumn.create(CompositeHeader.ProtocolType, cellsToTermCells(column))
-        | Some BuildingBlock.HeaderCellType.ProtocolUri, _ ->
+        | Some CompositeHeaderDiscriminate.ProtocolUri, _ ->
             CompositeColumn.create(CompositeHeader.ProtocolUri, cellsToFreeText(column))
-        | Some BuildingBlock.HeaderCellType.ProtocolVersion, _ ->
+        | Some CompositeHeaderDiscriminate.ProtocolVersion, _ ->
             CompositeColumn.create(CompositeHeader.ProtocolVersion, cellsToFreeText(column))
+        | Some CompositeHeaderDiscriminate.Comment, _ -> failwith "Comment header type is not yet implemented"
     let submit (e) =
         let nxtCol = updateColumn column0
         Spreadsheet.SetColumn (columnIndex, nxtCol) |> SpreadsheetMsg |> dispatch
@@ -196,9 +198,9 @@ let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
                         Bulma.field.div [
                             Bulma.buttons [
                                 prop.children [
-                                    SelectHeaderType(state, setState)
+                                    SelectHeaderType(column0.Header.AsDiscriminate, state, setState)
                                     match state.NextHeaderType with
-                                    | Some BuildingBlock.HeaderCellType.Output | Some BuildingBlock.HeaderCellType.Input ->
+                                    | Some CompositeHeaderDiscriminate.Output | Some CompositeHeaderDiscriminate.Input ->
                                         SelectIOType(state, setState)
                                     | _ -> Html.none
                                 ]

@@ -4,10 +4,12 @@ open Feliz
 open Feliz.Bulma
 
 open OfficeInterop.Core
+open Shared
+open ARCtrl.Helper
 
 module private CellConvertComponentHelpers =
 
-    let getSelectedCellType (setState: Model.BuildingBlock.BodyCellType option -> unit) =
+    let getSelectedCellType (setState: CompositeCellDiscriminate option -> unit) =
         promise {
             //Write function to access current state of selected excel cell excel
             let! cellType = getSelectedCellType ()
@@ -22,7 +24,7 @@ module private CellConvertComponentHelpers =
             setState result
         }
 
-    let getTargetConversionType (cellType: Model.BuildingBlock.BodyCellType option) =
+    let getTargetConversionType (cellType: CompositeCellDiscriminate option) =
         if cellType.IsSome then
             match cellType.Value with
             | Model.BuildingBlock.BodyCellType.Unitized -> Some Model.BuildingBlock.BodyCellType.Term
@@ -36,7 +38,7 @@ type CellConvertComponent =
     [<ReactComponent>]
     static member Main () =
 
-        let (state: Model.BuildingBlock.BodyCellType option), setState = React.useState(None)
+        let (state: CompositeCellDiscriminate option), setState = React.useState(None)
 
         React.useEffectOnce(fun () ->
             CellConvertComponentHelpers.getSelectedCellType setState

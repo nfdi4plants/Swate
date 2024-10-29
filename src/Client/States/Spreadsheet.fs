@@ -81,6 +81,13 @@ type Model = {
             ActiveCell = None
             ArcFile = None
         }
+    member this.FileType =
+        match this.ArcFile with
+        | Some (Assay _) -> "Assay"
+        | Some (Study _) -> "Study"
+        | Some (Investigation _) -> "Investigation"
+        | Some (Template _) -> "Template"
+        | None -> "No File"
 
     static member init(arcFile: ArcFiles) =
         {

@@ -6,6 +6,7 @@ open Model.BuildingBlock
 open Model
 open Messages
 open ARCtrl
+open Shared
 
 
 [<ReactComponent>]
@@ -94,19 +95,19 @@ module private DropdownElements =
             ]
         ]
 
-    let createBuildingBlockDropdownItem (model: Model) dispatch setUiState (headerType: BuildingBlock.HeaderCellType) =
+    let createBuildingBlockDropdownItem (model: Model) dispatch setUiState (headerType: CompositeHeaderDiscriminate) =
         Bulma.dropdownItem.a [
             prop.onClick (fun e ->
                 e.stopPropagation()
-                Helper.selectHeaderCellType headerType setUiState dispatch
+                Helper.selectCompositeHeaderDiscriminate headerType setUiState dispatch
             )
             prop.onKeyDown(fun k ->
-                if (int k.which) = 13 then Helper.selectHeaderCellType headerType setUiState dispatch
+                if (int k.which) = 13 then Helper.selectCompositeHeaderDiscriminate headerType setUiState dispatch
             )
             prop.text (headerType.ToString())
         ]
 
-    let createIOTypeDropdownItem (model: Model) dispatch setUiState (headerType: BuildingBlock.HeaderCellType) (iotype: IOType) =
+    let createIOTypeDropdownItem (model: Model) dispatch setUiState (headerType: CompositeHeaderDiscriminate) (iotype: IOType) =
         let setIO (ioType) = 
             { DropdownPage = DropdownPage.Main; DropdownIsActive = false } |> setUiState
             (headerType,ioType) |> BuildingBlock.UpdateHeaderWithIO |> BuildingBlockMsg |> dispatch
@@ -128,15 +129,15 @@ module private DropdownElements =
     /// Main column types subpage for dropdown
     let dropdownContentMain state setState (model:Model) dispatch =
         [
-            DropdownPage.IOTypes BuildingBlock.HeaderCellType.Input |> createSubBuildingBlockDropdownLink state setState
+            DropdownPage.IOTypes CompositeHeaderDiscriminate.Input |> createSubBuildingBlockDropdownLink state setState
             Bulma.dropdownDivider []
-            BuildingBlock.HeaderCellType.Parameter      |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.Factor         |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.Characteristic |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.Component      |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.Parameter      |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.Factor         |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.Characteristic |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.Component      |> createBuildingBlockDropdownItem model dispatch setState
             Model.BuildingBlock.DropdownPage.More       |> createSubBuildingBlockDropdownLink state setState
             Bulma.dropdownDivider []
-            DropdownPage.IOTypes BuildingBlock.HeaderCellType.Output |> createSubBuildingBlockDropdownLink state setState
+            DropdownPage.IOTypes CompositeHeaderDiscriminate.Output |> createSubBuildingBlockDropdownLink state setState
             Bulma.dropdownItem.div [
                 prop.style [style.textAlign.right]
                 prop.children annotationsPrinciplesUrl
@@ -146,13 +147,13 @@ module private DropdownElements =
     /// Protocol Type subpage for dropdown
     let dropdownContentProtocolTypeColumns state setState (model:Model) dispatch =
         [
-            BuildingBlock.HeaderCellType.Date                |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.Performer           |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.ProtocolREF         |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.ProtocolType        |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.ProtocolUri         |> createBuildingBlockDropdownItem model dispatch setState
-            BuildingBlock.HeaderCellType.ProtocolVersion     |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.Date                |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.Performer           |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.ProtocolREF         |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.ProtocolType        |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.ProtocolUri         |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.ProtocolVersion     |> createBuildingBlockDropdownItem model dispatch setState
             // Navigation element back to main page
             backToMainDropdownButton setState
         ]
