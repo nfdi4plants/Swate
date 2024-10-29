@@ -19,11 +19,14 @@ let private FileName (model: Model) =
         | Some (ArcFiles.Investigation i) -> i.Identifier
         | Some (ArcFiles.Template t) -> t.FileName
         | _ -> ""
-    Html.div [
-        prop.className "text-white text-lg font-bold flex items-center max-w-[125px] p-2 truncate inline-block"
-        prop.text txt
-        prop.title txt
-    ]
+    match model.SpreadsheetModel.ArcFile with
+    | Some _ ->
+        Html.div [
+            prop.className "text-white text-lg font-bold flex items-center max-w-[125px] p-2 truncate inline-block"
+            prop.text txt
+            prop.title txt
+        ]
+    | None -> Html.none
 
 let private quickAccessButtonListStart (model: Model) (state: LocalHistory.Model) dispatch =
     Html.div [
