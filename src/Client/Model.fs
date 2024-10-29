@@ -181,78 +181,13 @@ open Fable.Core
 module BuildingBlock =
 
     open ARCtrl
-
-    [<RequireQualifiedAccess>]
-    type HeaderCellType =
-    | Component
-    | Characteristic
-    | Factor
-    | Parameter
-    | ProtocolType
-    | ProtocolDescription
-    | ProtocolUri
-    | ProtocolVersion
-    | ProtocolREF
-    | Performer
-    | Date
-    | Input
-    | Output
-    with
-        /// <summary>
-        /// Returns true if the Building Block is a term column
-        /// </summary>
-        member this.IsTermColumn() =
-            match this with
-            | Component
-            | Characteristic
-            | Factor
-            | Parameter 
-            | ProtocolType -> true
-            | _ -> false
-        member this.HasOA() =
-            match this with
-            | Component
-            | Characteristic
-            | Factor
-            | Parameter -> true
-            | _ -> false
-
-        member this.HasIOType() =
-            match this with
-            | Input 
-            | Output -> true
-            | _ -> false
-
-        static member fromString(str: string) =
-            match str with
-            | "Component"           -> Component
-            | "Characteristic"      -> Characteristic
-            | "Factor"              -> Factor
-            | "Parameter"           -> Parameter
-            | "ProtocolType"        -> ProtocolType
-            | "ProtocolDescription" -> ProtocolDescription
-            | "ProtocolUri"         -> ProtocolUri
-            | "ProtocolVersion"     -> ProtocolVersion
-            | "ProtocolREF"         -> ProtocolREF
-            | "Performer"           -> Performer
-            | "Date"                -> Date
-            | "Input"               -> Input
-            | "Output"              -> Output
-            | anyElse -> failwithf "BuildingBlock.HeaderCellType.fromString: '%s' is not a valid HeaderCellType" anyElse
-
-
-    [<RequireQualifiedAccess>]
-    type BodyCellType =
-    | Term
-    | Unitized
-    | Text
-    | Data
+    open ARCtrl.Helper
 
     [<RequireQualifiedAccess>]
     type DropdownPage =
     | Main
     | More
-    | IOTypes of HeaderCellType
+    | IOTypes of CompositeHeaderDiscriminate
 
         member this.toString =
             match this with
@@ -277,17 +212,17 @@ module BuildingBlock =
 
     type Model = {
 
-        HeaderCellType  : HeaderCellType
+        HeaderCellType  : CompositeHeaderDiscriminate
         HeaderArg       : U2<OntologyAnnotation,IOType> option
-        BodyCellType    : BodyCellType
+        BodyCellType    : CompositeCellDiscriminate
         BodyArg         : U2<string, OntologyAnnotation> option
 
     } with
         static member init () = {
 
-            HeaderCellType      = HeaderCellType.Parameter
+            HeaderCellType      = CompositeHeaderDiscriminate.Parameter
             HeaderArg           = None
-            BodyCellType        = BodyCellType.Term
+            BodyCellType        = CompositeCellDiscriminate.Term
             BodyArg             = None
         }
 

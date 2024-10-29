@@ -71,10 +71,10 @@ module BuildingBlock =
     open TermSearch
 
     type Msg =
-    | UpdateHeaderWithIO of BuildingBlock.HeaderCellType * IOType
-    | UpdateHeaderCellType of BuildingBlock.HeaderCellType
+    | UpdateHeaderWithIO of CompositeHeaderDiscriminate * IOType
+    | UpdateHeaderCellType of CompositeHeaderDiscriminate
     | UpdateHeaderArg of U2<OntologyAnnotation,IOType> option
-    | UpdateBodyCellType of BuildingBlock.BodyCellType
+    | UpdateBodyCellType of CompositeCellDiscriminate
     | UpdateBodyArg of U2<string, OntologyAnnotation> option
 
 module Protocol =

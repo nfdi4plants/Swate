@@ -4,6 +4,7 @@ open Shared.TermTypes
 open Feliz
 open Feliz.Bulma
 open ARCtrl
+open Shared
 
 type private State =
     | Loading
@@ -46,9 +47,9 @@ let Main (oa: OntologyAnnotation, dispatch) (rmv: _ -> unit) =
                         ]
                     ]
                     Bulma.modalCardBody [
-                        prop.className "has-text-justified"
+                        prop.className "content"
                         prop.children [
-                            Bulma.content [
+                            Html.div [
                                 match state with
                                 | Loading -> Html.p "loading .."
                                 | NotFound ->
@@ -56,15 +57,26 @@ let Main (oa: OntologyAnnotation, dispatch) (rmv: _ -> unit) =
                                         prop.dangerouslySetInnerHTML $"Unable to find term with id <b>{oa.TermAccessionShort}</b> in database."
                                     ]
                                 | Found term ->
-                                    Html.h6 "Description"
+                                    Html.h5 "Description"
                                     Html.p term.Description
-                                    Html.h6 "Source Ontology"
+                                    Html.h5 "Source Ontology"
                                     Html.p term.FK_Ontology
                                     if term.IsObsolete then
                                         Html.p [
                                             color.hasTextDanger
                                             prop.text "Obsolete"
-                                        ] 
+                                        ]
+                                    Html.a [
+                                        prop.className "space-x-2 float-right"
+                                        prop.href (OntologyAnnotation.fromTerm term |> _.TermAccessionOntobeeUrl)
+                                        prop.target.blank
+                                        prop.children [
+                                            Html.span "Ref"
+                                            Html.i [
+                                                prop.className "fas fa-external-link-alt"
+                                            ]
+                                        ]
+                                    ]
                             ]
                         ]
                     ]

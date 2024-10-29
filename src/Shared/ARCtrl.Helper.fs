@@ -133,6 +133,73 @@ module Helper =
             let updatedKey = (newColumnIndex, rowIndex)
             table.[updatedKey] <- value
 
+[<RequireQualifiedAccess>]
+type CompositeHeaderDiscriminate =
+| Component
+| Characteristic
+| Factor
+| Parameter
+| ProtocolType
+| ProtocolDescription
+| ProtocolUri
+| ProtocolVersion
+| ProtocolREF
+| Performer
+| Date
+| Input
+| Output
+| Comment
+with
+    /// <summary>
+    /// Returns true if the Building Block is a term column
+    /// </summary>
+    member this.IsTermColumn() =
+        match this with
+        | Component
+        | Characteristic
+        | Factor
+        | Parameter 
+        | ProtocolType -> true
+        | _ -> false
+    member this.HasOA() =
+        match this with
+        | Component
+        | Characteristic
+        | Factor
+        | Parameter -> true
+        | _ -> false
+
+    member this.HasIOType() =
+        match this with
+        | Input 
+        | Output -> true
+        | _ -> false
+
+    static member fromString(str: string) =
+        match str with
+        | "Component"           -> Component
+        | "Characteristic"      -> Characteristic
+        | "Factor"              -> Factor
+        | "Parameter"           -> Parameter
+        | "ProtocolType"        -> ProtocolType
+        | "ProtocolDescription" -> ProtocolDescription
+        | "ProtocolUri"         -> ProtocolUri
+        | "ProtocolVersion"     -> ProtocolVersion
+        | "ProtocolREF"         -> ProtocolREF
+        | "Performer"           -> Performer
+        | "Date"                -> Date
+        | "Input"               -> Input
+        | "Output"              -> Output
+        | "Comment"             -> Comment
+        | anyElse -> failwithf "BuildingBlock.HeaderCellType.fromString: '%s' is not a valid HeaderCellType" anyElse
+
+[<RequireQualifiedAccess>]
+type CompositeCellDiscriminate =
+| Term
+| Unitized
+| Text
+| Data
+
 [<AutoOpen>]
 module Extensions =
 
@@ -291,6 +358,23 @@ module Extensions =
             | CompositeHeader.Characteristic oa -> Some oa
             | CompositeHeader.Factor oa -> Some oa
             | _ -> None
+
+        member this.AsDiscriminate =
+            match this with
+            | CompositeHeader.Component _ -> CompositeHeaderDiscriminate.Component
+            | CompositeHeader.Characteristic _      -> CompositeHeaderDiscriminate.Characteristic
+            | CompositeHeader.Factor _              -> CompositeHeaderDiscriminate.Factor
+            | CompositeHeader.Parameter _           -> CompositeHeaderDiscriminate.Parameter
+            | CompositeHeader.ProtocolType          -> CompositeHeaderDiscriminate.ProtocolType
+            | CompositeHeader.ProtocolDescription   -> CompositeHeaderDiscriminate.ProtocolDescription
+            | CompositeHeader.ProtocolUri           -> CompositeHeaderDiscriminate.ProtocolUri
+            | CompositeHeader.ProtocolVersion       -> CompositeHeaderDiscriminate.ProtocolVersion
+            | CompositeHeader.ProtocolREF           -> CompositeHeaderDiscriminate.ProtocolREF
+            | CompositeHeader.Performer             -> CompositeHeaderDiscriminate.Performer
+            | CompositeHeader.Date                  -> CompositeHeaderDiscriminate.Date
+            | CompositeHeader.Input _               -> CompositeHeaderDiscriminate.Input
+            | CompositeHeader.Output _              -> CompositeHeaderDiscriminate.Output
+            | CompositeHeader.Comment _             -> CompositeHeaderDiscriminate.Comment
 
     type CompositeCell with
 

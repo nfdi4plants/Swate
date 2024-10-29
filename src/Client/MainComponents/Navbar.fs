@@ -9,14 +9,29 @@ open Messages
 open Components.QuickAccessButton
 open MainComponents
 open Model
+open Shared
 
-let private quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
+let private FileName (model: Model) =
+    let txt =
+        match model.SpreadsheetModel.ArcFile with
+        | Some (ArcFiles.Assay a) -> a.Identifier
+        | Some (ArcFiles.Study (s,_)) -> s.Identifier
+        | Some (ArcFiles.Investigation i) -> i.Identifier
+        | Some (ArcFiles.Template t) -> t.FileName
+        | _ -> ""
+    Html.div [
+        prop.className "text-white text-lg font-bold flex items-center max-w-[125px] p-2 truncate inline-block"
+        prop.text txt
+        prop.title txt
+    ]
+
+let private quickAccessButtonListStart (model: Model) (state: LocalHistory.Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
-            
+            FileName model
             QuickAccessButton.create(
                 "Back",
                 [
@@ -167,7 +182,7 @@ let Main(model: Model, dispatch, widgets, setWidgets) =
                     Bulma.navbarStart.div [
                         prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                         prop.children [
-                            quickAccessButtonListStart model.History dispatch
+                            quickAccessButtonListStart model model.History dispatch
                             WidgetNavbarList(model, dispatch, addWidget)
                         ]
                     ]
