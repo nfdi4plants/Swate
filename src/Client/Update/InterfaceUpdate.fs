@@ -14,6 +14,81 @@ open Shared
 open Fable.Core.JsInterop
 open Shared.ARCtrlHelper
 
+module private JsonImportHelper =
+
+    open ARCtrl
+    open JsonImport
+
+    let private submitWithMetadataMsg (uploadedFile: ArcFiles) (state: SelectiveImportModalState) =
+        if not state.ImportMetadata then failwith "Metadata must be imported"
+        let createUpdatedTables (arcTables: ResizeArray<ArcTable>) =
+            [
+                for it in state.ImportTables do
+                    let sourceTable = arcTables.[it.Index]
+                    let appliedTable = ArcTable.init(sourceTable.Name)
+                    appliedTable.Join(sourceTable, joinOptions=state.ImportType)
+                    appliedTable
+            ]
+            |> ResizeArray
+        let arcFile =
+            match uploadedFile with
+            | Assay a as arcFile->
+                let tables = createUpdatedTables a.Tables
+                a.Tables <- tables
+                arcFile
+            | Study (s,_) as arcFile ->
+                let tables = createUpdatedTables s.Tables
+                s.Tables <- tables
+                arcFile
+            | Template t as arcFile ->
+                let table = createUpdatedTables (ResizeArray[t.Table])
+                t.Table <- table.[0]
+                arcFile
+            | Investigation _ as arcFile ->
+                arcFile
+        [
+            SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg |> Cmd.ofMsg
+        ]
+
+    let private submitTablesMsgs (tables: ResizeArray<ArcTable>) (importState: SelectiveImportModalState) (activeTable: ArcTable) =
+        if importState.ImportTables.Length = 0 then
+            []
+        else
+            let addMsgs =
+                importState.ImportTables
+                |> Seq.filter (fun x -> x.FullImport)
+                |> Seq.map (fun x -> tables.[x.Index])
+                |> Seq.map (fun table ->
+                    let nTable = ArcTable.init(table.Name)
+                    nTable.Join(table, joinOptions=importState.ImportType)
+                    nTable
+                )
+                |> Seq.map (fun table -> SpreadsheetInterface.AddTable table |> InterfaceMsg |> Cmd.ofMsg)
+            let appendMsg =
+                let tables = importState.ImportTables |> Seq.filter (fun x -> not x.FullImport) |> Seq.map (fun x -> tables.[x.Index])
+                /// Everything will be appended against this table, which in the end will be appended to the main table
+                let tempTable = ArcTable.init("ThisIsAPlaceholder")
+                for table in tables do
+                    let preparedTemplate = Table.distinctByHeader tempTable table
+                    tempTable.Join(preparedTemplate, joinOptions=importState.ImportType)
+                let appendTable = Table.distinctByHeader activeTable tempTable
+                SpreadsheetInterface.JoinTable (appendTable, None, Some importState.ImportType) |> InterfaceMsg  |> Cmd.ofMsg
+            [
+                appendMsg
+                yield! addMsgs
+            ]
+
+    let submitMsgs (import: ArcFiles) (importState: SelectiveImportModalState) (activeTable: ArcTable) =
+        let tables =
+            match import with
+            | Assay a -> a.Tables
+            | Study (s,_) -> s.Tables
+            | Template t -> ResizeArray([t.Table])
+            | Investigation _ -> ResizeArray()
+        match importState.ImportMetadata with
+        | true -> submitWithMetadataMsg import importState
+        | false -> submitTablesMsgs tables importState activeTable
+
 /// This seems like such a hack :(
 module private ExcelHelper =
 
@@ -181,6 +256,14 @@ module Interface =
                     model, Cmd.none
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.ImportXlsx bytes |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
+            | ImportJson data ->
+                match host with
+                | Some Swatehost.Excel ->
+                    model, Cmd.none
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                    let cmd = JsonImportHelper.submitMsgs data.importedFile data.importState model.SpreadsheetModel.ActiveTable |> Cmd.batch
                     model, cmd
                 | _ -> failwith "not implemented"
             | InsertOntologyAnnotation termMinimal ->

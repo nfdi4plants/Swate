@@ -7,84 +7,7 @@ open Messages
 open Shared
 
 open ARCtrl
-
-[<RequireQualifiedAccess>]
-type private ImportTable = {
-    Index: int
-    /// If FullImport is true, the table will be imported in full, otherwise it will be appended to active table.
-    FullImport: bool
-}
-
-type private SelectiveImportModalState = {
-    ImportType: ARCtrl.TableJoinOptions
-    ImportMetadata: bool
-    ImportTables: ImportTable list
-} with
-    static member init() =
-        {
-            ImportType = ARCtrl.TableJoinOptions.Headers
-            ImportMetadata = false
-            ImportTables = []
-        }
-
-module private Helper =
-
-    let submitWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) (dispatch: Messages.Msg -> unit) =
-        if not state.ImportMetadata then failwith "Metadata must be imported"
-        let createUpdatedTables (arcTables: ResizeArray<ArcTable>) =
-            [
-                for it in state.ImportTables do
-                    let sourceTable = arcTables.[it.Index]
-                    let appliedTable = ArcTable.init(sourceTable.Name)
-                    appliedTable.Join(sourceTable, joinOptions=state.ImportType)
-                    appliedTable
-            ]
-            |> ResizeArray
-        let arcFile =
-            match uploadedFile with
-            | Assay a as arcFile->
-                let tables = createUpdatedTables a.Tables
-                a.Tables <- tables
-                arcFile
-            | Study (s,_) as arcFile ->
-                let tables = createUpdatedTables s.Tables
-                s.Tables <- tables
-                arcFile
-            | Template t as arcFile ->
-                let table = createUpdatedTables (ResizeArray[t.Table])
-                t.Table <- table.[0]
-                arcFile
-            | Investigation _ as arcFile ->
-                arcFile
-        SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg |> dispatch
-
-    let submitTables (tables: ResizeArray<ArcTable>) (importState: SelectiveImportModalState) (activeTable: ArcTable) (dispatch: Messages.Msg -> unit) =
-        if importState.ImportTables.Length = 0 then
-            ()
-        else
-            let addMsgs =
-                importState.ImportTables
-                |> Seq.filter (fun x -> x.FullImport)
-                |> Seq.map (fun x -> tables.[x.Index])
-                |> Seq.map (fun table ->
-                    let nTable = ArcTable.init(table.Name)
-                    nTable.Join(table, joinOptions=importState.ImportType)
-                    nTable
-                )
-                |> Seq.map (fun table -> SpreadsheetInterface.AddTable table |> InterfaceMsg)
-            let appendMsg =
-                let tables = importState.ImportTables |> Seq.filter (fun x -> not x.FullImport) |> Seq.map (fun x -> tables.[x.Index])
-                /// Everything will be appended against this table, which in the end will be appended to the main table
-                let tempTable = ArcTable.init("ThisIsAPlaceholder")
-                for table in tables do
-                    let preparedTemplate = Table.distinctByHeader tempTable table
-                    tempTable.Join(preparedTemplate, joinOptions=importState.ImportType)
-                let appendTable = Table.distinctByHeader activeTable tempTable
-                SpreadsheetInterface.JoinTable (appendTable, None, Some importState.ImportType) |> InterfaceMsg
-            appendMsg |> dispatch
-            if Seq.length addMsgs = 0 then () else addMsgs |> Seq.iter dispatch
-
-open Helper
+open JsonImport
 
 type SelectiveImportModal =
 
@@ -291,16 +214,14 @@ type SelectiveImportModal =
                                     let t = tables.[ti]
                                     SelectiveImportModal.TableImport(ti, t, state, addTableImport, rmvTableImport)
                             ]
-                        ]    
+                        ]
                         Bulma.modalCardFoot [
                             Bulma.button.button [
                                 color.isInfo
                                 prop.style [style.marginLeft length.auto]
                                 prop.text "Submit"
                                 prop.onClick(fun e ->
-                                    match state.ImportMetadata with
-                                    | true -> submitWithMetadata import state dispatch
-                                    | false -> submitTables tables state model.ActiveTable dispatch
+                                    {| importState = state; importedFile = import|} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
                                     rmv e
                                 )
                             ]

@@ -69,7 +69,7 @@ module private Helper =
 
 type TemplateFromFile =
 
-    static member private fileUploadButton (state:TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch)  =
+    static member private FileUploadButton (state:TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch)  =
         let uploadId = "UploadFiles_ElementId"
         Bulma.label [
             Bulma.fileInput [
@@ -127,7 +127,6 @@ type TemplateFromFile =
             | Some af ->
                 Modals.SelectiveImportModal.Main af model.SpreadsheetModel dispatch (fun _ -> TemplateFromFileState.init() |> setState)
             | None -> Html.none
-            //Modals.SelectiveImportModal.Main af.current model.SpreadsheetModel dispatch (fun _ -> TemplateFromFileState.init() |> setState)
             Bulma.field.div [
                 Bulma.help [
                     Html.b "Import JSON files."
@@ -159,6 +158,6 @@ type TemplateFromFile =
             ]
 
             Bulma.field.div [
-                TemplateFromFile.fileUploadButton(state, setState, dispatch)
+                TemplateFromFile.FileUploadButton(state, setState, dispatch)
             ]
         ]
