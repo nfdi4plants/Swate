@@ -318,7 +318,7 @@ let MainMetadata(model: Model, dispatch: Messages.Msg -> unit) =
         prop.children [
             Html.a  [
                 Bulma.icon [Html.i [prop.className "fa-solid fa-circle-info"]]
-                Html.text (model.SpreadsheetModel.FileType)
+                Html.text model.SpreadsheetModel.FileType
             ]
         ]
     ]
