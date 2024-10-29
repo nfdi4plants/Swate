@@ -9,36 +9,32 @@ open Feliz
 open Feliz.Bulma
 
 open Components.QuickAccessButton
-open Browser.Types
 open ARCtrl
 open ARCtrl.Spreadsheet
 open Shared
 open Components.Metadata
 
-open ExcelJS.Fable
-open GlobalBindings
-
 type private NavbarState = {
     BurgerActive: bool
     QuickAccessActive: bool
-    SwateExcelHandleMetadataModal: bool
+    ExcelMetadataModalActive: bool
 } with
-    static member init = {
+    static member init() = {
         BurgerActive = false
         QuickAccessActive = false
-        SwateExcelHandleMetadataModal = false
+        ExcelMetadataModalActive = false
     }
 
 type ExcelMetadataState = {
-    TopLevelMetadata: ArcFiles option
+    Metadata: ArcFiles option
     WorkSheetName: string option
 } with
-    static member init = {
-        TopLevelMetadata = None
+    static member init() = {
+        Metadata = None
         WorkSheetName = None
     }
 
-let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: Messages.Msg -> unit) =
+let AddMetaDataButtons excelMetadataType setExcelMetadataType (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.style [
             style.display.flex
@@ -52,7 +48,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     setExcelMetadataType {
                         excelMetadataType with
                             WorkSheetName = Some ArcInvestigation.metadataSheetName
-                            TopLevelMetadata = Some (ArcFiles.Investigation investigation)
+                            Metadata = Some (ArcFiles.Investigation investigation)
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcInvestigation.metadataSheetName)
                     |> OfficeInteropMsg
@@ -68,7 +64,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     setExcelMetadataType {
                         excelMetadataType with
                             WorkSheetName = Some ArcStudy.metadataSheetName
-                            TopLevelMetadata = Some (ArcFiles.Study (study, []))
+                            Metadata = Some (ArcFiles.Study (study, []))
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcStudy.metadataSheetName)
                     |> OfficeInteropMsg
@@ -84,7 +80,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     setExcelMetadataType {
                         excelMetadataType with
                             WorkSheetName = Some ArcAssay.metadataSheetName
-                            TopLevelMetadata = Some (ArcFiles.Assay assay)
+                            Metadata = Some (ArcFiles.Assay assay)
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcAssay.metadataSheetName)
                     |> OfficeInteropMsg
@@ -103,7 +99,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                     setExcelMetadataType {
                         excelMetadataType with
                             WorkSheetName = Some Template.metaDataSheetName
-                            TopLevelMetadata = Some (ArcFiles.Template template)
+                            Metadata = Some (ArcFiles.Template template)
                     }
                     OfficeInterop.CreateTopLevelMetadata(Template.metaDataSheetName)
                     |> OfficeInteropMsg
@@ -114,26 +110,140 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
         ]
     ]
 
-[<ReactComponent>]
-let private CreateMetadataDialog excelMetadataType setExcelMetadataType (ref: IRefValue<HTMLInputElement option>) (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
-    Html.div [
+let NoMetadataModalContent excelMetadataType setExcelMetadataType (dispatch: Messages.Msg -> unit) =
+    Bulma.box [
+        //prop.style [style.height 350]
         prop.children [
-            // Modal background to close the dialog
-            Bulma.modalBackground [
-                prop.ref ref
-            ]
-            // Modal content
-            Bulma.modalContent [
-                prop.onClick (fun ev -> ev.stopPropagation())
+            Bulma.title.h2 "Create Top Level Metadata"
+            Html.p "Choose one of the following top level meta data types to create"
+            AddMetaDataButtons excelMetadataType setExcelMetadataType dispatch
+        ]
+    ]
+
+let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal (dispatch: Messages.Msg -> unit) =
+     Bulma.box [
+        Bulma.color.hasBackgroundGreyLighter
+        prop.children [
+            match excelMetadataType with
+            | { Metadata = Some (ArcFiles.Assay assay)} ->
+                let setAssay (assay: ArcAssay) =
+                    setExcelMetadataType {
+                        excelMetadataType with
+                            WorkSheetName = Some ArcAssay.metadataSheetName
+                            Metadata = Some (ArcFiles.Assay assay)
+                    }
+                let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
+                    assay.DataMap <- dataMap
+                Assay.Main(assay, setAssay, setAssayDataMap)
+            | { Metadata = Some (ArcFiles.Study (study, assays))} ->
+                let setStudy (study: ArcStudy, assays: ArcAssay list) =
+                    setExcelMetadataType {
+                        excelMetadataType with
+                            WorkSheetName = Some ArcStudy.metadataSheetName
+                            Metadata = Some (ArcFiles.Study (study, assays))
+                    }
+                let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
+                    study.DataMap <- dataMap
+                Study.Main(study, assays, setStudy, setStudyDataMap)
+            | { Metadata = Some (ArcFiles.Investigation investigation)} ->
+                let setInvestigation (investigation: ArcInvestigation) =
+                    setExcelMetadataType {
+                        excelMetadataType with
+                            WorkSheetName = Some ArcInvestigation.metadataSheetName
+                            Metadata = Some (ArcFiles.Investigation investigation)
+                    }
+                Investigation.Main(investigation, setInvestigation)
+            | { Metadata = Some (ArcFiles.Template template)} ->
+                let setTemplate (template: Template) =
+                    setExcelMetadataType {
+                        excelMetadataType with
+                            WorkSheetName = Some Template.metaDataSheetName
+                            Metadata = Some (ArcFiles.Template template)
+                    }
+                Template.Main(template, setTemplate)
+            | _ -> Html.none
+            Html.div [
+                prop.style [
+                    style.display.flex
+                    style.justifyContent.center
+                    style.alignItems.center
+                ]
                 prop.children [
                     Bulma.box [
-                        prop.style [style.height 350]
+                        prop.className "flex flex-col gap-4 items-center justify-center"
+                        prop.style [
+                            style.width 480
+                        ]
                         prop.children [
-                            Bulma.title.h2 "Create Top Level Metadata"
-                            Html.p "Choose one of the following top level meta data types to create"
-                            createMetaDataTypeButtons excelMetadataType setExcelMetadataType dispatch
+                            Bulma.button.a [
+                                Bulma.color.isPrimary
+                                prop.style [
+                                    style.width 250
+                                ]
+                                prop.text "Update Metadata Type"
+                                prop.onClick (fun _ ->
+                                    if excelMetadataType.Metadata.IsSome then
+                                        OfficeInterop.UpdateTopLevelMetadata(excelMetadataType.Metadata.Value)
+                                        |> OfficeInteropMsg
+                                        |> dispatch
+                                        closeModal()
+                                    else
+                                        logw ("Tried updating metadata sheet without given metadata")
+                                )
+                            ]
+                            Bulma.button.a [
+                                Bulma.color.isDanger
+                                prop.style [
+                                    style.width 250
+                                ]
+                                prop.text "Delete Metadata Type"
+                                prop.onClick (fun _ ->
+                                    OfficeInterop.DeleteTopLevelMetadata
+                                    |> OfficeInteropMsg
+                                    |> dispatch
+                                    closeModal()
+                                )
+                            ]
                         ]
                     ]
+                ]
+            ]
+        ]
+    ]
+
+// Define a modal dialog component
+[<ReactComponent>]
+let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
+    let (excelMetadataType, setExcelMetadataType) = React.useState(ExcelMetadataState.init)
+    React.useEffectOnce(fun _ ->
+        promise {
+            let! result = OfficeInterop.Core.tryParseExcelMetadataToArcFileWihoutTables ()
+            match result with
+            | Result.Ok (arcFile, workSheetName) ->
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some arcFile
+                        WorkSheetName = Some workSheetName
+                }
+            | Result.Error _ -> ()
+        } |> Promise.start
+    )
+    Bulma.modal [
+        // Add the "is-active" class to display the modal
+        Bulma.modal.isActive
+        prop.children [
+            Bulma.modalBackground [
+                prop.onClick (fun _ -> closeModal())
+            ]
+            Bulma.modalContent [
+                prop.className "overflow-y-auto"
+                prop.onClick (fun ev -> ev.stopPropagation())
+                prop.children [
+                    match excelMetadataType.Metadata with
+                    | None ->
+                        NoMetadataModalContent excelMetadataType setExcelMetadataType dispatch
+                    | Some metadata ->
+                        UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal dispatch
                 ]
             ]
             // Close button in the top-right corner
@@ -144,133 +254,8 @@ let private CreateMetadataDialog excelMetadataType setExcelMetadataType (ref: IR
         ]
     ]
 
-// Define a modal dialog component
-let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
-    let ref = React.useInputRef()
-    Bulma.modal [
-        if isActive then
-            // Add the "is-active" class to display the modal
-            Bulma.modal.isActive
-            if excelMetadataType.TopLevelMetadata.IsNone then
-                prop.children [
-                    CreateMetadataDialog excelMetadataType setExcelMetadataType ref closeModal dispatch
-                ]
-            else
-                prop.children [
-                    Bulma.modalBackground [
-                        prop.ref ref
-                    ]
-                    Bulma.modalContent [
-                        prop.className "overflow-y-auto h-full"
-                        prop.onClick (fun ev -> ev.stopPropagation())
-                        prop.children [
-                            Bulma.box [
-                                Bulma.color.hasBackgroundGreyLighter
-                                prop.children [
-                                    if excelMetadataType.TopLevelMetadata.IsSome then
-                                        match excelMetadataType.TopLevelMetadata.Value with
-                                        | ArcFiles.Assay assay ->
-                                            let setAssay (assay: ArcAssay) =
-                                                setExcelMetadataType {
-                                                    excelMetadataType with
-                                                        WorkSheetName = Some ArcAssay.metadataSheetName
-                                                        TopLevelMetadata = Some (ArcFiles.Assay assay)
-                                                }
-                                            let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
-                                                assay.DataMap <- dataMap
-                                            Assay.Main(assay, setAssay, setAssayDataMap)
-                                        | ArcFiles.Study (study, assays) ->
-                                            let setStudy (study: ArcStudy, assays: ArcAssay list) =
-                                                setExcelMetadataType {
-                                                    excelMetadataType with
-                                                        WorkSheetName = Some ArcStudy.metadataSheetName
-                                                        TopLevelMetadata = Some (ArcFiles.Study (study, assays))
-                                                }
-                                            let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
-                                                study.DataMap <- dataMap
-                                            Study.Main(study, assays, setStudy, setStudyDataMap)
-                                        | ArcFiles.Investigation investigation ->
-                                            let setInvestigation (investigation: ArcInvestigation) =
-                                                setExcelMetadataType {
-                                                    excelMetadataType with
-                                                        WorkSheetName = Some ArcInvestigation.metadataSheetName
-                                                        TopLevelMetadata = Some (ArcFiles.Investigation investigation)
-                                                }
-                                            Investigation.Main(investigation, setInvestigation)
-                                        | ArcFiles.Template template ->
-                                            let setTemplate (template: Template) =
-                                                setExcelMetadataType {
-                                                    excelMetadataType with
-                                                        WorkSheetName = Some Template.metaDataSheetName
-                                                        TopLevelMetadata = Some (ArcFiles.Template template)
-                                                }
-                                            Template.Main(template, setTemplate)
-                                    else Html.none
-                                    Html.div [
-                                        prop.style [
-                                            style.display.flex
-                                            style.justifyContent.center
-                                            style.alignItems.center
-                                        ]
-                                        prop.children [
-                                            Bulma.box [
-                                                prop.style [
-                                                    style.display.flex
-                                                    style.justifyContent.center
-                                                    style.alignItems.center
-                                                    style.flexDirection.column  // Stack buttons vertically
-                                                    style.gap 20                // Optional: add space between buttons
-                                                    style.width 480
-                                                ]
-                                                prop.children [
-                                                    Bulma.button.a [
-                                                        Bulma.color.isPrimary
-                                                        prop.style [
-                                                            style.width 250
-                                                        ]
-                                                        prop.text "Update Metadata Type"
-                                                        prop.onClick (fun _ ->
-                                                            OfficeInterop.UpdateTopLevelMetadata(excelMetadataType.TopLevelMetadata.Value)
-                                                            |> OfficeInteropMsg
-                                                            |> dispatch
-                                                            closeModal()
-                                                        )
-                                                    ]
-                                                    Bulma.button.a [
-                                                        Bulma.color.isDanger
-                                                        prop.style [
-                                                            style.width 250
-                                                        ]
-                                                        prop.text "Delete Metadata Type"
-                                                        prop.onClick (fun _ ->
-                                                            OfficeInterop.DeleteTopLevelMetadata
-                                                            |> OfficeInteropMsg
-                                                            |> dispatch
-                                                            setExcelMetadataType(ExcelMetadataState.init)
-                                                            closeModal()
-                                                        )
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                    // Close button in the top-right corner
-                    Bulma.modalClose [
-                        prop.onClick (fun _ ->
-                            closeModal())
-                    ]
-                ]
-    ]
-
-[<ReactComponent>]
-let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
-    let (isModalActive, setModalActive) = React.useState(NavbarState.init)
-    let (excelMetadataType, setExcelMetadataType) = React.useState(ExcelMetadataState.init)
-
+let private ShortCutIconList navState setNavState model (dispatch: Messages.Msg -> unit) =
+    let inline toggleModal _ = { navState with ExcelMetadataModalActive = not navState.ExcelMetadataModalActive } |> setNavState
     [
         QuickAccessButton.create(
             "Create Metadata",
@@ -278,32 +263,13 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
                 Html.i [prop.className "fa-solid fa-plus"]
                 Html.i [prop.className "fa-solid fa-info"]
                 Html.div [
-                    selectModalDialog
-                        isModalActive.SwateExcelHandleMetadataModal
-                        excelMetadataType
-                        setExcelMetadataType
-                        (fun () -> setModalActive(
-                            if
-                                excelMetadataType.WorkSheetName.IsNone then NavbarState.init
-                            else
-                                { isModalActive with SwateExcelHandleMetadataModal = not isModalActive.SwateExcelHandleMetadataModal }))
-                        dispatch
+                    if navState.ExcelMetadataModalActive then
+                        SelectModalDialog
+                            toggleModal
+                            dispatch
                 ]
             ],
-            (fun _ ->
-                setModalActive { isModalActive with SwateExcelHandleMetadataModal = not isModalActive.SwateExcelHandleMetadataModal }
-                promise {
-                    let! result = OfficeInterop.Core.tryParseExcelMetadataToArcFileWihoutTables ()
-                    match result with
-                    | Result.Ok (arcFile, workSheetName) ->
-                        setExcelMetadataType {
-                            excelMetadataType with
-                                TopLevelMetadata = Some arcFile
-                                WorkSheetName = Some workSheetName
-                        }
-                    | Result.Error _ -> setExcelMetadataType(ExcelMetadataState.init)
-                } |> ignore
-            )
+            toggleModal
         )
 
         QuickAccessButton.create(
@@ -419,10 +385,10 @@ let private quickAccessDropdownElement model dispatch (state: NavbarState) (setS
         ]
     ]
 
-let private quickAccessListElement model dispatch =
+let private QuickAccessListElement navState setNavState model dispatch =
     Html.div [
         prop.style [style.display.flex; style.flexDirection.row]
-        prop.children (shortCutIconList model dispatch)
+        prop.children (ShortCutIconList navState setNavState model dispatch)
     ]
 
 [<ReactComponent>]
@@ -459,7 +425,7 @@ let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) (sidebarsi
                             | WindowSize.Mini, Some Swatehost.Excel ->
                                 quickAccessDropdownElement model dispatch state setState false
                             | _, Some Swatehost.Excel ->
-                                quickAccessListElement model dispatch
+                                QuickAccessListElement state setState model dispatch
                             | _,_ -> Html.none
 
                             Bulma.navbarBurger [
@@ -541,7 +507,7 @@ let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) (sidebarsi
             if state.QuickAccessActive && sidebarsize = WindowSize.Mini then
                 Bulma.navbarBrand.div [
                     prop.style [style.flexGrow 1; style.display.flex]
-                    shortCutIconList model dispatch |> prop.children
+                    ShortCutIconList state setState model dispatch |> prop.children
                 ]
         ]
     ]
