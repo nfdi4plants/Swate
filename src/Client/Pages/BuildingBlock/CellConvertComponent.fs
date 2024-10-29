@@ -5,7 +5,6 @@ open Feliz.Bulma
 
 open OfficeInterop.Core
 open Shared
-open ARCtrl.Helper
 
 module private CellConvertComponentHelpers =
 
@@ -14,23 +13,16 @@ module private CellConvertComponentHelpers =
             //Write function to access current state of selected excel cell excel
             let! cellType = getSelectedCellType ()
 
-            let result =
-                match cellType with
-                | Some BodyCellType.Unitized -> Some Model.BuildingBlock.BodyCellType.Unitized
-                | Some BodyCellType.Term -> Some Model.BuildingBlock.BodyCellType.Term
-                | Some BodyCellType.Text -> Some Model.BuildingBlock.BodyCellType.Text
-                | Some BodyCellType.Data -> Some Model.BuildingBlock.BodyCellType.Data
-                | _ -> None
-            setState result
+            setState cellType
         }
 
     let getTargetConversionType (cellType: CompositeCellDiscriminate option) =
         if cellType.IsSome then
             match cellType.Value with
-            | Model.BuildingBlock.BodyCellType.Unitized -> Some Model.BuildingBlock.BodyCellType.Term
-            | Model.BuildingBlock.BodyCellType.Term -> Some Model.BuildingBlock.BodyCellType.Unitized
-            | Model.BuildingBlock.BodyCellType.Text -> Some Model.BuildingBlock.BodyCellType.Data
-            | Model.BuildingBlock.BodyCellType.Data -> Some Model.BuildingBlock.BodyCellType.Text
+            | CompositeCellDiscriminate.Unitized -> Some CompositeCellDiscriminate.Term
+            | CompositeCellDiscriminate.Term -> Some CompositeCellDiscriminate.Unitized
+            | CompositeCellDiscriminate.Text -> Some CompositeCellDiscriminate.Data
+            | CompositeCellDiscriminate.Data -> Some CompositeCellDiscriminate.Text
         else None
 
 type CellConvertComponent =

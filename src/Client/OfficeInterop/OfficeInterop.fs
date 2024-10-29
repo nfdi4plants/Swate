@@ -1756,16 +1756,9 @@ let deleteSelectedExcelColumns (selectedColumns: seq<int>) (excelTable: Table) =
 /// </summary>
 /// <param name="column"></param>
 let convertToFreeTextCell (arcTable: ArcTable) (columnIndex: int) (column: CompositeColumn) rowIndex =
-    let header = column.Header
     let freeTextCell = column.Cells.[rowIndex].ToFreeTextCell()
-    let newHeader =
-        match header with
-        | header when header.isOutput -> CompositeHeader.Output (IOType.FreeText (header.ToString()))
-        | header when header.isInput -> CompositeHeader.Input (IOType.FreeText (header.ToString()))
-        | _ -> CompositeHeader.FreeText (header.ToString())
     arcTable.UpdateCellAt(columnIndex, rowIndex, freeTextCell, true)
-    arcTable.UpdateHeader(columnIndex, newHeader, false)
-    
+
 /// <summary>
 /// Convert the body of the given column into data
 /// </summary>
@@ -1804,7 +1797,7 @@ let convertToTermCell (column: CompositeColumn) rowIndex =
 /// <param name="newBB"></param>
 /// <param name="table"></param>
 /// <param name="context"></param>
-let addBuildingBlockCellAt (excelIndex: int) (newBB: CompositeColumn) (table: Table) (context: RequestContext) =
+let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table: Table) (context: RequestContext) =
     promise {
         let headers = table.getHeaderRowRange()
         let _ = headers.load(U2.Case2 (ResizeArray [|"values"|]))
@@ -1833,12 +1826,6 @@ let addBuildingBlockCellAt (excelIndex: int) (newBB: CompositeColumn) (table: Ta
         |> List.iteri (fun ci header -> ExcelHelper.addColumnAndRows (float (excelIndex + ci)) table header bodyValues.[ci] |> ignore)
     }
 
-type BodyCellType =
-| Term
-| Unitized
-| Text
-| Data
-
 let getSelectedCellType () =
     Excel.run(fun context ->
         promise {
@@ -1850,17 +1837,15 @@ let getSelectedCellType () =
                 let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
                 let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable.Value context
 
-                if (arcMainColumn.Validate false) && rowIndex > 0 then
+                if rowIndex > 0 then
 
                     let result =
                         match arcMainColumn with
-                        | amc when amc.Header.ToString() = "Output [Sample Name]" -> None
-                        | amc when amc.Header.ToString() = "Input [Source Name]" -> None
-                        | amc when amc.Cells.[(int rowIndex) - 1].isUnitized -> Some BodyCellType.Unitized
-                        | amc when amc.Cells.[(int rowIndex) - 1].isTerm -> Some BodyCellType.Term
-                        | amc when amc.Cells.[(int rowIndex) - 1].isData -> Some BodyCellType.Data
-                        | amc when amc.Header.isInput && amc.Cells.[(int rowIndex) - 1].isFreeText -> Some BodyCellType.Text
-                        | amc when amc.Header.isOutput && amc.Cells.[(int rowIndex) - 1].isFreeText -> Some BodyCellType.Text
+                        | amc when amc.Cells.[(int rowIndex) - 1].isUnitized -> Some CompositeCellDiscriminate.Unitized
+                        | amc when amc.Cells.[(int rowIndex) - 1].isTerm -> Some CompositeCellDiscriminate.Term
+                        | amc when amc.Cells.[(int rowIndex) - 1].isData -> Some CompositeCellDiscriminate.Data
+                        | amc when amc.Header.isInput && amc.Header.IsDataColumn && amc.Cells.[(int rowIndex) - 1].isFreeText -> Some CompositeCellDiscriminate.Text
+                        | amc when amc.Header.isOutput && amc.Header.IsDataColumn && amc.Cells.[(int rowIndex) - 1].isFreeText -> Some CompositeCellDiscriminate.Text
                         | _ -> None
 
                     return result
@@ -1925,17 +1910,6 @@ let convertBuildingBlock () =
                 let newTableRange = excelTable.getRange()
                 let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["values";  "columnCount"]))
 
-                let test =
-                    newExcelTableValues
-                    |> Array.ofSeq
-                    |> Array.map (fun item ->
-                        item
-                        |> Array.ofSeq
-                        |> Array.map(fun itemi ->
-                            itemi.Value.ToString()
-                        )
-                    )
-
                 do! context.sync().``then``(fun _ ->
                     excelTable.delete()
                     newTableRange.values <- newExcelTableValues
@@ -1954,7 +1928,11 @@ let convertBuildingBlock () =
                     newTable.style <- style
                 )
 
-                do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+                let! newTable = tryGetActiveAnnotationTable context
+
+                match newTable with
+                | Result.Ok table -> do! ExcelHelper.adoptTableFormats(table, context, true)
+                | _ -> ()
 
                 let msg =
                     if String.IsNullOrEmpty(msgText) then $"Converted building block of {snd selectedBuildingBlock.[0]} to unit"
