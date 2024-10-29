@@ -9,30 +9,26 @@ module private CellConvertComponentHelpers =
 
     let getSelectedCellType (setState: Model.BuildingBlock.BodyCellType option -> unit) =
         promise {
-            //Write function to access current header state of excel
-
-            let! mainColumn = tryGetArcMainColumnFromFrontEnd ()
+            //Write function to access current state of selected excel cell excel
+            let! cellType = getSelectedCellType ()
 
             let result =
-                match mainColumn with
-                | Some column when column.Header.isInput -> None
-                | Some column when column.Header.isOutput -> None
-                | Some column when column.Cells.[0].isUnitized -> Model.BuildingBlock.BodyCellType.Unitized |> Some
-                | Some column when column.Cells.[0].isTerm -> Model.BuildingBlock.BodyCellType.Term |> Some
-                | Some column when column.Cells.[0].isFreeText -> Model.BuildingBlock.BodyCellType.Text |> Some
-                | Some column when column.Cells.[0].isData -> Model.BuildingBlock.BodyCellType.Data |> Some
+                match cellType with
+                | Some BodyCellType.Unitized -> Some Model.BuildingBlock.BodyCellType.Unitized
+                | Some BodyCellType.Term -> Some Model.BuildingBlock.BodyCellType.Term
+                | Some BodyCellType.Text -> Some Model.BuildingBlock.BodyCellType.Text
+                | Some BodyCellType.Data -> Some Model.BuildingBlock.BodyCellType.Data
                 | _ -> None
-
             setState result
         }
 
     let getTargetConversionType (cellType: Model.BuildingBlock.BodyCellType option) =
         if cellType.IsSome then
             match cellType.Value with
-            | Model.BuildingBlock.BodyCellType.Unitized -> Model.BuildingBlock.BodyCellType.Term |> Some
-            | Model.BuildingBlock.BodyCellType.Term -> Model.BuildingBlock.BodyCellType.Unitized |> Some
-            | Model.BuildingBlock.BodyCellType.Text -> Model.BuildingBlock.BodyCellType.Data |> Some
-            | Model.BuildingBlock.BodyCellType.Data -> Model.BuildingBlock.BodyCellType.Text |> Some
+            | Model.BuildingBlock.BodyCellType.Unitized -> Some Model.BuildingBlock.BodyCellType.Term
+            | Model.BuildingBlock.BodyCellType.Term -> Some Model.BuildingBlock.BodyCellType.Unitized
+            | Model.BuildingBlock.BodyCellType.Text -> Some Model.BuildingBlock.BodyCellType.Data
+            | Model.BuildingBlock.BodyCellType.Data -> Some Model.BuildingBlock.BodyCellType.Text
         else None
 
 type CellConvertComponent =
