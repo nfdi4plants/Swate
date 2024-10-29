@@ -6,6 +6,7 @@ open Feliz.Bulma
 open OfficeInterop.Core
 open Shared
 open ARCtrl.Helper
+open ExcelJS.Fable.GlobalBindings
 
 module private CellConvertComponentHelpers =
 
@@ -44,7 +45,7 @@ type CellConvertComponent =
 
         let (state: CompositeCellDiscriminate option), setState = React.useState(None)
 
-        React.useEffectOnce(fun () ->
+        React.useLayoutEffectOnce(fun () ->
             CellConvertComponentHelpers.getSelectedCellType setState
             |> Promise.start
         )
