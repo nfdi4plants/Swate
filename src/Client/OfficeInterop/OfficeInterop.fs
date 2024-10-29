@@ -1666,30 +1666,62 @@ let getArcMainColumn (excelTable: Table) (arcTable: ArcTable) (context: RequestC
     }
 
 /// <summary>
-/// Get the valid cell type for the conversion based on input cell type
+/// Get the cell type of the selected cell
 /// </summary>
-/// <param name="cellType"></param>
-let getValidConversionCellType (cellType: CompositeCellDiscriminate option) =
+let getSelectedCellType () =
     Excel.run(fun context ->
         promise {
             let! result = tryGetActiveAnnotationTable context
+
             match result with
             | Result.Ok excelTable ->
+                let! _, rowIndex = getSelectedBuildingBlockCell excelTable context
                 let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
                 let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable.Value context
 
-                return
-                    match cellType with
-                    | Some CompositeCellDiscriminate.Unitized -> Some CompositeCellDiscriminate.Term
-                    | Some CompositeCellDiscriminate.Term -> Some CompositeCellDiscriminate.Unitized
-                    | Some CompositeCellDiscriminate.Data -> Some CompositeCellDiscriminate.Text
-                    | Some CompositeCellDiscriminate.Text ->
-                        if (arcMainColumn.Header.isInput || arcMainColumn.Header.isOutput) && arcMainColumn.Header.IsDataColumn then
-                            Some CompositeCellDiscriminate.Data
-                        else None
-                    | _ -> None
+                if rowIndex > 0 then
+                    return
+                        match arcMainColumn with
+                        | amc when amc.Cells.[(int rowIndex) - 1].isUnitized -> Some CompositeCellDiscriminate.Unitized
+                        | amc when amc.Cells.[(int rowIndex) - 1].isTerm -> Some CompositeCellDiscriminate.Term
+                        | amc when amc.Cells.[(int rowIndex) - 1].isData -> Some CompositeCellDiscriminate.Data
+                        | amc when amc.Cells.[(int rowIndex) - 1].isFreeText -> Some CompositeCellDiscriminate.Text
+                        | _ -> None
+                else return None
 
             | Result.Error _ -> return None
+        }
+    )
+
+/// <summary>
+/// Get the valid cell type for the conversion based on input cell type
+/// </summary>
+/// <param name="cellType"></param>
+let getValidConversionCellTypes () =
+    Excel.run(fun context ->
+        promise {
+            let! result = tryGetActiveAnnotationTable context
+
+            match result with
+            | Result.Ok excelTable ->
+                let! _, rowIndex = getSelectedBuildingBlockCell excelTable context
+                let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
+                let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable.Value context
+
+                if rowIndex > 0 then
+                    return
+                        match arcMainColumn with
+                        | amc when amc.Cells.[(int rowIndex) - 1].isUnitized -> (Some CompositeCellDiscriminate.Unitized, Some CompositeCellDiscriminate.Term)
+                        | amc when amc.Cells.[(int rowIndex) - 1].isTerm -> (Some CompositeCellDiscriminate.Term, Some CompositeCellDiscriminate.Unitized)
+                        | amc when amc.Cells.[(int rowIndex) - 1].isData -> (Some CompositeCellDiscriminate.Data, Some CompositeCellDiscriminate.Text)
+                        | amc when amc.Cells.[(int rowIndex) - 1].isFreeText ->
+                            if (arcMainColumn.Header.isInput || arcMainColumn.Header.isOutput) && arcMainColumn.Header.IsDataColumn then
+                                (Some CompositeCellDiscriminate.Text, Some CompositeCellDiscriminate.Data)
+                            else
+                                (Some CompositeCellDiscriminate.Data, None)
+                        | _ -> (None, None)
+                else return (None, None)
+            | Result.Error _ -> return (None, None)
         }
     )
 
@@ -1851,34 +1883,6 @@ let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table: Table)
         headers
         |> List.iteri (fun ci header -> ExcelHelper.addColumnAndRows (float (excelIndex + ci)) table header bodyValues.[ci] |> ignore)
     }
-
-/// <summary>
-/// Get the cell type of the selected cell
-/// </summary>
-let getSelectedCellType () =
-    Excel.run(fun context ->
-        promise {
-            let! result = tryGetActiveAnnotationTable context
-
-            match result with
-            | Result.Ok excelTable ->
-                let! _, rowIndex = getSelectedBuildingBlockCell excelTable context
-                let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
-                let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable.Value context
-
-                if rowIndex > 0 then
-                    return
-                        match arcMainColumn with
-                        | amc when amc.Cells.[(int rowIndex) - 1].isUnitized -> Some CompositeCellDiscriminate.Unitized
-                        | amc when amc.Cells.[(int rowIndex) - 1].isTerm -> Some CompositeCellDiscriminate.Term
-                        | amc when amc.Cells.[(int rowIndex) - 1].isData -> Some CompositeCellDiscriminate.Data
-                        | amc when amc.Cells.[(int rowIndex) - 1].isFreeText -> Some CompositeCellDiscriminate.Text
-                        | _ -> None
-                else return None
-
-            | Result.Error _ -> return None
-        }
-    )
 
 /// <summary>
 /// This function is used to convert building blocks that can be converted. Data building blocks can be converted into free text, free text into data,
