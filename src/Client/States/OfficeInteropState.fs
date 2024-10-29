@@ -4,6 +4,7 @@ open Shared
 open ARCtrl
 open TermTypes
 open OfficeInteropTypes
+open JsonImport
 
 type FillHiddenColsState =
 | Inactive
