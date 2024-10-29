@@ -70,7 +70,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                             WorkSheetName = Some ArcStudy.metadataSheetName
                             TopLevelMetadata = Some (ArcFiles.Study (study, []))
                     }
-                    OfficeInterop.CreateTopLevelMetadata(ArcStudy.metadataSheetName)                            
+                    OfficeInterop.CreateTopLevelMetadata(ArcStudy.metadataSheetName)
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -105,7 +105,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
                             WorkSheetName = Some Template.metaDataSheetName
                             TopLevelMetadata = Some (ArcFiles.Template template)
                     }
-                    OfficeInterop.CreateTopLevelMetadata(Template.metaDataSheetName)                            
+                    OfficeInterop.CreateTopLevelMetadata(Template.metaDataSheetName)
                     |> OfficeInteropMsg
                     |> dispatch
                 )
@@ -117,7 +117,7 @@ let createMetaDataTypeButtons excelMetadataType setExcelMetadataType (dispatch: 
 [<ReactComponent>]
 let private CreateMetadataDialog excelMetadataType setExcelMetadataType (ref: IRefValue<HTMLInputElement option>) (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
     Html.div [
-        prop.children [            
+        prop.children [
             // Modal background to close the dialog
             Bulma.modalBackground [
                 prop.ref ref
@@ -219,8 +219,8 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                                                     style.justifyContent.center
                                                     style.alignItems.center
                                                     style.flexDirection.column  // Stack buttons vertically
-                                                    style.gap 20                // Optional: add space between buttons                                                
-                                                    style.width 480                                                
+                                                    style.gap 20                // Optional: add space between buttons
+                                                    style.width 480
                                                 ]
                                                 prop.children [
                                                     Bulma.button.a [
@@ -266,10 +266,12 @@ let selectModalDialog (isActive: bool) excelMetadataType setExcelMetadataType (c
                 ]
     ]
 
+[<ReactComponent>]
 let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
+    let (isModalActive, setModalActive) = React.useState(NavbarState.init)
+    let (excelMetadataType, setExcelMetadataType) = React.useState(ExcelMetadataState.init)
+
     [
-        let (isModalActive, setModalActive) = React.useState(NavbarState.init)
-        let (excelMetadataType, setExcelMetadataType) = React.useState(ExcelMetadataState.init)
         QuickAccessButton.create(
             "Create Metadata",
             [
@@ -339,7 +341,7 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
                 Html.i [prop.className "fa-solid fa-pen"]
             ],
             (fun _ ->
-                SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch                
+                SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch
             )
         )
         QuickAccessButton.create(
@@ -360,13 +362,9 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
             (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
         )
     ]
+    |> List.map (fun x -> x.toReactElement())
+    |> React.fragment
 
-let private navbarShortCutIconList model dispatch =
-    [
-        for icon in shortCutIconList model dispatch do
-            yield
-                icon.toReactElement()
-    ]
 
 let private quickAccessDropdownElement model dispatch (state: NavbarState) (setState: NavbarState -> unit) (isSndNavbar:bool) =
     Bulma.navbarItem.div [
@@ -424,7 +422,7 @@ let private quickAccessDropdownElement model dispatch (state: NavbarState) (setS
 let private quickAccessListElement model dispatch =
     Html.div [
         prop.style [style.display.flex; style.flexDirection.row]
-        prop.children (navbarShortCutIconList model dispatch)
+        prop.children (shortCutIconList model dispatch)
     ]
 
 [<ReactComponent>]
@@ -543,7 +541,7 @@ let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) (sidebarsi
             if state.QuickAccessActive && sidebarsize = WindowSize.Mini then
                 Bulma.navbarBrand.div [
                     prop.style [style.flexGrow 1; style.display.flex]
-                    navbarShortCutIconList model dispatch |> prop.children
+                    shortCutIconList model dispatch |> prop.children
                 ]
         ]
     ]
