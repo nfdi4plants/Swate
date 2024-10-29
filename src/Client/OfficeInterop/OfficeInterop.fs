@@ -1828,7 +1828,7 @@ let addBuildingBlockCellAt (excelIndex: int) (newBB: CompositeColumn) (table: Ta
                 bc
                 |> Array.ofSeq
                 |> Array.map (fun br -> [|U3<bool, string, float>.Case2 br|] :> IList<U3<bool, string, float>>))
-                ""
+
         headers
         |> List.iteri (fun ci header -> ExcelHelper.addColumnAndRows (float (excelIndex + ci)) table header bodyValues.[ci] |> ignore)
     }
