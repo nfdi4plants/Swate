@@ -1587,9 +1587,7 @@ let addAnnotationBlockHandler (newBB: CompositeColumn) =
 /// <param name="selectedIndex"></param>
 let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
     promise {
-
         let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
-
         let headerRange = table.getHeaderRowRange()
         let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
 
@@ -1632,6 +1630,68 @@ let getSelectedBuildingBlockCell (table: Table) (context: RequestContext) =
             selectedBuildingBlock, selectedRange.rowIndex
         )
     }
+
+/// <summary>
+/// Get the main column of the arc table of the selected building block of the active annotation table
+/// </summary>
+let getArcMainColumn (excelTable: Table) (arcTable: ArcTable) (context: RequestContext) =
+    promise {
+        let! selectedBlock = getSelectedBuildingBlock excelTable context
+
+        let protoHeaders = excelTable.getHeaderRowRange()
+        let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let headers = protoHeaders.values.Item 0 |> Array.ofSeq |> Array.map (fun c -> c.ToString())
+
+        let arcTableIndices = (groupToBuildingBlocks headers) |> Array.ofSeq |> Array.map (fun i -> i |> Array.ofSeq)
+
+        let arcTableIndex =
+            let potResult = arcTableIndices |> Array.mapi (fun i c -> i, c |> Array.tryFind (fun (_, s) -> s = snd selectedBlock.[0]))
+            let result = potResult |> Array.filter (fun (_, c) -> c.IsSome) |> Array.map (fun (i, c) -> i, c.Value)
+            Array.tryHead result
+
+        let arcTableIndex, columnName =
+            if arcTableIndex.IsSome then
+                fst arcTableIndex.Value, snd (snd arcTableIndex.Value)
+            else failwith "Could not find a fitting arc table index"
+
+        let targetColumn =
+            let potColumn = arcTable.GetColumn arcTableIndex
+            if columnName.Contains(potColumn.Header.ToString()) then potColumn
+            else failwith "Could not find a fitting arc table index with matchin name"
+
+        return (targetColumn, arcTableIndex)
+    }
+
+/// <summary>
+/// Get the valid cell type for the conversion based on input cell type
+/// </summary>
+/// <param name="cellType"></param>
+let getValidConversionCellType (cellType: CompositeCellDiscriminate option) =
+    Excel.run(fun context ->
+        promise {
+            let! result = tryGetActiveAnnotationTable context
+            match result with
+            | Result.Ok excelTable ->
+                let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
+                let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable.Value context
+
+                return
+                    match cellType with
+                    | Some CompositeCellDiscriminate.Unitized -> Some CompositeCellDiscriminate.Term
+                    | Some CompositeCellDiscriminate.Term -> Some CompositeCellDiscriminate.Unitized
+                    | Some CompositeCellDiscriminate.Data -> Some CompositeCellDiscriminate.Text
+                    | Some CompositeCellDiscriminate.Text ->
+                        if (arcMainColumn.Header.isInput || arcMainColumn.Header.isOutput) && arcMainColumn.Header.IsDataColumn then
+                            Some CompositeCellDiscriminate.Data
+                        else None
+                    | _ -> None
+
+            | Result.Error _ -> return None
+        }
+    )
 
 /// <summary>
 /// Select a building block, shifted by adaptedIndex from the selected building block
@@ -1687,40 +1747,6 @@ let removeSelectedAnnotationBlock () =
             | Result.Error msgs -> return msgs
         }
     )
-
-/// <summary>
-/// Get the main column of the arc table of the selected building block of the active annotation table
-/// </summary>
-let getArcMainColumn (excelTable: Table) (arcTable: ArcTable) (context: RequestContext)=
-    promise {
-        let! selectedBlock = getSelectedBuildingBlock excelTable context
-
-        let protoHeaders = excelTable.getHeaderRowRange()
-        let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
-
-        do! context.sync().``then``(fun _ -> ())
-
-        let headers = protoHeaders.values.Item 0 |> Array.ofSeq |> Array.map (fun c -> c.ToString())
-
-        let arcTableIndices = (groupToBuildingBlocks headers) |> Array.ofSeq |> Array.map (fun i -> i |> Array.ofSeq)
-
-        let arcTableIndex =
-            let potResult = arcTableIndices |> Array.mapi (fun i c -> i, c |> Array.tryFind (fun (_, s) -> s = snd selectedBlock.[0]))
-            let result = potResult |> Array.filter (fun (_, c) -> c.IsSome) |> Array.map (fun (i, c) -> i, c.Value)
-            Array.tryHead result
-
-        let arcTableIndex, columnName =
-            if arcTableIndex.IsSome then
-                fst arcTableIndex.Value, snd (snd arcTableIndex.Value)
-            else failwith "Could not find a fitting arc table index"
-
-        let targetColumn =
-            let potColumn = arcTable.GetColumn arcTableIndex
-            if columnName.Contains(potColumn.Header.ToString()) then potColumn
-            else failwith "Could not find a fitting arc table index with matchin name"
-
-        return (targetColumn, arcTableIndex)
-    }
 
 /// <summary>
 /// Get the main column of the arc table of the selected building block of the active annotation table
@@ -1826,6 +1852,9 @@ let addBuildingBlockAt (excelIndex: int) (newBB: CompositeColumn) (table: Table)
         |> List.iteri (fun ci header -> ExcelHelper.addColumnAndRows (float (excelIndex + ci)) table header bodyValues.[ci] |> ignore)
     }
 
+/// <summary>
+/// Get the cell type of the selected cell
+/// </summary>
 let getSelectedCellType () =
     Excel.run(fun context ->
         promise {
@@ -1838,17 +1867,13 @@ let getSelectedCellType () =
                 let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable.Value context
 
                 if rowIndex > 0 then
-
-                    let result =
+                    return
                         match arcMainColumn with
                         | amc when amc.Cells.[(int rowIndex) - 1].isUnitized -> Some CompositeCellDiscriminate.Unitized
                         | amc when amc.Cells.[(int rowIndex) - 1].isTerm -> Some CompositeCellDiscriminate.Term
                         | amc when amc.Cells.[(int rowIndex) - 1].isData -> Some CompositeCellDiscriminate.Data
-                        | amc when amc.Header.isInput && amc.Header.IsDataColumn && amc.Cells.[(int rowIndex) - 1].isFreeText -> Some CompositeCellDiscriminate.Text
-                        | amc when amc.Header.isOutput && amc.Header.IsDataColumn && amc.Cells.[(int rowIndex) - 1].isFreeText -> Some CompositeCellDiscriminate.Text
+                        | amc when amc.Cells.[(int rowIndex) - 1].isFreeText -> Some CompositeCellDiscriminate.Text
                         | _ -> None
-
-                    return result
                 else return None
 
             | Result.Error _ -> return None

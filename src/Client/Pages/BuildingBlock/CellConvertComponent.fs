@@ -6,34 +6,42 @@ open Feliz.Bulma
 open OfficeInterop.Core
 open Shared
 
-module private CellConvertComponentHelpers =
-
-    let getSelectedCellType (setState: CompositeCellDiscriminate option -> unit) =
-        promise {
-            //Write function to access current state of selected excel cell excel
-            let! cellType = getSelectedCellType ()
-
-            setState cellType
+type CellDiscriminateState = {
+        SelectedCellState: CompositeCellDiscriminate option
+        TargetCellState: CompositeCellDiscriminate option
+    } with
+        static member init = {
+            SelectedCellState = None
+            TargetCellState = None
         }
 
-    let getTargetConversionType (cellType: CompositeCellDiscriminate option) =
-        if cellType.IsSome then
-            match cellType.Value with
-            | CompositeCellDiscriminate.Unitized -> Some CompositeCellDiscriminate.Term
-            | CompositeCellDiscriminate.Term -> Some CompositeCellDiscriminate.Unitized
-            | CompositeCellDiscriminate.Text -> Some CompositeCellDiscriminate.Data
-            | CompositeCellDiscriminate.Data -> Some CompositeCellDiscriminate.Text
-        else None
+module private CellConvertComponentHelpers =
+
+    let setCellTypes (state: CellDiscriminateState) (setState: CellDiscriminateState -> unit) =
+        promise {
+            //Write function to access current state of selected excel cell excel
+            let! selectedCellType = getSelectedCellType ()
+
+            if selectedCellType.IsSome then
+                let! targetCellType = getValidConversionCellType (selectedCellType)
+
+                setState {
+                    state with
+                        SelectedCellState = selectedCellType
+                        TargetCellState = targetCellType
+                }
+        }
 
 type CellConvertComponent =
 
     [<ReactComponent>]
     static member Main () =
 
-        let (state: CompositeCellDiscriminate option), setState = React.useState(None)
-
+        //let (state: CompositeCellDiscriminate option), setState = React.useState(None)
+        //let (targetState: CompositeCellDiscriminate option), setTargetState = React.useState(None)
+        let (cellDiscriminateState, setCellDiscriminateState) = React.useState(CellDiscriminateState.init)
         React.useEffectOnce(fun () ->
-            CellConvertComponentHelpers.getSelectedCellType setState
+            CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
             |> Promise.start
         )
 
@@ -43,27 +51,26 @@ type CellConvertComponent =
                 Bulma.button.button [
                     Bulma.color.isSuccess
                     prop.text "Refresh"
-                    prop.onClick (fun _ -> CellConvertComponentHelpers.getSelectedCellType setState |> Promise.start)                    
+                    prop.onClick (fun _ ->
+                        CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState |> Promise.start
+                    )                    
                 ]
-                Html.div (string state)
+                Html.div (string cellDiscriminateState.SelectedCellState)
             ]
             Bulma.buttons [
                 Bulma.button.button [                    
-                    if state.IsSome then
+                    if cellDiscriminateState.TargetCellState.IsSome then
                         Bulma.color.isSuccess
                         prop.disabled false
-                        prop.text $"Convert {state.Value} to"
-
-
-
+                        prop.text $"Convert {cellDiscriminateState.SelectedCellState.Value} to"
                     else
                         Bulma.color.isDanger
                         prop.disabled true
                         prop.text $"Unconvertible"
                     prop.onClick (fun _ ->
-                        CellConvertComponentHelpers.getSelectedCellType setState |> ignore
+                        CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState |> Promise.start
                         convertBuildingBlock () |> Promise.start)                    
                 ]
-                Html.div (string (CellConvertComponentHelpers.getTargetConversionType state))
+                Html.div (string cellDiscriminateState.TargetCellState)
             ]
         ]
