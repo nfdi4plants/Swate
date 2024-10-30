@@ -308,7 +308,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
 let MainMetadata(model: Model, dispatch: Messages.Msg -> unit) =
     let id = "Metadata-Tab"
     let nav = Spreadsheet.ActiveView.Metadata
-    let order = nav.TableIndex
+    let order = nav.ViewIndex
     Bulma.tab [
         if model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
         prop.key id
@@ -327,7 +327,7 @@ let MainMetadata(model: Model, dispatch: Messages.Msg -> unit) =
 let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
     let id = "Metadata-Tab"
     let nav = Spreadsheet.ActiveView.DataMap
-    let order = nav.TableIndex
+    let order = nav.ViewIndex
     Bulma.tab [
         if model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
         prop.key id
