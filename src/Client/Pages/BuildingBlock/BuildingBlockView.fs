@@ -87,11 +87,24 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
             mainFunctionContainer [
                 SearchComponent.Main model dispatch
             ]
-            if model.PersistentStorageState.Host.IsSome && model.PersistentStorageState.Host.Value = Swatehost.Excel then
-                // Input forms, etc related to add building block.
-                Bulma.label "Convert existing Building Block."
-                mainFunctionContainer [
-                    CellConvertComponent.Main ()
-                ]
+            Bulma.button.button [
+                prop.onClick(fun _ ->
+                    let term = Shared.TermTypes.TermQuery.create("instrument model", searchMode = Database.FullTextSearch.Exact)
+                    let terms = [|Shared.TermTypes.TermQuery.create("instrument model", searchMode = Database.FullTextSearch.Exact)|]
+                    async {
+                        let! terms = Api.ontology.searchTerm term
+                        log terms
+                    }
+                    |> Async.StartImmediate
+                )
+                prop.text "Click"
+            ]
+            //match model.PersistentStorageState.Host with
+            //| Some Swatehost.Excel ->
+            //    Bulma.label "Convert existing Building Block."
+            //    mainFunctionContainer [
+            //        CellConvertComponent.Main ()
+            //    ]
+            //| _ -> Html.none
         ]
     ]
