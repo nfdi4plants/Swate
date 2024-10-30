@@ -4,6 +4,7 @@ open Shared
 open TermTypes
 
 open ARCtrl
+open JsonImport
 
 ///<summary>This type is used to interface between standalone, electron and excel logic and will forward the command to the correct logic.</summary>
 type Msg =
@@ -27,6 +28,7 @@ type Msg =
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
 | ImportXlsx of byte []
+| ImportJson of {|importState: SelectiveImportModalState; importedFile: ArcFiles|}
 /// Starts chain to export active table to isa json
 | ExportJson of ArcFiles * JsonExportFormat
 | UpdateUnitForCells

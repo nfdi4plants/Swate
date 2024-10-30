@@ -97,15 +97,22 @@ module Spreadsheet =
                 let options = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
                 let msg = fun t -> JoinTable(t, index, options) |> SpreadsheetMsg
                 let cmd =
-                        Table.selectiveTablePrepare state.ActiveTable table
-                        |> msg                     
-                        |> Cmd.ofMsg
+                    Table.selectiveTablePrepare state.ActiveTable table
+                    |> msg                     
+                    |> Cmd.ofMsg
                 state, model, cmd
             | JoinTable (table, index, options) ->
                 let nextState = Controller.BuildingBlocks.joinTable table index options state
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
-                let nextState = { state with ArcFile = Some arcFile }
+                let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid
+                let nextState =
+                    if reset then
+                        Spreadsheet.Model.init(arcFile)
+                    else 
+                        { state with 
+                            ArcFile = Some arcFile
+                        }
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
                 let nextState = Spreadsheet.Model.init(arcFile)

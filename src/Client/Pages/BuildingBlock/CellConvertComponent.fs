@@ -34,13 +34,7 @@ type CellConvertComponent =
     [<ReactComponent>]
     static member Main () =
 
-        //let (state: CompositeCellDiscriminate option), setState = React.useState(None)
-        //let (targetState: CompositeCellDiscriminate option), setTargetState = React.useState(None)
         let (cellDiscriminateState, setCellDiscriminateState) = React.useState(CellDiscriminateState.init)
-        React.useEffectOnce(fun () ->
-            CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
-            |> Promise.start
-        )
 
         Html.div [
             

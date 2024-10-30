@@ -22,6 +22,18 @@ module ARCtrlHelper =
         | Assay         of ArcAssay
 
     with
+        member this.HasTableAt(index: int) =
+            match this with
+            | Template _ -> index = 0 // Template always has exactly one table 
+            | Investigation i -> false
+            | Study (s,_) -> s.TableCount <= index
+            | Assay a -> a.TableCount <= index
+        member this.HasDataMap() =
+            match this with
+            | Template _ -> false
+            | Investigation i -> false
+            | Study (s,_) -> s.DataMap.IsSome
+            | Assay a -> a.DataMap.IsSome
         member this.Tables() : ArcTables =
             match this with
             | Template t -> ResizeArray([t.Table]) |> ArcTables

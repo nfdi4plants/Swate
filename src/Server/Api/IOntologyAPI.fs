@@ -23,7 +23,6 @@ module Helper =
         else
             Term.AnyOfOntology.Multiples ontologiesList |> Some
 
-
     module V3 =
         open ARCtrl.Helper.Regex.ActivePatterns
 
@@ -37,11 +36,12 @@ module Helper =
                     | notAnAccession ->
                         let searchmode = content.searchMode |> Option.defaultWith (fun () -> getSearchModeFromQuery content.query)
                         let ontologies = content.ontologies |> Option.defaultValue [] |> getOntologiesModeFromList 
-                        match content.parentTermId with
-                        | None ->
-                            Term.Term(credentials).getByName(notAnAccession, searchmode, ?limit=content.limit, ?sourceOntologyName = ontologies)
-                        | Some tan ->
-                            Term.Term(credentials).searchByParentStepwise(notAnAccession, tan, searchmode, ?limit=content.limit)
+                        if content.parentTermId.IsSome then
+                            Term.Term(credentials).searchByParentStepwise(notAnAccession, content.parentTermId.Value, searchmode, ?limit=content.limit)
+                        elif searchmode = Database.FullTextSearch.Exact then
+                            Term.Term(credentials).getByName(notAnAccession)
+                        else
+                            Term.Term(credentials).searchByName(notAnAccession, searchmode, ?limit=content.limit, ?sourceOntologyName = ontologies)
                     |> Array.ofSeq
                 return dbSearchRes
             }
@@ -124,7 +124,7 @@ module V1 =
                         | notAnAccession ->
                             let searchTextLength = typedSoFar.Length
                             let searchmode = if searchTextLength < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
-                            Term.Term(credentials).getByName(notAnAccession, searchmode)
+                            Term.Term(credentials).searchByName(notAnAccession, searchmode)
                         |> Array.ofSeq
                     let arr = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
                     return arr
@@ -197,7 +197,7 @@ module V1 =
                         | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | notAnAccession ->
-                            Term.Term(credentials).getByName(notAnAccession,sourceOntologyName= Term.AnyOfOntology.Single "uo")
+                            Term.Term(credentials).searchByName(notAnAccession,sourceOntologyName= Term.AnyOfOntology.Single "uo")
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -296,7 +296,7 @@ module V2 =
                         | notAnAccession ->
                             let searchTextLength = inp.query.Length
                             let searchmode = if searchTextLength < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
-                            Term.Term(credentials).getByName(notAnAccession, searchmode, ?sourceOntologyName = Option.map Term.AnyOfOntology.Single inp.ontology)
+                            Term.Term(credentials).searchByName(notAnAccession, searchmode, ?sourceOntologyName = Option.map Term.AnyOfOntology.Single inp.ontology)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
@@ -380,7 +380,7 @@ module V2 =
                         | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | notAnAccession ->
-                            Term.Term(credentials).getByName(notAnAccession, sourceOntologyName = Term.AnyOfOntology.Multiples ["uo"; "dpbo"])
+                            Term.Term(credentials).searchByName(notAnAccession, sourceOntologyName = Term.AnyOfOntology.Multiples ["uo"; "dpbo"])
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let res = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
