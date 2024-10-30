@@ -2199,11 +2199,14 @@ let getTermData names =
         let terms =
             names
             |> List.map (fun name ->
-                let termMinimal = TermMinimal.create name ""
-                TermSearchable.create termMinimal None false 0 [||]
+                TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
             )
             |> Array.ofSeq
-        return! Async.StartAsPromise (Api.api.getTermsByNames terms)
+        let! result = Async.StartAsPromise (Api.ontology.searchTerms terms)
+
+        return
+            result
+            |> Array.map (fun item -> Array.tryHead item.results)
     }
 
 /// <summary>
@@ -2330,7 +2333,7 @@ let rectifyTermColumns () =
                             let values = Array.create (arcTable.RowCount + 1) ""
                             indexedTerms
                             |> List.iter (fun (mainIndex, potTerm) ->
-                                match potTerm.SearchResultTerm with
+                                match potTerm with
                                 | Some term ->
                                     match pcv.[0] with
                                     | header when header = headers.[2] -> //Unit
