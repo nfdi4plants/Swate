@@ -2178,15 +2178,16 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
         }
     )
 
-let tryGetTermData name =
+let getTermData names =
     promise {
-        let termMinimal = TermMinimal.create name ""
-        let termSearchable = TermSearchable.create termMinimal None false 0 [||]
-        let! result = Async.StartAsPromise (Api.api.getTermsByNames [|termSearchable|])
-
-        if result.Length > 0 && result.[0].SearchResultTerm.IsSome then
-            return Result.Ok result.[0].SearchResultTerm.Value
-        else return Result.Error ()
+        let terms =
+            names
+            |> List.map (fun name ->
+                let termMinimal = TermMinimal.create name ""
+                TermSearchable.create termMinimal None false 0 [||]
+            )
+            |> Array.ofSeq
+        return! Async.StartAsPromise (Api.api.getTermsByNames terms)
     }
 
 /// <summary>
@@ -2279,7 +2280,10 @@ let rectifyTermColumns () =
                                 |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
                                 |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
                             )
-                        
+
+                        let mutable names = []
+                        let mutable indices = []
+
                         //Check whether value of property colum is fitting for value of main column and adapt if not
                         //Delete values of property columns when main column is empty
                         for pi in 0..propertyColumns.Length-1 do
@@ -2288,26 +2292,47 @@ let rectifyTermColumns () =
                             for mainIndex in 0..mainColumnHasValues.Length-1 do
                                 let mc, isNull = mainColumnHasValues.[mainIndex]
                                 if not isNull then
-                                    let! potTerm = tryGetTermData mc
+                                    names <- mc::names
+                                    indices <- mainIndex::indices
                                     values.[mainIndex] <- pcv.[mainIndex]
-                                    match potTerm with
-                                    | Result.Ok term ->
-                                        match pcv.[0] with
-                                        | header when header = headers.[2] -> //Unit
-                                            values.[mainIndex] <- term.Name
-                                        | header when header.Contains(headers.[0]) -> //Term Source REF
-                                            values.[mainIndex] <- term.FK_Ontology
-                                        | header when header.Contains(headers.[1]) -> //Term Accession Number
-                                            values.[mainIndex] <- term.Accession
-                                        | _ -> ()
-                                    | Result.Error _ -> ()
                             let bodyValues =
                                 values
                                 |> Array.map (box >> Some)
                                 |> Array.map (fun c -> ResizeArray[c])
                                 |> ResizeArray
                             excelTable.columns.items.[pIndex].values <- bodyValues
-                        //)
+
+                        let! terms = getTermData names
+
+                        let indexedTerms =
+                            indices
+                            |> List.mapi (fun ii index ->
+                                index, terms.[ii])
+
+                        for pi in 0..propertyColumns.Length-1 do
+                            let pIndex, pcv = propertyColumns.[pi]
+                            let values = Array.create (arcTable.RowCount + 1) ""
+                            indexedTerms
+                            |> List.iter (fun (mainIndex, potTerm) ->
+                                match potTerm.SearchResultTerm with
+                                | Some term ->
+                                    match pcv.[0] with
+                                    | header when header = headers.[2] -> //Unit
+                                        values.[mainIndex] <- term.Name
+                                    | header when header.Contains(headers.[0]) -> //Term Source REF
+                                        values.[mainIndex] <- term.FK_Ontology
+                                    | header when header.Contains(headers.[1]) -> //Term Accession Number
+                                        values.[mainIndex] <- term.Accession
+                                    | _ -> ()
+                                | None -> values.[mainIndex] <- pcv.[mainIndex]
+
+                                let bodyValues =
+                                    values
+                                    |> Array.map (box >> Some)
+                                    |> Array.map (fun c -> ResizeArray[c])
+                                    |> ResizeArray
+                                excelTable.columns.items.[pIndex].values <- bodyValues
+                            )
 
                 //do! ExcelHelper.adoptTableFormats(excelTable, context, true)
 
