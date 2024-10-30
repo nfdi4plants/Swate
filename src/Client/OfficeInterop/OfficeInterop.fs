@@ -1689,9 +1689,9 @@ let getSelectedCellType () =
             let! result = tryGetActiveAnnotationTable context
 
             match result with
-            | Result.Ok excelTable ->
+            | Some excelTable ->
                 let! _, rowIndex = getSelectedBuildingBlockCell excelTable context
-                let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
+                let! arcTable = ArcTable.tryParseFromExcelTable(excelTable, context)
                 let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable.Value context
 
                 if rowIndex > 0 then
@@ -1704,7 +1704,7 @@ let getSelectedCellType () =
                         | _ -> None
                 else return None
 
-            | Result.Error _ -> return None
+            | None -> return None
         }
     )
 
@@ -1718,9 +1718,9 @@ let getValidConversionCellTypes () =
             let! result = tryGetActiveAnnotationTable context
 
             match result with
-            | Result.Ok excelTable ->
+            | Some excelTable ->
                 let! _, rowIndex = getSelectedBuildingBlockCell excelTable context
-                let! arcTable = ArcTable.tryGetFromExcelTable(excelTable, context)
+                let! arcTable = ArcTable.tryParseFromExcelTable(excelTable, context)
                 let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable.Value context
 
                 if rowIndex > 0 then
@@ -1736,7 +1736,7 @@ let getValidConversionCellTypes () =
                                 (Some CompositeCellDiscriminate.Data, None)
                         | _ -> (None, None)
                 else return (None, None)
-            | Result.Error _ -> return (None, None)
+            | None -> return (None, None)
         }
     )
 
@@ -1798,42 +1798,6 @@ let removeSelectedAnnotationBlock () =
 /// <summary>
 /// Get the main column of the arc table of the selected building block of the active annotation table
 /// </summary>
-let getArcMainColumn (excelTable:Table) (context: RequestContext)=
-    promise {
-        let! selectedBlock = getSelectedBuildingBlock excelTable context
-
-        let! arcTable = ArcTable.tryParseFromExcelTable(excelTable, context)
-
-        let protoHeaders = excelTable.getHeaderRowRange()
-        let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
-
-        do! context.sync().``then``(fun _ -> ())
-
-        let headers = protoHeaders.values.Item 0 |> Array.ofSeq |> Array.map (fun c -> c.ToString())
-
-        let arcTableIndices = (groupToBuildingBlocks headers) |> Array.ofSeq |> Array.map (fun i -> i |> Array.ofSeq)
-
-        let arcTableIndex =
-            let potResult = arcTableIndices |> Array.mapi (fun i c -> i, c |> Array.tryFind (fun (_, s) -> s = snd selectedBlock.[0]))
-            let result = potResult |> Array.filter (fun (_, c) -> c.IsSome) |> Array.map (fun (i, c) -> i, c.Value)
-            Array.tryHead result
-
-        let arcTableIndex, columnName =
-            if arcTableIndex.IsSome then
-                fst arcTableIndex.Value, snd (snd arcTableIndex.Value)
-            else failwith "Could not find a fitting arc table index"
-
-        let targetColumn =
-            let potColumn = arcTable.Value.GetColumn arcTableIndex
-            if columnName.Contains(potColumn.Header.ToString()) then potColumn
-            else failwith "Could not find a fitting arc table index with matchin name"
-
-        return targetColumn
-    }
-
-/// <summary>
-/// Get the main column of the arc table of the selected building block of the active annotation table
-/// </summary>
 let tryGetArcMainColumnFromFrontEnd () =
     Excel.run(fun context ->
         promise {
@@ -1841,7 +1805,9 @@ let tryGetArcMainColumnFromFrontEnd () =
 
             match result with
             | Some table ->
-                let! column = getArcMainColumn table context
+                let! arcTable = ArcTable.tryParseFromExcelTable(table, context)
+                let! column = getArcMainColumn table arcTable.Value context
+
                 return Some column
             | None -> return None
         }
@@ -1945,9 +1911,8 @@ let convertBuildingBlock () =
 
             match result with
             | Some excelTable ->
-                let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
-                let excelMainColumnIndex = fst selectedBuildingBlock.[0]
-                let! arcMainColumn = getArcMainColumn excelTable context
+                let! selectedBuildingBlock, rowIndex = getSelectedBuildingBlockCell excelTable context
+                let! arcTable = ArcTable.tryParseFromExcelTable(excelTable, context)
 
                 let! (arcMainColumn, arcIndex) = getArcMainColumn excelTable arcTable.Value context
 
@@ -2011,7 +1976,7 @@ let convertBuildingBlock () =
                 let! newTable = tryGetActiveAnnotationTable context
 
                 match newTable with
-                | Result.Ok table -> do! ExcelHelper.adoptTableFormats(table, context, true)
+                | Some table -> do! ExcelHelper.adoptTableFormats(table, context, true)
                 | _ -> ()
 
                 let msg =
