@@ -5,47 +5,40 @@ open Feliz.Bulma
 
 open OfficeInterop.Core
 open Shared
-open ARCtrl.Helper
+
+type CellDiscriminateState = {
+        SelectedCellState: CompositeCellDiscriminate option
+        TargetCellState: CompositeCellDiscriminate option
+    } with
+        static member init = {
+            SelectedCellState = None
+            TargetCellState = None
+        }
 
 module private CellConvertComponentHelpers =
 
-    let getSelectedCellType (setState: CompositeCellDiscriminate option -> unit) =
+    let setCellTypes (state: CellDiscriminateState) (setState: CellDiscriminateState -> unit) =
         promise {
-            //Write function to access current header state of excel
+            //Write function to access current state of selected excel cell excel
+            let! (selectedCellType, targetCellType) = getValidConversionCellTypes ()
 
-            let! mainColumn = tryGetArcMainColumnFromFrontEnd ()
-
-            let result =
-                match mainColumn with
-                | Some column when column.Header.isInput -> None
-                | Some column when column.Header.isOutput -> None
-                | Some column when column.Cells.[0].isUnitized -> CompositeCellDiscriminate.Unitized |> Some
-                | Some column when column.Cells.[0].isTerm -> CompositeCellDiscriminate.Term |> Some
-                | Some column when column.Cells.[0].isFreeText -> CompositeCellDiscriminate.Text |> Some
-                | Some column when column.Cells.[0].isData -> CompositeCellDiscriminate.Data |> Some
-                | _ -> None
-
-            setState result
+            setState {
+                state with
+                    SelectedCellState = selectedCellType
+                    TargetCellState = targetCellType
+            }
         }
-
-    let getTargetConversionType (cellType: CompositeCellDiscriminate option) =
-        if cellType.IsSome then
-            match cellType.Value with
-            | CompositeCellDiscriminate.Unitized -> CompositeCellDiscriminate.Term |> Some
-            | CompositeCellDiscriminate.Term -> CompositeCellDiscriminate.Unitized |> Some
-            | CompositeCellDiscriminate.Text -> CompositeCellDiscriminate.Data |> Some
-            | CompositeCellDiscriminate.Data -> CompositeCellDiscriminate.Text |> Some
-        else None
 
 type CellConvertComponent =
 
     [<ReactComponent>]
     static member Main () =
 
-        let (state: CompositeCellDiscriminate option), setState = React.useState(None)
-
+        //let (state: CompositeCellDiscriminate option), setState = React.useState(None)
+        //let (targetState: CompositeCellDiscriminate option), setTargetState = React.useState(None)
+        let (cellDiscriminateState, setCellDiscriminateState) = React.useState(CellDiscriminateState.init)
         React.useEffectOnce(fun () ->
-            CellConvertComponentHelpers.getSelectedCellType setState
+            CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
             |> Promise.start
         )
 
@@ -55,27 +48,26 @@ type CellConvertComponent =
                 Bulma.button.button [
                     Bulma.color.isSuccess
                     prop.text "Refresh"
-                    prop.onClick (fun _ -> CellConvertComponentHelpers.getSelectedCellType setState |> Promise.start)                    
+                    prop.onClick (fun _ ->
+                        CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState |> Promise.start
+                    )                    
                 ]
-                Html.div (string state)
+                Html.div (string cellDiscriminateState.SelectedCellState)
             ]
             Bulma.buttons [
                 Bulma.button.button [                    
-                    if state.IsSome then
+                    if cellDiscriminateState.TargetCellState.IsSome then
                         Bulma.color.isSuccess
                         prop.disabled false
-                        prop.text $"Convert {state.Value} to"
-
-
-
+                        prop.text $"Convert {cellDiscriminateState.SelectedCellState.Value} to"
                     else
                         Bulma.color.isDanger
                         prop.disabled true
                         prop.text $"Unconvertible"
                     prop.onClick (fun _ ->
-                        CellConvertComponentHelpers.getSelectedCellType setState |> ignore
+                        CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState |> Promise.start
                         convertBuildingBlock () |> Promise.start)                    
                 ]
-                Html.div (string (CellConvertComponentHelpers.getTargetConversionType state))
+                Html.div (string cellDiscriminateState.TargetCellState)
             ]
         ]
