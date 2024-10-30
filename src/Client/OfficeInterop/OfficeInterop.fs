@@ -1610,6 +1610,59 @@ let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
 /// </summary>
 /// <param name="columns"></param>
 /// <param name="selectedIndex"></param>
+let getBuildingBlockByColumnIndex (table: Table) (excelColumnIndex: float) (context: RequestContext) =
+    promise {
+        let headerRange = table.getHeaderRowRange()
+        let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
+
+        return! context.sync().``then``(fun _ ->
+            let rebasedIndex = excelColumnIndex - headerRange.columnIndex |> int
+            if rebasedIndex < 0 || rebasedIndex >= (int headerRange.columnCount) then
+                failwith "Cannot select building block outside of annotation table!"
+            let headers: string [] = [|for v in headerRange.values.[0] do v.Value :?> string|]
+            let selectedHeader = rebasedIndex, headers.[rebasedIndex]
+            let buildingBlockGroups = groupToBuildingBlocks headers
+            let selectedBuildingBlock =
+                buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
+            selectedBuildingBlock
+        )
+    }
+
+/// <summary>
+/// Get the main column of the arc table of the selected building block of the active annotation table
+/// </summary>
+let getArcIndex (excelTable: Table) (excelColumnIndex: float) (context: RequestContext) =
+    promise {
+        let! selectedBlock = getBuildingBlockByColumnIndex excelTable excelColumnIndex context
+
+        let protoHeaders = excelTable.getHeaderRowRange()
+        let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let headers = protoHeaders.values.Item 0 |> Array.ofSeq |> Array.map (fun c -> c.ToString())
+
+        let arcTableIndices = (groupToBuildingBlocks headers) |> Array.ofSeq |> Array.map (fun i -> i |> Array.ofSeq)
+
+        let arcTableIndex =
+            let potResult = arcTableIndices |> Array.mapi (fun i c -> i, c |> Array.tryFind (fun (_, s) -> s = snd selectedBlock.[0]))
+            let result = potResult |> Array.filter (fun (_, c) -> c.IsSome) |> Array.map (fun (i, c) -> i, c.Value)
+            Array.tryHead result
+
+        let arcTableIndex =
+            if arcTableIndex.IsSome then
+                fst arcTableIndex.Value
+            else failwith "Could not find a fitting arc table index"
+
+        return arcTableIndex
+    }
+
+/// <summary>
+/// Returns a ResizeArray of indices and header names for the selected building block
+/// The indices are rebased to the excel annotation table.
+/// </summary>
+/// <param name="columns"></param>
+/// <param name="selectedIndex"></param>
 let getSelectedBuildingBlockCell (table: Table) (context: RequestContext) =
     promise {
 
@@ -2125,6 +2178,17 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
         }
     )
 
+let tryGetTermData name =
+    promise {
+        let termMinimal = TermMinimal.create name ""
+        let termSearchable = TermSearchable.create termMinimal None false 0 [||]
+        let! result = Async.StartAsPromise (Api.api.getTermsByNames [|termSearchable|])
+
+        if result.Length > 0 && result.[0].SearchResultTerm.IsSome then
+            return Result.Ok result.[0].SearchResultTerm.Value
+        else return Result.Error ()
+    }
+
 /// <summary>
 /// Validates the arc table of the currently selected work sheet
 /// When the validations returns an error, an error is returned to the user
@@ -2148,14 +2212,13 @@ let rectifyTermColumns () =
 
                 let arcTable = arcTable.Value
                 let columns = arcTable.Columns
-                let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "values"; "rowCount"|]))
+                let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
 
                 do! context.sync().``then``(fun _ -> ())
                 let items = excelTable.columns.items
                 do! context.sync().``then``(fun _ -> ())
 
                 let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
-
                 let columns =
                     items
                     |> Array.ofSeq
@@ -2174,6 +2237,8 @@ let rectifyTermColumns () =
                 let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
 
                 do! context.sync().``then``(fun _ -> ())
+
+                let headers = ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> Array.ofSeq
 
                 for i in 0..columns.Length-1 do
                     let column = columns.[i]
@@ -2214,28 +2279,37 @@ let rectifyTermColumns () =
                                 |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
                                 |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
                             )
-
+                        
                         //Check whether value of property colum is fitting for value of main column and adapt if not
                         //Delete values of property columns when main column is empty
-                        propertyColumns
-                        |> Array.iter (fun (pIndex, pcv) ->
+                        for pi in 0..propertyColumns.Length-1 do
+                            let pIndex, pcv = propertyColumns.[pi]
                             let values = Array.create (arcTable.RowCount + 1) ""
-                            mainColumnHasValues
-                            |> Array.iteri (fun mainIndex (mc, isNull) ->
-                                //if isNull for main column, then use empty string as value for properties
+                            for mainIndex in 0..mainColumnHasValues.Length-1 do
+                                let mc, isNull = mainColumnHasValues.[mainIndex]
                                 if not isNull then
+                                    let! potTerm = tryGetTermData mc
                                     values.[mainIndex] <- pcv.[mainIndex]
-                            )
-
+                                    match potTerm with
+                                    | Result.Ok term ->
+                                        match pcv.[0] with
+                                        | header when header = headers.[2] -> //Unit
+                                            values.[mainIndex] <- term.Name
+                                        | header when header.Contains(headers.[0]) -> //Term Source REF
+                                            values.[mainIndex] <- term.FK_Ontology
+                                        | header when header.Contains(headers.[1]) -> //Term Accession Number
+                                            values.[mainIndex] <- term.Accession
+                                        | _ -> ()
+                                    | Result.Error _ -> ()
                             let bodyValues =
                                 values
                                 |> Array.map (box >> Some)
                                 |> Array.map (fun c -> ResizeArray[c])
                                 |> ResizeArray
                             excelTable.columns.items.[pIndex].values <- bodyValues
-                        )
+                        //)
 
-                do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+                //do! ExcelHelper.adoptTableFormats(excelTable, context, true)
 
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
         }

@@ -332,7 +332,7 @@ let private shortCutIconList model (dispatch: Messages.Msg -> unit) =
         | _ ->
             ()
         QuickAccessButton.create(
-            "Validate / Update Ontology Terms",
+            "Rectify Ontology Terms",
             [
                 Html.i [prop.className "fa-solid fa-spell-check"]
                 Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
