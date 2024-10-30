@@ -39,7 +39,7 @@ type FullTextSearch with
     member this.ofQueryString(queryString:string) =
         let escaped = Regex.escapeQuery queryString
         match this with
-        | Exact         -> queryString
+        | Exact         -> "\"" + queryString + "\""
         | Complete      -> queryString + "*"
         | PerformanceComplete ->
             let singleWordArr = escaped.Split(" ", System.StringSplitOptions.RemoveEmptyEntries)
