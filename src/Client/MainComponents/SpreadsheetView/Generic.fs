@@ -22,7 +22,7 @@ let Main (data, createCell, headers, createHeaderCell, model:Model, dispatch: Ms
     let createRowLabel (rowIndex: int) = MainComponents.CellStyles.RowLabel rowIndex
     Html.div [
         prop.id "SPREADSHEET_MAIN_VIEW"
-        prop.key $"SPREADSHEET_MAIN_VIEW_{model.SpreadsheetModel.ActiveView.TableIndex}"
+        prop.key $"SPREADSHEET_MAIN_VIEW_{model.SpreadsheetModel.ActiveView.ViewIndex}"
         prop.tabIndex 0
         prop.className "flex grow overflow-y-hidden"
         prop.style [style.border(1, borderStyle.solid, "grey")]

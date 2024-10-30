@@ -57,8 +57,8 @@ let createTable (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Mo
     let tables = state.ArcFile.Value.Tables()
     let newName = createNewTableName 0 tables.TableNames
     let newTable = ArcTable.init(newName)
-    if usePrevOutput && ((tables.TableCount-1) >= state.ActiveView.TableIndex) then
-        let table = tables.GetTableAt(state.ActiveView.TableIndex)
+    if usePrevOutput && ((tables.TableCount-1) >= state.ActiveView.ViewIndex) then
+        let table = tables.GetTableAt(state.ActiveView.ViewIndex)
         let output = table.GetOutputColumn()
         let newInput = output.Header.TryOutput().Value |> CompositeHeader.Input
         newTable.AddColumn(newInput,output.Cells,forceReplace=true)

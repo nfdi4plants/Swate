@@ -27,11 +27,9 @@ type private NavbarState = {
 
 type ExcelMetadataState = {
     Metadata: ArcFiles option
-    WorkSheetName: string option
 } with
     static member init() = {
         Metadata = None
-        WorkSheetName = None
     }
 
 let AddMetaDataButtons excelMetadataType setExcelMetadataType (dispatch: Messages.Msg -> unit) =
@@ -47,7 +45,6 @@ let AddMetaDataButtons excelMetadataType setExcelMetadataType (dispatch: Message
                     let investigation = ArcInvestigation.init("New Investigation")
                     setExcelMetadataType {
                         excelMetadataType with
-                            WorkSheetName = Some ArcInvestigation.metadataSheetName
                             Metadata = Some (ArcFiles.Investigation investigation)
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcInvestigation.metadataSheetName)
@@ -63,7 +60,6 @@ let AddMetaDataButtons excelMetadataType setExcelMetadataType (dispatch: Message
                     study.Tables.Add(table)
                     setExcelMetadataType {
                         excelMetadataType with
-                            WorkSheetName = Some ArcStudy.metadataSheetName
                             Metadata = Some (ArcFiles.Study (study, []))
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcStudy.metadataSheetName)
@@ -79,7 +75,6 @@ let AddMetaDataButtons excelMetadataType setExcelMetadataType (dispatch: Message
                     assay.Tables.Add(table)
                     setExcelMetadataType {
                         excelMetadataType with
-                            WorkSheetName = Some ArcAssay.metadataSheetName
                             Metadata = Some (ArcFiles.Assay assay)
                     }
                     OfficeInterop.CreateTopLevelMetadata(ArcAssay.metadataSheetName)
@@ -98,7 +93,6 @@ let AddMetaDataButtons excelMetadataType setExcelMetadataType (dispatch: Message
                     template.LastUpdated <- System.DateTime.Now
                     setExcelMetadataType {
                         excelMetadataType with
-                            WorkSheetName = Some Template.metaDataSheetName
                             Metadata = Some (ArcFiles.Template template)
                     }
                     OfficeInterop.CreateTopLevelMetadata(Template.metaDataSheetName)
@@ -129,7 +123,6 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                 let setAssay (assay: ArcAssay) =
                     setExcelMetadataType {
                         excelMetadataType with
-                            WorkSheetName = Some ArcAssay.metadataSheetName
                             Metadata = Some (ArcFiles.Assay assay)
                     }
                 let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
@@ -139,7 +132,6 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                 let setStudy (study: ArcStudy, assays: ArcAssay list) =
                     setExcelMetadataType {
                         excelMetadataType with
-                            WorkSheetName = Some ArcStudy.metadataSheetName
                             Metadata = Some (ArcFiles.Study (study, assays))
                     }
                 let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
@@ -149,7 +141,6 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                 let setInvestigation (investigation: ArcInvestigation) =
                     setExcelMetadataType {
                         excelMetadataType with
-                            WorkSheetName = Some ArcInvestigation.metadataSheetName
                             Metadata = Some (ArcFiles.Investigation investigation)
                     }
                 Investigation.Main(investigation, setInvestigation)
@@ -157,7 +148,6 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                 let setTemplate (template: Template) =
                     setExcelMetadataType {
                         excelMetadataType with
-                            WorkSheetName = Some Template.metaDataSheetName
                             Metadata = Some (ArcFiles.Template template)
                     }
                 Template.Main(template, setTemplate)
@@ -217,13 +207,12 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
     let (excelMetadataType, setExcelMetadataType) = React.useState(ExcelMetadataState.init)
     React.useEffectOnce(fun _ ->
         promise {
-            let! result = OfficeInterop.Core.tryParseExcelMetadataToArcFileWihoutTables ()
+            let! result = OfficeInterop.Core.OfficeInterop.tryParseToArcFile(getTables=false)
             match result with
-            | Result.Ok (arcFile, workSheetName) ->
+            | Result.Ok (arcFile) ->
                 setExcelMetadataType {
                     excelMetadataType with
                         Metadata = Some arcFile
-                        WorkSheetName = Some workSheetName
                 }
             | Result.Error _ -> ()
         } |> Promise.start

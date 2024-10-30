@@ -165,7 +165,7 @@ type Cell =
         let isIdle = state.CellIsIdle (!^columnIndex, columnType)
         let isActive = not isIdle
         Html.th [
-            prop.key $"Header_{state.ActiveView.TableIndex}-{columnIndex}-{columnType}"
+            prop.key $"Header_{state.ActiveView.ViewIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
             prop.readOnly readonly
             cellStyle []

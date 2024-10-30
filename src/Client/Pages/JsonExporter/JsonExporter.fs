@@ -336,12 +336,12 @@ type FileExporter =
                                     let host = model.PersistentStorageState.Host
                                     match host with
                                     | Some Swatehost.Excel ->
-                                            promise {                     
-                                                let! result = OfficeInterop.Core.tryParseExcelMetadataToArcFile ()
-                                                match result with
-                                                | Result.Ok arcFile -> SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
-                                                | Result.Error msgs -> OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
-                                            } |> ignore
+                                        promise {                     
+                                            let! result = OfficeInterop.Core.OfficeInterop.tryParseToArcFile()
+                                            match result with
+                                            | Result.Ok arcFile -> SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
+                                            | Result.Error msgs -> OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
+                                        } |> ignore
                                     | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                                         if model.SpreadsheetModel.ArcFile.IsSome then
                                             SpreadsheetInterface.ExportJson (model.SpreadsheetModel.ArcFile.Value, state.ExportFormat) |> InterfaceMsg |> dispatch
