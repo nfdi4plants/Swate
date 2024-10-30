@@ -28,13 +28,12 @@ let private FileName (model: Model) =
         ]
     | None -> Html.none
 
-let private quickAccessButtonListStart (model: Model) (state: LocalHistory.Model) dispatch =
+let private quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
-            FileName model
             QuickAccessButton.create(
                 "Back",
                 [
@@ -168,39 +167,29 @@ let Main(model: Model, dispatch, widgets, setWidgets) =
         prop.role "navigation"
         prop.ariaLabel "main navigation"
         prop.style [
-            style.flexWrap.wrap; style.alignItems.stretch; style.display.flex;
             style.minHeight(length.rem 3.25)
         ]
         prop.children [
             Bulma.navbarBrand.div [
-
+                FileName model
             ]
-            Html.div [
-                prop.style [
-                    style.display.flex; style.flexGrow 1; style.flexShrink 0;
-                    style.alignItems.stretch; 
-                ]
-                prop.ariaLabel "menu"
+            Bulma.navbarStart.div [
+                //prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
                 prop.children [
-                    Bulma.navbarStart.div [
-                        prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
-                        prop.children [
-                            quickAccessButtonListStart model model.History dispatch
-                            WidgetNavbarList(model, dispatch, addWidget)
-                        ]
-                    ]
-                    match model.PersistentStorageState.Host with
-                    | Some (Swatehost.ARCitect) ->
-                        Html.none
-                    | Some _ ->
-                        Bulma.navbarEnd.div [
-                            prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("marginLeft", "auto")]
-                            prop.children [
-                                quickAccessButtonListEnd model dispatch
-                            ]
-                        ]
-                    | _ -> Html.none
+                    quickAccessButtonListStart model.History dispatch
+                    WidgetNavbarList(model, dispatch, addWidget)
                 ]
             ]
+            match model.PersistentStorageState.Host with
+            | Some (Swatehost.ARCitect) ->
+                Html.none
+            | Some _ ->
+                Bulma.navbarEnd.div [
+                    //prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("marginLeft", "auto")]
+                    prop.children [
+                        quickAccessButtonListEnd model dispatch
+                    ]
+                ]
+            | _ -> Html.none
         ]
     ]
