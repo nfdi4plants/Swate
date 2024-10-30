@@ -5,7 +5,6 @@ open Elmish
 open Messages
 open OfficeInterop
 open Shared
-open OfficeInteropTypes
 open Model
 
 module OfficeInterop = 
@@ -14,6 +13,10 @@ module OfficeInterop =
         let innerUpdate (state: OfficeInterop.Model) (model: Model) (msg: OfficeInterop.Msg) =
 
             match msg with
+
+            | UpdateArcFile arcFile ->
+                log ("UpdateArcFile", arcFile)
+                state, model, Cmd.none
 
             | AutoFitTable hidecols ->
                 let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run (OfficeInterop.Core.autoFitTable hidecols)
@@ -36,7 +39,7 @@ module OfficeInterop =
             | AnnotationTableExists annoTableOpt ->
                 let exists =
                     match annoTableOpt with
-                    | Success name -> true
+                    | Ok name -> true
                     | _ -> false
                 let nextState = {
                     model.ExcelState with

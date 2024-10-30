@@ -871,10 +871,15 @@ let tryFindActiveAnnotationTable() =
                     tables
                     |> Array.filter (fun x -> x.StartsWith "annotationTable")
                 // Get the correct error message if we have <> 1 annotation table. Only returns success and the table name if annoTables.Length = 1
-                let res = TryFindAnnoTableResult.exactlyOneAnnotationTable annoTables
-
-                // return result
-                res
+                match annoTables.Length with
+                | x when x < 1 ->
+                    Result.Error "Could not find annotationTable in active worksheet. Please create one before trying to execute this function."
+                | x when x > 1 ->
+                    Result.Error "The active worksheet contains more than one annotationTable. Please move one of them to another worksheet."
+                | 1 ->
+                    annoTables |> Array.exactlyOne |> Result.Ok
+                | _ ->
+                    Result.Error "Could not process message. Swate was not able to identify the given annotation tables with a known case."
         )
     )
 
@@ -3151,7 +3156,7 @@ let insertOntologyTerm (term:OntologyAnnotation) =
 
             // This function checks multiple scenarios destroying Swate table formatting through the insert ontology term function
             do! match tryTable with
-                | Success table ->
+                | Ok table ->
                     promise {
                         // Input column also affects the next 2 columns so [range.columnIndex; range.columnIndex+1.; range.columnIndex+2.]
                         let sheet = context.workbook.worksheets.getActiveWorksheet()
@@ -3197,7 +3202,7 @@ let insertOntologyTerm (term:OntologyAnnotation) =
                             if mainColumnIndices |> Array.contains rebasedIndex = false then failwith "Cannot insert ontology term to input/output/reference columns of an annotation table!"
                         return ()
                     }
-                | Error e       -> JS.Constructors.Promise.resolve(())
+                | Result.Error e       -> JS.Constructors.Promise.resolve(())
 
             //sync with proxy objects after loading values from excel
             let! res = context.sync().``then``( fun _ ->
@@ -3251,8 +3256,8 @@ let insertOntologyTerm (term:OntologyAnnotation) =
 
             let! fit =
                 match tryTable with
-                | Success table -> autoFitTableHide context
-                | Error e       -> JS.Constructors.Promise.resolve([])
+                | Ok table -> autoFitTableHide context
+                | Result.Error e       -> JS.Constructors.Promise.resolve([])
 
             return res
         }

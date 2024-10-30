@@ -95,8 +95,8 @@ module private JsonImportHelper =
                 )
                 |> Seq.iter (fun table -> existingTables.Add table)
             existing
-        | None -> //failsafe, if no file exists, we fully insert the import
-            import
+        | None -> //
+            failwith "Error! Can only append information if metadata sheet exists!"
 
 
 /// This seems like such a hack :(
@@ -252,9 +252,8 @@ module Interface =
             | UpdateArcFile arcFiles ->
                 match host with
                 | Some Swatehost.Excel ->
-                    //let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
-                    Browser.Dom.window.alert "Not implemented"
-                    model, Cmd.none
+                    let cmd = OfficeInterop.UpdateArcFile arcFiles |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.UpdateArcFile arcFiles |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
@@ -289,14 +288,13 @@ module Interface =
                                     | _ -> None
                                 return JsonImportHelper.updateTables data.importedFile data.importState activeTableIndex arcfileOpt
                         }
-                    let updateArcFile (arcFile: ArcFiles) =
-                        log ("next arcfile", arcFile)
-                        SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg
+                    let updateArcFile (arcFile: ArcFiles) = SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg
                     let cmd =
-                        Cmd.OfPromise.perform
+                        Cmd.OfPromise.either
                             updateExistingInfoWithImportedInfo
                             ()
                             updateArcFile
+                            (curry GenericError Cmd.none >> DevMsg)
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd =
