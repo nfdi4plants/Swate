@@ -4,6 +4,7 @@ open Shared
 open ARCtrl
 open TermTypes
 open OfficeInteropTypes
+open JsonImport
 
 type FillHiddenColsState =
 | Inactive
@@ -29,9 +30,10 @@ type Model = {
 type Msg =
     // create and update table element functions
     | CreateAnnotationTable                 of tryUsePrevOutput:bool
+    | UpdateArcFile                         of ArcFiles
     | AnnotationtableCreated
     | TryFindAnnotationTable
-    | AnnotationTableExists                 of TryFindAnnoTableResult
+    | AnnotationTableExists                 of Result<string, string>
     | InsertOntologyTerm                    of TermMinimal
     | ValidateBuildingBlock
     | AddAnnotationBlock                    of CompositeColumn

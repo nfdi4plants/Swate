@@ -15,7 +15,7 @@ let annotationTableMissingWarningComponent (model:Model) (dispatch: Msg-> unit) 
         prop.children [
             Bulma.delete [
                 prop.onClick (fun _ ->
-                    OfficeInterop.AnnotationTableExists (Shared.OfficeInteropTypes.TryFindAnnoTableResult.Success "Remove Warning Notification") |> OfficeInteropMsg |> dispatch
+                    OfficeInterop.AnnotationTableExists (Result.Ok "Remove Warning Notification") |> OfficeInteropMsg |> dispatch
                 )
             ]
             Html.h5 "Warning: No annotation table found in worksheet"

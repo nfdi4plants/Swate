@@ -14,6 +14,91 @@ open Shared
 open Fable.Core.JsInterop
 open Shared.ARCtrlHelper
 
+module private JsonImportHelper =
+
+    open ARCtrl
+    open JsonImport
+
+    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) =
+        if not state.ImportMetadata then failwith "Metadata must be imported"
+        /// This updates the existing tables based on import config (joinOptions)
+        let createUpdatedTables (arcTables: ResizeArray<ArcTable>) =
+            [
+                for it in state.ImportTables do
+                    let sourceTable = arcTables.[it.Index]
+                    let appliedTable = ArcTable.init(sourceTable.Name)
+                    appliedTable.Join(sourceTable, joinOptions=state.ImportType)
+                    appliedTable
+            ]
+            |> ResizeArray
+        let arcFile =
+            match uploadedFile with
+            | Assay a as arcFile->
+                let tables = createUpdatedTables a.Tables
+                a.Tables <- tables
+                arcFile
+            | Study (s,_) as arcFile ->
+                let tables = createUpdatedTables s.Tables
+                s.Tables <- tables
+                arcFile
+            | Template t as arcFile ->
+                let table = createUpdatedTables (ResizeArray[t.Table])
+                t.Table <- table.[0]
+                arcFile
+            | Investigation _ as arcFile ->
+                arcFile
+        arcFile
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="import"></param>
+    /// <param name="importState"></param>
+    /// <param name="activeTableIndex">Required to append imported tables to the active table.</param>
+    /// <param name="existing"></param>
+    let updateTables (import: ArcFiles) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) =
+        match existingOpt with
+        | Some existing ->
+            let importTables =
+                match import with
+                | Assay a -> a.Tables
+                | Study (s,_) -> s.Tables
+                | Template t -> ResizeArray([t.Table])
+                | Investigation _ -> ResizeArray()
+            let existingTables =
+                match existing with
+                | Assay a -> a.Tables
+                | Study (s,_) -> s.Tables
+                | Template t -> ResizeArray([t.Table])
+                | Investigation _ ->  ResizeArray()
+            let appendTables =
+                // only append if the active table exists (this is to handle join call on investigations)
+                match activeTableIndex with
+                | Some i when i >= 0 && i < existingTables.Count ->
+                    let activeTable = existingTables.[i]
+                    let tables = importState.ImportTables |> Seq.filter (fun x -> not x.FullImport) |> Seq.map (fun x -> importTables.[x.Index])
+                    /// Everything will be appended against this table, which in the end will be appended to the main table
+                    let tempTable = activeTable.Copy()
+                    for table in tables do
+                        let preparedTemplate = Table.distinctByHeader tempTable table
+                        tempTable.Join(preparedTemplate, joinOptions=importState.ImportType)
+                    existingTables.[i] <- tempTable
+                | _ -> ()
+            let addTables =
+                importState.ImportTables
+                |> Seq.filter (fun x -> x.FullImport)
+                |> Seq.map (fun x -> importTables.[x.Index])
+                |> Seq.map (fun table -> // update tables based on joinOptions
+                    let nTable = ArcTable.init(table.Name)
+                    nTable.Join(table, joinOptions=importState.ImportType)
+                    nTable
+                )
+                |> Seq.iter (fun table -> existingTables.Add table)
+            existing
+        | None -> //
+            failwith "Error! Can only append information if metadata sheet exists!"
+
+
 /// This seems like such a hack :(
 module private ExcelHelper =
 
@@ -167,9 +252,8 @@ module Interface =
             | UpdateArcFile arcFiles ->
                 match host with
                 | Some Swatehost.Excel ->
-                    //let cmd = OfficeInterop.ImportFile tables |> OfficeInteropMsg |> Cmd.ofMsg
-                    Browser.Dom.window.alert "Not implemented"
-                    model, Cmd.none
+                    let cmd = OfficeInterop.UpdateArcFile arcFiles |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.UpdateArcFile arcFiles |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
@@ -181,6 +265,43 @@ module Interface =
                     model, Cmd.none
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.ImportXlsx bytes |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
+            | ImportJson data ->
+                match host with
+                | Some Swatehost.Excel ->
+                    /// In Excel we must get the current information from worksheets and update them with the imported information
+                    let updateExistingInfoWithImportedInfo() = 
+                        promise {
+                            match data.importState.ImportMetadata with
+                            | true -> // full import, does not require additional information
+                                return JsonImportHelper.updateWithMetadata data.importedFile data.importState
+                            | false -> // partial import, requires additional information
+                                let! arcfile = OfficeInterop.Core.OfficeInterop.tryParseToArcFile()
+                                let arcfileOpt = arcfile |> Result.toOption
+                                let! activeTable = ExcelJS.Fable.GlobalBindings.Excel.run(fun context ->
+                                    OfficeInterop.Core.tryGetActiveArcTable context
+                                )
+                                let activeTableIndex =
+                                    match arcfileOpt, activeTable with
+                                    | Some arcfile, Some activeTable -> arcfile.Tables() |> Seq.tryFindIndex (fun x -> x = activeTable)
+                                    | _ -> None
+                                return JsonImportHelper.updateTables data.importedFile data.importState activeTableIndex arcfileOpt
+                        }
+                    let updateArcFile (arcFile: ArcFiles) = SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg
+                    let cmd =
+                        Cmd.OfPromise.either
+                            updateExistingInfoWithImportedInfo
+                            ()
+                            updateArcFile
+                            (curry GenericError Cmd.none >> DevMsg)
+                    model, cmd
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                    let cmd =
+                        match data.importState.ImportMetadata with
+                        | true -> JsonImportHelper.updateWithMetadata data.importedFile data.importState
+                        | false -> JsonImportHelper.updateTables data.importedFile data.importState model.SpreadsheetModel.ActiveView.TryTableIndex model.SpreadsheetModel.ArcFile
+                        |> SpreadsheetInterface.UpdateArcFile |> InterfaceMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | InsertOntologyAnnotation termMinimal ->

@@ -87,11 +87,12 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
             mainFunctionContainer [
                 SearchComponent.Main model dispatch
             ]
-            if model.PersistentStorageState.Host.IsSome && model.PersistentStorageState.Host.Value = Swatehost.Excel then
-                // Input forms, etc related to add building block.
+            match model.PersistentStorageState.Host with
+            | Some Swatehost.Excel ->
                 Bulma.label "Convert existing Building Block."
                 mainFunctionContainer [
                     CellConvertComponent.Main ()
                 ]
+            | _ -> Html.none
         ]
     ]

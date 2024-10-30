@@ -34,13 +34,13 @@ type Queries =
 
     static member Limit = """LIMIT $Limit"""
 
-    static member NameQueryExact (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: int) =
+    static member NameQueryExact (nodeName: string, ?ontologyFilter: AnyOfOntology, ?limit: bool) =
         let sb = new StringBuilder()
         sb.Append $"""MATCH ({nodeName}:Term {{name: $Name}})""" |> ignore
         if ontologyFilter.IsSome then
             sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
         sb.AppendLine(Queries.TermReturn nodeName) |> ignore
-        if limit.IsSome then
+        if limit.IsSome && limit.Value then
             sb.AppendLine (Queries.Limit) |> ignore
         sb.ToString()
 
@@ -52,7 +52,7 @@ YIELD {nodeName}""" |> ignore
             sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
         sb.AppendLine(Queries.TermReturn nodeName) |> ignore
         sb.AppendLine($"""ORDER BY apoc.text.distance(toLower({nodeName}.name), toLower($Name))""") |> ignore
-        if limit.IsSome then 
+        if limit.IsSome && limit.Value then 
             sb.AppendLine(Queries.Limit) |> ignore
         sb.ToString()
             
@@ -76,7 +76,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         term
 
     /// Searchtype defaults to "get term suggestions with auto complete".
-    member this.getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology, ?limit: int) =
+    member this.searchByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology, ?limit: int) =
         let nodeName = "node"
         let escaped, fulltextSearchStr =
             if searchType.IsSome then
@@ -92,6 +92,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 if limit.IsSome then "Limit", box limit.Value
             ] |> Some
         Neo4j.runQuery(query,parameters,(Term.asTerm(nodeName)),?session=session,?credentials=credentials)
+
+    //member this.getByName
 
     /// <summary>
     /// This is a more complete implementation, which should be abstracted more later.
@@ -223,6 +225,28 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 query,
                 param,
                 (Term.asTerm("node")),
+                credentials.Value
+            )
+
+    /// Exact match for unique identifier term accession.
+    member this.getByName(name:string) =
+        let query = 
+            """MATCH (term:Term {name: $Name})
+            RETURN term.accession, term.name, term.definition, term.is_obsolete"""
+        let param =
+            Map ["Name", box name] |> Some
+        if session.IsSome then
+            Neo4j.runQuery(
+                query,
+                param,
+                (Term.asTerm("term")),
+                session = session.Value
+            )
+        else
+            Neo4j.runQuery(
+                query,
+                param,
+                (Term.asTerm("term")),
                 credentials.Value
             )
 

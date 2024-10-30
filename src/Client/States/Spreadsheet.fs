@@ -40,13 +40,24 @@ type ActiveView =
 | Metadata
 with 
     /// <summary>
-    /// Returns -1 if no table index given
+    /// A identifier that returns an integer based on the ActiveView type.
     /// </summary>
-    member this.TableIndex =
+    member this.ViewIndex =
         match this with
         | Table i -> i
-        | DataMap -> 0
-        | Metadata -> -1
+        | DataMap -> -1
+        | Metadata -> -2
+
+    member this.TryTableIndex =
+        match this with
+        | Table i -> Some i
+        | _ -> None
+
+    member this.ArcFileHasView(arcfile: ArcFiles) =
+        match this with
+        | Table i -> arcfile.HasTableAt(i)
+        | DataMap -> arcfile.HasDataMap()
+        | Metadata -> true
 
 [<AutoOpen>]
 module ActivePattern =
