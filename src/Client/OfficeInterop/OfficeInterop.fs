@@ -2395,7 +2395,7 @@ type OfficeInterop =
                     worksheets.items
                     |> Seq.tryFind (fun item ->
                         ArcTable.isTopLevelMetadataName item.name)
-            
+
                 match worksheetTopLevelMetadata with
                 | Some worksheet when ArcAssay.isMetadataSheetName worksheet.name ->
                     let! assay = parseToTopLevelMetadata worksheet.name ArcAssay.fromMetadataCollection context
@@ -2496,22 +2496,37 @@ let deleteTopLevelMetadata () =
 /// <param name="context"></param>
 /// <param name="fsWorkSheet"></param>
 /// <param name="seqOfSeqs"></param>
-let private updateWorkSheet (context:RequestContext) (fsWorkSheet:FsWorksheet) (seqOfSeqs:seq<seq<string option>>) =
+let private updateWorkSheet (context:RequestContext) (worksheetName: string) (seqOfSeqs:seq<seq<string option>>) =
     promise {
-        let worksheet = context.workbook.worksheets.getItem(fsWorkSheet.Name)
+        let rowCount = seqOfSeqs |> Seq.length
+        let columnCount = seqOfSeqs |> Seq.map Seq.length |> Seq.max
+
+        let worksheet0 = context.workbook.worksheets.getItemOrNullObject(worksheetName)
+
+        let _ = worksheet0.load(U2.Case2 (ResizeArray[|"isNullObject"|]))
+        do! context.sync()
+
+        let worksheet =
+            if worksheet0.isNullObject then
+                context.workbook.worksheets.add(worksheetName)
+            else
+                worksheet0
+
+        do! context.sync()
+
         let range = worksheet.getUsedRange true
         let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         range.values <- null
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
-        let range = worksheet.getRangeByIndexes(0, 0, fsWorkSheet.MaxRowIndex, fsWorkSheet.MaxColumnIndex)
+        let range = worksheet.getRangeByIndexes(0, 0, rowCount, columnCount)
         let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let values = ExcelHelper.convertToResizeArrays(seqOfSeqs)
 
@@ -2520,7 +2535,9 @@ let private updateWorkSheet (context:RequestContext) (fsWorkSheet:FsWorksheet) (
         range.format.autofitColumns()
         range.format.autofitRows()
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
+
+        return worksheet
     }
 
 /// <summary>
@@ -2553,7 +2570,9 @@ let updateTopLevelMetadata (arcFiles: ArcFiles) =
                     let seqOfSeqs = Template.toMetadataCollection template
                     templateWorksheet, seqOfSeqs
 
-            do! updateWorkSheet context worksheet seqOfSeqs
+            let! updatedWorksheet = updateWorkSheet context worksheet.Name seqOfSeqs
+
+            updatedWorksheet.activate()
 
             return [InteropLogging.Msg.create InteropLogging.Warning $"The worksheet {worksheet.Name} has been updated"]
         }

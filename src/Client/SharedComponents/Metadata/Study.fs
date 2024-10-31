@@ -9,7 +9,7 @@ open System
 let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy * ArcAssay list) -> unit, setDatamap: ArcStudy -> DataMap option -> unit) = 
     Bulma.section [
         Generic.BoxedField
-            "Study Metadata"
+            (Some "Study Metadata")
             None
             [
                 FormComponents.TextInput (

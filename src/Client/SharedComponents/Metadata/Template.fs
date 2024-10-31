@@ -10,7 +10,7 @@ open Components.Forms
 let Main(template: Template, setTemplate: Template -> unit) =
     Bulma.section [
         Generic.BoxedField
-            "Template Metadata"
+            (Some "Template Metadata")
             None
             [
                 FormComponents.GUIDInput (

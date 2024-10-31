@@ -326,7 +326,7 @@ let Run(db: bool) =
     [ "server", dotnet [ "watch"; "run" ] serverPath
       "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "-e"; "fs.js"; "--run"; "npx"; "vite" ] clientPath
       if db then
-        "database", dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
+        "database", dockerCompose ["-f"; dockerComposePath; "up"; "-d"] __SOURCE_DIRECTORY__
     ] |> runParallel
 
 //Target.create "officedebug" (fun config ->
@@ -344,7 +344,7 @@ let Run(db: bool) =
 //)
 
 Target.create "RunDB" (fun _ ->
-    run dockerCompose ["-f"; dockerComposePath; "up"] __SOURCE_DIRECTORY__
+    run dockerCompose ["-f"; dockerComposePath; "up"; "-d"] __SOURCE_DIRECTORY__
 )
 
 [<RequireQualifiedAccess>]
