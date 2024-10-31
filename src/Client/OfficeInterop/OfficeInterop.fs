@@ -2209,6 +2209,35 @@ let getTermData names =
             |> Array.map (fun item -> Array.tryHead item.results)
     }
 
+let updateSelectedBuildingBlocks (excelTable: Table) (arcTable: ArcTable) (propertyColumns: array<int*string []>) (indexedTerms: list<int*Term option>) =
+    promise {
+        let headers = ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> Array.ofSeq
+
+        for pi in 0..propertyColumns.Length-1 do
+            let pIndex, pcv = propertyColumns.[pi]
+            let values = Array.create (arcTable.RowCount + 1) ""
+            indexedTerms
+            |> List.iter (fun (mainIndex, potTerm) ->
+                match potTerm with
+                | Some term ->
+                    match pcv.[0] with
+                    | header when header = headers.[2] -> //Unit
+                        values.[mainIndex] <- term.Name
+                    | header when header.Contains(headers.[0]) -> //Term Source REF
+                        values.[mainIndex] <- term.FK_Ontology
+                    | header when header.Contains(headers.[1]) -> //Term Accession Number
+                        values.[mainIndex] <- term.Accession
+                    | _ -> ()
+                | None -> values.[mainIndex] <- pcv.[mainIndex]
+
+                let bodyValues =
+                    values
+                    |> Array.map (box >> Some)
+                    |> Array.map (fun c -> ResizeArray[c])
+                    |> ResizeArray
+                excelTable.columns.items.[pIndex].values <- bodyValues
+            )
+        }
 /// <summary>
 /// Validates the arc table of the currently selected work sheet
 /// When the validations returns an error, an error is returned to the user
@@ -2257,8 +2286,6 @@ let rectifyTermColumns () =
                 let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
 
                 do! context.sync().``then``(fun _ -> ())
-
-                let headers = ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> Array.ofSeq
 
                 for i in 0..columns.Length-1 do
                     let column = columns.[i]
@@ -2328,32 +2355,9 @@ let rectifyTermColumns () =
                             |> List.mapi (fun ii index ->
                                 index, terms.[ii])
 
-                        for pi in 0..propertyColumns.Length-1 do
-                            let pIndex, pcv = propertyColumns.[pi]
-                            let values = Array.create (arcTable.RowCount + 1) ""
-                            indexedTerms
-                            |> List.iter (fun (mainIndex, potTerm) ->
-                                match potTerm with
-                                | Some term ->
-                                    match pcv.[0] with
-                                    | header when header = headers.[2] -> //Unit
-                                        values.[mainIndex] <- term.Name
-                                    | header when header.Contains(headers.[0]) -> //Term Source REF
-                                        values.[mainIndex] <- term.FK_Ontology
-                                    | header when header.Contains(headers.[1]) -> //Term Accession Number
-                                        values.[mainIndex] <- term.Accession
-                                    | _ -> ()
-                                | None -> values.[mainIndex] <- pcv.[mainIndex]
+                        do! updateSelectedBuildingBlocks excelTable arcTable propertyColumns indexedTerms
 
-                                let bodyValues =
-                                    values
-                                    |> Array.map (box >> Some)
-                                    |> Array.map (fun c -> ResizeArray[c])
-                                    |> ResizeArray
-                                excelTable.columns.items.[pIndex].values <- bodyValues
-                            )
-
-                //do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+                do! ExcelHelper.adoptTableFormats(excelTable, context, true)
 
                 return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
         }
