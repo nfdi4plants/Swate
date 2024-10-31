@@ -181,6 +181,9 @@ module OfficeInteropExtensions =
                         column.getRange().columnHidden <- shallHide)
             }
 
+        static member parseToObj (input: string) : obj =
+            box input
+
         /// <summary>
         /// Converts a sequence of sequence of excel data into a resizearray, compatible with Excel.Range
         /// </summary>
@@ -193,11 +196,9 @@ module OfficeInteropExtensions =
 
             //Adapts the length of the smaller sequences to the length of the longest sequence in order to avoid problems with the insertion into excel.Range
             let ra = ResizeArray()
-            let parseToObj (input: string) : obj =
-                box input
             for seq in metadataValues do
                 //Parse string to obj option
-                let ira = ResizeArray (seq |> Seq.map (fun column -> column |> Option.map parseToObj))
+                let ira = ResizeArray (seq |> Seq.map (fun column -> column |> Option.map ExcelHelper.parseToObj))
                 if ira.Count < maxLength then
                     ira.AddRange (Array.create (maxLength - ira.Count) None)
                 ra.Add ira
@@ -2049,7 +2050,6 @@ let convertBuildingBlock () =
 /// <param name="targetIndex"></param>
 /// <param name="context"></param>
 let validateSelectedColumns (headerRange: ExcelJS.Fable.Excel.Range, bodyRowRange: ExcelJS.Fable.Excel.Range, selectedIndex: int, targetIndex: int, context: RequestContext) =
-
     promise {
         let _ =
             headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
@@ -2096,15 +2096,14 @@ let validateSelectedColumns (headerRange: ExcelJS.Fable.Excel.Range, bodyRowRang
 /// <param name="excelTable"></param>
 /// <param name="context"></param>
 let validateBuildingBlock (excelTable: Table, context: RequestContext) =
-
-    let columns = excelTable.columns
-    let selectedRange = context.workbook.getSelectedRange()
-
-    let _ =
-        columns.load(propertyNames = U2.Case2 (ResizeArray[|"count"; "items"; "name"|])) |> ignore
-        selectedRange.load(U2.Case2 (ResizeArray [|"values"; "columnIndex"|]))
-
     promise {
+        let columns = excelTable.columns
+        let selectedRange = context.workbook.getSelectedRange()
+
+        let _ =
+            columns.load(propertyNames = U2.Case2 (ResizeArray[|"count"; "items"; "name"|])) |> ignore
+            selectedRange.load(U2.Case2 (ResizeArray [|"values"; "columnIndex"|]))
+    
         do! context.sync().``then``( fun _ -> ())
 
         let columnIndex = selectedRange.columnIndex
@@ -2665,6 +2664,91 @@ let updateTopLevelMetadata (arcFiles: ArcFiles) =
         }
     )
 
+let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) =
+    Excel.run(fun context ->
+        promise {
+            let! result = tryGetActiveAnnotationTable context
+
+            match result with
+            | Some excelTable ->
+
+                let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
+                let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowCount"; "rowIndex"|]))
+
+                let tableRange = excelTable.getRange()
+                let _ = tableRange.load(U2.Case2 (ResizeArray[|"values"|]))
+
+                do! context.sync().``then``(fun _ -> ())
+
+                let tableValues =
+                    tableRange.values
+                    |> Array.ofSeq
+                    |> Array.map (fun row ->
+                        row
+                        |> Array.ofSeq
+                        |> Array.map (fun column ->
+                            column
+                            |> Option.map string
+                            |> Option.defaultValue ""
+                            |> (fun s -> s.TrimEnd())
+                        )
+                    )
+
+                let tableHeaders = tableValues.[0]
+                let firstRow = selectedRange.rowIndex
+                let rowCount = selectedRange.rowCount
+
+                if firstRow = 0 && rowCount = 1 then return [InteropLogging.Msg.create InteropLogging.Error "You cannot fill the headers of an annotation table with terms!"]
+                else
+                    let rowCount =
+                        if firstRow = 0. then rowCount - 1.
+                        else rowCount
+                    let firstRow =
+                        if firstRow = 0. then 1.
+                        else firstRow
+
+                    let columnIndices = selectedBuildingBlock |> Array.ofSeq |> Array.map (fun (index, _) -> index)
+                    let columnHeaders = ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> Array.ofSeq
+
+                    let firstIndex = Array.head columnIndices
+                    let lastIndex = Array.last columnIndices
+
+                    let isUnit = Array.contains columnHeaders.[2] tableHeaders.[firstIndex..lastIndex] //Unit
+                    for rowIndex in firstRow..(firstRow + rowCount-1.) do
+                        
+                        columnIndices
+                        |> Array.iter (fun columnIndex ->
+                            match tableHeaders.[columnIndex] with
+                            | header when header = columnHeaders.[2] -> //Unit
+                                tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.Name.IsSome then ontologyAnnotation.Name.Value else tableValues.[int rowIndex].[columnIndex])
+                            | header when header.Contains(columnHeaders.[0]) -> //Term Source REF
+                                tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.TermSourceREF.IsSome then ontologyAnnotation.TermSourceREF.Value else tableValues.[int rowIndex].[columnIndex])
+                            | header when header.Contains(columnHeaders.[1]) -> //Term Accession Number
+                                tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.TermAccessionNumber.IsSome then ontologyAnnotation.TermAccessionNumber.Value else tableValues.[int rowIndex].[columnIndex])
+                            | _ -> //Only main column left
+                                if not isUnit then
+                                    tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.Name.IsSome then ontologyAnnotation.Name.Value else tableValues.[int rowIndex].[columnIndex])
+                        )
+
+                    let bodyValues =
+                        tableValues
+                        |> Array.map (fun row ->
+                            row
+                            |> Array.map (fun item -> ExcelHelper.parseToObj(item) |> Some)
+                            |> ResizeArray
+                        )
+                        |> ResizeArray
+
+                    tableRange.values <- bodyValues
+
+                    do! context.sync().``then``(fun _ -> ())
+
+                    return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the slected term"]
+
+            | _ -> return [InteropLogging.Msg.create InteropLogging.Error "No annoataion table is available!"]
+        }
+    )
+
 // Old stuff, mostly deprecated
 
 //let private createColumnBodyValues (insertBB:InsertBuildingBlock) (tableRowCount:int) =
@@ -3205,134 +3289,134 @@ let getParentTerm () =
         }
     )
 
-/// <summary>This is used to insert terms into selected cells.
-/// 'term' is the value that will be written into the main column.
-/// 'termBackground' needs to be spearate from 'term' in case the user uses the fill function for a custom term.
-/// Should the user write a real term with this function 'termBackground'.isSome and can be used to fill TSR and TAN.</summary>
-let insertOntologyTerm (term:OntologyAnnotation) =
-    Excel.run(fun context ->
-        // Ref. 2
-        let range = context.workbook.getSelectedRange()
-        let _ = range.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "rowIndex"; "columnCount"; "rowCount"])))
-        // This is for TSR and TAN
-        let nextColsRange = range.getColumnsAfter 2.
-        let _ = nextColsRange.load(U2.Case2 (ResizeArray(["values";"columnIndex";"columnCount"])))
+///// <summary>This is used to insert terms into selected cells.
+///// 'term' is the value that will be written into the main column.
+///// 'termBackground' needs to be spearate from 'term' in case the user uses the fill function for a custom term.
+///// Should the user write a real term with this function 'termBackground'.isSome and can be used to fill TSR and TAN.</summary>
+//let insertOntologyTerm (term:OntologyAnnotation) =
+//    Excel.run(fun context ->
+//        // Ref. 2
+//        let range = context.workbook.getSelectedRange()
+//        let _ = range.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "rowIndex"; "columnCount"; "rowCount"])))
+//        // This is for TSR and TAN
+//        let nextColsRange = range.getColumnsAfter 2.
+//        let _ = nextColsRange.load(U2.Case2 (ResizeArray(["values";"columnIndex";"columnCount"])))
 
-        // Ref. 1
-        let r = context.runtime.load(U2.Case1 "enableEvents")
+//        // Ref. 1
+//        let r = context.runtime.load(U2.Case1 "enableEvents")
 
-        promise {
+//        promise {
 
-            let! tryTable = tryFindActiveAnnotationTable()
+//            let! tryTable = tryFindActiveAnnotationTable()
 
-            // This function checks multiple scenarios destroying Swate table formatting through the insert ontology term function
-            do! match tryTable with
-                | Ok table ->
-                    promise {
-                        // Input column also affects the next 2 columns so [range.columnIndex; range.columnIndex+1.; range.columnIndex+2.]
-                        let sheet = context.workbook.worksheets.getActiveWorksheet()
-                        let table = sheet.tables.getItem(table)
-                        let tableRange = table.getRange()
-                        let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "rowCount"; "columnIndex"; "columnCount"])))
-                        // sync load to receive values
-                        let! inputRow, lastInputRow, inputColumn, lastInputColumn = context.sync().``then``(fun _ -> range.rowIndex, range.rowIndex+range.rowCount, range.columnIndex, range.columnIndex + 2.)
-                        //printfn $"inputRow: {inputRow}, lastInputRow: {lastInputRow}"
-                        //printfn $"inputColumn: {inputColumn}, lastInputColumn: {lastInputColumn}"
-                        let lastColumnIndex = tableRange.columnIndex + tableRange.columnCount
-                        let lastRowIndex = tableRange.rowIndex + tableRange.rowCount
-                        //printfn "rowIndex: %A, lastRowIndex: %A" tableRange.rowIndex lastRowIndex
-                        //printfn "columnIndex: %A, lastColumnIndex: %A" tableRange.columnIndex lastColumnIndex
-                        let isInBodyRows = (inputRow >= tableRange.rowIndex || lastInputRow >= tableRange.rowIndex) && (inputRow <= lastRowIndex || lastInputRow <= lastRowIndex)
-                        let isInBodyColumns = (inputColumn >= tableRange.columnIndex || lastInputColumn >= tableRange.columnIndex) && (inputColumn <= lastColumnIndex || lastInputColumn <= lastColumnIndex)
-                        //printfn "isInBodyRows: %A; isInBodyColumns: %A" isInBodyRows isInBodyColumns
-                        // Never add ontology terms inside annotation table header (this will also prevent adding terms right next to the table,
-                        // which is good, as excel would extend the table around the inserted term, destroying the annotation table format
-                        if [inputRow .. lastInputRow] |> List.contains tableRange.rowIndex then
-                            if isInBodyColumns then
-                                failwith "Cannot insert ontology term into annotation table header row. If you want to create new building blocks, please use the Add Building Block function."
-                        // Never add ontology terms right next to the table as excel would extend the table around the inserted term, destroying the annotation table format.
-                        // Check row below table
-                        if inputRow = lastRowIndex then
-                            if isInBodyColumns then failwith "Cannot insert ontology term directly underneath an annotation table!"
-                        // Check column to the right side of the table AND check the two columns left of the table (function fills 3 columns)
-                        if inputColumn = lastColumnIndex || inputColumn = tableRange.columnIndex - 2. || inputColumn = tableRange.columnIndex - 1. then
-                            if isInBodyRows then failwith "Cannot insert ontology term directly next to an annotation table!"
-                        let! buildingblocks = BuildingBlock.getFromContext(context,table)
-                        // Never add ontology terms to input/output columns and Only to main columns
-                        let mainColumnIndices =
-                            buildingblocks
-                            // cannot be added to input/output columns
-                            |> Array.filter(fun x -> not x.MainColumn.Header.isOutputCol && not x.MainColumn.Header.isInputCol )
-                            |> Array.map(fun x -> x.MainColumn.Index)
-                        // check if 'inputColumn' = any of the maincolumn indices
-                        let isInsideTable = isInBodyRows && isInBodyColumns
-                        if isInsideTable then
-                            printfn "mainColumnIndices: %A" mainColumnIndices
-                            /// indices start at table begin, so we need to rebase our inputcolumn index to table start
-                            let rebasedIndex = inputColumn - tableRange.columnIndex |> int
-                            if mainColumnIndices |> Array.contains rebasedIndex = false then failwith "Cannot insert ontology term to input/output/reference columns of an annotation table!"
-                        return ()
-                    }
-                | Result.Error e       -> JS.Constructors.Promise.resolve(())
+//            // This function checks multiple scenarios destroying Swate table formatting through the insert ontology term function
+//            do! match tryTable with
+//                | Ok table ->
+//                    promise {
+//                        // Input column also affects the next 2 columns so [range.columnIndex; range.columnIndex+1.; range.columnIndex+2.]
+//                        let sheet = context.workbook.worksheets.getActiveWorksheet()
+//                        let table = sheet.tables.getItem(table)
+//                        let tableRange = table.getRange()
+//                        let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "rowCount"; "columnIndex"; "columnCount"])))
+//                        // sync load to receive values
+//                        let! inputRow, lastInputRow, inputColumn, lastInputColumn = context.sync().``then``(fun _ -> range.rowIndex, range.rowIndex+range.rowCount, range.columnIndex, range.columnIndex + 2.)
+//                        //printfn $"inputRow: {inputRow}, lastInputRow: {lastInputRow}"
+//                        //printfn $"inputColumn: {inputColumn}, lastInputColumn: {lastInputColumn}"
+//                        let lastColumnIndex = tableRange.columnIndex + tableRange.columnCount
+//                        let lastRowIndex = tableRange.rowIndex + tableRange.rowCount
+//                        //printfn "rowIndex: %A, lastRowIndex: %A" tableRange.rowIndex lastRowIndex
+//                        //printfn "columnIndex: %A, lastColumnIndex: %A" tableRange.columnIndex lastColumnIndex
+//                        let isInBodyRows = (inputRow >= tableRange.rowIndex || lastInputRow >= tableRange.rowIndex) && (inputRow <= lastRowIndex || lastInputRow <= lastRowIndex)
+//                        let isInBodyColumns = (inputColumn >= tableRange.columnIndex || lastInputColumn >= tableRange.columnIndex) && (inputColumn <= lastColumnIndex || lastInputColumn <= lastColumnIndex)
+//                        //printfn "isInBodyRows: %A; isInBodyColumns: %A" isInBodyRows isInBodyColumns
+//                        // Never add ontology terms inside annotation table header (this will also prevent adding terms right next to the table,
+//                        // which is good, as excel would extend the table around the inserted term, destroying the annotation table format
+//                        if [inputRow .. lastInputRow] |> List.contains tableRange.rowIndex then
+//                            if isInBodyColumns then
+//                                failwith "Cannot insert ontology term into annotation table header row. If you want to create new building blocks, please use the Add Building Block function."
+//                        // Never add ontology terms right next to the table as excel would extend the table around the inserted term, destroying the annotation table format.
+//                        // Check row below table
+//                        if inputRow = lastRowIndex then
+//                            if isInBodyColumns then failwith "Cannot insert ontology term directly underneath an annotation table!"
+//                        // Check column to the right side of the table AND check the two columns left of the table (function fills 3 columns)
+//                        if inputColumn = lastColumnIndex || inputColumn = tableRange.columnIndex - 2. || inputColumn = tableRange.columnIndex - 1. then
+//                            if isInBodyRows then failwith "Cannot insert ontology term directly next to an annotation table!"
+//                        let! buildingblocks = BuildingBlock.getFromContext(context,table)
+//                        // Never add ontology terms to input/output columns and Only to main columns
+//                        let mainColumnIndices =
+//                            buildingblocks
+//                            // cannot be added to input/output columns
+//                            |> Array.filter(fun x -> not x.MainColumn.Header.isOutputCol && not x.MainColumn.Header.isInputCol )
+//                            |> Array.map(fun x -> x.MainColumn.Index)
+//                        // check if 'inputColumn' = any of the maincolumn indices
+//                        let isInsideTable = isInBodyRows && isInBodyColumns
+//                        if isInsideTable then
+//                            printfn "mainColumnIndices: %A" mainColumnIndices
+//                            /// indices start at table begin, so we need to rebase our inputcolumn index to table start
+//                            let rebasedIndex = inputColumn - tableRange.columnIndex |> int
+//                            if mainColumnIndices |> Array.contains rebasedIndex = false then failwith "Cannot insert ontology term to input/output/reference columns of an annotation table!"
+//                        return ()
+//                    }
+//                | Result.Error e       -> JS.Constructors.Promise.resolve(())
 
-            //sync with proxy objects after loading values from excel
-            let! res = context.sync().``then``( fun _ ->
+//            //sync with proxy objects after loading values from excel
+//            let! res = context.sync().``then``( fun _ ->
 
-                // failwith if the number of selected columns is > 1. This is done due to hidden columns
-                // and an overlapping reaction as we add values to the columns next to the selected one
-                if range.columnCount > 1. then failwith "Cannot insert Terms in more than one column at a time."
+//                // failwith if the number of selected columns is > 1. This is done due to hidden columns
+//                // and an overlapping reaction as we add values to the columns next to the selected one
+//                if range.columnCount > 1. then failwith "Cannot insert Terms in more than one column at a time."
 
-                r.enableEvents <- false
+//                r.enableEvents <- false
 
-                // create new values for selected range
-                let newVals = ResizeArray([
-                    for arr in range.values do
-                        let tmp = arr |> Seq.map (fun _ -> Some (term.Name |> box))
-                        ResizeArray(tmp)
-                ])
+//                // create new values for selected range
+//                let newVals = ResizeArray([
+//                    for arr in range.values do
+//                        let tmp = arr |> Seq.map (fun _ -> Some (term.Name |> box))
+//                        ResizeArray(tmp)
+//                ])
 
-                // create values for TSR and TAN
-                let nextNewVals = ResizeArray([
-                    // iterate over rows
-                    for ind in 0 .. nextColsRange.values.Count-1 do
-                        let tmp =
-                            nextColsRange.values.[ind]
-                            // iterate over cols
-                            |> Seq.mapi (fun i _ ->
-                                match i, term.TermAccessionShort = String.Empty with
-                                | 0, true | 1, true ->
-                                    None
-                                | 0, false ->
-                                    //add "Term Source REF"
-                                    term.TermSourceREF |> Option.map box
-                                | 1, false ->
-                                    //add "Term Accession Number"
-                                    Some ( term.TermAccessionOntobeeUrl |> box )
-                                | _, _ ->
-                                    r.enableEvents <- true
-                                    failwith "The insert should never add more than two extra columns."
-                            )
-                        ResizeArray(tmp)
-                ])
-                // fill selected range with new values
-                range.values <- newVals
-                // fill TSR and TAN with new values
-                nextColsRange.values <- nextNewVals
+//                // create values for TSR and TAN
+//                let nextNewVals = ResizeArray([
+//                    // iterate over rows
+//                    for ind in 0 .. nextColsRange.values.Count-1 do
+//                        let tmp =
+//                            nextColsRange.values.[ind]
+//                            // iterate over cols
+//                            |> Seq.mapi (fun i _ ->
+//                                match i, term.TermAccessionShort = String.Empty with
+//                                | 0, true | 1, true ->
+//                                    None
+//                                | 0, false ->
+//                                    //add "Term Source REF"
+//                                    term.TermSourceREF |> Option.map box
+//                                | 1, false ->
+//                                    //add "Term Accession Number"
+//                                    Some ( term.TermAccessionOntobeeUrl |> box )
+//                                | _, _ ->
+//                                    r.enableEvents <- true
+//                                    failwith "The insert should never add more than two extra columns."
+//                            )
+//                        ResizeArray(tmp)
+//                ])
+//                // fill selected range with new values
+//                range.values <- newVals
+//                // fill TSR and TAN with new values
+//                nextColsRange.values <- nextNewVals
 
-                r.enableEvents <- true
+//                r.enableEvents <- true
 
-                // return print msg
-                "Info",sprintf "Insert %A %Ax" term nextColsRange.values.Count
-            )
+//                // return print msg
+//                "Info",sprintf "Insert %A %Ax" term nextColsRange.values.Count
+//            )
 
-            let! fit =
-                match tryTable with
-                | Ok table -> autoFitTableHide context
-                | Result.Error e       -> JS.Constructors.Promise.resolve([])
+//            let! fit =
+//                match tryTable with
+//                | Ok table -> autoFitTableHide context
+//                | Result.Error e       -> JS.Constructors.Promise.resolve([])
 
-            return res
-        }
-    )
+//            return res
+//        }
+//    )
 
 /// <summary>This function will be executed after the SearchTerm types from 'createSearchTermsFromTable' where send to the server to search the database for them.
 /// Here the results will be written into the table by the stored col and row indices.</summary>
