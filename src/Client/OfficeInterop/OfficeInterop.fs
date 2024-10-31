@@ -2743,6 +2743,8 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
 
                     do! context.sync().``then``(fun _ -> ())
 
+                    do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+
                     return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the slected term"]
 
             | _ -> return [InteropLogging.Msg.create InteropLogging.Error "No annoataion table is available!"]
@@ -3288,135 +3290,6 @@ let getParentTerm () =
                 | exn -> return None
         }
     )
-
-///// <summary>This is used to insert terms into selected cells.
-///// 'term' is the value that will be written into the main column.
-///// 'termBackground' needs to be spearate from 'term' in case the user uses the fill function for a custom term.
-///// Should the user write a real term with this function 'termBackground'.isSome and can be used to fill TSR and TAN.</summary>
-//let insertOntologyTerm (term:OntologyAnnotation) =
-//    Excel.run(fun context ->
-//        // Ref. 2
-//        let range = context.workbook.getSelectedRange()
-//        let _ = range.load(U2.Case2 (ResizeArray(["values";"columnIndex"; "rowIndex"; "columnCount"; "rowCount"])))
-//        // This is for TSR and TAN
-//        let nextColsRange = range.getColumnsAfter 2.
-//        let _ = nextColsRange.load(U2.Case2 (ResizeArray(["values";"columnIndex";"columnCount"])))
-
-//        // Ref. 1
-//        let r = context.runtime.load(U2.Case1 "enableEvents")
-
-//        promise {
-
-//            let! tryTable = tryFindActiveAnnotationTable()
-
-//            // This function checks multiple scenarios destroying Swate table formatting through the insert ontology term function
-//            do! match tryTable with
-//                | Ok table ->
-//                    promise {
-//                        // Input column also affects the next 2 columns so [range.columnIndex; range.columnIndex+1.; range.columnIndex+2.]
-//                        let sheet = context.workbook.worksheets.getActiveWorksheet()
-//                        let table = sheet.tables.getItem(table)
-//                        let tableRange = table.getRange()
-//                        let _ = tableRange.load(U2.Case2 (ResizeArray(["rowIndex"; "rowCount"; "columnIndex"; "columnCount"])))
-//                        // sync load to receive values
-//                        let! inputRow, lastInputRow, inputColumn, lastInputColumn = context.sync().``then``(fun _ -> range.rowIndex, range.rowIndex+range.rowCount, range.columnIndex, range.columnIndex + 2.)
-//                        //printfn $"inputRow: {inputRow}, lastInputRow: {lastInputRow}"
-//                        //printfn $"inputColumn: {inputColumn}, lastInputColumn: {lastInputColumn}"
-//                        let lastColumnIndex = tableRange.columnIndex + tableRange.columnCount
-//                        let lastRowIndex = tableRange.rowIndex + tableRange.rowCount
-//                        //printfn "rowIndex: %A, lastRowIndex: %A" tableRange.rowIndex lastRowIndex
-//                        //printfn "columnIndex: %A, lastColumnIndex: %A" tableRange.columnIndex lastColumnIndex
-//                        let isInBodyRows = (inputRow >= tableRange.rowIndex || lastInputRow >= tableRange.rowIndex) && (inputRow <= lastRowIndex || lastInputRow <= lastRowIndex)
-//                        let isInBodyColumns = (inputColumn >= tableRange.columnIndex || lastInputColumn >= tableRange.columnIndex) && (inputColumn <= lastColumnIndex || lastInputColumn <= lastColumnIndex)
-//                        //printfn "isInBodyRows: %A; isInBodyColumns: %A" isInBodyRows isInBodyColumns
-//                        // Never add ontology terms inside annotation table header (this will also prevent adding terms right next to the table,
-//                        // which is good, as excel would extend the table around the inserted term, destroying the annotation table format
-//                        if [inputRow .. lastInputRow] |> List.contains tableRange.rowIndex then
-//                            if isInBodyColumns then
-//                                failwith "Cannot insert ontology term into annotation table header row. If you want to create new building blocks, please use the Add Building Block function."
-//                        // Never add ontology terms right next to the table as excel would extend the table around the inserted term, destroying the annotation table format.
-//                        // Check row below table
-//                        if inputRow = lastRowIndex then
-//                            if isInBodyColumns then failwith "Cannot insert ontology term directly underneath an annotation table!"
-//                        // Check column to the right side of the table AND check the two columns left of the table (function fills 3 columns)
-//                        if inputColumn = lastColumnIndex || inputColumn = tableRange.columnIndex - 2. || inputColumn = tableRange.columnIndex - 1. then
-//                            if isInBodyRows then failwith "Cannot insert ontology term directly next to an annotation table!"
-//                        let! buildingblocks = BuildingBlock.getFromContext(context,table)
-//                        // Never add ontology terms to input/output columns and Only to main columns
-//                        let mainColumnIndices =
-//                            buildingblocks
-//                            // cannot be added to input/output columns
-//                            |> Array.filter(fun x -> not x.MainColumn.Header.isOutputCol && not x.MainColumn.Header.isInputCol )
-//                            |> Array.map(fun x -> x.MainColumn.Index)
-//                        // check if 'inputColumn' = any of the maincolumn indices
-//                        let isInsideTable = isInBodyRows && isInBodyColumns
-//                        if isInsideTable then
-//                            printfn "mainColumnIndices: %A" mainColumnIndices
-//                            /// indices start at table begin, so we need to rebase our inputcolumn index to table start
-//                            let rebasedIndex = inputColumn - tableRange.columnIndex |> int
-//                            if mainColumnIndices |> Array.contains rebasedIndex = false then failwith "Cannot insert ontology term to input/output/reference columns of an annotation table!"
-//                        return ()
-//                    }
-//                | Result.Error e       -> JS.Constructors.Promise.resolve(())
-
-//            //sync with proxy objects after loading values from excel
-//            let! res = context.sync().``then``( fun _ ->
-
-//                // failwith if the number of selected columns is > 1. This is done due to hidden columns
-//                // and an overlapping reaction as we add values to the columns next to the selected one
-//                if range.columnCount > 1. then failwith "Cannot insert Terms in more than one column at a time."
-
-//                r.enableEvents <- false
-
-//                // create new values for selected range
-//                let newVals = ResizeArray([
-//                    for arr in range.values do
-//                        let tmp = arr |> Seq.map (fun _ -> Some (term.Name |> box))
-//                        ResizeArray(tmp)
-//                ])
-
-//                // create values for TSR and TAN
-//                let nextNewVals = ResizeArray([
-//                    // iterate over rows
-//                    for ind in 0 .. nextColsRange.values.Count-1 do
-//                        let tmp =
-//                            nextColsRange.values.[ind]
-//                            // iterate over cols
-//                            |> Seq.mapi (fun i _ ->
-//                                match i, term.TermAccessionShort = String.Empty with
-//                                | 0, true | 1, true ->
-//                                    None
-//                                | 0, false ->
-//                                    //add "Term Source REF"
-//                                    term.TermSourceREF |> Option.map box
-//                                | 1, false ->
-//                                    //add "Term Accession Number"
-//                                    Some ( term.TermAccessionOntobeeUrl |> box )
-//                                | _, _ ->
-//                                    r.enableEvents <- true
-//                                    failwith "The insert should never add more than two extra columns."
-//                            )
-//                        ResizeArray(tmp)
-//                ])
-//                // fill selected range with new values
-//                range.values <- newVals
-//                // fill TSR and TAN with new values
-//                nextColsRange.values <- nextNewVals
-
-//                r.enableEvents <- true
-
-//                // return print msg
-//                "Info",sprintf "Insert %A %Ax" term nextColsRange.values.Count
-//            )
-
-//            let! fit =
-//                match tryTable with
-//                | Ok table -> autoFitTableHide context
-//                | Result.Error e       -> JS.Constructors.Promise.resolve([])
-
-//            return res
-//        }
-//    )
 
 /// <summary>This function will be executed after the SearchTerm types from 'createSearchTermsFromTable' where send to the server to search the database for them.
 /// Here the results will be written into the table by the stored col and row indices.</summary>
