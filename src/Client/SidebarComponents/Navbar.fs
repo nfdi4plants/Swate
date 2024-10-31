@@ -289,7 +289,7 @@ let private ShortCutIconList navState setNavState model (dispatch: Messages.Msg 
         | _ ->
             ()
         QuickAccessButton.create(
-            "Validate / Update Ontology Terms",
+            "Rectify Ontology Terms",
             [
                 Html.i [prop.className "fa-solid fa-spell-check"]
                 Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
