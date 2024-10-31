@@ -2712,7 +2712,7 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
 
                     let firstIndex = Array.head columnIndices
                     let lastIndex = Array.last columnIndices
-
+                    log("columnHeaders", columnHeaders)
                     let isUnit = Array.contains columnHeaders.[2] tableHeaders.[firstIndex..lastIndex] //Unit
                     for rowIndex in firstRow..(firstRow + rowCount-1.) do
                         
@@ -2734,7 +2734,7 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
                         tableValues
                         |> Array.map (fun row ->
                             row
-                            |> Array.map (fun item -> ExcelHelper.parseToObj(item) |> Some)
+                            |> Array.map (fun item -> box item |> Some)
                             |> ResizeArray
                         )
                         |> ResizeArray
