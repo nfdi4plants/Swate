@@ -18,7 +18,15 @@ open BuildingBlockFunctions
 open ARCtrl
 open ARCtrl.Spreadsheet
 
+[<AutoOpen>]
 module OfficeInteropExtensions =
+
+    let createNewTableName() =
+        let guid = System.Guid.NewGuid().ToString("N")
+        ArcTable.annotationTablePrefix + guid
+
+    [<Literal>]
+    let TableStyleLight = "TableStyleMedium7"
 
     /// <summary>
     /// Check whether the selected column is a reference column or not
@@ -42,6 +50,15 @@ module OfficeInteropExtensions =
                 ra.Add(ResizeArray([(i, header)]))
         )
         ra
+
+    let isTopLevelMetadataSheet (worksheetName:string) =
+        match worksheetName with
+        | name when ArcAssay.isMetadataSheetName name -> true
+        | name when ArcInvestigation.isMetadataSheetName name -> true
+        | name when ArcStudy.isMetadataSheetName name -> true
+        | Template.metaDataSheetName
+        | Template.obsoletemetaDataSheetName -> true
+        | _ -> false
 
     /// <summary>
     /// Get the building block associated with the given column index
@@ -68,6 +85,31 @@ module OfficeInteropExtensions =
         }
 
     open ARCtrl.Spreadsheet.ArcTable
+
+    type ArcFiles with
+
+        /// <summary>
+        /// Output returns the expected sheetname and metadata values in string seqs form.
+        ///
+        /// </summary>
+        member this.MetadataToExcelStringValues() =
+            match this with
+            | ArcFiles.Assay assay ->
+                let metadataWorksheetName = ArcAssay.metadataSheetName
+                let seqOfSeqs = ArcAssay.toMetadataCollection assay
+                metadataWorksheetName, seqOfSeqs
+            | ArcFiles.Investigation investigation ->
+                let metadataWorksheetName = ArcInvestigation.metadataSheetName
+                let seqOfSeqs = ArcInvestigation.toMetadataCollection investigation
+                metadataWorksheetName, seqOfSeqs
+            | ArcFiles.Study (study, assays) ->
+                let metadataWorksheetName = ArcStudy.metadataSheetName
+                let seqOfSeqs = ArcStudy.toMetadataCollection study (Option.whereNot List.isEmpty assays)
+                metadataWorksheetName, seqOfSeqs
+            | ArcFiles.Template template ->
+                let metadataWorksheetName = Template.metaDataSheetName
+                let seqOfSeqs = Template.toMetadataCollection template
+                metadataWorksheetName, seqOfSeqs
 
     type ExcelHelper =
 
@@ -416,14 +458,7 @@ module OfficeInteropExtensions =
                 else return None
             }
 
-        static member isTopLevelMetadataName (tableName:string) =
-            match tableName with
-            | name when ArcAssay.isMetadataSheetName name -> true
-            | name when ArcInvestigation.isMetadataSheetName name -> true
-            | name when ArcStudy.isMetadataSheetName name -> true
-            | Template.metaDataSheetName
-            | Template.obsoletemetaDataSheetName -> true
-            | _ -> false
+
 
 open OfficeInteropExtensions
 
@@ -491,9 +526,6 @@ let exampleExcelFunction2 () =
             return (sprintf "%A"  allTables)
         }
     )
-
-let swateSync (context:RequestContext) =
-    context.sync().``then``(fun _ -> ())
 
 // I retrieve the index of the currently opened worksheet, here the new table should be created.
 // I retrieve all annotationTables in the workbook. I filter out all annotationTables that are on a worksheet with a lower index than the index of the currently opened worksheet.
@@ -1038,171 +1070,6 @@ let private rebaseIndexToTable (selectedRange:Excel.Range) (annoHeaderRange:Exce
     else
         diff
     |> float
-
-/// <summary>Check column type and term if combination already exists</summary>
-let private checkIfBuildingBlockExisting (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
-    let mainColumnPrints =
-        existingBuildingBlocks
-        |> Array.choose (fun x ->
-            // reference columns are now allowed in duplicates (0.6.4)
-            if x.MainColumn.Header.isMainColumn && not x.MainColumn.Header.isTermColumn then
-                x.MainColumn.Header.toBuildingBlockNamePrePrint
-            else
-                None
-        )
-    if mainColumnPrints |> Array.contains newBB.ColumnHeader then failwith $"Swate table contains already building block \"{newBB.ColumnHeader.toAnnotationTableHeader()}\" in worksheet."
-
-
-/// <summary>Check column type and term if combination already exists</summary>
-// Issue #203: Don't Error, instead change output column
-let private checkHasExistingOutput (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
-    if newBB.ColumnHeader.isOutputColumn then
-        let existingOutputOpt =
-            existingBuildingBlocks
-            |> Array.tryFind (fun x -> x.MainColumn.Header.isMainColumn && x.MainColumn.Header.isOutputCol)
-        existingOutputOpt
-    else
-        None
-        //if existingOutputOpt.IsSome then failwith $"Swate table contains already one output column \"{existingOutputOpt.Value.MainColumn.Header.SwateColumnHeader}\". Each Swate table can only contain exactly one output column type."
-
-let private checkHasExistingInput (newBB:InsertBuildingBlock) (existingBuildingBlocks:BuildingBlock []) =
-    if newBB.ColumnHeader.isInputColumn then
-        let existingInputOpt =
-            existingBuildingBlocks
-            |> Array.tryFind (fun x -> x.MainColumn.Header.isMainColumn && x.MainColumn.Header.isInputCol)
-        if existingInputOpt.IsSome then
-            failwith $"Swate table contains already input building block \"{newBB.ColumnHeader.toAnnotationTableHeader()}\" in worksheet."
-
-
-// ExcelApi 1.4
-/// <summary>This function is used to add a new building block to the active annotationTable.</summary>
-let addAnnotationBlock (newBB:InsertBuildingBlock) =
-    Excel.run(fun context ->
-        promise {
-
-            let! excelTableName = getActiveAnnotationTableName context
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let excelTable = sheet.tables.getItem(excelTableName)
-
-            // Ref. 2
-            // This is necessary to place new columns next to selected col
-            let annoHeaderRange = excelTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray[|"values"; "columnIndex"; "columnCount"; "rowIndex"|]))
-            let tableRange = excelTable.getRange()
-            let _ = tableRange.load(U2.Case2 (ResizeArray(["columnCount"; "rowCount"])))
-            let selectedRange = context.workbook.getSelectedRange()
-            let _ = selectedRange.load(U2.Case1 "columnIndex")
-
-            let! nextIndex, headerVals = context.sync().``then``(fun _ ->
-                // This is necessary to place new columns next to selected col.
-                let rebasedIndex = rebaseIndexToTable selectedRange annoHeaderRange
-
-                // This is necessary to skip over hidden cols
-                // Get an array of the headers
-                let headerVals = annoHeaderRange.values.[0] |> Array.ofSeq
-
-                // Here is the next col index, which is not hidden, calculated.
-                let nextIndex = findIndexNextNotHiddenCol headerVals rebasedIndex
-                nextIndex, headerVals
-            )
-
-            let rowCount = tableRange.rowCount |> int
-
-            //create an empty column to insert
-            let col value = createMatrixForTables 1 rowCount value
-
-            let! mainColName, formatChangedMsg = context.sync().``then``( fun _ ->
-
-                let allColHeaders =
-                    headerVals
-                    |> Array.choose id
-                    |> Array.map string
-
-                let columnNames = Indexing.createColumnNames newBB allColHeaders
-
-                /// This logic will only work if there is only one format change
-                let mutable formatChangedMsg : InteropLogging.Msg list = []
-
-                let createAllCols =
-                    let createCol index =
-                        excelTable.columns.add(
-                            index   = index,
-                            values  = U4.Case1 (col "")
-                        )
-                    columnNames
-                    |> Array.mapi (fun i colName ->
-                        // create a single column
-                        let col = createCol (nextIndex + float i)
-                        // add column header name
-                        col.name <- colName
-                        let columnBody = col.getDataBodyRange()
-                        // Fit column width to content
-                        columnBody.format.autofitColumns()
-                        // Update mainColumn body rows with number format IF building block has unit.
-                        // Trim column name to
-                        if newBB.UnitTerm.IsSome && colName = columnNames.[0] then
-                            // create numberFormat for unit columns
-                            let format = newBB.UnitTerm.Value.toNumberFormat
-                            let formats = createValueMatrix 1 (rowCount-1) format
-                            formatChangedMsg <- (InteropLogging.Msg.create InteropLogging.Info $"Added specified unit: {format}")::formatChangedMsg
-                            columnBody.numberFormat <- formats
-                        else
-                            let format = createValueMatrix 1 (rowCount-1) "@"
-                            columnBody.numberFormat <- format
-                        // hide freshly created column if it is a reference column
-                        if colName <> columnNames.[0] then
-                            columnBody.columnHidden <- true
-                        col
-                    )
-
-
-                // 'columnNames.[0]' should only be used for logging, so maybe trim whitespace?
-                columnNames.[0], formatChangedMsg
-            )
-
-            let! fit = autoFitTableByTable excelTable context
-
-            let createColsMsg = InteropLogging.Msg.create InteropLogging.Info $"{mainColName} was added."
-
-            let loggingList = [
-                if not formatChangedMsg.IsEmpty then yield! formatChangedMsg
-                createColsMsg
-            ]
-
-            return loggingList
-        }
-    )
-
-// https://github.com/nfdi4plants/Swate/issues/203
-/// If an output column already exists it should be replaced by the new output column type.
-let replaceOutputColumn (excelTableName: string) (existingOutputColumn: BuildingBlock) (newOutputcolumn: InsertBuildingBlock) =
-    Excel.run(fun context ->
-        promise {
-            // Ref. 2
-            // This is necessary to place new columns next to selected col
-            let sheet = context.workbook.worksheets.getActiveWorksheet()
-            let excelTable = sheet.tables.getItem(excelTableName)
-            let annoHeaderRange = excelTable.getHeaderRowRange()
-            let existingOutputColCell = annoHeaderRange.getCell(0., float existingOutputColumn.MainColumn.Index)
-            let _ = existingOutputColCell.load(U2.Case2 (ResizeArray[|"values"|]))
-
-            let newHeaderValues = ResizeArray[|ResizeArray [|newOutputcolumn.ColumnHeader.toAnnotationTableHeader() |> box |> Some|]|]
-            do! context.sync().``then``(fun _ ->
-                existingOutputColCell.values <- newHeaderValues
-                ()
-            )
-
-            let! _ = autoFitTableByTable excelTable context
-
-            let warningMsg = $"Found existing output column \"{existingOutputColumn.MainColumn.Header.SwateColumnHeader}\". Changed output column to \"{newOutputcolumn.ColumnHeader.toAnnotationTableHeader()}\"."
-
-            let msg = InteropLogging.Msg.create InteropLogging.Warning warningMsg
-
-            let loggingList = [ msg ]
-
-            return loggingList
-        }
-    )
 
 /// <summary>
 /// Update an existing inputcolumn of an annotation table
@@ -2393,8 +2260,7 @@ type OfficeInterop =
 
                 let worksheetTopLevelMetadata =
                     worksheets.items
-                    |> Seq.tryFind (fun item ->
-                        ArcTable.isTopLevelMetadataName item.name)
+                    |> Seq.tryFind (fun item -> isTopLevelMetadataSheet item.name)
 
                 match worksheetTopLevelMetadata with
                 | Some worksheet when ArcAssay.isMetadataSheetName worksheet.name ->
@@ -2442,23 +2308,43 @@ type OfficeInterop =
             }
         )
 
-/// <summary>
-/// Creates excel worksheet with name for top level metadata
-/// </summary>
-/// <param name="name"></param>
-let createTopLevelMetadata workSheetName =
-    Excel.run(fun context ->
-        promise {
-            let newWorkSheet = context.workbook.worksheets.add(workSheetName)
+    static member writeArcTable(arcTable: ArcTable, ?context0) =
+        let mkFunc (context: RequestContext) =
+            promise {
+                let worksheetName = arcTable.Name
+                //delete existing worksheet with the same name
+                let worksheet0 = context.workbook.worksheets.getItemOrNullObject(worksheetName)
+                worksheet0.delete()
 
-            try
-                newWorkSheet.activate()
-                do! context.sync().``then``(fun _ -> ())
-                return [InteropLogging.Msg.create InteropLogging.Warning $"The work sheet {workSheetName} has been created"]
-            with
-                | err -> return [InteropLogging.Msg.create InteropLogging.Error err.Message]
-        }
-    )
+                // create new worksheet
+                let worksheet = context.workbook.worksheets.add(worksheetName)
+                do! context.sync()
+
+                let tableValues = arcTable.ToExcelValues()
+                let rowCount = tableValues.Count
+                let columnCount = tableValues |> Seq.map Seq.length |> Seq.max
+                let tableRange = worksheet.getRangeByIndexes(0,0, rowCount, columnCount)
+
+                let table = worksheet.tables.add(U2.Case1 tableRange, true)
+
+                tableRange.values <- tableValues
+                table.name <- createNewTableName()
+                table.style <- TableStyleLight
+
+                // Only activate the worksheet if this function is specifically called
+                if context0.IsNone then worksheet.activate()
+
+                do! context.sync()
+
+                return worksheet, table
+            }
+        match context0 with
+        | Some ctx ->
+            mkFunc ctx
+        | None ->
+            Excel.run(fun ctx ->
+                mkFunc ctx
+            )
 
 open FsSpreadsheet
 
@@ -2473,17 +2359,12 @@ let deleteTopLevelMetadata () =
 
             let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
 
-            do! context.sync().``then``(fun _ -> ())
+            do! context.sync()
 
             worksheets.items
             |> Seq.iter (fun worksheet ->
-                match worksheet.name with
-                | name when ArcAssay.isMetadataSheetName name -> worksheet.delete()
-                | name when ArcInvestigation.isMetadataSheetName name -> worksheet.delete()
-                | name when ArcStudy.isMetadataSheetName name -> worksheet.delete()
-                | Template.metaDataSheetName -> worksheet.delete()
-                | Template.obsoletemetaDataSheetName  -> worksheet.delete()
-                | _ -> ()
+                if isTopLevelMetadataSheet worksheet.name then
+                    worksheet.delete()
             )
 
             return [InteropLogging.Msg.create InteropLogging.Warning $"The top level metadata work sheet has been deleted"]
@@ -2540,6 +2421,8 @@ let private updateWorkSheet (context:RequestContext) (worksheetName: string) (se
         return worksheet
     }
 
+
+
 /// <summary>
 /// Updates top level metadata excel worksheet of assays
 /// </summary>
@@ -2547,36 +2430,37 @@ let private updateWorkSheet (context:RequestContext) (worksheetName: string) (se
 let updateTopLevelMetadata (arcFiles: ArcFiles) =
     Excel.run(fun context ->
         promise {
-            let worksheet, seqOfSeqs =
-                match arcFiles with
-                | ArcFiles.Assay assay ->
-                    let assayWorksheet = ArcAssay.toMetadataSheet assay
-                    let seqOfSeqs = ArcAssay.toMetadataCollection assay
-                    assayWorksheet, seqOfSeqs
-                | ArcFiles.Investigation investigation ->
-                    let investigationWorkbook = ArcInvestigation.toFsWorkbook investigation
-                    let investigationWorksheet = investigationWorkbook.GetWorksheetByName(ArcInvestigation.metadataSheetName)
-                    let seqOfSeqs = ArcInvestigation.toMetadataCollection investigation
-                    investigationWorksheet, seqOfSeqs
-                | ArcFiles.Study (study, assays) ->
-                    let assays =
-                        if assays.IsEmpty then None
-                        else Some assays
-                    let studyWorksheet = ArcStudy.toMetadataSheet study assays
-                    let seqOfSeqs = ArcStudy.toMetadataCollection study assays
-                    studyWorksheet, seqOfSeqs
-                | ArcFiles.Template template ->
-                    let templateWorksheet = Template.toMetadataSheet template
-                    let seqOfSeqs = Template.toMetadataCollection template
-                    templateWorksheet, seqOfSeqs
+            let worksheetName, seqOfSeqs = arcFiles.MetadataToExcelStringValues()
 
-            let! updatedWorksheet = updateWorkSheet context worksheet.Name seqOfSeqs
+            let! updatedWorksheet = updateWorkSheet context worksheetName seqOfSeqs
 
             updatedWorksheet.activate()
 
-            return [InteropLogging.Msg.create InteropLogging.Warning $"The worksheet {worksheet.Name} has been updated"]
+            return [InteropLogging.Msg.create InteropLogging.Info $"The worksheet {worksheetName} has been updated"]
         }
     )
+
+/// <summary>
+/// This function deletes all existing arc tables in the excel file and metadata sheets, and writes a new ArcFile to excel
+/// </summary>
+/// <param name="arcFiles"></param>
+let updateArcFile (arcFiles: ArcFiles) =
+    Excel.run(fun context ->
+        promise {
+            let worksheetName, seqOfSeqs = arcFiles.MetadataToExcelStringValues()
+
+            let! updatedWorksheet = updateWorkSheet context worksheetName seqOfSeqs
+
+            let tables = arcFiles.Tables()
+            for table in tables do
+                do! OfficeInterop.writeArcTable(table, context0=context).``then``(fun _ -> ())
+
+            updatedWorksheet.activate()
+
+            return [InteropLogging.Msg.create InteropLogging.Info $"Replaced existing Swate information! Added {tables.TableCount} tables!"]
+        }
+    )
+    
 
 // Old stuff, mostly deprecated
 

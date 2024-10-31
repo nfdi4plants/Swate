@@ -136,9 +136,6 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                         Bulma.buttons [
                             Bulma.button.a [
                                 Bulma.color.isPrimary
-                                prop.style [
-                                    style.width 250
-                                ]
                                 prop.text "Update Metadata Type"
                                 prop.onClick (fun _ ->
                                     if excelMetadataType.Metadata.IsSome then
@@ -152,9 +149,6 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                             ]
                             Bulma.button.a [
                                 Bulma.color.isDanger
-                                prop.style [
-                                    style.width 250
-                                ]
                                 prop.text "Delete Metadata Type"
                                 prop.onClick (fun _ ->
                                     OfficeInterop.DeleteTopLevelMetadata
