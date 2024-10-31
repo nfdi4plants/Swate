@@ -150,8 +150,8 @@ module OfficeInteropExtensions =
         /// <param name="excelTable"></param>
         /// <param name="rowCount"></param>
         /// <param name="value"></param>
-        static member addRows (index: float) (excelTable: Table) rowCount value =
-            let col = createMatrixForTables 1 rowCount value
+        static member addRows (index: float) (excelTable: Table) columnCount rowCount value =
+            let col = createMatrixForTables columnCount rowCount value
             excelTable.rows.add(
                 index   = index,
                 values  = U4.Case1 col
@@ -2664,6 +2664,28 @@ let updateTopLevelMetadata (arcFiles: ArcFiles) =
         }
     )
 
+/// <summary>
+/// Add new rows to the end of the given table
+/// </summary>
+/// <param name="table"></param>
+/// <param name="tableRowCount"></param>
+/// <param name="tableColumnCount"></param>
+/// <param name="targetRowCount"></param>
+/// <param name="context"></param>
+let expandTableRowCount (table: Table) (tableRowCount: int) (tableColumnCount: int) (targetRowCount: int) (context: RequestContext) =
+    promise {
+
+        let diff = targetRowCount - tableRowCount
+
+        ExcelHelper.addRows -1. table tableColumnCount diff "" |> ignore
+
+        do! context.sync().``then``(fun _ -> ())
+    }    
+
+/// <summary>
+/// Fill the selected building blocks, or single columns, with the selected term
+/// </summary>
+/// <param name="ontologyAnnotation"></param>
 let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) =
     Excel.run(fun context ->
         promise {
@@ -2675,9 +2697,22 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
                 let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
                 let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowCount"; "rowIndex"|]))
 
-                let tableRange = excelTable.getRange()
-                let _ = tableRange.load(U2.Case2 (ResizeArray[|"values"|]))
+                let mutable tableRange = excelTable.getRange()
+                let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
 
+                do! context.sync().``then``(fun _ -> ())
+
+                let firstRow = selectedRange.rowIndex
+                let selectedRowCount = selectedRange.rowCount
+
+                if firstRow + selectedRowCount > tableRange.rowCount then
+                    let targetRowCount = int (firstRow + selectedRowCount)
+                    do! expandTableRowCount excelTable (int tableRange.rowCount) (int tableRange.columnCount) targetRowCount context
+                    let newTableRange = excelTable.getRange()
+                    tableRange <- newTableRange
+
+                let newTableRange = excelTable.getRange()
+                let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
                 do! context.sync().``then``(fun _ -> ())
 
                 let tableValues =
@@ -2695,14 +2730,12 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
                     )
 
                 let tableHeaders = tableValues.[0]
-                let firstRow = selectedRange.rowIndex
-                let rowCount = selectedRange.rowCount
 
-                if firstRow = 0 && rowCount = 1 then return [InteropLogging.Msg.create InteropLogging.Error "You cannot fill the headers of an annotation table with terms!"]
+                if firstRow = 0 && selectedRowCount = 1 then return [InteropLogging.Msg.create InteropLogging.Error "You cannot fill the headers of an annotation table with terms!"]
                 else
-                    let rowCount =
-                        if firstRow = 0. then rowCount - 1.
-                        else rowCount
+                    let selectedRowCount =
+                        if firstRow = 0. then selectedRowCount - 1.
+                        else selectedRowCount
                     let firstRow =
                         if firstRow = 0. then 1.
                         else firstRow
@@ -2714,8 +2747,8 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
                     let lastIndex = Array.last columnIndices
 
                     let isUnit = Array.contains columnHeaders.[2] tableHeaders.[firstIndex..lastIndex] //Unit
-                    for rowIndex in firstRow..(firstRow + rowCount-1.) do
-                        
+
+                    for rowIndex in firstRow..(firstRow + selectedRowCount-1.) do
                         columnIndices
                         |> Array.iter (fun columnIndex ->
                             match tableHeaders.[columnIndex] with
