@@ -2193,6 +2193,10 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
         }
     )
 
+/// <summary>
+/// Get term data from data base based on names
+/// </summary>
+/// <param name="names"></param>
 let getTermData names =
     promise {
         let terms =
@@ -2208,6 +2212,13 @@ let getTermData names =
             |> Array.map (fun item -> Array.tryHead item.results)
     }
 
+/// <summary>
+/// Convert selected building block
+/// </summary>
+/// <param name="excelTable"></param>
+/// <param name="arcTable"></param>
+/// <param name="propertyColumns"></param>
+/// <param name="indexedTerms"></param>
 let updateSelectedBuildingBlocks (excelTable: Table) (arcTable: ArcTable) (propertyColumns: array<int*string []>) (indexedTerms: list<int*Term option>) =
     promise {
         let headers = ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> Array.ofSeq
@@ -2674,13 +2685,100 @@ let updateTopLevelMetadata (arcFiles: ArcFiles) =
 /// <param name="context"></param>
 let expandTableRowCount (table: Table) (tableRowCount: int) (tableColumnCount: int) (targetRowCount: int) (context: RequestContext) =
     promise {
-
         let diff = targetRowCount - tableRowCount
 
         ExcelHelper.addRows -1. table tableColumnCount diff "" |> ignore
 
         do! context.sync().``then``(fun _ -> ())
     }    
+
+let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (context: RequestContext) =
+    promise {
+        let _ = selectedRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let rowCount =   int selectedRange.rowCount
+        let columnCount = int selectedRange.columnCount
+
+        let selectedValues =
+            selectedRange.values
+            |> Array.ofSeq
+            |> Array.map (fun item ->
+                item
+                |> Array.ofSeq
+                |> Array.map (fun itemi ->
+                    itemi
+                    |> Option.map string
+                    |> Option.defaultValue ""))
+
+        let rec loop columnIndex columnCount (values: string[]) lastindex =
+            if columnIndex < columnCount then
+                let mutable lastSelectedIndex = 0
+                let groupEnd = min (columnIndex + 3) columnCount
+                for i in columnIndex..groupEnd-1 do
+                    match i - columnIndex with
+                    | 0 -> values.[i] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
+                    | 1 -> values.[i] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
+                    | 2 -> values.[i] <- (if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
+                    | _ -> ()
+                    lastSelectedIndex <- (i - columnIndex)
+                // Recursively call with next starting index, reset after reaching 3 elements or end of array
+                loop groupEnd columnCount values lastSelectedIndex
+            else if columnIndex = columnCount then
+                match lastindex with
+                | 0 -> values.[columnCount] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
+                | 1 -> values.[columnCount] <-(if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
+                | 2 -> values.[columnCount] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
+                | _ -> ()
+                values
+            else
+                values
+
+        for rowIndex in 0..rowCount-1 do
+            selectedValues.[rowIndex] <- loop 0 (columnCount-1) selectedValues.[rowIndex] 0
+
+        let bodyValues =
+            selectedValues
+            |> Array.map (fun row ->
+                row
+                |> Array.map (fun item -> box item |> Some)
+                |> ResizeArray
+            )
+            |> ResizeArray
+
+        selectedRange.values <- bodyValues
+
+        selectedRange.format.autofitColumns()
+        selectedRange.format.autofitRows()
+
+        do! context.sync().``then``(fun _ -> ())
+    }
+
+/// <summary>
+/// Checks whether the first selected cell is within the range of an annotation table or not
+/// </summary>
+/// <param name="tableRange"></param>
+/// <param name="selectedRange"></param>
+/// <param name="context"></param>
+let private selectedOutsideAnnotationTable (tableRange: Excel.Range) (selectedRange: Excel.Range) (context: RequestContext) =
+    promise {
+        let _ =
+            tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount";|])) |> ignore
+            selectedRange.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex";|]))
+
+        do! context.sync().``then``(fun _ -> ())
+
+        let tableMaxRow = tableRange.rowCount
+        let tableMaxColumn = tableRange.columnCount
+
+        let selectedRow = selectedRange.rowIndex + 1.
+        let selectedColumn = selectedRange.columnIndex + 1.
+
+        if (selectedRow > tableMaxRow) || (selectedColumn > tableMaxColumn) then
+            return true
+        else return false
+    }
 
 /// <summary>
 /// Fill the selected building blocks, or single columns, with the selected term
@@ -2693,8 +2791,7 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
 
             match result with
             | Some excelTable ->
-
-                let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
+                
                 let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowCount"; "rowIndex"|]))
 
                 let mutable tableRange = excelTable.getRange()
@@ -2702,83 +2799,91 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
 
                 do! context.sync().``then``(fun _ -> ())
 
-                let firstRow = selectedRange.rowIndex
-                let selectedRowCount = selectedRange.rowCount
+                let! isAnnotationTableSelected = selectedOutsideAnnotationTable tableRange selectedRange context
 
-                if firstRow + selectedRowCount > tableRange.rowCount then
-                    let targetRowCount = int (firstRow + selectedRowCount)
-                    do! expandTableRowCount excelTable (int tableRange.rowCount) (int tableRange.columnCount) targetRowCount context
-                    let newTableRange = excelTable.getRange()
-                    tableRange <- newTableRange
-
-                let newTableRange = excelTable.getRange()
-                let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
-                do! context.sync().``then``(fun _ -> ())
-
-                let tableValues =
-                    tableRange.values
-                    |> Array.ofSeq
-                    |> Array.map (fun row ->
-                        row
-                        |> Array.ofSeq
-                        |> Array.map (fun column ->
-                            column
-                            |> Option.map string
-                            |> Option.defaultValue ""
-                            |> (fun s -> s.TrimEnd())
-                        )
-                    )
-
-                let tableHeaders = tableValues.[0]
-
-                if firstRow = 0 && selectedRowCount = 1 then return [InteropLogging.Msg.create InteropLogging.Error "You cannot fill the headers of an annotation table with terms!"]
+                if isAnnotationTableSelected then
+                    do! insertOntology selectedRange ontologyAnnotation context
+                    return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the selected term"]
                 else
-                    let selectedRowCount =
-                        if firstRow = 0. then selectedRowCount - 1.
-                        else selectedRowCount
-                    let firstRow =
-                        if firstRow = 0. then 1.
-                        else firstRow
 
-                    let columnIndices = selectedBuildingBlock |> Array.ofSeq |> Array.map (fun (index, _) -> index)
-                    let columnHeaders = ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> Array.ofSeq
+                    let firstRow = selectedRange.rowIndex
+                    let selectedRowCount = selectedRange.rowCount
 
-                    let firstIndex = Array.head columnIndices
-                    let lastIndex = Array.last columnIndices
+                    if firstRow + selectedRowCount > tableRange.rowCount then
+                        let targetRowCount = int (firstRow + selectedRowCount)
+                        do! expandTableRowCount excelTable (int tableRange.rowCount) (int tableRange.columnCount) targetRowCount context
+                        let newTableRange = excelTable.getRange()
+                        tableRange <- newTableRange
 
-                    let isUnit = Array.contains columnHeaders.[2] tableHeaders.[firstIndex..lastIndex] //Unit
-
-                    for rowIndex in firstRow..(firstRow + selectedRowCount-1.) do
-                        columnIndices
-                        |> Array.iter (fun columnIndex ->
-                            match tableHeaders.[columnIndex] with
-                            | header when header = columnHeaders.[2] -> //Unit
-                                tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.Name.IsSome then ontologyAnnotation.Name.Value else tableValues.[int rowIndex].[columnIndex])
-                            | header when header.Contains(columnHeaders.[0]) -> //Term Source REF
-                                tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.TermSourceREF.IsSome then ontologyAnnotation.TermSourceREF.Value else tableValues.[int rowIndex].[columnIndex])
-                            | header when header.Contains(columnHeaders.[1]) -> //Term Accession Number
-                                tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.TermAccessionNumber.IsSome then ontologyAnnotation.TermAccessionNumber.Value else tableValues.[int rowIndex].[columnIndex])
-                            | _ -> //Only main column left
-                                if not isUnit then
-                                    tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.Name.IsSome then ontologyAnnotation.Name.Value else tableValues.[int rowIndex].[columnIndex])
-                        )
-
-                    let bodyValues =
-                        tableValues
-                        |> Array.map (fun row ->
-                            row
-                            |> Array.map (fun item -> box item |> Some)
-                            |> ResizeArray
-                        )
-                        |> ResizeArray
-
-                    tableRange.values <- bodyValues
-
+                    let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
                     do! context.sync().``then``(fun _ -> ())
 
-                    do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+                    let tableValues =
+                        tableRange.values
+                        |> Array.ofSeq
+                        |> Array.map (fun row ->
+                            row
+                            |> Array.ofSeq
+                            |> Array.map (fun column ->
+                                column
+                                |> Option.map string
+                                |> Option.defaultValue ""
+                                |> (fun s -> s.TrimEnd())
+                            )
+                        )
 
-                    return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the slected term"]
+                    let tableHeaders = tableValues.[0]
+
+                    if firstRow = 0 && selectedRowCount = 1 then return [InteropLogging.Msg.create InteropLogging.Error "You cannot fill the headers of an annotation table with terms!"]
+                    else
+                        let selectedRowCount =
+                            if firstRow = 0. then selectedRowCount - 1.
+                            else selectedRowCount
+                        let firstRow =
+                            if firstRow = 0. then 1.
+                            else firstRow
+
+                        let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
+
+                        let columnIndices = selectedBuildingBlock |> Array.ofSeq |> Array.map (fun (index, _) -> index)
+                        let columnHeaders = ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> Array.ofSeq
+
+                        let firstIndex = Array.head columnIndices
+                        let lastIndex = Array.last columnIndices
+
+                        let isUnit = Array.contains columnHeaders.[2] tableHeaders.[firstIndex..lastIndex] //Unit
+
+                        for rowIndex in firstRow..(firstRow + selectedRowCount-1.) do
+                            columnIndices
+                            |> Array.iter (fun columnIndex ->
+                                match tableHeaders.[columnIndex] with
+                                | header when header = columnHeaders.[2] -> //Unit
+                                    tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.Name.IsSome then ontologyAnnotation.Name.Value else tableValues.[int rowIndex].[columnIndex])
+                                | header when header.Contains(columnHeaders.[0]) -> //Term Source REF
+                                    tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.TermSourceREF.IsSome then ontologyAnnotation.TermSourceREF.Value else tableValues.[int rowIndex].[columnIndex])
+                                | header when header.Contains(columnHeaders.[1]) -> //Term Accession Number
+                                    tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.TermAccessionNumber.IsSome then ontologyAnnotation.TermAccessionAndOntobeeUrlIfShort else tableValues.[int rowIndex].[columnIndex])
+                                | _ -> //Only main column left
+                                    if not isUnit then
+                                        tableValues.[int rowIndex].[columnIndex] <- (if ontologyAnnotation.Name.IsSome then ontologyAnnotation.Name.Value else tableValues.[int rowIndex].[columnIndex])
+                            )
+
+                        let bodyValues =
+                            tableValues
+                            |> Array.map (fun row ->
+                                row
+                                |> Array.map (fun item -> box item |> Some)
+                                |> ResizeArray
+                            )
+                            |> ResizeArray
+
+                        tableRange.values <- bodyValues
+
+                        do! context.sync().``then``(fun _ -> ())
+
+                        do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+
+                        return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the selected term"]
 
             | _ -> return [InteropLogging.Msg.create InteropLogging.Error "No annoataion table is available!"]
         }
@@ -2820,7 +2925,6 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
 
 let addAnnotationBlocksToTable (buildingBlocks:InsertBuildingBlock [], table:Table, context:RequestContext) =
     promise {
-
         let excelTable = table
         let _ = excelTable.load(U2.Case1 "name")
 
