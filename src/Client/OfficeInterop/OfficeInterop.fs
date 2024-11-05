@@ -2701,60 +2701,47 @@ let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (
 
         do! context.sync().``then``(fun _ -> ())
 
-        let rowCount =   int selectedRange.rowCount
-        let columnCount = int selectedRange.columnCount
+        let selectedRowCount =   int selectedRange.rowCount
+        let selectedColumnCount = int selectedRange.columnCount
 
-        let selectedValues =
-            selectedRange.values
-            |> Array.ofSeq
-            |> Array.map (fun item ->
-                item
-                |> Array.ofSeq
-                |> Array.map (fun itemi ->
-                    itemi
-                    |> Option.map string
-                    |> Option.defaultValue ""))
+        let selectedValues = selectedRange.values
 
-        let rec loop columnIndex columnCount (values: string[]) lastindex =
-            if columnIndex < columnCount then
-                let mutable lastSelectedIndex = 0
-                let groupEnd = min (columnIndex + 3) columnCount
-                for i in columnIndex..groupEnd-1 do
-                    match i - columnIndex with
-                    | 0 -> values.[i] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
-                    | 1 -> values.[i] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
-                    | 2 -> values.[i] <- (if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
-                    | _ -> ()
-                    lastSelectedIndex <- (i - columnIndex)
-                // Recursively call with next starting index, reset after reaching 3 elements or end of array
-                loop groupEnd columnCount values lastSelectedIndex
-            else
-                if columnCount = 0 then
-                    values.[0] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
-                    values
-                else if columnIndex = columnCount then
-                    match lastindex with
-                    | 0 -> values.[columnCount] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
-                    | 1 -> values.[columnCount] <-(if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
-                    | 2 -> values.[columnCount] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
-                    | _ -> ()
-                    values
-                else
-                    values
+        //let rec loop columnIndex columnCount (values: string[]) lastindex =
+        //    if columnIndex < columnCount then
+        //        let mutable lastSelectedIndex = 0
+        //        let groupEnd = min (columnIndex + 3) columnCount
+        //        for i in columnIndex..groupEnd-1 do
+        //            match i - columnIndex with
+        //            | 0 -> values.[i] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
+        //            | 1 -> values.[i] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
+        //            | 2 -> values.[i] <- (if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
+        //            | _ -> ()
+        //            lastSelectedIndex <- (i - columnIndex)
+        //        // Recursively call with next starting index, reset after reaching 3 elements or end of array
+        //        loop groupEnd columnCount values lastSelectedIndex
+        //    else
+        //        if columnCount = 0 then
+        //            values.[0] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
+        //            values
+        //        else if columnIndex = columnCount then
+        //            match lastindex with
+        //            | 0 -> values.[columnCount] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
+        //            | 1 -> values.[columnCount] <-(if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
+        //            | 2 -> values.[columnCount] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
+        //            | _ -> ()
+        //            values
+        //        else
+        //            values
 
-        for rowIndex in 0..rowCount-1 do
-            selectedValues.[rowIndex] <- loop 0 (columnCount-1) selectedValues.[rowIndex] 0
+        for rowIndex in 0..selectedRowCount-1 do
+            for columnIndex in 0..selectedColumnCount-1 do
+                match columnIndex%3 with
+                | 0 -> selectedValues.[rowIndex].[columnIndex] <- (Option.map box ontology.Name)
+                | 1 -> selectedValues.[rowIndex].[columnIndex] <- (Option.map box ontology.TermSourceREF)
+                | 2 -> selectedValues.[rowIndex].[columnIndex] <- (ontology.TermAccessionOntobeeUrl |> Option.whereNot String.IsNullOrWhiteSpace |> Option.map box)
+                | _ -> ()
 
-        let bodyValues =
-            selectedValues
-            |> Array.map (fun row ->
-                row
-                |> Array.map (fun item -> box item |> Some)
-                |> ResizeArray
-            )
-            |> ResizeArray
-
-        selectedRange.values <- bodyValues
+        selectedRange.values <- selectedValues
 
         selectedRange.format.autofitColumns()
         selectedRange.format.autofitRows()
