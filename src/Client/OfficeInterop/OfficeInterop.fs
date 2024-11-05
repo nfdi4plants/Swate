@@ -181,9 +181,6 @@ module OfficeInteropExtensions =
                         column.getRange().columnHidden <- shallHide)
             }
 
-        static member parseToObj (input: string) : obj =
-            box input
-
         /// <summary>
         /// Converts a sequence of sequence of excel data into a resizearray, compatible with Excel.Range
         /// </summary>
@@ -198,7 +195,7 @@ module OfficeInteropExtensions =
             let ra = ResizeArray()
             for seq in metadataValues do
                 //Parse string to obj option
-                let ira = ResizeArray (seq |> Seq.map (fun column -> column |> Option.map ExcelHelper.parseToObj))
+                let ira = ResizeArray (seq |> Seq.map (fun column -> column |> Option.map box))
                 if ira.Count < maxLength then
                     ira.AddRange (Array.create (maxLength - ira.Count) None)
                 ra.Add ira
