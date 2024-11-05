@@ -34,7 +34,7 @@ type Msg =
     | AnnotationtableCreated
     | TryFindAnnotationTable
     | AnnotationTableExists                 of Result<string, string>
-    | InsertOntologyTerm                    of TermMinimal
+    | InsertOntologyTerm                    of OntologyAnnotation
     | ValidateBuildingBlock
     | AddAnnotationBlock                    of CompositeColumn
     | AddAnnotationBlocks                   of CompositeColumn [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option

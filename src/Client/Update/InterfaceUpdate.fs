@@ -304,13 +304,13 @@ module Interface =
                         |> SpreadsheetInterface.UpdateArcFile |> InterfaceMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-            | InsertOntologyAnnotation termMinimal ->
+            | InsertOntologyAnnotation ontologyAnnotation ->
                 match host with
-                //| Swatehost.Excel _ ->
-                //    let cmd = OfficeInterop.InsertOntologyTerm termMinimal |> OfficeInteropMsg |> Cmd.ofMsg
-                //    model, cmd
+                | Some Swatehost.Excel ->
+                    let cmd = OfficeInterop.InsertOntologyTerm ontologyAnnotation |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.InsertOntologyAnnotation termMinimal |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.InsertOntologyAnnotation ontologyAnnotation |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | InsertFileNames fileNames ->

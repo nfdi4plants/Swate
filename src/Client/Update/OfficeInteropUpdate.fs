@@ -53,12 +53,12 @@ module OfficeInterop =
                 }
                 nextState, model, Cmd.none
 
-            | InsertOntologyTerm term ->
+            | InsertOntologyTerm ontologyAnnotation ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.insertOntologyTerm  
-                        (term.ToOntologyAnnotation())
-                        (curry GenericLog Cmd.none >> DevMsg)
+                        OfficeInterop.Core.fillSelectedBuildingBlocksWithOntologyAnnotation  
+                        (ontologyAnnotation)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
 
