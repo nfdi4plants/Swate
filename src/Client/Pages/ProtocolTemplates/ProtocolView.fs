@@ -19,6 +19,7 @@ open Elmish
 
 open Feliz
 open Feliz.Bulma
+open ARCtrl
 
 type Templates =
 

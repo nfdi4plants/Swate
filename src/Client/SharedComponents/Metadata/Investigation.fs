@@ -9,7 +9,7 @@ open Components.Forms
 let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit) =
     Bulma.section [
         Generic.BoxedField
-            "Investigation Metadata"
+            (Some "Investigation Metadata")
             None
             [
                 FormComponents.TextInput (

@@ -16,7 +16,13 @@ module OfficeInterop =
 
             | UpdateArcFile arcFile ->
                 log ("UpdateArcFile", arcFile)
-                state, model, Cmd.none
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.updateArcFile
+                        arcFile
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
 
             | AutoFitTable hidecols ->
                 let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run (OfficeInterop.Core.autoFitTable hidecols)
@@ -226,14 +232,6 @@ module OfficeInterop =
                             ]
                         )
                         (curry GenericError (UpdateCurrentRequestState RequestBuildingBlockInfoStates.Inactive |> BuildingBlockDetails |> Cmd.ofMsg) >> DevMsg)
-                state, model, cmd
-            | CreateTopLevelMetadata workSheetName ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.createTopLevelMetadata
-                        (workSheetName)
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg) //error
                 state, model, cmd
             | UpdateTopLevelMetadata arcFiles ->
                 let cmd =
