@@ -2706,33 +2706,6 @@ let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (
 
         let selectedValues = selectedRange.values
 
-        //let rec loop columnIndex columnCount (values: string[]) lastindex =
-        //    if columnIndex < columnCount then
-        //        let mutable lastSelectedIndex = 0
-        //        let groupEnd = min (columnIndex + 3) columnCount
-        //        for i in columnIndex..groupEnd-1 do
-        //            match i - columnIndex with
-        //            | 0 -> values.[i] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
-        //            | 1 -> values.[i] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
-        //            | 2 -> values.[i] <- (if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
-        //            | _ -> ()
-        //            lastSelectedIndex <- (i - columnIndex)
-        //        // Recursively call with next starting index, reset after reaching 3 elements or end of array
-        //        loop groupEnd columnCount values lastSelectedIndex
-        //    else
-        //        if columnCount = 0 then
-        //            values.[0] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
-        //            values
-        //        else if columnIndex = columnCount then
-        //            match lastindex with
-        //            | 0 -> values.[columnCount] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
-        //            | 1 -> values.[columnCount] <-(if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
-        //            | 2 -> values.[columnCount] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
-        //            | _ -> ()
-        //            values
-        //        else
-        //            values
-
         for rowIndex in 0..selectedRowCount-1 do
             for columnIndex in 0..selectedColumnCount-1 do
                 match columnIndex%3 with
