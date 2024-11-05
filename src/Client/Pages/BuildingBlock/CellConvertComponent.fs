@@ -20,7 +20,7 @@ module private CellConvertComponentHelpers =
     let setCellTypes (state: CellDiscriminateState) (setState: CellDiscriminateState -> unit) =
         promise {
             //Write function to access current state of selected excel cell excel
-            let! (selectedCellType, targetCellType) = getValidConversionCellTypes ()
+            let! (selectedCellType, targetCellType) = tryGetValidConversionCellTypes ()
 
             setState {
                 state with
