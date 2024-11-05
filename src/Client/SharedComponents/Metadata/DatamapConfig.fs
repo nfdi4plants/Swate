@@ -42,6 +42,6 @@ type DatamapConfig =
                 ]
             ]
         Generic.BoxedField
-            "Datamap"
+            (Some "Datamap")
             desc
             content

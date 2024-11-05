@@ -11,7 +11,7 @@ open Components.Forms
 let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit) =
     Bulma.section [
         Generic.BoxedField
-            "Assay Metadata"
+            (Some "Assay Metadata")
             None
             [                
                 FormComponents.TextInput (

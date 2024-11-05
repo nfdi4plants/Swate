@@ -58,11 +58,7 @@ type Msg =
     //
     ///
     | InsertFileNames                       of fileNameList:string list
-    | CreateTopLevelMetadata                of string
     | UpdateTopLevelMetadata                of ArcFiles
-    | UpdateTopLevelInvestigation           of ArcInvestigation option * string
-    | UpdateTopLevelStudy                   of (ArcStudy * ArcAssay list) option
-    | UpdateTopLevelTemplate                of Template option
     | DeleteTopLevelMetadata
     | SendErrorsToFront                     of InteropLogging.Msg list
     | ExportJson                            of ArcFiles * JsonExportFormat
