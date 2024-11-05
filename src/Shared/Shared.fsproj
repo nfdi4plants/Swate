@@ -8,15 +8,13 @@
     <Compile Include="Extensions.fs" />
     <Compile Include="StaticTermCollection.fs" />
     <Compile Include="URLs.fs" />
-    <Compile Include="Regex.fs" />
-    <Compile Include="TermTypes.fs" />
+    <Compile Include="DTO.fs" />
     <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="AdvancedSearchTypes.fs" />
-    <Compile Include="OfficeInteropTypes.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" Version="2.1.0-alpha.4" />
-    <PackageReference Include="ARCtrl.Json" Version="2.1.0-alpha.4" />
+    <PackageReference Include="ARCtrl.Core" Version="2.2.0" />
+    <PackageReference Include="ARCtrl.Json" Version="2.2.0" />
   </ItemGroup>
 </Project>

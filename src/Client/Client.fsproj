@@ -22,14 +22,11 @@
     <Compile Include="Colors\ExcelColors.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="JsBindings\Cytoscape.fs" />
-    <Compile Include="JsBindings\HumanReadableIds.fs" />
     <Compile Include="Host.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Routing.fs" />
     <Compile Include="OfficeInterop\InteropLogging.fs" />
-    <Compile Include="OfficeInterop\Functions\Indexing.fs" />
-    <Compile Include="OfficeInterop\Functions\BuildingBlockFunctions.fs" />
-    <Compile Include="OfficeInterop\HelperFunctions.fs" />
+    <Compile Include="OfficeInterop\ExcelUtil.fs" />
     <Compile Include="OfficeInterop\OfficeInterop.fs" />
     <Compile Include="States\DataAnnotator.fs" />
     <Compile Include="States\ARCitect.fs" />
@@ -130,7 +127,7 @@
     <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Javascript" Version="2.1.0-alpha.4" />
+    <PackageReference Include="ARCtrl.Javascript" Version="2.2.0" />
     <PackageReference Include="Fable.Core" Version="4.3.0" />
     <PackageReference Include="Fable.Elmish" Version="4.2.0" />
     <PackageReference Include="Fable.Elmish.HMR" Version="7.0.0" />

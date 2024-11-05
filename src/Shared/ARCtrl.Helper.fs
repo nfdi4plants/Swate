@@ -1,7 +1,7 @@
 namespace Shared
 
 open ARCtrl
-open TermTypes
+open Database
 open System.Collections.Generic
 
 /// This module contains helper functions which might be useful for ARCtrl
@@ -299,7 +299,6 @@ module Extensions =
     type OntologyAnnotation with
         static member empty() = OntologyAnnotation.create()
         static member fromTerm (term:Term) = OntologyAnnotation(term.Name, term.FK_Ontology, term.Accession)
-        member this.ToTermMinimal() = TermMinimal.create this.NameText this.TermAccessionShort
 
     type ArcTable with
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =

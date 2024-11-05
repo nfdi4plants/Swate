@@ -2,7 +2,8 @@ namespace Shared
 
 open System
 open Shared
-open TermTypes
+open Database
+open DTO
 
 module Route =
 
@@ -32,6 +33,14 @@ module SorensenDice =
             calculateDistance resultSet searchSet
         )
 
+type IOntologyAPIv3 = {
+    // Development
+    getTestNumber : unit -> Async<int>
+    searchTerm: TermQuery -> Async<Term []>
+    searchTerms: TermQuery[] -> Async<TermQueryResults[]>
+    getTermById: string -> Async<Term option>
+}
+
 /// Development api
 type ITestAPI = {
     test    : unit      -> Async<string*string>
@@ -43,7 +52,7 @@ type IServiceAPIv1 = {
 }
 
 type IDagAPIv1 = {
-    parseAnnotationTablesToDagHtml          : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    parseAnnotationTablesToDagHtml          : (string * obj []) [] -> Async<string>
 }
 
 type IISADotNetCommonAPIv1 = {
@@ -62,20 +71,43 @@ type IISADotNetCommonAPIv1 = {
 }
 
 type ISwateJsonAPIv1 = {
-    parseAnnotationTableToAssayJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
-    parseAnnotationTableToProcessSeqJson    : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
+    parseAnnotationTableToAssayJson         : string * obj []      -> Async<string>
+    parseAnnotationTableToProcessSeqJson    : string * obj []      -> Async<string>
     //parseAnnotationTableToTableJson         : string * OfficeInteropTypes.BuildingBlock []      -> Async<string>
-    parseAnnotationTablesToAssayJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
-    parseAnnotationTablesToProcessSeqJson   : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
+    parseAnnotationTablesToAssayJson        : (string * obj []) [] -> Async<string>
+    parseAnnotationTablesToProcessSeqJson   : (string * obj []) [] -> Async<string>
     //parseAnnotationTablesToTableJson        : (string * OfficeInteropTypes.BuildingBlock []) [] -> Async<string>
-    parseAssayJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+    parseAssayJsonToBuildingBlocks          : string -> Async<(string * obj []) []>
     //parseTableJsonToBuildingBlocks          : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
-    parseProcessSeqToBuildingBlocks         : string -> Async<(string * OfficeInteropTypes.InsertBuildingBlock []) []>
+    parseProcessSeqToBuildingBlocks         : string -> Async<(string * obj []) []>
 }
 
 type IExportAPIv1 = {
-    toAssayXlsx                             : (string * OfficeInteropTypes.BuildingBlock []) []         -> Async<byte []>
+    toAssayXlsx                             : (string * obj []) []         -> Async<byte []>
 }
+
+module SwateObsolete =
+
+    type TermMinimal = {
+        Name            : string
+        /// This is the Ontology Term Accession 'XX:aaaaaa'
+        TermAccession   : string
+    }
+
+    type TermSearchable = {
+        // Contains information about the term to search itself. If term accession is known, search result is 100% correct.
+        Term                : TermMinimal
+        // If ParentTerm isSome, then the term name is first searched in a is_a directed search
+        ParentTerm          : TermMinimal option
+        // Is term ist used as unit, unit ontology is searched first.
+        IsUnit              : bool
+        // ColIndex in table
+        ColIndex            : int
+        // RowIndex in table
+        RowIndices          : int []
+        // Search result
+        SearchResultTerm    : Term option
+    }
 
 /// <summary>Deprecated</summary>
 type IOntologyAPIv1 = {
@@ -89,19 +121,23 @@ type IOntologyAPIv1 = {
     ///
     getTermSuggestions                  : (int*string)                                                  -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : (int*string*TermMinimal)                                      -> Async<Term []>
-    getAllTermsByParentTerm             : TermMinimal                                                   -> Async<Term []>
+    getTermSuggestionsByParentTerm      : (int*string*SwateObsolete.TermMinimal)                                      -> Async<Term []>
+    getAllTermsByParentTerm             : SwateObsolete.TermMinimal                                                   -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : (int*string*TermMinimal)                                      -> Async<Term []>
-    getAllTermsByChildTerm              : TermMinimal                                                   -> Async<Term []>
+    getTermSuggestionsByChildTerm       : (int*string*SwateObsolete.TermMinimal)                                      -> Async<Term []>
+    getAllTermsByChildTerm              : SwateObsolete.TermMinimal                                                   -> Async<Term []>
     getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions)                   -> Async<Term []>
     getUnitTermSuggestions              : (int*string)                                                  -> Async<Term []>
-    getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
+    getTermsByNames                     : SwateObsolete.TermSearchable []                                             -> Async<SwateObsolete.TermSearchable []>
 
     // Tree related requests
     getTreeByAccession                  : string                                                        -> Async<TreeTypes.Tree>
 }
 
+
+/// <summary>
+/// This is used for MIAPPE Wizard external tool. Before removing this contact them.
+/// </summary>
 type IOntologyAPIv2 = {
     // Development
     getTestNumber                       : unit                                                          -> Async<int>
@@ -111,28 +147,21 @@ type IOntologyAPIv2 = {
 
     // Term related requests
     ///
-    getTermSuggestions                  : {| n: int; query: string; ontology: string option|}           -> Async<Term []>
+    getTermSuggestions                  : {| n: int; query: string; ontology: string option|} -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : {| n: int; query: string; parent_term: TermMinimal |}         -> Async<Term []>
-    getAllTermsByParentTerm             : TermMinimal                                                   -> Async<Term []>
+    getTermSuggestionsByParentTerm      : {| n: int; query: string; parent_term: SwateObsolete.TermMinimal |} -> Async<Term []>
+    getAllTermsByParentTerm             : SwateObsolete.TermMinimal -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : {| n: int; query: string; child_term: TermMinimal |}          -> Async<Term []>
-    getAllTermsByChildTerm              : TermMinimal                                                   -> Async<Term []>
-    getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions)                   -> Async<Term []>
+    getTermSuggestionsByChildTerm       : {| n: int; query: string; child_term: SwateObsolete.TermMinimal |} -> Async<Term []>
+    getAllTermsByChildTerm              : SwateObsolete.TermMinimal -> Async<Term []>
+    getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions) -> Async<Term []>
     getUnitTermSuggestions              : {| n: int; query: string|} -> Async<Term []>
-    getTermsByNames                     : TermSearchable []                                             -> Async<TermSearchable []>
+    getTermsByNames                     : SwateObsolete.TermSearchable []   -> Async<SwateObsolete.TermSearchable []>
 
     // Tree related requests
-    getTreeByAccession                  : string                                                        -> Async<TreeTypes.Tree>
+    getTreeByAccession                  : string                            -> Async<TreeTypes.Tree>
 }
 
-type IOntologyAPIv3 = {
-    // Development
-    getTestNumber : unit -> Async<int>
-    searchTerm: TermQuery -> Async<Term []>
-    searchTerms: TermQuery[] -> Async<TermQueryResults[]>
-    getTermById: string -> Async<Term option>
-}
 
 type ITemplateAPIv1 = {
     // must return template as string, fable remoting cannot do conversion automatically

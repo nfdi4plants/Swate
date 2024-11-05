@@ -56,7 +56,7 @@ module OfficeInterop =
             | InsertOntologyTerm ontologyAnnotation ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.fillSelectedBuildingBlocksWithOntologyAnnotation  
+                        OfficeInterop.Core.fillSelectedWithOntologyAnnotation  
                         (ontologyAnnotation)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
