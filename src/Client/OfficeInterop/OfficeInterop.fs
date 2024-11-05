@@ -2692,6 +2692,12 @@ let expandTableRowCount (table: Table) (tableRowCount: int) (tableColumnCount: i
         do! context.sync().``then``(fun _ -> ())
     }    
 
+/// <summary>
+/// Insert the ontology information in the selected range independent of an annotation table
+/// </summary>
+/// <param name="selectedRange"></param>
+/// <param name="ontology"></param>
+/// <param name="context"></param>
 let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (context: RequestContext) =
     promise {
         let _ = selectedRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
@@ -2725,15 +2731,19 @@ let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (
                     lastSelectedIndex <- (i - columnIndex)
                 // Recursively call with next starting index, reset after reaching 3 elements or end of array
                 loop groupEnd columnCount values lastSelectedIndex
-            else if columnIndex = columnCount then
-                match lastindex with
-                | 0 -> values.[columnCount] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
-                | 1 -> values.[columnCount] <-(if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
-                | 2 -> values.[columnCount] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
-                | _ -> ()
-                values
             else
-                values
+                if columnCount = 0 then
+                    values.[0] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
+                    values
+                else if columnIndex = columnCount then
+                    match lastindex with
+                    | 0 -> values.[columnCount] <- (if ontology.TermSourceREF.IsSome then ontology.TermSourceREF.Value else "")
+                    | 1 -> values.[columnCount] <-(if ontology.TermAccessionNumber.IsSome then ontology.TermAccessionAndOntobeeUrlIfShort else "")
+                    | 2 -> values.[columnCount] <- (if ontology.Name.IsSome then ontology.Name.Value else "")
+                    | _ -> ()
+                    values
+                else
+                    values
 
         for rowIndex in 0..rowCount-1 do
             selectedValues.[rowIndex] <- loop 0 (columnCount-1) selectedValues.[rowIndex] 0
@@ -2816,6 +2826,7 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
                         tableRange <- newTableRange
 
                     let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
+
                     do! context.sync().``then``(fun _ -> ())
 
                     let tableValues =
@@ -2885,7 +2896,13 @@ let fillSelectedBuildingBlocksWithOntologyAnnotation (ontologyAnnotation: Ontolo
 
                         return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the selected term"]
 
-            | _ -> return [InteropLogging.Msg.create InteropLogging.Error "No annoataion table is available!"]
+            | _ ->
+                let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowCount"; "rowIndex"|]))
+
+                do! context.sync().``then``(fun _ -> ())
+
+                do! insertOntology selectedRange ontologyAnnotation context
+                return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the selected term"]
         }
     )
 
