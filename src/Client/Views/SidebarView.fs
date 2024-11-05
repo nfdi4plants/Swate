@@ -115,7 +115,7 @@ type SidebarView =
             |> Async.StartImmediate
         )
         Html.div [
-            prop.style [style.color "grey"; style.position.sticky; style.width.inheritFromParent; style.bottom 0; style.textAlign.center]
+            prop.className "flex items-center justify-center p-2"
             prop.children [
                 Html.div [
                     Html.text "Swate Release Version "
@@ -127,49 +127,54 @@ type SidebarView =
         ]
 
     static member private content (model:Model) (dispatch: Msg -> unit) =
-        match model.PageState.CurrentPage with
-        | Routing.Route.BuildingBlock | Routing.Route.Home _ ->
-            BuildingBlock.Core.addBuildingBlockComponent model dispatch
+        Html.div [
+            prop.className "grow overflow-y-auto"
+            prop.children [
+                match model.PageState.CurrentPage with
+                | Routing.Route.BuildingBlock | Routing.Route.Home _ ->
+                    BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
-        | Routing.Route.TermSearch ->
-            TermSearch.Main (model, dispatch)
+                | Routing.Route.TermSearch ->
+                    TermSearch.Main (model, dispatch)
 
-        | Routing.Route.FilePicker ->
-            FilePicker.filePickerComponent model dispatch
+                | Routing.Route.FilePicker ->
+                    FilePicker.filePickerComponent model dispatch
 
-        | Routing.Route.Protocol ->
-            Protocol.Templates.Main (model, dispatch)
+                | Routing.Route.Protocol ->
+                    Protocol.Templates.Main (model, dispatch)
 
-        | Routing.Route.DataAnnotator ->
-            Pages.DataAnnotator.Main(model, dispatch)
+                | Routing.Route.DataAnnotator ->
+                    Pages.DataAnnotator.Main(model, dispatch)
 
-        | Routing.Route.JsonExport ->
-            JsonExporter.Core.FileExporter.Main(model, dispatch)
+                | Routing.Route.JsonExport ->
+                    JsonExporter.Core.FileExporter.Main(model, dispatch)
 
-        | Routing.Route.ProtocolSearch ->
-            Protocol.SearchContainer.Main model dispatch
+                | Routing.Route.ProtocolSearch ->
+                    Protocol.SearchContainer.Main model dispatch
 
-        | Routing.Route.ActivityLog ->
-            ActivityLog.activityLogComponent model dispatch
+                | Routing.Route.ActivityLog ->
+                    ActivityLog.activityLogComponent model dispatch
 
-        | Routing.Route.Settings ->
-            SettingsView.settingsViewComponent model dispatch
+                | Routing.Route.Settings ->
+                    SettingsView.settingsViewComponent model dispatch
 
-        | Routing.Route.Info ->
-            Pages.Info.Main
+                | Routing.Route.Info ->
+                    Pages.Info.Main
 
-        | Routing.Route.PrivacyPolicy ->
-            Pages.PrivacyPolicy.Main()
+                | Routing.Route.PrivacyPolicy ->
+                    Pages.PrivacyPolicy.Main()
 
-        | Routing.Route.NotFound ->
-            NotFoundView.notFoundComponent model dispatch
+                | Routing.Route.NotFound ->
+                    NotFoundView.notFoundComponent model dispatch
+            ]
+        ]
 
     /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
     [<ReactComponent>]
     static member Main (model: Model, dispatch: Msg -> unit) =
         let state, setState = React.useState(SidebarStyle.init)
         Html.div [
-            prop.className "grow overflow-auto h-full"
+            prop.className "h-full flex flex-col w-full"
             prop.id Sidebar_Id
             prop.onLoad(fun e ->
                 let ele = Browser.Dom.document.getElementById(Sidebar_Id)
@@ -179,7 +184,7 @@ type SidebarView =
 
                 SidebarComponents.Navbar.NavbarComponent model dispatch state.Size
                 Html.div [
-                    prop.className "pl-4 pr-4 h-full"
+                    prop.className "pl-4 pr-4 flex flex-col grow"
                     prop.children [
                         tabs model dispatch state.Size
 
@@ -200,8 +205,8 @@ type SidebarView =
                         | _ -> ()
 
                         SidebarView.content model dispatch
+                        SidebarView.footer (model, dispatch)
                     ]
                 ]
-                SidebarView.footer (model, dispatch)
             ]
         ]
