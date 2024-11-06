@@ -63,7 +63,7 @@ module OfficeInterop =
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.Main.addCompositeColumn  
-                        compositeColumn
+                        (compositeColumn)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd

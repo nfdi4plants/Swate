@@ -1,16 +1,12 @@
 module OfficeInterop.ExcelUtil
 
 open Fable.Core
-open Fable.Core.JsInterop
 open ExcelJS.Fable
 open Excel
 open GlobalBindings
 open System.Collections.Generic
-open System.Text.RegularExpressions
 open System
 
-open Shared
-open ARCtrl
 open ARCtrl.Spreadsheet
 
 [<Literal>]
@@ -22,7 +18,7 @@ let TableStyleLight = "TableStyleMedium7"
 // ExcelApi 1.1
 /// This function returns the names of all annotationTables in all worksheets.
 /// This function is used to pass a list of all table names to e.g. the 'createAnnotationTable()' function. 
-let getAllTableNames (context:RequestContext) =
+let getAllTableNames (context: RequestContext) =
     // Ref. 2
 
     let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
@@ -40,7 +36,7 @@ let getAllTableNames (context:RequestContext) =
             tableNames
     )
 
-let createMatrixForTables (colCount:int) (rowCount:int) value =
+let createMatrixForTables (colCount: int) (rowCount: int) value =
     [|
         for i in 0 .. rowCount-1 do
             yield [|
@@ -55,7 +51,7 @@ let inline excelRunWith<'A> (context: RequestContext option) (promise: RequestCo
 
 /// This is based on a excel hack on how to add multiple header of the same name to an excel table.,
 /// by just appending more whitespace to the name.
-let extendName (existingNames: string []) (baseName:string) =
+let extendName (existingNames: string []) (baseName: string) =
     /// https://unicode-table.com/en/200B/
     /// Play with Fire 🔥
     let zeroWidthChar = '​'
@@ -105,7 +101,7 @@ let viewRowsByColumns (rows: ResizeArray<ResizeArray<'a>>) =
 /// Converts a sequence of sequence of excel data into a resizearray, compatible with Excel.Range
 /// </summary>
 /// <param name="metadataValues"></param>
-let convertSeqToExcelRangeInput (metadataValues:seq<seq<string option>>) =
+let convertSeqToExcelRangeInput (metadataValues: seq<seq<string option>>) =
 
     //Selects the longest sequence of the metadata values
     //In the next step, determines the length of the longest metadata value sequence
@@ -124,7 +120,7 @@ let convertSeqToExcelRangeInput (metadataValues:seq<seq<string option>>) =
 module Table =
 
     /// <summary>
-    /// Add a new column at the given index
+    /// Add a new column at the index
     /// </summary>
     /// <param name="index"></param>
     /// <param name="excelTable"></param>
@@ -138,7 +134,27 @@ module Table =
             index   = index,
             values  = U4.Case1 col,
             name    = name
-    )
+        )
+
+    /// <summary>
+    /// Add a new column with the given values at the index
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="excelTable"></param>
+    /// <param name="values"></param>
+    let addColumnAt (index: int) (excelTable: Table) (values: string []) =
+        let columnValues =
+            U4<Array<Array<U3<bool,string,float>>>,bool,string,float>.Case1 [|
+                for row in values do
+                    [|
+                        U3.Case2 row
+                    |] 
+            |]
+
+        excelTable.columns.add(
+            index,
+            columnValues
+        )
 
     /// <summary>
     /// Delete an existing column at the given index
