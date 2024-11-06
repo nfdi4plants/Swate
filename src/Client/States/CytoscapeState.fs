@@ -1,7 +1,7 @@
 namespace Cytoscape
 
 open Shared
-open Shared.OfficeInteropTypes
+open Shared.Database
 open JS
 
 type Model = {

@@ -14,91 +14,6 @@ open Shared
 open Fable.Core.JsInterop
 open Shared.ARCtrlHelper
 
-module private JsonImportHelper =
-
-    open ARCtrl
-    open JsonImport
-
-    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) =
-        if not state.ImportMetadata then failwith "Metadata must be imported"
-        /// This updates the existing tables based on import config (joinOptions)
-        let createUpdatedTables (arcTables: ResizeArray<ArcTable>) =
-            [
-                for it in state.ImportTables do
-                    let sourceTable = arcTables.[it.Index]
-                    let appliedTable = ArcTable.init(sourceTable.Name)
-                    appliedTable.Join(sourceTable, joinOptions=state.ImportType)
-                    appliedTable
-            ]
-            |> ResizeArray
-        let arcFile =
-            match uploadedFile with
-            | Assay a as arcFile->
-                let tables = createUpdatedTables a.Tables
-                a.Tables <- tables
-                arcFile
-            | Study (s,_) as arcFile ->
-                let tables = createUpdatedTables s.Tables
-                s.Tables <- tables
-                arcFile
-            | Template t as arcFile ->
-                let table = createUpdatedTables (ResizeArray[t.Table])
-                t.Table <- table.[0]
-                arcFile
-            | Investigation _ as arcFile ->
-                arcFile
-        arcFile
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="import"></param>
-    /// <param name="importState"></param>
-    /// <param name="activeTableIndex">Required to append imported tables to the active table.</param>
-    /// <param name="existing"></param>
-    let updateTables (import: ArcFiles) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) =
-        match existingOpt with
-        | Some existing ->
-            let importTables =
-                match import with
-                | Assay a -> a.Tables
-                | Study (s,_) -> s.Tables
-                | Template t -> ResizeArray([t.Table])
-                | Investigation _ -> ResizeArray()
-            let existingTables =
-                match existing with
-                | Assay a -> a.Tables
-                | Study (s,_) -> s.Tables
-                | Template t -> ResizeArray([t.Table])
-                | Investigation _ ->  ResizeArray()
-            let appendTables =
-                // only append if the active table exists (this is to handle join call on investigations)
-                match activeTableIndex with
-                | Some i when i >= 0 && i < existingTables.Count ->
-                    let activeTable = existingTables.[i]
-                    let tables = importState.ImportTables |> Seq.filter (fun x -> not x.FullImport) |> Seq.map (fun x -> importTables.[x.Index])
-                    /// Everything will be appended against this table, which in the end will be appended to the main table
-                    let tempTable = activeTable.Copy()
-                    for table in tables do
-                        let preparedTemplate = Table.distinctByHeader tempTable table
-                        tempTable.Join(preparedTemplate, joinOptions=importState.ImportType)
-                    existingTables.[i] <- tempTable
-                | _ -> ()
-            let addTables =
-                importState.ImportTables
-                |> Seq.filter (fun x -> x.FullImport)
-                |> Seq.map (fun x -> importTables.[x.Index])
-                |> Seq.map (fun table -> // update tables based on joinOptions
-                    let nTable = ArcTable.init(table.Name)
-                    nTable.Join(table, joinOptions=importState.ImportType)
-                    nTable
-                )
-                |> Seq.iter (fun table -> existingTables.Add table)
-            existing
-        | None -> //
-            failwith "Error! Can only append information if metadata sheet exists!"
-
-
 /// This seems like such a hack :(
 module private ExcelHelper =
 
@@ -275,18 +190,18 @@ module Interface =
                         promise {
                             match data.importState.ImportMetadata with
                             | true -> // full import, does not require additional information
-                                return JsonImportHelper.updateWithMetadata data.importedFile data.importState
+                                return UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState
                             | false -> // partial import, requires additional information
-                                let! arcfile = OfficeInterop.Core.OfficeInterop.tryParseToArcFile()
+                                let! arcfile = OfficeInterop.Core.Main.tryParseToArcFile()
                                 let arcfileOpt = arcfile |> Result.toOption
                                 let! activeTable = ExcelJS.Fable.GlobalBindings.Excel.run(fun context ->
                                     OfficeInterop.Core.tryGetActiveArcTable context
                                 )
                                 let activeTableIndex =
                                     match arcfileOpt, activeTable with
-                                    | Some arcfile, Some activeTable -> arcfile.Tables() |> Seq.tryFindIndex (fun x -> x = activeTable)
+                                    | Some arcfile, Ok activeTable -> arcfile.Tables() |> Seq.tryFindIndex (fun x -> x = activeTable)
                                     | _ -> None
-                                return JsonImportHelper.updateTables data.importedFile data.importState activeTableIndex arcfileOpt
+                                return UpdateUtil.JsonImportHelper.updateTables data.importedFile data.importState activeTableIndex arcfileOpt
                         }
                     let updateArcFile (arcFile: ArcFiles) = SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg
                     let cmd =
@@ -299,8 +214,8 @@ module Interface =
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd =
                         match data.importState.ImportMetadata with
-                        | true -> JsonImportHelper.updateWithMetadata data.importedFile data.importState
-                        | false -> JsonImportHelper.updateTables data.importedFile data.importState model.SpreadsheetModel.ActiveView.TryTableIndex model.SpreadsheetModel.ArcFile
+                        | true -> UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState
+                        | false -> UpdateUtil.JsonImportHelper.updateTables data.importedFile data.importState model.SpreadsheetModel.ActiveView.TryTableIndex model.SpreadsheetModel.ArcFile
                         |> SpreadsheetInterface.UpdateArcFile |> InterfaceMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
@@ -366,21 +281,11 @@ module Interface =
             | ExportJson (arcfile, jef) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = SpreadsheetMsg (Spreadsheet.ExportJson (arcfile, jef)) |> Cmd.ofMsg
+                    let cmd = OfficeInteropMsg (OfficeInterop.ExportJson (arcfile, jef)) |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = SpreadsheetMsg (Spreadsheet.ExportJson (arcfile, jef)) |> Cmd.ofMsg
                     model, cmd
-                | _ -> failwith "not implemented"
-            | EditBuildingBlock ->
-                match host with
-                | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.GetSelectedBuildingBlockTerms |> OfficeInteropMsg |> Cmd.ofMsg
-                    model, cmd
-                //| Swatehost.Browser ->
-                //    let selectedIndex = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
-                //    let cmd = Cmd.ofEffect (fun dispatch -> Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main selectedIndex model dispatch))
-                //    model, cmd
                 | _ -> failwith "not implemented"
             | UpdateUnitForCells ->
                 match host with
@@ -394,16 +299,6 @@ module Interface =
                     let cmd = OfficeInterop.RectifyTermColumns |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-            | UpdateTermColumnsResponse terms ->
-                match host with
-                | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.FillHiddenColumns terms |> OfficeInteropMsg |> Cmd.ofMsg
-                    model, cmd
-                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.UpdateTermColumnsResponse terms |> SpreadsheetMsg |> Cmd.ofMsg
-                    model, cmd
-                | _ ->
-                    failwith "not implemented"
 
         try
             innerUpdate model msg

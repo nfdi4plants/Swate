@@ -172,7 +172,7 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
         fun () ->
             promise {
                 setExcelMetadataType (ExcelMetadataState.init())
-                let! result = OfficeInterop.Core.OfficeInterop.tryParseToArcFile(getTables=false)
+                let! result = OfficeInterop.Core.Main.tryParseToArcFile(getTables=false)
                 match result with
                 | Result.Ok (arcFile) ->
                     setExcelMetadataType {
@@ -272,15 +272,15 @@ let private ShortCutIconList toggleMetdadataModal model (dispatch: Messages.Msg 
             ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
         )
-        QuickAccessButton.create(
-            "Get Building Block Information",
-            [
-                Html.i [prop.className "fa-solid fa-question pr-1"]
-                Html.span model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg
-                Html.i [prop.className "fa-solid fa-table-columns"]
-            ],
-            (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
-        )
+        //QuickAccessButton.create(
+        //    "Get Building Block Information",
+        //    [
+        //        Html.i [prop.className "fa-solid fa-question pr-1"]
+        //        Html.span model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg
+        //        Html.i [prop.className "fa-solid fa-table-columns"]
+        //    ],
+        //    (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
+        //)
     ]
     |> List.map (fun x -> x.toReactElement())
     |> React.fragment

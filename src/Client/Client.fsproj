@@ -47,7 +47,6 @@
     <Compile Include="Modals\InteropLoggingModal.fs" />
     <Compile Include="Modals\ErrorModal.fs" />
     <Compile Include="Modals\TermModal.fs" />
-    <Compile Include="Modals\BuildingBlockDetailsModal.fs" />
     <Compile Include="Modals\CytoscapeView.fs" />
     <Compile Include="Modals\MoveColumn.fs" />
     <Compile Include="Modals\UpdateColumn.fs" />
@@ -116,6 +115,7 @@
     <Compile Include="Views\NotFoundView.fs" />
     <Compile Include="Views\MainWindowView.fs" />
     <Compile Include="Views\SidebarView.fs" />
+    <Compile Include="Update\UpdateUtil.fs" />
     <Compile Include="Update\SpreadsheetUpdate.fs" />
     <Compile Include="Update\OfficeInteropUpdate.fs" />
     <Compile Include="Update\InterfaceUpdate.fs" />

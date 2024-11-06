@@ -19,7 +19,6 @@ let initializeModel () =
         FilePickerState             = FilePicker.Model          .init()
         AddBuildingBlockState       = BuildingBlock.Model       .init()
         ProtocolState               = Protocol.Model            .init()
-        BuildingBlockDetailsState   = BuildingBlockDetailsState .init()
         CytoscapeModel              = Cytoscape.Model           .init()
         DataAnnotatorModel          = DataAnnotator.Model       .init()
         SpreadsheetModel            = Spreadsheet.Model         .fromLocalStorage()

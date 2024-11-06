@@ -5,7 +5,8 @@ open Feliz.Bulma
 open Browser.Types
 open ARCtrl
 open Shared
-open Shared.TermTypes
+open Shared.Database
+open DTO
 open Fable.Core.JsInterop
 
 module TermSearchAux =
@@ -20,30 +21,30 @@ module TermSearchAux =
 
     type SearchState = {
         SearchIs: SearchIs
-        Results: TermTypes.Term []
+        Results: Term []
     } with
         static member init() = {
             SearchIs = SearchIs.Idle
             Results = [||]
         }
 
-    let searchByName(query: string, setResults: TermTypes.Term [] -> unit) =
+    let searchByName(query: string, setResults: Term [] -> unit) =
         async {
             let query = TermQuery.create(query, 10)
             let! terms = Api.ontology.searchTerm query
             setResults terms
         }
 
-    let searchByParent(query: string, parentTAN: string, setResults: TermTypes.Term [] -> unit) =
+    let searchByParent(query: string, parentTAN: string, setResults: Term [] -> unit) =
         async {
             let query = TermQuery.create(query, 50, parentTAN)
             let! terms = Api.ontology.searchTerm query
             setResults terms
         }
 
-    let searchAllByParent(parentTAN: string, setResults: TermTypes.Term [] -> unit) =
+    let searchAllByParent(parentTAN: string, setResults: Term [] -> unit) =
         async {
-            let! terms = Api.api.getAllTermsByParentTerm <| TermTypes.TermMinimal.create "" parentTAN
+            let! terms = Api.api.getAllTermsByParentTerm <| Shared.SwateObsolete.TermMinimal.create "" parentTAN
             setResults terms
         }
 
@@ -151,7 +152,7 @@ module TermSearchAux =
                 ]
             ]
 
-        let termSelectItemMain (term: TermTypes.Term, show, setShow, setTerm, isDirectedSearchResult: bool) =
+        let termSelectItemMain (term: Term, show, setShow, setTerm, isDirectedSearchResult: bool) =
             Html.div [
                 prop.classes ["is-flex"; "is-flex-direction-row"; "term-select-item-main"]
                 prop.onClick setTerm
@@ -194,7 +195,7 @@ module TermSearchAux =
                 ]
             ]
 
-        let termSelectItemMore (term: TermTypes.Term, show) =
+        let termSelectItemMore (term: Term, show) =
             Bulma.field.div [
                 prop.classes [
                     if not show then "is-hidden";
@@ -258,7 +259,7 @@ type TermSearch =
         ]
 
     [<ReactComponent>]
-    static member TermSelectItem (term: TermTypes.Term, setTerm, ?isDirectedSearchResult: bool) =
+    static member TermSelectItem (term: Term, setTerm, ?isDirectedSearchResult: bool) =
         let isDirectedSearchResult = defaultArg isDirectedSearchResult false
         let show, setShow = React.useState(false)
         Html.div [
@@ -270,9 +271,9 @@ type TermSearch =
             ]
         ]
 
-    static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: TermTypes.Term option -> unit, show: bool, setAdvancedTermSearchActive) =
+    static member TermSelectArea (id: string, searchNameState: SearchState, searchTreeState: SearchState, setTerm: Term option -> unit, show: bool, setAdvancedTermSearchActive) =
         let searchesAreComplete = searchNameState.SearchIs = SearchIs.Done && searchTreeState.SearchIs = SearchIs.Done
-        let foundInBoth (term:TermTypes.Term) =
+        let foundInBoth (term:Term) =
             (searchTreeState.Results |> Array.contains term)
             && (searchNameState.Results |> Array.contains term)
         let matchSearchState (ss: SearchState) (isDirectedSearch: bool) =
@@ -353,7 +354,7 @@ type TermSearch =
             setIsSearching false
             setSearchTreeState {searchTreeState with SearchIs = SearchIs.Idle}
             setSearchNameState {searchNameState with SearchIs = SearchIs.Idle}
-        let selectTerm (t:TermTypes.Term option) =
+        let selectTerm (t:Term option) =
             let oaOpt = t |> Option.map OntologyAnnotation.fromTerm
             setter oaOpt
             if inputRef.current.IsSome then

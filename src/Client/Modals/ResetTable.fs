@@ -6,7 +6,6 @@ open ExcelColors
 open Model
 open Messages
 open Shared
-open TermTypes
 
 
 let Main (dispatch) (rmv: _ -> unit) =

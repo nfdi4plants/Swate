@@ -1,8 +1,9 @@
 module Database.Term
 
 open Neo4j.Driver
-open Shared.TermTypes
+open Shared.DTO
 open Shared.Database
+open Shared.SwateObsolete
 open Helper
 open System.Text
 open System
@@ -66,7 +67,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// "termParamName": the query function tries to map properties of the "termParamName" to this function so depending on how the node was called in the query this needs to adapt.
     static member asTerm(termParamName) = fun (record:IRecord) ->
         let accession = record.[$"{termParamName}.accession"].As<string>()
-        let (term:Shared.TermTypes.Term) = {
+        let (term: Shared.Database.Term) = {
             Accession = accession
             FK_Ontology = Term.parseAccessionToOntologyName accession
             Name = record.[$"{termParamName}.name"] |> defaultOutputWith<string> ""

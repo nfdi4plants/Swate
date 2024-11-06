@@ -3,9 +3,9 @@ namespace Model
 open Fable.React
 open Fable.React.Props
 open Shared
-open TermTypes
 open Feliz
 open Routing
+open Database
 
 type WindowSize =
 /// < 575
@@ -107,6 +107,7 @@ module TermSearch =
 
 module AdvancedSearch =
 
+   
     type AdvancedSearchSubpages =
     | InputFormSubpage
     | ResultsSubpage
@@ -299,16 +300,6 @@ type RequestBuildingBlockInfoStates =
         | RequestExcelInformation       -> "Check Columns"
         | RequestDataBaseInformation    -> "Search Database "
 
-type BuildingBlockDetailsState = {
-    CurrentRequestState : RequestBuildingBlockInfoStates
-    BuildingBlockValues : TermSearchable []
-} with
-    static member init () = {
-        CurrentRequestState = Inactive
-        BuildingBlockValues = [||]
-    }
-
-
 type Model = {
     ///PageState
     PageState                   : PageState
@@ -325,8 +316,6 @@ type Model = {
     ProtocolState               : Protocol.Model
     ///Insert annotation columns
     AddBuildingBlockState       : BuildingBlock.Model
-    ///Used to show selected building block information
-    BuildingBlockDetailsState   : BuildingBlockDetailsState
     CytoscapeModel              : Cytoscape.Model
     ///
     DataAnnotatorModel          : DataAnnotator.Model

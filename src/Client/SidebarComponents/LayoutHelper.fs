@@ -11,7 +11,6 @@ open Model
 open Messages
 open Messages.BuildingBlock
 open Shared
-open TermTypes
 open Feliz
 open Elmish
 

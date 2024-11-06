@@ -5,8 +5,8 @@ open Elmish
 open Shared
 open Fable.Remoting.Client
 open Fable.SimpleJson
+open Database
 
-open TermTypes
 open ExcelColors
 open OfficeInterop
 open Model
@@ -91,12 +91,6 @@ module Protocol =
         | SelectProtocol                    of Template
         | ProtocolIncreaseTimesUsed         of protocolName:string
 
-type BuildingBlockDetailsMsg =
-    | GetSelectedBuildingBlockTermsRequest      of TermSearchable []
-    | GetSelectedBuildingBlockTermsResponse     of TermSearchable []
-    | UpdateBuildingBlockValues                 of TermSearchable []
-    | UpdateCurrentRequestState                 of RequestBuildingBlockInfoStates
-
 type SettingsDataStewardMsg =
     // Client
     | UpdatePointerJson of string option
@@ -114,7 +108,6 @@ type Msg =
 | FilePickerMsg                 of FilePicker.Msg
 | BuildingBlockMsg              of BuildingBlock.Msg
 | ProtocolMsg                   of Protocol.Msg
-| BuildingBlockDetails          of BuildingBlockDetailsMsg
 | CytoscapeMsg                  of Cytoscape.Msg
 | DataAnnotatorMsg              of DataAnnotator.Msg
 | SpreadsheetMsg                of Spreadsheet.Msg

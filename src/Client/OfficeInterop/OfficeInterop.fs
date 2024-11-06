@@ -1024,6 +1024,22 @@ let joinTable (tableToAdd: ArcTable, options: TableJoinOptions option) =
         }
     )
 
+let tryGetSelectedTableIndex (table: Table) (context: RequestContext) =
+    promise {
+        let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
+        let headerRange = table.getHeaderRowRange()
+        let _ = headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "columnCount"|])) |> ignore
+
+        return! context.sync().``then``(fun _ ->
+            let rebasedIndex = selectedRange.columnIndex - headerRange.columnIndex |> int
+            if rebasedIndex < 0 || rebasedIndex >= (int headerRange.columnCount) then
+                None
+            else
+                Some rebasedIndex
+                //failwith "Cannot select building block outside of annotation table!"
+        )
+    }
+
 /// <summary>
 /// Returns a ResizeArray of indices and header names for the selected building block
 /// The indices are rebased to the excel annotation table.
@@ -2226,7 +2242,7 @@ let getTableMetaData () =
         }
     )
 
-type OfficeInterop =
+type Main =
 
     /// <summary>
     /// Reads all excel information and returns ArcFiles object, with metadata and tables.
@@ -2357,7 +2373,7 @@ type OfficeInterop =
 
                 let tables = arcFiles.Tables()
                 for table in tables do
-                    do! OfficeInterop.createNewAnnotationTable(table, context0=context).``then``(fun _ -> ())
+                    do! Main.createNewAnnotationTable(table, context0=context).``then``(fun _ -> ())
 
                 updatedWorksheet.activate()
 
@@ -2368,14 +2384,14 @@ type OfficeInterop =
     /// <summary>
     /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
     /// </summary>
-    /// <param name="newBB"></param>
-    static member addCompositeColumn (newColumn: CompositeColumn, ?target: {|table: Excel.Table; ColumnIndex: int|}, ?context: RequestContext) =
+    /// <param name="newColumn"></param>
+    static member addCompositeColumn (newColumn: CompositeColumn, ?table: Excel.Table, ?context: RequestContext) =
         excelRunWith context <| fun context ->
             promise {
 
                 let! excelTable =
-                    match target with
-                    | Some table -> promise {return Some table.table}
+                    match table with
+                    | Some table -> promise {return Some table}
                     | None -> AnnotationTable.tryGetActive context
 
                 if excelTable.IsNone then failwith "Error. No active table found!"
@@ -2387,15 +2403,6 @@ type OfficeInterop =
                 match arcTableRes with
                 | Ok arcTable ->
 
-                    let! columnIndex =
-                        match target with
-                        | Some data -> float data.ColumnIndex
-                        | None ->
-                            let selectedRange = context.workbook.getSelectedRange().getColumn(0)
-                            selectedRange.columnIndex
-                        |> fun index ->
-                            getArcIndex excelTable index context
-
                     let selectedRange = context.workbook.getSelectedRange().getColumn(0)
                     let headerRange = excelTable.getHeaderRowRange()
 
@@ -2405,30 +2412,60 @@ type OfficeInterop =
                         headerRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"; "values"]))) |> ignore
                         excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
 
-                    let (|Input|_|) (newBuildingBlock:CompositeColumn) =
-                        if newBuildingBlock.Header.isInput then
-                            if arcTable.TryGetInputColumn().IsSome then
-                                Some (updateInputColumn excelTable arcTable newBuildingBlock)
-                            else Some (addInputColumn excelTable arcTable newBuildingBlock)
-                        else None
+                    do! context.sync()
 
-                    let (|Output|_|) (newBuildingBlock:CompositeColumn) =
-                        if newBuildingBlock.Header.isOutput then
-                            if arcTable.TryGetOutputColumn().IsSome then
-                                Some (updateOutputColumn excelTable arcTable newBuildingBlock)
-                            else Some (addOutputColumn excelTable arcTable newBuildingBlock)
-                        else None
+                    let columns =
+                        Spreadsheet.CompositeColumn.toStringCellColumns newColumn
 
-                    let addBuildingBlock (newBuildingBlock:CompositeColumn) =
-                        arcTable.AddColumn(newColumn.Header, newColumn.Cells, columnIndex)
+                    let excelTableRowCount = excelTable.rows.count
 
-                        //addBuildingBlock excelTable arcTable.Value newBuildingBlock headerRange selectedRange
+                    let! selectedIndex = tryGetSelectedTableIndex excelTable context |> _.``then``(fun i ->
+                        match i with | Some i -> i | None -> int ExcelUtil.AppendIndex
+                    )
 
-                    let getResult (newBuildingBlock:CompositeColumn) =
-                        match newBuildingBlock with
-                        | Input msg -> msg
-                        | Output msg -> msg
-                        | _ -> addBuildingBlock newBuildingBlock
+                    let addColumn (index: int) (values: string list) =
+                        let columnValues =
+                            U4<Array<Array<U3<bool,string,float>>>,bool,string,float>.Case1 [|
+                                for row in values do
+                                    [|
+                                        U3.Case2 row
+                                    |] 
+                            |]
+                        log columnValues
+                        excelTable.columns.add(
+                            index,
+                            columnValues
+                        )
+                        |> ignore
+
+                    for i in 0 .. (columns.Length-1) do
+                        let column = columns.[i]
+                        let index = selectedIndex + i
+                        addColumn index column
+
+                    do! context.sync()
+
+                    //let (|Input|_|) (newBuildingBlock:CompositeColumn) =
+                    //    if newBuildingBlock.Header.isInput then
+                    //        if arcTable.TryGetInputColumn().IsSome then
+                    //            Some (updateInputColumn excelTable arcTable newBuildingBlock)
+                    //        else Some (addInputColumn excelTable arcTable newBuildingBlock)
+                    //    else None
+
+                    //let (|Output|_|) (newBuildingBlock:CompositeColumn) =
+                    //    if newBuildingBlock.Header.isOutput then
+                    //        if arcTable.TryGetOutputColumn().IsSome then
+                    //            Some (updateOutputColumn excelTable arcTable newBuildingBlock)
+                    //        else Some (addOutputColumn excelTable arcTable newBuildingBlock)
+                    //    else None
+
+                    //    //addBuildingBlock excelTable arcTable.Value newBuildingBlock headerRange selectedRange
+
+                    //let getResult (newBuildingBlock:CompositeColumn) =
+                    //    match newBuildingBlock with
+                    //    | Input msg -> msg
+                    //    | Output msg -> msg
+                    //    | _ -> addBuildingBlock newBuildingBlock
 
                     //let! result = context.sync().``then``(fun _ ->
                     //    getResult newColumn
@@ -2437,7 +2474,7 @@ type OfficeInterop =
 
                     //do! ExcelHelper.adoptTableFormats(excelTable, context, true)
 
-                    return result
+                    return []
                         
                 | Result.Error exn ->
                     return [InteropLogging.Msg.create InteropLogging.Error exn.Message]

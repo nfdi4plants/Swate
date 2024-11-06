@@ -5,7 +5,6 @@ open Feliz.Bulma
 open ExcelColors
 open Messages
 open Shared
-open TermTypes
 open Spreadsheet
 open Model
 
@@ -175,6 +174,7 @@ let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
         | Some CompositeHeaderDiscriminate.ProtocolVersion, _ ->
             CompositeColumn.create(CompositeHeader.ProtocolVersion, cellsToFreeText(column))
         | Some CompositeHeaderDiscriminate.Comment, _ -> failwith "Comment header type is not yet implemented"
+        | Some CompositeHeaderDiscriminate.Freetext, _ -> failwith "Freetext header type is not yet implemented"
     let submit (e) =
         let nxtCol = updateColumn column0
         Spreadsheet.SetColumn (columnIndex, nxtCol) |> SpreadsheetMsg |> dispatch
