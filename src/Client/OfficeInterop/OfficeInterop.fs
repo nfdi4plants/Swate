@@ -82,7 +82,6 @@ module ARCtrlExtensions =
 
         /// <summary>
         /// Output returns the expected sheetname and metadata values in string seqs form.
-        ///
         /// </summary>
         member this.MetadataToExcelStringValues() =
             match this with
@@ -106,7 +105,7 @@ module ARCtrlExtensions =
     type ArcTable with
 
         /// <summary>
-        /// Creates ArcTable based on table name and collections of strings, representing columns and rows
+        /// Creates ArcTable based on table name and collections of strings, representing columns and rows.
         /// </summary>
         /// <param name="name"></param>
         /// <param name="headers"></param>
@@ -317,12 +316,10 @@ module ARCtrlExtensions =
                     return Result.Error(exn $"Error. No table with the given name {tableName} found!")
             }
 
-open ARCtrlUtil
-open ARCtrlExtensions
-
 open System
 
-open Fable.Core.JsInterop
+open ARCtrlUtil
+open ARCtrlExtensions
 
 // I retrieve the index of the currently opened worksheet, here the new table should be created.
 // I retrieve all annotationTables in the workbook. I filter out all annotationTables that are on a worksheet with a lower index than the index of the currently opened worksheet.
@@ -444,16 +441,26 @@ module AnnotationTable =
         }
 
     /// <summary>
+    /// Get all annotation tables
+    /// </summary>
+    /// <param name="tables"></param>
+    let getAnnotationTables (tables: TableCollection) =
+        tables.items
+        |> Seq.toArray
+        |> Array.filter (fun table ->
+            table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix))
+
+    /// <summary>
     /// Try select the annotation table from the current active work sheet
     /// </summary>
     /// <param name="context"></param>
     let tryGetActive (context: RequestContext) =
         promise {
-
-            let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
             let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
             let tables = context.workbook.tables
-            let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "style"; "values"|]))
+            let _ =
+                context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|])) |> ignore
+                tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "style"; "values"|]))
 
             return! context.sync().``then``(fun _ ->
                 /// Get name of the table of currently active worksheet.
@@ -503,11 +510,7 @@ module AnnotationTable =
             do! context.sync().``then``( fun _ ->
 
                 // Filter all names of tables on the active worksheet for names starting with "annotationTable".
-                let annoTables =
-                    activeTables.items
-                    |> Seq.toArray
-                    |> Array.map (fun x -> x.name)
-                    |> Array.filter (fun x -> x.StartsWith ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix)
+                let annoTables = getAnnotationTables activeTables
 
                 match annoTables.Length with
                 //Create a new annotation table in the active worksheet
@@ -519,6 +522,7 @@ module AnnotationTable =
                     worksheet.activate()
                     activeSheet <- worksheet
                     hasCreatedNewWorkSheet <- true
+
                 // Fail the function if there are more than 1 annotation table in the active worksheet.
                 // This check is done, to only have one annotationTable per workSheet.
                 | x when x > 1 ->
@@ -664,11 +668,18 @@ module AnnotationTable =
             let! table = tryGetActive context
 
             match table with
-            | Some table ->
-                do! format(table, context, shallHide)
-            | None ->
-                ()
+            | Some table -> do! format(table, context, shallHide)
+            | None -> ()
         }
+
+    /// <summary>
+    /// Get headers from range
+    /// </summary>
+    /// <param name="range"></param>
+    let getHeaders (range: ResizeArray<ResizeArray<obj option>>) =
+        range.Item 0
+        |> Array.ofSeq
+        |> Array.map (fun header -> header.ToString())
 
 /// <summary>
 /// Try find annotation table in active worksheet and parse to ArcTable
@@ -725,7 +736,7 @@ let updateInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composite
         else
             failwith "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
     else
-        failwith "Something went wrong! The update input column does not exist! Please report this as a bug to the developers."
+        failwith "Something went wrong! The update input column does not exist! Please report this as a bug to the developers."    
 
 /// <summary>
 /// Add a new inputcolumn to an annotation table
@@ -804,7 +815,6 @@ let updateOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composit
 let addOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     if arcTable.TryGetOutputColumn().IsSome then
-
         failwith "Something went wrong! The add output column is filled with data! Please report this as a bug to the developers."
 
     else
@@ -849,7 +859,7 @@ let addCompositeColumn (excelTable: Table) (arcTable: ArcTable) (newColumn: Comp
                 diff
             |> float
 
-        let headers = arcTable.ToStringSeqs().[0] |> Array.ofSeq |> Array.map (fun header -> header.ToString())
+        let headers = AnnotationTable.getHeaders (arcTable.ToStringSeqs())
 
         if excelIndex < float (headers.Length - 1) then
 
@@ -878,15 +888,12 @@ let addCompositeColumn (excelTable: Table) (arcTable: ArcTable) (newColumn: Comp
             //Add the new building block to the end of the table
             AppendIndex
 
-    let headers =
-        headerRange.values[0]
-        |> List.ofSeq
-        |> List.map (fun header -> header.ToString())
+    let headers = AnnotationTable.getHeaders headerRange.values
 
     buildingBlockCells
     |> List.iteri(fun i bbCell ->
         //check and extend header to avoid duplicates
-        let newHeader = extendName (headers |> List.toArray) bbCell.Head
+        let newHeader = extendName headers bbCell.Head
         let colIndex =
             if targetIndex >= 0 then targetIndex + (float) i
             else AppendIndex
@@ -966,9 +973,6 @@ let joinTable (tableToAdd: ArcTable, options: TableJoinOptions option) =
                 | Result.Ok arcTable ->
                     arcTable.Join(tableToAdd, ?index=index, ?joinOptions=options, forceReplace=true)
 
-                    let tableValues = arcTable.ToStringSeqs() |> Array.ofSeq
-                    let (headers, _) = Array.ofSeq(tableValues.[0]), tableValues.[1..]
-
                     let newTableRange = excelTable.getRange()
 
                     let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowCount";]))
@@ -986,7 +990,7 @@ let joinTable (tableToAdd: ArcTable, options: TableJoinOptions option) =
                         newTable.name <- excelTable.name
 
                         let headerNames =
-                            let names = headers |> Array.map (fun item -> item.Value.ToString())
+                            let names = AnnotationTable.getHeaders (arcTable.ToStringSeqs())
                             names
                             |> Array.map (fun name -> extendName names name)
 
@@ -1101,7 +1105,7 @@ let getArcIndex (excelTable: Table) (excelColumnIndex: float) (context: RequestC
 
         do! context.sync().``then``(fun _ -> ())
 
-        let headers = protoHeaders.values.Item 0 |> Array.ofSeq |> Array.map (fun c -> c.ToString())
+        let headers = AnnotationTable.getHeaders protoHeaders.values
 
         let arcTableIndices = (groupToBuildingBlocks headers) |> Array.ofSeq |> Array.map (fun i -> i |> Array.ofSeq)
 
@@ -1157,7 +1161,7 @@ let getArcMainColumn (excelTable: Table) (arcTable: ArcTable) (context: RequestC
 
         do! context.sync().``then``(fun _ -> ())
 
-        let headers = protoHeaders.values.Item 0 |> Array.ofSeq |> Array.map (fun c -> c.ToString())
+        let headers = AnnotationTable.getHeaders protoHeaders.values
 
         let arcTableIndices = (groupToBuildingBlocks headers) |> Array.ofSeq |> Array.map (fun i -> i |> Array.ofSeq)
 
@@ -1579,6 +1583,7 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
     Excel.run(fun context ->
         promise {
             let! excelTableRes = AnnotationTable.tryGetActive context
+
             match excelTableRes with
             | Some excelTable -> return [InteropLogging.Msg.create InteropLogging.Info $"The annotation table {excelTable.name} is valid"]
             | None ->
@@ -1698,8 +1703,8 @@ let rectifyTermColumns () =
                     let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
 
                     do! context.sync().``then``(fun _ -> ())
+
                     let items = excelTable.columns.items
-                    do! context.sync().``then``(fun _ -> ())
 
                     let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
                     let columns =
@@ -1840,13 +1845,10 @@ let getExcelAnnotationTables (context: RequestContext) =
         let tables = context.workbook.tables
         let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
 
-        let! annotationTables = context.sync().``then``(fun _ ->
-            tables.items
-            |> Seq.toArray
-            |> Array.filter (fun table ->
-                table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix)
+        let! annotationTables =
+            context.sync().``then``(fun _ ->
+                AnnotationTable.getAnnotationTables tables
             )
-        )
 
         let inMemoryTables = new ResizeArray<ArcTable>()
         let mutable msgs = List.Empty
@@ -2065,7 +2067,9 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
                 let! isAnnotationTableSelected = isSelectedOutsideAnnotationTable tableRange selectedRange context
 
                 if isAnnotationTableSelected then
+
                     do! insertOntology selectedRange ontologyAnnotation context
+
                     return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the selected term"]
                 else
 
@@ -2290,7 +2294,7 @@ type Main =
                         let! tableCollection = getExcelAnnotationTables context
                         match tableCollection with
                         | Result.Ok tables ->
-                            study.Tables <- (tables)
+                            study.Tables <- tables
                             let result = ArcFiles.Study (study, assays)
                             return Result.Ok result
                         | Result.Error msgs -> return Result.Error msgs
@@ -2344,7 +2348,7 @@ type Main =
                 let tableValues = arcTable.ToStringSeqs()
                 let rowCount = tableValues.Count
                 let columnCount = tableValues |> Seq.map Seq.length |> Seq.max
-                let tableRange = worksheet.getRangeByIndexes(0,0, rowCount, columnCount)
+                let tableRange = worksheet.getRangeByIndexes(0, 0, rowCount, columnCount)
 
                 let table = worksheet.tables.add(U2.Case1 tableRange, true)
 
@@ -2385,7 +2389,7 @@ type Main =
     /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
     /// </summary>
     /// <param name="newColumn"></param>
-    static member addCompositeColumn (newColumn: CompositeColumn, ?table: Excel.Table, ?context: RequestContext) =
+    static member addCompositeColumn (newColumn: CompositeColumn,(*newHeader: CompositeHeader, ?newValues: U2<CompositeCell, CompositeCell[]>,*) ?table: Excel.Table, ?context: RequestContext) =
         excelRunWith context <| fun context ->
             promise {
 
@@ -2402,79 +2406,105 @@ type Main =
 
                 match arcTableRes with
                 | Ok arcTable ->
+                    let values =
+                        if newColumn.Cells.Length < arcTable.RowCount && newColumn.Cells.Length > 0 then
+                            Array.create arcTable.RowCount newColumn.Cells.[0]
+                        else
+                            newColumn.Cells
 
-                    let selectedRange = context.workbook.getSelectedRange().getColumn(0)
-                    let headerRange = excelTable.getHeaderRowRange()
+                    arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
-                    let _ =
-                        excelTable.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
-                        selectedRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"]))) |> ignore
-                        headerRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"; "values"]))) |> ignore
-                        excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|]))
+                    let! _ = Main.createNewAnnotationTable(arcTable)
 
-                    do! context.sync()
+                    let! newTable = AnnotationTable.tryGetActive(context)
 
-                    let columns =
-                        Spreadsheet.CompositeColumn.toStringCellColumns newColumn
-
-                    let excelTableRowCount = excelTable.rows.count
-
-                    let! selectedIndex = tryGetSelectedTableIndex excelTable context |> _.``then``(fun i ->
-                        match i with | Some i -> i | None -> int ExcelUtil.AppendIndex
-                    )
-
-                    let addColumn (index: int) (values: string list) =
-                        let columnValues =
-                            U4<Array<Array<U3<bool,string,float>>>,bool,string,float>.Case1 [|
-                                for row in values do
-                                    [|
-                                        U3.Case2 row
-                                    |] 
-                            |]
-                        log columnValues
-                        excelTable.columns.add(
-                            index,
-                            columnValues
-                        )
-                        |> ignore
-
-                    for i in 0 .. (columns.Length-1) do
-                        let column = columns.[i]
-                        let index = selectedIndex + i
-                        addColumn index column
-
-                    do! context.sync()
-
-                    //let (|Input|_|) (newBuildingBlock:CompositeColumn) =
-                    //    if newBuildingBlock.Header.isInput then
-                    //        if arcTable.TryGetInputColumn().IsSome then
-                    //            Some (updateInputColumn excelTable arcTable newBuildingBlock)
-                    //        else Some (addInputColumn excelTable arcTable newBuildingBlock)
-                    //    else None
-
-                    //let (|Output|_|) (newBuildingBlock:CompositeColumn) =
-                    //    if newBuildingBlock.Header.isOutput then
-                    //        if arcTable.TryGetOutputColumn().IsSome then
-                    //            Some (updateOutputColumn excelTable arcTable newBuildingBlock)
-                    //        else Some (addOutputColumn excelTable arcTable newBuildingBlock)
-                    //    else None
-
-                    //    //addBuildingBlock excelTable arcTable.Value newBuildingBlock headerRange selectedRange
-
-                    //let getResult (newBuildingBlock:CompositeColumn) =
-                    //    match newBuildingBlock with
-                    //    | Input msg -> msg
-                    //    | Output msg -> msg
-                    //    | _ -> addBuildingBlock newBuildingBlock
-
-                    //let! result = context.sync().``then``(fun _ ->
-                    //    getResult newColumn
-                    //)
-                    do! context.sync()
-
-                    //do! ExcelHelper.adoptTableFormats(excelTable, context, true)
+                    if newTable.IsSome then
+                        do! AnnotationTable.format(newTable.Value, context, true)
 
                     return []
+
+                    //let selectedRange = context.workbook.getSelectedRange().getColumn(0)
+                    //let headerRange = excelTable.getHeaderRowRange()
+
+                    //let _ =
+                    //    excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
+                    //    excelTable.rows.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"; "index"; "count"|])) |> ignore
+                    //    selectedRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"]))) |> ignore
+                    //    headerRange.load(U2.Case2 (ResizeArray(["rowIndex"; "columnIndex"; "rowCount"; "address"; "isEntireColumn"; "worksheet"; "columnCount"; "values"])))
+
+                    //do! context.sync()
+
+
+                    ////Work in progress
+                    //let excelTableRowCount = excelTable.rows.count
+
+                    //let columns =
+                    //    let values =
+                    //        match newValues with
+                    //        | Some (U2.Case1 cell) -> [|cell|]
+                    //        | Some (U2.Case2 cells) -> cells
+                    //        | None -> [||]
+                            
+                    //    //Adapt rowCount of composite column that shall be added
+                    //    let column = CompositeColumn.create(newHeader, values)                        
+
+                    //    [|
+                    //        for column in Spreadsheet.CompositeColumn.toStringCellColumns column do
+                    //            let c = ResizeArray column
+
+                    //            if excelTableRowCount > c.Count then
+                    //                let diff = int excelTableRowCount - c.Count
+                    //                let ex = Array.init diff (fun _ ->
+                    //                    match newValues with
+                    //                    | Some (U2.Case1 cell) -> c.[0]
+                    //                    | _ -> ""
+                    //                )
+                    //                c.AddRange ex
+                    //            c |> Array.ofSeq
+                    //    |]
+
+                    //let! selectedIndex = tryGetSelectedTableIndex excelTable context |> _.``then``(fun i ->
+                    //    match i with | Some i -> i | None -> int ExcelUtil.AppendIndex)
+
+                    ////When single column replace existing column with same name or add at index                    
+                    //if newHeader.IsUnique then
+
+                    //    let existingColumnRes = arcTable.TryGetColumnByHeader newHeader
+
+                    //    match existingColumnRes with
+                    //    | Some existingColumn ->
+                    //        let toUpdateColumn =
+                    //            excelTable.columns.items
+                    //            |> Seq.find (fun item ->
+                    //                item.name.Contains(existingColumn.Header.ToString()))
+                    //        excelTable.columns.items.[(int toUpdateColumn.index)].name <- columns.[0].[0]
+                    //    | None ->
+                    //        let isInputOrOutputAndExistingRes =
+                    //            match newHeader with
+                    //            | header when header.isOutput -> arcTable.TryGetOutputColumn()
+                    //            | header when header.isInput ->  arcTable.TryGetInputColumn()
+                    //            | _ -> None
+
+                    //        match isInputOrOutputAndExistingRes with
+                    //        | Some column ->
+                    //            let startString = if column.Header.isInput then "Input" else "Output"
+                    //            let toUpdateColumn =
+                    //                excelTable.columns.items
+                    //                |> Seq.find (fun item ->
+                    //                    item.name.StartsWith(startString))
+                    //            excelTable.columns.items.[(int toUpdateColumn.index)].name <- columns.[0].[0]
+                    //        | None -> ExcelUtil.Table.addColumnAt selectedIndex excelTable columns.[0] |> ignore                            
+                    //else
+                    //    for i in 0 .. (columns.Length-1) do
+                    //        let column = columns.[i]
+                    //        let index = selectedIndex + i                        
+                    //        ExcelUtil.Table.addColumnAt index excelTable column |> ignore
+
+                    //do! context.sync()
+
+                    //do! AnnotationTable.format(excelTable, context, true)
+
+                    //return []
                         
                 | Result.Error exn ->
                     return [InteropLogging.Msg.create InteropLogging.Error exn.Message]
