@@ -1,14 +1,14 @@
 module Database.Ontology
 
 open Neo4j.Driver
-open Shared.TermTypes
 open Helper
+open Shared.Database
 
 type Ontology(credentials:Neo4JCredentials) =
 
-    static member private asOntology : IRecord -> Shared.TermTypes.Ontology =
+    static member private asOntology : IRecord -> Shared.Database.Ontology =
         fun (record:IRecord) ->
-            let (ontology:Shared.TermTypes.Ontology) = {
+            let (ontology:Shared.Database.Ontology) = {
                 Name        = record.["o.name"].As<string>()
                 Version     = record.["o.version"] |> defaultOutputWith<string> ""
                 LastUpdated = record.["o.lastUpdated"].As<string>() |> System.DateTime.Parse

@@ -16,12 +16,6 @@ module Spreadsheet =
 
     module Helper =
 
-        let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
-
-        let downloadFromString(filename, content:string) = 
-            let bytes = System.Text.Encoding.UTF8.GetBytes(content)
-            bytes.SaveFileAs(filename)
-
         /// <summary>
         /// This function will store the information correctly.
         /// Can return save information to local storage (persistent between browser sessions) and session storage.
@@ -336,30 +330,8 @@ module Spreadsheet =
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
                 state, model, cmd
             | ExportJson (arcfile,jef) ->
-                let name, jsonString =
-                    let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
-                    let nameFromId (id: string) = (n + "_" + id + ".json")
-                    match arcfile, jef with
-                    | Investigation ai, JsonExportFormat.ARCtrl -> nameFromId ai.Identifier, ArcInvestigation.toJsonString 0 ai
-                    | Investigation ai, JsonExportFormat.ARCtrlCompressed -> nameFromId ai.Identifier, ArcInvestigation.toCompressedJsonString 0 ai
-                    | Investigation ai, JsonExportFormat.ISA -> nameFromId ai.Identifier, ArcInvestigation.toISAJsonString 0 ai
-                    | Investigation ai, JsonExportFormat.ROCrate -> nameFromId ai.Identifier, ArcInvestigation.toROCrateJsonString 0 ai
-
-                    | Study (as',_), JsonExportFormat.ARCtrl -> nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
-                    | Study (as',_), JsonExportFormat.ARCtrlCompressed -> nameFromId as'.Identifier, ArcStudy.toCompressedJsonString 0 (as')
-                    | Study (as',aaList), JsonExportFormat.ISA -> nameFromId as'.Identifier, ArcStudy.toISAJsonString (aaList,0) (as')
-                    | Study (as',aaList), JsonExportFormat.ROCrate -> nameFromId as'.Identifier, ArcStudy.toROCrateJsonString (aaList,0) (as')
-
-                    | Assay aa, JsonExportFormat.ARCtrl -> nameFromId aa.Identifier, ArcAssay.toJsonString 0 aa
-                    | Assay aa, JsonExportFormat.ARCtrlCompressed -> nameFromId aa.Identifier, ArcAssay.toCompressedJsonString 0 aa
-                    | Assay aa, JsonExportFormat.ISA -> nameFromId aa.Identifier, ArcAssay.toISAJsonString 0 aa
-                    | Assay aa, JsonExportFormat.ROCrate -> nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
-
-                    | Template t, JsonExportFormat.ARCtrl -> nameFromId t.FileName, Template.toJsonString 0 t
-                    | Template t, JsonExportFormat.ARCtrlCompressed -> nameFromId t.FileName, Template.toCompressedJsonString 0 t
-                    | Template _, anyElse -> failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
-                Helper.downloadFromString (name , jsonString)
-
+                let jsonExport = UpdateUtil.JsonExportHelper.parseToJsonString(arcfile, jef)
+                UpdateUtil.downloadFromString (jsonExport)
                 state, model, Cmd.none
             | ExportXlsx arcfile->
                 let name, fswb =
@@ -381,26 +353,7 @@ module Spreadsheet =
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
                 state, model, cmd
             | ExportXlsxDownload (name,xlsxBytes) ->
-                let _ = Helper.download (name ,xlsxBytes)
-                state, model, Cmd.none
-            | UpdateTermColumnsResponse terms ->
-                //let nextExcelState = {
-                //    model.ExcelState with
-                //        FillHiddenColsStateStore = OfficeInterop.FillHiddenColsState.ExcelWriteFoundTerms
-                //}
-                //let nextModel = model.updateByExcelState nextExcelState
-                //let setUpdateTermColumns terms = promise {return Controller.setUpdateTermColumns terms state}
-                //let cmd =
-                //    Cmd.OfPromise.either
-                //        setUpdateTermColumns
-                //        (terms)
-                //        (fun r -> Msg.Batch [
-                //            Spreadsheet.Success r |> SpreadsheetMsg
-                //            OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg
-                //        ])
-                //        (curry GenericError (OfficeInterop.UpdateFillHiddenColsState OfficeInterop.FillHiddenColsState.Inactive |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg)
-                //state, nextModel, cmd
-                failwith "UpdateTermColumnsResponse is not implemented yet"
+                let _ = UpdateUtil.download (name ,xlsxBytes)
                 state, model, Cmd.none
         try
             innerUpdate state model msg

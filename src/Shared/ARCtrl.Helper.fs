@@ -1,7 +1,7 @@
 namespace Shared
 
 open ARCtrl
-open TermTypes
+open Database
 open System.Collections.Generic
 
 /// This module contains helper functions which might be useful for ARCtrl
@@ -161,6 +161,7 @@ type CompositeHeaderDiscriminate =
 | Input
 | Output
 | Comment
+| Freetext
 with
     /// <summary>
     /// Returns true if the Building Block is a term column
@@ -299,7 +300,6 @@ module Extensions =
     type OntologyAnnotation with
         static member empty() = OntologyAnnotation.create()
         static member fromTerm (term:Term) = OntologyAnnotation(term.Name, term.FK_Ontology, term.Accession)
-        member this.ToTermMinimal() = TermMinimal.create this.NameText this.TermAccessionShort
 
     type ArcTable with
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
@@ -387,6 +387,7 @@ module Extensions =
             | CompositeHeader.Input _               -> CompositeHeaderDiscriminate.Input
             | CompositeHeader.Output _              -> CompositeHeaderDiscriminate.Output
             | CompositeHeader.Comment _             -> CompositeHeaderDiscriminate.Comment
+            | CompositeHeader.FreeText _            -> CompositeHeaderDiscriminate.Freetext
 
     type CompositeCell with
 

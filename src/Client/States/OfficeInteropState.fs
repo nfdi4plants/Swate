@@ -2,8 +2,6 @@ namespace OfficeInterop
 
 open Shared
 open ARCtrl
-open TermTypes
-open OfficeInteropTypes
 open JsonImport
 
 type FillHiddenColsState =
@@ -33,28 +31,22 @@ type Msg =
     | UpdateArcFile                         of ArcFiles
     | AnnotationtableCreated
     | TryFindAnnotationTable
-    | AnnotationTableExists                 of Result<string, string>
+    | AnnotationTableExists                 of bool
     | InsertOntologyTerm                    of OntologyAnnotation
     | ValidateBuildingBlock
     | AddAnnotationBlock                    of CompositeColumn
     | AddAnnotationBlocks                   of CompositeColumn [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | ImportFile                            of (string*InsertBuildingBlock []) []
     | AddTemplate                           of ArcTable
     | JoinTable                             of ArcTable * options: TableJoinOptions option
     | RemoveBuildingBlock
     | UpdateUnitForCells
     | AutoFitTable                          of hideRefCols:bool
     // Term search functions
-    | GetParentTerm
     // table+database interconnected functions
     /// 
     | RectifyTermColumns
     ///
-    | FillHiddenColumns                     of TermSearchable []
-    ///
     | UpdateFillHiddenColsState             of FillHiddenColsState
-    /// Show Details to selected BuildingBlock
-    | GetSelectedBuildingBlockTerms
     //
     ///
     | InsertFileNames                       of fileNameList:string list
@@ -62,8 +54,5 @@ type Msg =
     | DeleteTopLevelMetadata
     | SendErrorsToFront                     of InteropLogging.Msg list
     | ExportJson                            of ArcFiles * JsonExportFormat
-    // Development
-    | TryExcel
-    | TryExcel2
     //| ExcelSubscriptionMsg          of OfficeInterop.Types.Subscription.Msg
 

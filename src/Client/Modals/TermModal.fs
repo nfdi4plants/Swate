@@ -1,6 +1,6 @@
 module Modals.TermModal
 
-open Shared.TermTypes
+open Shared.Database
 open Feliz
 open Feliz.Bulma
 open ARCtrl

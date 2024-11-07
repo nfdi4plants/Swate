@@ -188,21 +188,12 @@ type SidebarView =
                     prop.children [
                         tabs model dispatch state.Size
 
-                        //str <| state.Size.ToString()
-
-                        //Button.button [
-                        //    Button.OnClick (fun _ ->
-                        //        //Spreadsheet.Controller.deleteRow 2 model.SpreadsheetModel
-                        //        //()
-                        //        //Spreadsheet.DeleteColumn 1 |> SpreadsheetMsg |> dispatch
-                        //        ()
-                        //    )
-                        //] [ str "Test button" ]
-
-                        match model.PersistentStorageState.Host, not model.ExcelState.HasAnnotationTable with
-                        | Some Swatehost.Excel, true ->
+                        match model.PersistentStorageState.Host, model.ExcelState.HasAnnotationTable with
+                        | Some Swatehost.Excel, false ->
                             SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
-                        | _ -> ()
+                            Html.none
+                        | _ ->
+                            Html.none
 
                         SidebarView.content model dispatch
                         SidebarView.footer (model, dispatch)

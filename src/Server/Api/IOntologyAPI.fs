@@ -1,9 +1,9 @@
 module API.IOntologyAPI
 
 open Shared
-open TermTypes
-
 open Database
+
+open DTO
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open ARCtrl
@@ -90,6 +90,9 @@ module V3 =
         |> Remoting.withErrorHandler Helper.errorHandler
         |> Remoting.buildHttpHandler
 
+open Shared.SwateObsolete
+open Shared.SwateObsolete.Regex
+
 [<RequireQualifiedAccess>]
 module V1 =
 
@@ -118,7 +121,7 @@ module V1 =
                 async {
                     let dbSearchRes =
                         match typedSoFar with
-                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
+                        | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         // This suggests we search for a term name
                         | notAnAccession ->
@@ -134,7 +137,7 @@ module V1 =
                 async {
                     let dbSearchRes =
                         match typedSoFar with
-                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
+                        | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Database.Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
                             let searchmode = if typedSoFar.Length < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
@@ -159,7 +162,7 @@ module V1 =
 
                     let dbSearchRes =
                         match typedSoFar with
-                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
+                        | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
                             if childTerm.TermAccession = ""
@@ -194,7 +197,7 @@ module V1 =
                 async {
                     let dbSearchRes =
                         match typedSoFar with
-                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
+                        | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | notAnAccession ->
                             Term.Term(credentials).searchByName(notAnAccession,sourceOntologyName= Term.AnyOfOntology.Single "uo")
@@ -290,7 +293,7 @@ module V2 =
                 async {
                     let dbSearchRes =
                         match inp.query with
-                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
+                        | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         // This suggests we search for a term name
                         | notAnAccession ->
@@ -309,7 +312,7 @@ module V2 =
                 async {
                     let dbSearchRes =
                         match inp.query with
-                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
+                        | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Database.Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
                             printfn "[getTermSuggestionsByParentTerm] Hit default search"
@@ -340,7 +343,7 @@ module V2 =
 
                     let dbSearchRes =
                         match inp.query with
-                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
+                        | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | _ ->
                             let searchmode = if inp.query.Length < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
@@ -377,7 +380,7 @@ module V2 =
                 async {
                     let dbSearchRes =
                         match inp.query with
-                        | Regex.Aux.Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
+                        | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
                             Term.Term(credentials).getByAccession foundAccession.Value
                         | notAnAccession ->
                             Term.Term(credentials).searchByName(notAnAccession, sourceOntologyName = Term.AnyOfOntology.Multiples ["uo"; "dpbo"])

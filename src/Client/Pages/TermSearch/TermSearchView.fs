@@ -5,7 +5,6 @@ open Fable.React.Props
 open ExcelColors
 open Messages
 open Shared
-open TermTypes
 open CustomComponents
 open Elmish
 open TermSearch

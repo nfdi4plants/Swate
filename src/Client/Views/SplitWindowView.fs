@@ -69,14 +69,6 @@ let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatc
         prop.onMouseDown <| mouseDown_event (mouseMove_event model setModel)
     ]
 
-let exampleTerm =
-    Shared.TermTypes.createTerm
-        "MS:1023810"
-        "instrument model"
-        "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."
-        false
-        "MS"
-
 let private sidebarCombinedElement(sidebarId: string, model: SplitWindow, setModel, dispatch, right) =
     Html.div [
         prop.id sidebarId

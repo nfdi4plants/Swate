@@ -5,7 +5,7 @@ open Fable.React.Props
 open Elmish
 
 open Shared
-open TermTypes
+open Database
 open ExcelColors
 open Model
 open Messages
@@ -58,8 +58,6 @@ open Fable.Core.JsInterop
 
 module private ResultsTable =
     open Feliz
-
-    open Shared.TermTypes
 
     type TableModel = {
         Data            : Term []

@@ -3,8 +3,9 @@ module Database.TreeSearch
 open System
 open Neo4j.Driver
 
-open Shared.TermTypes
-open Shared.TreeTypes
+open Shared.DTO
+open Shared.Database
+open Shared.Database.TreeTypes
 
 open Helper
 

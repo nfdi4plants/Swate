@@ -1,8 +1,6 @@
 namespace SpreadsheetInterface
 
 open Shared
-open TermTypes
-
 open ARCtrl
 open JsonImport
 
@@ -22,8 +20,6 @@ type Msg =
 | AddTemplate           of ArcTable
 | JoinTable             of ArcTable * columnIndex: int option * options: TableJoinOptions option
 | UpdateArcFile         of ArcFiles
-/// Open modal for selected building block, allows editing on standalone only.
-| EditBuildingBlock
 /// Inserts TermMinimal to selected fields of one column
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
@@ -33,4 +29,3 @@ type Msg =
 | ExportJson of ArcFiles * JsonExportFormat
 | UpdateUnitForCells
 | RectifyTermColumns
-| UpdateTermColumnsResponse of TermTypes.TermSearchable []

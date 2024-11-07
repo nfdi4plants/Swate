@@ -4,7 +4,7 @@ module Update.Update
 open Elmish
 
 open Shared
-open TermTypes
+open Database
 open Routing
 open Messages
 open Model
@@ -120,49 +120,6 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (cur
         nextState,Cmd.none
     | PersistentStorage.UpdateShowSidebar show ->
         {currentState with ShowSideBar = show}, Cmd.none
-
-let handleBuildingBlockDetailsMsg (topLevelMsg:BuildingBlockDetailsMsg) (currentState: BuildingBlockDetailsState) : BuildingBlockDetailsState * Cmd<Msg> =
-    match topLevelMsg with
-    // Client
-    | UpdateBuildingBlockValues nextValues ->
-        let nextState = {
-            currentState with
-                BuildingBlockValues = nextValues
-        }
-        nextState, Cmd.none
-    | UpdateCurrentRequestState nextRequState ->
-        let nextState = {
-            currentState with
-                CurrentRequestState = nextRequState
-        }
-        nextState, Cmd.none
-    // Server
-    | GetSelectedBuildingBlockTermsRequest searchTerms ->
-        let nextState = {
-            currentState with
-                CurrentRequestState = RequestBuildingBlockInfoStates.RequestDataBaseInformation
-        }
-        let cmd =
-            Cmd.OfAsync.either
-                Api.api.getTermsByNames
-                searchTerms
-                (GetSelectedBuildingBlockTermsResponse >> BuildingBlockDetails)
-                (fun x ->
-                    Msg.Batch [
-                        curry GenericError Cmd.none x |> DevMsg
-                        UpdateCurrentRequestState Inactive |> BuildingBlockDetails
-                    ]
-                )
-        nextState, cmd
-    | GetSelectedBuildingBlockTermsResponse searchTermResults ->
-        let nextState = {
-            BuildingBlockValues = searchTermResults
-            CurrentRequestState = Inactive
-        }
-        let cmd = Cmd.ofEffect(fun dispatch ->
-            Modals.Controller.renderModal("BuildingBlockDetails", Modals.BuildingBlockDetailsModal.buildingBlockDetailModal(nextState, dispatch))
-        )
-        nextState, cmd
 
 module Ontologies =
     let update (omsg: Ontologies.Msg) (model: Model) =
@@ -349,17 +306,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             let nextModel = {
                 currentModel with
                     ProtocolState = nextFileUploadJsonState
-                }
-            nextModel, nextCmd
-
-        | BuildingBlockDetails buildingBlockDetailsMsg ->
-            let nextState, nextCmd =
-                currentModel.BuildingBlockDetailsState
-                |> handleBuildingBlockDetailsMsg buildingBlockDetailsMsg
-
-            let nextModel = {
-                currentModel with
-                    BuildingBlockDetailsState = nextState
                 }
             nextModel, nextCmd
 

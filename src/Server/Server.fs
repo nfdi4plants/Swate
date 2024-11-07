@@ -6,7 +6,6 @@ open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open Saturn
 open Shared
-open Shared.TermTypes
 
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
@@ -21,153 +20,6 @@ let serviceApi: IServiceAPIv1 = {
 }
 
 open Microsoft.AspNetCore.Http
-
-let dagApiv1 = {
-    parseAnnotationTablesToDagHtml = fun worksheetBuildingBlocks -> async {
-        //let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-        //let processSequence = Option.defaultValue [] assay.ProcessSequence
-        //let dag = Viz.DAG.fromProcessSequence (processSequence,Viz.Schema.NFDIBlue) |> CyjsAdaption.MyHTML.toEmbeddedHTML
-        //return dag
-        return failwith "Not implemented yet"
-    }
-}
-
-let swateJsonAPIv1 = {
-    parseAnnotationTableToAssayJson = fun (worksheetName,buildingblocks) -> async {
-        //let assay = Export.parseBuildingBlockToAssay worksheetName buildingblocks
-        //let parsedJsonStr = ISADotNet.Json.Assay.toString assay
-        //return parsedJsonStr
-        return failwith "Not implemented yet"
-    }
-    parseAnnotationTableToProcessSeqJson = fun (worksheetName,buildingblocks) -> async {
-        //let assay = Export.parseBuildingBlockToAssay worksheetName buildingblocks
-        //let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
-        //return parsedJsonStr
-        return failwith "Not implemented yet"
-    }
-    parseAnnotationTablesToAssayJson = fun worksheetBuildingBlocks -> async {
-        //let assay = Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-        //let parsedJsonStr = ISADotNet.Json.Assay.toString assay
-        //return parsedJsonStr
-        return failwith "Not implemented yet"
-    }
-    parseAnnotationTablesToProcessSeqJson = fun worksheetBuildingBlocks -> async {
-        //let assay =  Export.parseBuildingBlockSeqsToAssay worksheetBuildingBlocks
-        //let parsedJsonStr = ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence.Value
-        //return parsedJsonStr
-        return failwith "Not implemented yet"
-    }
-    parseAssayJsonToBuildingBlocks = fun jsonString -> async {
-        //let table = Import.Json.fromAssay jsonString
-        //if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-        //let buildingBlocks =
-        //    table.Sheets
-        //    |> Array.ofList
-        //    |> Array.map(fun s ->
-        //        let ibb = s.toInsertBuildingBlockList |> Array.ofList
-        //        //printfn "%A" ibb
-        //        s.SheetName, ibb
-        //)
-        //return buildingBlocks
-        return failwith "Not implemented yet"
-    }
-    // [<System.ObsoleteAttribute>]
-    //parseTableJsonToBuildingBlocks = fun jsonString -> async {
-    //    let table = JsonImport.tableJsonToTable jsonString
-    //    if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-    //    let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
-    //    return buildingBlocks
-    //}
-    parseProcessSeqToBuildingBlocks = fun jsonString -> async {
-        //let table = Import.Json.fromProcessSeq jsonString
-        //if table.Sheets.Length = 0 then failwith "Unable to find any Swate annotation table information! Please check if uploaded json and chosen json import type match."
-        //let buildingBlocks = table.Sheets |> Array.ofList |> Array.map(fun s -> s.SheetName,s.toInsertBuildingBlockList |> Array.ofList)
-        //return buildingBlocks
-        return failwith "Not implemented yet"
-    }
-}
-
-let isaDotNetCommonAPIv1 : IISADotNetCommonAPIv1 =
-    //let assayFromByteArray (byteArray: byte []) =
-    //    let ms = new MemoryStream(byteArray)
-    //    let jsonStr = ISADotNet.XLSX.AssayFile.Assay.fromStream ms
-    //    jsonStr
-    //let investigationFromByteArray (byteArray: byte []) =
-    //    let ms = new MemoryStream(byteArray)
-    //    let jsonStr =
-    //        ISADotNet.XLSX.Investigation.fromStream ms
-    //    jsonStr
-    {
-        // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
-        toAssayJson = fun byteArray -> async {
-            //let assay = assayFromByteArray byteArray |> fun (_,assay) -> assay
-            //return box assay
-            return failwith "Not implemented yet"
-        }
-        // This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
-        // This is the main interop function for SWOBUP.
-        toSwateTemplateJson = fun byteArray -> async {
-            //let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
-            //let ms = new MemoryStream(byteArray)
-            //let doc = FsSpreadsheet.ExcelIO.Spreadsheet.fromStream ms false
-            //let tableName = metadata.TryGetValue "Table"
-            //let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
-            //let assayJson = ISADotNet.Json.Assay.toString assay.Value
-            //metadata.SetValue("TemplateJson",assayJson)
-            //return metadata |> box
-            return failwith "Not implemented yet"
-        }
-        // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
-        toInvestigationJson = fun byteArray -> async {
-            //let investigation = investigationFromByteArray byteArray
-            //return box investigation
-            return failwith "Not implemented yet"
-        }
-        toProcessSeqJson = fun byteArray -> async {
-            //let assay = assayFromByteArray byteArray 
-            //let processList = assay |> fun (_,assay) -> Option.defaultValue [] assay.ProcessSequence
-            //return box processList
-            return failwith "Not implemented yet"
-        }
-        // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Assay.
-        toAssayJsonStr = fun byteArray -> async {
-            //let assayJsonString = assayFromByteArray byteArray |> fun (_,assay) -> ISADotNet.Json.Assay.toString assay
-            //return assayJsonString
-            return failwith "Not implemented yet"
-        }
-        // This functions reads an ISA-XLSX protocol template as byte [] and returns template metadata and the correlated assay.json.
-        toSwateTemplateJsonStr = fun byteArray -> async {
-            //let metadata = TemplateMetadata.parseDynMetadataFromByteArr byteArray
-            //let ms = new MemoryStream(byteArray)
-            //let doc = FsSpreadsheet.ExcelIO.Spreadsheet.fromStream ms false
-            //let tableName = metadata.TryGetValue "Table"
-            //let assay = ISADotNet.Assay.fromTemplateSpreadsheet (doc, string tableName.Value) 
-            //let assayJson = ISADotNet.Json.Assay.toString assay.Value
-            //metadata.SetValue("TemplateJson",assayJson)
-            //let jsonExp = metadata.toJson()
-            //return jsonExp
-            return failwith "Not implemented yet"
-        }
-        // This functions takes an ISA-XLSX file as byte [] and converts it to a ISA-JSON Investigation.
-        toInvestigationJsonStr = fun byteArray -> async {
-            //let investigationJson = investigationFromByteArray byteArray |> ISADotNet.Json.Investigation.toString
-            //return investigationJson
-            return failwith "Not implemented yet"
-        }
-        toProcessSeqJsonStr = fun byteArray -> async {
-            //let assay = assayFromByteArray byteArray 
-            //let processJSon = assay |> fun (_,assay) -> Option.map ISADotNet.Json.ProcessSequence.toString assay.ProcessSequence |> Option.defaultValue "" 
-            //return processJSon
-            return failwith "Not implemented yet"
-        }
-        testPostNumber = fun num -> async {
-            let res = $"Hey you just sent us a number. Is this your number {num}?"
-            return res
-        }
-        getTestNumber = fun () -> async {
-            return "42"
-        }
-    }
 
 open Database
 
@@ -230,32 +82,6 @@ let createIServiceAPIv1 =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue serviceApi
     //|> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
-    |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler API.Helper.errorHandler
-    |> Remoting.buildHttpHandler
-
-let createISADotNetCommonAPIv1 =
-    Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue isaDotNetCommonAPIv1
-    |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler API.Helper.errorHandler
-    |> Remoting.buildHttpHandler
-
-let createExpertAPIv1 =
-    Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue swateJsonAPIv1
-    //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
-    |> Remoting.withDiagnosticsLogger(printfn "%A")
-    |> Remoting.withErrorHandler API.Helper.errorHandler
-    |> Remoting.buildHttpHandler
-
-let createDagApiv1 =
-    Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue dagApiv1
-    //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler API.Helper.errorHandler
     |> Remoting.buildHttpHandler
@@ -324,25 +150,9 @@ let topLevelRouter = router {
         createITemplateApiv1 credentials next ctx
     )
 
-    forward "" (fun next ctx ->
-        API.IExportAPI.V1.createExportApi () next ctx
-    )
-
     //
     forward @"" (fun next ctx ->
         createIServiceAPIv1 next ctx
-    )
-
-    forward @"" (fun next ctx ->
-        createISADotNetCommonAPIv1 next ctx
-    )
-
-    forward @"" (fun next ctx ->
-        createExpertAPIv1 next ctx
-    )
-
-    forward @""(fun next ctx ->
-        createDagApiv1 next ctx
     )
 
     forward @""(fun next ctx ->

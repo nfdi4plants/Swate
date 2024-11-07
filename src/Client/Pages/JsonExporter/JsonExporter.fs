@@ -337,7 +337,7 @@ type FileExporter =
                                     match host with
                                     | Some Swatehost.Excel ->
                                         promise {                     
-                                            let! result = OfficeInterop.Core.OfficeInterop.tryParseToArcFile()
+                                            let! result = OfficeInterop.Core.Main.tryParseToArcFile()
                                             match result with
                                             | Result.Ok arcFile -> SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
                                             | Result.Error msgs -> OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
