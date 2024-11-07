@@ -2406,8 +2406,13 @@ type Main =
 
                 match arcTableRes with
                 | Ok arcTable ->
+                    let values =
+                        if newColumn.Cells.Length < arcTable.RowCount && newColumn.Cells.Length > 0 then
+                            Array.create arcTable.RowCount newColumn.Cells.[0]
+                        else
+                            newColumn.Cells
 
-                    arcTable.AddColumn(newColumn.Header, newColumn.Cells, forceReplace=true)
+                    arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
                     let! _ = Main.createNewAnnotationTable(arcTable)
 
