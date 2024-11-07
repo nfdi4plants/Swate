@@ -1050,7 +1050,7 @@ let tryGetSelectedTableIndex (table: Table) (context: RequestContext) =
 /// </summary>
 /// <param name="columns"></param>
 /// <param name="selectedIndex"></param>
-let getSelectedBuildingBlock (table: Table) (context: RequestContext) =
+let getSelectedCompositeColumn (table: Table) (context: RequestContext) =
     promise {
         let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"columnIndex"|]))
         let headerRange = table.getHeaderRowRange()
@@ -1154,7 +1154,7 @@ let getSelectedBuildingBlockCell (table: Table) (context: RequestContext) =
 /// </summary>
 let getArcMainColumn (excelTable: Table) (arcTable: ArcTable) (context: RequestContext) =
     promise {
-        let! selectedBlock = getSelectedBuildingBlock excelTable context
+        let! selectedBlock = getSelectedCompositeColumn excelTable context
 
         let protoHeaders = excelTable.getHeaderRowRange()
         let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
@@ -1288,7 +1288,7 @@ let removeSelectedAnnotationBlock () =
 
             match excelTableRes with
             | Some excelTable ->
-                let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
+                let! selectedBuildingBlock = getSelectedCompositeColumn excelTable context
 
                 // iterate DESCENDING to avoid index shift
                 for i, _ in Seq.sortByDescending fst selectedBuildingBlock do
@@ -1547,7 +1547,7 @@ let validateBuildingBlock (excelTable: Table, context: RequestContext) =
         let mutable errors:list<exn*string> = []
 
         if isMainColumn then
-            let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
+            let! selectedBuildingBlock = getSelectedCompositeColumn excelTable context
             let targetIndex = fst (selectedBuildingBlock.Item (selectedBuildingBlock.Count - 1))
             let! result = validateSelectedColumns(headerRange, bodyRowRange, int columnIndex, targetIndex, context)
 
@@ -2111,7 +2111,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
                             if firstRow = 0. then 1.
                             else firstRow
 
-                        let! selectedBuildingBlock = getSelectedBuildingBlock excelTable context
+                        let! selectedBuildingBlock = getSelectedCompositeColumn excelTable context
 
                         let columnIndices = selectedBuildingBlock |> Array.ofSeq |> Array.map (fun (index, _) -> index)
                         let columnHeaders = ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> Array.ofSeq
@@ -2163,6 +2163,22 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
         }
     )
 
+let getCompositeColumnDetails () =
+    Excel.run(fun context ->
+        promise {
+            let! excelTableRes = AnnotationTable.tryGetActive context
+            match excelTableRes with
+            | Some excelTable ->
+
+                let selectedCompositeColumn = getSelectedCompositeColumn excelTable context
+
+
+
+                return [InteropLogging.Msg.create InteropLogging.Info "Some Info"]
+            | None ->
+                return [InteropLogging.NoActiveTableMsg]
+        }
+    )
 
 /// <summary>This function is used to insert file names into the selected range.</summary>
 let insertFileNamesFromFilePicker (fileNameList: string list) =

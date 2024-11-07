@@ -39,6 +39,7 @@ type Msg =
     | AddTemplate                           of ArcTable
     | JoinTable                             of ArcTable * options: TableJoinOptions option
     | RemoveBuildingBlock
+    | GetBuildingBlockDetails
     | UpdateUnitForCells
     | AutoFitTable                          of hideRefCols:bool
     // Term search functions
