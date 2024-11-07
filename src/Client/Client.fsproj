@@ -5,16 +5,14 @@
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Types.fs" />
     <None Include="tailwind.config.js" />
-    <Compile Include="Helper.fs" />
-    <Compile Include="React.useListener.fs" />
-    <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="vite.config.mts" />
-    <None Include="docs\IOntologyAPIv2.yaml" />
-    <Content Include="docs\IOntologyAPIv2.html" />
+    <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
     <None Include="style.scss" />
+    <Compile Include="Types.fs" />
+    <Compile Include="Helper.fs" />
+    <Compile Include="React.useListener.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
     <Compile Include="LocalStorage\SplitWindow.fs" />
     <Compile Include="LocalStorage\Darkmode.fs" />
@@ -121,7 +119,8 @@
     <Compile Include="Update\InterfaceUpdate.fs" />
     <Compile Include="Update.fs" />
     <Compile Include="Init.fs" />
-    <Compile Include="Client.fs" />
+    <Compile Include="Index.fs" />
+    <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.fsproj" />
@@ -141,5 +140,6 @@
     <PackageReference Include="Feliz.Bulma" Version="3.0.0" />
     <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
     <PackageReference Include="FsSpreadsheet.Js" Version="[6.2.0]" />
+    <PackageReference Include="Fable.Mocha" Version="2.17.0" />
   </ItemGroup>
 </Project>

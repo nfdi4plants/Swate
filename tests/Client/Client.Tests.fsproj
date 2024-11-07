@@ -4,12 +4,14 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="index.html" />
-    <None Include="vite.config.mts" />
+    <Compile Include="OfficeAddinMock.fs" />
     <Compile Include="Client.Tests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Client\Client.fsproj" />
     <ProjectReference Include="..\Shared\Shared.Tests.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Fable.Mocha" Version="2.17.0" />
   </ItemGroup>
 </Project>

@@ -49,3 +49,16 @@ let EventHandler (dispatch: Messages.Msg -> unit) : IEventHandler =
         Error = fun exn ->
             GenericError (Cmd.none, exn) |> DevMsg |> dispatch
     }
+
+
+let subscription (initial: Model) : (SubId * Subscribe<Messages.Msg>) list =
+    let subscription (dispatch: Messages.Msg -> unit) : System.IDisposable =
+        let rmv = ARCitect.Interop.initEventListener (EventHandler dispatch)
+        { new System.IDisposable with
+            member _.Dispose() = rmv()
+        }
+    [
+        // Only subscribe to ARCitect messages when host is set correctly via query param.
+        if initial.PersistentStorageState.Host = Some (Swatehost.ARCitect) then
+            ["ARCitect"], subscription
+    ]
