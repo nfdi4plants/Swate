@@ -16,7 +16,7 @@ let all =
 #if FABLE_COMPILER // This preprocessor directive makes editor happy
             Shared.Tests.shared
 #endif
-            // OfficeAddin.Tests.Main
+            OfficeAddin.Tests.Main
             client
         ]
 

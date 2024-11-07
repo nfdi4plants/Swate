@@ -36,7 +36,6 @@ module private CellComponents =
             prop.children [Html.i [prop.classes ["fa-sharp"; "fa-solid"; "fa-angles-up"; if isExtended then "fa-rotate-270" else "fa-rotate-90"]; prop.style [style.fontSize(length.em 1)]]]
         ]
 
-
 module private CellAux =
 
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
