@@ -39,6 +39,17 @@ module private CellComponents =
 
 module private CellAux =
 
+    let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
+        log (s, header)
+        match header.TryOA(), s with
+        | Some oa, "" -> oa.TermSourceREF <- None;  Some oa
+        | Some oa, s1 ->  oa.TermSourceREF <- Some s1;  Some oa
+        | None, _ -> None
+        |> fun s -> log s; s
+        |> Option.map header.UpdateWithOA
+        |> fun s -> log s; s
+        |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
+
     let headerTANSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
         match header.TryOA(), s with
         | Some oa, "" -> oa.TermAccessionNumber <- None;  Some oa
@@ -223,8 +234,8 @@ type Cell =
         Cell.HeaderBase(Unit, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
 
     static member HeaderTSR(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly) =
-        let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermAccessionShort) |> Option.defaultValue ""
-        let setter = fun (s: string) -> headerTANSetter(columnIndex, s, header, dispatch)
+        let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermSourceREF) |> Option.flatten |> Option.defaultValue ""
+        let setter = fun (s: string) -> headerTSRSetter(columnIndex, s, header, dispatch)
         Cell.HeaderBase(TSR, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
 
     static member HeaderTAN(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly) =
