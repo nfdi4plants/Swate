@@ -93,12 +93,6 @@ module TermSearchAux =
         setSearchNameState <| SearchState.init()
         debouncel debounceStorage "TermSearch" debounceTimer setLoading queryDB ()
 
-    let dsetter (inp: OntologyAnnotation option, setter, debounceStorage: DebounceStorage, setLoading: bool -> unit, debounceSetter: int option) =
-        if debounceSetter.IsSome then
-            debouncel debounceStorage "SetterDebounce" debounceSetter.Value setLoading setter inp
-        else
-            setter inp
-
     module Components =
 
         let termSeachNoResults (advancedTermSearchActiveSetter: (bool -> unit) option) = [
@@ -365,13 +359,9 @@ type TermSearch =
             setSearchNameState <| SearchState.init()
             setSearchTreeState <| SearchState.init()
             setIsSearching true
-        //let registerChange(queryString: string option) =
-        //    let oaOpt = queryString |> Option.map (fun s ->
-        //        let oa = input |> Option.defaultValue (OntologyAnnotation.empty())
-        //        oa.Name <- Some s
-        //        oa
-        //    )
-        //    dsetter(oaOpt,setter,debounceStorage.current,setLoading,debounceSetter)
+        let registerChange(searchTest: string option) =
+            let oa = searchTest |> Option.map (fun x -> OntologyAnnotation x)
+            debouncel debounceStorage.current "SetterDebounce" 500 setLoading setter oa
         Bulma.control.div [
             if isExpanded then Bulma.control.isExpanded
             if size.IsSome then size.Value
@@ -404,17 +394,17 @@ type TermSearch =
                         elif s.Trim() <> "" then
                             log "Double click not empty"
                             if searchable then
-                                startSearch ()
+                                startSearch()
                                 mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         else
                             ()
                     )
                     prop.onChange(fun (s: string) ->
                         if System.String.IsNullOrWhiteSpace s then
-                            //registerChange(None)
+                            registerChange(None)
                             stopSearch() // When deleting text this should stop search from completing
                         else
-                            //registerChange(Some s)
+                            registerChange(Some s)
                             if searchable then
                                 startSearch()
                                 mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
