@@ -6,8 +6,6 @@ open Fable.Mocha
 open Expecto
 #endif
 
-
-
 let example_tests = testList "example" [
     testCase "One" <| fun _ ->
         Expect.equal 1 1 ""

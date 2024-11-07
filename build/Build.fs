@@ -15,12 +15,12 @@ let sharedTestsPath = Path.getFullName "tests/Shared"
 let serverTestsPath = Path.getFullName "tests/Server"
 let clientTestsPath = Path.getFullName "tests/Client"
 
-let dockerComposePath = Path.getFullName ".db\docker-compose.yml"
+let dockerComposePath = Path.getFullName ".db/docker-compose.yml"
 
 let developmentUrl = "https://localhost:3000"
 
 module ProjectInfo =
-    
+
     let gitOwner = "nfdi4plants"
     let project = "Swate"
     let projectRepo = $"https://github.com/{gitOwner}/{project}"
@@ -33,7 +33,7 @@ module ProjectInfo =
     let release = ReleaseNotes.load releaseNotesPath
     let stableVersion = SemVer.parse release.NugetVersion
     let stableVersionTag = (sprintf "%i.%i.%i" stableVersion.Major stableVersion.Minor stableVersion.Patch )
-    
+
 module ReleaseNoteTasks =
 
     open Fake.Extensions.Release
@@ -46,7 +46,7 @@ module ReleaseNoteTasks =
                 Fake.DotNet.AssemblyInfo.Metadata ("Version",version)
                 Fake.DotNet.AssemblyInfo.Metadata ("ReleaseDate",releaseDate)
             ]
-        if commit then 
+        if commit then
             run git ["add"; "."] ""
             run git ["commit"; "-m"; (sprintf "Release %s :bookmark:" ProjectInfo.prereleaseTag)] ""
 
@@ -59,10 +59,10 @@ module ReleaseNoteTasks =
         createVersionFile(newRelease.AssemblyVersion, false)
 
         Trace.trace "Update Version.fs done!"
-        
+
         // Update maniefest.xmls
         Trace.trace "Update manifest.xml"
-        
+
         let _ =
             let newVer = sprintf "<Version>%i.%i.%i</Version>" newRelease.SemVer.Major newRelease.SemVer.Minor newRelease.SemVer.Patch
             Shell.regexReplaceInFilesWithEncoding
@@ -75,7 +75,7 @@ module ReleaseNoteTasks =
                     System.IO.Path.Combine(__SOURCE_DIRECTORY__, @"..\.assets\assets\experts_manifest.xml")
                     System.IO.Path.Combine(__SOURCE_DIRECTORY__, "manifest.xml")
                 ]
-        
+
         Trace.trace "Update manifest.xml done!"
     )
 
@@ -131,29 +131,29 @@ module ReleaseNoteTasks =
     )
 
 module Docker =
-    
+
     open Fake.Extensions.Release
 
     let dockerImageName = "freymaurer/swate"
     let dockerContainerName = "swate"
     let port = "8080"
 
-    let dockerCreateImage(tag:string option) = 
-        run 
-            docker 
+    let dockerCreateImage(tag:string option) =
+        run
+            docker
             [
-                "build"; "-t"; 
-                if tag.IsSome then $"{dockerContainerName}:{tag.Value}" else dockerContainerName; 
-                "-f"; "build/Dockerfile.publish"; "."
-            ] 
-            ""
-    let dockerTestImage(tag:string option) = 
-        run 
-            docker 
-            [
-                "run"; "-it"; "-p"; $"{port}:{port}"; 
+                "build"; "-t";
                 if tag.IsSome then $"{dockerContainerName}:{tag.Value}" else dockerContainerName;
-            ] 
+                "-f"; "build/Dockerfile.publish"; "."
+            ]
+            ""
+    let dockerTestImage(tag:string option) =
+        run
+            docker
+            [
+                "run"; "-it"; "-p"; $"{port}:{port}";
+                if tag.IsSome then $"{dockerContainerName}:{tag.Value}" else dockerContainerName;
+            ]
             ""
 
     /// <summary>
@@ -178,7 +178,7 @@ module Docker =
     // Change target to github-packages
     // https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
     //Target.create "docker-publish" (fun _ ->
-        
+
     //    let newRelease = ProjectInfo.release
     //    let check = Fake.Core.UserInput.getUserInput($"Is version {newRelease.SemVer.Major}.{newRelease.SemVer.Minor}.{newRelease.SemVer.Patch} correct? (y/n/true/false)" )
 
@@ -218,10 +218,6 @@ module Docker =
     //    | anythingElse -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
     //)
 
-module Build =
-    let SharedTests() =
-        run dotnet [ "build" ] sharedTestsPath
-
 module Release =
 
     open System.Diagnostics
@@ -259,14 +255,14 @@ module Release =
             failwith "aborted"
 
     let CreatePrereleaseTag() =
-        if promptYesNo (sprintf "Tagging branch with %s OK?" ProjectInfo.prereleaseTag ) then 
+        if promptYesNo (sprintf "Tagging branch with %s OK?" ProjectInfo.prereleaseTag ) then
             run git ["tag"; "-f"; ProjectInfo.prereleaseTag; ] ""
             Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.prereleaseTag
         else
             failwith "aborted"
 
     let ForcePushNightly() =
-        if promptYesNo "Ready to force push release to nightly branch?" then 
+        if promptYesNo "Ready to force push release to nightly branch?" then
             run git ["push"; "-f"; "origin"; "HEAD:nightly"] ""
         else
             failwith "aborted"
@@ -299,7 +295,7 @@ Target.create "CreateDevCerts" (fun _ ->
         Path.combine
             (Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
             ".office-addin-dev-certs/ca.crt"
-        
+
 
     let psi = new System.Diagnostics.ProcessStartInfo(FileName = certPath, UseShellExecute = true)
     System.Diagnostics.Process.Start(psi) |> ignore
@@ -349,72 +345,69 @@ Target.create "RunDB" (fun _ ->
 
 [<RequireQualifiedAccess>]
 module Tests =
-    let Watch() = 
+
+    let buildSharedTests () = run dotnet [ "build" ] sharedTestsPath
+
+    let Watch() =
         [
             "server", dotnet [ "watch"; "run" ] serverTestsPath
-            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath ]
+            // This below will start web ui for tests, but cannot execute due to office-addin-mock
+            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath
+            // "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
+        ]
         |> runParallel
 
-    let Run() = 
+    let Run() =
         [
             "server", dotnet [ "run" ] serverTestsPath
-            //"client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath 
+            "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
         ]|> runParallel
-
-Target.create "RunTests" (fun _ ->
-    run dotnet [ "build" ] sharedTestsPath
-    [
-        "server", dotnet [ "watch"; "run" ] serverTestsPath
-        "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath ]
-    |> runParallel
-)
 
 Target.create "Format" (fun _ ->
     run dotnet [ "fantomas"; "."; "-r" ] "src"
 )
 
-Target.create "Setup" ignore 
+Target.create "Setup" ignore
 
 Target.create "Ignore" (fun _ ->
     Trace.trace "Hit ignore"
 )
 
-let testFake = Target.create "testfake" (fun config ->
-    Trace.trace "Hit testfake"
-    Trace.traceImportant (sprintf "%A" config.Context.Arguments)
-    Trace.trace "Finish test"
-)
-
 [<EntryPoint>]
-let main args = 
+let main args =
     let argv = args |> Array.map (fun x -> x.ToLower()) |> Array.toList
 
     match argv with
-    | "bundle" :: a -> 
+    | "bundle" :: a ->
         InstallClient()
         Bundle(); 0
     | "run" :: a ->
         match a with
         | "db" :: a -> Run(true); 0
         | _ -> Run(false); 0
+    | "test" :: a ->
+        Tests.buildSharedTests()
+        match a with
+        | "watch" :: _ -> Tests.Watch(); 0
+        | _ -> Tests.Run(); 0
     | "release" :: a ->
-        Build.SharedTests()
+        Tests.buildSharedTests()
         Tests.Run()
         match a with
-        | "pre" :: a -> 
+        | "pre" :: a ->
             Release.SetPrereleaseTag()
             Release.CreatePrereleaseTag()
             let version = Release.GetLatestGitTag()
             ReleaseNoteTasks.createVersionFile(version, true)
             Release.ForcePushNightly()
             0
-        | _ -> 
+        | _ ->
             Release.CreateTag()
             0
     | "docker" :: a ->
         match a with
         | "create" :: a -> Docker.dockerCreateImage(Some "new"); 0
-        | "test" :: a -> 
+        | "test" :: a ->
             match a with
             | "single" :: a -> Docker.dockerTestImage(Some "new"); 0
             | _ -> Docker.DockerTestNewStack(); 0
@@ -429,4 +422,3 @@ let main args =
         0
     | _ -> runOrDefault args
 
-    

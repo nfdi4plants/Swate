@@ -11,11 +11,15 @@
     "@vitejs/plugin-basic-ssl": "^1.0.2",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.19",
+    "mocha": "^10.8.2",
+    "office-addin-mock": "^2.4.6",
     "postcss": "^8.4.39",
     "remotedev": "^0.2.7",
     "sass": "^1.69.5",
     "tailwindcss": "^3.4.4",
-    "vite": "^5.0.5"
+    "typescript": "^5.6.3",
+    "vite": "^5.0.5",
+    "vite-plugin-node-polyfills": "^0.22.0"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

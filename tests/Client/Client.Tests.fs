@@ -1,13 +1,13 @@
 module Client.Tests
 
 open Fable.Mocha
-open Client
 
 let client = testList "Client" [
     testCase "Hello received" <| fun _ ->
-        let hello = sayHello "SAFE V3"
+        let hello = Index.sayHello "SAFE V3"
 
         Expect.equal hello "Hello SAFE V3" "Unexpected greeting"
+
 ]
 
 let all =
@@ -16,6 +16,7 @@ let all =
 #if FABLE_COMPILER // This preprocessor directive makes editor happy
             Shared.Tests.shared
 #endif
+            // OfficeAddin.Tests.Main
             client
         ]
 
