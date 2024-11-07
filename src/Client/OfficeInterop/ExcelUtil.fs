@@ -21,7 +21,7 @@ let TableStyleLight = "TableStyleMedium7"
 
 // ExcelApi 1.1
 /// This function returns the names of all annotationTables in all worksheets.
-/// This function is used to pass a list of all table names to e.g. the 'createAnnotationTable()' function. 
+/// This function is used to pass a list of all table names to e.g. the 'createAnnotationTable()' function.
 let getAllTableNames (context:RequestContext) =
     // Ref. 2
 
@@ -59,9 +59,9 @@ let extendName (existingNames: string []) (baseName:string) =
     /// https://unicode-table.com/en/200B/
     /// Play with Fire 🔥
     let zeroWidthChar = '​'
-    let rec loop (baseName:string) = 
+    let rec loop (baseName:string) =
         if existingNames |> Array.contains baseName then
-            loop (baseName + " ") 
+            loop (baseName + " ")
         else
             baseName
     loop baseName
@@ -120,6 +120,18 @@ let convertSeqToExcelRangeInput (metadataValues:seq<seq<string option>>) =
             ira.AddRange (Array.create (maxLength - ira.Count) None)
         ra.Add ira
     ra
+
+/// <summary>
+/// This function is used as minimal test function to ensure a working excel function test suit
+/// </summary>
+let getSelectedRangeAdress (context: RequestContext) =
+    promise {
+        let range = context.workbook.getSelectedRange()
+        let _ = range.load(U2.Case1 "address") |> ignore
+        do! context.sync()
+
+        return range.address
+    }
 
 module Table =
 

@@ -351,7 +351,10 @@ module Tests =
     let Watch() =
         [
             "server", dotnet [ "watch"; "run" ] serverTestsPath
-            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath ]
+            // This below will start web ui for tests, but cannot execute due to office-addin-mock
+            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath
+            // "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
+        ]
         |> runParallel
 
     let Run() =
@@ -359,23 +362,6 @@ module Tests =
             "server", dotnet [ "run" ] serverTestsPath
             "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
         ]|> runParallel
-
-Target.create "RunTestsHeadless" (fun _ ->
-    Tests.buildSharedTests ()
-
-    run dotnet [ "run" ] serverTestsPath
-    run dotnet [ "fable"; "-o"; "output" ] clientTestsPath
-    run npx [ "mocha"; "output" ] clientTestsPath
-)
-
-Target.create "WatchRunTests" (fun _ ->
-    Tests.buildSharedTests ()
-
-    [
-        "server", dotnet [ "watch"; "run" ] serverTestsPath
-        "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath
-    ]
-    |> runParallel)
 
 Target.create "Format" (fun _ ->
     run dotnet [ "fantomas"; "."; "-r" ] "src"
