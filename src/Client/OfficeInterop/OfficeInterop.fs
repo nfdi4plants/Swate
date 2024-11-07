@@ -1703,8 +1703,8 @@ let rectifyTermColumns () =
                     let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
 
                     do! context.sync().``then``(fun _ -> ())
+
                     let items = excelTable.columns.items
-                    do! context.sync().``then``(fun _ -> ())
 
                     let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
                     let columns =
