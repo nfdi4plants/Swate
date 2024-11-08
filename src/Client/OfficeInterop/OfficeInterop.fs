@@ -2170,9 +2170,36 @@ let getCompositeColumnDetails () =
             match excelTableRes with
             | Some excelTable ->
 
-                let selectedCompositeColumn = getSelectedCompositeColumn excelTable context
+                let! selectedCompositeColumn = getSelectedCompositeColumn excelTable context
+                let selectedRange = context.workbook.getSelectedRange()
+                let tableRange = excelTable.getRange()
+                let _ =
+                    tableRange.load(U2.Case2 (ResizeArray[|"values";|])) |> ignore
+                    selectedRange.load(U2.Case2 (ResizeArray[|"rowIndex";|]))
 
+                do! context.sync().``then``(fun _ -> ())
 
+                let mainColumnIndex = fst (selectedCompositeColumn.Item 0)
+                let rowIndex = int selectedRange.rowIndex
+
+                let values =
+                    tableRange.values
+                    |> Array.ofSeq
+                    |> Array.map (fun item ->
+                        item |> Array.ofSeq
+                        |> Array.map (fun itemi ->
+                            Option.map string itemi
+                            |> Option.defaultValue ""))
+
+                let value = values.[rowIndex].[mainColumnIndex]
+
+                let! termsRes = searchTermsInDatabase [value]
+
+                let terms =
+                    termsRes
+                    |> Array.choose (fun term -> term)
+
+                let name = terms |> Array.map (fun item -> item.Name)
 
                 return [InteropLogging.Msg.create InteropLogging.Info "Some Info"]
             | None ->
