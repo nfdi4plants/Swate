@@ -355,7 +355,7 @@ module Tests =
             "server", dotnet [ "watch"; "run" ] serverTestsPath
             // This below will start web ui for tests, but cannot execute due to office-addin-mock
             //"client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath
-            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
+            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js"; "--watch" ] clientTestsPath
         ]
         |> runParallel
 
