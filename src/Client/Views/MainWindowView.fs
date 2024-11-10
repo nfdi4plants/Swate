@@ -83,6 +83,7 @@ let Main (model: Model, dispatch) =
     let state = model.SpreadsheetModel
     Html.div [
         prop.id "MainWindow"
+        prop.className "@container/main"
         prop.style [
             style.display.flex
             style.flexDirection.column

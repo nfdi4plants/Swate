@@ -14,7 +14,6 @@ open Elmish
 
 
 module private UploadHandler =
-    let buttonStyle = prop.style [style.margin(length.rem 1.5)]
 
     open Fable.Core.JsInterop
 
@@ -56,7 +55,7 @@ module private Helper =
             prop.children [
                 Html.input [
                     prop.id uploadId
-                    prop.type' "file";
+                    prop.type'.file;
                     prop.style [style.display.none]
                     prop.onChange (fun (ev: Event) ->
                         let fileList : FileList = ev.target?files
@@ -84,8 +83,7 @@ module private Helper =
                 ]
                 Daisy.button.button [
                     button.lg
-                    UploadHandler.buttonStyle
-                    button.info
+                    button.outline
                     prop.onClick(fun e ->
                         e.preventDefault()
                         let getUploadElement = Browser.Dom.document.getElementById uploadId
@@ -99,64 +97,66 @@ module private Helper =
             ]
         ]
 
+    let createNewTableItem (txt: string, onclick: Event -> unit)=
+        Html.li [Daisy.button.a [
+            button.block
+            button.ghost
+            button.sm
+            prop.className "justify-start"
+            prop.onClick onclick
+            prop.text txt
+        ]]
+
     let createNewTable (dispatch: Messages.Msg -> unit) =
 
         Daisy.dropdown [
-            UploadHandler.buttonStyle
             prop.children [
                 Html.div [
-                    prop.className "btn btn-lg"
+                    prop.className "btn btn-lg btn-primary w-full"
                     prop.tabIndex 0
                     prop.text "New File"
                 ]
                 Daisy.dropdownContent [
-                    Html.a [
-                        prop.onClick(fun _ ->
-                            let i = ArcInvestigation.init("New Investigation")
-                            ArcFiles.Investigation i
-                            |> UpdateArcFile
-                            |> InterfaceMsg
-                            |> dispatch
-                        )
-                        prop.text "Investigation"
-                    ]
-                    Html.a [
-                        prop.onClick(fun _ ->
-                            let s = ArcStudy.init("New Study")
-                            let _ = s.InitTable("New Study Table")
-                            ArcFiles.Study (s, [])
-                            |> UpdateArcFile
-                            |> InterfaceMsg
-                            |> dispatch
-                        )
-                        prop.text "Study"
-                    ]
-                    Html.a [
-                        prop.onClick(fun _ ->
-                            let a = ArcAssay.init("New Assay")
-                            let _ = a.InitTable("New Assay Table")
-                            ArcFiles.Assay a
-                            |> UpdateArcFile
-                            |> InterfaceMsg
-                            |> dispatch
-                        )
-                        prop.text "Assay"
-                    ]
-                    Daisy.divider [divider.horizontal]
-                    Html.a [
-                        prop.onClick(fun _ ->
-                            let template = Template.init("New Template")
-                            let table = ArcTable.init("New Table")
-                            template.Table <- table
-                            template.Version <- "0.0.0"
-                            template.Id <- System.Guid.NewGuid()
-                            template.LastUpdated <- System.DateTime.Now
-                            ArcFiles.Template template
-                            |> UpdateArcFile
-                            |> InterfaceMsg
-                            |> dispatch
-                        )
-                        prop.text "Template"
+                    prop.className "bg-base-300 [&_a]:rounded-none shadow"
+                    prop.children [
+                        Html.ul [
+                            createNewTableItem("Investigation", fun _ ->
+                                let i = ArcInvestigation.init("New Investigation")
+                                ArcFiles.Investigation i
+                                |> UpdateArcFile
+                                |> InterfaceMsg
+                                |> dispatch
+                            )
+                            createNewTableItem("Study", fun _ ->
+                                let s = ArcStudy.init("New Study")
+                                let _ = s.InitTable("New Study Table")
+                                ArcFiles.Study (s, [])
+                                |> UpdateArcFile
+                                |> InterfaceMsg
+                                |> dispatch
+                            )
+                            createNewTableItem("Assay", fun _ ->
+                                    let a = ArcAssay.init("New Assay")
+                                    let _ = a.InitTable("New Assay Table")
+                                    ArcFiles.Assay a
+                                    |> UpdateArcFile
+                                    |> InterfaceMsg
+                                    |> dispatch
+                            )
+                            Html.li [Daisy.divider [divider.horizontal]]
+                            createNewTableItem("Template", fun _ ->
+                                let template = Template.init("New Template")
+                                let table = ArcTable.init("New Table")
+                                template.Table <- table
+                                template.Version <- "0.0.0"
+                                template.Id <- System.Guid.NewGuid()
+                                template.LastUpdated <- System.DateTime.Now
+                                ArcFiles.Template template
+                                |> UpdateArcFile
+                                |> InterfaceMsg
+                                |> dispatch
+                            )
+                        ]
                     ]
                 ]
             ]
@@ -190,8 +190,7 @@ type NoFileElement =
             ]
             prop.children [
                 Html.div [
-                    //prop.style [style.height.minContent; style.display.inheritFromParent; style.justifyContent.spaceBetween]
-                    prop.style [style.display.flex; style.justifyContent.spaceBetween]
+                    prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
                         Helper.createNewTable args.dispatch
                         Helper.uploadNewTable args.dispatch
