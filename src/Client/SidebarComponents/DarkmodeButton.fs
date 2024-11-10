@@ -1,13 +1,13 @@
 module SidebarComponents.DarkmodeButton
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open LocalStorage.Darkmode
 
 [<ReactComponent>]
 let Main() =
     let state = React.useContext(LocalStorage.Darkmode.themeContext)
-    Bulma.navbarItem.a [
+    Daisy.button.button [
         prop.onClick (fun e ->
             e.preventDefault()
             let next = if state.Theme = Dark then Light else Dark
@@ -15,9 +15,6 @@ let Main() =
             state.SetTheme {state with Theme = next}
         )
         prop.children [
-            Bulma.icon [
-                Bulma.icon.isMedium
-                prop.children state.Theme.toIcon
-            ]
+            state.Theme.toIcon
         ]
     ]

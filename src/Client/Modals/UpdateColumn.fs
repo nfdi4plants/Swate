@@ -1,7 +1,7 @@
 namespace Modals
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
@@ -13,6 +13,8 @@ open System.Text.RegularExpressions
 type private FunctionPage =
 | Create
 | Update
+
+open Components
 
 module private Components =
 
@@ -37,8 +39,8 @@ module private Components =
         String.Join("", s0), String.Join("", s1), String.Join("", s2)
 
     let Tab(targetPage: FunctionPage, currentPage, setPage) =
-        Bulma.tab [
-            if targetPage = currentPage then tab.isActive
+        Daisy.tab [
+            if targetPage = currentPage then tab.active
             prop.onClick (fun _ -> setPage targetPage)
             prop.children [
                 Html.a [
@@ -48,10 +50,9 @@ module private Components =
         ]
 
     let TabNavigation(currentPage, setPage) =
-        Bulma.tabs [
-            prop.style [style.flexGrow 1]
-            tabs.isCentered
-            tabs.isFullWidth
+        Daisy.tabs [
+            prop.className "grow"
+            tabs.bordered
             prop.children [
                 Html.ul [
                     Tab(FunctionPage.Create, currentPage, setPage)
@@ -76,25 +77,30 @@ module private Components =
         ]
 
     let PreviewTable(column: CompositeColumn, cellValues: string [], regex) =
-        Bulma.field.div [
-            Bulma.label "Preview"
-            Bulma.tableContainer [
-                Bulma.table [
-                    Html.thead [
-                        Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
-                    ]
-                    Html.tbody [
-                        let previewCount = 5
-                        let preview = Array.takeSafe previewCount cellValues 
-                        for i in 0 .. (preview.Length-1) do
-                            let cell0 = column.Cells.[i].ToString()
-                            let cell = preview.[i]
-                            let regexMarkedIndex = calculateRegex regex cell0
-                            PreviewRow(i,cell0,cell,regexMarkedIndex)
-                    ]
-                ]                                
+        Html.div [
+            Daisy.label [
+                Daisy.labelText "Preview"
             ]
-        ]   
+            Html.div [
+                prop.className "overflow-x-auto grow"
+                prop.children [
+                    Daisy.table [
+                        Html.thead [
+                            Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
+                        ]
+                        Html.tbody [
+                            let previewCount = 5
+                            let preview = Array.takeSafe previewCount cellValues
+                            for i in 0 .. (preview.Length-1) do
+                                let cell0 = column.Cells.[i].ToString()
+                                let cell = preview.[i]
+                                let regexMarkedIndex = calculateRegex regex cell0
+                                PreviewRow(i,cell0,cell,regexMarkedIndex)
+                        ]
+                    ]
+                ]
+            ]
+        ]
 
 type UpdateColumn =
 
@@ -102,103 +108,89 @@ type UpdateColumn =
     static member private CreateForm(cellValues: string [], setPreview) =
         let baseStr, setBaseStr = React.useState("")
         let suffix, setSuffix = React.useState(false)
-        let updateCells (baseStr: string) (suffix:bool) = 
-            cellValues 
-            |> Array.mapi (fun i c -> 
+        let updateCells (baseStr: string) (suffix:bool) =
+            cellValues
+            |> Array.mapi (fun i c ->
                 match suffix with
                 | true -> baseStr + string (i+1)
                 | false -> baseStr
-            ) 
+            )
             |> setPreview
-        Bulma.field.div [
-            Bulma.field.div [
-                Bulma.label "Base"
-                Bulma.input.text [
-                    prop.autoFocus true
-                    prop.valueOrDefault baseStr
-                    prop.onChange(fun s -> 
-                        setBaseStr s
-                        updateCells s suffix
-                    )
-                ]
+        React.fragment [
+            Daisy.label [
+                Daisy.labelText "BAse"
             ]
-            Bulma.field.div [
-                Bulma.control.div [
-                    Html.label [
-                        prop.className "is-flex is-align-items-center checkbox"
-                        prop.style [style.gap (length.rem 0.5)]
-                        prop.children [
-                            Html.input [
-                                prop.type' "checkbox"
-                                prop.isChecked suffix
-                                prop.onChange(fun e -> 
-                                    setSuffix e
-                                    updateCells baseStr e
-                                )
-                            ]
-                            Bulma.help "Add number suffix"
-                        ]
+            Daisy.input [
+                prop.autoFocus true
+                prop.valueOrDefault baseStr
+                prop.onChange(fun s ->
+                    setBaseStr s
+                    updateCells s suffix
+                )
+            ]
+            Html.label [
+                prop.className "is-flex is-align-items-center checkbox"
+                prop.style [style.gap (length.rem 0.5)]
+                prop.children [
+                    Html.input [
+                        prop.type' "checkbox"
+                        prop.isChecked suffix
+                        prop.onChange(fun e ->
+                            setSuffix e
+                            updateCells baseStr e
+                        )
                     ]
+                    Html.p [prop.text "Add number suffix"; prop.className "text-sm"]
                 ]
             ]
         ]
-        
+
     [<ReactComponent>]
     static member private UpdateForm(cellValues: string [], setPreview, regex: string, setRegex: string -> unit) =
         let replacement, setReplacement = React.useState("")
-        let updateCells (replacement: string) (regex: string) = 
+        let updateCells (replacement: string) (regex: string) =
             if regex <> "" then
-                try 
+                try
                     let regex = Regex(regex)
-                    cellValues 
-                    |> Array.mapi (fun i c -> 
+                    cellValues
+                    |> Array.mapi (fun i c ->
                         let m = regex.Match(c)
                         match m.Success with
-                        | true -> 
+                        | true ->
                             let replaced = c.Replace(m.Value, replacement)
                             replaced
                         | false ->
                             c
-                    ) 
+                    )
                     |> setPreview
                 with
                     | _ -> ()
             else
                 ()
-        Bulma.field.div [
-            Bulma.field.div [
-                Html.div [
-                    prop.className "is-flex is-flex-direction-row"
-                    prop.style [style.gap (length.rem 1)]
-                    prop.children [
-                        Bulma.control.div [
-                            prop.style [style.flexGrow 1]
-                            prop.children [
-                                Bulma.label "Regex"
-                                Bulma.input.text [
-                                    prop.autoFocus true
-                                    prop.valueOrDefault regex
-                                    prop.onChange (fun s -> 
-                                        setRegex s; 
-                                        updateCells replacement s
-                                    )
-                                ]
-                            ]
-                        ]
-                        Bulma.control.div [
-                            prop.style [style.flexGrow 1]
-                            prop.children [
-                                Bulma.label "Replacement"
-                                Bulma.input.text [
-                                    prop.valueOrDefault replacement
-                                    prop.onChange (fun s -> 
-                                        setReplacement s;
-                                        updateCells s regex
-                                    )
-                                ]
-                            ]
-                        ]
-                    ]
+        Html.div [
+            prop.className "is-flex is-flex-direction-row"
+            prop.style [style.gap (length.rem 1)]
+            prop.children [
+                Daisy.label [
+                    Daisy.labelText "Regex"
+                ]
+                Daisy.input [
+                    prop.autoFocus true
+                    prop.valueOrDefault regex
+                    prop.onChange (fun s ->
+                        setRegex s;
+                        updateCells replacement s
+                    )
+                ]
+                Daisy.label [
+                    Daisy.labelText "Replacement"
+                ]
+                Daisy.input [
+                    prop.valueOrDefault replacement
+                    prop.onChange (fun s ->
+                        setReplacement s;
+                        updateCells s regex
+                    )
                 ]
             ]
         ]
@@ -215,40 +207,43 @@ type UpdateColumn =
             if p <> FunctionPage.Update then
                 setRegex ""
             setPage p
-        let submit = fun () -> 
+        let submit = fun () ->
             preview
             |> Array.map (fun x -> CompositeCell.FreeText x)
             |> fun x -> CompositeColumn.create(column.Header, x)
-            |> fun x -> Spreadsheet.SetColumn (index, x) 
+            |> fun x -> Spreadsheet.SetColumn (index, x)
             |> SpreadsheetMsg
             |> dispatch
-        Bulma.modal [
-            Bulma.modal.isActive
+        Daisy.modal.div [
+            modal.active
             prop.children [
-                Bulma.modalBackground [ prop.onClick rmv ]
-                Bulma.modalCard [
+                Daisy.modalBackdrop [ prop.onClick rmv ]
+                Daisy.card [
                     prop.style [style.maxHeight(length.percent 70); style.overflowY.hidden]
                     prop.children [
-                        Bulma.modalCardHead [
-                            Bulma.modalCardTitle "Update Column"
-                            Bulma.delete [ prop.onClick rmv ]
-                        ]
-                        Bulma.modalCardBody [ 
+                        Daisy.cardBody [
+                            Daisy.cardActions [
+                                prop.className "justify-end"
+                                prop.children [
+                                    Components.DeleteButton(props=[prop.onClick rmv])
+                                ]
+                            ]
+                            Daisy.cardTitle "Update Column"
                             Components.TabNavigation(currentPage, setPage)
                             match currentPage with
                             | FunctionPage.Create -> UpdateColumn.CreateForm(getCellStrings(), setPreview)
                             | FunctionPage.Update -> UpdateColumn.UpdateForm(getCellStrings(), setPreview, regex, setRegex)
                             Components.PreviewTable(column, preview, regex)
-                        ]    
-                        Bulma.modalCardFoot [
-                            Bulma.button.button [
-                                color.isInfo
-                                prop.style [style.marginLeft length.auto]
-                                prop.text "Submit"
-                                prop.onClick(fun e ->
-                                    submit()
-                                    rmv e
-                                )
+                            Daisy.cardActions [
+                                Daisy.button.button [
+                                    button.info
+                                    prop.style [style.marginLeft length.auto]
+                                    prop.text "Submit"
+                                    prop.onClick(fun e ->
+                                        submit()
+                                        rmv e
+                                    )
+                                ]
                             ]
                         ]
                     ]

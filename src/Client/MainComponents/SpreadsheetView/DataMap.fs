@@ -2,7 +2,7 @@ module MainComponents.SpreadsheetView.DataMap
 
 open ARCtrl
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Model
 open SpreadsheetInterface
 open Messages
@@ -20,7 +20,7 @@ let private CreateBodyCells(columnIndex, rowIndex, state: Set<int>, model, dispa
         let isExtended = state.Contains columnIndex
         let header = Spreadsheet.Controller.Generic.getHeader columnIndex model.SpreadsheetModel
         if (cell.isTerm || cell.isUnitized) && isExtended then
-            if cell.isUnitized then 
+            if cell.isUnitized then
                 Cell.BodyUnit(index, cell, model, dispatch)
             else
                 Cell.Empty()
@@ -76,13 +76,13 @@ let private BodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Ms
                 state,
                 model,
                 dispatch
-            )    
+            )
     ]
 
 let private BodyRows (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
     [|
         for rowInd in 0 .. model.SpreadsheetModel.DataMapOrDefault.RowCount-1 do
-            yield BodyRow rowInd state model dispatch 
+            yield BodyRow rowInd state model dispatch
     |]
 
 let private HeaderRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =

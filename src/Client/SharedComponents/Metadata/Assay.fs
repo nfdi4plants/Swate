@@ -1,7 +1,7 @@
 module Components.Metadata.Assay
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ARCtrl
 open Shared
 open Components
@@ -9,14 +9,14 @@ open Components.Forms
 
 [<ReactComponent>]
 let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit) =
-    Bulma.section [
+    Html.section [
         Generic.BoxedField
             (Some "Assay Metadata")
             None
-            [                
+            [
                 FormComponents.TextInput (
                     assay.Identifier,
-                    (fun v -> 
+                    (fun v ->
                         let nextAssay = IdentifierSetters.setAssayIdentifier v assay
                         setArcAssay nextAssay
                     ),
@@ -26,7 +26,7 @@ let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay ->
 
                 FormComponents.OntologyAnnotationInput(
                     assay.MeasurementType |> Option.defaultValue (OntologyAnnotation()),
-                    (fun oa -> 
+                    (fun oa ->
                         assay.MeasurementType <- oa |> Option.whereNot _.isEmpty()
                         setArcAssay <| assay
                     ),
@@ -34,7 +34,7 @@ let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay ->
                 )
                 FormComponents.OntologyAnnotationInput(
                     assay.TechnologyType |> Option.defaultValue (OntologyAnnotation.empty()),
-                    (fun oa -> 
+                    (fun oa ->
                         assay.TechnologyType <- oa |> Option.whereNot _.isEmpty()
                         setArcAssay <| assay
                     ),

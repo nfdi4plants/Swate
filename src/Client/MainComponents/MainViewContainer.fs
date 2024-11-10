@@ -2,11 +2,11 @@ module MainComponents.MainViewContainer
 
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Spreadsheet
 open Messages
 
-let Main(minWidth: int, left: ReactElement seq) = 
+let Main(minWidth: int, left: ReactElement seq) =
     Html.div [
         prop.style [
             style.minWidth(minWidth)

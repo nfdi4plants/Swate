@@ -1,7 +1,7 @@
 module MainComponents.AddRows
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Fable.Core.JsInterop
 
 open Messages
@@ -20,7 +20,8 @@ let Main (dispatch: Messages.Msg -> unit) =
             Html.div [
                 prop.style [style.height.maxContent; style.display.flex;]
                 prop.children [
-                    Bulma.input.number [
+                    Daisy.input [
+                        prop.type'.number
                         prop.id "n_row_input"
                         prop.min init_RowsToAdd
                         prop.onChange(fun e -> setState_rows e)
@@ -28,8 +29,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                         prop.defaultValue init_RowsToAdd
                         prop.style [style.width(100)]
                     ]
-                    Bulma.button.a [
-                        Bulma.button.isRounded
+                    Daisy.button.a [
                         prop.title "Add rows"
                         prop.onClick(fun _ ->
                             let inp = Browser.Dom.document.getElementById "n_row_input"
@@ -38,7 +38,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                             Spreadsheet.AddRows state_rows |> SpreadsheetMsg |> dispatch
                         )
                         prop.children [
-                            Bulma.icon [Html.i [prop.className "fa-solid fa-plus"]]
+                            Html.i [prop.className "fa-solid fa-plus"]
                         ]
                     ]
                 ]

@@ -11,14 +11,14 @@ open Messages
 open Browser.Types
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 let toggleDarkModeElement (model:Model) dispatch =
-    Bulma.level [
-        Bulma.level.isMobile
+    Html.div [
+        prop.className "flex flex-row"
         prop.children [
-            Bulma.levelLeft "Darkmode" 
-            Bulma.levelRight [
+            Html.h5 "Darkmode"
+            Html.div [
                 SidebarComponents.DarkmodeButton.Main() |> prop.children
             ]
         ]
@@ -64,51 +64,51 @@ let toggleDarkModeElement (model:Model) dispatch =
 //            Button.a [
 //                Button.Color IsInfo
 //                Button.IsOutlined
-//                Button.OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch ) 
+//                Button.OnClick (fun e -> UpdatePageState (Some Routing.Route.SettingsXml) |> dispatch )
 //            ] [
 //                str "Advanced Settings"
 //            ]
 //        ]
 //    ]
 
-let swateExperts (model:Model) dispatch =
-    Bulma.level [
-        Bulma.level.isMobile
-        prop.children [
-            Bulma.levelLeft "Swate.Experts"
-            Bulma.levelRight [
-                Bulma.button.a [
-                    Bulma.color.isInfo
-                    Bulma.button.isOutlined
-                    prop.onClick (fun _ -> Msg.Batch [UpdateIsExpert true; UpdatePageState (Some Routing.Route.JsonExport)] |> dispatch ) 
-                    prop.text "Swate.Experts"
-                ] |> prop.children
-            ]
-        ]
-    ]
+// let swateExperts (model:Model) dispatch =
+//     Bulma.level [
+//         Bulma.level.isMobile
+//         prop.children [
+//             Bulma.levelLeft "Swate.Experts"
+//             Bulma.levelRight [
+//                 Daisy.button.a [
+//                     button.info
+//                     Daisy.button.isOutlined
+//                     prop.onClick (fun _ -> Msg.Batch [UpdateIsExpert true; UpdatePageState (Some Routing.Route.JsonExport)] |> dispatch )
+//                     prop.text "Swate.Experts"
+//                 ] |> prop.children
+//             ]
+//         ]
+//     ]
 
-let swateCore (model:Model) dispatch =
-    Bulma.level [
-        Bulma.level.isMobile
-        prop.children [
-            Bulma.levelLeft "Swate.Core"
-            Bulma.levelRight [
-                Bulma.button.a [
-                    Bulma.color.isInfo
-                    Bulma.button.isOutlined
-                    prop.onClick (fun _ -> Msg.Batch [UpdateIsExpert false; UpdatePageState (Some Routing.Route.BuildingBlock)] |> dispatch ) 
-                    prop.text "Swate.Core"
-                ] |> prop.children
-            ]
-        ]
-    ]
-    
+// let swateCore (model:Model) dispatch =
+//     Bulma.level [
+//         Bulma.level.isMobile
+//         prop.children [
+//             Bulma.levelLeft "Swate.Core"
+//             Bulma.levelRight [
+//                 Daisy.button.a [
+//                     button.info
+//                     Daisy.button.isOutlined
+//                     prop.onClick (fun _ -> Msg.Batch [UpdateIsExpert false; UpdatePageState (Some Routing.Route.BuildingBlock)] |> dispatch )
+//                     prop.text "Swate.Core"
+//                 ] |> prop.children
+//             ]
+//         ]
+//     ]
+
 
 let settingsViewComponent (model:Model) dispatch =
     Html.div [
-        pageHeader "Swate Settings"
+        Html.h5 "Swate Settings"
 
-        Bulma.label "Customize Swate"
+        Html.p "Customize Swate"
         toggleDarkModeElement model dispatch
 
         //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
@@ -118,7 +118,7 @@ let settingsViewComponent (model:Model) dispatch =
         //customXmlSettings model dispatch
 
         //Bulma.label "Advanced Settings"
-        //if model.PageState.IsExpert then 
+        //if model.PageState.IsExpert then
         //    swateCore model dispatch
         //else
         //    swateExperts model dispatch

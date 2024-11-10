@@ -1,7 +1,7 @@
 module MainComponents.ContextMenu
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Spreadsheet
 open ARCtrl
 open Model
@@ -28,17 +28,16 @@ module private Shared =
         ]
     ]
     let button (name:string, icon: string, msg, props) = Html.li [
-        Bulma.button.button [
+        Daisy.button.button [
             prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
             prop.onClick msg
             prop.className "py-1"
-            Bulma.button.isFullWidth
-            //Bulma.button.isSmall
-            Bulma.color.isBlack
-            Bulma.button.isInverted
+            button.block
+            //button.sm
+            button.outline
             yield! props
             prop.children [
-                Bulma.icon [Html.i [prop.className icon]]
+                Html.i [prop.className icon]
                 Html.span name
             ]
         ]
@@ -130,7 +129,7 @@ module Table =
         let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
         let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
         let triggerMoveColumnModal _ = Modals.Controller.renderModal("MoveColumn_Modal", Modals.MoveColumn.Main(ci, model, dispatch))
-        let triggerUpdateColumnModal _ = 
+        let triggerUpdateColumnModal _ =
             let columnIndex = fst index
             let column = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
             Modals.Controller.renderModal("UpdateColumn_Modal", Modals.UpdateColumn.Main(ci, column, dispatch))
@@ -140,15 +139,15 @@ module Table =
             DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
             DeleteColumn    = fun rmv e -> rmv e; Spreadsheet.DeleteColumn (ci) |> Messages.SpreadsheetMsg |> dispatch
             MoveColumn      = fun rmv e -> rmv e; triggerMoveColumnModal e
-            Copy            = fun rmv e -> 
-                rmv e; 
+            Copy            = fun rmv e ->
+                rmv e;
                 if isSelectedCell then
                     Spreadsheet.CopySelectedCells |> Messages.SpreadsheetMsg |> dispatch
                 else
                     Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
             Cut             = fun rmv e -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
-            Paste           = fun rmv e -> 
-                rmv e; 
+            Paste           = fun rmv e ->
+                rmv e;
                 if isSelectedCell then
                     Spreadsheet.PasteSelectedCells |> Messages.SpreadsheetMsg |> dispatch
                 else
@@ -158,14 +157,14 @@ module Table =
                 Spreadsheet.PasteCellsExtend index |> Messages.SpreadsheetMsg |> dispatch
             FillColumn      = fun rmv e -> rmv e; Spreadsheet.FillColumnWithTerm index |> Messages.SpreadsheetMsg |> dispatch
             Clear           = fun rmv e -> rmv e; if isSelectedCell then Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch else Spreadsheet.Clear [|index|] |> Messages.SpreadsheetMsg |> dispatch
-            TransformCell   = fun rmv e -> 
+            TransformCell   = fun rmv e ->
                 if cell.IsSome && (cell.Value.isTerm || cell.Value.isUnitized) then
                     let nextCell = if cell.Value.isTerm then cell.Value.ToUnitizedCell() else cell.Value.ToTermCell()
                     rmv e; Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
                 elif cell.IsSome && header.IsDataColumn then
                     let nextCell = if cell.Value.isFreeText then cell.Value.ToDataCell() else cell.Value.ToFreeTextCell()
                     rmv e; Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
-                        
+
             UpdateAllCells = fun rmv e -> rmv e; triggerUpdateColumnModal e
             GetTermDetails = fun oa rmv e -> rmv e; triggerTermModal oa e
             EditColumn      = fun rmv e -> rmv e; editColumnEvent e
@@ -241,7 +240,7 @@ module DataMap =
         let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
         //let editColumnEvent _ = Modals.Controller.renderModal("EditColumn_Modal", Modals.EditColumn.Main (fst index) model dispatch)
         let triggerMoveColumnModal _ = Modals.Controller.renderModal("MoveColumn_Modal", Modals.MoveColumn.Main(fst index, model, dispatch))
-        let triggerUpdateColumnModal _ = 
+        let triggerUpdateColumnModal _ =
             let columnIndex = fst index
             let column = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
             Modals.Controller.renderModal("UpdateColumn_Modal", Modals.UpdateColumn.Main(fst index, column, dispatch))
@@ -249,15 +248,15 @@ module DataMap =
             FillColumn      = fun rmv e -> rmv e; Spreadsheet.FillColumnWithTerm index |> Messages.SpreadsheetMsg |> dispatch
             DeleteRow       = fun rmv e -> rmv e; deleteRowEvent e
             Clear           = fun rmv e -> rmv e; if isSelectedCell then Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch else Spreadsheet.Clear [|index|] |> Messages.SpreadsheetMsg |> dispatch
-            Copy            = fun rmv e -> 
-                rmv e; 
+            Copy            = fun rmv e ->
+                rmv e;
                 if isSelectedCell then
                     Spreadsheet.CopySelectedCells |> Messages.SpreadsheetMsg |> dispatch
                 else
                     Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
             Cut             = fun rmv e -> rmv e; Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
-            Paste           = fun rmv e -> 
-                rmv e; 
+            Paste           = fun rmv e ->
+                rmv e;
                 if isSelectedCell then
                     Spreadsheet.PasteSelectedCells |> Messages.SpreadsheetMsg |> dispatch
                 else

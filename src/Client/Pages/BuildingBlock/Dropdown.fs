@@ -1,7 +1,7 @@
 module BuildingBlock.Dropdown
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Model.BuildingBlock
 open Model
 open Messages
@@ -11,32 +11,22 @@ open Shared
 
 [<ReactComponent>]
 let FreeTextInputElement(onSubmit: string -> unit) =
-    let input, setInput = React.useState ""
-    Bulma.field.div [
-        field.isGrouped
+    let inputS, setInput = React.useState ""
+    Daisy.join [
         prop.className "w-full"
         prop.children [
-            Bulma.control.div [
-                control.isExpanded
-                prop.children [
-                    Bulma.input.text [
-                        prop.className "min-w-48 !rounded-none"
-                        Bulma.input.isSmall
-                        prop.onClick (fun e -> e.stopPropagation())
-                        prop.onChange (fun (v:string) -> setInput v)
-                        prop.onKeyDown(key.enter, fun e -> e.stopPropagation(); onSubmit input)
-                    ]
-                ]
+            Daisy.input [
+                prop.className "min-w-48 !rounded-none"
+                input.sm
+                prop.onClick (fun e -> e.stopPropagation())
+                prop.onChange (fun (v:string) -> setInput v)
+                prop.onKeyDown(key.enter, fun e -> e.stopPropagation(); onSubmit inputS)
             ]
-            Bulma.control.div [
-                Bulma.button.span [
-                    button.isSmall
-                    prop.onClick (fun e -> e.stopPropagation(); onSubmit input)
-                    prop.children [
-                        Bulma.icon [
-                            Html.i [prop.className "fa-solid fa-check"]
-                        ]
-                    ]
+            Daisy.button.submit [
+                button.sm
+                prop.onClick (fun e -> e.stopPropagation(); onSubmit inputS)
+                prop.children [
+                    Html.i [prop.className "fa-solid fa-check"]
                 ]
             ]
         ]
@@ -45,10 +35,10 @@ let FreeTextInputElement(onSubmit: string -> unit) =
 module private DropdownElements =
 
     let private itemTooltipStyle = [style.fontSize (length.rem 1.1); style.paddingRight (length.px 10); style.textAlign.center; style.color NFDIColors.Yellow.Darker20]
-    let private annotationsPrinciplesUrl = Html.a [prop.href Shared.URLs.AnnotationPrinciplesUrl; prop.target "_Blank"; prop.text "info"]
+    let private annotationsPrinciplesUrl = Html.a [prop.href Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.text "info"]
 
     let createSubBuildingBlockDropdownLink (state:BuildingBlockUIState) setState (subpage: Model.BuildingBlock.DropdownPage) =
-        Bulma.dropdownItem.a [
+        Html.li [Html.a [
             prop.tabIndex 0
             prop.onClick(fun e ->
                 e.preventDefault()
@@ -66,29 +56,27 @@ module private DropdownElements =
 
                 Html.span [
                     prop.style [style.width(length.px 20); style.alignSelf.flexEnd; style.lineHeight 1.5; style.fontSize(length.rem 1.1)]
-                    prop.children (Bulma.icon (Html.i [prop.className "fa-solid fa-arrow-right"]))
+                    prop.children (Html.i [prop.className "fa-solid fa-arrow-right"])
                 ]
             ]
-        ]
+        ]]
 
     /// Navigation element back to main page
     let backToMainDropdownButton setState =
-        Bulma.dropdownItem.div [
+        Html.li [
             prop.style [style.textAlign.right]
             prop.children [
-                Bulma.button.button [
+                Daisy.button.button [
                     prop.style [style.float'.left; style.width(length.px 20); style.height(length.px 20); style.borderRadius(length.px 4); style.custom("border", "unset")]
                     prop.onClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
                         setState {DropdownPage = BuildingBlock.DropdownPage.Main; DropdownIsActive = true}
                     )
-                    Bulma.button.isInverted
-                    Bulma.color.isBlack
                     prop.children [
-                        Bulma.icon [Html.i [
+                        Html.i [
                             prop.className "fa-solid fa-arrow-left"
-                        ]]
+                        ]
                     ]
                 ]
                 annotationsPrinciplesUrl
@@ -96,7 +84,7 @@ module private DropdownElements =
         ]
 
     let createBuildingBlockDropdownItem (model: Model) dispatch setUiState (headerType: CompositeHeaderDiscriminate) =
-        Bulma.dropdownItem.a [
+        Html.li [Html.a [
             prop.onClick (fun e ->
                 e.stopPropagation()
                 Helper.selectCompositeHeaderDiscriminate headerType setUiState dispatch
@@ -105,16 +93,16 @@ module private DropdownElements =
                 if (int k.which) = 13 then Helper.selectCompositeHeaderDiscriminate headerType setUiState dispatch
             )
             prop.text (headerType.ToString())
-        ]
+        ]]
 
     let createIOTypeDropdownItem (model: Model) dispatch setUiState (headerType: CompositeHeaderDiscriminate) (iotype: IOType) =
-        let setIO (ioType) = 
+        let setIO (ioType) =
             { DropdownPage = DropdownPage.Main; DropdownIsActive = false } |> setUiState
             (headerType,ioType) |> BuildingBlock.UpdateHeaderWithIO |> BuildingBlockMsg |> dispatch
-        Bulma.dropdownItem.button [
+        Html.li [Daisy.button.button [
             match iotype with
             | IOType.FreeText s ->
-                let onSubmit = fun (v: string) -> 
+                let onSubmit = fun (v: string) ->
                     let header = IOType.FreeText v
                     setIO header
                 prop.children [FreeTextInputElement onSubmit]
@@ -124,21 +112,21 @@ module private DropdownElements =
                 prop.children [
                     Html.div [prop.text (iotype.ToString())]
                 ]
-        ]
+        ]]
 
     /// Main column types subpage for dropdown
     let dropdownContentMain state setState (model:Model) dispatch =
-        [
+        React.fragment [
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Input |> createSubBuildingBlockDropdownLink state setState
-            Bulma.dropdownDivider []
+            Daisy.divider []
             CompositeHeaderDiscriminate.Parameter      |> createBuildingBlockDropdownItem model dispatch setState
             CompositeHeaderDiscriminate.Factor         |> createBuildingBlockDropdownItem model dispatch setState
             CompositeHeaderDiscriminate.Characteristic |> createBuildingBlockDropdownItem model dispatch setState
             CompositeHeaderDiscriminate.Component      |> createBuildingBlockDropdownItem model dispatch setState
             Model.BuildingBlock.DropdownPage.More       |> createSubBuildingBlockDropdownLink state setState
-            Bulma.dropdownDivider []
+            Daisy.divider []
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Output |> createSubBuildingBlockDropdownLink state setState
-            Bulma.dropdownItem.div [
+            Html.li [
                 prop.style [style.textAlign.right]
                 prop.children annotationsPrinciplesUrl
             ]
@@ -146,7 +134,7 @@ module private DropdownElements =
 
     /// Protocol Type subpage for dropdown
     let dropdownContentProtocolTypeColumns state setState (model:Model) dispatch =
-        [
+        React.fragment [
             CompositeHeaderDiscriminate.Date                |> createBuildingBlockDropdownItem model dispatch setState
             CompositeHeaderDiscriminate.Performer           |> createBuildingBlockDropdownItem model dispatch setState
             CompositeHeaderDiscriminate.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch setState
@@ -160,7 +148,7 @@ module private DropdownElements =
 
     /// Output columns subpage for dropdown
     let dropdownContentIOTypeColumns header state setState (model:Model) dispatch =
-        [
+        React.fragment [
             IOType.Source           |> createIOTypeDropdownItem model dispatch setState header
             IOType.Sample           |> createIOTypeDropdownItem model dispatch setState header
             IOType.Material         |> createIOTypeDropdownItem model dispatch setState header
@@ -171,25 +159,27 @@ module private DropdownElements =
         ]
 
 let Main state setState (model: Model) dispatch =
-    Bulma.control.div [
-        Bulma.dropdown [
-            if state.DropdownIsActive then Bulma.dropdown.isActive //Dropdown.IsActive model.AddBuildingBlockState.ShowBuildingBlockSelection
-            prop.children [
-                Bulma.dropdownTrigger [
-                    Bulma.button.a [
-                        prop.onClick (fun e -> e.stopPropagation(); setState {state with DropdownIsActive = not state.DropdownIsActive})
-                        prop.children [
-                            Html.span [
-                                prop.style [style.marginRight 5]
-                                prop.text (model.AddBuildingBlockState.HeaderCellType.ToString())
-                            ]
-                            Bulma.icon [ Html.i [
-                                prop.className "fa-solid fa-angle-down"
-                            ] ]
-                        ]
+    Daisy.dropdown [
+        join.item
+        // if state.DropdownIsActive then dropdown.open'
+        prop.children [
+            Daisy.button.div [
+                prop.tabIndex 0
+                prop.role "button"
+                // prop.onClick (fun e -> e.stopPropagation(); setState {state with DropdownIsActive = not state.DropdownIsActive})
+                prop.children [
+                    Html.span [
+                        prop.style [style.marginRight 5]
+                        prop.text (model.AddBuildingBlockState.HeaderCellType.ToString())
+                    ]
+                    Html.i [
+                        prop.className "fa-solid fa-angle-down"
                     ]
                 ]
-                Bulma.dropdownMenu [
+            ]
+            Daisy.dropdownContent [
+                prop.tabIndex 0
+                prop.children [
                     match state.DropdownPage with
                     | Model.BuildingBlock.DropdownPage.Main ->
                         DropdownElements.dropdownContentMain state setState model dispatch
@@ -197,8 +187,7 @@ let Main state setState (model: Model) dispatch =
                         DropdownElements.dropdownContentProtocolTypeColumns state setState model dispatch
                     | Model.BuildingBlock.DropdownPage.IOTypes iotype ->
                         DropdownElements.dropdownContentIOTypeColumns iotype state setState model dispatch
-                    |> fun content -> Bulma.dropdownContent [ prop.children content ] 
                 ]
             ]
-        ] 
+        ]
     ]

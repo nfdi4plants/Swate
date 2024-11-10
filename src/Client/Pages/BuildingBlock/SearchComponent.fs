@@ -1,7 +1,7 @@
 module BuildingBlock.SearchComponent
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Fable.Core.JsInterop
 open Model.BuildingBlock
 open Model
@@ -10,24 +10,21 @@ open ARCtrl
 open Shared
 
 let private termOrUnitizedSwitch (model:Model) dispatch =
-        
+
     let state = model.AddBuildingBlockState
-    Bulma.buttons [
-        Bulma.buttons.hasAddons
-        prop.style [style.flexWrap.nowrap; style.marginBottom 0; style.marginRight (length.rem 1)]
+    Daisy.join [
         prop.children [
-            Bulma.button.a [
+            Daisy.button.a [
+                join.item
                 let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
-                if isActive then Bulma.color.isSuccess
+                if isActive then button.success
                 prop.onClick (fun _ -> BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Term |> BuildingBlockMsg |> dispatch)
-                prop.classes ["pr-2 pl-2 mb-0"; if isActive then "is-selected"]
                 prop.text "Term"
             ]
-            Bulma.button.a [
+            Daisy.button.a [
                 let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
-                if isActive then Bulma.color.isSuccess
+                if isActive then button.success
                 prop.onClick (fun _ -> BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Unitized |> BuildingBlockMsg |> dispatch)
-                prop.classes ["pr-2 pl-2 mb-0"; if isActive then "is-selected"]
                 prop.text "Unit"
             ]
         ]
@@ -38,8 +35,7 @@ open Fable.Core
 [<ReactComponent>]
 let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
     let element = React.useElementRef()
-    
-    Bulma.field.div [
+    Html.div [
         prop.ref element
         prop.style [ style.display.flex; style.justifyContent.spaceBetween; style.position.relative ]
         prop.children [
@@ -57,9 +53,8 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
 let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, model: Model, dispatch) =
     let state = model.AddBuildingBlockState
     let element = React.useElementRef()
-    Bulma.field.div [
+    Daisy.join [
         prop.ref element
-        Bulma.field.hasAddons
         prop.style [style.position.relative]
         // Choose building block type dropdown element
         prop.children [
@@ -70,34 +65,26 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                 let setter (oaOpt: OntologyAnnotation option) =
                     let case = oaOpt |> Option.map (fun oa -> !^oa)
                     BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
-                    //selectHeader ui setUi h |> dispatch 
+                    //selectHeader ui setUi h |> dispatch
                 let input = model.AddBuildingBlockState.TryHeaderOA()
-                Components.TermSearch.Input(setter, fullwidth=true, ?input=input, isExpanded=true, ?portalTermSelectArea=element.current)
+                Components.TermSearch.Input(setter, fullwidth=true, ?input=input, isjoin=true, ?portalTermSelectArea=element.current)
             elif state.HeaderCellType.HasIOType() then
-                Bulma.control.div [
-                    Bulma.control.isExpanded
-                    prop.children [
-                        Bulma.control.p [
-                            Bulma.input.text [
-                                Bulma.color.hasBackgroundGreyLighter
-                                prop.readOnly true
-                                prop.valueOrDefault (
-                                    state.TryHeaderIO()
-                                    |> Option.get
-                                    |> _.ToString()
-                                )
-                            ]
-                        ]
-                    ]
+                Daisy.input [
+                    prop.readOnly true
+                    prop.valueOrDefault (
+                        state.TryHeaderIO()
+                        |> Option.get
+                        |> _.ToString()
+                    )
                 ]
         ]
     ]
 
 let private scrollIntoViewRetry (id: string) =
-    let rec loop (iteration: int) = 
+    let rec loop (iteration: int) =
         let headerelement = Browser.Dom.document.getElementById(id)
         if isNull headerelement then
-            if iteration < 5 then 
+            if iteration < 5 then
                 Fable.Core.JS.setTimeout (fun _ -> loop (iteration+1)) 100 |> ignore
             else
                 ()
@@ -116,24 +103,23 @@ let private scrollIntoViewRetry (id: string) =
 
 let private AddBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState
-    Bulma.field.div [
-        Bulma.button.button  [
+    Html.div [
+        Daisy.button.button  [
             let header = Helper.createCompositeHeaderFromState state
             let body = Helper.tryCreateCompositeCellFromState state
             let isValid = Helper.isValidColumn header
             if isValid then
-                Bulma.color.isSuccess
+                button.success
             else
-                Bulma.color.isDanger
+                button.error
                 prop.disabled true
-            Bulma.button.isFullWidth
             prop.onClick (fun _ ->
                 let bodyCells =
                     if body.IsSome then // create as many body cells as there are rows in the active table
                         let rowCount = System.Math.Max(1,model.SpreadsheetModel.ActiveTable.RowCount)
                         Array.init rowCount (fun _ -> body.Value.Copy())
                     else
-                        Array.empty                    
+                        Array.empty
                 let column = CompositeColumn.create(header, bodyCells)
                 let index = Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
                 SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch

@@ -1,51 +1,43 @@
 namespace Modals
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
 
 open ARCtrl
+open Components
 
 type MoveColumn =
 
     [<ReactComponent>]
     static member InputField(index: int, set, max: int, submit) =
         let input, setInput = React.useState(index)
-        Bulma.field.div [
+        Html.div [
             prop.className "is-grouped is-justify-content-space-between"
             prop.style [style.gap (length.rem 1)]
             prop.children [
-                Bulma.field.div [
-                    Bulma.label "Preview"
-                    Bulma.field.div [
-                        Bulma.field.hasAddons
-                        prop.children [
-                            Bulma.control.div [
-                                Bulma.control.isExpanded
-                                prop.children [
-                                    Bulma.input.number [
-                                        prop.onChange(fun i -> setInput i)
-                                        prop.defaultValue input
-                                        prop.min 0
-                                        prop.max max
-                                    ]
-                                ]
-                            ]
-                            Bulma.control.div [
-                                Bulma.button.button [
-                                    prop.onClick(fun _ -> set (index,input))
-                                    prop.text "Apply"
-                                ]
-                            ]
+                Html.div [
+                    Html.p "Preview"
+                    Html.div [
+                        Daisy.input [
+                            prop.type'.number
+                            prop.onChange(fun i -> setInput i)
+                            prop.defaultValue input
+                            prop.min 0
+                            prop.max max
+                        ]
+                        Daisy.button.button [
+                            prop.onClick(fun _ -> set (index,input))
+                            prop.text "Apply"
                         ]
                     ]
                 ]
-                Bulma.field.div [ 
-                    Bulma.label "Update Table"
-                    Bulma.button.a [
-                        Bulma.color.isInfo
+                Html.div [
+                    Html.p "Update Table"
+                    Daisy.button.a [
+                        button.info
                         prop.onClick (submit input)
                         prop.text "Submit"
                     ]
@@ -61,48 +53,47 @@ type MoveColumn =
         let updateIndex(current, next) =
             setIndex next
             let nextState = ResizeArray(state)
-            Helper.arrayMoveColumn current next nextState 
+            Helper.arrayMoveColumn current next nextState
             setState (Array.ofSeq nextState)
-        let submit = fun i e -> 
+        let submit = fun i e ->
             Spreadsheet.MoveColumn(columnIndex, i) |> SpreadsheetMsg |> dispatch
             rmv e
-        Bulma.modal [
-            Bulma.modal.isActive
+        Daisy.modal.div [
+            modal.active
             prop.children [
-                Bulma.modalBackground [ prop.onClick rmv ]
-                Bulma.modalCard [
+                Daisy.modalBackdrop [ prop.onClick rmv ]
+                Daisy.card [
                     prop.style [style.maxHeight(length.percent 70); style.overflowY.hidden]
                     prop.children [
-                        Bulma.modalCardHead [
-                            Bulma.modalCardTitle "Move Column"
-                            Bulma.delete [ prop.onClick rmv ]
-                        ]
-                        Bulma.modalCardBody [
-                            MoveColumn.InputField(index, updateIndex, state.Length-1, submit)
-                            Bulma.tableContainer [
-                                prop.style [style.maxHeight 400; style.overflowY.auto]
+                        Daisy.cardBody [
+                            Daisy.cardActions [
+                                prop.className "justify-end"
                                 prop.children [
-                                    Bulma.table [
-                                        Bulma.table.isFullWidth
-                                        prop.children [
-                                            Html.thead [
+                                    Components.DeleteButton(props=[prop.onClick rmv])
+                                ]
+                            ]
+                            Daisy.cardTitle "Move Column"
+                            MoveColumn.InputField(index, updateIndex, state.Length-1, submit)
+                            Html.div [
+                                prop.className "overflow-y-auto max-w-md"
+                                prop.children [
+                                    Daisy.table [
+                                        Html.thead [
+                                            Html.tr [
+                                                Html.th "Index"
+                                                Html.th "Column"
+                                            ]
+                                        ]
+                                        Html.tbody [
+                                            for i in 0 .. state.Length-1 do
                                                 Html.tr [
-                                                    Html.th "Index"
-                                                    Html.th "Column"
-                                                ]
-                                            ]
-                                            Html.tbody [
-                                                for i in 0 .. state.Length-1 do
-                                                    Html.tr [
-                                                        if i = index then 
-                                                            Bulma.color.hasBackgroundDanger; 
-                                                            prop.className "has-background-danger"
-                                                        prop.children [
-                                                            Html.td i
-                                                            Html.td (state.[i].ToString())
-                                                        ]
+                                                    if i = index then
+                                                        prop.className "bg-error"
+                                                    prop.children [
+                                                        Html.td i
+                                                        Html.td (state.[i].ToString())
                                                     ]
-                                            ]
+                                                ]
                                         ]
                                     ]
                                 ]

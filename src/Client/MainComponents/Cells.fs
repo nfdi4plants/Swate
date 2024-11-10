@@ -1,7 +1,7 @@
 module Spreadsheet.Cells
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Fable.Core
 
 open Spreadsheet
@@ -16,7 +16,7 @@ module private CellComponents =
 
     let extendHeaderButton (state_extend: Set<int>, columnIndex, setState_extend) =
         let isExtended = state_extend.Contains(columnIndex)
-        Bulma.icon [
+        Html.div [
             prop.style [
                 style.height (length.perc 100)
                 style.minWidth 25
@@ -72,7 +72,7 @@ module private EventPresets =
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
             if isIdle then
-                let set = 
+                let set =
                     match e.shiftKey, selectedCells.Count with
                     | true, 0 ->
                         selectedCells
@@ -94,8 +94,8 @@ module private EventPresets =
                         next
                 UpdateSelectedCells set |> SpreadsheetMsg |> dispatch
                 if not set.IsEmpty && model.SpreadsheetModel.TableViewIsActive() then
-                    let oa = 
-                        let columnIndex = set |> Seq.minBy fst |> fst 
+                    let oa =
+                        let columnIndex = set |> Seq.minBy fst |> fst
                         let column = model.SpreadsheetModel.ActiveTable.GetColumn(columnIndex)
                         if column.Header.IsTermColumn then
                             column.Header.ToTerm() |> Some //ToOA
@@ -116,53 +116,48 @@ type Cell =
         let debounceStorage = React.useRef(newDebounceStorage())
         let loading, setLoading = React.useState(false)
         let dsetter (inp) = debouncel debounceStorage.current "TextChange" 1000 setLoading setter inp
-        let input = 
-            Bulma.control.div [
-                Bulma.control.isExpanded
-                if loading then Bulma.control.isLoading
-                prop.children [
-                    Bulma.input.text [
-                        prop.defaultValue input
-                        prop.readOnly isReadOnly
-                        prop.autoFocus true
-                        prop.style [
-                            if isHeader then style.fontWeight.bold
-                            style.width(length.percent 100)
-                            style.height.unset
-                            style.borderRadius(0)
-                            style.border(0,borderStyle.none,"")
-                            style.backgroundColor.transparent
-                            style.margin (0)
-                            style.padding(length.em 0.5,length.em 0.75)
-                        ]
-                        prop.onBlur(fun _ -> 
-                            if isHeader then setter state;
+        Daisy.label [
+            prop.className "input input-bordered flex items-center gap-2 grow"
+            prop.children [
+                Html.input [
+                    prop.defaultValue input
+                    prop.readOnly isReadOnly
+                    prop.autoFocus true
+                    prop.style [
+                        if isHeader then style.fontWeight.bold
+                        style.width(length.percent 100)
+                        style.height.unset
+                        style.borderRadius(0)
+                        style.border(0,borderStyle.none,"")
+                        style.backgroundColor.transparent
+                        style.margin (0)
+                        style.padding(length.em 0.5,length.em 0.75)
+                    ]
+                    prop.onBlur(fun _ ->
+                        if isHeader then setter state;
+                        debounceStorage.current.ClearAndRun()
+                        makeIdle()
+                    )
+                    prop.onKeyDown(fun e ->
+                        e.stopPropagation()
+                        match e.which with
+                        | 13. -> //enter
+                            if isHeader then setter state
                             debounceStorage.current.ClearAndRun()
                             makeIdle()
-                        )
-                        prop.onKeyDown(fun e ->
-                            e.stopPropagation()
-                            match e.which with
-                            | 13. -> //enter
-                                if isHeader then setter state
-                                debounceStorage.current.ClearAndRun()
-                                makeIdle()
-                            | 27. -> //escape
-                                debounceStorage.current.Clear()
-                                makeIdle()
-                            | _ -> ()
-                        )
-                        // Only change cell value while typing to increase performance. 
-                        prop.onChange(fun e -> 
-                            if isHeader then setState e else dsetter e
-                        )
-                    ]
+                        | 27. -> //escape
+                            debounceStorage.current.Clear()
+                            makeIdle()
+                        | _ -> ()
+                    )
+                    // Only change cell value while typing to increase performance.
+                    prop.onChange(fun e ->
+                        if isHeader then setState e else dsetter e
+                    )
                 ]
+                if loading then
+                    Daisy.loading []
             ]
-        Bulma.field.div [
-            Bulma.field.hasAddons
-            prop.className "is-flex-grow-1 m-0"
-            prop.children [ input ]           
         ]
 
     [<ReactComponent>]
@@ -202,10 +197,10 @@ type Cell =
                         else
                             let cellValue = // shadow cell value for tsr and tan to add columnType
                                 match columnType with
-                                | TSR | TAN -> $"{columnType} ({cellValue})" 
+                                | TSR | TAN -> $"{columnType} ({cellValue})"
                                 | _ -> cellValue
                             basicValueDisplayCell cellValue true
-                        if columnType = Main && not header.IsSingleColumn then 
+                        if columnType = Main && not header.IsSingleColumn then
                             extendHeaderButton(state_extend, columnIndex, setState_extend)
                     ]
                 ]
@@ -215,7 +210,7 @@ type Cell =
     static member Header(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly: bool) =
         let cellValue = header.ToString()
         let setter =
-            fun (s: string) -> 
+            fun (s: string) ->
                 let mutable nextHeader = CompositeHeader.OfHeaderString s
                 // update header with ref columns if term column
                 if header.IsTermColumn && not header.IsFeaturedColumn then
@@ -259,7 +254,7 @@ type Cell =
         let cellValue = ct.ToColumnHeader()
         let setter = fun _ -> ()
         Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
-  
+
     static member Empty() =
         Html.td [ cellStyle []; prop.readOnly true; prop.children [
             Html.div [
@@ -280,7 +275,7 @@ type Cell =
         let isIdle = state.CellIsIdle (!^index, columnType)
         let isActive = not isIdle
         let displayValue = defaultArg displayValue cellValue
-        let makeIdle() = 
+        let makeIdle() =
             UpdateActiveCell None |> SpreadsheetMsg |> dispatch
             let ele = Browser.Dom.document.getElementById("SPREADSHEET_MAIN_VIEW")
             ele.focus()
@@ -310,7 +305,7 @@ type Cell =
             prop.key cellId
             prop.id cellId // This is used for scrollintoview on keyboard navigation
             prop.ref ref
-            prop.tabIndex 0 
+            prop.tabIndex 0
             cellStyle [
                 if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
             ]
@@ -332,11 +327,11 @@ type Cell =
                     prop.children [
                         if isActive then
                             // Update change to mainState and exit active input.
-                            if oasetter.IsSome then 
+                            if oasetter.IsSome then
                                 let oa = oasetter.Value.oa
                                 let onBlur = fun e -> makeIdle();
                                 let onEscape = fun e -> makeIdle();
-                                let onEnter = fun e -> makeIdle(); 
+                                let onEnter = fun e -> makeIdle();
                                 let setter = fun (oa: OntologyAnnotation option) ->
                                     let oa = oa |> Option.defaultValue (OntologyAnnotation())
                                     oasetter.Value.setter oa
@@ -436,7 +431,7 @@ type Cell =
     static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.ToOA().TermSourceREF |> Option.defaultValue ""
         let setter = fun (s: string) ->
-            let oa = cell.ToOA() 
+            let oa = cell.ToOA()
             let newTSR = if s = "" then None else Some s
             oa.TermSourceREF <- newTSR
             let nextCell = cell.UpdateWithOA oa
@@ -446,7 +441,7 @@ type Cell =
     static member BodyTAN(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.ToOA().TermAccessionNumber |> Option.defaultValue ""
         let setter = fun (s: string) ->
-            let oa = cell.ToOA() 
+            let oa = cell.ToOA()
             let newTAN = if s = "" then None else Some s
             oa.TermAccessionNumber <- newTAN
             let nextCell = cell.UpdateWithOA oa
@@ -482,4 +477,3 @@ type Cell =
             let nextCell = cell.UpdateWithData data
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(ColumnType.DataSelectorFormat, cellValue, setter, index, model, dispatch)
-        

@@ -2,9 +2,10 @@ module Modals.TermModal
 
 open Shared.Database
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ARCtrl
 open Shared
+open Components
 
 type private State =
     | Loading
@@ -26,29 +27,28 @@ let Main (oa: OntologyAnnotation, dispatch) (rmv: _ -> unit) =
         |> Async.StartImmediate
     )
 
-    Bulma.modal [
-        Bulma.modal.isActive
+    Daisy.modal.div [
+        modal.active
         prop.children [
-            Bulma.modalBackground [
+            Daisy.modalBackdrop [
                 prop.onClick rmv
                 prop.style [style.backgroundColor.transparent]
             ]
-            Bulma.modalCard [
+            Daisy.modalBox.div [
                 prop.className "shadow"
                 prop.children [
-                    Bulma.modalCardHead [
-                        Bulma.modalCardTitle [
-                            Bulma.title.h4 oa.NameText
-                            Bulma.subtitle.h6 oa.TermAccessionShort
-                        ]
-                        Bulma.delete [
-                            Bulma.delete.isSmall
-                            prop.onClick rmv
+                    Daisy.cardActions [
+                        prop.className "justify-end"
+                        prop.children [
+                            Components.Components.DeleteButton(props=[prop.onClick rmv])
                         ]
                     ]
-                    Bulma.modalCardBody [
-                        prop.className "content"
-                        prop.children [
+                    Daisy.card [
+                        Daisy.cardBody [
+                            Daisy.cardTitle [
+                                Html.h3 [ prop.className "font-bold"; prop.text oa.NameText]
+                                Html.div [ prop.className "text-xs"; prop.text oa.TermAccessionShort]
+                            ]
                             Html.div [
                                 match state with
                                 | Loading -> Html.p "loading .."
@@ -63,7 +63,7 @@ let Main (oa: OntologyAnnotation, dispatch) (rmv: _ -> unit) =
                                     Html.p term.FK_Ontology
                                     if term.IsObsolete then
                                         Html.p [
-                                            color.hasTextDanger
+                                            prop.className "text-error"
                                             prop.text "Obsolete"
                                         ]
                                     Html.a [

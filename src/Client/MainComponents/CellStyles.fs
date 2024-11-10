@@ -3,7 +3,7 @@ module MainComponents.CellStyles
 
 open ARCtrl
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Fable.Core
 
 let cellStyle (specificStyle: IStyleAttribute list) = prop.style [
@@ -55,11 +55,11 @@ let compositeCellDisplay (oa: OntologyAnnotation) (displayValue: string) =
                 ]
                 prop.text v
             ]
-            if hasValidOA then 
-                Bulma.icon [Html.i [
+            if hasValidOA then
+                Html.i [
                     prop.style [style.custom("marginLeft", "auto")]
-                    prop.className ["fa-solid"; "fa-check"]
-                ]]
+                    prop.className ["fa-solid"; "fa-check"; "size-4"]
+                ]
         ]
     ]
 
@@ -67,16 +67,16 @@ let compositeCellDisplay (oa: OntologyAnnotation) (displayValue: string) =
 /// rowIndex < 0 equals header
 /// </summary>
 /// <param name="rowIndex"></param>
-let RowLabel (rowIndex: int) = 
-    let t : IReactProperty list -> ReactElement = if rowIndex < 0 then Html.th else Html.td 
+let RowLabel (rowIndex: int) =
+    let t : IReactProperty list -> ReactElement = if rowIndex < 0 then Html.th else Html.td
     t [
         //prop.style [style.resize.none; style.border(length.px 1, borderStyle.solid, "darkgrey")]
         //prop.children [
-        //    Bulma.button.button [
+        //    Daisy.button.button [
         //        prop.className "px-2 py-1"
         //        prop.style [style.custom ("border", "unset"); style.borderRadius 0]
-        //        Bulma.button.isFullWidth
-        //        Bulma.button.isStatic
+        //        button.block
+        //        Daisy.button.isStatic
         //        prop.tabIndex -1
         //        prop.text (if rowIndex < 0 then "" else $"{rowIndex+1}")
         //    ]

@@ -1,7 +1,7 @@
 module MainComponents.FooterTabs
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ARCtrl
 open Model
 
@@ -40,17 +40,16 @@ module private TableContextMenu =
             ]
         ]
         let button (name:string, icon: string, msg, props) = Html.li [
-            Bulma.button.button [
+            Daisy.button.button [
                 prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
                 prop.onClick msg
                 prop.className "py-1"
-                Bulma.button.isFullWidth
-                //Bulma.button.isSmall
-                Bulma.color.isBlack
-                Bulma.button.isInverted
+                button.block
+                //button.sm
+                button.outline
                 yield! props
                 prop.children [
-                    Bulma.icon [Html.i [prop.className icon]]
+                    Html.i [prop.className icon]
                     Html.span name
                 ]
             ]
@@ -102,17 +101,16 @@ module private PlusContextMenu =
             ]
         ]
         let button (name:string, icon: string, msg, props) = Html.li [
-            Bulma.button.button [
+            Daisy.button.button [
                 prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
                 prop.onClick msg
                 prop.className "py-1"
-                Bulma.button.isFullWidth
-                //Bulma.button.isSmall
-                Bulma.color.isBlack
-                Bulma.button.isInverted
+                button.block
+                //button.sm
+                button.outline
                 yield! props
                 prop.children [
-                    Bulma.icon [Html.i [prop.className icon]]
+                    Html.i [prop.className icon]
                     Html.span name
                 ]
             ]
@@ -161,17 +159,16 @@ module DataMapContextMenu =
             ]
         ]
         let button (name:string, icon: string, msg, props) = Html.li [
-            Bulma.button.button [
+            Daisy.button.button [
                 prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
                 prop.onClick msg
                 prop.className "py-1"
-                Bulma.button.isFullWidth
-                //Bulma.button.isSmall
-                Bulma.color.isBlack
-                Bulma.button.isInverted
+                button.block
+                //button.sm
+                button.outline
                 yield! props
                 prop.children [
-                    Bulma.icon [Html.i [prop.className icon]]
+                    Html.i [prop.className icon]
                     Html.span name
                 ]
             ]
@@ -206,13 +203,13 @@ let private drag_preventdefault = fun (e: Browser.Types.DragEvent) ->
     e.stopPropagation()
 
 ///<summary>This is fired from the element on which something is dropped. Gets the data set during dragstart and uses it to update order.</summary>
-let private drop_handler (eleOrder, state, setState, dispatch) = fun (e: Browser.Types.DragEvent) -> 
+let private drop_handler (eleOrder, state, setState, dispatch) = fun (e: Browser.Types.DragEvent) ->
     // This event fire on the element on which something is dropped! Not on the element which is dropped!
     let data = e.dataTransfer.getData("text")
     let getData = FooterReorderData.ofJson data
     setState {state with IsDraggedOver = false}
     match getData with
-    | Ok data -> 
+    | Ok data ->
         let prev_index = data.OriginOrder
         let next_index = eleOrder
         Spreadsheet.UpdateTableOrder(prev_index, next_index) |> Messages.SpreadsheetMsg |> dispatch
@@ -224,7 +221,7 @@ let private dragenter_handler(state, setState) = fun (e: Browser.Types.DragEvent
     e.preventDefault()
     e.stopPropagation()
     setState {state with IsDraggedOver = true}
-        
+
 ///<summary>Removes dragenter styling.</summary>
 let private dragleave_handler(state, setState) = fun (e: Browser.Types.DragEvent) ->
     e.preventDefault()
@@ -236,7 +233,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
     let table = tables.GetTableAt(index)
     let state, setState = React.useState(FooterTab.init(table.Name))
     let id = $"ReorderMe_{index}_{table.Name}"
-    Bulma.tab [
+    Daisy.tab [
         if state.IsDraggedOver then prop.className "dragover-footertab"
         prop.draggable true
         prop.onDrop <| drop_handler (index, state, setState, dispatch)
@@ -255,7 +252,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
         // Use this to ensure updating reactelement correctly
         prop.key id
         prop.id id
-        if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then Bulma.tab.isActive
+        if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then tab.active
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView (Spreadsheet.ActiveView.Table index) |> Messages.SpreadsheetMsg |> dispatch)
         prop.onContextMenu(fun e ->
             e.stopPropagation()
@@ -278,7 +275,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                     if state.Name <> table.Name then
                         Spreadsheet.RenameTable (index, state.Name) |> Messages.SpreadsheetMsg |> dispatch
                     setState {state with IsEditable = false}
-                Bulma.input.text [
+                Daisy.input [
                     prop.autoFocus(true)
                     prop.id (id + "input")
                     prop.onChange (fun e ->
@@ -298,7 +295,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                 ]
             else
                 Html.a [
-                    Bulma.icon [Html.i [prop.className "fa-solid fa-table"]]
+                    Html.i [prop.className "fa-solid fa-table"]
                     Html.text table.Name
                 ]
         ]
@@ -309,15 +306,15 @@ let MainMetadata(model: Model, dispatch: Messages.Msg -> unit) =
     let id = "Metadata-Tab"
     let nav = Spreadsheet.ActiveView.Metadata
     let order = nav.ViewIndex
-    Bulma.tab [
-        if model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
+    Daisy.tab [
+        if model.SpreadsheetModel.ActiveView = nav then tab.active
         prop.key id
         prop.id id
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
             Html.a  [
-                Bulma.icon [Html.i [prop.className "fa-solid fa-circle-info"]]
+                Html.i [prop.className "fa-solid fa-circle-info"]
                 Html.text model.SpreadsheetModel.FileType
             ]
         ]
@@ -328,8 +325,8 @@ let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
     let id = "Metadata-Tab"
     let nav = Spreadsheet.ActiveView.DataMap
     let order = nav.ViewIndex
-    Bulma.tab [
-        if model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
+    Daisy.tab [
+        if model.SpreadsheetModel.ActiveView = nav then tab.active
         prop.key id
         prop.id id
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
@@ -348,7 +345,7 @@ let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
             Html.a [
-                Bulma.icon [Html.i [prop.className "fa-solid fa-map"]]
+                Html.i [prop.className "fa-solid fa-map"]
                 Html.text "Data Map"
             ]
         ]
@@ -359,7 +356,7 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
     let state, setState = React.useState(FooterTab.init())
     let order = System.Int32.MaxValue-1 // MaxValue will be sidebar toggle
     let id = "Add-Spreadsheet-Button"
-    Bulma.tab [
+    Daisy.tab [
         prop.key id
         prop.id id
         if state.IsDraggedOver then prop.className "dragover-footertab"
@@ -387,12 +384,7 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
             Html.a [
                 prop.style [style.height.inheritFromParent; style.pointerEvents.none]
                 prop.children [
-                    Bulma.icon [
-                        Bulma.icon.isSmall
-                        prop.children [
-                            Html.i [prop.className "fa-solid fa-plus"]
-                        ]
-                    ]
+                    Html.i [prop.className "fa-solid fa-plus"]
                 ]
             ]
         ]
@@ -402,7 +394,7 @@ let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
     let show = model.PersistentStorageState.ShowSideBar
     let order = System.Int32.MaxValue
     let id = "Toggle-Sidebar-Button"
-    Bulma.tab [
+    Daisy.tab [
         prop.key id
         prop.id id
         prop.onClick (fun e -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
@@ -411,12 +403,7 @@ let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
             Html.a [
                 prop.style [style.height.inheritFromParent; style.pointerEvents.none]
                 prop.children [
-                    Bulma.icon [
-                        Bulma.icon.isSmall
-                        prop.children [
-                            Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
-                        ]
-                    ]
+                    Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
                 ]
             ]
         ]

@@ -4,13 +4,14 @@ open ExcelColors
 open Model
 open Messages
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 module private InfoHelper =
 
     let IntroductionElement =
-        Bulma.field.div [
-            Bulma.content [
+        Html.div [
+            prop.className "prose-sm"
+            prop.children [
                 Html.p [
                     Html.b "Swate"
                     Html.text " is a "
@@ -32,21 +33,20 @@ module private InfoHelper =
 
 
     let MediaContainer (content: ReactElement list) (imageSrc: string) (imageUrl: string)=
-        Bulma.media [
-            prop.className "w-full"
+        Html.div [
+            prop.className "w-full grid grid-cols-1 md:grid-cols-2 gap-4"
             prop.children [
-                Bulma.content [
-                    prop.className "grow"
+                Html.div [
+                    prop.className "grow prose"
                     prop.children content
                 ]
-                Bulma.mediaRight [
+                Html.div [
                     Html.a [
                         prop.href imageUrl
                         prop.target.blank
                         prop.children [
-                            Bulma.image [
+                            Html.div [
                                 prop.className "bg-white p-2 rounded transition hover:scale-110 shadow-md hover:shadow-cyan-500/50"
-                                image.is64x64
                                 prop.children [
                                     Html.img [prop.src imageSrc]
                                 ]
@@ -58,11 +58,8 @@ module private InfoHelper =
         ]
 
     let GetInContactElements =
-        Bulma.field.div [
-            Bulma.title [
-                title.is5
-                prop.text "Get In Contact With Us"
-            ]
+        Html.div [
+            Html.h5 "Get In Contact With Us"
             MediaContainer
                 [
                     Html.strong "DataPLANT"
@@ -110,7 +107,7 @@ module private InfoHelper =
 type Info =
     static member Main =
         Html.div [
-            pageHeader "Swate"
+            Html.h5 "Swate"
             InfoHelper.IntroductionElement
             InfoHelper.GetInContactElements
         ]

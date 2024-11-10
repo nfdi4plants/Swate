@@ -2,7 +2,6 @@ module Routing
 
 open Elmish.UrlParser
 open Feliz
-open Feliz.Bulma
 
 /// The different pages of the application. If you add a new page, then add an entry here.
 [<RequireQualifiedAccess>]
@@ -50,7 +49,7 @@ type Route =
 
     static member toIcon (p: Route)=
         let createElem (icons: ReactElement list) name =
-            Bulma.icon [
+            Html.i [
                 prop.title name
                 prop.children icons
             ]

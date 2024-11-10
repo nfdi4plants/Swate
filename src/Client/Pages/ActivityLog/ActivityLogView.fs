@@ -8,11 +8,11 @@ open Messages
 open Browser.Types
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 //TO-DO: Save log as tab seperated file
 
 let debugBox model dispatch =
-    Bulma.box [
+    Html.div [
         //Button.button [
         //    Button.Color Color.IsInfo
         //    Button.IsFullWidth
@@ -21,10 +21,10 @@ let debugBox model dispatch =
         //] [
         //    str "Try Excel"
         //]
-        Bulma.button.button [
+        Daisy.button.button [
             prop.onClick(fun e -> TestMyAPI |> dispatch)
             prop.text "Test api"]
-        Bulma.button.button [
+        Daisy.button.button [
             prop.onClick(fun e -> TestMyPostAPI |> dispatch)
             prop.text "Test post api"]
         //Button.button [
@@ -51,16 +51,15 @@ let debugBox model dispatch =
 let activityLogComponent (model:Model) dispatch =
     Html.div [
 
-        Bulma.label "Activity Log"
+        Html.h5 "Activity Log"
 
         //debugBox model dispatch
 
-        Bulma.label "Display all recorded activities of this session."
+        Html.p "Display all recorded activities of this session."
         Html.div [
             prop.style [style.borderLeft(5, borderStyle.solid, NFDIColors.Mint.Base); style.padding(length.rem 0.25, length.rem 1); style.marginBottom(length.rem 1) ]
             prop.children [
-                Bulma.table [
-                    Bulma.table.isFullWidth
+                Daisy.table [
                     Html.tbody (
                         model.DevState.Log
                         |> List.map LogItem.toTableRow

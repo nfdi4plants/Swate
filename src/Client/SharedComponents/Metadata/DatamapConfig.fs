@@ -2,7 +2,7 @@ namespace Components.Datamap
 
 open ARCtrl
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Components
 
 type DatamapConfig =
@@ -11,31 +11,27 @@ type DatamapConfig =
         let desc = Some "Add datamap sheet. This allows detailed annotation of data files."
         let content =
             [
-                Bulma.buttons [
-                    Bulma.button.button [
-                        color.isSuccess
-                        if datamap.IsSome then button.isStatic
+                Html.div [
+                    Daisy.button.button [
+                        button.success
+                        if datamap.IsSome then button.disabled
                         prop.onClick (fun _ ->
                             let newDtm = DataMap.init()
                             setDatamap (Some newDtm)
                         )
                         prop.children [
-                            Bulma.icon [
-                                Html.i [prop.className "fa-solid fa-map"]
-                            ]
+                            Html.i [prop.className "fa-solid fa-map"]
                             Html.span "Add Datamap"
                         ]
                     ]
-                    Bulma.button.button [
-                        color.isDanger
-                        if datamap.IsNone then button.isStatic
+                    Daisy.button.button [
+                        button.error
+                        if datamap.IsNone then button.disabled
                         prop.onClick(fun _ ->
                             setDatamap None
                         )
                         prop.children [
-                            Bulma.icon [
-                                Html.i [prop.className "fa-solid fa-trash"]
-                            ]
+                            Html.i [prop.className "fa-solid fa-trash"]
                             Html.span "Remove Datamap"
                         ]
                     ]

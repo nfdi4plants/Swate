@@ -1,7 +1,7 @@
 namespace MainComponents
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 open SpreadsheetInterface
 open Messages
@@ -52,10 +52,7 @@ module private Helper =
 
     let uploadNewTable dispatch =
         let uploadId = "UploadFiles_MainWindowInit"
-        Bulma.label [
-            //prop.onDragEnter <| UploadHandler.dontBubble
-            //prop.onDragLeave <| UploadHandler.dontBubble
-            prop.style [style.fontWeight.normal]
+        Html.p [
             prop.children [
                 Html.input [
                     prop.id uploadId
@@ -72,7 +69,7 @@ module private Helper =
                             reader.onload <- fun evt ->
                                 let (r: byte []) = evt.target?result
                                 r |> ImportXlsx |> InterfaceMsg |> dispatch
-                                   
+
                             reader.onerror <- fun evt ->
                                 curry GenericLog Cmd.none ("Error", evt?Value) |> DevMsg |> dispatch
 
@@ -85,10 +82,10 @@ module private Helper =
                         ()
                     )
                 ]
-                Bulma.button.span [
-                    Bulma.button.isLarge
+                Daisy.button.button [
+                    button.lg
                     UploadHandler.buttonStyle
-                    Bulma.color.isInfo
+                    button.info
                     prop.onClick(fun e ->
                         e.preventDefault()
                         let getUploadElement = Browser.Dom.document.getElementById uploadId
@@ -102,74 +99,64 @@ module private Helper =
             ]
         ]
 
-    let createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
-    
-        Bulma.dropdown [
-            if isActive then 
-                Bulma.dropdown.isActive
+    let createNewTable (dispatch: Messages.Msg -> unit) =
+
+        Daisy.dropdown [
             UploadHandler.buttonStyle
             prop.children [
-                Bulma.dropdownTrigger [
-                    Bulma.button.span [
-                        Bulma.button.isLarge
-                        Bulma.color.isPrimary
-                        prop.onClick toggle
-                        //prop.onClick(fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
-                        prop.children [
-                            Html.div "New File"
-                        ]
-                    ]
+                Html.div [
+                    prop.className "btn btn-lg"
+                    prop.tabIndex 0
+                    prop.text "New File"
                 ]
-                Bulma.dropdownMenu [
-                    Bulma.dropdownContent [
-                        Bulma.dropdownItem.a [
-                            prop.onClick(fun _ ->
-                                let i = ArcInvestigation.init("New Investigation")
-                                ArcFiles.Investigation i
-                                |> UpdateArcFile
-                                |> InterfaceMsg
-                                |> dispatch
-                            )
-                            prop.text "Investigation"
-                        ]
-                        Bulma.dropdownItem.a [
-                            prop.onClick(fun _ ->
-                                let s = ArcStudy.init("New Study")
-                                let _ = s.InitTable("New Study Table")
-                                ArcFiles.Study (s, [])
-                                |> UpdateArcFile
-                                |> InterfaceMsg
-                                |> dispatch
-                            )
-                            prop.text "Study"
-                        ]
-                        Bulma.dropdownItem.a [
-                            prop.onClick(fun _ ->
-                                let a = ArcAssay.init("New Assay")
-                                let newTable = a.InitTable("New Assay Table")
-                                ArcFiles.Assay a
-                                |> UpdateArcFile
-                                |> InterfaceMsg
-                                |> dispatch
-                            )
-                            prop.text "Assay"
-                        ]
-                        Bulma.dropdownDivider []
-                        Bulma.dropdownItem.a [
-                            prop.onClick(fun _ ->
-                                let template = Template.init("New Template")
-                                let table = ArcTable.init("New Table")
-                                template.Table <- table
-                                template.Version <- "0.0.0"
-                                template.Id <- System.Guid.NewGuid()
-                                template.LastUpdated <- System.DateTime.Now
-                                ArcFiles.Template template
-                                |> UpdateArcFile
-                                |> InterfaceMsg
-                                |> dispatch
-                            )
-                            prop.text "Template"
-                        ]
+                Daisy.dropdownContent [
+                    Html.a [
+                        prop.onClick(fun _ ->
+                            let i = ArcInvestigation.init("New Investigation")
+                            ArcFiles.Investigation i
+                            |> UpdateArcFile
+                            |> InterfaceMsg
+                            |> dispatch
+                        )
+                        prop.text "Investigation"
+                    ]
+                    Html.a [
+                        prop.onClick(fun _ ->
+                            let s = ArcStudy.init("New Study")
+                            let _ = s.InitTable("New Study Table")
+                            ArcFiles.Study (s, [])
+                            |> UpdateArcFile
+                            |> InterfaceMsg
+                            |> dispatch
+                        )
+                        prop.text "Study"
+                    ]
+                    Html.a [
+                        prop.onClick(fun _ ->
+                            let a = ArcAssay.init("New Assay")
+                            let _ = a.InitTable("New Assay Table")
+                            ArcFiles.Assay a
+                            |> UpdateArcFile
+                            |> InterfaceMsg
+                            |> dispatch
+                        )
+                        prop.text "Assay"
+                    ]
+                    Daisy.divider [divider.horizontal]
+                    Html.a [
+                        prop.onClick(fun _ ->
+                            let template = Template.init("New Template")
+                            let table = ArcTable.init("New Table")
+                            template.Table <- table
+                            template.Version <- "0.0.0"
+                            template.Id <- System.Guid.NewGuid()
+                            template.LastUpdated <- System.DateTime.Now
+                            ArcFiles.Template template
+                            |> UpdateArcFile
+                            |> InterfaceMsg
+                            |> dispatch
+                        )
+                        prop.text "Template"
                     ]
                 ]
             ]
@@ -179,7 +166,6 @@ type NoFileElement =
 
     [<ReactComponent>]
     static member Main (args: {|dispatch: Messages.Msg -> unit|}) =
-        let isActive, setIsActive = React.useState(false)
         Html.div [
             prop.id UploadHandler.id
             prop.onDragEnter (fun e ->
@@ -207,7 +193,7 @@ type NoFileElement =
                     //prop.style [style.height.minContent; style.display.inheritFromParent; style.justifyContent.spaceBetween]
                     prop.style [style.display.flex; style.justifyContent.spaceBetween]
                     prop.children [
-                        Helper.createNewTable isActive (fun _ -> not isActive |> setIsActive) args.dispatch
+                        Helper.createNewTable args.dispatch
                         Helper.uploadNewTable args.dispatch
                     ]
                 ]

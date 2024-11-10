@@ -6,11 +6,9 @@ open ExcelColors
 open Model
 open Messages
 open Browser
-
-open CustomComponents
 open Fable.Core.JsInterop
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 [<Literal>]
 let private Sidebar_Id = "SidebarContainer-ID"
@@ -25,8 +23,8 @@ type private SidebarStyle = {
 
 let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) (sidebarsize: Model.WindowSize) =
     let isActive = pageLink.isActive(model.PageState.CurrentPage)
-    Bulma.tab [
-        if isActive then Bulma.tab.isActive
+    Daisy.tab [
+        if isActive then tab.active
         Html.a [
             prop.className "navigation" // this class does not do anything, but disables <a> styling.
             prop.onClick (fun e -> e.preventDefault(); UpdatePageState (Some pageLink) |> dispatch)
@@ -39,13 +37,14 @@ let private createNavigationTab (pageLink: Routing.Route) (model:Model) (dispatc
         |> prop.children
     ]
 
-let private tabRow (model:Model) (tabs: seq<ReactElement>) =
-    Bulma.tabs [
-        Bulma.tabs.isCentered; Bulma.tabs.isFullWidth; Bulma.tabs.isBoxed
+let private tabRow (model:Model) (tabs_: seq<ReactElement>) =
+    Daisy.tabs [
+        tabs.boxed
+        prop.className "w-full flex justify-center"
         prop.style [
             style.paddingTop(length.rem 1); style.borderBottom (2, borderStyle.solid, NFDIColors.Mint.Base)
         ]
-        tabs
+        tabs_
         |> prop.children
     ]
 

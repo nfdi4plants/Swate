@@ -31,12 +31,12 @@ let curry f a b = f (a,b)
 module TermSearch =
 
     type Msg =
-        | UpdateSelectedTerm of OntologyAnnotation option 
+        | UpdateSelectedTerm of OntologyAnnotation option
         | UpdateParentTerm of OntologyAnnotation option
 
 
 module AdvancedSearch =
-    
+
     type Msg =
         | GetSearchResults of {| config:AdvancedSearchTypes.AdvancedSearchOptions; responseSetter: Term [] -> unit |}
 
@@ -108,7 +108,7 @@ type Msg =
 | FilePickerMsg                 of FilePicker.Msg
 | BuildingBlockMsg              of BuildingBlock.Msg
 | ProtocolMsg                   of Protocol.Msg
-| CytoscapeMsg                  of Cytoscape.Msg
+// | CytoscapeMsg                  of Cytoscape.Msg
 | DataAnnotatorMsg              of DataAnnotator.Msg
 | SpreadsheetMsg                of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop

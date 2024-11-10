@@ -3,7 +3,7 @@ module Modals.Loading
 open Fable.React
 open Fable.React.Props
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 let loadingComponent =
     Html.i [
@@ -11,14 +11,14 @@ let loadingComponent =
     ]
 
 let loadingModal =
-    Bulma.modal [
-        Bulma.modal.isActive
+    Daisy.modal.div [
+        prop.className "modal-open"
         prop.children [
-            Bulma.modalBackground []
-            Bulma.modalContent [
+            Daisy.modalBackdrop []
+            Daisy.modalBox.div [
                 prop.style [style.custom("width","auto")]
                 prop.children [
-                    Bulma.box loadingComponent
+                    loadingComponent
                 ]
             ]
         ]

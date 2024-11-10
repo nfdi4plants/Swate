@@ -16,14 +16,14 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
         let nextState = { state with HeaderArg = next}
         nextState, Cmd.none
     | UpdateHeaderCellType next ->
-        let nextState = 
+        let nextState =
             if Helper.isSameMajorCompositeHeaderDiscriminate state.HeaderCellType next then
-                { state with 
-                    HeaderCellType = next 
+                { state with
+                    HeaderCellType = next
                 }
             else
                 let nextBodyCellType = if next.IsTermColumn() then CompositeCellDiscriminate.Term else CompositeCellDiscriminate.Text
-                { state with 
+                { state with
                     HeaderCellType = next
                     BodyCellType = nextBodyCellType
                     HeaderArg = None
@@ -32,7 +32,7 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
         nextState, Cmd.none
     | UpdateHeaderWithIO (hct, iotype) ->
         let nextState = {
-            state with 
+            state with
                 HeaderCellType = hct
                 HeaderArg = Some (Fable.Core.U2.Case2 iotype)
                 BodyArg = None
@@ -44,21 +44,21 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
         nextState, Cmd.none
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 //let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
 //    mainFunctionContainer [
 //        Bulma.field.div [
-//            Bulma.button.button [
-                
+//            Daisy.button.button [
+
 //                let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
 //                Bulma.color.isSuccess
 //                if isValid then
-//                    Bulma.button.isActive
+//                    Daisy.button.isActive
 //                else
-//                    Bulma.color.isDanger
+//                    button.error
 //                    prop.disabled true
-//                Bulma.button.isFullWidth
+//                button.block
 //                prop.onClick (fun _ ->
 //                    let unitTerm =
 //                        if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
@@ -80,16 +80,16 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
         prop.onSubmit (fun e -> e.preventDefault())
         prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
         prop.children [
-            pageHeader "Building Blocks"
+            Html.h5 "Building Blocks"
 
             // Input forms, etc related to add building block.
-            Bulma.label "Add annotation building blocks (columns) to the annotation table."
+            Html.p "Add annotation building blocks (columns) to the annotation table."
             mainFunctionContainer [
                 SearchComponent.Main model dispatch
             ]
             match model.PersistentStorageState.Host with
             | Some Swatehost.Excel ->
-                Bulma.label "Convert existing Building Block."
+                Html.p "Convert existing Building Block."
                 mainFunctionContainer [
                     CellConvertComponent.Main ()
                 ]

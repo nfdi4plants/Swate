@@ -12,7 +12,7 @@ open Update
 let sayHello name = $"Hello {name}"
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 let private split_container model dispatch =
     let mainWindow = Seq.singleton <| MainWindowView.Main (model, dispatch)

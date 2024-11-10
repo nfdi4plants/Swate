@@ -1,7 +1,7 @@
 module Components.QuickAccessButton
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 type QuickAccessButton = {
     Description : string
@@ -19,7 +19,7 @@ type QuickAccessButton = {
     }
     member this.toReactElement() =
         let isDisabled = not this.IsActive
-        Bulma.navbarItem.div [
+        Html.div [
             prop.title this.Description
             prop.style [
                 style.padding 0; style.minWidth(length.px 45)
@@ -28,7 +28,7 @@ type QuickAccessButton = {
                     style.cursor.notAllowed
             ]
             prop.children [
-                Bulma.button.a [
+                Daisy.button.a [
                     prop.tabIndex (if isDisabled then -1 else 0)
                     prop.className "myNavbarButton"
                     yield! this.ButtonProps

@@ -33,6 +33,4 @@ let mainFunctionContainer (children: ReactElement list) =
     ]
 
 open Feliz
-open Feliz.Bulma
-
-let pageHeader (header: string) = Bulma.title [Bulma.title.is5; prop.text header]
+open Feliz.DaisyUI

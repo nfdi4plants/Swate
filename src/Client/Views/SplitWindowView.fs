@@ -1,7 +1,7 @@
 module SplitWindowView
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Elmish
 open Browser.Types
 open LocalStorage.SplitWindow
@@ -28,12 +28,12 @@ let private onResize_event (model:SplitWindow) (setModel: SplitWindow -> unit) =
         let new_sidebarWidth = calculateNewSideBarSize model (windowWidth - sidebarWindow)
         { model with RightWindowWidth = new_sidebarWidth } |> setModel
 )
-    
+
 /// <summary> This event changes the size of main window and sidebar </summary>
 let private mouseMove_event (model:SplitWindow) (setModel: SplitWindow -> unit) = (fun (e: Event) ->
     let pos = (e :?> MouseEvent).clientX
     let new_sidebarWidth = calculateNewSideBarSize model pos
-    //propagateWindowSize new_sidebarWidth dispatch 
+    //propagateWindowSize new_sidebarWidth dispatch
     //Browser.Dom.console.log("side: ", newWidthSide)
     { model with RightWindowWidth = new_sidebarWidth } |> setModel
 )
@@ -83,7 +83,7 @@ let private sidebarCombinedElement(sidebarId: string, model: SplitWindow, setMod
         ]
         prop.children [
             dragbar model setModel dispatch
-            yield! right 
+            yield! right
         ]
     ]
 

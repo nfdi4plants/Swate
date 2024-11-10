@@ -1,7 +1,7 @@
 module Modals.EditColumn
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ExcelColors
 open Messages
 open Shared
@@ -23,15 +23,15 @@ type private State =
 module private EditColumnComponents =
 
     let BackButton cancel =
-        Bulma.button.button [
+        Daisy.button.button [
             prop.onClick cancel
-            color.isWarning
+            button.warning
             prop.text "Back"
         ]
 
     let SubmitButton(submit) =
-        Bulma.button.button [
-            color.isSuccess
+        Daisy.button.button [
+            button.success
             prop.text "Submit"
             prop.onClick submit
         ]
@@ -44,7 +44,7 @@ module private EditColumnComponents =
         ]
 
     let SelectHeaderType(header, state, setState) =
-        Bulma.select [
+        Daisy.select [
             prop.value (header.ToString())
             prop.onChange (fun (e: string) -> {state with NextHeaderType = Some (CompositeHeaderDiscriminate.fromString e)} |> setState )
             prop.children [
@@ -75,7 +75,7 @@ module private EditColumnComponents =
         ]
 
     let SelectIOType(state, setState) =
-        Bulma.select [
+        Daisy.select [
             prop.onChange (fun (e: string) -> {state with NextIOType = Some (IOType.ofString e)} |> setState )
             prop.children [
                 SelectIOTypeOption IOType.Source
@@ -92,16 +92,15 @@ module private EditColumnComponents =
                 parsedStrList.[0], parsedStrList.[1..]
             else
                 parsedStrList.[0], []
-        Bulma.tableContainer [
-            prop.style [style.overflowY.auto; style.flexGrow 1]
+        Html.div [
+            prop.className "overflow-x-auto grow"
             prop.children [
-                Bulma.table [
-                    table.isFullWidth
+                Daisy.table [
                     prop.children [
                         Html.thead [
                             Html.tr [
                                 for header in headers do
-                                    Html.th header 
+                                    Html.th header
                             ]
                         ]
                         Html.tbody [
@@ -183,41 +182,40 @@ let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
         let cells = Array.takeSafe 10 column0.Cells
         updateColumn {column0 with Cells = cells}
 
-    Bulma.modal [
-        Bulma.modal.isActive
+    Daisy.modal.div [
+        prop.className "modal-open"
         prop.children [
-            Bulma.modalBackground [ prop.onClick rmv ]
-            Bulma.modalCard [
+            Daisy.modalBackdrop [ prop.onClick rmv ]
+            Daisy.modalBox.div [
                 prop.style [style.maxHeight(length.percent 70)]
                 prop.children [
-                    Bulma.modalCardHead [
-                        Bulma.modalCardTitle "Update Column"
-                        Bulma.delete [ prop.onClick rmv ]
-                    ]
-                    Bulma.modalCardBody [
-                        Bulma.field.div [
-                            Bulma.buttons [
-                                prop.children [
-                                    SelectHeaderType(column0.Header.AsDiscriminate, state, setState)
-                                    match state.NextHeaderType with
-                                    | Some CompositeHeaderDiscriminate.Output | Some CompositeHeaderDiscriminate.Input ->
-                                        SelectIOType(state, setState)
-                                    | _ -> Html.none
-                                ]
+                    Daisy.cardBody [
+                        Daisy.cardActions [
+                            prop.className "justify-end"
+                            prop.children [
+                                Components.Components.DeleteButton(props=[prop.onClick rmv])
                             ]
                         ]
-                        Bulma.field.div [
+                        Daisy.cardTitle "Update Column"
+                        Html.div [
+                            SelectHeaderType(column0.Header.AsDiscriminate, state, setState)
+                            match state.NextHeaderType with
+                            | Some CompositeHeaderDiscriminate.Output | Some CompositeHeaderDiscriminate.Input ->
+                                SelectIOType(state, setState)
+                            | _ -> Html.none
+                        ]
+                        Html.div [
                             prop.style [style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex]
                             prop.children [
                                 Preview(previewColumn)
                             ]
                         ]
-                    ]
-                    Bulma.modalCardFoot [
-                        prop.className "flex grow justify-between"
-                        prop.children [
-                            BackButton rmv
-                            SubmitButton submit
+                        Daisy.cardActions [
+                            prop.className "justify-end"
+                            prop.children [
+                                BackButton rmv
+                                SubmitButton submit
+                            ]
                         ]
                     ]
                 ]

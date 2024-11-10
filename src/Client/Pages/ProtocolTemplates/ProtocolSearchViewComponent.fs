@@ -6,7 +6,7 @@ open Messages.Protocol
 open Messages
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 /// Fields of Template that can be searched
 [<RequireQualifiedAccess>]
@@ -59,7 +59,7 @@ type TemplateFilterConfig = {
         Searchfield             = SearchFields.Name
     }
 
-module ComponentAux = 
+module ComponentAux =
 
     let curatedOrganisationNames = [
         "dataplant"
@@ -71,43 +71,37 @@ module ComponentAux =
 
     let queryField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         Html.div [
-            Bulma.label $"Search by {state.Searchfield.toNameRdb}"
+            Html.p $"Search by {state.Searchfield.toNameRdb}"
             let hasSearchAddon = state.Searchfield <> SearchFields.Name
-            Bulma.field.div [
-                if hasSearchAddon then Bulma.field.hasAddons
+            Daisy.join [
                 prop.children [
                     if hasSearchAddon then
-                        Bulma.control.div [
-                            Bulma.button.a [ Bulma.button.isStatic; prop.text state.Searchfield.toStr]
+                        Daisy.button.a [ join.item; button.disabled; prop.text state.Searchfield.toStr]
+                    Daisy.label [
+                        Daisy.input [
+                            prop.style [style.minWidth 200]
+                            prop.placeholder $".. {state.Searchfield.toNameRdb}"
+                            prop.id SearchFieldId
+                            input.primary
+                            prop.valueOrDefault state.ProtocolSearchQuery
+                            prop.onChange (fun (e: string) ->
+                                let query = e
+                                // if query starts with "/" expect intend to search by different field
+                                if query.StartsWith "/" then
+                                    let searchField = SearchFields.GetOfQuery query
+                                    if searchField.IsSome then
+                                        {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
+                                        //let inp = Browser.Dom.document.getElementById SearchFieldId
+                                // if query starts NOT with "/" update query
+                                else
+                                    {
+                                        state with
+                                            ProtocolSearchQuery = query
+                                    }
+                                    |> setState
+                            )
                         ]
-                    Bulma.control.div [
-                        Bulma.control.hasIconsRight
-                        prop.children [
-                            Bulma.input.text [
-                                prop.style [style.minWidth 200]
-                                prop.placeholder $".. {state.Searchfield.toNameRdb}"
-                                prop.id SearchFieldId
-                                Bulma.color.isPrimary
-                                prop.valueOrDefault state.ProtocolSearchQuery
-                                prop.onChange (fun (e: string) ->
-                                    let query = e
-                                    // if query starts with "/" expect intend to search by different field
-                                    if query.StartsWith "/" then
-                                        let searchField = SearchFields.GetOfQuery query
-                                        if searchField.IsSome then
-                                            {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
-                                            //let inp = Browser.Dom.document.getElementById SearchFieldId
-                                    // if query starts NOT with "/" update query
-                                    else
-                                        {
-                                            state with
-                                                ProtocolSearchQuery = query
-                                        }
-                                        |> setState
-                                )
-                            ]
-                            Bulma.icon [Bulma.icon.isSmall; Bulma.icon.isRight; prop.children (Html.i [prop.className "fa-solid fa-search"])]
-                        ]
+                        Html.i [prop.className "fa-solid fa-search"]
                     ]
                 ]
             ]
@@ -119,7 +113,7 @@ module ComponentAux =
         let hitTagList, hitErTagList =
             if state.ProtocolTagSearchQuery <> ""
             then
-                let queryBigram = state.ProtocolTagSearchQuery |> Shared.SorensenDice.createBigrams 
+                let queryBigram = state.ProtocolTagSearchQuery |> Shared.SorensenDice.createBigrams
                 let getMatchingTags (allTags: OntologyAnnotation []) =
                     allTags
                     |> Array.map (fun x ->
@@ -137,25 +131,21 @@ module ComponentAux =
             else
                 [||], [||]
         Html.div [
-            Bulma.label "Search for tags"
-            Bulma.control.div [
-                Bulma.control.hasIconsRight
+            Html.p "Search for tags"
+            Daisy.label [
                 prop.children [
-                    Bulma.input.text [
+                    Daisy.input [
                         prop.style [style.minWidth 150]
                         prop.placeholder ".. protocol tag"
-                        Bulma.color.isPrimary
+                        input.primary
                         prop.valueOrDefault state.ProtocolTagSearchQuery
                         prop.onChange (fun (e:string) ->
                             {state with ProtocolTagSearchQuery = e} |> setState
                         )
                     ]
-                    Bulma.icon [
-                        Bulma.icon.isSmall; Bulma.icon.isRight
-                        Html.i [prop.className "fa-solid fa-search"] |> prop.children
-                    ]
+                    Html.i [prop.className "fa-solid fa-search"]
                     // Pseudo dropdown
-                    Bulma.box [
+                    Html.div [
                         prop.style [
                             style.position.absolute
                             style.width(length.perc 100)
@@ -164,13 +154,13 @@ module ComponentAux =
                         ]
                         prop.children [
                             if hitErTagList <> [||] then
-                                Bulma.label "Endpoint Repositories"
-                                Bulma.tags [
+                                Html.p "Endpoint Repositories"
+                                Html.div [
                                     for tagSuggestion in hitErTagList do
                                         yield
-                                            Bulma.tag [
+                                            Daisy.badge [
                                                 prop.className "clickableTag"
-                                                Bulma.color.isLink
+                                                badge.info
                                                 prop.onClick (fun _ ->
                                                     let nextState = {
                                                         state with
@@ -184,13 +174,13 @@ module ComponentAux =
                                             ]
                                 ]
                             if hitTagList <> [||] then
-                                Bulma.label "Tags"
-                                Bulma.tags [
+                                Html.p "Tags"
+                                Html.div [
                                     for tagSuggestion in hitTagList do
                                         yield
-                                            Bulma.tag [
+                                            Daisy.badge [
                                                 prop.className "clickableTag"
-                                                Bulma.color.isInfo
+                                                button.info
                                                 prop.onClick (fun _ ->
                                                     let nextState = {
                                                             state with
@@ -213,50 +203,54 @@ module ComponentAux =
     open Fable.Core.JsInterop
 
     let communitySelectField (model: Model) (state: TemplateFilterConfig) setState =
-        let communityNames = 
-            model.ProtocolState.Templates 
-            |> Array.choose (fun t -> Model.Protocol.CommunityFilter.CommunityFromOrganisation t.Organisation) 
+        let communityNames =
+            model.ProtocolState.Templates
+            |> Array.choose (fun t -> Model.Protocol.CommunityFilter.CommunityFromOrganisation t.Organisation)
             |> Array.distinct |> List.ofArray
-        let options = 
+        let options =
             [
                 Model.Protocol.CommunityFilter.All
                 Model.Protocol.CommunityFilter.OnlyCurated
             ]@communityNames
         Html.div [
-            Bulma.label "Select community"
-            Bulma.control.div [
-                Bulma.control.isExpanded 
+            Html.p "Select community"
+            Daisy.select [
+                prop.value (state.CommunityFilter.ToStringRdb())
+                prop.onChange(fun (e: Browser.Types.Event) ->
+                    let filter = Model.Protocol.CommunityFilter.fromString e.target?value
+                    if state.CommunityFilter <> filter then
+                        {state with CommunityFilter = filter} |> setState
+                )
                 prop.children [
-                    Bulma.select [
-                        prop.value (state.CommunityFilter.ToStringRdb())
-                        prop.onChange(fun (e: Browser.Types.Event) ->
-                            let filter = Model.Protocol.CommunityFilter.fromString e.target?value
-                            if state.CommunityFilter <> filter then
-                                {state with CommunityFilter = filter} |> setState
-                        )
-                        prop.children [
-                            for option in options do
-                                Html.option [
-                                    //prop.selected (state.CommunityFilter = option)
-                                    prop.value (option.ToStringRdb())                                   
-                                    prop.text (option.ToStringRdb())                                   
-                                ]
+                    for option in options do
+                        Html.option [
+                            //prop.selected (state.CommunityFilter = option)
+                            prop.value (option.ToStringRdb())
+                            prop.text (option.ToStringRdb())
                         ]
-                    ]
                 ]
             ]
         ]
 
     let TagRemovableElement (tag:OntologyAnnotation) (color: IReactProperty) (rmv: unit -> unit) =
-        Bulma.control.div [
-            Bulma.tags [
-                prop.style [style.flexWrap.nowrap]
-                Bulma.tags.hasAddons
-                prop.children [
-                    Bulma.tag [color; prop.style [style.borderWidth 0]; prop.text tag.NameText; prop.title tag.TermAccessionShort]
-                    Bulma.tag [
-                        Bulma.tag.isDelete
-                        prop.onClick (fun _ -> rmv())
+        Daisy.badge [
+            color
+            prop.className "hover:brightness-75"
+            prop.onClick (fun _ -> rmv())
+            prop.children [
+                Html.text tag.NameText
+                Svg.svg [
+                    svg.xmlns "http://www.w3.org/2000/svg"
+                    svg.fill "none"
+                    svg.viewBox (0,0,24,24)
+                    svg.className "inline-block h-4 w-4 stroke-current"
+                    svg.children [
+                        Svg.path [
+                            svg.strokeLineCap "round"
+                            svg.strokeLineJoin "round"
+                            svg.strokeWidth 2
+                            svg.d "M6 18L18 6M6 6l12 12"
+                        ]
                     ]
                 ]
             ]
@@ -266,8 +260,8 @@ module ComponentAux =
         Html.div [
             prop.style [style.marginLeft length.auto]
             prop.children [
-                Bulma.button.button [
-                    Bulma.button.isSmall
+                Daisy.button.button [
+                    button.sm
                     prop.onClick (fun _ -> setFilter (not tagIsFilterAnd))
                     prop.title (if tagIsFilterAnd then "Templates contain all tags." else "Templates contain at least one tag.")
                     prop.text (if tagIsFilterAnd then "And" else "Or")
@@ -279,19 +273,18 @@ module ComponentAux =
         Html.div [
             prop.className "is-flex"
             prop.children [
-                Bulma.field.div [
-                    Bulma.field.isGroupedMultiline
+                Html.div [
                     prop.style [style.display.flex; style.flexGrow 1; style.gap (length.rem 0.5); style.flexWrap.wrap; style.flexDirection.row]
                     prop.children [
                         for selectedTag in state.ProtocolFilterErTags do
                             let rmv = fun () -> {state with ProtocolFilterErTags = state.ProtocolFilterErTags |> List.except [selectedTag]} |> setState
-                            TagRemovableElement selectedTag Bulma.color.isLink rmv
+                            TagRemovableElement selectedTag button.accent rmv
                         for selectedTag in state.ProtocolFilterTags do
                             let rmv = fun () -> {state with ProtocolFilterTags = state.ProtocolFilterTags |> List.except [selectedTag]} |> setState
-                            TagRemovableElement selectedTag Bulma.color.isInfo rmv
+                            TagRemovableElement selectedTag button.info rmv
                     ]
                 ]
-                // tag filter (AND or OR) 
+                // tag filter (AND or OR)
                 let filtersetter = fun b -> setState {state with TagFilterIsAnd = b}
                 SwitchElement state.TagFilterIsAnd filtersetter
             ]
@@ -302,7 +295,7 @@ module ComponentAux =
         Html.div [
             prop.style [style.marginBottom(length.rem 0.75); style.display.flex; style.flexDirection.column]
             prop.children [
-                Bulma.field.div [
+                Html.div [
                     prop.className "template-filter-container"
                     prop.children [
                         queryField model state setState
@@ -312,25 +305,25 @@ module ComponentAux =
                 ]
                 // Only show the tag list and tag filter (AND or OR) if any tag exists
                 if state.ProtocolFilterErTags <> [] || state.ProtocolFilterTags <> [] then
-                    Bulma.field.div [
+                    Html.div [
                         TagDisplayField model state setState
                     ]
             ]
         ]
 
-    let curatedTag = Bulma.tag [prop.text "curated"; Bulma.color.isSuccess]
-    let communitytag = Bulma.tag [prop.text "community"; Bulma.color.isWarning]
+    let curatedTag = Daisy.badge [prop.text "curated"; badge.success]
+    let communitytag = Daisy.badge [prop.text "community"; badge.warning]
     let curatedCommunityTag =
-        Bulma.tag [
+        Daisy.badge [
             prop.style [style.custom("background", "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)")]
-            Bulma.color.isSuccess
+            badge.success
             prop.children [
                 Html.span [prop.style [style.marginRight (length.em 0.75)]; prop.text "cur"]
-                Html.span [prop.style [style.marginLeft (length.em 0.75); style.color "rgba(0, 0, 0, 0.7)"]; prop.text "com"]  
+                Html.span [prop.style [style.marginLeft (length.em 0.75); style.color "rgba(0, 0, 0, 0.7)"]; prop.text "com"]
             ]
         ]
 
-    let createAuthorStringHelper (author: Person) = 
+    let createAuthorStringHelper (author: Person) =
         let mi = if author.MidInitials.IsSome then author.MidInitials.Value else ""
         $"{author.FirstName} {mi} {author.LastName}"
     let createAuthorsStringHelper (authors: ResizeArray<Person>) = authors |> Seq.map createAuthorStringHelper |> String.concat ", "
@@ -370,7 +363,7 @@ module ComponentAux =
                     //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string template.Used) ]
                     Html.td [
                         prop.key $"{i}_{template.Id}_button"
-                        prop.children [Bulma.icon [Html.i [prop.className "fa-solid fa-chevron-down"]] ]
+                        prop.children [Html.i [prop.className "fa-solid fa-chevron-down"] ]
                     ]
                 ]
             ]
@@ -386,34 +379,31 @@ module ComponentAux =
                     ]
                     prop.colSpan 4
                     prop.children [
-                        Bulma.box [
-                            prop.style [style.borderRadius 0]
-                            prop.children [
+                        Html.div [
+                            Html.div [
+                                Html.div template.Description
                                 Html.div [
-                                    Html.div template.Description
-                                    Html.div [
-                                        Html.div [ Html.b "Author: "; Html.span (createAuthorsStringHelper template.Authors) ]
-                                        Html.div [ Html.b "Created: "; Html.span (template.LastUpdated.ToString("yyyy/MM/dd")) ]
-                                    ]
-                                    Html.div [
-                                        Html.div [ Html.b "Organisation: "; Html.span (template.Organisation.ToString()) ]
-                                    ]
+                                    Html.div [ Html.b "Author: "; Html.span (createAuthorsStringHelper template.Authors) ]
+                                    Html.div [ Html.b "Created: "; Html.span (template.LastUpdated.ToString("yyyy/MM/dd")) ]
                                 ]
-                                Bulma.tags [
-                                    for tag in template.EndpointRepositories do
-                                        yield
-                                            Bulma.tag [Bulma.color.isLink; prop.text tag.NameText; prop.title tag.TermAccessionShort]
+                                Html.div [
+                                    Html.div [ Html.b "Organisation: "; Html.span (template.Organisation.ToString()) ]
                                 ]
-                                Bulma.tags [
-                                    for tag in template.Tags do
-                                        yield
-                                            Bulma.tag [Bulma.color.isInfo; prop.text tag.NameText; prop.title tag.TermAccessionShort]
-                                ]
-                                Bulma.button.a [
-                                    prop.onClick (fun _ -> SelectProtocol template |> ProtocolMsg |> dispatch)
-                                    Bulma.button.isFullWidth; Bulma.color.isSuccess
-                                    prop.text "select"
-                                ]
+                            ]
+                            Html.div [
+                                for tag in template.EndpointRepositories do
+                                    yield
+                                        Daisy.badge [badge.accent; prop.text tag.NameText; prop.title tag.TermAccessionShort]
+                            ]
+                            Html.div [
+                                for tag in template.Tags do
+                                    yield
+                                        Daisy.badge [button.info; prop.text tag.NameText; prop.title tag.TermAccessionShort]
+                            ]
+                            Daisy.button.a [
+                                prop.onClick (fun _ -> SelectProtocol template |> ProtocolMsg |> dispatch)
+                                button.block; button.success
+                                prop.text "select"
                             ]
                         ]
                     ]
@@ -422,11 +412,11 @@ module ComponentAux =
         ]
 
     let RefreshButton (model:Model) dispatch =
-        Bulma.button.button [
-            Bulma.button.isSmall
+        Daisy.button.button [
+            button.sm
             prop.onClick (fun _ -> Messages.Protocol.GetAllProtocolsForceRequest |> ProtocolMsg |> dispatch)
             prop.children [
-                Bulma.icon [Html.i [prop.className "fa-solid fa-arrows-rotate"]]
+                Html.i [prop.className "fa-solid fa-arrows-rotate"]
             ]
         ]
 
@@ -469,7 +459,7 @@ module FilterHelper =
                             createScore s
                             |> adjustScore s
                         | SearchFields.Authors       ->
-                            let scores = template.Authors |> Seq.filter (fun author -> 
+                            let scores = template.Authors |> Seq.filter (fun author ->
                                 (createAuthorStringHelper author).ToLower().Contains query
                                 || (author.ORCID.IsSome && author.ORCID.Value = query)
                             )
@@ -478,7 +468,7 @@ module FilterHelper =
                 )
                 |> Array.filter (fun (score,_) -> score > 0.3)
                 |> Array.sortByDescending fst
-                |> fun y -> 
+                |> fun y ->
                     for score, x in y do
                         log (score, x.Name)
                     y
@@ -507,23 +497,22 @@ open ComponentAux
 type Search =
 
     static member InfoField() =
-        Bulma.field.div [
-            Bulma.content [
-                Html.b "Search for templates."
-                Html.span " For more information you can look "
-                Html.a [ prop.href Shared.URLs.SwateWiki; prop.target "_Blank"; prop.text "here"]
-                Html.span ". If you find any problems with a template or have other suggestions you can contact us "
-                Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.text "here"]
-                Html.span "."
-            ]
-            Bulma.content [
-                Html.span "You can search by template name, organisation and authors. Just type:"
-                Bulma.content [
-                    Html.ul [
-                        Html.li [Html.code "/a"; Html.span " to search authors."]
-                        Html.li [Html.code "/o"; Html.span " to search organisations."]
-                        Html.li [Html.code "/n"; Html.span " to search template names."]
-                    ]
+        Html.div [
+            prop.className "prose-sm"
+            prop.children [
+                Html.p [
+                    Html.b "Search for templates."
+                    Html.text " For more information you can look "
+                    Html.a [ prop.href Shared.URLs.SwateWiki; prop.target "_Blank"; prop.text "here"]
+                    Html.text ". If you find any problems with a template or have other suggestions you can contact us "
+                    Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.text "here"]
+                    Html.text "."
+                ]
+                Html.p "You can search by template name, organisation and authors. Just type:"
+                Html.ul [
+                    Html.li [Html.code "/a"; Html.span " to search authors."]
+                    Html.li [Html.code "/o"; Html.span " to search organisations."]
+                    Html.li [Html.code "/n"; Html.span " to search template names."]
                 ]
             ]
         ]
@@ -533,7 +522,7 @@ type Search =
             templates
             |> Array.ofSeq
             |> Array.sortBy (fun template -> template.Name, template.Organisation)
-            |> FilterHelper.filterTableByTags config.ProtocolFilterTags config.ProtocolFilterErTags config.TagFilterIsAnd 
+            |> FilterHelper.filterTableByTags config.ProtocolFilterTags config.ProtocolFilterErTags config.TagFilterIsAnd
             |> FilterHelper.filterTableByCommunityFilter config.CommunityFilter
             |> FilterHelper.sortTableBySearchQuery config.Searchfield config.ProtocolSearchQuery
 
@@ -548,10 +537,10 @@ type Search =
         Html.div [
             prop.style [style.overflow.auto; style.maxHeight maxheight]
             prop.children [
-                Bulma.table [
-                    Bulma.table.isFullWidth
-                    Bulma.table.isStriped
-                    prop.className "tableFixHead"
+                Daisy.table [
+                    table.zebra
+                    table.pinCols
+                    // prop.className "tableFixHead"
                     prop.children [
                         Html.thead [
                             Html.tr [
@@ -573,12 +562,7 @@ type Search =
                                         prop.colSpan 4
                                         prop.style [style.textAlign.center]
                                         prop.children [
-                                            Bulma.icon [ 
-                                                Bulma.icon.isMedium
-                                                prop.children [
-                                                    Html.i [prop.className "fa-solid fa-spinner fa-spin fa-lg"]
-                                                ]
-                                            ]
+                                            Html.i [prop.className "fa-solid fa-spinner fa-spin fa-lg"]
                                         ]
                                     ]
                                 ]
@@ -589,10 +573,10 @@ type Search =
                                 | _ ->
                                     for i in 0 .. templates.Length-1 do
                                         let isShown = showIds |> List.contains i
-                                        let setIsShown (show: bool) = 
+                                        let setIsShown (show: bool) =
                                             if show then i::showIds |> setShowIds else showIds |> List.filter (fun x -> x <> i) |> setShowIds
                                         yield!
-                                            protocolElement i templates.[i] isShown setIsShown model dispatch 
+                                            protocolElement i templates.[i] isShown setIsShown model dispatch
                         ]
                     ]
                 ]

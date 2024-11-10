@@ -1,10 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="GenericComponents.fs" />
     <None Include="tailwind.config.js" />
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
@@ -71,7 +72,6 @@
     <Compile Include="SharedComponents\Metadata\Template.fs" />
     <Compile Include="SidebarComponents\DarkmodeButton.fs" />
     <Compile Include="SidebarComponents\LayoutHelper.fs" />
-    <Compile Include="SidebarComponents\ResponsiveFA.fs" />
     <Compile Include="SidebarComponents\AnnotationTableMissingWarning.fs" />
     <Compile Include="SidebarComponents\Navbar.fs" />
     <Compile Include="Pages\Cytoscape\CytoscapeGraph.fs" />
@@ -137,7 +137,7 @@
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.SimpleJson" Version="3.24.0" />
     <PackageReference Include="Feliz" Version="2.8.0" />
-    <PackageReference Include="Feliz.Bulma" Version="3.0.0" />
+    <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
     <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
     <PackageReference Include="FsSpreadsheet.Js" Version="[6.2.0]" />
     <PackageReference Include="Fable.Mocha" Version="2.17.0" />

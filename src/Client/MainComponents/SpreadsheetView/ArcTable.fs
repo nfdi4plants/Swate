@@ -1,7 +1,7 @@
 module MainComponents.SpreadsheetView.ArcTable
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 open Spreadsheet
 open Messages
@@ -19,7 +19,7 @@ let private CreateBodyCells (columnIndex, rowIndex, state:Set<int>, model:Model,
         Cells.Cell.Body (index, cell, model, dispatch)
         let header = table.Headers.[columnIndex]
         if (cell.isTerm || cell.isUnitized) && isExtended then
-            if cell.isUnitized then 
+            if cell.isUnitized then
                 Cell.BodyUnit(index, cell, model, dispatch)
             else
                 Cell.Empty()
@@ -54,7 +54,7 @@ let private CreateHeaderCells(columnIndex, state, setState, model, dispatch) =
         else
             ()
     ]
-    
+
 
 let private BodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
     [
@@ -71,9 +71,9 @@ let private BodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Ms
 let private BodyRows (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
     [|
         for rowInd in 0 .. model.SpreadsheetModel.ActiveTable.RowCount-1 do
-            yield BodyRow rowInd state model dispatch 
+            yield BodyRow rowInd state model dispatch
     |]
-    
+
 
 let private HeaderRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
     [
@@ -84,7 +84,7 @@ let private HeaderRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> 
                 setState,
                 model,
                 dispatch
-            )           
+            )
     ]
 
 open Fable.Core.JsInterop

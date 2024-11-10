@@ -14,7 +14,7 @@ open Messages
 open Elmish
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Shared
 open ARCtrl
 
@@ -35,8 +35,8 @@ type private TemplateFromFileState = {
         }
 
 module private Helper =
-    
-    let upload (uploadId: string) (state: TemplateFromFileState) setState (dispatch: Msg -> unit) (ev: File list) =
+
+    let upload (state: TemplateFromFileState) setState (dispatch: Msg -> unit) (ev: File list) =
         let fileList = ev //: FileList = ev.target?files
 
         if fileList.Length > 0 then
@@ -56,50 +56,36 @@ module private Helper =
                             p
                         |> Async.AwaitPromise
                 } |> Async.StartImmediate
-                                   
+
             reader.onerror <- fun evt ->
                 curry GenericError Cmd.none (exn evt.Value) |> DevMsg |> dispatch
 
             reader.readAsText(file)
         else
             ()
-        let picker = Browser.Dom.document.getElementById(uploadId)
-        // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
-        picker?value <- null
 
 type TemplateFromFile =
 
     static member private FileUploadButton (state:TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch)  =
-        let uploadId = "UploadFiles_ElementId"
-        Bulma.label [
-            Bulma.fileInput [
-                prop.id uploadId
+        Daisy.formControl [
+            Daisy.file [
+                file.bordered
+                prop.className "w-full max-w-xs"
                 prop.type' "file";
-                prop.style [style.display.none]
                 prop.onChange (fun (ev: File list) ->
-                    Helper.upload uploadId state setState dispatch ev
+                    Helper.upload state setState dispatch ev
                 )
-            ]
-            Bulma.button.a [
-                Bulma.color.isInfo;
-                Bulma.button.isFullWidth
-                prop.onClick(fun e ->
-                    e.preventDefault()
-                    let getUploadElement = Browser.Dom.document.getElementById uploadId
-                    getUploadElement.click()
-                )
-                prop.text "Upload protocol"
             ]
         ]
 
     static member private SelectorButton<'a when 'a : equality> (targetselector: 'a, selector: 'a, setSelector: 'a -> unit, ?isDisabled) =
-        Bulma.button.button [
+        Daisy.button.button [
+            join.item
             if isDisabled.IsSome then
                 prop.disabled isDisabled.Value
             prop.style [style.flexGrow 1]
             if (targetselector = selector) then
-                color.isSuccess
-                button.isSelected
+                button.success
             prop.onClick (fun _ -> setSelector targetselector)
             prop.text (string targetselector)
         ]
@@ -118,7 +104,7 @@ type TemplateFromFile =
         let jsonFormatDisabled (jf: JsonExportFormat) =
             match state.FileType ,jf with
             // template does not support isa and rocrate
-            | ArcFilesDiscriminate.Template, JsonExportFormat.ROCrate 
+            | ArcFilesDiscriminate.Template, JsonExportFormat.ROCrate
             | ArcFilesDiscriminate.Template, JsonExportFormat.ISA -> true
             | _ -> false
         mainFunctionContainer [
@@ -127,15 +113,14 @@ type TemplateFromFile =
             | Some af ->
                 Modals.SelectiveImportModal.Main af model.SpreadsheetModel dispatch (fun _ -> TemplateFromFileState.init() |> setState)
             | None -> Html.none
-            Bulma.field.div [
-                Bulma.help [
+            Html.div [
+                Html.p [
                     Html.b "Import JSON files."
                     Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
                 ]
             ]
-            Bulma.field.div [
-                Bulma.buttons [
-                    buttons.hasAddons
+            Html.div [
+                Daisy.join [
                     prop.children [
                         JsonExportFormat.ROCrate |> fun jef -> TemplateFromFile.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
                         JsonExportFormat.ISA |> fun jef -> TemplateFromFile.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
@@ -145,9 +130,8 @@ type TemplateFromFile =
                 ]
             ]
 
-            Bulma.field.div [
-                Bulma.buttons [
-                    buttons.hasAddons
+            Html.div [
+                Daisy.join [
                     prop.children [
                         ArcFilesDiscriminate.Assay |> fun ft -> TemplateFromFile.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
                         ArcFilesDiscriminate.Study |> fun ft -> TemplateFromFile.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
@@ -157,7 +141,7 @@ type TemplateFromFile =
                 ]
             ]
 
-            Bulma.field.div [
+            Html.div [
                 TemplateFromFile.FileUploadButton(state, setState, dispatch)
             ]
         ]

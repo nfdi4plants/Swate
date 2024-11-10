@@ -1,7 +1,7 @@
 module MainComponents.SpreadsheetView.Generic
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 open Spreadsheet
 open Messages

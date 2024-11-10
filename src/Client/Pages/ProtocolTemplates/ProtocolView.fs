@@ -18,7 +18,7 @@ open Messages
 open Elmish
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ARCtrl
 
 type Templates =
@@ -28,15 +28,15 @@ type Templates =
             prop.onSubmit (fun e -> e.preventDefault())
             prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
             prop.children [
-                pageHeader "Templates"
+                Html.h5 "Templates"
 
                 // Box 1
-                Bulma.label "Add template from database."
+                Html.p "Add template from database."
 
                 TemplateFromDB.Main(model, dispatch)
 
                 // Box 2
-                Bulma.label "Add template(s) from file."
+                Html.p "Add template(s) from file."
 
                 TemplateFromFile.Main(model, dispatch)
             ]

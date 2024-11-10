@@ -1,7 +1,7 @@
 namespace MainComponents
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ARCtrl
 
 type EmptyTableElement =
@@ -10,40 +10,35 @@ type EmptyTableElement =
             prop.className "is-flex is-justify-content-center is-align-items-center"
             prop.style [style.height (length.perc 100)]
             prop.children [
-                Bulma.box [
-                    Bulma.content [
-                        prop.children [
-                            Html.h3 [
-                                prop.className "title"
-                                prop.text "New Table!"
-                            ]
-                            Bulma.field.div [
-                                prop.className "is-flex is-justify-content-space-between is-align-items-center gap-3"
-                                prop.children [
-                                    Html.text "Start from an existing template!"
-                                    Bulma.button.span [
-                                        prop.onClick (fun _ -> openTemplateWidget())
-                                        prop.children [
-                                            Bulma.icon [ 
-                                                Html.i [prop.className "fa-solid fa-circle-plus" ]
-                                                Html.i [prop.className "fa-solid fa-table" ]
-                                            ]
-                                        ]
+                Html.div [
+                    prop.className "border border-base-100 rounded p-5 shadow prose"
+                    prop.children [
+                        Html.h3 [
+                            prop.className "title"
+                            prop.text "New Table!"
+                        ]
+                        Html.div [
+                            prop.className "is-flex is-justify-content-space-between is-align-items-center gap-3"
+                            prop.children [
+                                Html.text "Start from an existing template!"
+                                Daisy.button.button [
+                                    prop.onClick (fun _ -> openTemplateWidget())
+                                    prop.children [
+                                        Html.i [prop.className "fa-solid fa-circle-plus" ]
+                                        Html.i [prop.className "fa-solid fa-table" ]
                                     ]
                                 ]
                             ]
-                            Bulma.field.div [
-                                prop.className "is-flex is-justify-content-space-between is-align-items-center gap-3"
-                                prop.children [
-                                    Html.text "Or start from scratch!"
-                                    Bulma.button.span [
-                                        prop.onClick (fun _ -> openBuildingBlockWidget())
-                                        prop.children [
-                                            Bulma.icon [ 
-                                                Html.i [prop.className "fa-solid fa-circle-plus" ]
-                                                Html.i [prop.className "fa-solid fa-table-columns" ]
-                                            ]
-                                        ]
+                        ]
+                        Html.div [
+                            prop.className "is-flex is-justify-content-space-between is-align-items-center gap-3"
+                            prop.children [
+                                Html.text "Or start from scratch!"
+                                Daisy.button.button [
+                                    prop.onClick (fun _ -> openBuildingBlockWidget())
+                                    prop.children [
+                                        Html.i [prop.className "fa-solid fa-circle-plus" ]
+                                        Html.i [prop.className "fa-solid fa-table-columns" ]
                                     ]
                                 ]
                             ]

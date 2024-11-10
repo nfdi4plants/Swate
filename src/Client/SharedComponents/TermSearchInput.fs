@@ -1,7 +1,7 @@
 namespace Components
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Browser.Types
 open ARCtrl
 open Shared
@@ -128,23 +128,8 @@ module TermSearchAux =
             ]
         ]
 
-        let searchIcon =
-            Bulma.icon [
-                Bulma.icon.isLeft
-                Bulma.icon.isSmall
-                prop.children [
-                    Html.i [prop.className "fa-solid fa-magnifying-glass"]
-                ]
-            ]
-
-        let verifiedIcon =
-            Bulma.icon [
-                Bulma.icon.isRight
-                Bulma.icon.isSmall
-                prop.children [
-                    Html.i [prop.className "fa-solid fa-check"]
-                ]
-            ]
+        let searchIcon = Html.i [prop.className "fa-solid fa-magnifying-glass"]
+        let verifiedIcon = Html.i [prop.className "fa-solid fa-check"]
 
         let termSelectItemMain (term: Term, show, setShow, setTerm, isDirectedSearchResult: bool) =
             Html.div [
@@ -190,15 +175,13 @@ module TermSearchAux =
             ]
 
         let termSelectItemMore (term: Term, show) =
-            Bulma.field.div [
+            Html.div [
                 prop.classes [
                     if not show then "is-hidden";
                     "term-select-item-more"
                 ]
                 prop.children [
-                    Bulma.table [
-                        Bulma.table.isFullWidth
-                        //prop.className "p-0"
+                    Daisy.table [
                         prop.children [
                             Html.tbody [
                                 Html.tr [
@@ -229,25 +212,18 @@ open Fable.Core.JsInterop
 
 type TermSearch =
 
-    static member ToggleSearchContainer (element: ReactElement, ref: IRefValue<HTMLElement option>, searchable: bool, searchableSetter: bool -> unit) =
-        Bulma.field.div [
-            prop.style [style.flexGrow 1; style.position.relative]
+    static member ToggleSearchButton (element: ReactElement, ref: IRefValue<HTMLElement option>, searchable: bool, searchableSetter: bool -> unit) =
+        Daisy.join [
             prop.ref ref
-            Bulma.field.hasAddons
             prop.children [
                 element
-                Bulma.control.p [
-                    prop.style [style.marginRight 0]
-                    prop.children [
-                        Bulma.button.a [
-                            prop.className "h-full"
-                            prop.style [style.borderWidth 0; style.borderRadius 0]
-                            if not searchable then Bulma.color.hasTextGreyLight
-                            Bulma.button.isInverted
-                            prop.onClick(fun _ -> searchableSetter (not searchable))
-                            prop.children [Bulma.icon [Html.i [prop.className "fa-solid fa-magnifying-glass"]]]
-                        ]
-                    ]
+                Daisy.button.a [
+                    join.item
+                    if not searchable then
+                        button.neutral
+                    prop.className "h-full join-item border-0"
+                    prop.onClick(fun _ -> searchableSetter (not searchable))
+                    prop.children [Html.i [prop.className "fa-solid fa-magnifying-glass"]]
                 ]
             ]
         ]
@@ -313,12 +289,12 @@ type TermSearch =
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
-        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isExpanded: bool, ?displayParent: bool, ?borderRadius: int, ?border: string, ?minWidth: Styles.ICssUnit)
+        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isjoin: bool, ?displayParent: bool, ?borderRadius: int, ?border: string, ?minWidth: Styles.ICssUnit)
         =
+        let isjoin = defaultArg isjoin false
         let searchableToggle = defaultArg searchableToggle false
         let autofocus = defaultArg autofocus false
         let displayParent = defaultArg displayParent true
-        let isExpanded = defaultArg isExpanded false
         let advancedSearchActive, setAdvancedSearchActive = React.useState(false)
         let fullwidth = defaultArg fullwidth false
         let loading, setLoading = React.useState(false)
@@ -362,19 +338,16 @@ type TermSearch =
         let registerChange(searchTest: string option) =
             let oa = searchTest |> Option.map (fun x -> OntologyAnnotation x)
             debouncel debounceStorage.current "SetterDebounce" 500 setLoading setter oa
-        Bulma.control.div [
-            if isExpanded then Bulma.control.isExpanded
+        Html.div [
+            if isjoin then join.item
             if size.IsSome then size.Value
-            if not searchableToggle then Bulma.control.hasIconsLeft
-            Bulma.control.hasIconsRight
             if not searchableToggle then prop.ref ref
             prop.style [
                 if fullwidth then style.flexGrow 1;
                 if minWidth.IsSome then style.minWidth minWidth.Value
             ]
-            if loading then Bulma.control.isLoading
             prop.children [
-                Bulma.input.text [
+                Daisy.input [
                     prop.autoFocus autofocus
                     prop.style [
                         if borderRadius.IsSome then style.borderRadius borderRadius.Value
@@ -440,9 +413,12 @@ type TermSearch =
                     prop.classes ["is-flex"]
                     prop.children [
                         if parent.IsSome && displayParent then
-                            Bulma.help [
-                                Html.span "Parent: "
-                                Html.span $"{parent.Value.NameText}, {parent.Value.TermAccessionShort}"
+                            Html.p [
+                                prop.className "text-sm"
+                                prop.children [
+                                    Html.span "Parent: "
+                                    Html.span $"{parent.Value.NameText}, {parent.Value.TermAccessionShort}"
+                                ]
                             ]
                         if advancedSearchDispatch.IsSome then
                             Components.AdvancedSearch.Main(advancedSearchActive, setAdvancedSearchActive, (fun t ->
@@ -461,7 +437,7 @@ type TermSearch =
         ]
         |> fun main ->
             if searchableToggle then
-                TermSearch.ToggleSearchContainer(main, ref, searchable, setSearchable)
+                TermSearch.ToggleSearchButton(main, ref, searchable, setSearchable)
             else
                 main
 
