@@ -78,6 +78,8 @@ module ARCtrlUtil =
 
 module ARCtrlExtensions =
 
+    open System
+
     type ArcFiles with
 
         /// <summary>
@@ -164,9 +166,10 @@ module ARCtrlExtensions =
                 let bodyRowRange = excelTable.getDataBodyRange()
 
                 let _ =
-                    excelTable.load(U2.Case2 (ResizeArray [|"name"|])) |> ignore
-                    bodyRowRange.load(U2.Case2 (ResizeArray [|"numberFormat"; "values";|])) |> ignore
-                    headerRange.load(U2.Case2 (ResizeArray [|"columnCount"; "columnIndex"; "rowIndex"; "values"; |]))
+                    excelTable.load(U2.Case2 (ResizeArray [| "name" |])) |> ignore
+                    headerRange.load(U2.Case2 (ResizeArray [| "values" |])) |> ignore
+                    bodyRowRange.load(U2.Case2 (ResizeArray [| "values" |])) |> ignore
+                    
 
                 return! context.sync().``then``(fun _ ->
                     let headers =
@@ -187,8 +190,8 @@ module ARCtrlExtensions =
                                 |> Option.defaultValue ""
                             )
                         )
-                    try 
-                        ArcTable.fromStringSeqs(excelTable.worksheet.name, headers, bodyRows) |> Result.Ok
+                    try
+                        ArcTable.fromStringSeqs(excelTable.name, headers, bodyRows) |> Result.Ok
                     with
                         | exn -> Result.Error exn
                 )
@@ -266,8 +269,8 @@ module ARCtrlExtensions =
                 let bodyRowRange = excelTable.getDataBodyRange()
 
                 let _ =
-                    headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-                    bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+                    headerRange.load(U2.Case2 (ResizeArray [| "values" |])) |> ignore
+                    bodyRowRange.load(U2.Case2 (ResizeArray [| "values" |])) |> ignore
 
                 do! context.sync()
 
@@ -333,10 +336,12 @@ open ARCtrlExtensions
 let tryGetPrevAnnotationTableName (context: RequestContext) =
     promise {
 
-        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
-        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|" tables" |]))
+        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
         let tables = context.workbook.tables
-        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "position"; "values"|]))
+        let _ =
+            activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[| "position" |])) |> ignore
+            tables.load(propertyNames=U2.Case2 (ResizeArray[| "items";"worksheet";"name"; "position"; "values" |]))
 
         let! prevTable = context.sync().``then``(fun _ ->
             /// Get all names of all tables in the whole workbook.
@@ -445,6 +450,7 @@ module AnnotationTable =
     /// </summary>
     /// <param name="tables"></param>
     let getAnnotationTables (tables: TableCollection) =
+
         tables.items
         |> Seq.toArray
         |> Array.filter (fun table ->
@@ -456,18 +462,19 @@ module AnnotationTable =
     /// <param name="context"></param>
     let tryGetActive (context: RequestContext) =
         promise {
-            let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+            let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
             let tables = context.workbook.tables
             let _ =
+                activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[| "position" |])) |> ignore
                 context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|])) |> ignore
                 tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "style"; "values"|]))
-
+            
             return! context.sync().``then``(fun _ ->
                 /// Get name of the table of currently active worksheet.
                 let activeTable =
                     tables.items
                     |> Seq.toArray
-                    |> Array.tryFind (fun table ->
+                    |> Array.tryFind (fun table ->                        
                         table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) && table.worksheet.position = activeWorksheet.position
                     )
                 activeTable
@@ -1589,9 +1596,11 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
             | None ->
                 //have to try to get the table without check in order to obtain an indexed error of the building block
                 let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
-                let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+                let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
                 let tables = context.workbook.tables
-                let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+                let _ =
+                    activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[| "position" |])) |> ignore
+                    tables.load(propertyNames=U2.Case2 (ResizeArray[| "items"; "worksheet"; "name"; "position"; "values" |]))
 
                 let! table = context.sync().``then``(fun _ ->
                     let activeWorksheetPosition = activeWorksheet.position
@@ -1685,27 +1694,22 @@ let updateSelectedBuildingBlocks (excelTable: Table) (arcTable: ArcTable) (prope
 /// with the correct value
 /// The later is not implemented yet
 /// </summary>
-let rectifyTermColumns () =
-    Excel.run(fun context ->
+let rectifyTermColumns context0 =
+    excelRunWith context0 <| fun context ->
         promise {
             let! excelTableRes = AnnotationTable.tryGetActive context
-
             //When there are messages, then there is an error and further processes can be skipped because the annotation table is not valid
             match excelTableRes with
             | None -> return [InteropLogging.NoActiveTableMsg]
             | Some excelTable ->
                 //Arctable enables a fast check for term and unit building blocks
                 let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
-
                 match arcTableRes with
                 | Result.Ok arcTable ->
                     let columns = arcTable.Columns
                     let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
-
                     do! context.sync().``then``(fun _ -> ())
-
                     let items = excelTable.columns.items
-
                     let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
                     let columns =
                         items
@@ -1719,13 +1723,10 @@ let rectifyTermColumns () =
                                 |> Array.choose (fun r -> if r.IsSome then Some (r.ToString()) else None)
                             )
                         )
-
                     let body = excelTable.getDataBodyRange()
-
                     let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
 
                     do! context.sync()
-
                     for i in 0..columns.Length-1 do
                         let column = columns.[i]
                         if Array.contains (column.[0].Trim()) termAndUnitHeaders then
@@ -1801,7 +1802,6 @@ let rectifyTermColumns () =
 
                 | Result.Error ex -> return [InteropLogging.Msg.create InteropLogging.Error ex.Message]
         }
-    )
 
 /// <summary>
 /// Try to get the values of top level meta data from excel worksheet
@@ -1841,9 +1841,9 @@ let parseToTopLevelMetadata<'T> identifier (parseToMetadata: string option seq s
 /// <param name="context"></param>
 let getExcelAnnotationTables (context: RequestContext) =
     promise {
-        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[| "tables" |]))
         let tables = context.workbook.tables
-        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[| "items"; "name" |]))
 
         let! annotationTables =
             context.sync().``then``(fun _ ->
@@ -2257,7 +2257,7 @@ type Main =
             promise {
                 let worksheets = context.workbook.worksheets
 
-                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[| "name" |]))
 
                 do! context.sync().``then``(fun _ -> ())
 
@@ -2333,29 +2333,37 @@ type Main =
     /// </summary>
     /// <param name="arcTable"></param>
     /// <param name="context0"></param>
-    static member createNewAnnotationTable(arcTable: ArcTable, ?context0) =
+    static member createNewAnnotationTable(arcTable: ArcTable, context0) =
+        Console.WriteLine("createNewAnnotationTable 100")
         excelRunWith context0 <| fun context ->
             promise {
+                Console.WriteLine("createNewAnnotationTable 0")
                 let worksheetName = arcTable.Name
                 //delete existing worksheet with the same name
+                Console.WriteLine("createNewAnnotationTable 1")
                 let worksheet0 = context.workbook.worksheets.getItemOrNullObject(worksheetName)
+                Console.WriteLine("createNewAnnotationTable 2")
                 worksheet0.delete()
-
-                // create new worksheet
-                let worksheet = context.workbook.worksheets.add(worksheetName)
+                Console.WriteLine("createNewAnnotationTable 3")
                 do! context.sync()
-
+                // create new worksheet
+                Console.WriteLine("createNewAnnotationTable 33")
+                let worksheet = context.workbook.worksheets.add(worksheetName)
+                Console.WriteLine("createNewAnnotationTable 34")
+                do! context.sync()
+                Console.WriteLine("createNewAnnotationTable 4")
                 let tableValues = arcTable.ToStringSeqs()
+                Console.WriteLine("createNewAnnotationTable 5")
                 let rowCount = tableValues.Count
                 let columnCount = tableValues |> Seq.map Seq.length |> Seq.max
                 let tableRange = worksheet.getRangeByIndexes(0, 0, rowCount, columnCount)
-
+                Console.WriteLine("createNewAnnotationTable 6")
                 let table = worksheet.tables.add(U2.Case1 tableRange, true)
-
+                Console.WriteLine("createNewAnnotationTable 7")
                 tableRange.values <- tableValues
                 table.name <- createNewTableName()
                 table.style <- TableStyleLight
-
+                Console.WriteLine("createNewAnnotationTable 8")
                 // Only activate the worksheet if this function is specifically called
                 if context0.IsNone then worksheet.activate()
 
@@ -2377,7 +2385,7 @@ type Main =
 
                 let tables = arcFiles.Tables()
                 for table in tables do
-                    do! Main.createNewAnnotationTable(table, context0=context).``then``(fun _ -> ())
+                    do! Main.createNewAnnotationTable(table, Some context).``then``(fun _ -> ())
 
                 updatedWorksheet.activate()
 
@@ -2389,10 +2397,9 @@ type Main =
     /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
     /// </summary>
     /// <param name="newColumn"></param>
-    static member addCompositeColumn (newColumn: CompositeColumn,(*newHeader: CompositeHeader, ?newValues: U2<CompositeCell, CompositeCell[]>,*) ?table: Excel.Table, ?context: RequestContext) =
-        excelRunWith context <| fun context ->
+    static member addCompositeColumn (newColumn: CompositeColumn,(*newHeader: CompositeHeader, ?newValues: U2<CompositeCell, CompositeCell[]>,*) context0: RequestContext option, ?table: Excel.Table) =
+        excelRunWith context0 <| fun context ->
             promise {
-
                 let! excelTable =
                     match table with
                     | Some table -> promise {return Some table}
@@ -2411,10 +2418,10 @@ type Main =
                             Array.create arcTable.RowCount newColumn.Cells.[0]
                         else
                             newColumn.Cells
-
+                    
                     arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
-                    let! _ = Main.createNewAnnotationTable(arcTable)
+                    let! _ = Main.createNewAnnotationTable(arcTable, Some context)
 
                     let! newTable = AnnotationTable.tryGetActive(context)
 

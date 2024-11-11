@@ -44,6 +44,7 @@ let createMatrixForTables (colCount: int) (rowCount: int) value =
     |] :> IList<IList<U3<bool,string,float>>>
 
 let inline excelRunWith<'A> (context: RequestContext option) (promise: RequestContext -> JS.Promise<'A>) =
+    log("context.IsSome", context.IsSome)
     match context with
     | Some ctx -> promise ctx
     | None -> Excel.run (fun ctx -> promise ctx)
