@@ -2345,7 +2345,6 @@ type Main =
                 Console.WriteLine("createNewAnnotationTable 2")
                 worksheet0.delete()
                 Console.WriteLine("createNewAnnotationTable 3")
-                do! context.sync()
                 // create new worksheet
                 Console.WriteLine("createNewAnnotationTable 33")
                 let worksheet = context.workbook.worksheets.add(worksheetName)
@@ -2421,7 +2420,7 @@ type Main =
                     
                     arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
-                    let! _ = Main.createNewAnnotationTable(arcTable, Some context)
+                    let! _ = Main.createNewAnnotationTable(arcTable, None)
 
                     let! newTable = AnnotationTable.tryGetActive(context)
 
