@@ -191,7 +191,7 @@ module ARCtrlExtensions =
                             )
                         )
                     try
-                        ArcTable.fromStringSeqs(excelTable.name, headers, bodyRows) |> Result.Ok
+                        ArcTable.fromStringSeqs(excelTable.worksheet.name, headers, bodyRows) |> Result.Ok
                     with
                         | exn -> Result.Error exn
                 )
@@ -450,7 +450,6 @@ module AnnotationTable =
     /// </summary>
     /// <param name="tables"></param>
     let getAnnotationTables (tables: TableCollection) =
-
         tables.items
         |> Seq.toArray
         |> Array.filter (fun table ->
