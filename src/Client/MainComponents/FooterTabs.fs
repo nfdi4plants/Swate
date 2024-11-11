@@ -37,20 +37,17 @@ module private TableContextMenu =
                 style.right 0
                 style.bottom 0
                 style.display.block
+                style.zIndex -1
             ]
         ]
         let button (name:string, icon: string, msg, props) = Html.li [
-            Daisy.button.button [
-                prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
+            Html.button [
                 prop.onClick msg
-                prop.className "py-1"
-                button.block
-                //button.sm
-                button.outline
+                prop.className "px-4 py-1 flex flex-row justify-between items-center h-8 min-h-8 gap-2 w-full transition-all hover:bg-base-200 cursor-pointer"
                 yield! props
                 prop.children [
-                    Html.i [prop.className icon]
                     Html.span name
+                    Html.i [prop.className icon]
                 ]
             ]
         ]
@@ -62,18 +59,20 @@ module private TableContextMenu =
             button ("Rename", "fa-solid fa-pen-to-square", funcs.Rename rmv, [])
         ]
         Html.div [
+            prop.className "bg-base-300"
             prop.style [
-                style.backgroundColor "white"
                 style.position.absolute
                 style.left mousex
                 style.top (mousey-40)
-                style.width 150
+                style.minWidth 150
                 style.zIndex 40 // to overlap navbar
-                style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base)
             ]
             prop.children [
                 rmv_element
-                Html.ul buttonList
+                Html.ul [
+                    prop.className "z-50"
+                    prop.children buttonList
+                ]
             ]
         ]
 
@@ -257,7 +256,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, int e.pageY
+            let mousePosition = int e.pageX, int e.pageY - 50
             let deleteMsg rmv = fun e -> rmv e; Spreadsheet.RemoveTable index |> Messages.SpreadsheetMsg |> dispatch
             let renameMsg rmv = fun e -> rmv e; {state with IsEditable = true} |> setState
             let funcs : TableContextMenu.ContextFunctions = {
@@ -294,7 +293,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                     prop.defaultValue table.Name
                 ]
             else
-                Html.a [
+                React.fragment [
                     Html.i [prop.className "fa-solid fa-table"]
                     Html.text table.Name
                 ]
@@ -313,10 +312,8 @@ let MainMetadata(model: Model, dispatch: Messages.Msg -> unit) =
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
-            Html.a  [
-                Html.i [prop.className "fa-solid fa-circle-info"]
-                Html.text model.SpreadsheetModel.FileType
-            ]
+            Html.i [prop.className "fa-solid fa-circle-info"]
+            Html.text model.SpreadsheetModel.FileType
         ]
     ]
 
@@ -344,10 +341,8 @@ let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
         )
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
-            Html.a [
-                Html.i [prop.className "fa-solid fa-map"]
-                Html.text "Data Map"
-            ]
+            Html.i [prop.className "fa-solid fa-map"]
+            Html.text "Data Map"
         ]
     ]
 
@@ -368,7 +363,7 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, int e.pageY
+            let mousePosition = int e.pageX, (int e.pageY - 50)
             let addTableMsg rmv = fun e -> rmv e; SpreadsheetInterface.CreateAnnotationTable false |> Messages.InterfaceMsg |> dispatch
             let addDatamapMsg rmv = fun e -> rmv e; SpreadsheetInterface.UpdateDatamap (DataMap.init() |> Some) |> Messages.InterfaceMsg |> dispatch
             let funcs : PlusContextMenu.ContextFunctions = {
@@ -381,12 +376,7 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
         )
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
-            Html.a [
-                prop.style [style.height.inheritFromParent; style.pointerEvents.none]
-                prop.children [
-                    Html.i [prop.className "fa-solid fa-plus"]
-                ]
-            ]
+            Html.i [prop.className "fa-solid fa-plus"]
         ]
     ]
 
@@ -400,11 +390,6 @@ let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
         prop.onClick (fun e -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer; style.marginLeft length.auto]
         prop.children [
-            Html.a [
-                prop.style [style.height.inheritFromParent; style.pointerEvents.none]
-                prop.children [
-                    Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
-                ]
-            ]
+            Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
         ]
     ]

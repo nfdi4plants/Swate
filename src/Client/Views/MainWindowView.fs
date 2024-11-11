@@ -35,26 +35,20 @@ let private SpreadsheetSelectionFooter (model: Model) dispatch =
         ]
         prop.children [
             Html.div [
+                prop.className "tabs tabs-lifted w-full flex flex-row items-center pt-1 bg-secondary *:!border-b-0 *:gap-1"
                 prop.children [
-                    Daisy.tabs [
-                        tabs.boxed
-                        prop.children [
-                            Html.ul [
-                                Daisy.tab  [
-                                    prop.style [style.width (length.px 20); style.custom ("order", -2)]
-                                ]
-                                MainComponents.FooterTabs.MainMetadata (model, dispatch)
-                                if model.SpreadsheetModel.HasDataMap() then
-                                    MainComponents.FooterTabs.MainDataMap (model, dispatch)
-                                for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
-                                    MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
-                                if model.SpreadsheetModel.CanHaveTables() then
-                                    MainComponents.FooterTabs.MainPlus (model, dispatch)
-                                if model.SpreadsheetModel.TableViewIsActive() then
-                                    MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
-                            ]
-                        ]
+                    Daisy.tab  [
+                        prop.style [style.width (length.px 20); style.custom ("order", -2)]
                     ]
+                    MainComponents.FooterTabs.MainMetadata (model, dispatch)
+                    if model.SpreadsheetModel.HasDataMap() then
+                        MainComponents.FooterTabs.MainDataMap (model, dispatch)
+                    for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
+                        MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
+                    if model.SpreadsheetModel.CanHaveTables() then
+                        MainComponents.FooterTabs.MainPlus (model, dispatch)
+                    if model.SpreadsheetModel.TableViewIsActive() then
+                        MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
                 ]
             ]
         ]

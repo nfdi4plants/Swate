@@ -1,44 +1,23 @@
-module Components.QuickAccessButton
+namespace Components
 
 open Feliz
+open Browser.Types
 open Feliz.DaisyUI
 
-type QuickAccessButton = {
-    Description : string
-    FaList      : ReactElement list
-    Msg         : Browser.Types.MouseEvent -> unit
-    IsActive    : bool
-    ButtonProps : IReactProperty list
-} with
-    static member create(description, faList, msg, ?isActive: bool, ?buttonProps : IReactProperty list) = {
-        Description = description
-        FaList      = faList
-        Msg         = msg
-        IsActive    = Option.defaultValue true isActive
-        ButtonProps = Option.defaultValue List.empty buttonProps
-    }
-    member this.toReactElement() =
-        let isDisabled = not this.IsActive
-        Html.div [
-            prop.title this.Description
-            prop.style [
-                style.padding 0; style.minWidth(length.px 45)
-                style.display.flex; style.alignItems.center
-                if isDisabled then
-                    style.cursor.notAllowed
+type QuickAccessButton =
+    static member Main(desc:string, children: ReactElement, onclick: Event -> unit, ?isDisabled, ?props, ?classes: string) =
+        let isDisabled = defaultArg isDisabled false
+        Html.button [
+            prop.className [
+                "px-3 h-8 min-h-8 text-primary inline-flex justify-center items-center transition-all hover:brightness-110 cursor-pointer disabled:cursor-not-allowed disabled:text-gray-500";
+                if classes.IsSome then classes.Value
             ]
+            prop.tabIndex (if isDisabled then -1 else 0)
+            prop.title desc
+            prop.disabled isDisabled
+            prop.onClick onclick
+            if props.IsSome then yield! props.Value
             prop.children [
-                Daisy.button.a [
-                    prop.tabIndex (if isDisabled then -1 else 0)
-                    prop.className "myNavbarButton"
-                    yield! this.ButtonProps
-                    prop.disabled isDisabled
-                    prop.onClick this.Msg
-                    prop.children [
-                        Html.div [
-                            prop.children this.FaList
-                        ]
-                    ]
-                ]
+                children
             ]
         ]

@@ -13,25 +13,17 @@ module.exports = {
                     primary: "#1FC2A7",
                     secondary: "#2D3E50",
                     accent: "#B4CE82",
-                    "--xlsx": "0.41 0.55 0.29",
                 },
                 dark: {
                     ...require("daisyui/src/theming/themes")["dark"],
                     primary: "#1FC2A7",
                     secondary: "#2D3E50",
                     accent: "#B4CE82",
-                    "--xlsx": "0.41 0.55 0.29",
                 }
             },
         ],
     },
     theme: {
-        extend: {
-            colors: {
-              "xlsx": "oklch(var(--primary-muted) / <alpha-value>)",
-              "xlsx-content": "black",
-            },
-        },
         container: {
             center: true,
             padding: {

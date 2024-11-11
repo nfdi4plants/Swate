@@ -103,11 +103,14 @@ module private Helper =
             button.ghost
             button.sm
             prop.className "justify-start"
-            prop.onClick onclick
+            prop.onClick (fun e ->
+                log "inner"
+                onclick e
+            )
             prop.text txt
         ]]
 
-    let createNewTable (dispatch: Messages.Msg -> unit) =
+    let createNewFile (dispatch: Messages.Msg -> unit) =
 
         Daisy.dropdown [
             prop.children [
@@ -117,6 +120,7 @@ module private Helper =
                     prop.text "New File"
                 ]
                 Daisy.dropdownContent [
+                    prop.tabIndex 0
                     prop.className "bg-base-300 [&_a]:rounded-none shadow"
                     prop.children [
                         Html.ul [
@@ -136,8 +140,10 @@ module private Helper =
                                 |> dispatch
                             )
                             createNewTableItem("Assay", fun _ ->
+                                    log "Test"
                                     let a = ArcAssay.init("New Assay")
                                     let _ = a.InitTable("New Assay Table")
+                                    log "New Assay!"
                                     ArcFiles.Assay a
                                     |> UpdateArcFile
                                     |> InterfaceMsg
@@ -192,7 +198,7 @@ type NoFileElement =
                 Html.div [
                     prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
-                        Helper.createNewTable args.dispatch
+                        Helper.createNewFile args.dispatch
                         Helper.uploadNewTable args.dispatch
                     ]
                 ]

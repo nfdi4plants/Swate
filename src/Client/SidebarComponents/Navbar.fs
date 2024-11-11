@@ -8,12 +8,11 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
-open Components.QuickAccessButton
+open Components
 open ARCtrl
 open ARCtrl.Spreadsheet
 open Shared
 open Components.Metadata
-open Components
 
 type private NavbarState = {
     BurgerActive: bool
@@ -211,45 +210,47 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
 
 let private ShortCutIconList toggleMetdadataModal model (dispatch: Messages.Msg -> unit) =
     [
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Create Metadata",
-            [
+            React.fragment [
                 Html.i [prop.className "fa-solid fa-plus"]
                 Html.i [prop.className "fa-solid fa-info"]
             ],
             toggleMetdadataModal
         )
 
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Create Annotation Table",
-            [
+            React.fragment [
                 Html.i [prop.className "fa-solid fa-plus"]
                 Html.i [prop.className "fa-solid fa-table"]
             ],
             (fun e ->
                 e.preventDefault()
+                let e = e :?> Browser.Types.MouseEvent
                 let ctrl = e.metaKey || e.ctrlKey
                 SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
             )
         )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
-            QuickAccessButton.create(
+            QuickAccessButton.Main(
                 "Autoformat Table",
-                [
+                React.fragment [
                     Html.i [prop.className "fa-solid fa-rotate"]
                 ],
                 (fun e ->
                     e.preventDefault()
+                    let e = e :?> Browser.Types.MouseEvent
                     let ctrl = not (e.metaKey || e.ctrlKey)
                     OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
                 )
             )
         | _ ->
             ()
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Rectify Ontology Terms",
-            [
+            React.fragment [
                 Html.i [prop.className "fa-solid fa-spell-check"]
                 Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
                 Html.i [prop.className "fa-solid fa-pen"]
@@ -258,9 +259,9 @@ let private ShortCutIconList toggleMetdadataModal model (dispatch: Messages.Msg 
                 SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch
             )
         )
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Remove Building Block",
-            [
+            React.fragment [
                 Html.i [prop.className "fa-solid fa-minus pr-1"]
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
@@ -276,7 +277,6 @@ let private ShortCutIconList toggleMetdadataModal model (dispatch: Messages.Msg 
         //    (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
         //)
     ]
-    |> List.map (fun x -> x.toReactElement())
     |> React.fragment
 
 
@@ -365,7 +365,7 @@ let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) (sidebarsi
                                 let path = if model.PageState.IsExpert then "_e" else ""
                                 Html.img [
                                     prop.style [style.maxHeight(length.perc 100); style.width 100]
-                                    prop.src @$"assets\Swate_logo_for_excel{path}.svg"
+                                    prop.src @$"assets/Swate_logo_for_excel{path}.svg"
                                 ]
                                 |> prop.children
                             ]

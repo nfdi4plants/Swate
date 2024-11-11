@@ -38,7 +38,7 @@ let View (model : Model) (dispatch : Msg -> unit) =
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
         Html.div [
             prop.id "ClientView"
-            prop.className "flex w-full h-full overflow-auto"
+            prop.className "flex size-full overflow-auto"
             prop.children [
                 match model.PersistentStorageState.Host with
                 | Some Swatehost.Excel ->
