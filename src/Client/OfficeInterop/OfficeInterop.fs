@@ -1921,9 +1921,8 @@ let private updateWorkSheet (context: RequestContext) (worksheetName: string) (s
 
         do! context.sync()
 
-        let range = worksheet.getUsedRange true
+        let range = worksheet.getUsedRange true        
         let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
-
         do! context.sync()
 
         range.values <- null
@@ -2250,9 +2249,9 @@ type Main =
     /// <summary>
     /// Reads all excel information and returns ArcFiles object, with metadata and tables.
     /// </summary>
-    static member tryParseToArcFile (?getTables) =
+    static member tryParseToArcFile (?getTables, ?context0) =
         let getTables = defaultArg getTables true
-        Excel.run(fun context ->
+        excelRunWith context0 <| fun context ->
             promise {
                 let worksheets = context.workbook.worksheets
 
@@ -2325,48 +2324,33 @@ type Main =
                     
                 | _ -> return Result.Error [InteropLogging.Msg.create InteropLogging.Error $"No top level metadata sheet is available that determines the type of data!"]
             }
-        )
 
     /// <summary>
     /// Create a new annotation table based on an arcTable 
     /// </summary>
     /// <param name="arcTable"></param>
     /// <param name="context0"></param>
-    static member createNewAnnotationTable(arcTable: ArcTable, context0) =
-        Console.WriteLine("createNewAnnotationTable 100")
+    static member createNewAnnotationTable(arcTable: ArcTable, ?context0) =
         excelRunWith context0 <| fun context ->
             promise {
-                Console.WriteLine("createNewAnnotationTable 0")
                 let worksheetName = arcTable.Name
                 //delete existing worksheet with the same name
-                Console.WriteLine("createNewAnnotationTable 1")
                 let worksheet0 = context.workbook.worksheets.getItemOrNullObject(worksheetName)
-                Console.WriteLine("createNewAnnotationTable 2")
                 worksheet0.delete()
-                Console.WriteLine("createNewAnnotationTable 3")
                 // create new worksheet
-                Console.WriteLine("createNewAnnotationTable 33")
                 let worksheet = context.workbook.worksheets.add(worksheetName)
-                Console.WriteLine("createNewAnnotationTable 34")
                 do! context.sync()
-                Console.WriteLine("createNewAnnotationTable 4")
                 let tableValues = arcTable.ToStringSeqs()
-                Console.WriteLine("createNewAnnotationTable 5")
                 let rowCount = tableValues.Count
                 let columnCount = tableValues |> Seq.map Seq.length |> Seq.max
                 let tableRange = worksheet.getRangeByIndexes(0, 0, rowCount, columnCount)
-                Console.WriteLine("createNewAnnotationTable 6")
                 let table = worksheet.tables.add(U2.Case1 tableRange, true)
-                Console.WriteLine("createNewAnnotationTable 7")
                 tableRange.values <- tableValues
                 table.name <- createNewTableName()
                 table.style <- TableStyleLight
-                Console.WriteLine("createNewAnnotationTable 8")
                 // Only activate the worksheet if this function is specifically called
                 if context0.IsNone then worksheet.activate()
-
                 do! context.sync()
-
                 return worksheet, table
             }
 
@@ -2374,28 +2358,23 @@ type Main =
     /// This function deletes all existing arc tables in the excel file and metadata sheets, and writes a new ArcFile to excel
     /// </summary>
     /// <param name="arcFiles"></param>
-    static member updateArcFile (arcFiles: ArcFiles) =
-        Excel.run(fun context ->
+    static member updateArcFile (arcFiles: ArcFiles, ?context0) =
+        excelRunWith context0 <| fun context ->
             promise {
                 let worksheetName, seqOfSeqs = arcFiles.MetadataToExcelStringValues()
-
                 let! updatedWorksheet = updateWorkSheet context worksheetName seqOfSeqs
-
                 let tables = arcFiles.Tables()
                 for table in tables do
-                    do! Main.createNewAnnotationTable(table, Some context).``then``(fun _ -> ())
-
+                    do! Main.createNewAnnotationTable(table, context).``then``(fun _ -> ())
                 updatedWorksheet.activate()
-
                 return [InteropLogging.Msg.create InteropLogging.Info $"Replaced existing Swate information! Added {tables.TableCount} tables!"]
             }
-        )
 
     /// <summary>
     /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
     /// </summary>
     /// <param name="newColumn"></param>
-    static member addCompositeColumn (newColumn: CompositeColumn,(*newHeader: CompositeHeader, ?newValues: U2<CompositeCell, CompositeCell[]>,*) context0: RequestContext option, ?table: Excel.Table) =
+    static member addCompositeColumn (newColumn: CompositeColumn,(*newHeader: CompositeHeader, ?newValues: U2<CompositeCell, CompositeCell[]>,*) ?table: Excel.Table, ?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! excelTable =
@@ -2419,7 +2398,7 @@ type Main =
                     
                     arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
-                    let! _ = Main.createNewAnnotationTable(arcTable, None)
+                    let! _ = Main.createNewAnnotationTable(arcTable)
 
                     let! newTable = AnnotationTable.tryGetActive(context)
 
