@@ -10,10 +10,9 @@ open Components.Forms
 [<ReactComponent>]
 let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit) =
     Generic.Section [
-        Generic.BoxedField
-            (Some "Assay Metadata")
-            None
-            [
+        Generic.BoxedField(
+            "Assay Metadata",
+            content = [
                 FormComponents.TextInput (
                     assay.Identifier,
                     (fun v ->
@@ -63,7 +62,8 @@ let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay ->
                     "Comments"
                 )
             ]
-        Datamap.DatamapConfig.Main(
+        )
+        Datamap.Main(
             assay.DataMap,
             fun dataMap ->
                 //logw "HARDCODED DTM EXTENSION!"

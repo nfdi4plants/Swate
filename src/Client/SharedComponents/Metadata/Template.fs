@@ -9,10 +9,9 @@ open Components.Forms
 [<ReactComponent>]
 let Main(template: Template, setTemplate: Template -> unit) =
     Generic.Section [
-        Generic.BoxedField
-            (Some "Template Metadata")
-            None
-            [
+        Generic.BoxedField(
+            "Template Metadata",
+            content = [
                 FormComponents.GUIDInput (
                     template.Id,
                     (fun guid ->
@@ -85,4 +84,5 @@ let Main(template: Template, setTemplate: Template -> unit) =
                     "Authors"
                 )
             ]
+        )
     ]

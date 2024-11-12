@@ -140,7 +140,10 @@ module private Helper =
     let addButton (clickEvent: MouseEvent -> unit) =
         Daisy.button.button [
             prop.text "+"
+            button.wide
             prop.onClick clickEvent
+            button.ghost
+            prop.className "text-accent"
         ]
 
     let deleteButton (clickEvent: MouseEvent -> unit) =
@@ -157,22 +160,23 @@ module private Helper =
 
     let readOnlyFormElement(v: string option, label: string) =
         let v = defaultArg v "-"
-        Html.div [
-            prop.className "is-flex is-flex-direction-column is-flex-grow-1"
+        Daisy.formControl [
             prop.children [
                 Daisy.label [
                     Daisy.labelText label
-                    Daisy.input [
-                        prop.readOnly true
-                        prop.valueOrDefault v
-                    ]
+                ]
+                Daisy.input [
+                    input.bordered
+                    prop.disabled true
+                    prop.readOnly true
+                    prop.valueOrDefault v
                 ]
             ]
         ]
 
     let cardFormGroup (content: ReactElement list) =
         Html.div [
-            prop.className "grid"
+            prop.className "grid @md/main:grid-cols-2 @xl/main:grid-flow-col gap-4 not-prose"
             prop.children content
         ]
 
@@ -194,11 +198,12 @@ module private Helper =
                         readOnlyFormElement(person.Affiliation, "Affiliation")
                     ]
                     Html.div [
-                        prop.className "is-flex is-justify-content-flex-end"
+                        prop.className "flex justify-end gap-4"
                         prop.style [style.gap (length.rem 1)]
                         prop.children [
                             Daisy.button.button [
                                 prop.text "back"
+                                button.outline
                                 prop.onClick back
                             ]
                             Daisy.button.button [
@@ -256,11 +261,14 @@ module private Helper =
             prop.children [
                 Daisy.modalBackdrop [prop.onClick back]
                 Daisy.modalBox.div [
-                    Daisy.alert [
-                        alert.error
-                        prop.children [
-                            Components.DeleteButton(props=[|prop.onClick back|])
-                            Html.div error.Message
+                    prop.className "bg-transparent p-0 border-0"
+                    prop.children [
+                        Daisy.alert [
+                            alert.error
+                            prop.children [
+                                Components.DeleteButton(props=[|prop.onClick back|])
+                                Html.div error.Message
+                            ]
                         ]
                     ]
                 ]
@@ -342,58 +350,62 @@ type FormComponents =
                 OrderId.current <- System.Guid.NewGuid()
             ()
         Html.div [
-            if label.IsSome then Daisy.label [Daisy.labelText label.Value]
-            DndKit.DndContext(
-                sensors = sensors,
-                onDragEnd = handleDragEnd,
-                collisionDetection = DndKit.closestCenter,
-                children = [
-                    DndKit.SortableContext(
-                        items = guids,
-                        strategy = DndKit.verticalListSortingStrategy,
-                        children = ResizeArray [
-                            Html.div [
-                                prop.className "space-y-2"
-                                prop.children [
-                                    for i in 0 .. (inputs.Count-1) do
-                                        let item = inputs.[i]
-                                        let id = mkId i
-                                        FormComponents.InputSequenceElement(
-                                            id,
-                                            id,
-                                            (
-                                                inputComponent(
-                                                    item,
-                                                    (fun v ->
-                                                        inputs.[i] <- v
-                                                        inputs |> setter
-                                                    ),
-                                                    (fun _ ->
-                                                        inputs.RemoveAt i
-                                                        inputs |> setter
+            prop.children [
+                if label.IsSome then
+                    Generic.FieldTitle label.Value
+                DndKit.DndContext(
+                    sensors = sensors,
+                    onDragEnd = handleDragEnd,
+                    collisionDetection = DndKit.closestCenter,
+                    children = [
+                        DndKit.SortableContext(
+                            items = guids,
+                            strategy = DndKit.verticalListSortingStrategy,
+                            children = ResizeArray [
+                                Html.div [
+                                    prop.className "space-y-2"
+                                    prop.children [
+                                        for i in 0 .. (inputs.Count-1) do
+                                            let item = inputs.[i]
+                                            let id = mkId i
+                                            FormComponents.InputSequenceElement(
+                                                id,
+                                                id,
+                                                (
+                                                    inputComponent(
+                                                        item,
+                                                        (fun v ->
+                                                            inputs.[i] <- v
+                                                            inputs |> setter
+                                                        ),
+                                                        (fun _ ->
+                                                            inputs.RemoveAt i
+                                                            inputs |> setter
+                                                        )
                                                     )
                                                 )
                                             )
-                                        )
+                                    ]
                                 ]
                             ]
-                        ]
-                    )
-                ]
-            )
-            Html.div [
-                prop.className "flex justify-center w-full mt-2"
-                prop.children [
-                    Helper.addButton (fun _ ->
-                        inputs.Add (constructor())
-                        inputs |> setter
-                    )
+                        )
+                    ]
+                )
+                Html.div [
+                    prop.className "flex justify-center w-full mt-2"
+                    prop.children [
+                        Helper.addButton (fun _ ->
+                            inputs.Add (constructor())
+                            inputs |> setter
+                        )
+                    ]
                 ]
             ]
         ]
 
     [<ReactComponent>]
-    static member TextInput(value: string, setValue: string -> unit, ?label: string, ?validator: {| fn: string -> bool; msg: string |}, ?placeholder: string, ?isarea: bool) =
+    static member TextInput(value: string, setValue: string -> unit, ?label: string, ?validator: {| fn: string -> bool; msg: string |}, ?placeholder: string, ?isarea: bool, ?isJoin) =
+        let isJoin = defaultArg isJoin false
         let loading, setLoading = React.useState(false)
         let isValid, setIsValid = React.useState(true)
         let ref = React.useInputRef()
@@ -424,16 +436,23 @@ type FormComponents =
                     debounceSetter e
         )
         Html.div [
-            prop.className "grow"
+            prop.className "grow not-prose"
             prop.children [
-                if label.IsSome then Html.h4 label.Value
+                if label.IsSome then Generic.FieldTitle label.Value
                 Daisy.label [
-                    prop.className "input input-bordered flex items-center gap-2"
+                    prop.className [
+                        if isarea.IsSome && isarea.Value then
+                            "textarea textarea-bordered"
+                        else
+                            "input input-bordered"
+                        "flex items-center gap-2"
+                        if isJoin then "join-item"
+                    ]
                     prop.children [
                         match isarea with
                         | Some true ->
-                            Html.textarea [
-                                prop.className "grow"
+                            Daisy.textarea [
+                                prop.className "grow ghost"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
                                 prop.onChange onChange
@@ -466,7 +485,7 @@ type FormComponents =
         Html.div [
             prop.className "space-y-2"
             prop.children [
-                if label.IsSome then Html.h4 label.Value
+                if label.IsSome then Generic.FieldTitle label.Value
                 Html.div [
                     prop.ref portal
                     prop.className "w-full flex gap-2 relative"
@@ -478,19 +497,7 @@ type FormComponents =
                             ?portalTermSelectArea=portal.current,
                             ?parent=parent
                         )
-                        Html.label [
-                            prop.className "btn btn-square swap swap-rotate grow-0"
-                            prop.onClick (fun e -> e.preventDefault(); not isExtended |> setIsExtended)
-                            prop.children [
-                                Html.input [prop.type'.checkbox; prop.isChecked isExtended]
-                                Html.i [
-                                    prop.className "swap-off fa-solid fa-chevron-down"
-                                ]
-                                Html.i [
-                                    prop.className "swap-on fa-solid fa-x"
-                                ]
-                            ]
-                        ]
+                        Components.CollapseButton(isExtended, setIsExtended)
                         if rmv.IsSome then
                             Helper.deleteButton rmv.Value
                     ]
@@ -537,29 +544,31 @@ type FormComponents =
         let state, setState = React.useState(API.Request<Person>.Idle)
         let resetState = fun _ -> setState API.Request.Idle
         Html.div [
-            prop.className "is-flex-grow-1"
+            prop.className "grow cursor-default"
             prop.children [
-                if label.IsSome then Daisy.label [Daisy.labelText label.Value]
+                match state with
+                | API.Request.Ok p -> Helper.personModal (p, (fun _ -> searchsetter p; resetState()), resetState)
+                | API.Request.Error e -> Helper.errorModal(e, resetState)
+                | API.Request.Loading -> Modals.Loading.Modal(rmv=resetState)
+                | _ -> Html.none
+                if label.IsSome then Generic.FieldTitle label.Value
                 Daisy.join [
+                    prop.className "w-full"
                     prop.children [
-                        //if state.IsSome || error.IsSome then
-                        match state with
-                        | API.Request.Ok p -> Helper.personModal (p, (fun _ -> searchsetter p; resetState()), resetState)
-                        | API.Request.Error e -> Helper.errorModal(e, resetState)
-                        | API.Request.Loading -> Modals.Loading.loadingModal
-                        | _ -> Html.none
                         FormComponents.TextInput(
                             orcid,
                             doisetter,
-                            placeholder="xxxx-xxxx-xxxx-xxxx"
+                            placeholder="xxxx-xxxx-xxxx-xxxx",
+                            isJoin=true
                         )
                         Daisy.button.button [
                             join.item
                             button.info
                             prop.text "Search"
                             prop.onClick (fun _ ->
-                                //API.requestByORCID ("0000-0002-8510-6810") |> Promise.start
                                 setState API.Request.Loading
+                                // setState <| API.Request.Error (new Exception("Not implemented"))
+                                // setState <| (API.Request.Ok (Person.create(orcid=orcid,firstName="John",lastName="Doe")))
                                 API.start
                                     API.requestByORCID
                                     orcid
@@ -606,61 +615,50 @@ type FormComponents =
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
-        Daisy.collapse [
-            prop.className "grow"
-            collapse.plus
-            prop.children [
-                Html.input [prop.type'.checkbox]
-                Daisy.collapseTitle [
-                    Html.div [
-                        Html.h5 nameStr
-                        Html.p [prop.text orcid; prop.className "text-sm"]
-                    ]
-                    Html.div [
-                        prop.style [style.custom("marginLeft", "auto")]
-                        prop.text (countFilledFieldsString input)
-                    ]
-                ]
-                Daisy.collapseContent [
-                    Helper.cardFormGroup [
-                        createPersonFieldTextInput(input.FirstName, "First Name", fun s -> input.FirstName <- s)
-                        createPersonFieldTextInput(input.LastName, "Last Name", fun s -> input.LastName <- s)
-                    ]
-                    Helper.cardFormGroup [
-                        createPersonFieldTextInput(input.MidInitials, "Mid Initials", fun s -> input.MidInitials <- s)
-                        FormComponents.PersonRequestInput(
-                            input.ORCID,
-                            (fun s ->
-                                let s = if s = "" then None else Some s
-                                input.ORCID <- s
-                                input |> setter),
-                                (fun s -> setter s),
-                                "ORCID"
-                        )
-                    ]
-                    Helper.cardFormGroup [
-                        createPersonFieldTextInput(input.Affiliation, "Affiliation", fun s -> input.Affiliation <- s)
-                        createPersonFieldTextInput(input.Address, "Address", fun s -> input.Address <- s)
-                    ]
-                    Helper.cardFormGroup [
-                        createPersonFieldTextInput(input.EMail, "Email", fun s -> input.EMail <- s)
-                        createPersonFieldTextInput(input.Phone, "Phone", fun s -> input.Phone <- s)
-                        createPersonFieldTextInput(input.Fax, "Fax", fun s -> input.Fax <- s)
-                    ]
-                    FormComponents.OntologyAnnotationsInput(
-                        input.Roles,
-                        (fun oas ->
-                            input.Roles <- oas
-                            input |> setter
-                        ),
-                        "Roles",
-                        parent=Shared.TermCollection.PersonRoleWithinExperiment
-                    )
-                    if rmv.IsSome then
-                        Helper.deleteButton rmv.Value
-                ]
+        Generic.Collapse
+            // title
+            [
+                Generic.CollapseTitle(nameStr, orcid, countFilledFieldsString input)
             ]
-        ]
+            // content
+            [
+                Helper.cardFormGroup [
+                    createPersonFieldTextInput(input.FirstName, "First Name", fun s -> input.FirstName <- s)
+                    createPersonFieldTextInput(input.LastName, "Last Name", fun s -> input.LastName <- s)
+                ]
+                Helper.cardFormGroup [
+                    createPersonFieldTextInput(input.MidInitials, "Mid Initials", fun s -> input.MidInitials <- s)
+                    FormComponents.PersonRequestInput(
+                        input.ORCID,
+                        (fun s ->
+                            let s = if s = "" then None else Some s
+                            input.ORCID <- s
+                            input |> setter),
+                            (fun s -> setter s),
+                            "ORCID"
+                    )
+                ]
+                Helper.cardFormGroup [
+                    createPersonFieldTextInput(input.Affiliation, "Affiliation", fun s -> input.Affiliation <- s)
+                    createPersonFieldTextInput(input.Address, "Address", fun s -> input.Address <- s)
+                ]
+                Helper.cardFormGroup [
+                    createPersonFieldTextInput(input.EMail, "Email", fun s -> input.EMail <- s)
+                    createPersonFieldTextInput(input.Phone, "Phone", fun s -> input.Phone <- s)
+                    createPersonFieldTextInput(input.Fax, "Fax", fun s -> input.Fax <- s)
+                ]
+                FormComponents.OntologyAnnotationsInput(
+                    input.Roles,
+                    (fun oas ->
+                        input.Roles <- oas
+                        input |> setter
+                    ),
+                    "Roles",
+                    parent=Shared.TermCollection.PersonRoleWithinExperiment
+                )
+                if rmv.IsSome then
+                    Helper.deleteButton rmv.Value
+            ]
 
     static member PersonsInput (persons: ResizeArray<Person>, setter: ResizeArray<Person> -> unit, ?label: string) =
         FormComponents.InputSequence(
@@ -672,7 +670,7 @@ type FormComponents =
         )
 
     [<ReactComponent>]
-    static member DateTimeInput (input: string, setter: string -> unit, ?label: string) =
+    static member DateTimeInput (input_: string, setter: string -> unit, ?label: string) =
         let loading, setLoading = React.useState(false)
         let ref = React.useInputRef()
         let debounceSetter = React.useMemo(
@@ -684,9 +682,9 @@ type FormComponents =
             (fun () ->
                 if ref.current.IsSome then
                     setLoading false
-                    ref.current.Value.value <- input
+                    ref.current.Value.value <- input_
             ),
-            [|box input|]
+            [|box input_|]
         )
         let onChange = React.useMemo(fun () ->
             fun (e: string) ->
@@ -696,8 +694,9 @@ type FormComponents =
         Html.div [
             prop.className "grow"
             prop.children [
-                if label.IsSome then Daisy.label [Daisy.labelText label.Value]
-                Html.input [
+                if label.IsSome then Generic.FieldTitle label.Value
+                Daisy.input [
+                    input.bordered
                     prop.type'.dateTimeLocal
                     prop.ref ref
                     prop.onChange(fun (e: System.DateTime) ->
@@ -735,31 +734,37 @@ type FormComponents =
         let state, setState = React.useState(API.Request<Publication>.Idle)
         let resetState = fun _ -> setState API.Request.Idle
         Html.div [
-            prop.className "flex grow"
+            prop.className "grow"
             prop.children [
-                if label.IsSome then Daisy.label [Daisy.labelText label.Value]
+                if label.IsSome then Generic.FieldTitle label.Value
                 //if state.IsSome || error.IsSome then
                 match state with
                 | API.Request.Ok pub -> Helper.publicationModal(pub,(fun _ -> searchsetter pub; resetState()), resetState)
                 | API.Request.Error e -> Helper.errorModal(e, resetState)
-                | API.Request.Loading -> Modals.Loading.loadingModal
+                | API.Request.Loading -> Modals.Loading.Modal(rmv=resetState)
                 | _ -> Html.none
-                FormComponents.TextInput(
-                    id,
-                    doisetter
-                )
-                Daisy.button.button [
-                    button.info
-                    prop.text "Search"
-                    prop.onClick (fun _ ->
-                        //API.requestByORCID ("0000-0002-8510-6810") |> Promise.start
-                        setState API.Request.Loading
-                        API.start
-                            searchAPI
-                            id
-                            (API.Request.Ok >> setState)
-                            (API.Request.Error >> setState)
-                    )
+                Daisy.join [
+                    prop.className "w-full"
+                    prop.children [
+                        FormComponents.TextInput(
+                            id,
+                            doisetter,
+                            isJoin=true
+                        )
+                        Daisy.button.button [
+                            button.info
+                            join.item
+                            prop.text "Search"
+                            prop.onClick (fun _ ->
+                                setState API.Request.Loading
+                                API.start
+                                    searchAPI
+                                    id
+                                    (API.Request.Ok >> setState)
+                                    (API.Request.Error >> setState)
+                            )
+                        ]
+                    ]
                 ]
             ]
         ]
@@ -843,66 +848,53 @@ type FormComponents =
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
-        Daisy.collapse [
-            collapse.plus
-            prop.children [
-                Daisy.collapseTitle [
-                    Html.div [
-                        Html.h5 title
-                        Html.p [prop.className "text-sm"; prop.text doi]
-                    ]
-                    Html.div [
-                        prop.style [style.custom("marginLeft", "auto")]
-                        prop.text (countFilledFieldsString ())
-                    ]
-                ]
-                Daisy.collapseContent [
-                    prop.children [
-                        createFieldTextInput(input.Title, "Title", fun s -> input.Title <- s)
-                        Helper.cardFormGroup [
-                            FormComponents.PubMedIDInput(
-                                input.PubMedID,
-                                (fun s ->
-                                    let s = if s = "" then None else Some s
-                                    input.PubMedID <- s
-                                    input |> setter),
-                                (fun pub -> setter pub),
-                                "PubMed Id"
-                            )
-                            FormComponents.DOIInput(
-                                input.DOI,
-                                (fun s ->
-                                    let s = if s = "" then None else Some s
-                                    input.DOI <- s
-                                    input |> setter),
-                                (fun pub -> setter pub),
-                                "DOI"
-                            )
-                        ]
-                        createFieldTextInput(input.Authors, "Authors", fun s -> input.Authors <- s)
-                        FormComponents.OntologyAnnotationInput(
-                            Option.defaultValue (OntologyAnnotation.empty()) input.Status,
-                            (fun s ->
-                                input.Status <- s |> Option.whereNot _.isEmpty()
-                                input |> setter
-                            ),
-                            "Status",
-                            parent=Shared.TermCollection.PublicationStatus
-                        )
-                        FormComponents.CommentsInput(
-                            input.Comments,
-                            (fun c ->
-                                input.Comments <- ResizeArray(c)
-                                input |> setter
-                            ),
-                            "Comments"
-                        )
-                        if rmv.IsSome then
-                            Helper.deleteButton rmv.Value
-                    ]
-                ]
+        Generic.Collapse
+            [
+                Generic.CollapseTitle(title, doi, countFilledFieldsString ())
             ]
-        ]
+            [
+                createFieldTextInput(input.Title, "Title", fun s -> input.Title <- s)
+                Helper.cardFormGroup [
+                    FormComponents.PubMedIDInput(
+                        input.PubMedID,
+                        (fun s ->
+                            let s = if s = "" then None else Some s
+                            input.PubMedID <- s
+                            input |> setter),
+                        (fun pub -> setter pub),
+                        "PubMed Id"
+                    )
+                    FormComponents.DOIInput(
+                        input.DOI,
+                        (fun s ->
+                            let s = if s = "" then None else Some s
+                            input.DOI <- s
+                            input |> setter),
+                        (fun pub -> setter pub),
+                        "DOI"
+                    )
+                ]
+                createFieldTextInput(input.Authors, "Authors", fun s -> input.Authors <- s)
+                FormComponents.OntologyAnnotationInput(
+                    Option.defaultValue (OntologyAnnotation.empty()) input.Status,
+                    (fun s ->
+                        input.Status <- s |> Option.whereNot _.isEmpty()
+                        input |> setter
+                    ),
+                    "Status",
+                    parent=Shared.TermCollection.PublicationStatus
+                )
+                FormComponents.CommentsInput(
+                    input.Comments,
+                    (fun c ->
+                        input.Comments <- ResizeArray(c)
+                        input |> setter
+                    ),
+                    "Comments"
+                )
+                if rmv.IsSome then
+                    Helper.deleteButton rmv.Value
+            ]
 
     static member PublicationsInput(input: ResizeArray<Publication>, setter: ResizeArray<Publication> -> unit, label: string) =
         FormComponents.InputSequence(
@@ -915,7 +907,6 @@ type FormComponents =
 
     [<ReactComponent>]
     static member OntologySourceReferenceInput(input: OntologySourceReference, setter: OntologySourceReference -> unit, ?deletebutton: MouseEvent -> unit) =
-        let isExtended, setIsExtended = React.useState(false)
         let name = Option.defaultValue "<name>" input.Name
         let version = Option.defaultValue "<version>" input.Version
         let createFieldTextInput(field: string option, label, setFunction: string option -> unit) =
@@ -937,46 +928,35 @@ type FormComponents =
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
-        Daisy.collapse [
-            collapse.plus
-            prop.children [
-                Daisy.collapseTitle [
-                    Html.div [
-                        Html.h5 name
-                        Html.p [prop.text version; prop.className "text-sm"]
-                    ]
-                    Html.div [
-                        prop.style [style.custom("marginLeft", "auto")]
-                        prop.text (countFilledFieldsString ())
-                    ]
-                ]
-                Daisy.collapseContent [
-                    createFieldTextInput(input.Name, "Name", fun s -> input.Name <- s)
-                    Helper.cardFormGroup [
-                        createFieldTextInput(input.Version, "Version", fun s -> input.Version <- s)
-                        createFieldTextInput(input.File, "File", fun s -> input.File <- s)
-                    ]
-                    FormComponents.TextInput(
-                        Option.defaultValue "" input.Description,
-                        (fun s ->
-                            input.Description <- s |> Option.whereNot System.String.IsNullOrWhiteSpace
-                            input |> setter),
-                        "Description",
-                        isarea=true
-                    )
-                    FormComponents.CommentsInput(
-                        input.Comments,
-                        (fun c ->
-                            input.Comments <- c
-                            input |> setter
-                        ),
-                        "Comments"
-                    )
-                    if deletebutton.IsSome then
-                        Helper.deleteButton deletebutton.Value
-                ]
+        Generic.Collapse
+            [
+                Generic.CollapseTitle(name, version, countFilledFieldsString ())
             ]
-        ]
+            [
+                createFieldTextInput(input.Name, "Name", fun s -> input.Name <- s)
+                Helper.cardFormGroup [
+                    createFieldTextInput(input.Version, "Version", fun s -> input.Version <- s)
+                    createFieldTextInput(input.File, "File", fun s -> input.File <- s)
+                ]
+                FormComponents.TextInput(
+                    Option.defaultValue "" input.Description,
+                    (fun s ->
+                        input.Description <- s |> Option.whereNot System.String.IsNullOrWhiteSpace
+                        input |> setter),
+                    "Description",
+                    isarea=true
+                )
+                FormComponents.CommentsInput(
+                    input.Comments,
+                    (fun c ->
+                        input.Comments <- c
+                        input |> setter
+                    ),
+                    "Comments"
+                )
+                if deletebutton.IsSome then
+                    Helper.deleteButton deletebutton.Value
+            ]
 
     static member OntologySourceReferencesInput(input: ResizeArray<OntologySourceReference>, setter: ResizeArray<OntologySourceReference> -> unit, label: string) =
         FormComponents.InputSequence(

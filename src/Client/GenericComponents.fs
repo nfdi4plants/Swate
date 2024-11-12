@@ -7,7 +7,7 @@ open Feliz.DaisyUI
 module DaisyUiExtensions =
 
     type modal with
-        static member active = prop.className "modal-active"
+        static member active = prop.className "modal-open"
 
 type Components =
     static member DeleteButton(?children, ?props) =
@@ -34,7 +34,7 @@ type Components =
             ]
         ]
 
-    static member Collapse(isCollapsed, setIsCollapsed, ?collapsedIcon, ?collapseIcon, ?classes: string) =
+    static member CollapseButton(isCollapsed, setIsCollapsed, ?collapsedIcon, ?collapseIcon, ?classes: string) =
         Html.label [
             prop.className [
                 "btn btn-square swap swap-rotate grow-0"
@@ -42,7 +42,7 @@ type Components =
             ]
             prop.onClick (fun e -> e.preventDefault(); e.stopPropagation(); not isCollapsed |> setIsCollapsed)
             prop.children [
-                Html.input [prop.type'.checkbox; prop.isChecked isCollapsed]
+                Html.input [prop.type'.checkbox; prop.isChecked isCollapsed; prop.onChange(fun (_:bool) -> ())]
                 Html.i [
                     prop.className [
                         "swap-off fa-solid"

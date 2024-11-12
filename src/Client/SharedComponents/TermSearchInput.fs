@@ -141,7 +141,7 @@ module TermSearchAux =
         let verifiedIcon = Html.i [prop.className "fa-solid fa-check text-primary"]
         let termSelectItemMain (term: Term, show, setShow, setTerm, isDirectedSearchResult: bool) =
             Html.div [
-                prop.className "grid grid-cols-subgrid col-span-4 cursor-pointer hover:bg-base-100 transition-colors px-2 py-0.5 items-center"
+                prop.className "grid grid-cols-subgrid col-span-4 gap-2 cursor-pointer hover:bg-base-100 transition-colors py-0.5 items-center"
                 prop.onClick setTerm
                 prop.children [
                     Html.i [
@@ -172,7 +172,7 @@ module TermSearchAux =
                             ]
                         ]
                     ]
-                    Components.Collapse(show, setShow, classes="btn-sm btn-ghost")
+                    Components.CollapseButton(show, setShow, classes="btn-sm btn-ghost")
                 ]
             ]
 

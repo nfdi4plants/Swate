@@ -1,14 +1,13 @@
-namespace Components.Datamap
+namespace Components.Forms
 
 open ARCtrl
 open Feliz
 open Feliz.DaisyUI
-open Components
 
-type DatamapConfig =
+type Datamap =
 
     static member Main(datamap: DataMap option, setDatamap: DataMap option -> unit) =
-        let desc = Some "Add datamap sheet. This allows detailed annotation of data files."
+        let desc = "Add datamap sheet. This allows detailed annotation of data files."
         let content =
             [
                 Html.div [
@@ -40,7 +39,8 @@ type DatamapConfig =
                     ]
                 ]
             ]
-        Generic.BoxedField
-            (Some "Datamap")
-            desc
+        Generic.BoxedField(
+            "Datamap",
+            desc,
             content
+        )

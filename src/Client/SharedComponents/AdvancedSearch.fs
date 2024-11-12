@@ -334,7 +334,7 @@ let private resultsPage (resultHandler: Term -> unit) (state: AdvancedSearch.Mod
             if state.HasAdvancedSearchResultsLoading then
                 Html.div [
                     prop.style [style.width(length.perc 100); style.display.flex; style.justifyContent.center]
-                    prop.children Modals.Loading.loadingComponent
+                    prop.children Modals.Loading.Component
                 ]
             else
                 let init: ResultsTable.TableModel = {

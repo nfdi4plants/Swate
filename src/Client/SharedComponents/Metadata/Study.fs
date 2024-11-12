@@ -8,10 +8,9 @@ open System
 
 let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy * ArcAssay list) -> unit, setDatamap: ArcStudy -> DataMap option -> unit) =
     Generic.Section [
-        Generic.BoxedField
-            (Some "Study Metadata")
-            None
-            [
+        Generic.BoxedField(
+            "Study Metadata",
+            content = [
                 FormComponents.TextInput (
                     study.Identifier,
                     (fun s ->
@@ -77,7 +76,8 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy 
                     "Comments"
                 )
             ]
-        Datamap.DatamapConfig.Main(
+        )
+        Datamap.Main(
             study.DataMap,
             fun dataMap ->
                 setDatamap study dataMap

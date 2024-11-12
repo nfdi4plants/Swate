@@ -9,10 +9,9 @@ open Components.Forms
 
 let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit) =
     Generic.Section [
-        Generic.BoxedField
-            (Some "Investigation Metadata")
-            None
-            [
+        Generic.BoxedField(
+            "Investigation Metadata",
+            content = [
                 FormComponents.TextInput (
                     investigation.Identifier,
                     (fun s ->
@@ -86,4 +85,5 @@ let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> 
                     "Comments"
                 )
             ]
+        )
     ]

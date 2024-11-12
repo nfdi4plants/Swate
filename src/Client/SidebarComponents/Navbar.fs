@@ -84,7 +84,7 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
 
 let NoMetadataModalContent refresh (dispatch: Messages.Msg -> unit) =
     Html.section [
-        Components.Generic.BoxedField None None [
+        Components.Forms.Generic.BoxedField [
             Html.h2 "Create Top Level Metadata"
             Html.p "Choose one of the following top level meta data types to create"
             AddMetaDataButtons refresh dispatch
@@ -131,7 +131,7 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
             Html.section [
                 prop.className "pt-0"
                 prop.children [
-                    Components.Generic.BoxedField None None [
+                    Components.Forms.Generic.BoxedField [
                         Html.div [
                             Daisy.button.a [
                                 button.primary
@@ -198,7 +198,7 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
                 prop.children [
                     match excelMetadataType with
                     | { Loading = true } ->
-                        Modals.Loading.loadingComponent
+                        Modals.Loading.Modal()
                     | { Metadata = None } ->
                         NoMetadataModalContent refreshMetadataState dispatch
                     | { Metadata = Some metadata } ->

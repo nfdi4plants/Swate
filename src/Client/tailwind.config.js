@@ -34,7 +34,15 @@ module.exports = {
                 '2xl': '6rem',
             }
         },
-        extend: {},
+        extend: {
+            containers: {
+                sm: "640px",
+                md: "768px",
+                lg: "1024px",
+                xl: "1280px",
+                "2xl": "1536px",
+            },
+        },
     },
     plugins: [
         require('@tailwindcss/container-queries'),
