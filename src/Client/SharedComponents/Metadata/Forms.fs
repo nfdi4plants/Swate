@@ -268,7 +268,6 @@ module private Helper =
         ]
 
 open JsBindings
-
 type FormComponents =
 
     [<ReactComponent>]
@@ -427,23 +426,28 @@ type FormComponents =
         Html.div [
             prop.className "grow"
             prop.children [
-                if label.IsSome then Daisy.label [Daisy.labelText label.Value]
+                if label.IsSome then Html.h4 label.Value
                 Daisy.label [
+                    prop.className "input input-bordered flex items-center gap-2"
                     prop.children [
                         match isarea with
                         | Some true ->
-                            Daisy.textarea [
+                            Html.textarea [
+                                prop.className "grow"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
                                 prop.onChange onChange
                             ]
                         | _ ->
-                            Daisy.input [
+                            Html.input [
+                                prop.className "grow"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
                                 prop.onChange onChange
                             ]
-                        if loading then Daisy.loading []
+                        Daisy.loading [
+                            if not loading then prop.className "invisible"
+                        ]
                     ]
                 ]
                 if not isValid then
@@ -460,52 +464,60 @@ type FormComponents =
         let isExtended, setIsExtended = React.useState(false)
         let portal = React.useElementRef()
         Html.div [
-            if label.IsSome then Daisy.label [Daisy.labelText label.Value]
-            Html.div [
-                prop.ref portal
-                prop.className "flex flex-row gap-2 relative"
-                prop.children [
-                    TermSearch.Input(
-                        (fun oaOpt -> oaOpt |> Option.defaultValue (OntologyAnnotation()) |> setter),
-                        input,
-                        fullwidth=true,
-                        ?portalTermSelectArea=portal.current,
-                        ?parent=parent
-                    )
-                    if isExtended then
-                        FormComponents.TextInput(
-                            Option.defaultValue "" input.TermSourceREF,
-                            (fun (s: string) ->
-                                let s = s |> Option.whereNot String.IsNullOrWhiteSpace
-                                input.TermSourceREF <- s
-                                input |> setter),
-                            placeholder="term source ref"
+            prop.className "space-y-2"
+            prop.children [
+                if label.IsSome then Html.h4 label.Value
+                Html.div [
+                    prop.ref portal
+                    prop.className "w-full flex gap-2 relative"
+                    prop.children [
+                        TermSearch.Input(
+                            (fun oaOpt -> oaOpt |> Option.defaultValue (OntologyAnnotation()) |> setter),
+                            input,
+                            fullwidth=true,
+                            ?portalTermSelectArea=portal.current,
+                            ?parent=parent
                         )
-                        FormComponents.TextInput(
-                            Option.defaultValue "" input.TermAccessionNumber,
-                            (fun s0 ->
-                                let s = s0 |> Option.whereNot String.IsNullOrWhiteSpace
-                                input.TermAccessionNumber <- s
-                                input |> setter
-                            ),
-                            placeholder="term accession number"
-                        )
-                    Html.div [
-                        prop.className "grow-0"
-                        prop.children [
-                            Daisy.button.button [
-                                prop.onClick (fun _ -> not isExtended |> setIsExtended)
-                                prop.children [
-                                    Html.i [
-                                        prop.className "fa-solid fa-chevron-right"
-                                    ]
+                        Html.label [
+                            prop.className "btn btn-square swap swap-rotate grow-0"
+                            prop.onClick (fun e -> e.preventDefault(); not isExtended |> setIsExtended)
+                            prop.children [
+                                Html.input [prop.type'.checkbox; prop.isChecked isExtended]
+                                Html.i [
+                                    prop.className "swap-off fa-solid fa-chevron-down"
+                                ]
+                                Html.i [
+                                    prop.className "swap-on fa-solid fa-x"
                                 ]
                             ]
                         ]
+                        if rmv.IsSome then
+                            Helper.deleteButton rmv.Value
                     ]
-                    if rmv.IsSome then
-                        Helper.deleteButton rmv.Value
                 ]
+                if isExtended then
+                    Html.div [
+                        prop.className "flex flex-col @md/main:flex-row gap-2"
+                        prop.children [
+                            FormComponents.TextInput(
+                                Option.defaultValue "" input.TermSourceREF,
+                                (fun (s: string) ->
+                                    let s = s |> Option.whereNot String.IsNullOrWhiteSpace
+                                    input.TermSourceREF <- s
+                                    input |> setter),
+                                placeholder="term source ref"
+                            )
+                            FormComponents.TextInput(
+                                Option.defaultValue "" input.TermAccessionNumber,
+                                (fun s0 ->
+                                    let s = s0 |> Option.whereNot String.IsNullOrWhiteSpace
+                                    input.TermAccessionNumber <- s
+                                    input |> setter
+                                ),
+                                placeholder="term accession number"
+                            )
+                        ]
+                    ]
             ]
         ]
 

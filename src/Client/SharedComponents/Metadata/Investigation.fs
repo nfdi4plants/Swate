@@ -8,7 +8,7 @@ open Components
 open Components.Forms
 
 let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit) =
-    Html.section [
+    Generic.Section [
         Generic.BoxedField
             (Some "Investigation Metadata")
             None

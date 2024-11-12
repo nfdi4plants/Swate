@@ -8,7 +8,7 @@ open Components.Forms
 
 [<ReactComponent>]
 let Main(template: Template, setTemplate: Template -> unit) =
-    Html.section [
+    Generic.Section [
         Generic.BoxedField
             (Some "Template Metadata")
             None

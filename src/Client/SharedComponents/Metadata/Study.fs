@@ -7,7 +7,7 @@ open Components.Forms
 open System
 
 let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy * ArcAssay list) -> unit, setDatamap: ArcStudy -> DataMap option -> unit) =
-    Html.section [
+    Generic.Section [
         Generic.BoxedField
             (Some "Study Metadata")
             None

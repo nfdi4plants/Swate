@@ -9,7 +9,7 @@ open Components.Forms
 
 [<ReactComponent>]
 let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit) =
-    Html.section [
+    Generic.Section [
         Generic.BoxedField
             (Some "Assay Metadata")
             None

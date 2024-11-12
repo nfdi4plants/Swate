@@ -23,8 +23,8 @@ module TermSearchAux =
         SearchIs: SearchIs
         Results: Term []
     } with
-        static member init() = {
-            SearchIs = SearchIs.Idle
+        static member init(?running:bool) = {
+            SearchIs = if running.IsSome && running.Value then SearchIs.Running else SearchIs.Idle
             Results = [||]
         }
 
@@ -95,65 +95,74 @@ module TermSearchAux =
 
     module Components =
 
-        let termSeachNoResults (advancedTermSearchActiveSetter: (bool -> unit) option) = [
+        let termSeachNoResults (advancedTermSearchActiveSetter: (bool -> unit) option) =
             Html.div [
-                prop.key $"TermSelectItem_NoResults"
-                prop.classes ["term-select-item"]
+                prop.className "col-span-4"
                 prop.children [
-                    Html.div "No terms found matching your input."
-                ]
-            ]
-            if advancedTermSearchActiveSetter.IsSome then
-                Html.div [
-                    prop.key $"TermSelectItem_Suggestion"
-                    prop.classes ["term-select-item"]
-                    prop.children [
-                        Html.span "Can't find the term you are looking for? "
-                        Html.a [
-                            prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); advancedTermSearchActiveSetter.Value true)
-                            prop.text "Try Advanced Search!"
+                    Html.div [
+                        prop.key $"TermSelectItem_NoResults"
+                        prop.children [
+                            Html.div "No terms found matching your input."
+                        ]
+                    ]
+                    if advancedTermSearchActiveSetter.IsSome then
+                        Html.div [
+                            prop.key $"TermSelectItem_Suggestion"
+                            prop.classes ["term-select-item"]
+                            prop.children [
+                                Html.span "Can't find the term you are looking for? "
+                                Html.a [
+                                    prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); advancedTermSearchActiveSetter.Value true)
+                                    prop.text "Try Advanced Search!"
+                                ]
+                            ]
+                        ]
+                    Html.div [
+                        prop.key $"TermSelectItem_Contact"
+                        prop.classes ["term-select-item"]
+                        prop.children [
+                            Html.div [
+                                Html.span "Still can't find what you need? Get in "
+                                Html.a [prop.href Shared.URLs.Helpdesk.UrlOntologyTopic; prop.target.blank; prop.text "contact"; prop.className "link link-primary"]
+                                Html.span " with us!"
+                            ]
                         ]
                     ]
                 ]
-            Html.div [
-                prop.key $"TermSelectItem_Contact"
-                prop.classes ["term-select-item"]
-                prop.children [
-                    Html.div [
-                        Html.span "Still can't find what you need? Get in "
-                        Html.a [prop.href Shared.URLs.Helpdesk.UrlOntologyTopic; prop.target.blank; prop.text "contact"]
-                        Html.span " with us!"
-                    ]
+            ]
+
+        let loadingIcon (loading: bool) =
+            Daisy.loading [
+                prop.className [
+                    if not loading then "invisible";
                 ]
             ]
-        ]
-
         let searchIcon = Html.i [prop.className "fa-solid fa-magnifying-glass"]
-        let verifiedIcon = Html.i [prop.className "fa-solid fa-check"]
-
+        let verifiedIcon = Html.i [prop.className "fa-solid fa-check text-primary"]
         let termSelectItemMain (term: Term, show, setShow, setTerm, isDirectedSearchResult: bool) =
             Html.div [
-                prop.classes ["is-flex"; "is-flex-direction-row"; "term-select-item-main"]
+                prop.className "grid grid-cols-subgrid col-span-4 cursor-pointer hover:bg-base-100 transition-colors px-2 py-0.5 items-center"
                 prop.onClick setTerm
-                prop.style [style.position.relative]
                 prop.children [
                     Html.i [
                         prop.style [style.width (length.px 20)]
+                        prop.className [
+                            if term.IsObsolete then
+                                "fa-solid fa-link-slash text-error";
+                            elif isDirectedSearchResult then
+                                "fa-solid fa-diagram-project text-primary"
+                        ]
                         if term.IsObsolete then
-                            prop.classes ["fa-solid fa-link-slash"; "is-flex"; "is-align-items-center"; "has-text-danger"]
                             prop.title "Obsolete"
                         elif isDirectedSearchResult then
-                            prop.classes ["fa-solid fa-diagram-project"; "is-flex"; "is-align-items-center"]
                             prop.title "Related Term"
                     ]
                     Html.div [
-                        prop.classes ["has-text-weight-bold"]
-                        prop.style [style.flexGrow 1; style.textOverflow.ellipsis; style.whitespace.nowrap; style.overflow.hidden]
+                        prop.className "font-bold grow truncate"
                         prop.text term.Name
                     ]
                     Html.div [
-                        prop.classes ["is-flex"; "is-align-items-center"; "is-justify-content-end"; ]
-                        prop.style [style.flexGrow 1]
+                        prop.className "grow"
                         prop.children [
                             Html.a [
                                 prop.href (ARCtrl.OntologyAnnotation(tan=term.Accession).TermAccessionOntobeeUrl)
@@ -163,47 +172,27 @@ module TermSearchAux =
                             ]
                         ]
                     ]
-                    Html.button [
-                        prop.onClick(fun e ->
-                            e.stopPropagation()
-                            setShow (not show)
-                        )
-                        prop.classes ["term-select-item-toggle-button"]
-                        prop.children [ Html.i [prop.classes ["fa-solid"; if show then "fa-angle-up" else "fa-angle-down"]] ]
-                    ]
+                    Components.Collapse(show, setShow, classes="btn-sm btn-ghost")
                 ]
             ]
 
         let termSelectItemMore (term: Term, show) =
             Html.div [
-                prop.classes [
-                    if not show then "is-hidden";
-                    "term-select-item-more"
+                prop.className [
+                    // padding is sum of padding + possible icon of main term info
+                    "col-span-4 pl-[28px] grid grid-cols-[auto,1fr] gap-x-2 bg-base-100 border-b"
+                    if not show then "hidden";
                 ]
                 prop.children [
-                    Daisy.table [
-                        prop.children [
-                            Html.tbody [
-                                Html.tr [
-                                    Html.td [ prop.className "has-text-weight-bold pl-0"; prop.text "Name:"]
-                                    Html.td [ prop.text (if term.Name = "" then "<no name>" else term.Name)]
-                                ]
-                                Html.tr [
-                                    Html.td [ prop.className "has-text-weight-bold pl-0"; prop.text "Description:"]
-                                    Html.td [ prop.text (if term.Description = "" then "<no description>" else term.Description)]
-                                ]
-                                Html.tr [
-                                    Html.td [ prop.className "has-text-weight-bold pl-0"; prop.text "Source:"]
-                                    Html.td [ prop.text (term.FK_Ontology)]
-                                ]
-                                if term.IsObsolete then
-                                    Html.tr [
-                                        Html.td [ prop.classes ["pl-0"; "has-text-danger"]; prop.text "Obsolete"]
-                                        Html.td [ ]
-                                    ]
-                            ]
-                        ]
-                    ]
+                    Html.div [ prop.className "font-semibold"; prop.text "Name:"]
+                    Html.div [ prop.text (if System.String.IsNullOrWhiteSpace term.Name then "<no name>" else term.Name)]
+                    Html.div [ prop.className "font-semibold"; prop.text "Description:"]
+                    Html.div [ prop.text (if System.String.IsNullOrWhiteSpace term.Description then "<no description>" else term.Description)]
+                    Html.div [ prop.className "font-semibold"; prop.text "Source:"]
+                    Html.div [ prop.text (term.FK_Ontology)]
+                    if term.IsObsolete then
+                        Html.div [ prop.className "font-semibold text-error"; prop.text "Obsolete"]
+                        Html.div [ ]
                 ]
             ]
 
@@ -233,8 +222,8 @@ type TermSearch =
         let isDirectedSearchResult = defaultArg isDirectedSearchResult false
         let show, setShow = React.useState(false)
         Html.div [
+            prop.className "grid grid-cols-subgrid col-span-4"
             prop.key $"TermSelectItem_{term.Accession}"
-            prop.classes ["term-select-item"]
             prop.children [
                 Components.termSelectItemMain(term, show, setShow, setTerm, isDirectedSearchResult)
                 Components.termSelectItemMore(term, show)
@@ -250,34 +239,45 @@ type TermSearch =
             match ss with
             | {SearchIs = SearchIs.Done; Results = [||]} when not isDirectedSearch ->
                 Components.termSeachNoResults setAdvancedTermSearchActive
-            | {SearchIs = SearchIs.Done; Results = results} -> [
-                for term in results do
-                    let setTerm = fun (e: MouseEvent) -> setTerm (Some term)
-                    // Term is found in both: Do not show in real directed search, update first search hit instead
-                    if searchesAreComplete && foundInBoth term then
-                        if isDirectedSearch then
-                            Html.none
+            | {SearchIs = SearchIs.Done; Results = results} ->
+                React.fragment [
+                    for term in results do
+                        let setTerm = fun (e: MouseEvent) -> setTerm (Some term)
+                        // Term is found in both: Do not show in real directed search, update first search hit instead
+                        if searchesAreComplete && foundInBoth term then
+                            if isDirectedSearch then
+                                Html.none
+                            else
+                                TermSearch.TermSelectItem (term, setTerm, true)
                         else
-                            TermSearch.TermSelectItem (term, setTerm, true)
-                    else
-                        TermSearch.TermSelectItem (term, setTerm, isDirectedSearch)
-                ]
-            | {SearchIs = SearchIs.Running; Results = _ } -> [
-                    Html.div [
-                        prop.className "px-3 py-2"
-                        prop.text "loading.."
+                            TermSearch.TermSelectItem (term, setTerm, isDirectedSearch)
                     ]
-                ]
-            | _ -> [
-                    Html.none
-                ]
+            | _ -> Html.none
         Html.div [
             prop.id id
-            prop.classes ["term-select-area"; if not show then "is-hidden";]
-            prop.style [style.width (length.perc 100); style.top (length.perc 100)]
+            prop.className [
+                "grid grid-cols-[auto,1fr,1fr,auto] absolute left-0 z-50 w-full
+                bg-base-200 rounded shadow-md border-2 border-primary py-2 pl-4 max-h-[400px] overflow-y-auto w-full"
+                if not show then "hidden";
+            ]
+            prop.style [style.top (length.perc 110); style.scrollbarGutter.stable]
             prop.children [
-                yield! matchSearchState searchNameState false
-                yield! matchSearchState searchTreeState true
+                match searchNameState.SearchIs, searchTreeState.SearchIs, show with
+                | SearchIs.Done, _,_ | _, SearchIs.Done, _->
+                    matchSearchState searchNameState false
+                    matchSearchState searchTreeState true
+                | _,_, true ->
+                    Html.div [
+                        prop.className "px-3 col-span-4"
+                        prop.children [
+                            Daisy.loading [
+                                loading.dots
+                                prop.className "text-primary inline-block align-middle"
+                            ]
+                        ]
+                    ]
+                | _ ->
+                    Html.none
             ]
         ]
 
@@ -332,13 +332,14 @@ type TermSearch =
             setIsSearching false
         let startSearch() =
             setLoading true
-            setSearchNameState <| SearchState.init()
-            setSearchTreeState <| SearchState.init()
+            setSearchNameState <| SearchState.init(running=true)
+            setSearchTreeState <| SearchState.init(running=true)
             setIsSearching true
         let registerChange(searchTest: string option) =
             let oa = searchTest |> Option.map (fun x -> OntologyAnnotation x)
             debouncel debounceStorage.current "SetterDebounce" 500 setLoading setter oa
         Html.div [
+            prop.className "input input-bordered flex items-center gap-2"
             if isjoin then join.item
             if size.IsSome then size.Value
             if not searchableToggle then prop.ref ref
@@ -347,7 +348,9 @@ type TermSearch =
                 if minWidth.IsSome then style.minWidth minWidth.Value
             ]
             prop.children [
-                Daisy.input [
+                if not searchableToggle then Components.searchIcon
+                Html.input [
+                    prop.className "grow"
                     prop.autoFocus autofocus
                     prop.style [
                         if borderRadius.IsSome then style.borderRadius borderRadius.Value
@@ -406,7 +409,7 @@ type TermSearch =
                     ReactDOM.createPortal(TermSelectArea, ref.current.Value)
                 else
                     TermSelectArea
-                if not searchableToggle then Components.searchIcon
+                Components.loadingIcon loading
                 if input.IsSome && input.Value.Name.IsSome && input.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                 // Optional elements
                 Html.div [
