@@ -459,7 +459,7 @@ type FormComponents =
                             ]
                         | _ ->
                             Html.input [
-                                prop.className "grow"
+                                prop.className "trunacte w-full"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
                                 prop.onChange onChange
@@ -544,7 +544,7 @@ type FormComponents =
         let state, setState = React.useState(API.Request<Person>.Idle)
         let resetState = fun _ -> setState API.Request.Idle
         Html.div [
-            prop.className "grow cursor-default"
+            prop.className "grow cursor-auto"
             prop.children [
                 match state with
                 | API.Request.Ok p -> Helper.personModal (p, (fun _ -> searchsetter p; resetState()), resetState)

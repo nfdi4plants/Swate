@@ -10,28 +10,32 @@ type Generic =
             prop.text title;
         ]
     static member BoxedField (?title: string, ?description: string, ?content: ReactElement list) =
-        Html.div [
-            prop.className "space-y-6 rounded-lg border border-black p-6 lg:p-8 shadow-md shadow-base-300 prose prose-headings:text-primary container max-w-full lg:max-w-[800px]"
+        Daisy.card [
+            card.compact
+            prop.className "space-y-6 border-2 border-base-300 shadow-xl bg-base
+            prose prose-headings:text-primary container max-w-full lg:max-w-[800px]"
             prop.children [
-                Html.div [
-                    prop.children [
-                        if title.IsSome then
-                            Html.h2 [
-                                prop.className "mt-0"
-                                prop.text title.Value
-                            ]
-                        if description.IsSome then
-                            Html.p [
-                                prop.className "text-sm text-gray-500"
-                                prop.text description.Value
-                            ]
-                    ]
-                ]
-                if content.IsSome then
+                Daisy.cardBody [
                     Html.div [
-                        prop.className "space-y-4 divide-y divide-base-content"
-                        prop.children content.Value
+                        prop.children [
+                            if title.IsSome then
+                                Html.h1 [
+                                    prop.className "mt-0"
+                                    prop.text title.Value
+                                ]
+                            if description.IsSome then
+                                Html.p [
+                                    prop.className "text-sm text-gray-500"
+                                    prop.text description.Value
+                                ]
+                        ]
                     ]
+                    if content.IsSome then
+                        Html.div [
+                            prop.className "space-y-4 divide-y divide-base-content"
+                            prop.children content.Value
+                        ]
+                ]
             ]
         ]
     static member BoxedField (content: ReactElement list) =

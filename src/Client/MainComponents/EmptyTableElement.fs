@@ -5,41 +5,47 @@ open Feliz.DaisyUI
 open ARCtrl
 
 type EmptyTableElement =
+
+    static member private Button(icons: ReactElement, onclick) =
+        Daisy.button.button [
+            button.primary
+            prop.className "place-self-end"
+            prop.onClick (fun _ -> onclick())
+            prop.children icons
+        ]
+
     static member Main(openBuildingBlockWidget: unit -> unit, openTemplateWidget: unit -> unit) =
         Html.div [
-            prop.className "is-flex is-justify-content-center is-align-items-center"
+            prop.className "flex justify-center items-center"
             prop.style [style.height (length.perc 100)]
             prop.children [
-                Html.div [
-                    prop.className "border border-base-100 rounded p-5 shadow prose"
+                Daisy.card [
+                    prop.className "bg-base-300 shadow-xl"
                     prop.children [
-                        Html.h3 [
-                            prop.className "title"
-                            prop.text "New Table!"
-                        ]
-                        Html.div [
-                            prop.className "is-flex is-justify-content-space-between is-align-items-center gap-3"
-                            prop.children [
-                                Html.text "Start from an existing template!"
-                                Daisy.button.button [
-                                    prop.onClick (fun _ -> openTemplateWidget())
-                                    prop.children [
-                                        Html.i [prop.className "fa-solid fa-circle-plus" ]
-                                        Html.i [prop.className "fa-solid fa-table" ]
-                                    ]
-                                ]
+                        Daisy.cardBody [
+                            Html.h3 [
+                                prop.className "font-bold text-xl"
+                                prop.text "New Table!"
                             ]
-                        ]
-                        Html.div [
-                            prop.className "is-flex is-justify-content-space-between is-align-items-center gap-3"
-                            prop.children [
-                                Html.text "Or start from scratch!"
-                                Daisy.button.button [
-                                    prop.onClick (fun _ -> openBuildingBlockWidget())
-                                    prop.children [
-                                        Html.i [prop.className "fa-solid fa-circle-plus" ]
-                                        Html.i [prop.className "fa-solid fa-table-columns" ]
-                                    ]
+                            Html.div [
+                                prop.className "grid grid-cols-[1fr,auto] gap-4 items-center"
+                                prop.children [
+                                    Html.text "Start from an existing template!"
+                                    EmptyTableElement.Button(
+                                        React.fragment [
+                                            Html.i [prop.className "fa-solid fa-circle-plus" ]
+                                            Html.i [prop.className "fa-solid fa-table" ]
+                                        ],
+                                        fun _ -> openTemplateWidget()
+                                    )
+                                    Html.text "Or start from scratch!"
+                                    EmptyTableElement.Button(
+                                        React.fragment [
+                                            Html.i [prop.className "fa-solid fa-circle-plus" ]
+                                            Html.i [prop.className "fa-solid fa-table-columns" ]
+                                        ],
+                                        fun _ -> openBuildingBlockWidget()
+                                    )
                                 ]
                             ]
                         ]
