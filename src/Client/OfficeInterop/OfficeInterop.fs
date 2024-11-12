@@ -166,9 +166,9 @@ module ARCtrlExtensions =
                 let bodyRowRange = excelTable.getDataBodyRange()
 
                 let _ =
-                    excelTable.load(U2.Case2 (ResizeArray [| "name" |])) |> ignore
-                    headerRange.load(U2.Case2 (ResizeArray [| "values" |])) |> ignore
-                    bodyRowRange.load(U2.Case2 (ResizeArray [| "values" |])) |> ignore
+                    excelTable.load(U2.Case2 (ResizeArray [|"name"|])) |> ignore
+                    headerRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+                    bodyRowRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
                     
 
                 return! context.sync().``then``(fun _ ->
@@ -269,8 +269,8 @@ module ARCtrlExtensions =
                 let bodyRowRange = excelTable.getDataBodyRange()
 
                 let _ =
-                    headerRange.load(U2.Case2 (ResizeArray [| "values" |])) |> ignore
-                    bodyRowRange.load(U2.Case2 (ResizeArray [| "values" |])) |> ignore
+                    headerRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+                    bodyRowRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
 
                 do! context.sync()
 
@@ -336,12 +336,12 @@ open ARCtrlExtensions
 let tryGetPrevAnnotationTableName (context: RequestContext) =
     promise {
 
-        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|" tables" |]))
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|" tables"|]))
         let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
         let tables = context.workbook.tables
         let _ =
-            activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[| "position" |])) |> ignore
-            tables.load(propertyNames=U2.Case2 (ResizeArray[| "items";"worksheet";"name"; "position"; "values" |]))
+            activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
+            tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "position"; "values"|]))
 
         let! prevTable = context.sync().``then``(fun _ ->
             /// Get all names of all tables in the whole workbook.
@@ -464,7 +464,7 @@ module AnnotationTable =
             let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
             let tables = context.workbook.tables
             let _ =
-                activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[| "position" |])) |> ignore
+                activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
                 context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|])) |> ignore
                 tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "style"; "values"|]))
             
@@ -1023,7 +1023,7 @@ let joinTable (tableToAdd: ArcTable, options: TableJoinOptions option) =
                         newTable.columns.load(propertyNames = U2.Case2 (ResizeArray["name"; "items"])) |> ignore
                         newBodyRange.load(propertyNames = U2.Case2 (ResizeArray["name"; "columnCount"; "values"]))
 
-                    do! context.sync().``then``(fun _ -> ())
+                    do! context.sync()
 
                     do! AnnotationTable.format(newTable, context, true)
 
@@ -1109,7 +1109,7 @@ let getArcIndex (excelTable: Table) (excelColumnIndex: float) (context: RequestC
         let protoHeaders = excelTable.getHeaderRowRange()
         let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let headers = AnnotationTable.getHeaders protoHeaders.values
 
@@ -1165,7 +1165,7 @@ let getArcMainColumn (excelTable: Table) (arcTable: ArcTable) (context: RequestC
         let protoHeaders = excelTable.getHeaderRowRange()
         let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let headers = AnnotationTable.getHeaders protoHeaders.values
 
@@ -1302,7 +1302,7 @@ let removeSelectedAnnotationBlock () =
                     log $"delete column {i}"
                     column.delete()
 
-                do! context.sync().``then``(fun _ -> ())
+                do! context.sync()
 
                 do! AnnotationTable.format(excelTable, context, true)
 
@@ -1448,7 +1448,7 @@ let convertBuildingBlock () =
 
                     let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["values"; "worksheet"]))
 
-                    do! context.sync().``then``(fun _ -> ())
+                    do! context.sync()
 
                     let activeSheet = newTableRange.worksheet
                     let _ = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
@@ -1598,8 +1598,8 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
                 let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
                 let tables = context.workbook.tables
                 let _ =
-                    activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[| "position" |])) |> ignore
-                    tables.load(propertyNames=U2.Case2 (ResizeArray[| "items"; "worksheet"; "name"; "position"; "values" |]))
+                    activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
+                    tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
 
                 let! table = context.sync().``then``(fun _ ->
                     let activeWorksheetPosition = activeWorksheet.position
@@ -1707,7 +1707,7 @@ let rectifyTermColumns context0 =
                 | Result.Ok arcTable ->
                     let columns = arcTable.Columns
                     let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
-                    do! context.sync().``then``(fun _ -> ())
+                    do! context.sync()
                     let items = excelTable.columns.items
                     let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
                     let columns =
@@ -1815,7 +1815,7 @@ let parseToTopLevelMetadata<'T> identifier (parseToMetadata: string option seq s
             workSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|])) |> ignore
             range.load(propertyNames = U2.Case2 (ResizeArray["values"; "rowCount"]))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         if range.rowCount > 1 then
 
@@ -1840,9 +1840,14 @@ let parseToTopLevelMetadata<'T> identifier (parseToMetadata: string option seq s
 /// <param name="context"></param>
 let getExcelAnnotationTables (context: RequestContext) =
     promise {
-        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[| "tables" |]))
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+
+        do! context.sync()
+
         let tables = context.workbook.tables
-        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[| "items"; "name" |]))
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "name"|]))
+
+        do! context.sync()
 
         let! annotationTables =
             context.sync().``then``(fun _ ->
@@ -1982,7 +1987,7 @@ let expandTableRowCount (table: Table) (tableRowCount: int) (tableColumnCount: i
 
         ExcelUtil.Table.addRows -1. table tableColumnCount diff "" |> ignore
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
     }    
 
 /// <summary>
@@ -1995,7 +2000,7 @@ let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (
     promise {
         let _ = selectedRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let selectedRowCount =   int selectedRange.rowCount
         let selectedColumnCount = int selectedRange.columnCount
@@ -2015,7 +2020,7 @@ let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (
         selectedRange.format.autofitColumns()
         selectedRange.format.autofitRows()
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
     }
 
 /// <summary>
@@ -2030,7 +2035,7 @@ let private isSelectedOutsideAnnotationTable (tableRange: Excel.Range) (selected
             tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount";|])) |> ignore
             selectedRange.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex";|]))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let tableMaxRow = tableRange.rowCount
         let tableMaxColumn = tableRange.columnCount
@@ -2060,7 +2065,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
                 let mutable tableRange = excelTable.getRange()
                 let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
 
-                do! context.sync().``then``(fun _ -> ())
+                do! context.sync()
 
                 let! isAnnotationTableSelected = isSelectedOutsideAnnotationTable tableRange selectedRange context
 
@@ -2082,7 +2087,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
 
                     let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
 
-                    do! context.sync().``then``(fun _ -> ())
+                    do! context.sync()
 
                     let tableValues =
                         tableRange.values
@@ -2145,7 +2150,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
 
                         tableRange.values <- bodyValues
 
-                        do! context.sync().``then``(fun _ -> ())
+                        do! context.sync()
 
                         do! AnnotationTable.format(excelTable, context, true)
 
@@ -2154,7 +2159,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
             | _ ->
                 let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowCount"; "rowIndex"|]))
 
-                do! context.sync().``then``(fun _ -> ())
+                do! context.sync()
 
                 do! insertOntology selectedRange ontologyAnnotation context
                 return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the selected term"]
@@ -2254,15 +2259,11 @@ type Main =
         excelRunWith context0 <| fun context ->
             promise {
                 let worksheets = context.workbook.worksheets
-
-                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[| "name" |]))
-
-                do! context.sync().``then``(fun _ -> ())
-
+                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
+                do! context.sync()
                 let worksheetTopLevelMetadata =
                     worksheets.items
                     |> Seq.tryFind (fun item -> isTopLevelMetadataSheet item.name)
-
                 match worksheetTopLevelMetadata with
                 | Some worksheet when ArcAssay.isMetadataSheetName worksheet.name ->
                     let! assay = parseToTopLevelMetadata worksheet.name ArcAssay.fromMetadataCollection context

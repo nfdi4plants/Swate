@@ -181,6 +181,7 @@ const MockData = {
     },
     tables: tableCollection,
     worksheets: {
+      name: "worksheetCollection 1",
       position: 0,
       items: [ workSheet ],
       activeWorkSheet: workSheet,

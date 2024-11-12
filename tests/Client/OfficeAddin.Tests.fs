@@ -19,9 +19,30 @@ let compositeColumn =
     let header = CompositeHeader.Parameter (OntologyAnnotation.create("Test"))
     CompositeColumn.create(header)
 
+let arcTable =
+    let table = ArcTable.init("annotationTable 2")
+    let header = CompositeHeader.Component (OntologyAnnotation.create("TestI"))
+    let body = CompositeCell.emptyData
+    ArcTable.addColumnFill(header, body) table
+
 let arcInvestigation =
     let investigation = ArcInvestigation.init("New Investigation")
     ArcFiles.Investigation investigation
+
+let arcAssay =
+    let assay = ArcAssay.init("New Assay")
+    assay.AddTable(arcTable)
+    ArcFiles.Assay assay
+
+let arcStudy =
+    let study = ArcStudy.init("New Study")
+    study.AddTable(arcTable)
+    ArcFiles.Study (study, [])
+
+let arcTemplate =
+    let template = Template.init("New Template")
+    template.Table <- arcTable
+    ArcFiles.Template template
 
 let private TestsBasic = testList "Basic tests" [
     testCaseAsync "develop mock" <| async {
@@ -56,12 +77,36 @@ let private TestsSuccessful = testList "Successful tests" [
         Expect.equal result.IsEmpty true "This is a message"
     }
 
-    testCaseAsync "develop updateArcInvestigationTest successful" <| async {
+    testCaseAsync "develop ArcInvestigation updateTest successful" <| async {
         let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
         let! resultRes = OfficeInterop.Core.Main.updateArcFile (arcInvestigation, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 0 tables!" "This is a message"
+    }
+
+    testCaseAsync "develop ArcAssay updateTest successful" <| async {
+        let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile (arcAssay, testContext) |> Async.AwaitPromise
+
+        let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
+        Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" "This is a message"
+    }
+
+    testCaseAsync "develop ArcStudy updateTest successful" <| async {
+        let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile (arcStudy, testContext) |> Async.AwaitPromise
+
+        let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
+        Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" "This is a message"
+    }
+
+    testCaseAsync "develop Template updateTest successful" <| async {
+        let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile (arcTemplate, testContext) |> Async.AwaitPromise
+
+        let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
+        Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" "This is a message"
     }
 
     testCaseAsync "develop parseExcelDataToArcFileTest successful" <| async {
