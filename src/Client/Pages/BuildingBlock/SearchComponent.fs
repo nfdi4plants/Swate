@@ -136,8 +136,11 @@ let Main (model: Model) dispatch =
     //let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
     //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
     Html.div [
-        SearchBuildingBlockHeaderElement (state_bb, setState_bb, model, dispatch)
-        if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
-            SearchBuildingBlockBodyElement (model, dispatch)
-        AddBuildingBlockButton model dispatch
+        prop.className "flex flex-col gap-2"
+        prop.children [
+            SearchBuildingBlockHeaderElement (state_bb, setState_bb, model, dispatch)
+            if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
+                SearchBuildingBlockBodyElement (model, dispatch)
+            AddBuildingBlockButton model dispatch
+        ]
     ]

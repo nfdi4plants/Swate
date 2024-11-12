@@ -12,17 +12,21 @@ open Shared
 [<ReactComponent>]
 let FreeTextInputElement(onSubmit: string -> unit) =
     let inputS, setInput = React.useState ""
-    Daisy.join [
-        prop.className "w-full"
+    Html.div [
+        prop.className "flex flex-row gap-0 p-0"
         prop.children [
             Daisy.input [
-                prop.className "min-w-48 !rounded-none"
+                join.item
                 input.sm
+                prop.placeholder "..."
+                prop.className "grow truncate"
                 prop.onClick (fun e -> e.stopPropagation())
                 prop.onChange (fun (v:string) -> setInput v)
                 prop.onKeyDown(key.enter, fun e -> e.stopPropagation(); onSubmit inputS)
             ]
-            Daisy.button.submit [
+            Daisy.button.button [
+                join.item
+                button.accent
                 button.sm
                 prop.onClick (fun e -> e.stopPropagation(); onSubmit inputS)
                 prop.children [
@@ -34,52 +38,45 @@ let FreeTextInputElement(onSubmit: string -> unit) =
 
 module private DropdownElements =
 
+    let divider = Daisy.divider [prop.className "mx-2 my-0"]
     let private itemTooltipStyle = [style.fontSize (length.rem 1.1); style.paddingRight (length.px 10); style.textAlign.center; style.color NFDIColors.Yellow.Darker20]
-    let private annotationsPrinciplesUrl = Html.a [prop.href Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.text "info"]
+    let private annotationsPrinciplesLink = Html.a [prop.href Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.className "ml-auto link-info"; prop.text "info"]
 
     let createSubBuildingBlockDropdownLink (state:BuildingBlockUIState) setState (subpage: Model.BuildingBlock.DropdownPage) =
-        Html.li [Html.a [
-            prop.tabIndex 0
+        Html.li [
             prop.onClick(fun e ->
                 e.preventDefault()
                 e.stopPropagation()
                 setState {state with DropdownPage = subpage}
             )
-            prop.style [
-                style.paddingRight(length.rem 1)
-                style.display.inlineFlex
-                style.justifyContent.spaceBetween
-            ]
             prop.children [
-
-                Html.span subpage.toString
-
-                Html.span [
-                    prop.style [style.width(length.px 20); style.alignSelf.flexEnd; style.lineHeight 1.5; style.fontSize(length.rem 1.1)]
-                    prop.children (Html.i [prop.className "fa-solid fa-arrow-right"])
+                Html.div [
+                    prop.className "flex flex-row justify-between"
+                    prop.children [
+                        Html.span subpage.toString
+                        Html.i [prop.className "fa-solid fa-arrow-right"]
+                    ]
                 ]
             ]
-        ]]
+        ]
 
     /// Navigation element back to main page
     let backToMainDropdownButton setState =
         Html.li [
-            prop.style [style.textAlign.right]
+            prop.className "flex flex-row justify-between"
+            prop.onClick(fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                setState {DropdownPage = BuildingBlock.DropdownPage.Main; DropdownIsActive = true}
+            )
             prop.children [
-                Daisy.button.button [
-                    prop.style [style.float'.left; style.width(length.px 20); style.height(length.px 20); style.borderRadius(length.px 4); style.custom("border", "unset")]
-                    prop.onClick(fun e ->
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setState {DropdownPage = BuildingBlock.DropdownPage.Main; DropdownIsActive = true}
-                    )
+                Html.a [
+                    prop.className "content-center"
                     prop.children [
-                        Html.i [
-                            prop.className "fa-solid fa-arrow-left"
-                        ]
+                        Html.i [ prop.className "fa-solid fa-arrow-left" ]
                     ]
                 ]
-                annotationsPrinciplesUrl
+                annotationsPrinciplesLink
             ]
         ]
 
@@ -99,7 +96,7 @@ module private DropdownElements =
         let setIO (ioType) =
             { DropdownPage = DropdownPage.Main; DropdownIsActive = false } |> setUiState
             (headerType,ioType) |> BuildingBlock.UpdateHeaderWithIO |> BuildingBlockMsg |> dispatch
-        Html.li [Daisy.button.button [
+        Html.li [
             match iotype with
             | IOType.FreeText s ->
                 let onSubmit = fun (v: string) ->
@@ -112,23 +109,22 @@ module private DropdownElements =
                 prop.children [
                     Html.div [prop.text (iotype.ToString())]
                 ]
-        ]]
+        ]
 
     /// Main column types subpage for dropdown
     let dropdownContentMain state setState (model:Model) dispatch =
         React.fragment [
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Input |> createSubBuildingBlockDropdownLink state setState
-            Daisy.divider []
+            divider
             CompositeHeaderDiscriminate.Parameter      |> createBuildingBlockDropdownItem model dispatch setState
             CompositeHeaderDiscriminate.Factor         |> createBuildingBlockDropdownItem model dispatch setState
             CompositeHeaderDiscriminate.Characteristic |> createBuildingBlockDropdownItem model dispatch setState
             CompositeHeaderDiscriminate.Component      |> createBuildingBlockDropdownItem model dispatch setState
             Model.BuildingBlock.DropdownPage.More       |> createSubBuildingBlockDropdownLink state setState
-            Daisy.divider []
+            divider
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Output |> createSubBuildingBlockDropdownLink state setState
             Html.li [
-                prop.style [style.textAlign.right]
-                prop.children annotationsPrinciplesUrl
+                prop.children annotationsPrinciplesLink
             ]
         ]
 
@@ -158,27 +154,27 @@ module private DropdownElements =
             backToMainDropdownButton setState
         ]
 
+[<ReactComponent>]
 let Main state setState (model: Model) dispatch =
+    let isOpen, setOpen = React.useState false
     Daisy.dropdown [
         join.item
-        // if state.DropdownIsActive then dropdown.open'
+        if isOpen then dropdown.open'
         prop.children [
             Daisy.button.div [
-                prop.tabIndex 0
+                button.primary
+                prop.onClick (fun _ -> setOpen (not isOpen))
                 prop.role "button"
-                // prop.onClick (fun e -> e.stopPropagation(); setState {state with DropdownIsActive = not state.DropdownIsActive})
+                join.item
                 prop.children [
-                    Html.span [
-                        prop.style [style.marginRight 5]
-                        prop.text (model.AddBuildingBlockState.HeaderCellType.ToString())
-                    ]
+                    Html.span (model.AddBuildingBlockState.HeaderCellType.ToString())
                     Html.i [
                         prop.className "fa-solid fa-angle-down"
                     ]
                 ]
             ]
             Daisy.dropdownContent [
-                prop.tabIndex 0
+                prop.className "bg-base-300 w-64 menu rounded-box z-[1] p-2 shadow"
                 prop.children [
                     match state.DropdownPage with
                     | Model.BuildingBlock.DropdownPage.Main ->

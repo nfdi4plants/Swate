@@ -119,12 +119,12 @@ type Widget =
                     config.once <- true
                     Browser.Dom.document.addEventListener("mouseup", onmouseup, config)
                 )
-                prop.className "drop-shadow border border-black *:p-4"
+                prop.className "shadow-md border border-base-300 space-y-4 rounded-lg border-r-2 bg-base-100"
                 prop.style [
                     style.zIndex 40
                     style.cursor.eastWestResize//style.cursor.northWestSouthEastResize ;
                     style.display.flex
-                    style.paddingRight(2);
+                    // style.paddingRight(2);
                     style.overflow.visible
                     style.position.fixedRelativeToWindow
                     style.minWidth.minContent
@@ -159,40 +159,42 @@ type Widget =
                         config.once <- true
                         Browser.Dom.document.addEventListener("mouseup", onmouseup, config)
                     )
-                    prop.style [style.cursor.move]
+                    prop.className "cursor-move flex justify-end bg-gradient-to-br from-primary to-base-200 rounded-lg"
                     prop.children [
-                        Html.div [
-                            prop.className "justify-end"
-                            prop.children [Components.Components.DeleteButton(props=[prop.onClick (fun e -> e.stopPropagation(); rmv e)])]
-                        ]
+                        Components.Components.DeleteButton(props=[prop.className "btn-ghost glass";prop.onClick (fun e -> e.stopPropagation(); rmv e)])
                     ]
                 ]
                 Html.div [
-                    prop.style [style.overflow.inheritFromParent]
+                    prop.className "p-2"
                     prop.children [
                         content
-                        if help.IsSome then Elements.helpExtendButton (fun _ -> setHelpIsActive (not helpIsActive))
                     ]
                 ]
-                Html.div [
-                    prop.className "border-t"
-                    if help.IsSome then
+                if help.IsSome then
+                    Html.div [
+                        prop.tabIndex 0
+                        prop.className "text-primary prose collapse bg-opacity-50 focus:bg-primary focus:text-primary-content rounded-none"
                         prop.children [
-                            Html.div [
-                                prop.className "widget-help-container prose"
-                                prop.style [style.overflow.hidden; if not helpIsActive then style.display.none; ]
+                            Daisy.collapseTitle [
+                                prop.className "px-2 py-1 min-h-0 flex"
+                                prop.children [
+                                    Html.div [prop.text "Help"; prop.className "text-sm font-light ml-auto"]
+                                ]
+                            ]
+                            Daisy.collapseContent [
+                                prop.className "marker:text-primary-content"
                                 prop.children [
                                     help.Value
                                 ]
                             ]
                         ]
-                ]
+                    ]
             ]
         ]
 
     static member BuildingBlock (model, dispatch, rmv: MouseEvent -> unit) =
         let content = BuildingBlock.SearchComponent.Main model dispatch
-        let help = Html.div [
+        let help = React.fragment [
             Html.p "Add a new Building Block."
             Html.ul [
                 Html.li "If a cell is selected, a new Building Block is added to the right of the selected cell."

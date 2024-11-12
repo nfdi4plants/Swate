@@ -201,22 +201,6 @@ open Fable.Core.JsInterop
 
 type TermSearch =
 
-    static member ToggleSearchButton (element: ReactElement, ref: IRefValue<HTMLElement option>, searchable: bool, searchableSetter: bool -> unit) =
-        Daisy.join [
-            prop.ref ref
-            prop.children [
-                element
-                Daisy.button.a [
-                    join.item
-                    if not searchable then
-                        button.neutral
-                    prop.className "h-full join-item border-0"
-                    prop.onClick(fun _ -> searchableSetter (not searchable))
-                    prop.children [Html.i [prop.className "fa-solid fa-magnifying-glass"]]
-                ]
-            ]
-        ]
-
     [<ReactComponent>]
     static member TermSelectItem (term: Term, setTerm, ?isDirectedSearchResult: bool) =
         let isDirectedSearchResult = defaultArg isDirectedSearchResult false
@@ -285,20 +269,19 @@ type TermSearch =
     static member Input (
         setter: OntologyAnnotation option -> unit,
         ?input: OntologyAnnotation, ?parent: OntologyAnnotation,
-        ?searchableToggle: bool,
+        ?isSearchable: bool,
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
         ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isjoin: bool, ?displayParent: bool, ?borderRadius: int, ?border: string, ?minWidth: Styles.ICssUnit)
         =
         let isjoin = defaultArg isjoin false
-        let searchableToggle = defaultArg searchableToggle false
+        let isSearchable = defaultArg isSearchable true
         let autofocus = defaultArg autofocus false
         let displayParent = defaultArg displayParent true
         let advancedSearchActive, setAdvancedSearchActive = React.useState(false)
         let fullwidth = defaultArg fullwidth false
         let loading, setLoading = React.useState(false)
-        let searchable, setSearchable = React.useState(true)
         let searchNameState, setSearchNameState = React.useState(SearchState.init)
         let searchTreeState, setSearchTreeState = React.useState(SearchState.init)
         let isSearching, setIsSearching = React.useState(false)
@@ -339,16 +322,18 @@ type TermSearch =
             let oa = searchTest |> Option.map (fun x -> OntologyAnnotation x)
             debouncel debounceStorage.current "SetterDebounce" 500 setLoading setter oa
         Html.div [
-            prop.className "input input-bordered flex items-center gap-2"
-            if isjoin then join.item
+            prop.className [
+                "input input-bordered flex items-center gap-2"
+                if isjoin then "join-item";
+            ]
             if size.IsSome then size.Value
-            if not searchableToggle then prop.ref ref
+            prop.ref ref
             prop.style [
                 if fullwidth then style.flexGrow 1;
                 if minWidth.IsSome then style.minWidth minWidth.Value
             ]
             prop.children [
-                if not searchableToggle then Components.searchIcon
+                Components.searchIcon
                 Html.input [
                     prop.className "grow"
                     prop.autoFocus autofocus
@@ -364,12 +349,12 @@ type TermSearch =
                         let s : string = e.target?value
                         if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
                             log "Double click empty + parent"
-                            if searchable then
+                            if isSearchable then
                                 startSearch()
                                 allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         elif s.Trim() <> "" then
                             log "Double click not empty"
-                            if searchable then
+                            if isSearchable then
                                 startSearch()
                                 mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
                         else
@@ -381,7 +366,7 @@ type TermSearch =
                             stopSearch() // When deleting text this should stop search from completing
                         else
                             registerChange(Some s)
-                            if searchable then
+                            if isSearchable then
                                 startSearch()
                                 mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
                     )
@@ -395,10 +380,6 @@ type TermSearch =
                         | 13. -> //enter
                             debounceStorage.current.ClearAndRun()
                             if onEnter.IsSome then onEnter.Value e
-                        | 9. -> //tab
-                            if searchableToggle then
-                                e.preventDefault()
-                                setSearchable (not searchable)
                         | _ -> ()
                     )
                 ]
@@ -438,9 +419,4 @@ type TermSearch =
                 ]
             ]
         ]
-        |> fun main ->
-            if searchableToggle then
-                TermSearch.ToggleSearchButton(main, ref, searchable, setSearchable)
-            else
-                main
 

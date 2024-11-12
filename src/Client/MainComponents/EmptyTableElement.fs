@@ -9,7 +9,8 @@ type EmptyTableElement =
     static member private Button(icons: ReactElement, onclick) =
         Daisy.button.button [
             button.primary
-            prop.className "place-self-end"
+            button.square
+            prop.className "place-self-end gap-0"
             prop.onClick (fun _ -> onclick())
             prop.children icons
         ]
