@@ -158,43 +158,47 @@ function createWorksheet(name, position, tableCollection, range) {
   }
 }
 
+function createWorksheetCollection(name, items, activeWorksheet) {
+  return {
+    name: name,
+    items: items,
+    getActiveWorksheet: function () {
+      return activeWorksheet
+    },
+    getItemOrNullObject: function () {
+      return activeWorksheet
+    },
+    add: function (worksheetName) {
+      return activeWorksheet
+    },
+    getItem: function (worksheetName) {
+      return this.items.find(worksheet => worksheet.name === worksheetName)
+    }
+  }
+}
 
 const range = createRange("C2:G3", tableValues)
 const rangeWithLoad = createRangeWithLoad("C2:G3", tableValues)
 
 const tableWorksheet = createWorksheet("worksheet 1", 1, [], rangeWithLoad)
-
 const table1 = createTable("table 1", 0, tableWorksheet, rangeWithLoad)
 const annotationTable1 = createTable("annotationTable 1", 1, tableWorksheet, rangeWithLoad)
-
 const tableCollection = createTableCollection([table1, annotationTable1], 0, annotationTable1)
 
-const workSheet = createWorksheet("worksheet 1", 1, tableCollection, rangeWithLoad)
+const worksheet = createWorksheet("worksheet 1", 1, tableCollection, rangeWithLoad)
+const investigationMetadataWorksheet = createWorksheet("isa_investigation", 0, [], rangeWithLoad)
+const worksheetCollection = createWorksheetCollection("worksheetCollection 1", [worksheet, investigationMetadataWorksheet], worksheet)
 
 const MockData = {
   workbook: {
     name: "workbook",
     position: 0,
     range: range,
+    tables: tableCollection,
+    worksheets: worksheetCollection,
     getSelectedRange: function () {
       return this.range;
     },
-    tables: tableCollection,
-    worksheets: {
-      name: "worksheetCollection 1",
-      position: 0,
-      items: [ workSheet ],
-      activeWorkSheet: workSheet,
-      getActiveWorksheet: function () {
-        return workSheet
-      },
-      getItemOrNullObject: function () {
-        return workSheet
-      },
-      add: function (workSheetName) {
-        return workSheet
-      },
-    }
   },
 };
 
@@ -203,24 +207,11 @@ const MockData2 = {
     name: "workbook",
     position: 0,
     range: range,
+    tables: tableCollection,
+    worksheets: worksheetCollection,
     getSelectedRange: function () {
       return this.range;
     },
-    tables: tableCollection,
-    worksheets: {
-      position: 0,
-      items: [ workSheet ],
-      activeWorkSheet: workSheet,
-      getActiveWorksheet: function () {
-        return workSheet
-      },
-      getItemOrNullObject: function () {
-        return workSheet
-      },
-      add: function (workSheetName) {
-        return workSheet
-      },
-    }
   },
   sync: function() {
     return Promise.resolve();  // Simulate a successful sync

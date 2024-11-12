@@ -1888,7 +1888,7 @@ let deleteTopLevelMetadata () =
         promise {
             let worksheets = context.workbook.worksheets
 
-            let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+            let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"|]))
 
             do! context.sync()
 
@@ -2258,12 +2258,15 @@ type Main =
         let getTables = defaultArg getTables true
         excelRunWith context0 <| fun context ->
             promise {
+                let _ = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"worksheets"|]))
+                do! context.sync()
                 let worksheets = context.workbook.worksheets
-                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"name"|]))
+                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
                 do! context.sync()
                 let worksheetTopLevelMetadata =
                     worksheets.items
                     |> Seq.tryFind (fun item -> isTopLevelMetadataSheet item.name)
+
                 match worksheetTopLevelMetadata with
                 | Some worksheet when ArcAssay.isMetadataSheetName worksheet.name ->
                     let! assay = parseToTopLevelMetadata worksheet.name ArcAssay.fromMetadataCollection context

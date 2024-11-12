@@ -71,7 +71,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop addCompositeColumnTest" <| async {
         let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
-        let! resultRes = OfficeInterop.Core.Main.addCompositeColumn (compositeColumn, context0=testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.addCompositeColumn(compositeColumn, context0=testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
         Expect.equal result.IsEmpty true "This is a message"
@@ -79,7 +79,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop ArcInvestigation updateTest successful" <| async {
         let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
-        let! resultRes = OfficeInterop.Core.Main.updateArcFile (arcInvestigation, testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile(arcInvestigation, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 0 tables!" "This is a message"
@@ -87,7 +87,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop ArcAssay updateTest successful" <| async {
         let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
-        let! resultRes = OfficeInterop.Core.Main.updateArcFile (arcAssay, testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile(arcAssay, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" "This is a message"
@@ -95,7 +95,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop ArcStudy updateTest successful" <| async {
         let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
-        let! resultRes = OfficeInterop.Core.Main.updateArcFile (arcStudy, testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile(arcStudy, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" "This is a message"
@@ -103,15 +103,15 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop Template updateTest successful" <| async {
         let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
-        let! resultRes = OfficeInterop.Core.Main.updateArcFile (arcTemplate, testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile(arcTemplate, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" "This is a message"
     }
 
-    testCaseAsync "develop parseExcelDataToArcFileTest successful" <| async {
+    testCaseAsync "develop parseExcelInvestigationMetaDataToArcFileTest successful" <| async {
         let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
-        let! resultRes = OfficeInterop.Core.Main.tryParseToArcFile (context0=testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.tryParseToArcFile(context0=testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
         Expect.equal (Result.toOption result).IsNone true "This is a message"
