@@ -472,7 +472,7 @@ type FormComponents =
                 if not isValid then
                     let txt = validator |> Option.map _.msg |> Option.defaultValue "Invalid input."
                     Html.p [
-                        prop.className "text-error text-sm"
+                        prop.className "text-error text-sm mt-1"
                         prop.text txt
                     ]
             ]
@@ -725,7 +725,7 @@ type FormComponents =
             input.ToString(),
             (fun s -> System.Guid.Parse s |> setter),
             ?label=label,
-            validator={| fn = Guid.TryParse >> fst; msg = "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx." |}
+            validator={| fn = Guid.TryParse >> fst; msg = "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Using numbers 0 through 9 and letters A through F." |}
         )
 
     [<ReactComponent>]
