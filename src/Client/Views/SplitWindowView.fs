@@ -96,7 +96,13 @@ open Model
 let Main (left:seq<ReactElement>) (right:seq<ReactElement>) (mainModel:Model) (dispatch: Messages.Msg -> unit) =
     let (model, setModel) = React.useState(SplitWindow.init)
     React.useEffect(model.WriteToLocalStorage, [|box model|])
-    React.useEffectOnce(fun _ -> Browser.Dom.window.addEventListener("resize", onResize_event model setModel))
+    React.useEffectOnce(fun _ ->
+        let event = onResize_event model setModel
+        let rmv = fun () -> Browser.Dom.window.removeEventListener("resize", event)
+        let dispose = React.createDisposable rmv
+        Browser.Dom.window.addEventListener("resize", onResize_event model setModel)
+        dispose
+    )
     Html.div [
         prop.id "SplitWindowView"
         prop.className "flex overflow-auto grow"

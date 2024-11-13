@@ -84,7 +84,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                     Html.i [prop.className "fa-solid fa-trash-can";]
                 ],
                 (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
-                classes = "hover:text-error"
+                classes = "hover:!text-error"
             )
         ]
     ]

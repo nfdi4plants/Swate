@@ -103,7 +103,7 @@
     <Compile Include="MainComponents\ContextMenu.fs" />
     <Compile Include="MainComponents\Cells.fs" />
     <Compile Include="MainComponents\KeyboardShortcuts.fs" />
-    <Compile Include="MainComponents\AddRows.fs" />
+    <Compile Include="MainComponents\TableFooter.fs" />
     <Compile Include="MainComponents\SpreadsheetView\Generic.fs" />
     <Compile Include="MainComponents\SpreadsheetView\ArcTable.fs" />
     <Compile Include="MainComponents\SpreadsheetView\DataMap.fs" />

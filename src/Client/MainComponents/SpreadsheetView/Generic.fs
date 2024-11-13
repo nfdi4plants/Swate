@@ -35,7 +35,7 @@ let Main (data, createCell, headers, createHeaderCell, model:Model, dispatch: Ms
                 createCell,
                 {|data=headers state setState; createCell=createHeaderCell|},
                 35,
-                tableClasses=[|"fixed_headers"|],
+                tableClasses=[|""|],
                 containerClasses=[|"pr-[10vw]"|],
                 rowLabel={|styling=Some createRowLabel|}
             )

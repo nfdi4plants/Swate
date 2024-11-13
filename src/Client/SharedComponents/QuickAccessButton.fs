@@ -9,7 +9,7 @@ type QuickAccessButton =
         let isDisabled = defaultArg isDisabled false
         Html.button [
             prop.className [
-                "px-3 h-8 min-h-8 text-primary inline-flex justify-center items-center transition-all hover:brightness-110 cursor-pointer disabled:cursor-not-allowed disabled:text-gray-500";
+                "px-3 h-8 min-h-8 text-secondary-content transition-colors duration-300 inline-flex justify-center items-center hover:text-primary cursor-pointer disabled:cursor-not-allowed disabled:text-gray-500";
                 if classes.IsSome then classes.Value
             ]
             prop.tabIndex (if isDisabled then -1 else 0)

@@ -58,7 +58,7 @@ open Shared
 
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
-    let widgets, setWidgets = React.useState([Widget._DataAnnotator])
+    let widgets, setWidgets = React.useState([])
     let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
     let bringWidgetToFront (widget: Widget) =
         let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev
@@ -108,7 +108,7 @@ let Main (model: Model, dispatch) =
                                 MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget)
                             | _ ->
                                 MainComponents.SpreadsheetView.ArcTable.Main(model, dispatch)
-                                MainComponents.AddRows.Main dispatch
+                                MainComponents.TableFooter.Main dispatch
                         | Spreadsheet.ActiveView.Metadata ->
                             Html.section [
                                 prop.className "overflow-y-auto h-full"
@@ -144,7 +144,7 @@ let Main (model: Model, dispatch) =
                             ]
                         | Spreadsheet.ActiveView.DataMap ->
                             MainComponents.SpreadsheetView.DataMap.Main(model, dispatch)
-                            MainComponents.AddRows.Main dispatch
+                            MainComponents.TableFooter.Main dispatch
                 ]
             ]
             if state.ArcFile.IsSome then

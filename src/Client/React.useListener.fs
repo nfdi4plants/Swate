@@ -87,6 +87,9 @@ module React =
         static member inline onTouchStart (action: TouchEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
             useListener.on("touchstart", action, ?options = options, ?dependencies = dependencies)
 
+        static member inline onResize (action: Event -> unit, ?options: AddEventListenerOptions) =
+            useListener.on("resize", action, ?options = options)
+
         /// Invokes the callback when a click event is not within the given element.
         ///
         /// Uses separate handlers for touch and mouse events.
@@ -154,3 +157,6 @@ module React =
             )
 
             React.useEffect(listener)
+
+        static member inline onResize (elemRef: IRefValue<#HTMLElement option>, action: Event -> unit, ?options: AddEventListenerOptions) =
+            useElementListener.on(elemRef, "resize", action, ?options = options)
