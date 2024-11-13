@@ -64,7 +64,7 @@ let private dragbar (model:SplitWindow) (setModel: SplitWindow -> unit) (dispatc
             style.height (length.perc 100)
             style.backgroundColor.darkGray
             style.cursor.columnResize
-            style.zIndex 39
+            style.zIndex 1
         ]
         prop.onMouseDown <| mouseDown_event (mouseMove_event model setModel)
     ]

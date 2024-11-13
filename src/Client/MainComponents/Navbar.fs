@@ -127,9 +127,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
             (fun _ -> addWidget Widget._DataAnnotator)
         )
     Html.div [
-        prop.style [
-            style.display.flex; style.flexDirection.row
-        ]
+        prop.className "flex flex-row"
         prop.children [
             match model.SpreadsheetModel.ActiveView with
             | Spreadsheet.ActivePattern.IsTable ->

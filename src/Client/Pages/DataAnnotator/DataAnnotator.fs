@@ -13,8 +13,8 @@ module private DataAnnotatorHelper =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
             Daisy.button.button [
-                prop.style [style.marginLeft length.auto]
                 prop.onClick rmvFile
+                button.outline
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     button.disabled
                 else
@@ -25,22 +25,23 @@ module private DataAnnotatorHelper =
         [<ReactComponent>]
         let UpdateSeparatorButton dispatch =
             let updateSeparator = fun s -> DataAnnotator.UpdateSeperator s |> DataAnnotatorMsg |> dispatch
-            let input, setInput = React.useState("")
+            let input_, setInput = React.useState("")
             Daisy.join [
                 prop.children [
                     Daisy.input [
+                        input.bordered
                         join.item
                         prop.placeholder ".. update separator"
-                        prop.defaultValue input
+                        prop.defaultValue input_
                         prop.onChange(fun s -> setInput s)
                         prop.onKeyDown(key.enter, fun e ->
-                            updateSeparator input
+                            updateSeparator input_
                         )
                     ]
                     Daisy.button.button [
                         join.item
                         prop.text "Update"
-                        prop.onClick (fun _ -> updateSeparator input)
+                        prop.onClick (fun _ -> updateSeparator input_)
                     ]
                 ]
             ]
@@ -54,7 +55,7 @@ module private DataAnnotatorHelper =
                     prop.text "Has Header"
                 ]
             Daisy.button.button [
-                if hasHeader then button.success
+                if hasHeader then button.primary
                 prop.onClick (fun _ -> DataAnnotator.ToggleHeader |> DataAnnotatorMsg |> dispatch)
                 prop.children txtEle
             ]
@@ -70,17 +71,23 @@ module private DataAnnotatorHelper =
                 | TargetColumn.Autodetect -> "Creates missing Input or Output column, if both exist submit will fail!"
                 | TargetColumn.Input -> "Create Input column, will overwrite!"
                 | TargetColumn.Output -> "Create Output column, will overwrite!"
-            Html.div [
+            Daisy.tooltip [
+                tooltip.bottom
+                tooltip.text infoText
                 prop.children [
-                    Html.div [
-                        prop.title infoText
-                        prop.className "select"
-                        prop.defaultValue (string current)
-                        prop.onChange(fun (e: string) ->
-                            TargetColumn.fromString e |> setTarget
-                        )
+                    Daisy.indicator [
                         prop.children [
-                            Html.select [
+                            Html.i [
+                                prop.className "indicator-item fa-solid fa-info-circle fa-lg text-accent"
+                            ]
+                            Daisy.select [
+                                select.bordered
+                                join.item
+                                prop.title infoText
+                                prop.defaultValue (string current)
+                                prop.onChange(fun (e: string) ->
+                                            TargetColumn.fromString e |> setTarget
+                                        )
                                 prop.children [
                                     mkOption TargetColumn.Autodetect
                                     mkOption TargetColumn.Input
@@ -89,13 +96,12 @@ module private DataAnnotatorHelper =
                             ]
                         ]
                     ]
-                    Html.i [prop.className "fa-solid fa-info-circle"]
                 ]
             ]
-
         let UploadButton (ref: IRefValue<#Browser.Types.HTMLElement option>) (model: Model) (uploadFile: Browser.Types.File -> unit) =
             Daisy.file [
-                file.success
+                prop.className "col-span-2"
+                file.primary
                 file.bordered
                 prop.ref ref
                 prop.onChange uploadFile
@@ -103,6 +109,7 @@ module private DataAnnotatorHelper =
 
         let OpenModalButton model mkOpen =
             Daisy.button.button [
+                button.primary
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     button.disabled
                 prop.text "Open Annotator"
@@ -114,7 +121,7 @@ module private DataAnnotatorHelper =
 
     let ModalMangementComponent ref (model: Model) (openModal: Browser.Types.Event -> unit) rmvFile uploadFile =
         Html.div [
-            prop.className "grid grid-cols-1 md:grid-cols-3 gap-4"
+            prop.className "grid grid-cols-2 gap-4"
             prop.children [
                 UploadButton ref model uploadFile
                 ResetButton model rmvFile
@@ -124,7 +131,7 @@ module private DataAnnotatorHelper =
 
     let DataFileConfigComponent model rmvFile target setTarget dispatch =
         Html.div [
-            prop.className "flex flex-row justify-between"
+            prop.className "flex flex-row gap-4"
             prop.children [
                 match model.SpreadsheetModel.ActiveView with
                 | Spreadsheet.ActivePattern.IsTable ->
@@ -235,7 +242,7 @@ module private DataAnnotatorHelper =
         |]
         let rowHeight = 57.
         Html.div [
-            prop.className "overflow-hidden"
+            prop.className "overflow-hidden flex"
             prop.children [
                 Components.LazyLoadTable.Main(
                     "DataAnnotatorFileView",
@@ -264,40 +271,46 @@ type DataAnnotator =
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
                 Daisy.modalBox.div [
-                    prop.style [style.maxHeight(length.percent 80); style.width (length.perc 80); style.overflowY.hidden]
+                    prop.className "max-w-none"
                     prop.children [
-                        Daisy.card [Daisy.cardBody [
-                            Daisy.cardActions [Components.DeleteButton(props = [prop.onClick rmv]) |> prop.children; prop.className "justify-end"]
-                            Daisy.cardTitle "Data Annotator"
-                            Html.div [
-                                prop.className "p-5 overflow-hidden flex flex-col"
-                                prop.children [
-                                    DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
-                                    FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
-                                    FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
+                        Daisy.card [
+                            card.compact
+                            prop.children [
+                                Daisy.cardBody [
+                                    prop.className "grid grid-cols-1 grid-rows-[1fr_1fr_20px_8fr_1fr] h-[600px] w-full overflow-hidden"
+                                    prop.children [
+                                        Daisy.cardTitle [
+                                            Html.p "Data Annotator"
+                                            Daisy.cardActions [Components.DeleteButton(props = [prop.onClick rmv]) |> prop.children; prop.className "justify-end"]
+                                        ]
+                                        DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
+                                        FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
+                                        // Html.div [prop.text "Test 4"; prop.className "bg-yellow-300"]
+                                        FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
+                                        Daisy.cardActions [
+                                            Daisy.button.button [
+                                                button.info
+                                                prop.style [style.marginLeft length.auto]
+                                                prop.text "Submit"
+                                                prop.onClick(fun e ->
+                                                    match model.DataAnnotatorModel.DataFile with
+                                                    | Some dtf ->
+                                                        let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
+                                                        let name = dtf.DataFileName
+                                                        let dt = dtf.DataFileType
+                                                        SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}
+                                                        |> InterfaceMsg
+                                                        |> dispatch
+                                                    | None ->
+                                                        logw "No file selected"
+                                                    rmv e
+                                                )
+                                            ]
+                                        ]
+                                    ]
                                 ]
                             ]
-                            Daisy.cardActions [
-                                Daisy.button.button [
-                                    button.info
-                                    prop.style [style.marginLeft length.auto]
-                                    prop.text "Submit"
-                                    prop.onClick(fun e ->
-                                        match model.DataAnnotatorModel.DataFile with
-                                        | Some dtf ->
-                                            let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
-                                            let name = dtf.DataFileName
-                                            let dt = dtf.DataFileType
-                                            SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}
-                                            |> InterfaceMsg
-                                            |> dispatch
-                                        | None ->
-                                            logw "No file selected"
-                                        rmv e
-                                    )
-                                ]
-                            ]
-                        ]]
+                        ]
                     ]
                 ]
             ]

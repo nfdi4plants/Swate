@@ -8,6 +8,7 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
+
 /// Fields of Template that can be searched
 [<RequireQualifiedAccess>]
 type SearchFields =
@@ -61,6 +62,9 @@ type TemplateFilterConfig = {
 
 module ComponentAux =
 
+    let ErBadgeColor = badge.primary
+    let TagBadgeColor = badge.accent
+
     let curatedOrganisationNames = [
         "dataplant"
         "nfdi4plants"
@@ -76,33 +80,74 @@ module ComponentAux =
             Daisy.join [
                 prop.children [
                     if hasSearchAddon then
-                        Daisy.button.a [ join.item; button.disabled; prop.text state.Searchfield.toStr]
+                        Daisy.button.a [ join.item; prop.readOnly true; button.disabled; prop.text state.Searchfield.toStr; prop.className "!text-base-content !border-primary"]
                     Daisy.label [
-                        Daisy.input [
-                            prop.style [style.minWidth 200]
-                            prop.placeholder $".. {state.Searchfield.toNameRdb}"
-                            prop.id SearchFieldId
-                            input.primary
-                            prop.valueOrDefault state.ProtocolSearchQuery
-                            prop.onChange (fun (e: string) ->
-                                let query = e
-                                // if query starts with "/" expect intend to search by different field
-                                if query.StartsWith "/" then
-                                    let searchField = SearchFields.GetOfQuery query
-                                    if searchField.IsSome then
-                                        {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
-                                        //let inp = Browser.Dom.document.getElementById SearchFieldId
-                                // if query starts NOT with "/" update query
-                                else
-                                    {
-                                        state with
-                                            ProtocolSearchQuery = query
-                                    }
-                                    |> setState
-                            )
+                        prop.className "join-item input input-bordered input-primary flex items-center"
+                        prop.children [
+                            Html.input [
+                                prop.style [style.minWidth 200]
+                                prop.placeholder $".. {state.Searchfield.toNameRdb}"
+                                prop.id SearchFieldId
+                                prop.valueOrDefault state.ProtocolSearchQuery
+                                prop.onChange (fun (e: string) ->
+                                    let query = e
+                                    // if query starts with "/" expect intend to search by different field
+                                    if query.StartsWith "/" then
+                                        let searchField = SearchFields.GetOfQuery query
+                                        if searchField.IsSome then
+                                            {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
+                                            //let inp = Browser.Dom.document.getElementById SearchFieldId
+                                    // if query starts NOT with "/" update query
+                                    else
+                                        {
+                                            state with
+                                                ProtocolSearchQuery = query
+                                        }
+                                        |> setState
+                                )
+                            ]
+                            Html.i [prop.className "fa-solid fa-search"]
                         ]
-                        Html.i [prop.className "fa-solid fa-search"]
                     ]
+                ]
+            ]
+        ]
+
+    let Tag (tag:OntologyAnnotation, color: IReactProperty, isRemovable: bool, onclick: (Browser.Types.MouseEvent -> unit) option) =
+        Daisy.badge [
+            color
+            if onclick.IsSome then
+                prop.onClick(onclick.Value)
+                prop.className "cursor-pointer hover:brightness-110"
+            prop.children [
+                if isRemovable then
+                    Svg.svg [
+                        svg.xmlns "http://www.w3.org/2000/svg"
+                        svg.fill "none"
+                        svg.viewBox (0,0,24,24)
+                        svg.className "inline-block h-4 w-4 stroke-current"
+                        svg.children [
+                            Svg.path [
+                                svg.strokeLineCap "round"
+                                svg.strokeLineJoin "round"
+                                svg.strokeWidth 2
+                                svg.d "M6 18L18 6M6 6l12 12"
+                            ]
+                        ]
+                    ]
+                Html.div tag.NameText
+            ]
+            prop.title tag.TermAccessionShort
+        ]
+
+    let TagContainer(tagList: OntologyAnnotation [], title: string, updateToggle, badgeColor) =
+        React.fragment [
+            Daisy.divider title
+            Html.div [
+                prop.className "flex flex-wrap gap-2"
+                prop.children [
+                    for tagSuggestion in tagList do
+                        Tag(tagSuggestion, badgeColor, false, Some <| fun _ -> updateToggle tagSuggestion)
                 ]
             ]
         ]
@@ -132,68 +177,51 @@ module ComponentAux =
                 [||], [||]
         Html.div [
             Html.p "Search for tags"
-            Daisy.label [
+            Html.div [
+                prop.className "relative"
                 prop.children [
-                    Daisy.input [
-                        prop.style [style.minWidth 150]
-                        prop.placeholder ".. protocol tag"
-                        input.primary
-                        prop.valueOrDefault state.ProtocolTagSearchQuery
-                        prop.onChange (fun (e:string) ->
-                            {state with ProtocolTagSearchQuery = e} |> setState
-                        )
+                    Daisy.label [
+                        prop.className "input input-bordered input-primary flex items-center"
+                        prop.children [
+                            Html.input [
+                                prop.placeholder ".. protocol tag"
+                                input.primary
+                                prop.valueOrDefault state.ProtocolTagSearchQuery
+                                prop.onChange (fun (e:string) ->
+                                    {state with ProtocolTagSearchQuery = e} |> setState
+                                )
+                            ]
+                            Html.i [prop.className "fa-solid fa-search"]
+                            // Pseudo dropdown
+                        ]
                     ]
-                    Html.i [prop.className "fa-solid fa-search"]
-                    // Pseudo dropdown
                     Html.div [
+                        prop.className "absolute bg-base-300 shadow-lg rounded-md w-full z-10 p-2 text-base-content"
                         prop.style [
-                            style.position.absolute
-                            style.width(length.perc 100)
-                            style.zIndex 10
                             if hitTagList |> Array.isEmpty && hitErTagList |> Array.isEmpty then style.display.none
                         ]
                         prop.children [
                             if hitErTagList <> [||] then
-                                Html.p "Endpoint Repositories"
-                                Html.div [
-                                    for tagSuggestion in hitErTagList do
-                                        yield
-                                            Daisy.badge [
-                                                prop.className "clickableTag"
-                                                badge.info
-                                                prop.onClick (fun _ ->
-                                                    let nextState = {
-                                                        state with
-                                                            ProtocolFilterErTags = tagSuggestion::state.ProtocolFilterErTags
-                                                            ProtocolTagSearchQuery = ""
-                                                    }
-                                                    setState nextState
-                                                )
-                                                prop.title tagSuggestion.TermAccessionShort
-                                                prop.text tagSuggestion.NameText
-                                            ]
-                                ]
+                                let updateToggle =
+                                    (fun tagSuggestion ->
+                                        let nextState = {
+                                            state with
+                                                ProtocolFilterErTags = tagSuggestion::state.ProtocolFilterErTags
+                                                ProtocolTagSearchQuery = ""
+                                        }
+                                        setState nextState
+                                    )
+                                TagContainer(hitErTagList, "Endpoint Repositories", updateToggle, ErBadgeColor)
                             if hitTagList <> [||] then
-                                Html.p "Tags"
-                                Html.div [
-                                    for tagSuggestion in hitTagList do
-                                        yield
-                                            Daisy.badge [
-                                                prop.className "clickableTag"
-                                                button.info
-                                                prop.onClick (fun _ ->
-                                                    let nextState = {
-                                                            state with
-                                                                ProtocolFilterTags = tagSuggestion::state.ProtocolFilterTags
-                                                                ProtocolTagSearchQuery = ""
-                                                        }
-                                                    setState nextState
-                                                    //AddProtocolTag tagSuggestion |> ProtocolMsg |> dispatch
-                                                )
-                                                prop.title tagSuggestion.TermAccessionShort
-                                                prop.text tagSuggestion.NameText
-                                            ]
-                                ]
+                                let updateToggle = (fun tagSuggestion ->
+                                    let nextState = {
+                                        state with
+                                            ProtocolFilterTags = tagSuggestion::state.ProtocolFilterTags
+                                            ProtocolTagSearchQuery = ""
+                                    }
+                                    setState nextState
+                                )
+                                TagContainer(hitTagList, "Tags", updateToggle, TagBadgeColor)
                         ]
                     ]
                 ]
@@ -215,6 +243,8 @@ module ComponentAux =
         Html.div [
             Html.p "Select community"
             Daisy.select [
+                select.bordered
+                select.primary
                 prop.value (state.CommunityFilter.ToStringRdb())
                 prop.onChange(fun (e: Browser.Types.Event) ->
                     let filter = Model.Protocol.CommunityFilter.fromString e.target?value
@@ -228,30 +258,6 @@ module ComponentAux =
                             prop.value (option.ToStringRdb())
                             prop.text (option.ToStringRdb())
                         ]
-                ]
-            ]
-        ]
-
-    let TagRemovableElement (tag:OntologyAnnotation) (color: IReactProperty) (rmv: unit -> unit) =
-        Daisy.badge [
-            color
-            prop.className "hover:brightness-75"
-            prop.onClick (fun _ -> rmv())
-            prop.children [
-                Html.text tag.NameText
-                Svg.svg [
-                    svg.xmlns "http://www.w3.org/2000/svg"
-                    svg.fill "none"
-                    svg.viewBox (0,0,24,24)
-                    svg.className "inline-block h-4 w-4 stroke-current"
-                    svg.children [
-                        Svg.path [
-                            svg.strokeLineCap "round"
-                            svg.strokeLineJoin "round"
-                            svg.strokeWidth 2
-                            svg.d "M6 18L18 6M6 6l12 12"
-                        ]
-                    ]
                 ]
             ]
         ]
@@ -271,17 +277,17 @@ module ComponentAux =
 
     let TagDisplayField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         Html.div [
-            prop.className "is-flex"
+            prop.className "flex"
             prop.children [
                 Html.div [
-                    prop.style [style.display.flex; style.flexGrow 1; style.gap (length.rem 0.5); style.flexWrap.wrap; style.flexDirection.row]
+                    prop.className "flex flex-wrap gap-2"
                     prop.children [
                         for selectedTag in state.ProtocolFilterErTags do
-                            let rmv = fun () -> {state with ProtocolFilterErTags = state.ProtocolFilterErTags |> List.except [selectedTag]} |> setState
-                            TagRemovableElement selectedTag button.accent rmv
+                            let rmv = fun _ -> {state with ProtocolFilterErTags = state.ProtocolFilterErTags |> List.except [selectedTag]} |> setState
+                            Tag (selectedTag, ErBadgeColor, true, Some rmv)
                         for selectedTag in state.ProtocolFilterTags do
-                            let rmv = fun () -> {state with ProtocolFilterTags = state.ProtocolFilterTags |> List.except [selectedTag]} |> setState
-                            TagRemovableElement selectedTag button.info rmv
+                            let rmv = fun _ -> {state with ProtocolFilterTags = state.ProtocolFilterTags |> List.except [selectedTag]} |> setState
+                            Tag(selectedTag, TagBadgeColor, true, Some rmv)
                     ]
                 ]
                 // tag filter (AND or OR)
@@ -291,27 +297,23 @@ module ComponentAux =
         ]
 
     let fileSortElements (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
-
-        Html.div [
-            prop.style [style.marginBottom(length.rem 0.75); style.display.flex; style.flexDirection.column]
-            prop.children [
-                Html.div [
-                    prop.className "template-filter-container"
-                    prop.children [
-                        queryField model state setState
-                        tagQueryField model state setState
-                        communitySelectField model state setState
-                    ]
+        React.fragment [
+            Html.div [
+                prop.className "flex flex-row gap-4"
+                prop.children [
+                    queryField model state setState
+                    tagQueryField model state setState
+                    communitySelectField model state setState
                 ]
-                // Only show the tag list and tag filter (AND or OR) if any tag exists
-                if state.ProtocolFilterErTags <> [] || state.ProtocolFilterTags <> [] then
-                    Html.div [
-                        TagDisplayField model state setState
-                    ]
             ]
+            // Only show the tag list and tag filter (AND or OR) if any tag exists
+            if state.ProtocolFilterErTags <> [] || state.ProtocolFilterTags <> [] then
+                Html.div [
+                    TagDisplayField model state setState
+                ]
         ]
 
-    let curatedTag = Daisy.badge [prop.text "curated"; badge.success]
+    let curatedTag = Daisy.badge [prop.text "curated"; badge.primary]
     let communitytag = Daisy.badge [prop.text "community"; badge.warning]
     let curatedCommunityTag =
         Daisy.badge [
@@ -371,7 +373,6 @@ module ComponentAux =
                 Html.td [
                     prop.key $"{i}_{template.Id}_description"
                     prop.style [
-                        style.padding 0
                         if isShown then
                             style.borderBottom (2, borderStyle.solid, "black")
                         else
@@ -380,30 +381,43 @@ module ComponentAux =
                     prop.colSpan 4
                     prop.children [
                         Html.div [
-                            Html.div [
-                                Html.div template.Description
+                            prop.className "prose max-w-none p-3"
+                            prop.children [
                                 Html.div [
-                                    Html.div [ Html.b "Author: "; Html.span (createAuthorsStringHelper template.Authors) ]
-                                    Html.div [ Html.b "Created: "; Html.span (template.LastUpdated.ToString("yyyy/MM/dd")) ]
+                                    Html.div template.Description
+                                    Html.div [
+                                        Html.div [ Html.b "Author: "; Html.span (createAuthorsStringHelper template.Authors) ]
+                                        Html.div [ Html.b "Created: "; Html.span (template.LastUpdated.ToString("yyyy/MM/dd")) ]
+                                    ]
+                                    Html.div [
+                                        Html.div [ Html.b "Organisation: "; Html.span (template.Organisation.ToString()) ]
+                                    ]
                                 ]
                                 Html.div [
-                                    Html.div [ Html.b "Organisation: "; Html.span (template.Organisation.ToString()) ]
+                                    prop.className "flex gap-2 mb-1"
+                                    prop.children [
+                                        for tag in template.EndpointRepositories do
+                                            Tag(tag, ErBadgeColor, false, None)
+                                    ]
+                                ]
+                                Html.div [
+                                    prop.className "flex gap-2"
+                                    prop.children [
+                                        for tag in template.Tags do
+                                            Tag(tag, TagBadgeColor, false, None)
+                                    ]
                                 ]
                             ]
-                            Html.div [
-                                for tag in template.EndpointRepositories do
-                                    yield
-                                        Daisy.badge [badge.accent; prop.text tag.NameText; prop.title tag.TermAccessionShort]
-                            ]
-                            Html.div [
-                                for tag in template.Tags do
-                                    yield
-                                        Daisy.badge [button.info; prop.text tag.NameText; prop.title tag.TermAccessionShort]
-                            ]
-                            Daisy.button.a [
-                                prop.onClick (fun _ -> SelectProtocol template |> ProtocolMsg |> dispatch)
-                                button.block; button.success
-                                prop.text "select"
+                        ]
+                        Html.div [
+                            prop.className "flex justify-center"
+                            prop.children [
+                                Daisy.button.a [
+                                    button.sm
+                                    prop.onClick (fun _ -> SelectProtocol template |> ProtocolMsg |> dispatch)
+                                    button.wide; button.success
+                                    prop.text "select"
+                                ]
                             ]
                         ]
                     ]
@@ -498,7 +512,6 @@ type Search =
 
     static member InfoField() =
         Html.div [
-            prop.className "prose-sm"
             prop.children [
                 Html.p [
                     Html.b "Search for templates."

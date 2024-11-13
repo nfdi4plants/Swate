@@ -173,7 +173,10 @@ type Widget =
                 if help.IsSome then
                     Html.div [
                         prop.tabIndex 0
-                        prop.className "text-primary prose collapse bg-opacity-50 focus:bg-primary focus:text-primary-content rounded-none"
+                        prop.className "text-primary collapse bg-opacity-50 rounded-none max-w-none
+                        focus:bg-primary focus:text-primary-content
+                        prose prose-a:text-primary-content
+                        prose-code:text-base-content prose-code:bg-base-200 prose-code:rounded-none"
                         prop.children [
                             Daisy.collapseTitle [
                                 prop.className "px-2 py-1 min-h-0 flex"
@@ -232,6 +235,7 @@ type Widget =
         let content =
             let switchContent = if model.ProtocolState.TemplateSelected.IsNone then selectContent() else insertContent()
             Html.div [
+                prop.className "flex flex-col gap-4"
                 prop.children switchContent
             ]
 

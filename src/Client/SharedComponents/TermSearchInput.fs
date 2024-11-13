@@ -273,7 +273,7 @@ type TermSearch =
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
-        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isjoin: bool, ?displayParent: bool, ?borderRadius: int, ?border: string, ?minWidth: Styles.ICssUnit)
+        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isjoin: bool, ?displayParent: bool, ?classes: string)
         =
         let isjoin = defaultArg isjoin false
         let isSearchable = defaultArg isSearchable true
@@ -325,22 +325,18 @@ type TermSearch =
             prop.className [
                 "input input-bordered flex items-center gap-2"
                 if isjoin then "join-item";
+                if classes.IsSome then classes.Value;
             ]
             if size.IsSome then size.Value
             prop.ref ref
             prop.style [
                 if fullwidth then style.flexGrow 1;
-                if minWidth.IsSome then style.minWidth minWidth.Value
             ]
             prop.children [
                 Components.searchIcon
                 Html.input [
                     prop.className "grow"
                     prop.autoFocus autofocus
-                    prop.style [
-                        if borderRadius.IsSome then style.borderRadius borderRadius.Value
-                        if border.IsSome then style.custom("border", border.Value)
-                    ]
                     if size.IsSome then size.Value
                     if input.IsSome then prop.valueOrDefault input.Value.NameText
                     prop.ref inputRef

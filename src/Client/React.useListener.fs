@@ -27,11 +27,11 @@ module Impl =
 
         try
             if isWindowDefined() && isWindowListenerFunction() then
-                let options = 
+                let options =
                     jsOptions<AddEventListenerOptions>(fun o ->
                         o.passive <- true
                     )
-                
+
                 window.addEventListener("testPassiveEventSupport", ignore, options)
                 window.removeEventListener("testPassiveEventSupport", ignore)
         with _ -> ()
@@ -54,7 +54,7 @@ module Impl =
     let createRemoveOptions (maybeOptions: AddEventListenerOptions option) =
         maybeOptions
         |> Option.bind (fun options ->
-            if options.capture then 
+            if options.capture then
                 Some (jsOptions<RemoveEventListenerOptions>(fun o -> o.capture <- true))
             else None)
 
@@ -62,14 +62,14 @@ module Impl =
 module React =
     [<Erase>]
     type useListener =
-        static member inline on (eventType: string, action: #Event -> unit, ?options: AddEventListenerOptions) =
+        static member inline on (eventType: string, action: #Event -> unit, ?options: AddEventListenerOptions, ?dependencies: obj []) =
             let addOptions = React.useMemo((fun () -> Impl.adjustPassive options), [| options |])
             let removeOptions = React.useMemo((fun () -> Impl.createRemoveOptions options), [| options |])
-            let fn = React.useMemo((fun () -> unbox<#Event> >> action), [| action |])
+            let fn = React.useMemo((fun () -> unbox<#Event> >> action), [| action; if dependencies.IsSome then yield! dependencies.Value |])
 
             let listener = React.useCallbackRef(fun () ->
                 match addOptions with
-                | Some options -> 
+                | Some options ->
                     document.addEventListener(eventType, fn, options)
                 | None -> document.addEventListener(eventType, fn)
 
@@ -79,8 +79,57 @@ module React =
                     | None -> document.removeEventListener(eventType, fn)
                 )
             )
-            
+
             React.useEffect(listener)
+
+        static member inline onMouseDown (action: MouseEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
+            useListener.on("mousedown", action, ?options = options, ?dependencies = dependencies)
+        static member inline onTouchStart (action: TouchEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
+            useListener.on("touchstart", action, ?options = options, ?dependencies = dependencies)
+
+        /// Invokes the callback when a click event is not within the given element.
+        ///
+        /// Uses separate handlers for touch and mouse events.
+        ///
+        /// This listener is passive by default.
+        static member inline onClickAway (elemRef: IRefValue<#HTMLElement option>, callback: MouseEvent -> unit, touchCallback: TouchEvent -> unit, ?options: AddEventListenerOptions) =
+            let options = Option.defaultValue Impl.defaultPassive options
+
+            useListener.onMouseDown((fun ev ->
+                match elemRef.current with
+                | Some elem when not (elem.contains(unbox ev.target)) ->
+                    callback ev
+                | _ -> ()
+            ), options)
+
+            useListener.onTouchStart((fun ev ->
+                match elemRef.current with
+                | Some elem when not (elem.contains(unbox ev.target)) ->
+                    touchCallback ev
+                | _ -> ()
+            ), options)
+
+        /// Invokes the callback when a click event is not within the given element.
+        ///
+        /// Shares a common callback for both touch and mouse events.
+        ///
+        /// This listener is passive by default.
+        static member inline onClickAway (elemRef: IRefValue<#HTMLElement option>, callback: UIEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
+            let options = Option.defaultValue Impl.defaultPassive options
+
+            useListener.onMouseDown((fun ev ->
+                match elemRef.current with
+                | Some elem when not (elem.contains(unbox ev.target)) ->
+                    callback ev
+                | _ -> ()
+            ), options, ?dependencies = dependencies)
+
+            useListener.onTouchStart((fun ev ->
+                match elemRef.current with
+                | Some elem when not (elem.contains(unbox ev.target)) ->
+                    callback ev
+                | _ -> ()
+            ), options, ?dependencies = dependencies)
 
     [<Erase>]
     type useElementListener =
@@ -95,8 +144,8 @@ module React =
                     | Some options -> elem.addEventListener(eventType, fn, options)
                     | None -> elem.addEventListener(eventType, fn)
                 )
-                
-                React.createDisposable(fun () -> 
+
+                React.createDisposable(fun () ->
                     elemRef.current |> Option.iter(fun elem ->
                         match removeOptions with
                         | Some options -> elem.removeEventListener(eventType, fn, options)

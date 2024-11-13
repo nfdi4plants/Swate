@@ -61,40 +61,42 @@ module private DropdownElements =
         ]
 
     /// Navigation element back to main page
-    let backToMainDropdownButton setState =
+    let DropdownContentInfoFooter setState (hasBack: bool) =
         Html.li [
-            prop.className "flex flex-row justify-between"
+            prop.className "flex flex-row justify-between pt-1"
             prop.onClick(fun e ->
                 e.preventDefault()
                 e.stopPropagation()
                 setState {DropdownPage = BuildingBlock.DropdownPage.Main; DropdownIsActive = true}
             )
             prop.children [
-                Html.a [
-                    prop.className "content-center"
-                    prop.children [
-                        Html.i [ prop.className "fa-solid fa-arrow-left" ]
+                if hasBack then
+                    Html.a [
+                        prop.className "content-center"
+                        prop.children [
+                            Html.i [ prop.className "fa-solid fa-arrow-left" ]
+                        ]
                     ]
-                ]
                 annotationsPrinciplesLink
             ]
         ]
 
-    let createBuildingBlockDropdownItem (model: Model) dispatch setUiState (headerType: CompositeHeaderDiscriminate) =
+    let createBuildingBlockDropdownItem (model: Model) (dispatch: Msg -> unit) setUiState close (headerType: CompositeHeaderDiscriminate) =
         Html.li [Html.a [
             prop.onClick (fun e ->
                 e.stopPropagation()
-                Helper.selectCompositeHeaderDiscriminate headerType setUiState dispatch
+                Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
             )
             prop.onKeyDown(fun k ->
-                if (int k.which) = 13 then Helper.selectCompositeHeaderDiscriminate headerType setUiState dispatch
+                if (int k.which) = 13 then Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
             )
             prop.text (headerType.ToString())
         ]]
 
-    let createIOTypeDropdownItem (model: Model) dispatch setUiState (headerType: CompositeHeaderDiscriminate) (iotype: IOType) =
+    let createIOTypeDropdownItem (model: Model) dispatch setUiState close (headerType: CompositeHeaderDiscriminate) (iotype: IOType) =
         let setIO (ioType) =
             { DropdownPage = DropdownPage.Main; DropdownIsActive = false } |> setUiState
+            close()
             (headerType,ioType) |> BuildingBlock.UpdateHeaderWithIO |> BuildingBlockMsg |> dispatch
         Html.li [
             match iotype with
@@ -112,51 +114,50 @@ module private DropdownElements =
         ]
 
     /// Main column types subpage for dropdown
-    let dropdownContentMain state setState (model:Model) dispatch =
+    let dropdownContentMain state setState close (model:Model) (dispatch: Msg -> unit) =
         React.fragment [
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Input |> createSubBuildingBlockDropdownLink state setState
             divider
-            CompositeHeaderDiscriminate.Parameter      |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.Factor         |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.Characteristic |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.Component      |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.Parameter      |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.Factor         |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.Characteristic |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.Component      |> createBuildingBlockDropdownItem model dispatch setState close
             Model.BuildingBlock.DropdownPage.More       |> createSubBuildingBlockDropdownLink state setState
             divider
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Output |> createSubBuildingBlockDropdownLink state setState
-            Html.li [
-                prop.children annotationsPrinciplesLink
-            ]
+            DropdownContentInfoFooter setState false
         ]
 
     /// Protocol Type subpage for dropdown
-    let dropdownContentProtocolTypeColumns state setState (model:Model) dispatch =
+    let dropdownContentProtocolTypeColumns state setState close (model:Model) dispatch =
         React.fragment [
-            CompositeHeaderDiscriminate.Date                |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.Performer           |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.ProtocolREF         |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.ProtocolType        |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.ProtocolUri         |> createBuildingBlockDropdownItem model dispatch setState
-            CompositeHeaderDiscriminate.ProtocolVersion     |> createBuildingBlockDropdownItem model dispatch setState
+            CompositeHeaderDiscriminate.Date                |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.Performer           |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.ProtocolREF         |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.ProtocolType        |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.ProtocolUri         |> createBuildingBlockDropdownItem model dispatch setState close
+            CompositeHeaderDiscriminate.ProtocolVersion     |> createBuildingBlockDropdownItem model dispatch setState close
             // Navigation element back to main page
-            backToMainDropdownButton setState
+            DropdownContentInfoFooter setState true
         ]
 
     /// Output columns subpage for dropdown
-    let dropdownContentIOTypeColumns header state setState (model:Model) dispatch =
+    let dropdownContentIOTypeColumns header state setState close (model:Model) dispatch =
         React.fragment [
-            IOType.Source           |> createIOTypeDropdownItem model dispatch setState header
-            IOType.Sample           |> createIOTypeDropdownItem model dispatch setState header
-            IOType.Material         |> createIOTypeDropdownItem model dispatch setState header
-            IOType.Data             |> createIOTypeDropdownItem model dispatch setState header
-            IOType.FreeText ""      |> createIOTypeDropdownItem model dispatch setState header
+            IOType.Source           |> createIOTypeDropdownItem model dispatch setState close header
+            IOType.Sample           |> createIOTypeDropdownItem model dispatch setState close header
+            IOType.Material         |> createIOTypeDropdownItem model dispatch setState close header
+            IOType.Data             |> createIOTypeDropdownItem model dispatch setState close header
+            IOType.FreeText ""      |> createIOTypeDropdownItem model dispatch setState close header
             // Navigation element back to main page
-            backToMainDropdownButton setState
+            DropdownContentInfoFooter setState true
         ]
 
 [<ReactComponent>]
-let Main state setState (model: Model) dispatch =
+let Main(state, setState, model: Model, dispatch: Msg -> unit) =
     let isOpen, setOpen = React.useState false
+    let close = fun _ -> setOpen false
     Daisy.dropdown [
         join.item
         if isOpen then dropdown.open'
@@ -166,6 +167,7 @@ let Main state setState (model: Model) dispatch =
                 prop.onClick (fun _ -> setOpen (not isOpen))
                 prop.role "button"
                 join.item
+                prop.className "flex-nowrap"
                 prop.children [
                     Html.span (model.AddBuildingBlockState.HeaderCellType.ToString())
                     Html.i [
@@ -178,11 +180,11 @@ let Main state setState (model: Model) dispatch =
                 prop.children [
                     match state.DropdownPage with
                     | Model.BuildingBlock.DropdownPage.Main ->
-                        DropdownElements.dropdownContentMain state setState model dispatch
+                        DropdownElements.dropdownContentMain state setState close model dispatch
                     | Model.BuildingBlock.DropdownPage.More ->
-                        DropdownElements.dropdownContentProtocolTypeColumns state setState model dispatch
+                        DropdownElements.dropdownContentProtocolTypeColumns state setState close model dispatch
                     | Model.BuildingBlock.DropdownPage.IOTypes iotype ->
-                        DropdownElements.dropdownContentIOTypeColumns iotype state setState model dispatch
+                        DropdownElements.dropdownContentIOTypeColumns iotype state setState close model dispatch
                 ]
             ]
         ]

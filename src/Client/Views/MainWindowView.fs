@@ -58,7 +58,7 @@ open Shared
 
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
-    let widgets, setWidgets = React.useState([Widget._BuildingBlock])
+    let widgets, setWidgets = React.useState([Widget._DataAnnotator])
     let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
     let bringWidgetToFront (widget: Widget) =
         let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev
