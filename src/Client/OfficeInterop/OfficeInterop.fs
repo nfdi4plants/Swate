@@ -1684,127 +1684,6 @@ let updateSelectedBuildingBlocks (excelTable: Table) (arcTable: ArcTable) (prope
                 excelTable.columns.items.[pIndex].values <- bodyValues
             )
         }
-/// <summary>
-/// Validates the arc table of the currently selected work sheet
-/// When the validations returns an error, an error is returned to the user
-/// When the arc table is valid one or more of the following processes happen:
-/// * When the main column of term or unit is empty, then the Term Source REF and Term Accession Number are emptied
-/// * When the main column of term or unit contains a value, the Term Source REF and Term Accession Number are filled
-/// with the correct value
-/// The later is not implemented yet
-/// </summary>
-let rectifyTermColumns (context0, getTerms0) =
-    excelRunWith context0 <| fun context ->
-        promise {
-            let! excelTableRes = AnnotationTable.tryGetActive context
-            //When there are messages, then there is an error and further processes can be skipped because the annotation table is not valid
-            match excelTableRes with
-            | None -> return [InteropLogging.NoActiveTableMsg]
-            | Some excelTable ->
-                //Arctable enables a fast check for term and unit building blocks
-                let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
-                match arcTableRes with
-                | Result.Ok arcTable ->
-                    let columns = arcTable.Columns
-                    let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
-                    do! context.sync()
-                    let items = excelTable.columns.items
-                    let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
-                    let columns =
-                        items
-                        |> Array.ofSeq
-                        |> Array.map (fun c ->
-                            c.values
-                            |> Array.ofSeq
-                            |> Array.collect (fun cc ->
-                                cc
-                                |> Array.ofSeq
-                                |> Array.choose (fun r -> if r.IsSome then Some (r.ToString()) else None)
-                            )
-                        )
-                    let body = excelTable.getDataBodyRange()
-                    let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
-
-                    do! context.sync()
-                    for i in 0..columns.Length-1 do
-                        let column = columns.[i]
-                        if Array.contains (column.[0].Trim()) termAndUnitHeaders then
-                            let! potBuildingBlock = getCompositeColumnInfoByIndex excelTable i context
-                            let buildingBlock = potBuildingBlock |> Array.ofSeq
-
-                            // Check whether building block is unit or not
-                            // When it is unit, then delete the property column values only when the unit is empty, independent of the main column
-                            // When it is a term, then delete the property column values when the main column is empty
-                            let mainColumn =
-                                if snd buildingBlock.[1] = "Unit" then
-                                    excelTable.columns.items.Item (fst buildingBlock.[1])
-                                else excelTable.columns.items.Item (fst buildingBlock.[0])
-                            let potPropertyColumns =
-                                buildingBlock.[1..]
-                                |> Array.map (fun (index, _) -> index, excelTable.columns.items.Item index)
-
-                            let propertyColumns =
-                                potPropertyColumns
-                                |> Array.map (fun (index, c) ->
-                                    index,
-                                    c.values
-                                    |> Array.ofSeq
-                                    |> Array.collect (fun pc ->
-                                        pc
-                                        |> Array.ofSeq
-                                        |> Array.choose (fun pcv -> if pcv.IsSome then Some (pcv.ToString()) else None)
-                                    )
-                                )
-
-                            let mainColumnHasValues =
-                                mainColumn.values
-                                |> Array.ofSeq
-                                |> Array.collect (fun c ->
-                                    c
-                                    |> Array.ofSeq
-                                    |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
-                                    |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
-                                )
-
-                            let mutable names = []
-                            let mutable indices = []
-
-                            //Check whether value of property colum is fitting for value of main column and adapt if not
-                            //Delete values of property columns when main column is empty
-                            for pi in 0..propertyColumns.Length-1 do
-                                let pIndex, pcv = propertyColumns.[pi]
-                                let values = Array.create (arcTable.RowCount + 1) ""
-                                for mainIndex in 0..mainColumnHasValues.Length-1 do
-                                    let mc, isNull = mainColumnHasValues.[mainIndex]
-                                    if not isNull then
-                                        names <- mc::names
-                                        indices <- mainIndex::indices
-                                        values.[mainIndex] <- pcv.[mainIndex]
-                                let bodyValues =
-                                    values
-                                    |> Array.map (box >> Some)
-                                    |> Array.map (fun c -> ResizeArray[c])
-                                    |> ResizeArray
-                                excelTable.columns.items.[pIndex].values <- bodyValues
-
-                            let getTerms =
-                                match getTerms0 with
-                                | Some getTerms -> getTerms
-                                | None -> searchTermsInDatabase
-                            let! terms = getTerms names
-
-                            let indexedTerms =
-                                indices
-                                |> List.mapi (fun ii index ->
-                                    index, terms.[ii])
-
-                            do! updateSelectedBuildingBlocks excelTable arcTable propertyColumns indexedTerms
-                    do! AnnotationTable.format(excelTable, context, true)
-
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
-
-                | Result.Error ex -> return [InteropLogging.Msg.create InteropLogging.Error ex.Message]
-        }
 
 /// <summary>
 /// Try to get the values of top level meta data from excel worksheet
@@ -2219,7 +2098,6 @@ let insertFileNamesFromFilePicker (fileNameList: string list) =
 
 let getTableMetaData () =
     Excel.run (fun context ->
-
         promise {
             let! excelTable = AnnotationTable.tryGetActive context
             if excelTable.IsNone then failwith "Error. No active table found!"
@@ -2254,7 +2132,6 @@ let getTableMetaData () =
     )
 
 type Main =
-
     /// <summary>
     /// Reads all excel information and returns ArcFiles object, with metadata and tables.
     /// </summary>
@@ -2376,6 +2253,126 @@ type Main =
                     do! Main.createNewAnnotationTable(table, context).``then``(fun _ -> ())
                 updatedWorksheet.activate()
                 return [InteropLogging.Msg.create InteropLogging.Info $"Replaced existing Swate information! Added {tables.TableCount} tables!"]
+            }
+
+    /// <summary>
+    /// Validates the arc table of the currently selected work sheet
+    /// When the validations returns an error, an error is returned to the user
+    /// When the arc table is valid one or more of the following processes happen:
+    /// * When the main column of term or unit is empty, then the Term Source REF and Term Accession Number are emptied
+    /// * When the main column of term or unit contains a value, the Term Source REF and Term Accession Number are filled
+    /// with the correct value
+    /// The later is not implemented yet
+    /// </summary>
+    static member rectifyTermColumns (?context0, ?getTerms0) =
+        excelRunWith context0 <| fun context ->
+            promise {
+                let! excelTableRes = AnnotationTable.tryGetActive context
+                //When there are messages, then there is an error and further processes can be skipped because the annotation table is not valid
+                match excelTableRes with
+                | None -> return [InteropLogging.NoActiveTableMsg]
+                | Some excelTable ->
+                    //Arctable enables a fast check for term and unit building blocks
+                    let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
+                    match arcTableRes with
+                    | Result.Ok arcTable ->
+                        let columns = arcTable.Columns
+                        let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
+                        do! context.sync()
+                        let items = excelTable.columns.items
+                        let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
+                        let columns =
+                            items
+                            |> Array.ofSeq
+                            |> Array.map (fun c ->
+                                c.values
+                                |> Array.ofSeq
+                                |> Array.collect (fun cc ->
+                                    cc
+                                    |> Array.ofSeq
+                                    |> Array.choose (fun r -> if r.IsSome then Some (r.ToString()) else None)
+                                )
+                            )
+                        let body = excelTable.getDataBodyRange()
+                        let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
+
+                        do! context.sync()
+                        for i in 0..columns.Length-1 do
+                            let column = columns.[i]
+                            if Array.contains (column.[0].Trim()) termAndUnitHeaders then
+                                let! potBuildingBlock = getCompositeColumnInfoByIndex excelTable i context
+                                let buildingBlock = potBuildingBlock |> Array.ofSeq
+
+                                // Check whether building block is unit or not
+                                // When it is unit, then delete the property column values only when the unit is empty, independent of the main column
+                                // When it is a term, then delete the property column values when the main column is empty
+                                let mainColumn =
+                                    if snd buildingBlock.[1] = "Unit" then
+                                        excelTable.columns.items.Item (fst buildingBlock.[1])
+                                    else excelTable.columns.items.Item (fst buildingBlock.[0])
+                                let potPropertyColumns =
+                                    buildingBlock.[1..]
+                                    |> Array.map (fun (index, _) -> index, excelTable.columns.items.Item index)
+
+                                let propertyColumns =
+                                    potPropertyColumns
+                                    |> Array.map (fun (index, c) ->
+                                        index,
+                                        c.values
+                                        |> Array.ofSeq
+                                        |> Array.collect (fun pc ->
+                                            pc
+                                            |> Array.ofSeq
+                                            |> Array.choose (fun pcv -> if pcv.IsSome then Some (pcv.ToString()) else None)
+                                        )
+                                    )
+
+                                let mainColumnHasValues =
+                                    mainColumn.values
+                                    |> Array.ofSeq
+                                    |> Array.collect (fun c ->
+                                        c
+                                        |> Array.ofSeq
+                                        |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
+                                        |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
+                                    )
+
+                                let mutable names = []
+                                let mutable indices = []
+
+                                //Check whether value of property colum is fitting for value of main column and adapt if not
+                                //Delete values of property columns when main column is empty
+                                for pi in 0..propertyColumns.Length-1 do
+                                    let pIndex, pcv = propertyColumns.[pi]
+                                    let values = Array.create (arcTable.RowCount + 1) ""
+                                    for mainIndex in 0..mainColumnHasValues.Length-1 do
+                                        let mc, isNull = mainColumnHasValues.[mainIndex]
+                                        if not isNull then
+                                            names <- mc::names
+                                            indices <- mainIndex::indices
+                                            values.[mainIndex] <- pcv.[mainIndex]
+                                    let bodyValues =
+                                        values
+                                        |> Array.map (box >> Some)
+                                        |> Array.map (fun c -> ResizeArray[c])
+                                        |> ResizeArray
+                                    excelTable.columns.items.[pIndex].values <- bodyValues
+
+                                let getTerms = defaultArg getTerms0 searchTermsInDatabase
+
+                                let! terms = getTerms names
+
+                                let indexedTerms =
+                                    indices
+                                    |> List.mapi (fun ii index ->
+                                        index, terms.[ii])
+
+                                do! updateSelectedBuildingBlocks excelTable arcTable propertyColumns indexedTerms
+                        do! AnnotationTable.format(excelTable, context, true)
+
+                        return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+
+                    | Result.Error ex -> return [InteropLogging.Msg.create InteropLogging.Error ex.Message]
             }
 
     /// <summary>

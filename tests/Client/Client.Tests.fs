@@ -1,6 +1,7 @@
 module Client.Tests
 
 open Fable.Mocha
+open OfficeAddIn.AnnotationTable
 
 let client = testList "Client" [
     testCase "Hello received" <| fun _ ->
@@ -16,7 +17,7 @@ let all =
 #if FABLE_COMPILER // This preprocessor directive makes editor happy
             Shared.Tests.shared
 #endif
-            OfficeAddin.Tests.Main
+            Successful.Main
             client
         ]
 

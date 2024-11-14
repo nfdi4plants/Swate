@@ -1,7 +1,5 @@
 import { OfficeMockObject } from "office-addin-mock";
 
-//Problem still exists, cannot parse collections: https://github.com/OfficeDev/Office-Addin-Scripts/issues/729
-
 const headerRange = {
   values: [
     [
@@ -33,46 +31,7 @@ const tableValues = [
   ["body 0", "body 1", "body 2",]
 ]
 
-//function createRange(address, values) {
-//  return {
-//    address: address || "A1",
-//    values: values,
-//    format: {
-//      autofitColumns: function () {
-//        return
-//      },
-//      autofitRows: function () {
-//        return
-//      },
-//    },
-//    load: function (property) {
-//      if (Array.isArray(property)) {
-//        property.forEach((prop) => {
-//          this._loadedProperties[prop] = true;
-//       });
-//      } else {
-//        this._loadedProperties[property] = true;
-//      }
-//    },
-//  }
-//}
-
 function createRange(address, values) {
-  return {
-    address: address,
-    values: values,
-    format: {
-      autofitColumns: function () {
-        return
-      },
-      autofitRows: function () {
-        return
-      },
-    },
-  }
-}
-
-function createRangeWithLoad(address, values) {
   return {
     address: address,
     values: values,
@@ -178,15 +137,14 @@ function createWorksheetCollection(name, items, activeWorksheet) {
 }
 
 const range = createRange("C2:G3", tableValues)
-const rangeWithLoad = createRangeWithLoad("C2:G3", tableValues)
 
-const tableWorksheet = createWorksheet("worksheet 1", 1, [], rangeWithLoad)
-const table1 = createTable("table 1", 0, tableWorksheet, rangeWithLoad)
-const annotationTable1 = createTable("annotationTable 1", 1, tableWorksheet, rangeWithLoad)
+const tableWorksheet = createWorksheet("worksheet 1", 1, [], range)
+const table1 = createTable("table 1", 0, tableWorksheet, range)
+const annotationTable1 = createTable("annotationTable 1", 1, tableWorksheet, range)
 const tableCollection = createTableCollection([table1, annotationTable1], 0, annotationTable1)
 
-const worksheet = createWorksheet("worksheet 1", 1, tableCollection, rangeWithLoad)
-const investigationMetadataWorksheet = createWorksheet("isa_investigation", 0, [], rangeWithLoad)
+const worksheet = createWorksheet("worksheet 1", 1, tableCollection, range)
+const investigationMetadataWorksheet = createWorksheet("isa_investigation", 0, [], range)
 const worksheetCollection = createWorksheetCollection("worksheetCollection 1", [worksheet, investigationMetadataWorksheet], worksheet)
 
 const MockData = {
