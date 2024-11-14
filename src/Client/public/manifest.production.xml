@@ -43,11 +43,11 @@
                   <bt:Image size="80" resid="Icon.80x80"/>
                   <bt:Image size="96" resid="Icon.96x96"/>
                 </Icon>
-                <Control xsi:type="Button" id="Swate.Core">
-                    <Label resid="Swate.Core.Label"/>
+                <Control xsi:type="Button" id="Swate">
+                    <Label resid="Swate.Label"/>
                     <Supertip>
-                        <Title resid="Swate.Core.Label"/>
-                        <Description resid="Swate.Core.Tooltip"/>
+                        <Title resid="Swate.Label"/>
+                        <Description resid="Swate.Tooltip"/>
                     </Supertip>
                     <Icon>
                         <bt:Image size="16" resid="Icon.16x16"/>
@@ -62,7 +62,7 @@
                     </Icon>
                     <Action xsi:type="ShowTaskpane">
                         <TaskpaneId>ButtonId2</TaskpaneId>
-                        <SourceLocation resid="Swate.Core.Url"/>
+                        <SourceLocation resid="Swate.Url"/>
                     </Action>
                 </Control>
                 <!--<Control xsi:type="Button" id="Swate.Experts">
@@ -104,30 +104,21 @@
         <bt:Image id="Icon.64x64" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_64x64.png"/>
         <bt:Image id="Icon.80x80" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_80x80.png"/>
         <bt:Image id="Icon.96x96" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_96x96.png"/>
-        <bt:Image id="IconE.16x16" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_16x16.png"/>
-        <bt:Image id="IconE.20x20" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_20x20.png"/>
-        <bt:Image id="IconE.24x24" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_24x24.png"/>
-        <bt:Image id="IconE.32x32" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_32x32.png"/>
-        <bt:Image id="IconE.40x40" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_40x40.png"/>
-        <bt:Image id="IconE.48x48" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_48x48.png"/>
-        <bt:Image id="IconE.64x64" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_64x64.png"/>
-        <bt:Image id="IconE.80x80" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_80x80.png"/>
-        <bt:Image id="IconE.96x96" DefaultValue="https://swate-alpha.nfdi4plants.org/assets/swate_e_96x96.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
-        <bt:Url id="Swate.Core.Url" DefaultValue="https://swate-alpha.nfdi4plants.org?is_swatehost=2"/>
+        <bt:Url id="Swate.Url" DefaultValue="https://swate-alpha.nfdi4plants.org?is_swatehost=2"/>
         <!--<bt:Url id="Swate.Experts.Url" DefaultValue="https://swate-alpha.nfdi4plants.org/#Experts/JsonExport"/>-->
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>
         <bt:String id="SwateCommands.Label" DefaultValue="Swate"/>
-        <bt:String id="Swate.Core.Label" DefaultValue="Core"/>
+        <bt:String id="Swate.Label" DefaultValue="Swate"/>
         <bt:String id="Swate.Experts.Label" DefaultValue="Experts"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Swate was loaded succesfully. Go to the DATA tab and click the 'Swate' button to get started."/>
-        <bt:String id="Swate.Core.Tooltip" DefaultValue="Open a task pane to gain full access to the Swate user functionality."/>
+        <bt:String id="Swate.Tooltip" DefaultValue="Open a task pane to gain full access to the Swate user functionality."/>
         <bt:String id="Swate.Experts.Tooltip" DefaultValue="Open a task pane to gain full access to advanced, in-depth Swate functionalities."/>
       </bt:LongStrings>
     </Resources>
