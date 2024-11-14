@@ -1693,7 +1693,7 @@ let updateSelectedBuildingBlocks (excelTable: Table) (arcTable: ArcTable) (prope
 /// with the correct value
 /// The later is not implemented yet
 /// </summary>
-let rectifyTermColumns context0 =
+let rectifyTermColumns (context0, getTerms0) =
     excelRunWith context0 <| fun context ->
         promise {
             let! excelTableRes = AnnotationTable.tryGetActive context
@@ -1787,7 +1787,11 @@ let rectifyTermColumns context0 =
                                     |> ResizeArray
                                 excelTable.columns.items.[pIndex].values <- bodyValues
 
-                            let! terms = searchTermsInDatabase names
+                            let getTerms =
+                                match getTerms0 with
+                                | Some getTerms -> getTerms
+                                | None -> searchTermsInDatabase
+                            let! terms = getTerms names
 
                             let indexedTerms =
                                 indices

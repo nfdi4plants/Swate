@@ -63,7 +63,11 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop rectifyTermColumnsTest successful" <| async {
         let testContext: RequestContext = importDefault "./OfficeMockObjects/ExampleObject.js"
-        let! resultRes = OfficeInterop.Core.rectifyTermColumns (Some testContext) |> Async.AwaitPromise
+        let getTerms (termNames:string list) =
+            promise {
+                return [|None|]
+            }
+        let! resultRes = OfficeInterop.Core.rectifyTermColumns (Some testContext, Some getTerms) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "This is a message"
         Expect.equal result.Head.MessageTxt "The annotation table annotationTable 1 is valid" "This is a message"

@@ -159,7 +159,7 @@ module OfficeInterop =
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.rectifyTermColumns
-                        (None)
+                        (None, None)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
