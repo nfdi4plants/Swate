@@ -107,7 +107,7 @@ type TemplateFromFile =
             | ArcFilesDiscriminate.Template, JsonExportFormat.ROCrate
             | ArcFilesDiscriminate.Template, JsonExportFormat.ISA -> true
             | _ -> false
-        mainFunctionContainer [
+        SidebarComponents.SidebarLayout.LogicContainer [
             // modal!
             match state.UploadedFile with
             | Some af ->

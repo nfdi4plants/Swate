@@ -76,23 +76,19 @@ open Feliz.DaisyUI
 //    ]
 
 let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
-    Html.div [
-        prop.onSubmit (fun e -> e.preventDefault())
-        prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-        prop.children [
-            Html.h5 "Building Blocks"
+    SidebarComponents.SidebarLayout.Container [
+        SidebarComponents.SidebarLayout.Header "Building Blocks"
 
-            // Input forms, etc related to add building block.
-            Html.p "Add annotation building blocks (columns) to the annotation table."
-            mainFunctionContainer [
-                SearchComponent.Main model dispatch
-            ]
-            match model.PersistentStorageState.Host with
-            | Some Swatehost.Excel ->
-                Html.p "Convert existing Building Block."
-                mainFunctionContainer [
-                    CellConvertComponent.Main ()
-                ]
-            | _ -> Html.none
+        // Input forms, etc related to add building block.
+        SidebarComponents.SidebarLayout.Description "Add annotation building blocks (columns) to the annotation table."
+        SidebarComponents.SidebarLayout.LogicContainer [
+            SearchComponent.Main model dispatch
         ]
+        match model.PersistentStorageState.Host with
+        | Some Swatehost.Excel ->
+            Html.p "Convert existing Building Block."
+            SidebarComponents.SidebarLayout.LogicContainer [
+                CellConvertComponent.Main ()
+            ]
+        | _ -> Html.none
     ]

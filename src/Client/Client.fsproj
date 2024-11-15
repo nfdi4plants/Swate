@@ -15,7 +15,6 @@
     <Compile Include="Helper.fs" />
     <Compile Include="React.useListener.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
-    <Compile Include="LocalStorage\SplitWindow.fs" />
     <Compile Include="LocalStorage\Darkmode.fs" />
     <Compile Include="Colors\NFDIColors.fs" />
     <Compile Include="Colors\ExcelColors.fs" />
@@ -70,10 +69,13 @@
     <Compile Include="SharedComponents\Metadata\Investigation.fs" />
     <Compile Include="SharedComponents\Metadata\Study.fs" />
     <Compile Include="SharedComponents\Metadata\Template.fs" />
+    <Compile Include="SharedComponents\BaseNavbar.fs" />
     <Compile Include="SidebarComponents\DarkmodeButton.fs" />
     <Compile Include="SidebarComponents\LayoutHelper.fs" />
     <Compile Include="SidebarComponents\AnnotationTableMissingWarning.fs" />
+    <Compile Include="SidebarComponents\Tabs.fs" />
     <Compile Include="SidebarComponents\Navbar.fs" />
+    <Compile Include="SidebarComponents\Footer.fs" />
     <Compile Include="Pages\Cytoscape\CytoscapeGraph.fs" />
     <Compile Include="Pages\Cytoscape\CytoscapeUpdate.fs" />
     <Compile Include="Pages\BuildingBlock\CellConvertComponent.fs" />
@@ -98,7 +100,6 @@
     <Compile Include="MainComponents\CellStyles.fs" />
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />
-    <Compile Include="MainComponents\MainViewContainer.fs" />
     <Compile Include="MainComponents\NoFileElement.fs" />
     <Compile Include="MainComponents\ContextMenu.fs" />
     <Compile Include="MainComponents\Cells.fs" />
@@ -109,7 +110,6 @@
     <Compile Include="MainComponents\SpreadsheetView\DataMap.fs" />
     <Compile Include="MainComponents\Navbar.fs" />
     <Compile Include="MainComponents\FooterTabs.fs" />
-    <Compile Include="Views\SplitWindowView.fs" />
     <Compile Include="Views\NotFoundView.fs" />
     <Compile Include="Views\MainWindowView.fs" />
     <Compile Include="Views\SidebarView.fs" />

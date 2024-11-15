@@ -7,21 +7,11 @@ open Messages
 open Model
 open Update
 
-
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
 
 open Feliz
 open Feliz.DaisyUI
-
-let private split_container model dispatch =
-    let mainWindow = Seq.singleton <| MainWindowView.Main (model, dispatch)
-    let sideWindow = Seq.singleton <| SidebarView.SidebarView.Main(model, dispatch)
-    SplitWindowView.Main
-        mainWindow
-        sideWindow
-        model
-        dispatch
 
 [<ReactComponent>]
 let View (model : Model) (dispatch : Msg -> unit) =
@@ -38,13 +28,32 @@ let View (model : Model) (dispatch : Msg -> unit) =
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
         Html.div [
             prop.id "ClientView"
-            prop.className "flex size-full overflow-auto"
+            prop.className "flex size-full overflow-auto h-screen"
             prop.children [
                 match model.PersistentStorageState.Host with
                 | Some Swatehost.Excel ->
                     SidebarView.SidebarView.Main(model, dispatch)
                 | _ ->
-                    split_container model dispatch
+                    let isActive = model.SpreadsheetModel.TableViewIsActive() && model.PersistentStorageState.ShowSideBar
+                    Daisy.drawer [
+                        prop.className [
+                            "drawer-end"
+                            if isActive then "drawer-open"
+                        ]
+                        prop.children [
+                            Html.input [
+                                prop.id "split-window-drawer"
+                                prop.type'.checkbox
+                                prop.className "drawer-toggle"
+                            ]
+                            Daisy.drawerContent [
+                                MainWindowView.Main (model, dispatch)
+                            ]
+                            Daisy.drawerSide [
+                                SidebarView.SidebarView.Main(model, dispatch)
+                            ]
+                        ]
+                    ]
             ]
         ]
     )

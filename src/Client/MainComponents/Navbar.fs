@@ -153,37 +153,28 @@ let Main(model: Model, dispatch, widgets, setWidgets) =
             |> fun filteredWidgets -> add widget filteredWidgets
         else
             add widget widgets
-    Daisy.navbar [
-        prop.className "bg-secondary"
-        prop.id "swate-mainNavbar"
-        prop.role "navigation"
-        prop.ariaLabel "main navigation"
-        prop.style [
-            style.minHeight(length.rem 3.25)
+    Components.BaseNavbar.Main [
+        Html.div [
+            prop.className "grow-0"
+            prop.children [
+                FileName model
+            ]
         ]
-        prop.children [
+        Daisy.navbarCenter [
+            prop.children [
+                QuickAccessButtonListStart model.History dispatch
+                WidgetNavbarList(model, dispatch, addWidget)
+            ]
+        ]
+        match model.PersistentStorageState.Host with
+        | Some (Swatehost.ARCitect) ->
+            Html.none
+        | Some _ ->
             Html.div [
-                prop.className "grow-0"
+                prop.className "ml-auto"
                 prop.children [
-                    FileName model
+                    QuickAccessButtonListEnd model dispatch
                 ]
             ]
-            Daisy.navbarCenter [
-                prop.children [
-                    QuickAccessButtonListStart model.History dispatch
-                    WidgetNavbarList(model, dispatch, addWidget)
-                ]
-            ]
-            match model.PersistentStorageState.Host with
-            | Some (Swatehost.ARCitect) ->
-                Html.none
-            | Some _ ->
-                Html.div [
-                    prop.className "ml-auto"
-                    prop.children [
-                        QuickAccessButtonListEnd model dispatch
-                    ]
-                ]
-            | _ -> Html.none
-        ]
+        | _ -> Html.none
     ]

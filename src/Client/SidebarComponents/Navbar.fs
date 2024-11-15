@@ -208,7 +208,7 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
         ]
     ]
 
-let private ShortCutIconList toggleMetdadataModal model (dispatch: Messages.Msg -> unit) =
+let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -> unit) =
     [
         QuickAccessButton.Main(
             "Create Metadata",
@@ -332,133 +332,151 @@ let private quickAccessDropdownElement model dispatch (state: NavbarState) (setS
         ]
     ]
 
-let private QuickAccessListElement toggleMetdadataModal model dispatch =
-    Html.div [
-        prop.style [style.display.flex; style.flexDirection.row]
-        prop.children (ShortCutIconList toggleMetdadataModal model dispatch)
-    ]
-
 [<ReactComponent>]
-let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) (sidebarsize: Model.WindowSize) =
+let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) =
     let state, setState = React.useState(NavbarState.init)
     let inline toggleMetdadataModal _ = { state with ExcelMetadataModalActive = not state.ExcelMetadataModalActive } |> setState
-    Daisy.navbar [
-        prop.className "myNavbarSticky"
-        prop.id "swate-mainNavbar"; prop.role "navigation"; prop.ariaLabel "main navigation" ;
-        prop.style [style.flexWrap.wrap]
-        prop.children [
-            if state.ExcelMetadataModalActive then
-                SelectModalDialog
-                    toggleMetdadataModal
-                    dispatch
-            Html.div [
-                prop.style [style.flexBasis (length.percent 100)]
-                prop.children [
-                    Html.div [
-                        prop.style [style.width(length.perc 100)]
-                        prop.children [
-                            // Logo
-                            Html.div [
-                                prop.id "logo"
-                                prop.onClick (fun _ -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
-                                prop.style [style.width 100; style.cursor.pointer; style.padding (0,length.rem 0.4)]
-                                let path = if model.PageState.IsExpert then "_e" else ""
+    Components.BaseNavbar.Main [
+        Html.div [
+            prop.className "relative size-full"
+            prop.children [
+                // glow background
+                Html.div [prop.className "absolute inset-0 bg-gradient-to-r from-primary to-info blur-2xl opacity-75"]
+                Html.div [
+                    prop.className "z-10 flex flex-row gap-2 w-full items-center"
+                    prop.children [
+                        if state.ExcelMetadataModalActive then
+                            SelectModalDialog
+                                toggleMetdadataModal
+                                dispatch
+                        Html.div [
+                            prop.id "logo"
+                            prop.onClick (fun _ -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
+                            prop.children [
                                 Html.img [
                                     prop.style [style.maxHeight(length.perc 100); style.width 100]
-                                    prop.src @$"assets/Swate_logo_for_excel{path}.svg"
-                                ]
-                                |> prop.children
-                            ]
-
-                            // Quick access buttons
-                            match sidebarsize, model.PersistentStorageState.Host with
-                            | WindowSize.Mini, Some Swatehost.Excel ->
-                                quickAccessDropdownElement model dispatch state setState false
-                            | _, Some Swatehost.Excel ->
-                                QuickAccessListElement toggleMetdadataModal model dispatch
-                            | _,_ -> Html.none
-
-                            Html.div [
-                                Daisy.button.button [
-                                    if state.BurgerActive then button.active
-                                    prop.onClick (fun _ -> setState { state with BurgerActive = not state.BurgerActive })
-                                    prop.role "button"
-                                    prop.ariaLabel "menu"
-                                    prop.ariaExpanded false
-                                    prop.style [style.display.block]
-                                    prop.children [
-                                        Html.span [prop.ariaHidden true]
-                                        Html.span [prop.ariaHidden true]
-                                        Html.span [prop.ariaHidden true]
-                                        Html.span [prop.ariaHidden true]
-                                    ]
+                                    prop.src @"assets/Swate_logo_for_excel.svg"
                                 ]
                             ]
                         ]
+                        match model.PersistentStorageState.Host with
+                        | Some Swatehost.Excel ->
+                            Daisy.navbarCenter [
+                                QuickAccessList toggleMetdadataModal model dispatch
+                            ]
+                        | _ ->
+                            Html.div [
+                                prop.className "ml-auto"
+                                prop.children [
+                                    Components.DeleteButton(props = [
+                                        prop.onClick (fun _ ->
+                                            Messages.PersistentStorage.UpdateShowSidebar (not model.PersistentStorageState.ShowSideBar)
+                                            |> Messages.PersistentStorageMsg
+                                            |> dispatch
+                                        )
+                                        button.sm
+                                        button.glass
+                                    ])
+                                ]
+                            ]
                     ]
-            //         Bulma.navbarMenu [
-            //             prop.style [if state.BurgerActive then style.display.block]
-            //             prop.id "navbarMenu"
-            //             prop.className (if state.BurgerActive then "navbar-menu is-active" else "navbar-menu")
-            //             Bulma.navbarDropdown.div [
-            //                 prop.style [if state.BurgerActive then style.display.block]
-            //                 prop.children [
-            //                     Bulma.navbarItem.a [
-            //                         prop.href Shared.URLs.NFDITwitterUrl ;
-            //                         prop.target "_Blank";
-            //                         prop.children [
-            //                             Html.span "News "
-            //                             Html.i [prop.className "fa-brands fa-twitter"; prop.style [style.color "#1DA1F2"; style.marginLeft 2]]
-            //                         ]
-            //                     ]
-            //                     Bulma.navbarItem.a [
-            //                         prop.onClick (fun _ ->
-            //                             setState { state with BurgerActive = not state.BurgerActive }
-            //                             UpdatePageState (Some Routing.Route.Info) |> dispatch
-            //                         )
-            //                         prop.text Routing.Route.Info.toStringRdbl
-            //                     ]
-            //                     Bulma.navbarItem.a [
-            //                         prop.onClick (fun _ ->
-            //                             setState { state with BurgerActive = not state.BurgerActive }
-            //                             UpdatePageState (Some Routing.Route.PrivacyPolicy) |> dispatch
-            //                         )
-            //                         prop.text Routing.Route.PrivacyPolicy.toStringRdbl
-            //                     ]
-            //                     Bulma.navbarItem.a [
-            //                         prop.href Shared.URLs.SwateWiki ;
-            //                         prop.target "_Blank";
-            //                         prop.text "How to use"
-            //                     ]
-            //                     Bulma.navbarItem.a [
-            //                         prop.href Shared.URLs.Helpdesk.Url;
-            //                         prop.target "_Blank";
-            //                         prop.text "Contact us!"
-            //                     ]
-            //                     Bulma.navbarItem.a [
-            //                         prop.onClick (fun _ ->
-            //                             setState {state with BurgerActive = not state.BurgerActive}
-            //                             UpdatePageState (Some Routing.Route.Settings) |> dispatch
-            //                         )
-            //                         prop.text "Settings"
-            //                     ]
-            //                     Bulma.navbarItem.a [
-            //                         prop.onClick (fun e ->
-            //                             setState { state with BurgerActive = not state.BurgerActive }
-            //                             UpdatePageState (Some Routing.Route.ActivityLog) |> dispatch
-            //                         )
-            //                         prop.text "Activity Log"
-            //                     ]
-            //                 ]
-            //             ]
-            //             |> prop.children
-            //         ]
                 ]
             ]
-            // if state.QuickAccessActive && sidebarsize = WindowSize.Mini then
-            //     Bulma.navbarBrand.div [
-            //         prop.style [style.flexGrow 1; style.display.flex]
-            //         ShortCutIconList toggleMetdadataModal model dispatch |> prop.children
-            //     ]
         ]
+        // Html.div [
+        //     prop.children [
+                // Logo
+
+                // Html.div [
+                //     prop.children [
+
+
+                //         // Quick access buttons
+                //         match model.PersistentStorageState.Host with
+                //         | Some Swatehost.Excel ->
+                //             quickAccessDropdownElement model dispatch state setState false
+                //         | _ -> Html.none
+
+                //         Html.div [
+                //             Daisy.button.button [
+                //                 if state.BurgerActive then button.active
+                //                 prop.onClick (fun _ -> setState { state with BurgerActive = not state.BurgerActive })
+                //                 prop.role "button"
+                //                 prop.ariaLabel "menu"
+                //                 prop.ariaExpanded false
+                //                 prop.style [style.display.block]
+                //                 prop.children [
+                //                     Html.span [prop.ariaHidden true]
+                //                     Html.span [prop.ariaHidden true]
+                //                     Html.span [prop.ariaHidden true]
+                //                     Html.span [prop.ariaHidden true]
+                //                 ]
+                //             ]
+                //         ]
+                //     ]
+                // ]
+        //         Bulma.navbarMenu [
+        //             prop.style [if state.BurgerActive then style.display.block]
+        //             prop.id "navbarMenu"
+        //             prop.className (if state.BurgerActive then "navbar-menu is-active" else "navbar-menu")
+        //             Bulma.navbarDropdown.div [
+        //                 prop.style [if state.BurgerActive then style.display.block]
+        //                 prop.children [
+        //                     Bulma.navbarItem.a [
+        //                         prop.href Shared.URLs.NFDITwitterUrl ;
+        //                         prop.target "_Blank";
+        //                         prop.children [
+        //                             Html.span "News "
+        //                             Html.i [prop.className "fa-brands fa-twitter"; prop.style [style.color "#1DA1F2"; style.marginLeft 2]]
+        //                         ]
+        //                     ]
+        //                     Bulma.navbarItem.a [
+        //                         prop.onClick (fun _ ->
+        //                             setState { state with BurgerActive = not state.BurgerActive }
+        //                             UpdatePageState (Some Routing.Route.Info) |> dispatch
+        //                         )
+        //                         prop.text Routing.Route.Info.toStringRdbl
+        //                     ]
+        //                     Bulma.navbarItem.a [
+        //                         prop.onClick (fun _ ->
+        //                             setState { state with BurgerActive = not state.BurgerActive }
+        //                             UpdatePageState (Some Routing.Route.PrivacyPolicy) |> dispatch
+        //                         )
+        //                         prop.text Routing.Route.PrivacyPolicy.toStringRdbl
+        //                     ]
+        //                     Bulma.navbarItem.a [
+        //                         prop.href Shared.URLs.SwateWiki ;
+        //                         prop.target "_Blank";
+        //                         prop.text "How to use"
+        //                     ]
+        //                     Bulma.navbarItem.a [
+        //                         prop.href Shared.URLs.Helpdesk.Url;
+        //                         prop.target "_Blank";
+        //                         prop.text "Contact us!"
+        //                     ]
+        //                     Bulma.navbarItem.a [
+        //                         prop.onClick (fun _ ->
+        //                             setState {state with BurgerActive = not state.BurgerActive}
+        //                             UpdatePageState (Some Routing.Route.Settings) |> dispatch
+        //                         )
+        //                         prop.text "Settings"
+        //                     ]
+        //                     Bulma.navbarItem.a [
+        //                         prop.onClick (fun e ->
+        //                             setState { state with BurgerActive = not state.BurgerActive }
+        //                             UpdatePageState (Some Routing.Route.ActivityLog) |> dispatch
+        //                         )
+        //                         prop.text "Activity Log"
+        //                     ]
+        //                 ]
+        //             ]
+        //             |> prop.children
+        //         ]
+        //     ]
+        // ]
+        // if state.QuickAccessActive && sidebarsize = WindowSize.Mini then
+        //     Bulma.navbarBrand.div [
+        //         prop.style [style.flexGrow 1; style.display.flex]
+        //         ShortCutIconList toggleMetdadataModal model dispatch |> prop.children
+        //     ]
     ]

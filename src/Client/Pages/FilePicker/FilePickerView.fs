@@ -239,7 +239,7 @@ module FileNameTable =
 
 
 let fileContainer (model:Model) dispatch =
-    mainFunctionContainer [
+    SidebarComponents.SidebarLayout.LogicContainer [
 
         uploadButton model dispatch
 
@@ -252,10 +252,10 @@ let fileContainer (model:Model) dispatch =
     ]
 
 let filePickerComponent (model:Model) (dispatch:Messages.Msg -> unit) =
-    Html.div [
-        Html.h5 "File Picker"
+    SidebarComponents.SidebarLayout.Container [
+        SidebarComponents.SidebarLayout.Header "File Picker"
 
-        Html.p "Select files from your computer and insert their names into Excel"
+        SidebarComponents.SidebarLayout.Description "Select files from your computer and insert their names into Excel"
 
         // Colored container element for all uploaded file names and sort elements
         fileContainer model dispatch

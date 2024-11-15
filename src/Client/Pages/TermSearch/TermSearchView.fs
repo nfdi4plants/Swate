@@ -86,18 +86,14 @@ let private addButton (model: Model, dispatch) =
 [<ReactComponent>]
 let Main (model:Model, dispatch) =
     let setTerm = fun (term: OntologyAnnotation option) -> TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
-    Html.div [
-        prop.onSubmit (fun e -> e.preventDefault())
-        prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-        prop.children [
-            Html.h5 "Ontology term search"
+    SidebarComponents.SidebarLayout.Container  [
+        SidebarComponents.SidebarLayout.Header "Ontology term search"
 
-            Html.p "Search for an ontology term to fill into the selected field(s)"
+        SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
-            mainFunctionContainer [
-                Components.TermSearch.Input(setTerm, fullwidth=true, size=button.lg, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch)
-                addButton(model, dispatch)
-            ]
+        SidebarComponents.SidebarLayout.LogicContainer [
+            Components.TermSearch.Input(setTerm, fullwidth=true, size=button.lg, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch)
+            addButton(model, dispatch)
         ]
     ]
         //simpleSearchComponent model dispatch

@@ -24,20 +24,16 @@ open ARCtrl
 type Templates =
 
     static member Main (model:Model, dispatch) =
-        Html.div [
-            prop.onSubmit (fun e -> e.preventDefault())
-            prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-            prop.children [
-                Html.h5 "Templates"
+        SidebarComponents.SidebarLayout.Container [
+            SidebarComponents.SidebarLayout.Header "Templates"
 
-                // Box 1
-                Html.p "Add template from database."
+            // Box 1
+            SidebarComponents.SidebarLayout.Description "Add template from database."
 
-                TemplateFromDB.Main(model, dispatch)
+            TemplateFromDB.Main(model, dispatch)
 
-                // Box 2
-                Html.p "Add template(s) from file."
+            // Box 2
+            SidebarComponents.SidebarLayout.Description "Add template(s) from file."
 
-                TemplateFromFile.Main(model, dispatch)
-            ]
+            TemplateFromFile.Main(model, dispatch)
         ]

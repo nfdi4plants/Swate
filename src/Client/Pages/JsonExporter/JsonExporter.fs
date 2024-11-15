@@ -323,6 +323,7 @@ type FileExporter =
                     Daisy.button.button [
                         join.item
                         button.block
+                        button.primary
                         prop.text "Download"
                         prop.onClick (fun _ ->
                             let host = model.PersistentStorageState.Host
@@ -345,15 +346,15 @@ type FileExporter =
         ]
 
     static member Main(model:Model, dispatch: Messages.Msg -> unit) =
-        Html.div [
-            Html.h5 "File Export"
+        SidebarComponents.SidebarLayout.Container [
+            SidebarComponents.SidebarLayout.Header "File Export"
 
-            Html.p "Export to Json"
-            mainFunctionContainer [
+            SidebarComponents.SidebarLayout.Description "Export to Json"
+            SidebarComponents.SidebarLayout.LogicContainer [
                 Html.div [
-                    prop.className "prose-sm"
+                    prop.className "prose-sm -mt-4"
                     prop.children [
-                        Html.p "Export Swate annotation tables to official JSON."
+                        Html.h3 "Export Swate annotation tables to official JSON."
                         Html.ul [
                             Html.li [
                                 Html.b "ARCtrl"

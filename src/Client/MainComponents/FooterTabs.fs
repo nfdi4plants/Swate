@@ -256,7 +256,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, int e.pageY - 50
+            let mousePosition = int e.pageX, int e.pageY - 30
             let deleteMsg rmv = fun e -> rmv e; Spreadsheet.RemoveTable index |> Messages.SpreadsheetMsg |> dispatch
             let renameMsg rmv = fun e -> rmv e; {state with IsEditable = true} |> setState
             let funcs : TableContextMenu.ContextFunctions = {
@@ -274,7 +274,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                     if state.Name <> table.Name then
                         Spreadsheet.RenameTable (index, state.Name) |> Messages.SpreadsheetMsg |> dispatch
                     setState {state with IsEditable = false}
-                Daisy.input [
+                Html.input [
+                    prop.className "bg-transparent px-2 border-0 focus:ring-0"
                     prop.autoFocus(true)
                     prop.id (id + "input")
                     prop.onChange (fun e ->
@@ -293,9 +294,10 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                     prop.defaultValue table.Name
                 ]
             else
-                React.fragment [
-                    Html.i [prop.className "fa-solid fa-table"]
-                    Html.text table.Name
+                Html.i [prop.className "fa-solid fa-table"]
+                Html.span [
+                    prop.className "truncate"
+                    prop.text table.Name
                 ]
         ]
     ]
@@ -382,14 +384,20 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
 
 let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
     let show = model.PersistentStorageState.ShowSideBar
-    let order = System.Int32.MaxValue
-    let id = "Toggle-Sidebar-Button"
-    Daisy.tab [
-        prop.key id
+    let id = "toggle-sidebar-button"
+    Html.div [
         prop.id id
-        prop.onClick (fun e -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
-        prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer; style.marginLeft length.auto]
+        prop.onClick (fun _ -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
+        prop.className "h-full cursor-pointer ml-auto"
         prop.children [
-            Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
+            Html.label [
+                // prop.for' "split-window-drawer"
+                prop.className "drawer-button btn btn-sm px-2 py-2 swap swap-rotate rounded-none h-full btn-secondary"
+                prop.children [
+                    Html.input [prop.type'.checkbox]
+                    Html.i [prop.className ["fa-solid"; "fa-chevron-left"; "swap-off"]]
+                    Html.i [prop.className ["fa-solid"; "fa-chevron-right"; "swap-on" ]]
+                ]
+            ]
         ]
     ]

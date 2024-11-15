@@ -81,7 +81,7 @@ type TemplateFromDB =
         ]
 
     static member Main(model:Model, dispatch) =
-        mainFunctionContainer [
+        SidebarComponents.SidebarLayout.LogicContainer [
             Html.div [
                 Html.p [
                     Html.b "Search the database for templates."

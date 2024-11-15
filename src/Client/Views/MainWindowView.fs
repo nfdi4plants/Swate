@@ -29,13 +29,12 @@ let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactEl
 
 let private SpreadsheetSelectionFooter (model: Model) dispatch =
     Html.div [
-        prop.style [
-            style.position.sticky;
-            style.bottom 0
-        ]
+        prop.className "sticky bottom-0 flex flex-row"
         prop.children [
             Html.div [
-                prop.className "tabs tabs-lifted w-full flex flex-row items-center pt-1 bg-secondary *:!border-b-0 *:gap-1"
+                prop.className "tabs tabs-lifted w-full overflow-x-auto overflow-y-hidden
+                flex flex-row items-center
+                pt-1 bg-secondary *:!border-b-0 *:gap-1 *:flex-nowrap"
                 prop.children [
                     Daisy.tab  [
                         prop.style [style.width (length.px 20); style.custom ("order", -2)]
@@ -47,10 +46,10 @@ let private SpreadsheetSelectionFooter (model: Model) dispatch =
                         MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
                     if model.SpreadsheetModel.CanHaveTables() then
                         MainComponents.FooterTabs.MainPlus (model, dispatch)
-                    if model.SpreadsheetModel.TableViewIsActive() then
-                        MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
                 ]
             ]
+            if model.SpreadsheetModel.TableViewIsActive() then
+                MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
         ]
     ]
 
@@ -77,13 +76,7 @@ let Main (model: Model, dispatch) =
     let state = model.SpreadsheetModel
     Html.div [
         prop.id "MainWindow"
-        prop.className "@container/main"
-        prop.style [
-            style.display.flex
-            style.flexDirection.column
-            style.width (length.percent 100)
-            style.height (length.percent 100)
-        ]
+        prop.className "@container/main min-w-[400px] flex flex-col h-screen"
         prop.children [
             MainComponents.Navbar.Main (model, dispatch, widgets, setWidgets)
             ModalDisplay (widgets, displayWidget)

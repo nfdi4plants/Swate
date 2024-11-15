@@ -53,7 +53,7 @@ type SearchContainer =
 
                 Html.p "Search the database for protocol templates."
 
-                mainFunctionContainer [
+                SidebarComponents.SidebarLayout.LogicContainer [
                     Protocol.Search.InfoField()
                     Protocol.Search.FileSortElement(model, config, setConfig)
                     Protocol.Search.Component (filteredTemplates, model, dispatch)

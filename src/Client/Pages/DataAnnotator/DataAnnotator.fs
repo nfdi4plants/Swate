@@ -333,10 +333,17 @@ type DataAnnotator =
             UpdateDataFile None |> DataAnnotatorMsg |> dispatch
             if ref.current.IsSome then
                 ref.current.Value.value <- null
-        Html.div [
-            ModalMangementComponent ref model (fun _ -> setShowModal true) rmvFile uploadFile
-            match model.DataAnnotatorModel, showModal with
-            | { DataFile = Some _; ParsedFile = Some _ }, true -> DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false)
-            | _, _ -> Html.none
+        SidebarComponents.SidebarLayout.Container [
+
+            SidebarComponents.SidebarLayout.Header "Data Annotator"
+
+            SidebarComponents.SidebarLayout.Description "Specify exact data points for annotation."
+
+            SidebarComponents.SidebarLayout.LogicContainer [
+                ModalMangementComponent ref model (fun _ -> setShowModal true) rmvFile uploadFile
+                match model.DataAnnotatorModel, showModal with
+                | { DataFile = Some _; ParsedFile = Some _ }, true -> DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false)
+                | _, _ -> Html.none
+            ]
         ]
 
