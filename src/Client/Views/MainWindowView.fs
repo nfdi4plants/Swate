@@ -33,8 +33,8 @@ let private SpreadsheetSelectionFooter (model: Model) dispatch =
         prop.children [
             Html.div [
                 prop.className "tabs tabs-lifted w-full overflow-x-auto overflow-y-hidden
-                flex flex-row items-center
-                pt-1 bg-secondary *:!border-b-0 *:gap-1 *:flex-nowrap"
+                flex flex-row items-center pt-1 border-t-2
+                *:!border-b-0 *:gap-1 *:flex-nowrap"
                 prop.children [
                     Daisy.tab  [
                         prop.style [style.width (length.px 20); style.custom ("order", -2)]

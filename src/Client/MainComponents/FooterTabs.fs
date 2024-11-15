@@ -392,7 +392,7 @@ let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
         prop.children [
             Html.label [
                 // prop.for' "split-window-drawer"
-                prop.className "drawer-button btn btn-sm px-2 py-2 swap swap-rotate rounded-none h-full btn-secondary"
+                prop.className "drawer-button btn btn-sm px-2 py-2 swap swap-rotate rounded-none h-full border-t-2"
                 prop.children [
                     Html.input [prop.type'.checkbox]
                     Html.i [prop.className ["fa-solid"; "fa-chevron-left"; "swap-off"]]
