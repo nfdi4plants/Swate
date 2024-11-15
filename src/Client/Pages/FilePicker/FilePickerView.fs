@@ -29,7 +29,7 @@ let uploadButton (model:Model) dispatch =
             prop.style [style.display.none]
             prop.id inputId
             prop.multiple true
-            prop.type' "file"
+            prop.type'.file
             prop.onChange (fun (ev: File list) ->
                 let files = ev //ev.target?files
 
@@ -46,11 +46,10 @@ let uploadButton (model:Model) dispatch =
         match model.PersistentStorageState.Host with
             | Some (Swatehost.ARCitect) ->
                 Html.div [
-                    prop.className "is-flex is-flex-direction-row"
-                    prop.style [style.gap (length.rem 1)]
+                    prop.className "flex flex-row gap-2"
                     prop.children [
                         Daisy.button.button [
-                            button.info
+                            button.primary
                             button.block
                             prop.onClick(fun _ ->
                                 ARCitect.RequestPaths false |> ARCitect.ARCitect.send
@@ -58,7 +57,7 @@ let uploadButton (model:Model) dispatch =
                             prop.text "Pick Files"
                         ]
                         Daisy.button.button [
-                            button.info
+                            button.primary
                             button.block
                             prop.onClick(fun _ ->
                                 ARCitect.RequestPaths true |> ARCitect.ARCitect.send
@@ -69,7 +68,7 @@ let uploadButton (model:Model) dispatch =
                 ]
             | _ ->
                 Daisy.button.button [
-                    button.info
+                    button.primary
                     button.block
                     prop.onClick(fun _ ->
                         let getUploadElement = Browser.Dom.document.getElementById inputId
@@ -81,14 +80,18 @@ let uploadButton (model:Model) dispatch =
 
 let insertButton (model:Model) dispatch =
     Html.div [
-        Daisy.button.button [
-            button.success
-            button.block
-            prop.onClick (fun _ ->
-                let fileNames = model.FilePickerState.FileNames |> List.map snd
-                SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch
-            )
-            prop.text "Insert file names"
+        prop.className "flex flex-row justify-center"
+        prop.children [
+
+            Daisy.button.button [
+                button.success
+                button.wide
+                prop.onClick (fun _ ->
+                    let fileNames = model.FilePickerState.FileNames |> List.map snd
+                    SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch
+                )
+                prop.text "Insert file names"
+            ]
         ]
     ]
 
@@ -114,37 +117,6 @@ let fileSortElements (model:Model) dispatch =
                     UpdateFileNames sortedList |> FilePickerMsg |> dispatch
                 )
             ]
-            //Daisy.button.a [
-            //    prop.title "Copy to Clipboard"
-            //    prop.onClick(fun e ->
-            //        CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker"
-            //        let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
-            //        let textArea = Browser.Dom.document.createElement "textarea"
-            //        textArea?value <- txt
-            //        textArea?style?top <- "0"
-            //        textArea?style?left <- "0"
-            //        textArea?style?position <- "fixed"
-
-            //        Browser.Dom.document.body.appendChild textArea |> ignore
-
-            //        textArea.focus()
-            //        // Can't belive this actually worked
-            //        textArea?select()
-
-            //        let t = Browser.Dom.document.execCommand("copy")
-            //        Browser.Dom.document.body.removeChild(textArea) |> ignore
-            //        ()
-            //    )
-            //    prop.children [
-            //        CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" "fa-solid fa-copy" "fa-solid fa-check"
-            //    ]
-            //]
-
-            // Daisy.buttons [
-            //     Daisy.buttons.hasAddons
-            //     prop.style [style.custom("marginLeft", "auto")]
-
-            // ]
         ]
     ]
 
@@ -159,14 +131,14 @@ module FileNameTable =
                     |> List.mapi (fun i (_,name) -> i+1, name)
                 newList |> UpdateFileNames |> FilePickerMsg |> dispatch
             )
-            prop.style [
-                style.marginRight(length.rem 2)
-            ]
+            button.xs
+            button.error
+            button.outline
         ])
 
     let moveUpButton (id,fileName) (model:Model) dispatch =
         Daisy.button.a [
-            button.sm
+            button.xs
             join.item
             prop.onClick (fun _ ->
                 let sortedList =
@@ -191,7 +163,7 @@ module FileNameTable =
 
     let moveDownButton (id,fileName) (model:Model) dispatch =
         Daisy.button.a [
-            button.sm
+            button.xs
             join.item
             prop.onClick (fun _ ->
                 let sortedList =
@@ -224,6 +196,7 @@ module FileNameTable =
     let table (model:Model) dispatch =
         Daisy.table [
             table.zebra
+            table.xs
             prop.children [
                 Html.tbody [
                     for index,fileName in model.FilePickerState.FileNames do

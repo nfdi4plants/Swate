@@ -78,11 +78,12 @@ module ComponentAux =
             Html.p $"Search by {state.Searchfield.toNameRdb}"
             let hasSearchAddon = state.Searchfield <> SearchFields.Name
             Daisy.join [
+                prop.className "w-full"
                 prop.children [
                     if hasSearchAddon then
                         Daisy.button.a [ join.item; prop.readOnly true; button.disabled; prop.text state.Searchfield.toStr; prop.className "!text-base-content !border-primary"]
                     Daisy.label [
-                        prop.className "join-item input input-bordered input-primary flex items-center"
+                        prop.className "join-item input input-bordered input-primary flex items-center w-full"
                         prop.children [
                             Html.input [
                                 prop.style [style.minWidth 200]
@@ -116,9 +117,13 @@ module ComponentAux =
     let Tag (tag:OntologyAnnotation, color: IReactProperty, isRemovable: bool, onclick: (Browser.Types.MouseEvent -> unit) option) =
         Daisy.badge [
             color
+
+            prop.className [
+                if onclick.IsSome then "cursor-pointer hover:brightness-110"
+                "text-nowrap"
+            ]
             if onclick.IsSome then
                 prop.onClick(onclick.Value)
-                prop.className "cursor-pointer hover:brightness-110"
             prop.children [
                 if isRemovable then
                     Svg.svg [
@@ -140,14 +145,14 @@ module ComponentAux =
             prop.title tag.TermAccessionShort
         ]
 
-    let TagContainer(tagList: OntologyAnnotation [], title: string, updateToggle, badgeColor) =
+    let TagContainer(tagList: OntologyAnnotation seq, title: string option, updateToggle: (OntologyAnnotation -> unit) option, badgeColor) =
         React.fragment [
-            Daisy.divider title
+            if title.IsSome then Daisy.divider title.Value
             Html.div [
                 prop.className "flex flex-wrap gap-2"
                 prop.children [
                     for tagSuggestion in tagList do
-                        Tag(tagSuggestion, badgeColor, false, Some <| fun _ -> updateToggle tagSuggestion)
+                        Tag(tagSuggestion, badgeColor, false, updateToggle |> Option.map (fun f -> fun _ -> f tagSuggestion))
                 ]
             ]
         ]
@@ -211,7 +216,7 @@ module ComponentAux =
                                         }
                                         setState nextState
                                     )
-                                TagContainer(hitErTagList, "Endpoint Repositories", updateToggle, ErBadgeColor)
+                                TagContainer(hitErTagList, Some "Endpoint Repositories", Some updateToggle, ErBadgeColor)
                             if hitTagList <> [||] then
                                 let updateToggle = (fun tagSuggestion ->
                                     let nextState = {
@@ -221,7 +226,7 @@ module ComponentAux =
                                     }
                                     setState nextState
                                 )
-                                TagContainer(hitTagList, "Tags", updateToggle, TagBadgeColor)
+                                TagContainer(hitTagList, Some "Tags", Some updateToggle, TagBadgeColor)
                         ]
                     ]
                 ]
@@ -243,6 +248,7 @@ module ComponentAux =
         Html.div [
             Html.p "Select community"
             Daisy.select [
+                prop.className "w-full"
                 select.bordered
                 select.primary
                 prop.value (state.CommunityFilter.ToStringRdb())
@@ -294,23 +300,6 @@ module ComponentAux =
                 let filtersetter = fun b -> setState {state with TagFilterIsAnd = b}
                 SwitchElement state.TagFilterIsAnd filtersetter
             ]
-        ]
-
-    let fileSortElements (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
-        React.fragment [
-            Html.div [
-                prop.className "flex flex-row gap-4"
-                prop.children [
-                    queryField model state setState
-                    tagQueryField model state setState
-                    communitySelectField model state setState
-                ]
-            ]
-            // Only show the tag list and tag filter (AND or OR) if any tag exists
-            if state.ProtocolFilterErTags <> [] || state.ProtocolFilterTags <> [] then
-                Html.div [
-                    TagDisplayField model state setState
-                ]
         ]
 
     let curatedTag = Daisy.badge [prop.text "curated"; badge.primary]
@@ -381,7 +370,7 @@ module ComponentAux =
                     prop.colSpan 4
                     prop.children [
                         Html.div [
-                            prop.className "prose max-w-none p-3"
+                            prop.className "prose max-w-none p-3 flex flex-col gap-2"
                             prop.children [
                                 Html.div [
                                     Html.div template.Description
@@ -393,20 +382,8 @@ module ComponentAux =
                                         Html.div [ Html.b "Organisation: "; Html.span (template.Organisation.ToString()) ]
                                     ]
                                 ]
-                                Html.div [
-                                    prop.className "flex gap-2 mb-1"
-                                    prop.children [
-                                        for tag in template.EndpointRepositories do
-                                            Tag(tag, ErBadgeColor, false, None)
-                                    ]
-                                ]
-                                Html.div [
-                                    prop.className "flex gap-2"
-                                    prop.children [
-                                        for tag in template.Tags do
-                                            Tag(tag, TagBadgeColor, false, None)
-                                    ]
-                                ]
+                                TagContainer(template.EndpointRepositories, None, None, ErBadgeColor)
+                                TagContainer(template.Tags, None, None, TagBadgeColor)
                             ]
                         ]
                         Html.div [
@@ -512,6 +489,7 @@ type Search =
 
     static member InfoField() =
         Html.div [
+            prop.className "prose-sm prose-p:m-1 prose-ul:mt-1 max-w-none"
             prop.children [
                 Html.p [
                     Html.b "Search for templates."
@@ -540,8 +518,25 @@ type Search =
             |> FilterHelper.sortTableBySearchQuery config.Searchfield config.ProtocolSearchQuery
 
     [<ReactComponent>]
-    static member FileSortElement(model, config, configSetter: TemplateFilterConfig -> unit) =
-        fileSortElements model config configSetter
+    static member FileSortElement(model, config, configSetter: TemplateFilterConfig -> unit, ?classes: string) =
+        React.fragment [
+            Html.div [
+                prop.className [
+                    "grid grid-cols-1 gap-2"
+                    if classes.IsSome then classes.Value
+                ]
+                prop.children [
+                    queryField model config configSetter
+                    tagQueryField model config configSetter
+                    communitySelectField model config configSetter
+                ]
+            ]
+            // Only show the tag list and tag filter (AND or OR) if any tag exists
+            if config.ProtocolFilterErTags <> [] || config.ProtocolFilterTags <> [] then
+                Html.div [
+                    TagDisplayField model config configSetter
+                ]
+        ]
 
     [<ReactComponent>]
     static member Component (templates, model:Model, dispatch, ?maxheight: Styles.ICssUnit) =

@@ -349,50 +349,46 @@ type FileExporter =
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "File Export"
 
-            SidebarComponents.SidebarLayout.Description "Export to Json"
-            SidebarComponents.SidebarLayout.LogicContainer [
-                Html.div [
-                    prop.className "prose-sm -mt-4"
-                    prop.children [
-                        Html.h3 "Export Swate annotation tables to official JSON."
-                        Html.ul [
-                            Html.li [
-                                Html.b "ARCtrl"
-                                Html.text ": A simple ARCtrl specific format."
-                            ]
-                            Html.li [
-                                Html.b "ARCtrlCompressed"
-                                Html.text ": A compressed ARCtrl specific format."
-                            ]
-                            Html.li [
-                                Html.b "ISA"
-                                Html.text ": ISA-JSON format ("
-                                Html.a [
-                                    prop.target.blank
-                                    prop.href "https://isa-specs.readthedocs.io/en/latest/isajson.html#"
-                                    prop.text "ISA-JSON"
-                                ]
-                                Html.text ")."
-                            ]
-                            Html.li [
-                                Html.b "ROCrate"
-                                Html.text ": ROCrate format ("
-                                Html.a [
-                                    prop.target.blank
-                                    prop.href "https://www.researchobject.org/ro-crate/"
-                                    prop.text "ROCrate"
-                                ]
-                                Html.text ", "
-                                Html.a [
-                                    prop.target.blank
-                                    prop.href "https://github.com/nfdi4plants/isa-ro-crate-profile/blob/main/profile/isa_ro_crate.md"
-                                    prop.text "ISA-Profile"
-                                ]
-                                Html.text ")."
-                            ]
+            SidebarComponents.SidebarLayout.Description(Html.div [
+                Html.p "Export Swate annotation tables to official JSON."
+                Html.ul [
+                    Html.li [
+                        Html.b "ARCtrl"
+                        Html.text ": A simple ARCtrl specific format."
+                    ]
+                    Html.li [
+                        Html.b "ARCtrlCompressed"
+                        Html.text ": A compressed ARCtrl specific format."
+                    ]
+                    Html.li [
+                        Html.b "ISA"
+                        Html.text ": ISA-JSON format ("
+                        Html.a [
+                            prop.target.blank
+                            prop.href "https://isa-specs.readthedocs.io/en/latest/isajson.html#"
+                            prop.text "ISA-JSON"
                         ]
+                        Html.text ")."
+                    ]
+                    Html.li [
+                        Html.b "ROCrate"
+                        Html.text ": ROCrate format ("
+                        Html.a [
+                            prop.target.blank
+                            prop.href "https://www.researchobject.org/ro-crate/"
+                            prop.text "ROCrate"
+                        ]
+                        Html.text ", "
+                        Html.a [
+                            prop.target.blank
+                            prop.href "https://github.com/nfdi4plants/isa-ro-crate-profile/blob/main/profile/isa_ro_crate.md"
+                            prop.text "ISA-Profile"
+                        ]
+                        Html.text ")."
                     ]
                 ]
+            ])
+            SidebarComponents.SidebarLayout.LogicContainer [
                 FileExporter.JsonExport(model, dispatch)
             ]
         ]

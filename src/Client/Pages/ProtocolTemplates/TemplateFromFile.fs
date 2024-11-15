@@ -66,16 +66,13 @@ module private Helper =
 
 type TemplateFromFile =
 
-    static member private FileUploadButton (state:TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch)  =
-        Daisy.formControl [
-            Daisy.file [
-                file.bordered
-                prop.className "w-full max-w-xs"
-                prop.type' "file";
-                prop.onChange (fun (ev: File list) ->
-                    Helper.upload state setState dispatch ev
-                )
-            ]
+    static member private FileUploadButton (state:TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch) =
+        Daisy.file [
+            file.bordered
+            prop.className "w-full"
+            prop.onChange (fun (ev: File list) ->
+                Helper.upload state setState dispatch ev
+            )
         ]
 
     static member private SelectorButton<'a when 'a : equality> (targetselector: 'a, selector: 'a, setSelector: 'a -> unit, ?isDisabled) =
@@ -85,7 +82,7 @@ type TemplateFromFile =
                 prop.disabled isDisabled.Value
             prop.style [style.flexGrow 1]
             if (targetselector = selector) then
-                button.success
+                button.primary
             prop.onClick (fun _ -> setSelector targetselector)
             prop.text (string targetselector)
         ]
@@ -114,13 +111,8 @@ type TemplateFromFile =
                 Modals.SelectiveImportModal.Main af model.SpreadsheetModel dispatch (fun _ -> TemplateFromFileState.init() |> setState)
             | None -> Html.none
             Html.div [
-                Html.p [
-                    Html.b "Import JSON files."
-                    Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
-                ]
-            ]
-            Html.div [
                 Daisy.join [
+                    prop.className "w-full"
                     prop.children [
                         JsonExportFormat.ROCrate |> fun jef -> TemplateFromFile.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
                         JsonExportFormat.ISA |> fun jef -> TemplateFromFile.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
@@ -132,6 +124,7 @@ type TemplateFromFile =
 
             Html.div [
                 Daisy.join [
+                    prop.className "w-full"
                     prop.children [
                         ArcFilesDiscriminate.Assay |> fun ft -> TemplateFromFile.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
                         ArcFilesDiscriminate.Study |> fun ft -> TemplateFromFile.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)

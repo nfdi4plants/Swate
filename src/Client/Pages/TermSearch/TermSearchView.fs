@@ -94,22 +94,3 @@ let Main (model:Model, dispatch) =
             addButton(model, dispatch)
         ]
     ]
-        //simpleSearchComponent model dispatch
-
-        //if model.TermSearchState.SelectedTerm.IsNone then
-        //    str "No Term Selected"
-        //else
-        //    str (sprintf "%A" model.TermSearchState.SelectedTerm.Value)
-
-        //Button.button [
-        //    Button.OnClick (fun e ->
-        //        GetParentOntology |> ExcelInterop |> dispatch
-        //    )
-        //] [
-        //    str "GetParentOntology"
-        //]
-
-        //if model.TermSearchState.ParentOntology.IsNone then
-        //    str "No Parent Ontology selected"
-        //else
-        //    str model.TermSearchState.ParentOntology.Value

@@ -49,12 +49,9 @@ type SidebarLayout =
 
     static member Description (content: ReactElement) =
         Html.div [
-            prop.className "prose-sm"
+            prop.className "prose-sm prose-p:m-1 prose-ul:my-1 prose-ul:list-disc"
             prop.children content
         ]
 
     static member Description (content: string) =
-        Html.div [
-            prop.className "prose-sm"
-            prop.children (Html.p content)
-        ]
+        SidebarLayout.Description (Html.p content)

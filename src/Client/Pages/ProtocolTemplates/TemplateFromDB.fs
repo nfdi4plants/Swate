@@ -11,41 +11,35 @@ type TemplateFromDB =
     static member toProtocolSearchElement (model:Model) dispatch =
         Daisy.button.button [
             prop.onClick(fun _ -> UpdatePageState (Some Routing.Route.ProtocolSearch) |> dispatch)
-            button.info
+            button.primary
             button.block
             prop.text "Browse database"
         ]
 
     static member addFromDBToTableButton (model:Model) dispatch =
         Html.div [
-            prop.className "flex flex-row"
+            prop.className "join flex flex-row justify-center gap-2"
             prop.children [
-                Html.div [
-                    prop.children [
-                        Daisy.button.a [
-                            button.success
-                            button.block
-                            if model.ProtocolState.TemplateSelected.IsNone then
-                                button.error
-                                prop.disabled true
-                            prop.onClick (fun _ ->
-                                if model.ProtocolState.TemplateSelected.IsNone then
-                                    failwith "No template selected!"
+                Daisy.button.a [
+                    button.success
+                    button.wide
+                    if model.ProtocolState.TemplateSelected.IsNone then
+                        button.error
+                        prop.disabled true
+                    prop.onClick (fun _ ->
+                        if model.ProtocolState.TemplateSelected.IsNone then
+                            failwith "No template selected!"
 
-                                SpreadsheetInterface.AddTemplate(model.ProtocolState.TemplateSelected.Value.Table) |> InterfaceMsg |> dispatch
-                            )
-                            prop.text "Add template"
-                        ]
-                    ]
+                        SpreadsheetInterface.AddTemplate(model.ProtocolState.TemplateSelected.Value.Table) |> InterfaceMsg |> dispatch
+                    )
+                    prop.text "Add template"
                 ]
                 if model.ProtocolState.TemplateSelected.IsSome then
-                    Html.div [
-                        prop.className "grow-0"
-                        Daisy.button.a [
-                            prop.onClick (fun e -> Protocol.RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
-                            button.error
-                            Html.i [prop.className "fa-solid fa-times"] |> prop.children
-                        ] |> prop.children
+                    Daisy.button.a [
+                        button.outline
+                        prop.onClick (fun e -> Protocol.RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
+                        button.error
+                        Html.i [prop.className "fa-solid fa-times"] |> prop.children
                     ]
             ]
         ]
@@ -82,16 +76,6 @@ type TemplateFromDB =
 
     static member Main(model:Model, dispatch) =
         SidebarComponents.SidebarLayout.LogicContainer [
-            Html.div [
-                Html.p [
-                    Html.b "Search the database for templates."
-                    Html.text " The building blocks from these templates can be inserted into the Swate table. "
-                    Html.span [
-                        prop.className "text-error"
-                        prop.text "Only missing building blocks will be added."
-                    ]
-                ]
-            ]
             Html.div [
                 TemplateFromDB.toProtocolSearchElement model dispatch
             ]

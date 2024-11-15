@@ -414,10 +414,6 @@ type TermSearch =
                                     prop.className "label-text-alt link-primary cursor-pointer"
                                     prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); setAdvancedSearchActive true)
                                     prop.text "Use advanced search"
-                                    // prop.children [
-                                    //     Html.a [
-                                    //     ]
-                                    // ]
                                 ]
                             ]
                 ]

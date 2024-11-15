@@ -217,7 +217,7 @@ type Widget =
         React.useEffect((fun _ -> setTemplates model.ProtocolState.Templates), [|box model.ProtocolState.Templates|])
         let selectContent() =
             [
-                Protocol.Search.FileSortElement(model, config, setConfig)
+                Protocol.Search.FileSortElement(model, config, setConfig, "@md/templateWidget:grid-cols-3")
                 Protocol.Search.Component (filteredTemplates, model, dispatch, length.px 350)
             ]
         let insertContent() =
@@ -235,7 +235,7 @@ type Widget =
         let content =
             let switchContent = if model.ProtocolState.TemplateSelected.IsNone then selectContent() else insertContent()
             Html.div [
-                prop.className "flex flex-col gap-4"
+                prop.className "flex flex-col gap-4 @container/templateWidget"
                 prop.children switchContent
             ]
 

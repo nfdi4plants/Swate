@@ -58,12 +58,12 @@ type SidebarView =
     [<ReactComponent>]
     static member Main (model: Model, dispatch: Msg -> unit) =
         Html.div [
-            prop.className "min-h-full flex flex-col bg-base-300 min-w-[400px] grow"
+            prop.className "min-h-full flex flex-col bg-base-300 min-w-[500px] xl:min-w-[600px] @container/sidebar"
             prop.children [
 
                 SidebarComponents.Navbar.NavbarComponent model dispatch
                 Html.div [
-                    prop.className "pl-4 pr-4 flex flex-col grow w-[500px] xl:w-[600px]"
+                    prop.className "pl-4 pr-4 flex flex-col grow"
                     prop.children [
                         SidebarComponents.Tabs.Main model dispatch
 
