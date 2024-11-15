@@ -26,10 +26,8 @@ open Fable.Core.JsInterop
 /// "Fill selected cells with this term" - button //
 let private addButton (model: Model, dispatch) =
 
-    // For some reason columns seem to be faulty here. Without the workaround of removing negative margin left and right from Columns.columns
-    // It would not be full width. This results in the need to remove padding left/right for Column.column childs.
     Html.div [
-        prop.style [style.width(length.perc 100); style.marginRight 0; style.marginLeft 0]
+        prop.className "flex flex-row justify-center"
         prop.children [
             Daisy.button.a [
                 let hasTerm = model.TermSearchState.SelectedTerm.IsSome

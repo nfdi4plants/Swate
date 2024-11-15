@@ -321,96 +321,105 @@ type TermSearch =
         let registerChange(searchTest: string option) =
             let oa = searchTest |> Option.map (fun x -> OntologyAnnotation x)
             debouncel debounceStorage.current "SetterDebounce" 500 setLoading setter oa
-        Html.div [
-            prop.className [
-                "input input-bordered flex items-center gap-2"
-                if isjoin then "join-item";
-                if classes.IsSome then classes.Value;
-            ]
-            prop.ref ref
-            prop.style [
-                if fullwidth then style.flexGrow 1;
-            ]
+        Daisy.formControl [
+            prop.className "w-full"
             prop.children [
-                Components.searchIcon
-                Html.input [
-                    prop.className "grow"
-                    prop.autoFocus autofocus
-                    if input.IsSome then prop.valueOrDefault input.Value.NameText
-                    prop.ref inputRef
-                    prop.onMouseDown(fun e -> e.stopPropagation())
-                    prop.onDoubleClick(fun e ->
-                        let s : string = e.target?value
-                        if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
-                            log "Double click empty + parent"
-                            if isSearchable then
-                                startSearch()
-                                allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
-                        elif s.Trim() <> "" then
-                            log "Double click not empty"
-                            if isSearchable then
-                                startSearch()
-                                mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
-                        else
-                            ()
-                    )
-                    prop.onChange(fun (s: string) ->
-                        if System.String.IsNullOrWhiteSpace s then
-                            registerChange(None)
-                            stopSearch() // When deleting text this should stop search from completing
-                        else
-                            registerChange(Some s)
-                            if isSearchable then
-                                startSearch()
-                                mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
-                    )
-                    prop.onKeyDown(fun e ->
-                        e.stopPropagation()
-                        match e.which with
-                        | 27. -> //escape
-                            stopSearch()
-                            debounceStorage.current.ClearAndRun()
-                            if onEscape.IsSome then onEscape.Value e
-                        | 13. -> //enter
-                            debounceStorage.current.ClearAndRun()
-                            if onEnter.IsSome then onEnter.Value e
-                        | _ -> ()
-                    )
-                ]
-                let TermSelectArea = TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching, (if advancedSearchDispatch.IsSome then Some setAdvancedSearchActive else None))
-                if portalTermSelectArea.IsSome then
-                    ReactDOM.createPortal(TermSelectArea, portalTermSelectArea.Value)
-                elif ref.current.IsSome then
-                    ReactDOM.createPortal(TermSelectArea, ref.current.Value)
-                else
-                    TermSelectArea
-                Components.loadingIcon loading
-                if input.IsSome && input.Value.Name.IsSome && input.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
-                // Optional elements
                 Html.div [
-                    prop.classes ["is-flex"]
+                    prop.className [
+                        "input input-bordered flex items-center gap-2 relative"
+                        if isjoin then "join-item";
+                        if classes.IsSome then classes.Value;
+                    ]
+                    prop.ref ref
+                    prop.style [
+                        if fullwidth then style.flexGrow 1;
+                    ]
                     prop.children [
-                        if parent.IsSome && displayParent then
-                            Html.p [
-                                prop.className "text-sm"
-                                prop.children [
-                                    Html.span "Parent: "
-                                    Html.span $"{parent.Value.NameText}, {parent.Value.TermAccessionShort}"
+                        Components.searchIcon
+                        Html.input [
+                            prop.className "grow"
+                            prop.autoFocus autofocus
+                            if input.IsSome then prop.valueOrDefault input.Value.NameText
+                            prop.ref inputRef
+                            prop.onMouseDown(fun e -> e.stopPropagation())
+                            prop.onDoubleClick(fun e ->
+                                let s : string = e.target?value
+                                if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
+                                    log "Double click empty + parent"
+                                    if isSearchable then
+                                        startSearch()
+                                        allByParentSearch(parent.Value, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
+                                elif s.Trim() <> "" then
+                                    log "Double click not empty"
+                                    if isSearchable then
+                                        startSearch()
+                                        mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 0)
+                                else
+                                    ()
+                            )
+                            prop.onChange(fun (s: string) ->
+                                if System.String.IsNullOrWhiteSpace s then
+                                    registerChange(None)
+                                    stopSearch() // When deleting text this should stop search from completing
+                                else
+                                    registerChange(Some s)
+                                    if isSearchable then
+                                        startSearch()
+                                        mainSearch(s, parent, setSearchNameState, setSearchTreeState, setLoading, stopSearch, debounceStorage.current, 1000)
+                            )
+                            prop.onKeyDown(fun e ->
+                                e.stopPropagation()
+                                match e.which with
+                                | 27. -> //escape
+                                    stopSearch()
+                                    debounceStorage.current.ClearAndRun()
+                                    if onEscape.IsSome then onEscape.Value e
+                                | 13. -> //enter
+                                    debounceStorage.current.ClearAndRun()
+                                    if onEnter.IsSome then onEnter.Value e
+                                | _ -> ()
+                            )
+                        ]
+                        let TermSelectArea = TermSearch.TermSelectArea (SelectAreaID, searchNameState, searchTreeState, selectTerm, isSearching, (if advancedSearchDispatch.IsSome then Some setAdvancedSearchActive else None))
+                        if portalTermSelectArea.IsSome then
+                            ReactDOM.createPortal(TermSelectArea, portalTermSelectArea.Value)
+                        elif ref.current.IsSome then
+                            ReactDOM.createPortal(TermSelectArea, ref.current.Value)
+                        else
+                            TermSelectArea
+                        Components.loadingIcon loading
+                        if input.IsSome && input.Value.Name.IsSome && input.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
+                    ]
+                ]
+                if parent.IsSome || advancedSearchDispatch.IsSome then
+                    // Optional elements
+                    Html.div [
+                        prop.className "label not-prose"
+                        prop.children [
+                            if parent.IsSome && displayParent then
+                                Html.span [
+                                    prop.className "text-sm label-text-alt"
+                                    prop.children [
+                                        Html.span "Parent: "
+                                        Html.span $"{parent.Value.NameText}, {parent.Value.TermAccessionShort}"
+                                    ]
+                                ]
+                            if advancedSearchDispatch.IsSome then
+                                Components.AdvancedSearch.Main(advancedSearchActive, setAdvancedSearchActive, (fun t ->
+                                    setAdvancedSearchActive false
+                                    Some t |> selectTerm),
+                                    advancedSearchDispatch.Value
+                                )
+                                Html.span [
+                                    prop.className "label-text-alt link-primary cursor-pointer"
+                                    prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); setAdvancedSearchActive true)
+                                    prop.text "Use advanced search"
+                                    // prop.children [
+                                    //     Html.a [
+                                    //     ]
+                                    // ]
                                 ]
                             ]
-                        if advancedSearchDispatch.IsSome then
-                            Components.AdvancedSearch.Main(advancedSearchActive, setAdvancedSearchActive, (fun t ->
-                                setAdvancedSearchActive false
-                                Some t |> selectTerm),
-                                advancedSearchDispatch.Value
-                            )
-                            Html.a [
-                                prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); setAdvancedSearchActive true)
-                                prop.style [style.custom("marginLeft","auto")]
-                                prop.text "Use advanced search"
-                            ]
-                        ]
                 ]
             ]
         ]
-

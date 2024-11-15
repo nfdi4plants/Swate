@@ -124,7 +124,7 @@ let private AddBuildingBlockButton (model: Model) dispatch =
                 let isValid = Helper.isValidColumn header
                 button.wide
                 if isValid then
-                    button.primary
+                    button.success
                 else
                     button.error
                     prop.disabled true

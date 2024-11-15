@@ -38,7 +38,7 @@ type SidebarLayout =
         //         style.custom("borderImageSource", $"linear-gradient({colorArr.[if order then 0 else 1]} {100-rndVal}%%, {colorArr.[if order then 1 else 0]})")
         //         order <- not order
         //     ]
-            prop.className "relative p-4 animated-border shadow-md" //experimental
+            prop.className "relative flex p-4 animated-border shadow-md gap-4 flex-col" //experimental
             prop.children children
         ]
     static member Header(txt: string) =

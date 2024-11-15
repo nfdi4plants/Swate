@@ -13,8 +13,8 @@ type TemplateFromDB =
             prop.onClick(fun _ -> UpdatePageState (Some Routing.Route.ProtocolSearch) |> dispatch)
             button.info
             button.block
-            prop.style [style.margin (length.rem 1, length.px 0)]
-            prop.text "Browse database" ]
+            prop.text "Browse database"
+        ]
 
     static member addFromDBToTableButton (model:Model) dispatch =
         Html.div [
