@@ -92,7 +92,7 @@ let Main (model:Model, dispatch) =
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
         SidebarComponents.SidebarLayout.LogicContainer [
-            Components.TermSearch.Input(setTerm, fullwidth=true, size=button.lg, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch)
+            Components.TermSearch.Input(setTerm, fullwidth=true, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch)
             addButton(model, dispatch)
         ]
     ]

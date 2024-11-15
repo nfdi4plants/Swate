@@ -273,7 +273,7 @@ type TermSearch =
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
-        ?autofocus: bool, ?fullwidth: bool, ?size: IReactProperty, ?isjoin: bool, ?displayParent: bool, ?classes: string)
+        ?autofocus: bool, ?fullwidth: bool, ?isjoin: bool, ?displayParent: bool, ?classes: string)
         =
         let isjoin = defaultArg isjoin false
         let isSearchable = defaultArg isSearchable true
@@ -327,7 +327,6 @@ type TermSearch =
                 if isjoin then "join-item";
                 if classes.IsSome then classes.Value;
             ]
-            if size.IsSome then size.Value
             prop.ref ref
             prop.style [
                 if fullwidth then style.flexGrow 1;
@@ -337,7 +336,6 @@ type TermSearch =
                 Html.input [
                     prop.className "grow"
                     prop.autoFocus autofocus
-                    if size.IsSome then size.Value
                     if input.IsSome then prop.valueOrDefault input.Value.NameText
                     prop.ref inputRef
                     prop.onMouseDown(fun e -> e.stopPropagation())

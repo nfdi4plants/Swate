@@ -28,11 +28,16 @@ let View (model : Model) (dispatch : Msg -> unit) =
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
         Html.div [
             prop.id "ClientView"
-            prop.className "flex size-full overflow-auto h-screen"
+            prop.className "flex w-full overflow-auto h-screen"
             prop.children [
                 match model.PersistentStorageState.Host with
                 | Some Swatehost.Excel ->
-                    SidebarView.SidebarView.Main(model, dispatch)
+                    Html.div [
+                        prop.className "flex flex-col w-full h-full"
+                        prop.children [
+                            SidebarView.SidebarView.Main(model, dispatch)
+                        ]
+                    ]
                 | _ ->
                     let isActive = model.SpreadsheetModel.TableViewIsActive() && model.PersistentStorageState.ShowSideBar
                     Daisy.drawer [
