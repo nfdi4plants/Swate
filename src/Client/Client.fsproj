@@ -57,6 +57,7 @@
     <Compile Include="Spreadsheet\Controller\Table.fs" />
     <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
     <Compile Include="Spreadsheet\Controller\DataMap.fs" />
+    <Compile Include="SharedComponents\BaseContextMenu.fs" />
     <Compile Include="SharedComponents\BaseDropdown.fs" />
     <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />

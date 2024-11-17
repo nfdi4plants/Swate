@@ -15,13 +15,14 @@ type MoveColumn =
     static member InputField(index: int, set, max: int, submit) =
         let input, setInput = React.useState(index)
         Html.div [
-            prop.className "is-grouped is-justify-content-space-between"
-            prop.style [style.gap (length.rem 1)]
+            prop.className "flex gap-4 justify-between"
             prop.children [
                 Html.div [
                     Html.p "Preview"
-                    Html.div [
+                    Daisy.join [
                         Daisy.input [
+                            join.item
+                            prop.className "input-bordered"
                             prop.type'.number
                             prop.onChange(fun i -> setInput i)
                             prop.defaultValue input
@@ -29,6 +30,7 @@ type MoveColumn =
                             prop.max max
                         ]
                         Daisy.button.button [
+                            join.item
                             prop.onClick(fun _ -> set (index,input))
                             prop.text "Apply"
                         ]
@@ -62,38 +64,40 @@ type MoveColumn =
             modal.active
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
-                Daisy.card [
-                    prop.style [style.maxHeight(length.percent 70); style.overflowY.hidden]
-                    prop.children [
-                        Daisy.cardBody [
-                            Daisy.cardActions [
-                                prop.className "justify-end"
-                                prop.children [
-                                    Components.DeleteButton(props=[prop.onClick rmv])
+                Daisy.modalBox.div [
+                    Daisy.card [
+                        prop.style [style.maxHeight(length.percent 70); style.overflowY.hidden]
+                        prop.children [
+                            Daisy.cardBody [
+                                Daisy.cardTitle [
+                                    prop.className "flex flex-row justify-between"
+                                    prop.children [
+                                        Html.h2 "Move Column"
+                                        Components.DeleteButton(props=[prop.onClick rmv])
+                                    ]
                                 ]
-                            ]
-                            Daisy.cardTitle "Move Column"
-                            MoveColumn.InputField(index, updateIndex, state.Length-1, submit)
-                            Html.div [
-                                prop.className "overflow-y-auto max-w-md"
-                                prop.children [
-                                    Daisy.table [
-                                        Html.thead [
-                                            Html.tr [
-                                                Html.th "Index"
-                                                Html.th "Column"
-                                            ]
-                                        ]
-                                        Html.tbody [
-                                            for i in 0 .. state.Length-1 do
+                                MoveColumn.InputField(index, updateIndex, state.Length-1, submit)
+                                Html.div [
+                                    prop.className "overflow-y-auto max-w-[700px]"
+                                    prop.children [
+                                        Daisy.table [
+                                            Html.thead [
                                                 Html.tr [
-                                                    if i = index then
-                                                        prop.className "bg-error"
-                                                    prop.children [
-                                                        Html.td i
-                                                        Html.td (state.[i].ToString())
-                                                    ]
+                                                    Html.th "Index"
+                                                    Html.th "Column"
                                                 ]
+                                            ]
+                                            Html.tbody [
+                                                for i in 0 .. state.Length-1 do
+                                                    Html.tr [
+                                                        if i = index then
+                                                            prop.className "bg-error text-error-content"
+                                                        prop.children [
+                                                            Html.td i
+                                                            Html.td (state.[i].ToString())
+                                                        ]
+                                                    ]
+                                            ]
                                         ]
                                     ]
                                 ]

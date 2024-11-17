@@ -20,18 +20,20 @@ let interopLoggingModal(model:DevState, dispatch) (rmv: _ -> unit) =
         modal.active
         prop.children [
             Daisy.modalBackdrop [ prop.onClick closeMsg ]
-            Daisy.alert [
-                prop.style [style.width(length.percent 80); style.maxHeight (length.percent 80)]
-                prop.children [
-                    Components.DeleteButton(props = [prop.onClick closeMsg])
-                    Daisy.table [
-                        Html.tbody (logs |> List.map LogItem.toTableRow)
-                    ]
-                    Daisy.button.a [
-                        button.warning
-                        prop.className "justify-end"
-                        prop.onClick closeMsg
-                        prop.text "Continue"
+            Daisy.modalBox.div [
+                Daisy.alert [
+                    prop.style [style.width(length.percent 80); style.maxHeight (length.percent 80)]
+                    prop.children [
+                        Components.DeleteButton(props = [prop.onClick closeMsg])
+                        Daisy.table [
+                            Html.tbody (logs |> List.map LogItem.toTableRow)
+                        ]
+                        Daisy.button.a [
+                            button.warning
+                            prop.className "justify-end"
+                            prop.onClick closeMsg
+                            prop.text "Continue"
+                        ]
                     ]
                 ]
             ]

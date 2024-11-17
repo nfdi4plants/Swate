@@ -20,179 +20,42 @@ type private FooterTab = {
 module private TableContextMenu =
 
     type ContextFunctions = {
-        Delete  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
-        Rename  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        Delete  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
+        Rename  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
     }
 
     let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        /// This element will remove the contextmenu when clicking anywhere else
-        let rmv_element = Html.div [
-            prop.onClick rmv
-            prop.onContextMenu(fun e -> e.preventDefault(); rmv e)
-            prop.style [
-                style.position.fixedRelativeToWindow
-                style.backgroundColor.transparent
-                style.left 0
-                style.top 0
-                style.right 0
-                style.bottom 0
-                style.display.block
-                style.zIndex -1
-            ]
-        ]
-        let button (name:string, icon: string, msg, props) = Html.li [
-            Html.button [
-                prop.onClick msg
-                prop.className "px-4 py-1 flex flex-row justify-between items-center h-8 min-h-8 gap-2 w-full transition-all hover:bg-base-200 cursor-pointer"
-                yield! props
-                prop.children [
-                    Html.span name
-                    Html.i [prop.className icon]
-                ]
-            ]
-        ]
-        let divider = Html.li [
-            Html.div [ prop.style [style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0); style.width (length.perc 75); style.marginLeft length.auto] ]
-        ]
         let buttonList = [
-            button ("Delete", "fa-solid fa-trash", funcs.Delete rmv, [])
-            button ("Rename", "fa-solid fa-pen-to-square", funcs.Rename rmv, [])
+            Components.BaseContextMenu.Item (Html.span "Delete", funcs.Delete rmv, "fa-solid fa-trash")
+            Components.BaseContextMenu.Item (Html.span "Rename", funcs.Rename rmv, "fa-solid fa-pen-to-square")
         ]
-        Html.div [
-            prop.className "bg-base-300"
-            prop.style [
-                style.position.absolute
-                style.left mousex
-                style.top (mousey-40)
-                style.minWidth 150
-                style.zIndex 40 // to overlap navbar
-            ]
-            prop.children [
-                rmv_element
-                Html.ul [
-                    prop.className "z-50"
-                    prop.children buttonList
-                ]
-            ]
-        ]
+        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
 
 
 [<RequireQualifiedAccess>]
 module private PlusContextMenu =
     type ContextFunctions = {
-        AddTable  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
-        AddDatamap  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        AddTable  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
+        AddDatamap  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
     }
 
     let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        /// This element will remove the contextmenu when clicking anywhere else
-        let rmv_element = Html.div [
-            prop.onClick rmv
-            prop.onContextMenu(fun e -> e.preventDefault(); rmv e)
-            prop.style [
-                style.position.fixedRelativeToWindow
-                style.backgroundColor.transparent
-                style.left 0
-                style.top 0
-                style.right 0
-                style.bottom 0
-                style.display.block
-            ]
-        ]
-        let button (name:string, icon: string, msg, props) = Html.li [
-            Daisy.button.button [
-                prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
-                prop.onClick msg
-                prop.className "py-1"
-                button.block
-                //button.sm
-                button.outline
-                yield! props
-                prop.children [
-                    Html.i [prop.className icon]
-                    Html.span name
-                ]
-            ]
-        ]
-        let divider = Html.li [
-            Html.div [ prop.style [style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0); style.width (length.perc 75); style.marginLeft length.auto] ]
-        ]
         let buttonList = [
-            button ("Add Table", "fa-solid fa-table", funcs.AddTable rmv, [])
-            button ("Add Datamap", "fa-solid fa-map", funcs.AddDatamap rmv, [])
+            Components.BaseContextMenu.Item (Html.span "Add Table", funcs.AddTable rmv, "fa-solid fa-table")
+            Components.BaseContextMenu.Item (Html.span "Add Datamap", funcs.AddDatamap rmv, "fa-solid fa-map")
         ]
-        Html.div [
-            prop.style [
-                style.backgroundColor "white"
-                style.position.absolute
-                style.left mousex
-                style.top (mousey-40)
-                style.width 150
-                style.zIndex 40 // to overlap navbar
-                style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base)
-            ]
-            prop.children [
-                rmv_element
-                Html.ul buttonList
-            ]
-        ]
+        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
 
 module DataMapContextMenu =
     type ContextFunctions = {
-        Delete  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        Delete  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
     }
 
     let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        /// This element will remove the contextmenu when clicking anywhere else
-        let rmv_element = Html.div [
-            prop.onClick rmv
-            prop.onContextMenu(fun e -> e.preventDefault(); rmv e)
-            prop.style [
-                style.position.fixedRelativeToWindow
-                style.backgroundColor.transparent
-                style.left 0
-                style.top 0
-                style.right 0
-                style.bottom 0
-                style.display.block
-            ]
-        ]
-        let button (name:string, icon: string, msg, props) = Html.li [
-            Daisy.button.button [
-                prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
-                prop.onClick msg
-                prop.className "py-1"
-                button.block
-                //button.sm
-                button.outline
-                yield! props
-                prop.children [
-                    Html.i [prop.className icon]
-                    Html.span name
-                ]
-            ]
-        ]
-        let divider = Html.li [
-            Html.div [ prop.style [style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0); style.width (length.perc 75); style.marginLeft length.auto] ]
-        ]
         let buttonList = [
-            button ("Delete", "fa-solid fa-trash", funcs.Delete rmv, [])
+            Components.BaseContextMenu.Item (Html.span "Delete", funcs.Delete rmv, "fa-solid fa-trash")
         ]
-        Html.div [
-            prop.style [
-                style.backgroundColor "white"
-                style.position.absolute
-                style.left mousex
-                style.top (mousey-40)
-                style.width 150
-                style.zIndex 40 // to overlap navbar
-                style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base)
-            ]
-            prop.children [
-                rmv_element
-                Html.ul buttonList
-            ]
-        ]
+        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
 
 open Spreadsheet.Types
 
@@ -257,8 +120,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
             e.stopPropagation()
             e.preventDefault()
             let mousePosition = int e.pageX, int e.pageY - 30
-            let deleteMsg rmv = fun e -> rmv e; Spreadsheet.RemoveTable index |> Messages.SpreadsheetMsg |> dispatch
-            let renameMsg rmv = fun e -> rmv e; {state with IsEditable = true} |> setState
+            let deleteMsg rmv = fun _ -> rmv(); Spreadsheet.RemoveTable index |> Messages.SpreadsheetMsg |> dispatch
+            let renameMsg rmv = fun _ -> rmv(); {state with IsEditable = true} |> setState
             let funcs : TableContextMenu.ContextFunctions = {
                 Rename = renameMsg
                 Delete = deleteMsg
@@ -333,7 +196,7 @@ let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
             e.stopPropagation()
             e.preventDefault()
             let mousePosition = int e.pageX, int e.pageY
-            let deleteDatamapMsg rmv = fun e -> rmv e; SpreadsheetInterface.UpdateDatamap None |> Messages.InterfaceMsg |> dispatch
+            let deleteDatamapMsg rmv = fun _ -> rmv(); SpreadsheetInterface.UpdateDatamap None |> Messages.InterfaceMsg |> dispatch
             let funcs : DataMapContextMenu.ContextFunctions = {
                 Delete = deleteDatamapMsg
             }
@@ -365,9 +228,9 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, (int e.pageY - 50)
-            let addTableMsg rmv = fun e -> rmv e; SpreadsheetInterface.CreateAnnotationTable false |> Messages.InterfaceMsg |> dispatch
-            let addDatamapMsg rmv = fun e -> rmv e; SpreadsheetInterface.UpdateDatamap (DataMap.init() |> Some) |> Messages.InterfaceMsg |> dispatch
+            let mousePosition = int e.pageX, (int e.pageY - 20)
+            let addTableMsg rmv = fun _ -> rmv(); SpreadsheetInterface.CreateAnnotationTable false |> Messages.InterfaceMsg |> dispatch
+            let addDatamapMsg rmv = fun _ -> rmv(); SpreadsheetInterface.UpdateDatamap (DataMap.init() |> Some) |> Messages.InterfaceMsg |> dispatch
             let funcs : PlusContextMenu.ContextFunctions = {
                 AddTable = addTableMsg
                 AddDatamap = addDatamapMsg

@@ -16,12 +16,14 @@ let errorModal(error: exn) (rmv: _ -> unit) =
         modal.active
         prop.children [
             Daisy.modalBackdrop [ prop.onClick closeMsg ]
-            Daisy.alert [
-                alert.error
-                prop.style [style.width(length.percent 90); style.maxHeight (length.percent 80); style.overflow.auto]
-                prop.children [
-                    Components.DeleteButton(props = [prop.onClick closeMsg])
-                    Html.span (error.GetPropagatedError())
+            Daisy.modalBox.div [
+                Daisy.alert [
+                    alert.error
+                    prop.style [style.width(length.percent 90); style.maxHeight (length.percent 80); style.overflow.auto]
+                    prop.children [
+                        Components.DeleteButton(props = [prop.onClick closeMsg])
+                        Html.span (error.GetPropagatedError())
+                    ]
                 ]
             ]
         ]
