@@ -99,6 +99,7 @@ type TopLevelMsg =
     | CloseSuggestions
 
 type Msg =
+| UpdateModel                   of Model
 | DevMsg                        of DevMsg
 | OntologyMsg                   of Ontologies.Msg
 | TermSearchMsg                 of TermSearch.Msg
@@ -113,9 +114,6 @@ type Msg =
 | SpreadsheetMsg                of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
 | InterfaceMsg                  of SpreadsheetInterface.Msg
-//| SettingsProtocolMsg   of SettingsProtocolMsg
-| UpdatePageState               of Routing.Route option
-| UpdateIsExpert                of bool
 | Batch                         of seq<Messages.Msg>
 | Run                           of (unit -> unit)
 | UpdateHistory                 of LocalHistory.Model

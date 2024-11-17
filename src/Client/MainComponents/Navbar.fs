@@ -86,6 +86,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                 (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
                 classes = "hover:!text-error"
             )
+            NavbarBurger.Main(model, dispatch)
         ]
     ]
 

@@ -83,7 +83,7 @@ module ComponentAux =
                     if hasSearchAddon then
                         Daisy.button.a [ join.item; prop.readOnly true; button.disabled; prop.text state.Searchfield.toStr; prop.className "!text-base-content !border-primary"]
                     Daisy.label [
-                        prop.className "join-item input input-bordered input-primary flex items-center w-full"
+                        prop.className "join-item input input-bordered input-sm input-primary flex items-center w-full"
                         prop.children [
                             Html.input [
                                 prop.style [style.minWidth 200]
@@ -186,11 +186,10 @@ module ComponentAux =
                 prop.className "relative"
                 prop.children [
                     Daisy.label [
-                        prop.className "input input-bordered input-primary flex items-center"
+                        prop.className "input input-bordered input-sm input-primary flex items-center"
                         prop.children [
                             Html.input [
                                 prop.placeholder ".. protocol tag"
-                                input.primary
                                 prop.valueOrDefault state.ProtocolTagSearchQuery
                                 prop.onChange (fun (e:string) ->
                                     {state with ProtocolTagSearchQuery = e} |> setState
@@ -249,6 +248,7 @@ module ComponentAux =
             Html.p "Select community"
             Daisy.select [
                 prop.className "w-full"
+                select.sm
                 select.bordered
                 select.primary
                 prop.value (state.CommunityFilter.ToStringRdb())
@@ -494,7 +494,7 @@ type Search =
                 Html.p [
                     Html.b "Search for templates."
                     Html.text " For more information you can look "
-                    Html.a [ prop.href Shared.URLs.SwateWiki; prop.target "_Blank"; prop.text "here"]
+                    Html.a [ prop.href Shared.URLs.SWATE_WIKI; prop.target "_Blank"; prop.text "here"]
                     Html.text ". If you find any problems with a template or have other suggestions you can contact us "
                     Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.text "here"]
                     Html.text "."

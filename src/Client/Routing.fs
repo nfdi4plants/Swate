@@ -3,79 +3,67 @@ module Routing
 open Elmish.UrlParser
 open Feliz
 
+[<RequireQualifiedAccess>]
+type SidebarPage =
+    | BuildingBlock
+    | TermSearch
+    | FilePicker
+    | Protocol
+    | ProtocolSearch
+    | JsonExport
+    | DataAnnotator
+
+    member this.AsStringRdbl =
+        match this with
+        | BuildingBlock -> "Building Blocks"
+        | TermSearch -> "Terms"
+        | FilePicker -> "File Picker"
+        | Protocol -> "Templates"
+        | ProtocolSearch -> "Template Search"
+        | JsonExport -> "Json Export"
+        | DataAnnotator -> "Data Annotator"
+
+    member this.AsIcon() =
+        let createElem (icons: ReactElement list) =
+            Html.i [
+                prop.title this.AsStringRdbl
+                prop.children icons
+            ]
+
+        match this with
+        | TermSearch          ->
+            createElem [Html.i [prop.className "fa-solid fa-magnifying-glass-plus" ]]
+        | BuildingBlock       ->
+            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ]; Html.i [prop.className "fa-solid fa-table-columns" ]]
+        | Protocol            ->
+            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]]
+        | ProtocolSearch      ->
+            createElem [ Html.i [prop.className "fa-solid fa-table" ]; Html.i [prop.className "fa-solid fa-magnifying-glass" ]]
+        | JsonExport          ->
+            createElem [ Html.i [prop.className "fa-solid fa-file-export" ]]
+        | FilePicker          ->
+            createElem [ Html.i [prop.className "fa-solid fa-file-signature" ]]
+        | DataAnnotator       ->
+            createElem [ Html.i [prop.className "fa-solid fa-object-group" ]]
+
+[<RequireQualifiedAccess>]
+type MainPage =
+    | Default
+    | About
+    | PrivacyPolicy
+    | Settings
+
+    member this.AsStringRdbl =
+        match this with
+        | About -> "About"
+        | PrivacyPolicy -> "Privacy Policy"
+        | Settings -> "Settings"
+        | Default -> "Home"
+
 /// The different pages of the application. If you add a new page, then add an entry here.
 [<RequireQualifiedAccess>]
 type Route =
 | Home of int option
-| BuildingBlock
-| TermSearch
-| FilePicker
-| Info
-| PrivacyPolicy
-| Protocol
-| ProtocolSearch
-| JsonExport
-| DataAnnotator
-| ActivityLog
-| Settings
-| NotFound
-
-    member this.toStringRdbl =
-        match this with
-        | Home _ | Route.BuildingBlock  -> "Building Blocks"
-        | Route.TermSearch          -> "Terms"
-        | Route.FilePicker          -> "File Picker"
-        | Route.Protocol            -> "Templates"
-        | Route.ProtocolSearch      -> "Template Search"
-        | Route.JsonExport          -> "Json Export"
-        | Route.DataAnnotator       -> "Data Annotator"
-        | Route.Info                -> "Info"
-        | Route.PrivacyPolicy       -> "Privacy Policy"
-        | Route.ActivityLog         -> "Activity Log"
-        | Route.Settings            -> "Settings"
-        | Route.NotFound            -> "NotFound"
-
-    member this.isExpert =
-        match this with
-        | Route.JsonExport -> true
-        | _ -> false
-
-    member this.isActive(currentRoute: Route) =
-        let activeArr=
-            match this with
-            | Route.Protocol    -> [|Route.Protocol; Route.ProtocolSearch|]
-            | any               -> [|any|]
-        Array.contains currentRoute activeArr
-
-    static member toIcon (p: Route)=
-        let createElem (icons: ReactElement list) name =
-            Html.i [
-                prop.title name
-                prop.children icons
-            ]
-
-        match p with
-        | Route.TermSearch          ->
-            createElem [Html.i [prop.className "fa-solid fa-magnifying-glass-plus" ]] p.toStringRdbl
-        | Route.BuildingBlock       ->
-            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ]; Html.i [prop.className "fa-solid fa-table-columns" ]]  p.toStringRdbl
-        | Route.Protocol            ->
-            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]] p.toStringRdbl
-        | Route.ProtocolSearch      ->
-            createElem [ Html.i [prop.className "fa-solid fa-table" ]; Html.i [prop.className "fa-solid fa-magnifying-glass" ]] p.toStringRdbl
-        | Route.JsonExport          ->
-            createElem [ Html.i [prop.className "fa-solid fa-file-export" ]] p.toStringRdbl
-        | Route.FilePicker          ->
-            createElem [ Html.i [prop.className "fa-solid fa-file-signature" ]] p.toStringRdbl
-        | Route.ActivityLog         ->
-            createElem [ Html.i [prop.className "fa-solid fa-timeline" ]] p.toStringRdbl
-        | Route.Info                ->
-            createElem [ Html.i [prop.className "fa-solid fa-question" ]] p.toStringRdbl
-        | Route.PrivacyPolicy                ->
-            createElem [ Html.i [prop.className "fa-solid fa-question" ]] p.toStringRdbl
-        | Route.DataAnnotator       ->
-            createElem [ Html.i [prop.className "fa-solid fa-object-group" ]] p.toStringRdbl
-        | _                         -> Html.i [prop.className "fa-question"]
 
 ///explained here: https://elmish.github.io/browser/routing.html
 //let curry f x y = f (x,y)
@@ -89,19 +77,6 @@ module Routing =
     let route : Parser<Route -> Route,_> =
         oneOf [
             map Route.Home                  (s "" <?> intParam "is_swatehost")
-            map Route.TermSearch            (s "TermSearch")
-            map Route.BuildingBlock         (s "BuildingBlock")
-            map Route.FilePicker            (s "FilePicker")
-            map Route.Info                  (s "Info")
-            map Route.PrivacyPolicy         (s "PrivacyPolicy")
-            map Route.Protocol              (s "ProtocolInsert")
-            map Route.ProtocolSearch        (s "Protocol" </> s "Search")
-            map Route.JsonExport            (s "Experts" </> s "JsonExport")
-            map Route.ActivityLog           (s "ActivityLog")
-            map Route.Settings              (s "Settings")
-            map Route.NotFound              (s "NotFound")
-            // Redirect
-            map Route.BuildingBlock         (s "Core")
         ]
 
 

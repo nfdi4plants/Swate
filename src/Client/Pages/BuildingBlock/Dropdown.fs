@@ -158,11 +158,10 @@ module private DropdownElements =
 let Main(state, setState, model: Model, dispatch: Msg -> unit) =
     let isOpen, setOpen = React.useState false
     let close = fun _ -> setOpen false
-    Daisy.dropdown [
-        join.item
-        if isOpen then dropdown.open'
-        prop.children [
-            Daisy.button.div [
+    Components.BaseDropdown.Main(
+        isOpen,
+        setOpen,
+        Daisy.button.div [
                 button.primary
                 prop.onClick (fun _ -> setOpen (not isOpen))
                 prop.role "button"
@@ -174,18 +173,28 @@ let Main(state, setState, model: Model, dispatch: Msg -> unit) =
                         prop.className "fa-solid fa-angle-down"
                     ]
                 ]
-            ]
-            Daisy.dropdownContent [
-                prop.className "bg-base-300 w-64 menu rounded-box z-[1] p-2 shadow"
-                prop.children [
-                    match state.DropdownPage with
-                    | Model.BuildingBlock.DropdownPage.Main ->
-                        DropdownElements.dropdownContentMain state setState close model dispatch
-                    | Model.BuildingBlock.DropdownPage.More ->
-                        DropdownElements.dropdownContentProtocolTypeColumns state setState close model dispatch
-                    | Model.BuildingBlock.DropdownPage.IOTypes iotype ->
-                        DropdownElements.dropdownContentIOTypeColumns iotype state setState close model dispatch
-                ]
-            ]
-        ]
-    ]
+            ],
+        [
+            match state.DropdownPage with
+            | Model.BuildingBlock.DropdownPage.Main ->
+                DropdownElements.dropdownContentMain state setState close model dispatch
+            | Model.BuildingBlock.DropdownPage.More ->
+                DropdownElements.dropdownContentProtocolTypeColumns state setState close model dispatch
+            | Model.BuildingBlock.DropdownPage.IOTypes iotype ->
+                DropdownElements.dropdownContentIOTypeColumns iotype state setState close model dispatch
+        ],
+        style=Style.init("join-item dropdown", Map [
+            "content", Style.init("!min-w-64")
+        ])
+    )
+    // Daisy.dropdown [
+    //     join.item
+    //     if isOpen then dropdown.open'
+    //     prop.children [
+
+    //         Daisy.dropdownContent [
+    //             prop.className "bg-base-300 w-64 menu rounded-box z-[1] p-2 shadow"
+    //             prop.children
+    //         ]
+    //     ]
+    // ]

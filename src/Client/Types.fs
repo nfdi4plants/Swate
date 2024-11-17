@@ -21,3 +21,38 @@ module JsonImport =
                 ImportMetadata = false
                 ImportTables = []
             }
+
+open Fable.Core
+
+type Style =
+    {
+        classes: U2<string, string []>
+        subClasses: Map<string, Style> option
+    } with
+        static member init(classes: string, ?subClasses: Map<string, Style>) =
+            {
+                classes = U2.Case1 classes
+                subClasses = subClasses
+            }
+        static member init(classes: string [], ?subClasses: Map<string, Style>) =
+            {
+                classes = U2.Case2 classes
+                subClasses = subClasses
+            }
+
+        member this.StyleString =
+            match this.classes with
+            | U2.Case1 style -> style
+            | U2.Case2 styleArr -> styleArr |> String.concat " "
+
+        member this.TryGetSubclass(name: string) =
+            match this.subClasses with
+            | Some subClasses -> subClasses.TryFind name
+            | None -> None
+
+        member this.GetSubclassStyle(name: string) =
+            match this.subClasses with
+            | Some subClasses -> subClasses.TryFind name
+            | None -> None
+            |> Option.map _.StyleString
+            |> Option.defaultValue ""

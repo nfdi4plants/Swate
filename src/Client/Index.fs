@@ -30,15 +30,17 @@ let View (model : Model) (dispatch : Msg -> unit) =
             prop.id "ClientView"
             prop.className "flex w-full overflow-auto h-screen"
             prop.children [
-                match model.PersistentStorageState.Host with
-                | Some Swatehost.Excel ->
+                match model.PageState.IsHome, model.PersistentStorageState.Host with
+                | false, _ ->
+                    View.MainPageView.Main(model, dispatch)
+                | _, Some Swatehost.Excel ->
                     Html.div [
                         prop.className "flex flex-col w-full h-full"
                         prop.children [
                             SidebarView.SidebarView.Main(model, dispatch)
                         ]
                     ]
-                | _ ->
+                | _, _ ->
                     let isActive = model.SpreadsheetModel.TableViewIsActive() && model.PersistentStorageState.ShowSideBar
                     Daisy.drawer [
                         prop.className [
@@ -52,7 +54,7 @@ let View (model : Model) (dispatch : Msg -> unit) =
                                 prop.className "drawer-toggle"
                             ]
                             Daisy.drawerContent [
-                                MainWindowView.Main (model, dispatch)
+                                SpreadsheetView.Main (model, dispatch)
                             ]
                             Daisy.drawerSide [
                                 SidebarView.SidebarView.Main(model, dispatch)

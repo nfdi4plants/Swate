@@ -1,4 +1,4 @@
-module MainWindowView
+module SpreadsheetView
 
 open Feliz
 open Feliz.DaisyUI
@@ -27,31 +27,7 @@ let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactEl
             for widget in widgets do displayWidget widget
         ]
 
-let private SpreadsheetSelectionFooter (model: Model) dispatch =
-    Html.div [
-        prop.className "sticky bottom-0 flex flex-row"
-        prop.children [
-            Html.div [
-                prop.className "tabs tabs-lifted w-full overflow-x-auto overflow-y-hidden
-                flex flex-row items-center pt-1 border-t-2
-                *:!border-b-0 *:gap-1 *:flex-nowrap"
-                prop.children [
-                    Daisy.tab  [
-                        prop.style [style.width (length.px 20); style.custom ("order", -2)]
-                    ]
-                    MainComponents.FooterTabs.MainMetadata (model, dispatch)
-                    if model.SpreadsheetModel.HasDataMap() then
-                        MainComponents.FooterTabs.MainDataMap (model, dispatch)
-                    for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
-                        MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
-                    if model.SpreadsheetModel.CanHaveTables() then
-                        MainComponents.FooterTabs.MainPlus (model, dispatch)
-                ]
-            ]
-            if model.SpreadsheetModel.TableViewIsActive() then
-                MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
-        ]
-    ]
+
 
 open Shared
 
@@ -141,6 +117,6 @@ let Main (model: Model, dispatch) =
                 ]
             ]
             if state.ArcFile.IsSome then
-                SpreadsheetSelectionFooter model dispatch
+                MainComponents.FooterTabs.SpreadsheetSelectionFooter model dispatch
         ]
     ]

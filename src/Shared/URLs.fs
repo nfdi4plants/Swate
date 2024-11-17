@@ -36,11 +36,13 @@ module URLs =
 
         static member UrlTemplateTopic = Helpdesk.Url + "/?topic=Metadata_SwateTemplate"
 
+    let CONTACT = Helpdesk.Url
+
     [<LiteralAttribute>]
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
-    let SwateWiki = @"https://nfdi4plants.org/nfdi4plants.knowledgebase/docs/SwateManual/index.html"
+    let SWATE_WIKI = @"https://nfdi4plants.github.io/nfdi4plants.knowledgebase/swate/"
 
     [<LiteralAttribute>]
     let SwateRepo = @"https://github.com/nfdi4plants/Swate"

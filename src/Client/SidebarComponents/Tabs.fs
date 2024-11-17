@@ -9,13 +9,13 @@ open Feliz.DaisyUI
 
 type Tabs =
 
-    static member private NavigationTab (pageLink: Routing.Route) (model:Model) (dispatch:Msg-> unit) =
-        let isActive = pageLink.isActive(model.PageState.CurrentPage)
+    static member private NavigationTab (pageLink: Routing.SidebarPage) (model:Model) (dispatch:Msg-> unit) =
+        let isActive = pageLink = model.PageState.SidebarPage
         Daisy.tab [
             if isActive then tab.active
             prop.className "navigation" // this class does not do anything, but disables <a> styling.
-            prop.onClick (fun e -> e.preventDefault(); UpdatePageState (Some pageLink) |> dispatch)
-            prop.children (pageLink |> Routing.Route.toIcon)
+            prop.onClick (fun e -> e.preventDefault(); UpdateModel { model with Model.PageState.SidebarPage = pageLink } |> dispatch)
+            prop.children (pageLink.AsIcon())
         ]
 
 
@@ -25,11 +25,11 @@ type Tabs =
             tabs.boxed
             prop.className "w-full"
             prop.children [
-                Tabs.NavigationTab Routing.Route.BuildingBlock     model dispatch
-                Tabs.NavigationTab Routing.Route.TermSearch        model dispatch
-                Tabs.NavigationTab Routing.Route.Protocol          model dispatch
-                Tabs.NavigationTab Routing.Route.FilePicker        model dispatch
-                Tabs.NavigationTab Routing.Route.DataAnnotator     model dispatch
-                Tabs.NavigationTab Routing.Route.JsonExport        model dispatch
+                Tabs.NavigationTab Routing.SidebarPage.BuildingBlock     model dispatch
+                Tabs.NavigationTab Routing.SidebarPage.TermSearch        model dispatch
+                Tabs.NavigationTab Routing.SidebarPage.Protocol          model dispatch
+                Tabs.NavigationTab Routing.SidebarPage.FilePicker        model dispatch
+                Tabs.NavigationTab Routing.SidebarPage.DataAnnotator     model dispatch
+                Tabs.NavigationTab Routing.SidebarPage.JsonExport        model dispatch
             ]
         ]

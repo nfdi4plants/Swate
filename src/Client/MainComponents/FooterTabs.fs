@@ -392,12 +392,38 @@ let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
         prop.children [
             Html.label [
                 // prop.for' "split-window-drawer"
-                prop.className "drawer-button btn btn-sm px-2 py-2 swap swap-rotate rounded-none h-full border-t-2"
+                prop.className "drawer-button btn btn-sm px-2 py-2 swap swap-rotate rounded-none h-full"
                 prop.children [
                     Html.input [prop.type'.checkbox]
                     Html.i [prop.className ["fa-solid"; "fa-chevron-left"; "swap-off"]]
                     Html.i [prop.className ["fa-solid"; "fa-chevron-right"; "swap-on" ]]
                 ]
             ]
+        ]
+    ]
+
+let SpreadsheetSelectionFooter (model: Model) dispatch =
+    Html.div [
+        prop.className "sticky bottom-0 flex flex-row border-t-2"
+        prop.children [
+            Html.div [
+                prop.className "tabs tabs-lifted w-full overflow-x-auto overflow-y-hidden
+                flex flex-row items-center pt-1
+                *:!border-b-0 *:gap-1 *:flex-nowrap"
+                prop.children [
+                    Daisy.tab  [
+                        prop.style [style.width (length.px 20); style.custom ("order", -2)]
+                    ]
+                    MainMetadata (model, dispatch)
+                    if model.SpreadsheetModel.HasDataMap() then
+                        MainDataMap (model, dispatch)
+                    for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
+                        Main (index, model.SpreadsheetModel.Tables, model, dispatch)
+                    if model.SpreadsheetModel.CanHaveTables() then
+                        MainPlus (model, dispatch)
+                ]
+            ]
+            if model.SpreadsheetModel.TableViewIsActive() then
+                ToggleSidebar(model, dispatch)
         ]
     ]

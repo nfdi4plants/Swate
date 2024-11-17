@@ -15,42 +15,27 @@ type SidebarView =
         Html.div [
             prop.className "grow overflow-y-auto"
             prop.children [
-                match model.PageState.CurrentPage with
-                | Routing.Route.BuildingBlock | Routing.Route.Home _ ->
+                match model.PageState with
+                | {SidebarPage = Routing.SidebarPage.BuildingBlock } ->
                     BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
-                | Routing.Route.TermSearch ->
+                | {SidebarPage = Routing.SidebarPage.TermSearch } ->
                     TermSearch.Main (model, dispatch)
 
-                | Routing.Route.FilePicker ->
+                | {SidebarPage = Routing.SidebarPage.FilePicker } ->
                     FilePicker.filePickerComponent model dispatch
 
-                | Routing.Route.Protocol ->
+                | {SidebarPage = Routing.SidebarPage.Protocol } ->
                     Protocol.Templates.Main (model, dispatch)
 
-                | Routing.Route.DataAnnotator ->
+                | {SidebarPage = Routing.SidebarPage.DataAnnotator } ->
                     Pages.DataAnnotator.Main(model, dispatch)
 
-                | Routing.Route.JsonExport ->
+                | {SidebarPage = Routing.SidebarPage.JsonExport } ->
                     JsonExporter.Core.FileExporter.Main(model, dispatch)
 
-                | Routing.Route.ProtocolSearch ->
+                | {SidebarPage = Routing.SidebarPage.ProtocolSearch } ->
                     Protocol.SearchContainer.Main model dispatch
-
-                | Routing.Route.ActivityLog ->
-                    ActivityLog.activityLogComponent model dispatch
-
-                | Routing.Route.Settings ->
-                    SettingsView.settingsViewComponent model dispatch
-
-                | Routing.Route.Info ->
-                    Pages.Info.Main
-
-                | Routing.Route.PrivacyPolicy ->
-                    Pages.PrivacyPolicy.Main()
-
-                | Routing.Route.NotFound ->
-                    NotFoundView.notFoundComponent model dispatch
             ]
         ]
 
@@ -67,14 +52,8 @@ type SidebarView =
                     prop.children [
                         SidebarComponents.Tabs.Main model dispatch
 
-                        match model.PersistentStorageState.Host, model.ExcelState.HasAnnotationTable with
-                        | Some Swatehost.Excel, false ->
-                            SidebarComponents.AnnotationTableMissingWarning.annotationTableMissingWarningComponent model dispatch
-                            Html.none
-                        | _ ->
-                            Html.none
-
                         SidebarView.content model dispatch
+
                         SidebarComponents.Footer.Main(model, dispatch)
                     ]
                 ]

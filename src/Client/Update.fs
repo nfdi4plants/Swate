@@ -15,25 +15,11 @@ let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.
         let swatehost = Swatehost.ofQueryParam queryIntegerOption
         let nextModel = {
             currentModel with
-                Model.PageState.CurrentPage = Route.BuildingBlock
-                Model.PageState.IsExpert = false
                 Model.PersistentStorageState.Host = Some swatehost
         }
         nextModel,Cmd.none
-    | Some page ->
-        let nextModel = {
-            currentModel with
-                Model.PageState.CurrentPage = page
-                Model.PageState.IsExpert = page.isExpert
-        }
-        nextModel,Cmd.none
     | None ->
-        let nextModel = {
-            currentModel with
-                Model.PageState.CurrentPage = Route.BuildingBlock
-                Model.PageState.IsExpert = false
-        }
-        nextModel,Cmd.none
+        currentModel, Cmd.none
 
 module AdvancedSearch =
 
@@ -191,36 +177,8 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
                         msgSeq |> Seq.map Cmd.ofMsg
                 ]
             currentModel, cmd
-        | UpdatePageState (pageOpt:Route option) ->
-            let nextPageState =
-                match pageOpt with
-                | Some page -> {
-                    currentModel.PageState with
-                        CurrentPage = page
-                    }
-                | None -> {
-                    currentModel.PageState with
-                        CurrentPage = Route.BuildingBlock
-                    }
-            let nextModel = {
-                currentModel with
-                    PageState = nextPageState
-            }
+        | UpdateModel nextModel ->
             nextModel, Cmd.none
-        | UpdateIsExpert b ->
-            let nextPageState = {
-                currentModel.PageState with
-                    IsExpert = b
-            }
-            let nextModel = {
-                currentModel with
-                    PageState = nextPageState
-            }
-            nextModel, Cmd.none
-        // does not work due to office.js ->
-        // https://stackoverflow.com/questions/42642863/office-js-nullifies-browser-history-functions-breaking-history-usage
-        //| Navigate route ->
-        //    currentModel, Navigation.newUrl (Routing.Route.toRouteUrl route)
 
         | OntologyMsg msg ->
             let nextModel, cmd = Ontologies.update msg model
@@ -277,8 +235,7 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
 
         | FilePickerMsg filePickerMsg ->
             let nextFilePickerState, nextCmd =
-                currentModel.FilePickerState
-                |> FilePicker.update filePickerMsg
+                FilePicker.update filePickerMsg currentModel.FilePickerState model
 
             let nextModel = {
                 currentModel with
@@ -300,24 +257,13 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
 
         | ProtocolMsg fileUploadJsonMsg ->
             let nextFileUploadJsonState, nextCmd =
-                currentModel.ProtocolState
-                |> Protocol.update fileUploadJsonMsg
+                Protocol.update fileUploadJsonMsg currentModel.ProtocolState model
 
             let nextModel = {
                 currentModel with
                     ProtocolState = nextFileUploadJsonState
                 }
             nextModel, nextCmd
-
-        //| SettingsXmlMsg msg ->
-        //    let nextState, nextCmd =
-        //        currentModel.SettingsXmlState
-        //        |> SettingsXml.update msg
-        //    let nextModel = {
-        //        currentModel with
-        //            SettingsXmlState = nextState
-        //    }
-        //    nextModel, nextCmd
 
         // | CytoscapeMsg msg ->
         //     let nextState, nextModel0, nextCmd =
@@ -336,7 +282,7 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     /// The function is exception based, so msg which should not be logged needs to be added here.
     let matchMsgToLog (msg: Msg) =
         match msg with
-        | DevMsg _ | UpdatePageState _ -> false
+        | DevMsg _ | UpdateModel _ -> false
         | _ -> true
 
     let logg (msg:Msg) (model: Model) : Model =

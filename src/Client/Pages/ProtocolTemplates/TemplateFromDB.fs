@@ -10,7 +10,7 @@ type TemplateFromDB =
 
     static member toProtocolSearchElement (model:Model) dispatch =
         Daisy.button.button [
-            prop.onClick(fun _ -> UpdatePageState (Some Routing.Route.ProtocolSearch) |> dispatch)
+            prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
             button.primary
             button.block
             prop.text "Browse database"

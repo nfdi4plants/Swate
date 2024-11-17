@@ -57,6 +57,7 @@
     <Compile Include="Spreadsheet\Controller\Table.fs" />
     <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
     <Compile Include="Spreadsheet\Controller\DataMap.fs" />
+    <Compile Include="SharedComponents\BaseDropdown.fs" />
     <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\AdvancedSearch.fs" />
@@ -70,9 +71,8 @@
     <Compile Include="SharedComponents\Metadata\Study.fs" />
     <Compile Include="SharedComponents\Metadata\Template.fs" />
     <Compile Include="SharedComponents\BaseNavbar.fs" />
-    <Compile Include="SidebarComponents\DarkmodeButton.fs" />
+    <Compile Include="SharedComponents\NavbarBurger.fs" />
     <Compile Include="SidebarComponents\LayoutHelper.fs" />
-    <Compile Include="SidebarComponents\AnnotationTableMissingWarning.fs" />
     <Compile Include="SidebarComponents\Tabs.fs" />
     <Compile Include="SidebarComponents\Navbar.fs" />
     <Compile Include="SidebarComponents\Footer.fs" />
@@ -111,7 +111,8 @@
     <Compile Include="MainComponents\Navbar.fs" />
     <Compile Include="MainComponents\FooterTabs.fs" />
     <Compile Include="Views\NotFoundView.fs" />
-    <Compile Include="Views\MainWindowView.fs" />
+    <Compile Include="Views\MainPageViews.fs" />
+    <Compile Include="Views\SpreadsheetView.fs" />
     <Compile Include="Views\SidebarView.fs" />
     <Compile Include="Update\UpdateUtil.fs" />
     <Compile Include="Update\SpreadsheetUpdate.fs" />

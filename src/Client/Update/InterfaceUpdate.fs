@@ -2,7 +2,7 @@ namespace Update
 
 // <-->
 // This order is required to correctly inferre the correct "Msg"s below.
-// do not touch and remove 
+// do not touch and remove
 open Messages
 open OfficeInterop
 open SpreadsheetInterface
@@ -69,15 +69,11 @@ module Interface =
                         Cmd.ofMsg (Ontologies.GetOntologies |> OntologyMsg)
                         match host with
                         | Swatehost.Excel ->
-                            Cmd.OfAsync.either
-                                ExcelHelper.officeload
-                                ()
-                                (fun _ -> TryFindAnnotationTable |> OfficeInteropMsg)
-                                (curry GenericError Cmd.none >> DevMsg)
+                            Cmd.none
                         | Swatehost.Browser ->
                             Cmd.none
                         | Swatehost.ARCitect ->
-                            Cmd.ofEffect (fun _ -> 
+                            Cmd.ofEffect (fun _ ->
                                 LocalHistory.Model.ResetHistoryWebStorage()
                                 ARCitect.ARCitect.send ARCitect.Init
                             )
@@ -186,7 +182,7 @@ module Interface =
                 match host with
                 | Some Swatehost.Excel ->
                     /// In Excel we must get the current information from worksheets and update them with the imported information
-                    let updateExistingInfoWithImportedInfo() = 
+                    let updateExistingInfoWithImportedInfo() =
                         promise {
                             match data.importState.ImportMetadata with
                             | true -> // full import, does not require additional information
@@ -272,7 +268,7 @@ module Interface =
                 match host with
                 | Some Swatehost.Excel ->
                     //let cmd = OfficeInterop.AddDataAnnotation data |> OfficeInteropMsg |> Cmd.ofMsg
-                    failwith "AddDataAnnotation is not implemented" 
+                    failwith "AddDataAnnotation is not implemented"
                     model, Cmd.none
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.AddDataAnnotation data |> SpreadsheetMsg |> Cmd.ofMsg
@@ -303,7 +299,6 @@ module Interface =
         try
             innerUpdate model msg
         with
-            | e -> 
+            | e ->
                 let cmd = GenericError (Cmd.none, e) |> DevMsg |> Cmd.ofMsg
                 model, cmd
-                

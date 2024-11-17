@@ -10,7 +10,7 @@ module Protocol =
     open Shared
     open Fable.Core
 
-    let update (fujMsg:Protocol.Msg) (state: Protocol.Model) : Protocol.Model * Cmd<Messages.Msg> =
+    let update (fujMsg:Protocol.Msg) (state: Protocol.Model) (model: Model.Model) : Protocol.Model * Cmd<Messages.Msg> =
 
         match fujMsg with
         | UpdateLoading next ->
@@ -19,7 +19,7 @@ module Protocol =
         | GetAllProtocolsRequest ->
             let now = System.DateTime.UtcNow
             let olderThanOneHour = state.LastUpdated |> Option.map (fun last -> (now - last) > System.TimeSpan(1,0,0))
-            let cmd = 
+            let cmd =
                 if olderThanOneHour.IsNone || olderThanOneHour.Value then GetAllProtocolsForceRequest |> ProtocolMsg |> Cmd.ofMsg else Cmd.none
             state, cmd
         | GetAllProtocolsForceRequest ->
@@ -34,14 +34,14 @@ module Protocol =
             nextState, cmd
         | GetAllProtocolsResponse protocolsJson ->
             let state = {state with Loading = false}
-            let templates = 
+            let templates =
                 try
                     protocolsJson |> ARCtrl.Json.Templates.fromJsonString |> Ok
                 with
                     | e -> Result.Error e
-            let nextState, cmd = 
+            let nextState, cmd =
                 match templates with
-                | Ok t0 -> 
+                | Ok t0 ->
                     let t = Array.ofSeq t0
                     let nextState = { state with LastUpdated = Some System.DateTime.UtcNow }
                     nextState, UpdateTemplates t |> ProtocolMsg |> Cmd.ofMsg
@@ -53,12 +53,12 @@ module Protocol =
                     Templates = templates
             }
             nextState, Cmd.none
-        | SelectProtocol prot -> 
+        | SelectProtocol prot ->
             let nextState = {
                 state with
                     TemplateSelected = Some prot
             }
-            nextState, Cmd.ofMsg (UpdatePageState <| Some Routing.Route.Protocol)
+            nextState, Cmd.ofMsg (UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.Protocol})
         | ProtocolIncreaseTimesUsed templateId ->
             failwith "ParseUploadedFileRequest IS NOT IMPLEMENTED YET"
             //let cmd =
@@ -67,7 +67,7 @@ module Protocol =
             //        templateId
             //        (curry GenericError Cmd.none >> DevMsg)
             state, Cmd.none
-                
+
         // Client
         | RemoveSelectedProtocol ->
             let nextState = {
