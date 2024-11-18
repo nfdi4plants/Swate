@@ -17,13 +17,13 @@ let Main (dispatch) (rmv: _ -> unit) =
         prop.children [
             Daisy.modalBackdrop [ prop.onClick rmv ]
             Daisy.modalBox.div [
-                Daisy.cardActions [
-                    prop.className "justify-end"
+                Daisy.cardTitle [
+                    prop.className "flex flex-row justify-between"
                     prop.children [
+                        Html.h5 [prop.className "text-xl"; prop.text "Attention!"]
                         Components.Components.DeleteButton(props=[prop.onClick rmv])
                     ]
                 ]
-                Daisy.cardTitle "Attention!"
                 Html.div [
                     Html.p [prop.innerHtml "Careful, this will delete <b>all</b> tables and <b>all</b> table history!"]
                     Html.p [prop.innerHtml "There is no option to recover any information deleted in this way."]

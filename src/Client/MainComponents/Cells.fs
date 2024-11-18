@@ -18,7 +18,6 @@ module private CellComponents =
         let isExtended = state_extend.Contains(columnIndex)
         Html.div [
             prop.style [
-                style.height (length.perc 100)
                 style.minWidth 25
                 style.cursor.pointer
             ]
@@ -173,18 +172,15 @@ type Cell =
             prop.key $"Header_{state.ActiveView.ViewIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
             prop.readOnly readonly
-            cellStyle []
-            prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
-            prop.className [
-                "w-[300px]" // horizontal resize property sets width, but cannot override style.width. Therefore we set width as class, which makes it overridable by resize property.
+            cellStyle [
+                "resize-x w-[300px] truncate" // horizontal resize property sets width, but cannot override style.width. Therefore we set width as class, which makes it overridable by resize property.
                 if columnType.IsRefColumn then
-                    "bg-gray-300 dark:bg-gray-700"
-                else
-                    "bg-white dark:bg-black-800"
+                    "bg-base-200"
             ]
+            prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
             prop.children [
                 Html.div [
-                    cellInnerContainerStyle [style.custom("backgroundColor","inherit")]
+                    cellInnerContainerStyle []
                     if not isReadOnly then prop.onDoubleClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
@@ -199,7 +195,7 @@ type Cell =
                                 match columnType with
                                 | TSR | TAN -> $"{columnType} ({cellValue})"
                                 | _ -> cellValue
-                            basicValueDisplayCell cellValue true
+                            basicValueDisplayCell cellValue
                         if columnType = Main && not header.IsSingleColumn then
                             extendHeaderButton(state_extend, columnIndex, setState_extend)
                     ]
@@ -307,7 +303,7 @@ type Cell =
             prop.ref ref
             prop.tabIndex 0
             cellStyle [
-                if isSelected then style.backgroundColor(NFDIColors.Mint.Lighter80)
+                if isSelected then "!bg-base-300"
             ]
             prop.readOnly readonly
             //prop.ref ref
@@ -336,14 +332,18 @@ type Cell =
                                     let oa = oa |> Option.defaultValue (OntologyAnnotation())
                                     oasetter.Value.setter oa
                                 let headerOA = if state.TableViewIsActive() then state.ActiveTable.Headers.[columnIndex].TryOA() else None
-                                Components.TermSearch.Input(setter, input=oa, fullwidth=true, ?parent=headerOA, displayParent=false, onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true)
+                                Components.TermSearch.Input(
+                                    setter, input=oa, fullwidth=true, ?parent=headerOA, displayParent=false,
+                                    onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true,
+                                    classes="h-[35px] !rounded-none w-full !border-0"
+                                )
                             else
                                 Cell.CellInputElement(cellValue, false, false, setter, makeIdle)
                         else
                             if columnType = Main && oasetter.IsSome then
                                 CellStyles.compositeCellDisplay oasetter.Value.oa displayValue
                             else
-                                basicValueDisplayCell displayValue false
+                                basicValueDisplayCell displayValue
                     ]
                 ]
             ]

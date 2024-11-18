@@ -143,6 +143,7 @@ module TermSearchAux =
             Html.div [
                 prop.className "grid grid-cols-subgrid col-span-4 gap-2 cursor-pointer hover:bg-base-100 transition-colors py-0.5 items-center"
                 prop.onClick setTerm
+                prop.title term.Name
                 prop.children [
                     Html.i [
                         prop.style [style.width (length.px 20)]
@@ -391,7 +392,7 @@ type TermSearch =
                         if input.IsSome && input.Value.Name.IsSome && input.Value.TermAccessionNumber.IsSome && not isSearching then Components.verifiedIcon
                     ]
                 ]
-                if parent.IsSome || advancedSearchDispatch.IsSome then
+                if (parent.IsSome && displayParent) || advancedSearchDispatch.IsSome then
                     // Optional elements
                     Html.div [
                         prop.className "label not-prose"

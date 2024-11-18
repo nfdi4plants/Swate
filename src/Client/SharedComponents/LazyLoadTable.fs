@@ -108,10 +108,12 @@ type LazyLoadTable =
             ]
             prop.children [
                 Html.table [
-                    if tableClasses.IsSome then
-                        prop.className tableClasses.Value
-                    else
-                        prop.className "table"
+                    prop.className [
+                        if tableClasses.IsSome then
+                            tableClasses.Value |> String.concat " "
+                        else
+                            "table"
+                    ]
                     prop.children [
                         if headerRow.IsSome then
                             Html.thead [

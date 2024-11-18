@@ -70,12 +70,10 @@ module private ResultsTable =
     let createPaginationLinkFromIndex (updatePageIndex: int ->unit) (pageIndex:int) (currentPageinationIndex: int)=
         let isActve = pageIndex = currentPageinationIndex
         Daisy.button.a [
-            if isActve then button.active
-            prop.style [
-                if isActve then style.color "white";
-                style.backgroundColor NFDIColors.Mint.Base
-                style.borderColor NFDIColors.Mint.Base
-            ]
+            join.item
+            if isActve then
+                button.active
+                button.primary
             prop.onClick(fun _ -> pageIndex |> updatePageIndex)
             prop.text (string (pageIndex+1))
         ]
@@ -83,7 +81,7 @@ module private ResultsTable =
     let pageinateDynamic (updatePageIndex:int->unit) (currentPageinationIndex: int) (pageCount:int)  =
         (*[0 .. pageCount-1].*)
         React.fragment [
-            for index in (max 1 (currentPageinationIndex-2)) .. (min (currentPageinationIndex+2) (pageCount-1)) do
+            for index in (max 1 (currentPageinationIndex-1)) .. (min (currentPageinationIndex+1) (pageCount-1)) do
                 createPaginationLinkFromIndex updatePageIndex index currentPageinationIndex
         ]
 
@@ -214,9 +212,11 @@ module private ResultsTable =
             let len = chunked.Length
             let disabledEllipsisButton = Daisy.button.button [button.disabled; prop.className "join-item"; prop.text "..."]
             Html.div [
-                prop.className "container mx-auto p-4"
+                prop.className "space-y-2 flex flex-col h-full"
                 prop.children [
                     Daisy.table [
+                        prop.className "grow"
+                        table.xs
                         prop.children [
                             Html.thead []
                             Html.tbody (
@@ -227,6 +227,7 @@ module private ResultsTable =
                     Daisy.join [
                         prop.children [
                             Daisy.button.button [
+                                join.item
                                 prop.className "cursor-pointer join-item"
                                 prop.onClick (fun _ ->
                                     max (currentPageinationIndex - 1) 0 |> updatePageIndex handlerState
@@ -235,18 +236,23 @@ module private ResultsTable =
                                 prop.text "«"
                             ]
                             createPaginationLinkFromIndex (updatePageIndex handlerState) 0 currentPageinationIndex
-                            if len > 5 && currentPageinationIndex > 3 then disabledEllipsisButton
-                            pageinateDynamic (updatePageIndex handlerState) currentPageinationIndex (len - 1)
-                            if len > 5 && currentPageinationIndex < len-4 then disabledEllipsisButton
+                            // if len > 5 && currentPageinationIndex > 3 then disabledEllipsisButton
+                            // pageinateDynamic (updatePageIndex handlerState) currentPageinationIndex (len - 1)
+                            if currentPageinationIndex = 0 || currentPageinationIndex = len - 1 then
+                                disabledEllipsisButton
+                            else
+                                createPaginationLinkFromIndex (updatePageIndex handlerState) currentPageinationIndex currentPageinationIndex
+                            // if len > 5 && currentPageinationIndex < len-4 then disabledEllipsisButton
                             if len > 1 then createPaginationLinkFromIndex (updatePageIndex handlerState) (len-1) currentPageinationIndex
                             Daisy.button.button [
+                                join.item
                                 prop.style [style.cursor.pointer]
                                 prop.onClick (fun _ ->
                                     let next = min (currentPageinationIndex + 1) (len - 1)
                                     next |> updatePageIndex handlerState
                                 )
                                 prop.disabled <| (currentPageinationIndex = len - 1)
-                                prop.text "Next"
+                                prop.text "»"
                             ]
                         ]
                     ]
@@ -280,6 +286,8 @@ let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.
             Daisy.input [
                 prop.placeholder "... search term name"
                 input.sm
+                prop.autoFocus true
+                input.bordered
                 prop.onChange (fun (e:string) ->
                     {state with AdvancedSearch.Model.AdvancedSearchOptions.TermName = e }|> setState
                 )
@@ -306,6 +314,7 @@ let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.
             Daisy.input [
                 prop.placeholder "... search term definition"
                 input.sm
+                input.bordered
                 //Input.Props [ExcelColors.colorControl model.SiteStyleState.ColorMode]
                 prop.onChange (fun (e: string) -> {state with AdvancedSearch.Model.AdvancedSearchOptions.TermDefinition = e} |> setState)
                 prop.onKeyDown (fun e ->
@@ -328,26 +337,28 @@ let private inputFormPage (state:AdvancedSearch.Model) (setState:AdvancedSearch.
     ]
 
 let private resultsPage (resultHandler: Term -> unit) (state: AdvancedSearch.Model) setState =
-    Daisy.formControl [
-        Daisy.label [Daisy.labelText "Results:"]
-        if state.Subpage = AdvancedSearchSubpages.ResultsSubpage then
-            if state.HasAdvancedSearchResultsLoading then
-                Html.div [
-                    prop.style [style.width(length.perc 100); style.display.flex; style.justifyContent.center]
-                    prop.children Modals.Loading.Component
-                ]
-            else
-                let init: ResultsTable.TableModel = {
-                    Data            = state.AdvancedSearchTermResults
-                    ActiveDropdowns = []
-                    ElementsPerPage = 10
-                    PageIndex       = 0
-                    ResultHandler   = resultHandler
-                }
-                ResultsTable.paginatedTableComponent
-                    state
-                    setState
-                    init
+    Html.div [
+        prop.className "h-full flex"
+        prop.children [
+            if state.Subpage = AdvancedSearchSubpages.ResultsSubpage then
+                if state.HasAdvancedSearchResultsLoading then
+                    Html.div [
+                        prop.style [style.width(length.perc 100); style.display.flex; style.justifyContent.center]
+                        prop.children Modals.Loading.Component
+                    ]
+                else
+                    let init: ResultsTable.TableModel = {
+                        Data            = state.AdvancedSearchTermResults
+                        ActiveDropdowns = []
+                        ElementsPerPage = 10
+                        PageIndex       = 0
+                        ResultHandler   = resultHandler
+                    }
+                    ResultsTable.paginatedTableComponent
+                        state
+                        setState
+                        init
+        ]
     ]
 
 [<ReactComponent>]
@@ -365,49 +376,55 @@ let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit
         prop.children [
             // Close modal on click on background
             Daisy.modalBackdrop [ prop.onClick (fun e -> setIsActive false)]
-            Daisy.card [
+            Daisy.modalBox.div [
                 prop.style [style.width(length.perc 90); style.maxWidth(length.px 600); style.height(length.perc 80); style.maxHeight(length.px 600)]
                 prop.children [
-                    Daisy.cardBody [
-                        Daisy.cardActions [
-                            prop.className "justify-end"
-                            Components.DeleteButton(props=[prop.onClick(fun _ -> setIsActive false)])
-                            |> prop.children
-                        ]
-                        Daisy.cardTitle "Advanced Search"
-                        Html.div [
-                            prop.className "prose text-sm"
-                            prop.text "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."
-                        ]
-                        match state.Subpage with
-                        | AdvancedSearchSubpages.InputFormSubpage ->
-                            // we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
-                            inputFormPage state setState dispatch
-                        | AdvancedSearchSubpages.ResultsSubpage ->
-                            resultsPage resultHandler state setState
-                        Daisy.cardActions [
-                            if state.Subpage <> AdvancedSearchSubpages.InputFormSubpage then
-                                Daisy.button.button [
-                                    button.error
-                                    prop.onClick (fun e -> e.stopPropagation(); e.preventDefault(); setState {state with Subpage = InputFormSubpage })
-                                    prop.text "Back"
+                    Daisy.card [
+                        card.compact
+                        prop.children [
+                            Daisy.cardBody [
+                                Daisy.cardTitle [
+                                    prop.className "flex flex-row justify-between"
+                                    prop.children [
+                                        Html.h3 "Advanced Search"
+                                        Components.DeleteButton(props=[prop.onClick(fun _ -> setIsActive false)])
+                                    ]
                                 ]
-                            // Show "Start advanced search" button ONLY on first subpage
-                            if state.Subpage = AdvancedSearchSubpages.InputFormSubpage then
-                                Daisy.button.button [
-                                    let isValid = isValidAdancedSearchOptions state.AdvancedSearchOptions
-                                    if isValid then
-                                        button.success
-                                    else
-                                        button.error
-                                        prop.disabled true
-                                    prop.onClick (fun e ->
-                                        e.preventDefault()
-                                        e.stopPropagation();
-                                        StartAdvancedSearch state setState dispatch
-                                    )
-                                    prop.text "Start advanced search"
+                                Html.div [
+                                    prop.className "prose text-sm"
+                                    prop.text "Swate advanced search uses the Apache Lucene query parser syntax. Feel free to read the related Swate documentation [wip] for guidance on how to use it."
                                 ]
+                                match state.Subpage with
+                                | AdvancedSearchSubpages.InputFormSubpage ->
+                                    // we need to propagate the modal id here, so we can use meaningful and UNIQUE ids to the checkradio id's
+                                    inputFormPage state setState dispatch
+                                | AdvancedSearchSubpages.ResultsSubpage ->
+                                    resultsPage resultHandler state setState
+                                Daisy.cardActions [
+                                    if state.Subpage <> AdvancedSearchSubpages.InputFormSubpage then
+                                        Daisy.button.button [
+                                            button.error
+                                            prop.onClick (fun e -> e.stopPropagation(); e.preventDefault(); setState {state with Subpage = InputFormSubpage })
+                                            prop.text "Back"
+                                        ]
+                                    // Show "Start advanced search" button ONLY on first subpage
+                                    if state.Subpage = AdvancedSearchSubpages.InputFormSubpage then
+                                        Daisy.button.button [
+                                            let isValid = isValidAdancedSearchOptions state.AdvancedSearchOptions
+                                            if isValid then
+                                                button.success
+                                            else
+                                                button.error
+                                                prop.disabled true
+                                            prop.onClick (fun e ->
+                                                e.preventDefault()
+                                                e.stopPropagation();
+                                                StartAdvancedSearch state setState dispatch
+                                            )
+                                            prop.text "Start advanced search"
+                                        ]
+                                ]
+                            ]
                         ]
                     ]
                 ]

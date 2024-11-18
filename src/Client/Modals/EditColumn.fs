@@ -25,7 +25,7 @@ module private EditColumnComponents =
     let BackButton cancel =
         Daisy.button.button [
             prop.onClick cancel
-            button.warning
+            button.outline
             prop.text "Back"
         ]
 
@@ -45,6 +45,7 @@ module private EditColumnComponents =
 
     let SelectHeaderType(header, state, setState) =
         Daisy.select [
+            select.bordered
             prop.value (header.ToString())
             prop.onChange (fun (e: string) -> {state with NextHeaderType = Some (CompositeHeaderDiscriminate.fromString e)} |> setState )
             prop.children [
@@ -96,18 +97,27 @@ module private EditColumnComponents =
             prop.className "overflow-x-auto grow"
             prop.children [
                 Daisy.table [
+                    table.sm
                     prop.children [
                         Html.thead [
                             Html.tr [
                                 for header in headers do
-                                    Html.th header
+                                    Html.th [
+                                        prop.className "truncate max-w-16"
+                                        prop.text header
+                                        prop.title header
+                                    ]
                             ]
                         ]
                         Html.tbody [
                             for row in body do
                                 Html.tr [
                                     for cell in row do
-                                        Html.td cell
+                                        Html.td [
+                                            prop.className "truncate max-w-16"
+                                            prop.text cell
+                                            prop.title cell
+                                        ]
                                 ]
                         ]
                     ]
@@ -183,20 +193,21 @@ let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
         updateColumn {column0 with Cells = cells}
 
     Daisy.modal.div [
-        prop.className "modal-open"
+        modal.open'
         prop.children [
             Daisy.modalBackdrop [ prop.onClick rmv ]
             Daisy.modalBox.div [
+                prop.className "lg:max-w-[600px]"
                 prop.style [style.maxHeight(length.percent 70)]
                 prop.children [
                     Daisy.cardBody [
-                        Daisy.cardActions [
-                            prop.className "justify-end"
+                        Daisy.cardTitle [
+                            prop.className "flex flex-row justify-between"
                             prop.children [
+                                Html.h2 "Update Column"
                                 Components.Components.DeleteButton(props=[prop.onClick rmv])
                             ]
                         ]
-                        Daisy.cardTitle "Update Column"
                         Html.div [
                             SelectHeaderType(column0.Header.AsDiscriminate, state, setState)
                             match state.NextHeaderType with

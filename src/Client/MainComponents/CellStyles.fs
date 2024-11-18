@@ -6,35 +6,27 @@ open Feliz
 open Feliz.DaisyUI
 open Fable.Core
 
-let cellStyle (specificStyle: IStyleAttribute list) = prop.style [
-        style.minWidth 200
-        style.maxWidth 600
-        style.height 35
-        style.minHeight(35)
-        style.border(length.px 1, borderStyle.solid, "darkgrey")
-        yield! specificStyle
+[<Literal>]
+let Height = 38
+
+let cellStyle (adjusted: string list) =
+    prop.className [
+        "min-w-48 max-w-xl h-[38px] min-h-[38px] max-h-[38px] overflow-visible border border-solid border-base-content cursor-pointer"
+        adjusted |> String.concat " "
     ]
 
-let cellInnerContainerStyle (specificStyle: IStyleAttribute list) = prop.style [
-        style.display.flex;
-        style.justifyContent.spaceBetween;
-        style.height(length.percent 100);
-        style.width(length.percent 100)
-        yield! specificStyle
+let cellInnerContainerStyle (adjusted: string list) =
+    prop.className [
+        "flex justify-between size-full items-center truncate px-2 py-1"
+        adjusted |> String.concat " "
     ]
 
-let basicValueDisplayCell (v: string) (isHeader: bool) =
+let basicValueDisplayCell (v: string) =
     Html.span [
         if v.Length > 60 then
             prop.title v
-        prop.style [
-            style.textOverflow.ellipsis
-            style.overflow.hidden
-            //style.whitespace.nowrap
-            if not isHeader then
-                style.maxHeight 35
-            style.flexGrow 1
-            style.padding(length.em 0.5,length.em 0.75)
+        prop.className [
+            "truncate"
         ]
         prop.text v
     ]
@@ -42,25 +34,15 @@ let basicValueDisplayCell (v: string) (isHeader: bool) =
 let compositeCellDisplay (oa: OntologyAnnotation) (displayValue: string) =
     let hasValidOA = oa.TermAccessionShort <> ""
     let v = displayValue
-    Html.div [
-        prop.classes ["is-flex"]
-        prop.style [
-            style.flexGrow 1
-            style.padding(length.em 0.5,length.em 0.75)
+    React.fragment [
+        Html.span [
+            prop.className "grow"
+            prop.text v
         ]
-        prop.children [
-            Html.span [
-                prop.style [
-                    style.flexGrow 1
-                ]
-                prop.text v
+        if hasValidOA then
+            Html.i [
+                prop.className ["ml-auto text-primary"; "fa-solid"; "fa-check"; "size-4"]
             ]
-            if hasValidOA then
-                Html.i [
-                    prop.style [style.custom("marginLeft", "auto")]
-                    prop.className ["fa-solid"; "fa-check"; "size-4"]
-                ]
-        ]
     ]
 
 /// <summary>
@@ -68,8 +50,7 @@ let compositeCellDisplay (oa: OntologyAnnotation) (displayValue: string) =
 /// </summary>
 /// <param name="rowIndex"></param>
 let RowLabel (rowIndex: int) =
-    let t : IReactProperty list -> ReactElement = if rowIndex < 0 then Html.th else Html.td
-    t [
+    Html.th [
         //prop.style [style.resize.none; style.border(length.px 1, borderStyle.solid, "darkgrey")]
         //prop.children [
         //    Daisy.button.button [
@@ -81,11 +62,12 @@ let RowLabel (rowIndex: int) =
         //        prop.text (if rowIndex < 0 then "" else $"{rowIndex+1}")
         //    ]
         //]
-        prop.style [style.resize.none; style.border(length.px 1, borderStyle.solid, "darkgrey"); style.height(length.perc 100)]
+        prop.className "border border-solid border-base-content"
+        prop.style [style.resize.none;]
         prop.children [
             Html.div [
                 prop.style [style.height(length.perc 100);]
-                prop.className "is-flex is-justify-content-center is-align-items-center px-2 is-unselectable my-grey-out"
+                prop.className "flex items-center justify-center px-2 py-1"
                 prop.disabled true
                 prop.children [
                     Html.b (if rowIndex < 0 then "" else $"{rowIndex+1}")
