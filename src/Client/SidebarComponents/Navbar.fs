@@ -89,7 +89,7 @@ let NoMetadataModalContent refresh (dispatch: Messages.Msg -> unit) =
         AddMetaDataButtons refresh dispatch
     ])
 
-let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal (dispatch: Messages.Msg -> unit) =
+let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal model (dispatch: Messages.Msg -> unit) =
     React.fragment [
         match excelMetadataType with
         | { Metadata = Some (ArcFiles.Assay assay)} ->
@@ -100,7 +100,7 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                 }
             let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
                 assay.DataMap <- dataMap
-            Assay.Main(assay, setAssay, setAssayDataMap)
+            Assay.Main(assay, setAssay, setAssayDataMap, model)
         | { Metadata = Some (ArcFiles.Study (study, assays))} ->
             let setStudy (study: ArcStudy, assays: ArcAssay list) =
                 setExcelMetadataType {
@@ -109,14 +109,14 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                 }
             let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
                 study.DataMap <- dataMap
-            Study.Main(study, assays, setStudy, setStudyDataMap)
+            Study.Main(study, assays, setStudy, setStudyDataMap, model)
         | { Metadata = Some (ArcFiles.Investigation investigation)} ->
             let setInvestigation (investigation: ArcInvestigation) =
                 setExcelMetadataType {
                     excelMetadataType with
                         Metadata = Some (ArcFiles.Investigation investigation)
                 }
-            Investigation.Main(investigation, setInvestigation)
+            Investigation.Main(investigation, setInvestigation, model)
         | { Metadata = Some (ArcFiles.Template template)} ->
             let setTemplate (template: Template) =
                 setExcelMetadataType {
@@ -161,7 +161,7 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
 
 // Define a modal dialog component
 [<ReactComponent>]
-let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
+let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -> unit) =
     let (excelMetadataType, setExcelMetadataType) = React.useState(ExcelMetadataState.init)
     let refreshMetadataState =
         fun () ->
@@ -198,7 +198,7 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
                     | { Metadata = None } ->
                         NoMetadataModalContent refreshMetadataState dispatch
                     | { Metadata = Some metadata } ->
-                        UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal dispatch
+                        UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal model dispatch
                 ]
             ]
         ]
@@ -283,6 +283,7 @@ let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) =
         if state.ExcelMetadataModalActive then
             SelectModalDialog
                 toggleMetdadataModal
+                model
                 dispatch
         Html.div [
             prop.ariaLabel "logo"

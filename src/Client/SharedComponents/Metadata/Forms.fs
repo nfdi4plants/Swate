@@ -404,7 +404,8 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member TextInput(value: string, setValue: string -> unit, ?label: string, ?validator: {| fn: string -> bool; msg: string |}, ?placeholder: string, ?isarea: bool, ?isJoin) =
+    static member TextInput(value: string, setValue: string -> unit, ?label: string, ?validator: {| fn: string -> bool; msg: string |}, ?placeholder: string, ?isarea: bool, ?isJoin, ?disabled) =
+        let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
         let loading, setLoading = React.useState(false)
         let isValid, setIsValid = React.useState(true)
@@ -452,6 +453,8 @@ type FormComponents =
                         match isarea with
                         | Some true ->
                             Daisy.textarea [
+                                prop.disabled disabled
+                                prop.readOnly disabled
                                 prop.className "grow ghost"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
@@ -459,6 +462,8 @@ type FormComponents =
                             ]
                         | _ ->
                             Html.input [
+                                prop.disabled disabled
+                                prop.readOnly disabled
                                 prop.className "trunacte w-full"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
