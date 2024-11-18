@@ -391,7 +391,9 @@ module ComponentAux =
                             prop.children [
                                 Daisy.button.a [
                                     button.sm
-                                    prop.onClick (fun _ -> SelectProtocol template |> ProtocolMsg |> dispatch)
+                                    prop.onClick (fun _ ->
+                                        SelectProtocol template |> ProtocolMsg |> dispatch
+                                    )
                                     button.wide; button.success
                                     prop.text "select"
                                 ]
