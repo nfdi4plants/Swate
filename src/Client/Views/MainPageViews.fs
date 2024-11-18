@@ -128,7 +128,7 @@ type MainPageView =
                     prop.className "z-10"
                     prop.children [
                         Daisy.drawerOverlay [
-                            prop.for' DrawerId
+                            prop.htmlFor DrawerId
                             prop.ariaLabel "Close sidebar"
                         ]
                         MainPageView.DrawerSideContent(model, dispatch)
