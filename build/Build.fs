@@ -136,7 +136,7 @@ module Docker =
 
     let dockerImageName = "freymaurer/swate"
     let dockerContainerName = "swate"
-    let port = "8080"
+    let port = "5000"
 
     let dockerCreateImage(tag:string option) =
         run
@@ -160,7 +160,7 @@ module Docker =
     /// Runs full docker compose stack with the swate:new image.
     /// </summary>
     let DockerTestNewStack() =
-        let dockerComposeNewPath = Path.getFullName ".db\docker.compose.new.yml"
+        let dockerComposeNewPath = Path.getFullName ".db/docker.compose.new.yml"
         run dockerCompose ["-f"; dockerComposeNewPath; "up"] __SOURCE_DIRECTORY__
 
     Target.create "docker-test" (fun _ ->

@@ -14,11 +14,11 @@ type Loading =
 
     static member Modal(?rmv: Browser.Types.MouseEvent -> unit) =
         Daisy.modal.div [
-            prop.className "modal-open"
+            modal.open'
             prop.children [
                 Daisy.modalBackdrop [if rmv.IsSome then prop.onClick rmv.Value]
                 Daisy.modalBox.div [
-                    prop.className "size-auto flex"
+                    prop.className "size-auto flex min-w-0"
                     prop.children [
                         Loading.Component
                     ]

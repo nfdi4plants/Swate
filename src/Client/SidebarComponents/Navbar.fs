@@ -83,83 +83,79 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
     ]
 
 let NoMetadataModalContent refresh (dispatch: Messages.Msg -> unit) =
-    Html.section [
-        Components.Forms.Generic.BoxedField [
-            Html.h2 "Create Top Level Metadata"
-            Html.p "Choose one of the following top level meta data types to create"
-            AddMetaDataButtons refresh dispatch
-        ]
-    ]
+    Components.Forms.Generic.BoxedField (content=[
+        Html.h2 "Create Top Level Metadata"
+        Html.p "Choose one of the following top level meta data types to create"
+        AddMetaDataButtons refresh dispatch
+    ])
 
 let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal (dispatch: Messages.Msg -> unit) =
-    Html.div [
-        prop.children [
-            match excelMetadataType with
-            | { Metadata = Some (ArcFiles.Assay assay)} ->
-                let setAssay (assay: ArcAssay) =
-                    setExcelMetadataType {
-                        excelMetadataType with
-                            Metadata = Some (ArcFiles.Assay assay)
-                    }
-                let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
-                    assay.DataMap <- dataMap
-                Assay.Main(assay, setAssay, setAssayDataMap)
-            | { Metadata = Some (ArcFiles.Study (study, assays))} ->
-                let setStudy (study: ArcStudy, assays: ArcAssay list) =
-                    setExcelMetadataType {
-                        excelMetadataType with
-                            Metadata = Some (ArcFiles.Study (study, assays))
-                    }
-                let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
-                    study.DataMap <- dataMap
-                Study.Main(study, assays, setStudy, setStudyDataMap)
-            | { Metadata = Some (ArcFiles.Investigation investigation)} ->
-                let setInvestigation (investigation: ArcInvestigation) =
-                    setExcelMetadataType {
-                        excelMetadataType with
-                            Metadata = Some (ArcFiles.Investigation investigation)
-                    }
-                Investigation.Main(investigation, setInvestigation)
-            | { Metadata = Some (ArcFiles.Template template)} ->
-                let setTemplate (template: Template) =
-                    setExcelMetadataType {
-                        excelMetadataType with
-                            Metadata = Some (ArcFiles.Template template)
-                    }
-                Template.Main(template, setTemplate)
-            | _ -> Html.none
-            Html.section [
-                prop.className "pt-0"
-                prop.children [
-                    Components.Forms.Generic.BoxedField [
-                        Html.div [
-                            Daisy.button.a [
-                                button.primary
-                                prop.text "Update Metadata Type"
-                                prop.onClick (fun _ ->
-                                    if excelMetadataType.Metadata.IsSome then
-                                        OfficeInterop.UpdateTopLevelMetadata(excelMetadataType.Metadata.Value)
-                                        |> OfficeInteropMsg
-                                        |> dispatch
-                                        closeModal()
-                                    else
-                                        logw ("Tried updating metadata sheet without given metadata")
-                                )
-                            ]
-                            Daisy.button.a [
-                                button.error
-                                prop.text "Delete Metadata Type"
-                                prop.onClick (fun _ ->
-                                    OfficeInterop.DeleteTopLevelMetadata
+    React.fragment [
+        match excelMetadataType with
+        | { Metadata = Some (ArcFiles.Assay assay)} ->
+            let setAssay (assay: ArcAssay) =
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some (ArcFiles.Assay assay)
+                }
+            let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
+                assay.DataMap <- dataMap
+            Assay.Main(assay, setAssay, setAssayDataMap)
+        | { Metadata = Some (ArcFiles.Study (study, assays))} ->
+            let setStudy (study: ArcStudy, assays: ArcAssay list) =
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some (ArcFiles.Study (study, assays))
+                }
+            let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
+                study.DataMap <- dataMap
+            Study.Main(study, assays, setStudy, setStudyDataMap)
+        | { Metadata = Some (ArcFiles.Investigation investigation)} ->
+            let setInvestigation (investigation: ArcInvestigation) =
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some (ArcFiles.Investigation investigation)
+                }
+            Investigation.Main(investigation, setInvestigation)
+        | { Metadata = Some (ArcFiles.Template template)} ->
+            let setTemplate (template: Template) =
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some (ArcFiles.Template template)
+                }
+            Template.Main(template, setTemplate)
+        | _ -> Html.none
+        Components.Forms.Generic.Section [
+            Components.Forms.Generic.BoxedField (content= [
+                Html.div [
+                    prop.className "flex flex-col md:flex-row gap-4"
+                    prop.children [
+                        Daisy.button.a [
+                            button.primary
+                            prop.text "Update Metadata Type"
+                            prop.onClick (fun _ ->
+                                if excelMetadataType.Metadata.IsSome then
+                                    OfficeInterop.UpdateTopLevelMetadata(excelMetadataType.Metadata.Value)
                                     |> OfficeInteropMsg
                                     |> dispatch
                                     closeModal()
-                                )
-                            ]
+                                else
+                                    logw ("Tried updating metadata sheet without given metadata")
+                            )
+                        ]
+                        Daisy.button.a [
+                            button.error
+                            prop.text "Delete Metadata Type"
+                            prop.onClick (fun _ ->
+                                OfficeInterop.DeleteTopLevelMetadata
+                                |> OfficeInteropMsg
+                                |> dispatch
+                                closeModal()
+                            )
                         ]
                     ]
                 ]
-            ]
+            ])
         ]
     ]
 
@@ -185,7 +181,7 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
                             Loading = false
                     }
             }
-    React.useEffectOnce(refreshMetadataState >> Promise.start)
+    React.useLayoutEffectOnce(refreshMetadataState >> Promise.start)
     Daisy.modal.div [
         // Add the "is-active" class to display the modal
         modal.active
@@ -193,12 +189,12 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
             Daisy.modalBackdrop [
                 prop.onClick (fun _ -> closeModal())
             ]
-            Daisy.modalBox.form [
-                prop.className "overflow-y-auto"
+            Daisy.modalBox.div [
+                prop.className "overflow-y-auto h-[100%]"
                 prop.children [
                     match excelMetadataType with
                     | { Loading = true } ->
-                        Modals.Loading.Modal()
+                        Modals.Loading.Component
                     | { Metadata = None } ->
                         NoMetadataModalContent refreshMetadataState dispatch
                     | { Metadata = Some metadata } ->

@@ -38,8 +38,6 @@ type Generic =
                 ]
             ]
         ]
-    static member BoxedField (content: ReactElement list) =
-        Generic.BoxedField (content = content)
 
     static member Section (children: ReactElement seq) =
         Html.section [
