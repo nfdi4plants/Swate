@@ -69,6 +69,7 @@ module Interface =
                         Cmd.ofMsg (Ontologies.GetOntologies |> OntologyMsg)
                         match host with
                         | Swatehost.Excel ->
+                            ExcelHelper.officeload() |> Async.StartImmediate
                             Cmd.none
                         | Swatehost.Browser ->
                             Cmd.none
