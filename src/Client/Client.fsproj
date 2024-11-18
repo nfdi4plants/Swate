@@ -1,10 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="GenericComponents.fs" />
     <None Include="tailwind.config.js" />
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
@@ -14,7 +15,6 @@
     <Compile Include="Helper.fs" />
     <Compile Include="React.useListener.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
-    <Compile Include="LocalStorage\SplitWindow.fs" />
     <Compile Include="LocalStorage\Darkmode.fs" />
     <Compile Include="Colors\NFDIColors.fs" />
     <Compile Include="Colors\ExcelColors.fs" />
@@ -57,6 +57,8 @@
     <Compile Include="Spreadsheet\Controller\Table.fs" />
     <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
     <Compile Include="Spreadsheet\Controller\DataMap.fs" />
+    <Compile Include="SharedComponents\BaseContextMenu.fs" />
+    <Compile Include="SharedComponents\BaseDropdown.fs" />
     <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\AdvancedSearch.fs" />
@@ -69,11 +71,12 @@
     <Compile Include="SharedComponents\Metadata\Investigation.fs" />
     <Compile Include="SharedComponents\Metadata\Study.fs" />
     <Compile Include="SharedComponents\Metadata\Template.fs" />
-    <Compile Include="SidebarComponents\DarkmodeButton.fs" />
+    <Compile Include="SharedComponents\BaseNavbar.fs" />
+    <Compile Include="SharedComponents\NavbarBurger.fs" />
     <Compile Include="SidebarComponents\LayoutHelper.fs" />
-    <Compile Include="SidebarComponents\ResponsiveFA.fs" />
-    <Compile Include="SidebarComponents\AnnotationTableMissingWarning.fs" />
+    <Compile Include="SidebarComponents\Tabs.fs" />
     <Compile Include="SidebarComponents\Navbar.fs" />
+    <Compile Include="SidebarComponents\Footer.fs" />
     <Compile Include="Pages\Cytoscape\CytoscapeGraph.fs" />
     <Compile Include="Pages\Cytoscape\CytoscapeUpdate.fs" />
     <Compile Include="Pages\BuildingBlock\CellConvertComponent.fs" />
@@ -98,20 +101,19 @@
     <Compile Include="MainComponents\CellStyles.fs" />
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />
-    <Compile Include="MainComponents\MainViewContainer.fs" />
     <Compile Include="MainComponents\NoFileElement.fs" />
     <Compile Include="MainComponents\ContextMenu.fs" />
     <Compile Include="MainComponents\Cells.fs" />
     <Compile Include="MainComponents\KeyboardShortcuts.fs" />
-    <Compile Include="MainComponents\AddRows.fs" />
+    <Compile Include="MainComponents\TableFooter.fs" />
     <Compile Include="MainComponents\SpreadsheetView\Generic.fs" />
     <Compile Include="MainComponents\SpreadsheetView\ArcTable.fs" />
     <Compile Include="MainComponents\SpreadsheetView\DataMap.fs" />
     <Compile Include="MainComponents\Navbar.fs" />
     <Compile Include="MainComponents\FooterTabs.fs" />
-    <Compile Include="Views\SplitWindowView.fs" />
     <Compile Include="Views\NotFoundView.fs" />
-    <Compile Include="Views\MainWindowView.fs" />
+    <Compile Include="Views\MainPageViews.fs" />
+    <Compile Include="Views\SpreadsheetView.fs" />
     <Compile Include="Views\SidebarView.fs" />
     <Compile Include="Update\UpdateUtil.fs" />
     <Compile Include="Update\SpreadsheetUpdate.fs" />
@@ -137,7 +139,7 @@
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.SimpleJson" Version="3.24.0" />
     <PackageReference Include="Feliz" Version="2.8.0" />
-    <PackageReference Include="Feliz.Bulma" Version="3.0.0" />
+    <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
     <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
     <PackageReference Include="FsSpreadsheet.Js" Version="[6.2.0]" />
     <PackageReference Include="Fable.Mocha" Version="2.17.0" />

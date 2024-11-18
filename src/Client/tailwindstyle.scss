@@ -1,3 +1,49 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes border-gradient-flow {
+    0% {
+      background-position: 50% 0%;
+    }
+    50% {
+      background-position: 50% 100%;
+    }
+    100% {
+      background-position: 50% 0%;
+    }
+  }
+
+
+@layer utilities {
+    .animated-border::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: -1; /* Place it behind the content */
+      padding: 2px; /* Thickness of the border */
+      border-radius: 8px; /* Optional rounded corners */
+      background: linear-gradient(180deg, oklch(var(--p)), oklch(var(--in)));
+      background-size: 200% 200%;
+      animation: border-gradient-flow 8s ease-in-out infinite;
+    }
+
+        /* Apply offsets to each container based on its order */
+    .animated-border:nth-of-type(1)::before {
+        animation-delay: 0s;
+    }
+
+    .animated-border:nth-of-type(2)::before {
+        animation-delay: 3s; /* Offset to create continuous flow */
+    }
+
+    .animated-border:nth-of-type(3)::before {
+        animation-delay: 4s;
+    }
+
+    .animated-border:nth-of-type(4)::before {
+        animation-delay: 6s;
+    }
+}

@@ -1,7 +1,7 @@
 namespace MainComponents
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
 
@@ -51,7 +51,7 @@ module private MoveEventListener =
         let nextPosition = calculatePosition element startPosition e
         setPosition (Some nextPosition)
 
-    let onmouseup (prefix,element:IRefValue<HTMLElement option>) onmousemove = 
+    let onmouseup (prefix,element:IRefValue<HTMLElement option>) onmousemove =
         Browser.Dom.document.removeEventListener("mousemove", onmousemove)
         if element.current.IsSome then
             let rect = element.current.Value.getBoundingClientRect()
@@ -65,25 +65,25 @@ module private ResizeEventListener =
     let onmousemove (startPosition: Rect) (startSize: Rect) setSize = fun (e: Event) ->
         let e : MouseEvent = !!e
         let width = int e.clientX - startPosition.X + startSize.X
-        // I did not enable this, as it creates issues with overlays such as the term search dropdown. 
-        // The widget card itself has overflow: visible, which makes a set height impossible, 
+        // I did not enable this, as it creates issues with overlays such as the term search dropdown.
+        // The widget card itself has overflow: visible, which makes a set height impossible,
         // but wihout the visible overflow term search results might require scrolling.
         // // let height = int e.clientY - startPosition.Y + startSize.Y
         setSize (Some {X = width; Y = startSize.Y})
 
-    let onmouseup (prefix, element: IRefValue<HTMLElement option>) onmousemove = 
+    let onmouseup (prefix, element: IRefValue<HTMLElement option>) onmousemove =
         Browser.Dom.document.removeEventListener("mousemove", onmousemove)
-        if element.current.IsSome then 
+        if element.current.IsSome then
             Size.write(prefix,{X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
 module private Elements =
 
     let helpExtendButton (extendToggle: unit -> unit) =
-        Bulma.help [
-            prop.className "is-flex"
+        Html.p [
+            prop.className "w-full text-sm"
             prop.children [
                 Html.a [
-                    prop.text "Help"; 
+                    prop.text "Help";
                     prop.style [style.marginLeft length.auto; style.userSelect.none]
                     prop.onClick (fun e -> e.preventDefault(); e.stopPropagation(); extendToggle())
                 ]
@@ -105,7 +105,7 @@ type Widget =
         let element = React.useElementRef()
         React.useLayoutEffectOnce(fun _ -> position |> Option.iter (fun position -> MoveEventListener.ensurePositionInsideWindow element position |> Some |> setPosition)) // Reposition widget inside window
         let resizeElement (content: ReactElement) =
-            Bulma.card [
+            Html.div [
                 prop.ref element
                 prop.onMouseDown(fun e ->  // resize
                     e.preventDefault()
@@ -119,11 +119,12 @@ type Widget =
                     config.once <- true
                     Browser.Dom.document.addEventListener("mouseup", onmouseup, config)
                 )
+                prop.className "shadow-md border border-base-300 space-y-4 rounded-lg border-r-2 bg-base-100"
                 prop.style [
                     style.zIndex 40
-                    style.cursor.eastWestResize//style.cursor.northWestSouthEastResize ; 
+                    style.cursor.eastWestResize//style.cursor.northWestSouthEastResize ;
                     style.display.flex
-                    style.paddingRight(2);
+                    // style.paddingRight(2);
                     style.overflow.visible
                     style.position.fixedRelativeToWindow
                     style.minWidth.minContent
@@ -134,17 +135,17 @@ type Widget =
                         //style.height size.Value.Y
                     if position.IsNone then
                         //style.transform.translate (length.perc -50,length.perc -50)
-                        style.top (length.perc 20); style.left (length.perc 20); 
+                        style.top (length.perc 20); style.left (length.perc 20);
                     else
-                        style.top position.Value.Y; style.left position.Value.X; 
+                        style.top position.Value.Y; style.left position.Value.X;
                 ]
                 prop.children content
             ]
         resizeElement <| Html.div [
             prop.onMouseDown(fun e -> e.stopPropagation())
-            prop.style [style.cursor.defaultCursor; style.display.flex; style.flexDirection.column; style.flexGrow 1]
+            prop.className "border-b border-black cursor-default flex flex-col grow"
             prop.children [
-                Bulma.cardHeader [
+                Html.div [
                     prop.onMouseDown(fun e -> // move
                         e.preventDefault()
                         e.stopPropagation()
@@ -158,42 +159,45 @@ type Widget =
                         config.once <- true
                         Browser.Dom.document.addEventListener("mouseup", onmouseup, config)
                     )
-                    prop.style [style.cursor.move]
+                    prop.className "cursor-move flex justify-end bg-gradient-to-br from-primary to-base-200 rounded-lg"
                     prop.children [
-                        Bulma.cardHeaderTitle.p Html.none
-                        Bulma.cardHeaderIcon.a [
-                            Bulma.delete [
-                                prop.onClick (fun e -> e.stopPropagation(); rmv e)
-                            ]
-                        ]
+                        Components.Components.DeleteButton(props=[prop.className "btn-ghost glass";prop.onClick (fun e -> e.stopPropagation(); rmv e)])
                     ]
                 ]
-                Bulma.cardContent [
-                    prop.style [style.overflow.inheritFromParent]
+                Html.div [
+                    prop.className "p-2"
                     prop.children [
                         content
-                        if help.IsSome then Elements.helpExtendButton (fun _ -> setHelpIsActive (not helpIsActive))
                     ]
                 ]
-                Bulma.cardFooter [
-                    prop.style [style.padding 5]
-                    if help.IsSome then
+                if help.IsSome then
+                    Html.div [
+                        prop.tabIndex 0
+                        prop.className "text-primary collapse bg-opacity-50 rounded-none max-w-none
+                        focus:bg-primary focus:text-primary-content
+                        prose prose-a:text-primary-content
+                        prose-code:text-base-content prose-code:bg-base-200 prose-code:rounded-none"
                         prop.children [
-                            Bulma.content [
-                                prop.className "widget-help-container"
-                                prop.style [style.overflow.hidden; if not helpIsActive then style.display.none; ]
+                            Daisy.collapseTitle [
+                                prop.className "px-2 py-1 min-h-0 flex"
+                                prop.children [
+                                    Html.div [prop.text "Help"; prop.className "text-sm font-light ml-auto"]
+                                ]
+                            ]
+                            Daisy.collapseContent [
+                                prop.className "marker:text-primary-content"
                                 prop.children [
                                     help.Value
                                 ]
                             ]
                         ]
-                ]
+                    ]
             ]
         ]
-        
+
     static member BuildingBlock (model, dispatch, rmv: MouseEvent -> unit) =
         let content = BuildingBlock.SearchComponent.Main model dispatch
-        let help = Html.div [
+        let help = React.fragment [
             Html.p "Add a new Building Block."
             Html.ul [
                 Html.li "If a cell is selected, a new Building Block is added to the right of the selected cell."
@@ -202,7 +206,7 @@ type Widget =
         ]
         let prefix = WidgetLiterals.BuildingBlock
         Widget.Base(content, prefix, rmv, help)
-        
+
 
     [<ReactComponent>]
     static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
@@ -211,29 +215,30 @@ type Widget =
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         React.useEffect((fun _ -> setTemplates model.ProtocolState.Templates), [|box model.ProtocolState.Templates|])
-        let selectContent() = 
+        let selectContent() =
             [
-                Protocol.Search.FileSortElement(model, config, setConfig)
+                Protocol.Search.FileSortElement(model, config, setConfig, "@md/templateWidget:grid-cols-3")
                 Protocol.Search.Component (filteredTemplates, model, dispatch, length.px 350)
             ]
         let insertContent() =
             [
-                Bulma.field.div [
+                Html.div [
                     Protocol.TemplateFromDB.addFromDBToTableButton model dispatch
                 ]
-                Bulma.field.div [
+                Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.children [
                         Protocol.TemplateFromDB.displaySelectedProtocolEle model dispatch
                     ]
                 ]
             ]
-        let content = 
+        let content =
             let switchContent = if model.ProtocolState.TemplateSelected.IsNone then selectContent() else insertContent()
             Html.div [
+                prop.className "flex flex-col gap-4 @container/templateWidget"
                 prop.children switchContent
             ]
-        
+
         let help = Protocol.Search.InfoField()
         let prefix = WidgetLiterals.Templates
         Widget.Base(content, prefix, rmv, help)
@@ -244,7 +249,7 @@ type Widget =
             if model.FilePickerState.FileNames <> [] then
                 FilePicker.fileSortElements model dispatch
 
-                Bulma.field.div [
+                Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.children [
                         FilePicker.FileNameTable.table model dispatch

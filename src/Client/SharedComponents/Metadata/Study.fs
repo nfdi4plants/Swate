@@ -1,30 +1,29 @@
 module Components.Metadata.Study
 
-open Feliz.Bulma
+open Feliz
 open ARCtrl
 open Components
 open Components.Forms
 open System
 
-let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy * ArcAssay list) -> unit, setDatamap: ArcStudy -> DataMap option -> unit) = 
-    Bulma.section [
-        Generic.BoxedField
-            (Some "Study Metadata")
-            None
-            [
+let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy * ArcAssay list) -> unit, setDatamap: ArcStudy -> DataMap option -> unit) =
+    Generic.Section [
+        Generic.BoxedField(
+            "Study Metadata",
+            content = [
                 FormComponents.TextInput (
                     study.Identifier,
-                    (fun s -> 
+                    (fun s ->
                         let nextStudy = IdentifierSetters.setStudyIdentifier s study
                         setArcStudy (nextStudy , assignedAssays)),
                     "Identifier"
                 )
                 FormComponents.TextInput (
                     Option.defaultValue "" study.Description,
-                    (fun s -> 
+                    (fun s ->
                         study.Description <- s |> Option.whereNot String.IsNullOrWhiteSpace
                         setArcStudy (study , assignedAssays)),
-                    "Description", 
+                    "Description",
                     isarea=true
                 )
                 FormComponents.PersonsInput(
@@ -36,21 +35,21 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy 
                 )
                 FormComponents.PublicationsInput (
                     study.Publications,
-                    (fun pubs -> 
+                    (fun pubs ->
                         study.Publications <- ResizeArray(pubs)
                         setArcStudy (study , assignedAssays)),
                     "Publications"
                 )
                 FormComponents.DateTimeInput(
                     Option.defaultValue "" study.SubmissionDate,
-                    (fun s -> 
+                    (fun s ->
                         study.SubmissionDate <- s |> Option.whereNot String.IsNullOrWhiteSpace
                         setArcStudy (study , assignedAssays)),
                     "Submission Date"
                 )
                 FormComponents.DateTimeInput (
                     Option.defaultValue "" study.PublicReleaseDate,
-                    (fun s -> 
+                    (fun s ->
                         study.PublicReleaseDate <- s |> Option.whereNot String.IsNullOrWhiteSpace
                         setArcStudy (study , assignedAssays)),
                     "Public ReleaseDate"
@@ -77,7 +76,8 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy 
                     "Comments"
                 )
             ]
-        Datamap.DatamapConfig.Main(
+        )
+        Datamap.Main(
             study.DataMap,
             fun dataMap ->
                 setDatamap study dataMap

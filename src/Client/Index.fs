@@ -7,21 +7,11 @@ open Messages
 open Model
 open Update
 
-
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
 
 open Feliz
-open Feliz.Bulma
-
-let private split_container model dispatch =
-    let mainWindow = Seq.singleton <| MainWindowView.Main (model, dispatch)
-    let sideWindow = Seq.singleton <| SidebarView.SidebarView.Main(model, dispatch)
-    SplitWindowView.Main
-        mainWindow
-        sideWindow
-        model
-        dispatch
+open Feliz.DaisyUI
 
 [<ReactComponent>]
 let View (model : Model) (dispatch : Msg -> unit) =
@@ -38,13 +28,39 @@ let View (model : Model) (dispatch : Msg -> unit) =
     React.contextProvider(LocalStorage.Darkmode.themeContext, v,
         Html.div [
             prop.id "ClientView"
-            prop.className "flex w-full h-full overflow-auto"
+            prop.className "flex w-full overflow-auto h-screen"
             prop.children [
-                match model.PersistentStorageState.Host with
-                | Some Swatehost.Excel ->
-                    SidebarView.SidebarView.Main(model, dispatch)
-                | _ ->
-                    split_container model dispatch
+                match model.PageState.IsHome, model.PersistentStorageState.Host with
+                | false, _ ->
+                    View.MainPageView.Main(model, dispatch)
+                | _, Some Swatehost.Excel ->
+                    Html.div [
+                        prop.className "flex flex-col w-full h-full"
+                        prop.children [
+                            SidebarView.SidebarView.Main(model, dispatch)
+                        ]
+                    ]
+                | _, _ ->
+                    let isActive = model.SpreadsheetModel.TableViewIsActive() && model.PersistentStorageState.ShowSideBar
+                    Daisy.drawer [
+                        prop.className [
+                            "drawer-end"
+                            if isActive then "drawer-open"
+                        ]
+                        prop.children [
+                            Html.input [
+                                prop.id "split-window-drawer"
+                                prop.type'.checkbox
+                                prop.className "drawer-toggle"
+                            ]
+                            Daisy.drawerContent [
+                                SpreadsheetView.Main (model, dispatch)
+                            ]
+                            Daisy.drawerSide [
+                                SidebarView.SidebarView.Main(model, dispatch)
+                            ]
+                        ]
+                    ]
             ]
         ]
     )

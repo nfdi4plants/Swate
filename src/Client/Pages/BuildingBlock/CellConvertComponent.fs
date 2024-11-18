@@ -1,7 +1,7 @@
 namespace BuildingBlock
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 open OfficeInterop.Core
 open Shared
@@ -37,30 +37,30 @@ type CellConvertComponent =
         let (cellDiscriminateState, setCellDiscriminateState) = React.useState(CellDiscriminateState.init)
 
         Html.div [
-            
-            Bulma.buttons [
-                Bulma.button.button [
-                    Bulma.color.isSuccess
+
+            Html.div [
+                Daisy.button.button [
+                    button.success
                     prop.text "Refresh"
                     prop.onClick (fun _ ->
                         CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState |> Promise.start
-                    )                    
+                    )
                 ]
                 Html.div (string cellDiscriminateState.SelectedCellState)
             ]
-            Bulma.buttons [
-                Bulma.button.button [                    
+            Html.div [
+                Daisy.button.button [
                     if cellDiscriminateState.TargetCellState.IsSome then
-                        Bulma.color.isSuccess
+                        button.success
                         prop.disabled false
                         prop.text $"Convert {cellDiscriminateState.SelectedCellState.Value} to"
                     else
-                        Bulma.color.isDanger
+                        button.error
                         prop.disabled true
                         prop.text $"Unconvertible"
                     prop.onClick (fun _ ->
                         CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState |> Promise.start
-                        convertBuildingBlock () |> Promise.start)                    
+                        convertBuildingBlock () |> Promise.start)
                 ]
                 Html.div (string cellDiscriminateState.TargetCellState)
             ]

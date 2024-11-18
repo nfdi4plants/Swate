@@ -1,0 +1,23 @@
+{
+    "tailwindCSS.includeLanguages": {
+        "fsharp": "html"
+    },
+    "tailwindCSS.experimental.classRegex": [
+        "\\.className\\s+\"([^\"]*)\"",
+        ["\\.className\\s+\\[([^\\]]*)\\]", "\"([^\"]*)\""]
+    ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/.vs": true,
+        "**/.idea": true,
+        "**/.ionide": true,
+        "**/bin": true,
+        "**/obj": true,
+        "**/deploy": true,
+    }
+}

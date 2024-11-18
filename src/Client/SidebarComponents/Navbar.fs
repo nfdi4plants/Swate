@@ -6,9 +6,9 @@ open Model
 open Messages
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
-open Components.QuickAccessButton
+open Components
 open ARCtrl
 open ARCtrl.Spreadsheet
 open Shared
@@ -45,7 +45,7 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
-            Bulma.button.a [
+            Daisy.button.a [
                 prop.onClick(fun _ ->
                     let investigation = ArcInvestigation.init("New Investigation")
                     let arcfile = ArcFiles.Investigation investigation
@@ -53,7 +53,7 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
                 )
                 prop.text "Investigation"
             ]
-            Bulma.button.a [
+            Daisy.button.a [
                 prop.onClick(fun _ ->
                     let study = ArcStudy.init("New Study")
                     let arcfile = ArcFiles.Study (study, [])
@@ -61,7 +61,7 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
                 )
                 prop.text "Study"
             ]
-            Bulma.button.a [
+            Daisy.button.a [
                 prop.onClick(fun _ ->
                     let assay = ArcAssay.init("New Assay")
                     let arcfile = ArcFiles.Assay assay
@@ -69,7 +69,7 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
                 )
                 prop.text "Assay"
             ]
-            Bulma.button.a [
+            Daisy.button.a [
                 prop.onClick(fun _ ->
                     let template = Template.init("New Template")
                     template.Version <- "0.0.0"
@@ -83,17 +83,16 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
     ]
 
 let NoMetadataModalContent refresh (dispatch: Messages.Msg -> unit) =
-    Bulma.section [
-        Components.Generic.BoxedField None None [
-            Bulma.title.h2 "Create Top Level Metadata"
+    Html.section [
+        Components.Forms.Generic.BoxedField [
+            Html.h2 "Create Top Level Metadata"
             Html.p "Choose one of the following top level meta data types to create"
             AddMetaDataButtons refresh dispatch
         ]
     ]
 
 let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal (dispatch: Messages.Msg -> unit) =
-     Bulma.box [
-        Bulma.color.hasBackgroundGreyLighter
+    Html.div [
         prop.children [
             match excelMetadataType with
             | { Metadata = Some (ArcFiles.Assay assay)} ->
@@ -129,13 +128,13 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                     }
                 Template.Main(template, setTemplate)
             | _ -> Html.none
-            Bulma.section [
+            Html.section [
                 prop.className "pt-0"
                 prop.children [
-                    Components.Generic.BoxedField None None [
-                        Bulma.buttons [
-                            Bulma.button.a [
-                                Bulma.color.isPrimary
+                    Components.Forms.Generic.BoxedField [
+                        Html.div [
+                            Daisy.button.a [
+                                button.primary
                                 prop.text "Update Metadata Type"
                                 prop.onClick (fun _ ->
                                     if excelMetadataType.Metadata.IsSome then
@@ -147,8 +146,8 @@ let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal
                                         logw ("Tried updating metadata sheet without given metadata")
                                 )
                             ]
-                            Bulma.button.a [
-                                Bulma.color.isDanger
+                            Daisy.button.a [
+                                button.error
                                 prop.text "Delete Metadata Type"
                                 prop.onClick (fun _ ->
                                     OfficeInterop.DeleteTopLevelMetadata
@@ -187,75 +186,71 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
                     }
             }
     React.useEffectOnce(refreshMetadataState >> Promise.start)
-    Bulma.modal [
+    Daisy.modal.div [
         // Add the "is-active" class to display the modal
-        Bulma.modal.isActive
+        modal.active
         prop.children [
-            Bulma.modalBackground [
+            Daisy.modalBackdrop [
                 prop.onClick (fun _ -> closeModal())
             ]
-            Bulma.modalContent [
+            Daisy.modalBox.form [
                 prop.className "overflow-y-auto"
-                prop.onClick (fun ev -> ev.stopPropagation())
                 prop.children [
                     match excelMetadataType with
                     | { Loading = true } ->
-                        Modals.Loading.loadingComponent
+                        Modals.Loading.Modal()
                     | { Metadata = None } ->
                         NoMetadataModalContent refreshMetadataState dispatch
                     | { Metadata = Some metadata } ->
                         UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal dispatch
                 ]
             ]
-            // Close button in the top-right corner
-            Bulma.modalClose [
-                prop.onClick (fun _ ->
-                    closeModal())
-            ]
         ]
     ]
 
-let private ShortCutIconList toggleMetdadataModal model (dispatch: Messages.Msg -> unit) =
+let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -> unit) =
     [
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Create Metadata",
-            [
+            React.fragment [
                 Html.i [prop.className "fa-solid fa-plus"]
                 Html.i [prop.className "fa-solid fa-info"]
             ],
             toggleMetdadataModal
         )
 
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Create Annotation Table",
-            [
+            React.fragment [
                 Html.i [prop.className "fa-solid fa-plus"]
                 Html.i [prop.className "fa-solid fa-table"]
             ],
             (fun e ->
                 e.preventDefault()
+                let e = e :?> Browser.Types.MouseEvent
                 let ctrl = e.metaKey || e.ctrlKey
                 SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
             )
         )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
-            QuickAccessButton.create(
+            QuickAccessButton.Main(
                 "Autoformat Table",
-                [
+                React.fragment [
                     Html.i [prop.className "fa-solid fa-rotate"]
                 ],
                 (fun e ->
                     e.preventDefault()
+                    let e = e :?> Browser.Types.MouseEvent
                     let ctrl = not (e.metaKey || e.ctrlKey)
                     OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
                 )
             )
         | _ ->
             ()
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Rectify Ontology Terms",
-            [
+            React.fragment [
                 Html.i [prop.className "fa-solid fa-spell-check"]
                 Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
                 Html.i [prop.className "fa-solid fa-pen"]
@@ -264,9 +259,9 @@ let private ShortCutIconList toggleMetdadataModal model (dispatch: Messages.Msg 
                 SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch
             )
         )
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Remove Building Block",
-            [
+            React.fragment [
                 Html.i [prop.className "fa-solid fa-minus pr-1"]
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
@@ -282,12 +277,11 @@ let private ShortCutIconList toggleMetdadataModal model (dispatch: Messages.Msg 
             (fun _ -> SpreadsheetInterface.GetBuildingBlockDetails |> InterfaceMsg |> dispatch)
         )
     ]
-    |> List.map (fun x -> x.toReactElement())
     |> React.fragment
 
 
 let private quickAccessDropdownElement model dispatch (state: NavbarState) (setState: NavbarState -> unit) (isSndNavbar:bool) =
-    Bulma.navbarItem.div [
+    Html.div [
         prop.onClick (fun _ -> setState { state with QuickAccessActive = not state.QuickAccessActive })
         prop.style [ style.padding 0; if isSndNavbar then style.custom("marginLeft", "auto")]
         prop.title (if state.QuickAccessActive then "Close quick access" else "Open quick access")
@@ -295,10 +289,9 @@ let private quickAccessDropdownElement model dispatch (state: NavbarState) (setS
             Html.div [
                 prop.style [style.width(length.perc 100); style.height (length.perc 100); style.position.relative]
                 prop.children [
-                    Bulma.button.a [
+                    Daisy.button.a [
                         prop.style [style.backgroundColor "transparent"; style.height(length.perc 100); if state.QuickAccessActive then style.color NFDIColors.Yellow.Base]
-                        Bulma.color.isWhite
-                        Bulma.button.isInverted
+                        button.outline
                         prop.children [
                             Html.div [
                                 prop.style [ style.display.inlineFlex; style.position.relative; style.justifyContent.center]
@@ -339,134 +332,48 @@ let private quickAccessDropdownElement model dispatch (state: NavbarState) (setS
         ]
     ]
 
-let private QuickAccessListElement toggleMetdadataModal model dispatch =
-    Html.div [
-        prop.style [style.display.flex; style.flexDirection.row]
-        prop.children (ShortCutIconList toggleMetdadataModal model dispatch)
-    ]
-
 [<ReactComponent>]
-let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) (sidebarsize: Model.WindowSize) =
+let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) =
     let state, setState = React.useState(NavbarState.init)
     let inline toggleMetdadataModal _ = { state with ExcelMetadataModalActive = not state.ExcelMetadataModalActive } |> setState
-    Bulma.navbar [
-        prop.className "myNavbarSticky"
-        prop.id "swate-mainNavbar"; prop.role "navigation"; prop.ariaLabel "main navigation" ;
-        prop.style [style.flexWrap.wrap]
-        prop.children [
-            if state.ExcelMetadataModalActive then
-                SelectModalDialog
-                    toggleMetdadataModal
-                    dispatch
-            Html.div [
-                prop.style [style.flexBasis (length.percent 100)]
-                prop.children [
-                    Bulma.navbarBrand.div [
-                        prop.style [style.width(length.perc 100)]
-                        prop.children [
-                            // Logo
-                            Bulma.navbarItem.div [
-                                prop.id "logo"
-                                prop.onClick (fun _ -> Routing.Route.BuildingBlock |> Some |> UpdatePageState |> dispatch)
-                                prop.style [style.width 100; style.cursor.pointer; style.padding (0,length.rem 0.4)]
-                                let path = if model.PageState.IsExpert then "_e" else ""
-                                Bulma.image [
-                                    Html.img [
-                                        prop.style [style.maxHeight(length.perc 100); style.width 100]
-                                        prop.src @$"assets\Swate_logo_for_excel{path}.svg"
-                                    ]
-                                ]
-                                |> prop.children
-                            ]
-
-                            // Quick access buttons
-                            match sidebarsize, model.PersistentStorageState.Host with
-                            | WindowSize.Mini, Some Swatehost.Excel ->
-                                quickAccessDropdownElement model dispatch state setState false
-                            | _, Some Swatehost.Excel ->
-                                QuickAccessListElement toggleMetdadataModal model dispatch
-                            | _,_ -> Html.none
-
-                            Bulma.navbarBurger [
-                                if state.BurgerActive then Bulma.navbarBurger.isActive
-                                prop.onClick (fun _ -> setState { state with BurgerActive = not state.BurgerActive })
-                                Bulma.color.hasTextWhite
-                                prop.role "button"
-                                prop.ariaLabel "menu"
-                                prop.ariaExpanded false
-                                prop.style [style.display.block]
-                                prop.children [
-                                    Html.span [prop.ariaHidden true]
-                                    Html.span [prop.ariaHidden true]
-                                    Html.span [prop.ariaHidden true]
-                                    Html.span [prop.ariaHidden true]
-                                ]
-                            ]
-                        ]
-                    ]
-                    Bulma.navbarMenu [
-                        prop.style [if state.BurgerActive then style.display.block]
-                        prop.id "navbarMenu"
-                        prop.className (if state.BurgerActive then "navbar-menu is-active" else "navbar-menu")
-                        Bulma.navbarDropdown.div [
-                            prop.style [if state.BurgerActive then style.display.block]
-                            prop.children [
-                                Bulma.navbarItem.a [
-                                    prop.href Shared.URLs.NFDITwitterUrl ;
-                                    prop.target "_Blank";
-                                    prop.children [
-                                        Html.span "News "
-                                        Html.i [prop.className "fa-brands fa-twitter"; prop.style [style.color "#1DA1F2"; style.marginLeft 2]]
-                                    ]
-                                ]
-                                Bulma.navbarItem.a [
-                                    prop.onClick (fun _ ->
-                                        setState { state with BurgerActive = not state.BurgerActive }
-                                        UpdatePageState (Some Routing.Route.Info) |> dispatch
-                                    )
-                                    prop.text Routing.Route.Info.toStringRdbl
-                                ]
-                                Bulma.navbarItem.a [
-                                    prop.onClick (fun _ ->
-                                        setState { state with BurgerActive = not state.BurgerActive }
-                                        UpdatePageState (Some Routing.Route.PrivacyPolicy) |> dispatch
-                                    )
-                                    prop.text Routing.Route.PrivacyPolicy.toStringRdbl
-                                ]
-                                Bulma.navbarItem.a [
-                                    prop.href Shared.URLs.SwateWiki ;
-                                    prop.target "_Blank";
-                                    prop.text "How to use"
-                                ]
-                                Bulma.navbarItem.a [
-                                    prop.href Shared.URLs.Helpdesk.Url;
-                                    prop.target "_Blank";
-                                    prop.text "Contact us!"
-                                ]
-                                Bulma.navbarItem.a [
-                                    prop.onClick (fun _ ->
-                                        setState {state with BurgerActive = not state.BurgerActive}
-                                        UpdatePageState (Some Routing.Route.Settings) |> dispatch
-                                    )
-                                    prop.text "Settings"
-                                ]
-                                Bulma.navbarItem.a [
-                                    prop.onClick (fun e ->
-                                        setState { state with BurgerActive = not state.BurgerActive }
-                                        UpdatePageState (Some Routing.Route.ActivityLog) |> dispatch
-                                    )
-                                    prop.text "Activity Log"
-                                ]
-                            ]
-                        ]
-                        |> prop.children
-                    ]
+    Components.BaseNavbar.Glow [
+        if state.ExcelMetadataModalActive then
+            SelectModalDialog
+                toggleMetdadataModal
+                dispatch
+        Html.div [
+            prop.ariaLabel "logo"
+            prop.children [
+                Html.img [
+                    prop.style [style.maxHeight(length.perc 100); style.width 100]
+                    prop.src @"assets/Swate_logo_for_excel.svg"
                 ]
             ]
-            if state.QuickAccessActive && sidebarsize = WindowSize.Mini then
-                Bulma.navbarBrand.div [
-                    prop.style [style.flexGrow 1; style.display.flex]
-                    ShortCutIconList toggleMetdadataModal model dispatch |> prop.children
-                ]
         ]
+        match model.PersistentStorageState.Host with
+        | Some Swatehost.Excel ->
+            Daisy.navbarCenter [
+                QuickAccessList toggleMetdadataModal model dispatch
+            ]
+            Html.div [
+                prop.className "ml-auto"
+                prop.children [
+                    NavbarBurger.Main(model, dispatch)
+                ]
+            ]
+        | _ ->
+            Html.div [
+                prop.className "ml-auto"
+                prop.children [
+                    Components.DeleteButton(props = [
+                        prop.onClick (fun _ ->
+                            Messages.PersistentStorage.UpdateShowSidebar (not model.PersistentStorageState.ShowSideBar)
+                            |> Messages.PersistentStorageMsg
+                            |> dispatch
+                        )
+                        button.sm
+                        button.glass
+                    ])
+                ]
+            ]
     ]

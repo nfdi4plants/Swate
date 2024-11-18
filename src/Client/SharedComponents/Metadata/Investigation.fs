@@ -1,70 +1,70 @@
 module Components.Metadata.Investigation
 
 open System
-open Feliz.Bulma
+open Feliz
+open Feliz.DaisyUI
 open ARCtrl
 open Components
 open Components.Forms
 
 let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit) =
-    Bulma.section [
-        Generic.BoxedField
-            (Some "Investigation Metadata")
-            None
-            [
+    Generic.Section [
+        Generic.BoxedField(
+            "Investigation Metadata",
+            content = [
                 FormComponents.TextInput (
                     investigation.Identifier,
-                    (fun s -> 
+                    (fun s ->
                         let nextInvestigation = IdentifierSetters.setInvestigationIdentifier s investigation
                         setInvestigation nextInvestigation),
                     "Identifier"
                 )
                 FormComponents.TextInput (
                     Option.defaultValue "" investigation.Title,
-                    (fun s -> 
+                    (fun s ->
                         investigation.Title <- s |> Option.whereNot String.IsNullOrWhiteSpace
                         setInvestigation investigation),
-                    "Title" 
+                    "Title"
                 )
                 FormComponents.TextInput (
                     Option.defaultValue "" investigation.Description,
-                    (fun s -> 
+                    (fun s ->
                         investigation.Description <- s |> Option.whereNot String.IsNullOrWhiteSpace
                         setInvestigation investigation),
-                    "Description", 
+                    "Description",
                     isarea = true
                 )
                 FormComponents.PersonsInput(
                     investigation.Contacts,
-                    (fun i -> 
+                    (fun i ->
                         investigation.Contacts <- ResizeArray i
                         setInvestigation investigation),
                     "Contacts"
                 )
                 FormComponents.PublicationsInput(
                     investigation.Publications,
-                    (fun i -> 
+                    (fun i ->
                         investigation.Publications <- i
                         setInvestigation investigation),
                     "Publications"
                 )
                 FormComponents.DateTimeInput (
                     Option.defaultValue "" investigation.SubmissionDate,
-                    (fun s -> 
+                    (fun s ->
                         investigation.SubmissionDate <- if s = "" then None else Some s
                         setInvestigation investigation),
                     "Submission Date"
                 )
                 FormComponents.DateTimeInput (
                     Option.defaultValue "" investigation.PublicReleaseDate,
-                    (fun s -> 
+                    (fun s ->
                         investigation.PublicReleaseDate <- if s = "" then None else Some s
                         setInvestigation investigation),
                     "Public Release Date"
                 )
                 FormComponents.OntologySourceReferencesInput(
                     investigation.OntologySourceReferences,
-                    (fun oas -> 
+                    (fun oas ->
                         investigation.OntologySourceReferences <- oas
                         setInvestigation investigation),
                     "Ontology Source References"
@@ -73,16 +73,17 @@ let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> 
                 ////FormComponents.TextInputs(
                 ////    Array.ofSeq inv.RegisteredStudyIdentifiers,
                 ////    "RegisteredStudyIdentifiers",
-                ////    (fun i -> 
+                ////    (fun i ->
                 ////        inv.RegisteredStudyIdentifiers <- ResizeArray i
                 ////        inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
                 ////)
                 FormComponents.CommentsInput(
                     investigation.Comments,
-                    (fun comments -> 
+                    (fun comments ->
                         investigation.Comments <- ResizeArray comments
                         setInvestigation investigation),
                     "Comments"
                 )
             ]
+        )
     ]

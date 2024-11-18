@@ -6,15 +6,15 @@ open Elmish
 open Messages.FilePicker
 open Messages
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
-let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : FilePicker.Model * Cmd<Messages.Msg> =
+let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
     match filePickerMsg with
     | LoadNewFiles fileNames ->
         let nextState : FilePicker.Model = {
             FileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
         }
-        let nextCmd = UpdatePageState (Some Routing.Route.FilePicker) |> Cmd.ofMsg
+        let nextCmd = UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.FilePicker} |> Cmd.ofMsg
         nextState, nextCmd
     | UpdateFileNames newFileNames ->
         let nextState : FilePicker.Model = {
@@ -24,12 +24,12 @@ let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) : Fil
 
 let uploadButton (model:Model) dispatch =
     let inputId = "filePicker_OnFilePickerMainFunc"
-    Bulma.field.div [
+    Html.div [
         Html.input [
             prop.style [style.display.none]
             prop.id inputId
             prop.multiple true
-            prop.type' "file"
+            prop.type'.file
             prop.onChange (fun (ev: File list) ->
                 let files = ev //ev.target?files
 
@@ -46,20 +46,19 @@ let uploadButton (model:Model) dispatch =
         match model.PersistentStorageState.Host with
             | Some (Swatehost.ARCitect) ->
                 Html.div [
-                    prop.className "is-flex is-flex-direction-row"
-                    prop.style [style.gap (length.rem 1)]
+                    prop.className "flex flex-row gap-2"
                     prop.children [
-                        Bulma.button.button [
-                            Bulma.color.isInfo
-                            Bulma.button.isFullWidth
+                        Daisy.button.button [
+                            button.primary
+                            button.block
                             prop.onClick(fun _ ->
                                 ARCitect.RequestPaths false |> ARCitect.ARCitect.send
                             )
                             prop.text "Pick Files"
                         ]
-                        Bulma.button.button [
-                            Bulma.color.isInfo
-                            Bulma.button.isFullWidth
+                        Daisy.button.button [
+                            button.primary
+                            button.block
                             prop.onClick(fun _ ->
                                 ARCitect.RequestPaths true |> ARCitect.ARCitect.send
                             )
@@ -68,9 +67,9 @@ let uploadButton (model:Model) dispatch =
                     ]
                 ]
             | _ ->
-                Bulma.button.button [
-                    Bulma.color.isInfo
-                    Bulma.button.isFullWidth
+                Daisy.button.button [
+                    button.primary
+                    button.block
                     prop.onClick(fun _ ->
                         let getUploadElement = Browser.Dom.document.getElementById inputId
                         getUploadElement.click()
@@ -80,68 +79,43 @@ let uploadButton (model:Model) dispatch =
     ]
 
 let insertButton (model:Model) dispatch =
-    Bulma.field.div [
-        Bulma.button.button [
-            Bulma.color.isSuccess
-            Bulma.button.isFullWidth
-            prop.onClick (fun _ ->
-                let fileNames = model.FilePickerState.FileNames |> List.map snd
-                SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch
-            )
-            prop.text "Insert file names"
+    Html.div [
+        prop.className "flex flex-row justify-center"
+        prop.children [
+
+            Daisy.button.button [
+                button.success
+                button.wide
+                prop.onClick (fun _ ->
+                    let fileNames = model.FilePickerState.FileNames |> List.map snd
+                    SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch
+                )
+                prop.text "Insert file names"
+            ]
         ]
     ]
 
 let sortButton icon msg =
-    Bulma.button.a [
+    Daisy.button.a [
+        join.item
         prop.onClick msg
         prop.children [
-            Bulma.icon [Html.i [prop.classes ["fa-lg"; icon]]]
+            Html.i [prop.classes ["fa-lg"; icon]]
         ]
     ]
 
 let fileSortElements (model:Model) dispatch =
-    Bulma.field.div [
-        Bulma.buttons [
-            //Bulma.button.a [
-            //    prop.title "Copy to Clipboard"
-            //    prop.onClick(fun e ->
-            //        CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_filepicker" 
-            //        let txt = model.FilePickerState.FileNames |> List.map snd |> String.concat System.Environment.NewLine
-            //        let textArea = Browser.Dom.document.createElement "textarea"
-            //        textArea?value <- txt
-            //        textArea?style?top <- "0"
-            //        textArea?style?left <- "0"
-            //        textArea?style?position <- "fixed"
-
-            //        Browser.Dom.document.body.appendChild textArea |> ignore
-
-            //        textArea.focus()
-            //        // Can't belive this actually worked
-            //        textArea?select()
-
-            //        let t = Browser.Dom.document.execCommand("copy")
-            //        Browser.Dom.document.body.removeChild(textArea) |> ignore
-            //        ()
-            //    )
-            //    prop.children [
-            //        CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_filepicker" "fa-solid fa-copy" "fa-solid fa-check"
-            //    ]
-            //]
-
-            Bulma.buttons [
-                Bulma.buttons.hasAddons
-                prop.style [style.custom("marginLeft", "auto")]
-                prop.children [
-                    sortButton "fa-solid fa-arrow-down-a-z" (fun _ ->
-                        let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
-                        UpdateFileNames sortedList |> FilePickerMsg |> dispatch
-                    )
-                    sortButton "fa-solid fa-arrow-down-z-a" (fun _ ->
-                        let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i+1,snd x)
-                        UpdateFileNames sortedList |> FilePickerMsg |> dispatch
-                    )
-                ]
+    Html.div [
+        Daisy.join [
+            prop.children [
+                sortButton "fa-solid fa-arrow-down-a-z" (fun _ ->
+                    let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
+                    UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+                )
+                sortButton "fa-solid fa-arrow-down-z-a" (fun _ ->
+                    let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i+1,snd x)
+                    UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+                )
             ]
         ]
     ]
@@ -149,7 +123,7 @@ let fileSortElements (model:Model) dispatch =
 module FileNameTable =
 
     let deleteFromTable (id,fileName) (model:Model) dispatch =
-        Bulma.delete [
+        Components.Components.DeleteButton (props = [
             prop.onClick (fun _ ->
                 let newList =
                     model.FilePickerState.FileNames
@@ -157,14 +131,15 @@ module FileNameTable =
                     |> List.mapi (fun i (_,name) -> i+1, name)
                 newList |> UpdateFileNames |> FilePickerMsg |> dispatch
             )
-            prop.style [
-                style.marginRight(length.rem 2)
-            ]
-        ]
+            button.xs
+            button.error
+            button.outline
+        ])
 
     let moveUpButton (id,fileName) (model:Model) dispatch =
-        Bulma.button.a [
-            Bulma.button.isSmall
+        Daisy.button.a [
+            button.xs
+            join.item
             prop.onClick (fun _ ->
                 let sortedList =
                     model.FilePickerState.FileNames
@@ -182,13 +157,14 @@ module FileNameTable =
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
             prop.children [
-                Bulma.icon [Html.i [prop.className "fa-solid fa-arrow-up"]]
+                Html.i [prop.className "fa-solid fa-arrow-up"]
             ]
         ]
 
     let moveDownButton (id,fileName) (model:Model) dispatch =
-        Bulma.button.a [
-            Bulma.button.isSmall
+        Daisy.button.a [
+            button.xs
+            join.item
             prop.onClick (fun _ ->
                 let sortedList =
                     model.FilePickerState.FileNames
@@ -206,22 +182,21 @@ module FileNameTable =
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch
             )
             prop.children [
-                Bulma.icon [Html.i [prop.className "fa-solid fa-arrow-down"]]
+                Html.i [prop.className "fa-solid fa-arrow-down"]
             ]
         ]
 
     let moveButtonList (id,fileName) (model:Model) dispatch =
-        Bulma.buttons [
+        Daisy.join [
             moveUpButton (id,fileName) model dispatch
             moveDownButton (id,fileName) model dispatch
         ]
-        
+
 
     let table (model:Model) dispatch =
-        Bulma.table [
-            Bulma.table.isHoverable
-            Bulma.table.isStriped
-            Bulma.table.isHoverable
+        Daisy.table [
+            table.zebra
+            table.xs
             prop.children [
                 Html.tbody [
                     for index,fileName in model.FilePickerState.FileNames do
@@ -234,10 +209,10 @@ module FileNameTable =
                 ]
             ]
         ]
-        
+
 
 let fileContainer (model:Model) dispatch =
-    mainFunctionContainer [
+    SidebarComponents.SidebarLayout.LogicContainer [
 
         uploadButton model dispatch
 
@@ -250,10 +225,10 @@ let fileContainer (model:Model) dispatch =
     ]
 
 let filePickerComponent (model:Model) (dispatch:Messages.Msg -> unit) =
-    Bulma.content [
-        pageHeader "File Picker"
+    SidebarComponents.SidebarLayout.Container [
+        SidebarComponents.SidebarLayout.Header "File Picker"
 
-        Bulma.label "Select files from your computer and insert their names into Excel"
+        SidebarComponents.SidebarLayout.Description "Select files from your computer and insert their names into Excel"
 
         // Colored container element for all uploaded file names and sort elements
         fileContainer model dispatch

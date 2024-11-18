@@ -1,12 +1,12 @@
 module MainComponents.Navbar
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 
 open LocalHistory
 open Messages
-open Components.QuickAccessButton
+open Components
 open MainComponents
 open Model
 open Shared
@@ -22,25 +22,25 @@ let private FileName (model: Model) =
     match model.SpreadsheetModel.ArcFile with
     | Some _ ->
         Html.div [
-            prop.className "text-white text-lg font-bold flex items-center max-w-[125px] p-2 truncate inline-block"
+            prop.className "text-white text-lg font-bold inline-flex items-center max-w-[125px] px-2 truncate"
             prop.text txt
             prop.title txt
         ]
     | None -> Html.none
 
-let private quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
+let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
-            QuickAccessButton.create(
+            QuickAccessButton.Main(
                 "Back",
-                [
-                    Bulma.icon [Html.i [prop.className "fa-solid fa-rotate-left"]]
+                React.fragment [
+                    Html.i [prop.className "fa-solid fa-rotate-left"]
                 ],
                 (fun _ ->
-                    let newPosition = state.HistoryCurrentPosition + 1 
+                    let newPosition = state.HistoryCurrentPosition + 1
                     //let newPosition_clamped = System.Math.Min(newPosition, state.HistoryExistingItemCount)
                     //let noChange = newPosition_clamped = Spreadsheet.LocalStorage.CurrentHistoryPosition
                     //let overMax = newPosition_clamped = Spreadsheet.LocalStorage.MaxHistory
@@ -48,94 +48,87 @@ let private quickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                     if state.NextPositionIsValid(newPosition) then
                         Spreadsheet.UpdateHistoryPosition newPosition |> Msg.SpreadsheetMsg |> dispatch
                 ),
-                isActive = (state.NextPositionIsValid(state.HistoryCurrentPosition + 1))
-            ).toReactElement()
-            QuickAccessButton.create(
+                isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition + 1) |> not)
+            )
+            QuickAccessButton.Main(
                 "Forward",
-                [
-                    Bulma.icon [Html.i [prop.className "fa-solid fa-rotate-right"]]
+                React.fragment [
+                    Html.i [prop.className "fa-solid fa-rotate-right"]
                 ],
                 (fun _ ->
                     let newPosition = state.HistoryCurrentPosition - 1
                     if state.NextPositionIsValid(newPosition) then
                         Spreadsheet.UpdateHistoryPosition newPosition |> Msg.SpreadsheetMsg |> dispatch
                 ),
-                isActive = (state.NextPositionIsValid(state.HistoryCurrentPosition - 1))
-            ).toReactElement()
+                isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition - 1) |> not)
+            )
         ]
     ]
 
-let private quickAccessButtonListEnd (model: Model) dispatch =
+let private QuickAccessButtonListEnd (model: Model) dispatch =
     Html.div [
         prop.style [
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
-            QuickAccessButton.create(
+            QuickAccessButton.Main(
                 "Save",
-                [
-                    Bulma.icon [Html.i [prop.className "fa-solid fa-floppy-disk";]]
+                React.fragment [
+                    Html.i [prop.className "fa-solid fa-floppy-disk";]
                 ],
                 (fun _ -> Spreadsheet.ExportXlsx model.SpreadsheetModel.ArcFile.Value |> SpreadsheetMsg |> dispatch)
-            ).toReactElement()
-            QuickAccessButton.create(
+            )
+            QuickAccessButton.Main(
                 "Reset",
-                [
-                    Bulma.icon [Html.i [prop.className "fa-sharp fa-solid fa-trash";]]
+                React.fragment [
+                    Html.i [prop.className "fa-solid fa-trash-can";]
                 ],
                 (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
-                buttonProps = [Bulma.color.isDanger]
-            ).toReactElement()
+                classes = "hover:!text-error"
+            )
+            NavbarBurger.Main(model, dispatch)
         ]
     ]
 
 let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
     let addBuildingBlock =
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Add Building Block",
-            [
-                Bulma.icon [ 
+            React.fragment [
+                React.fragment [
                     Html.i [prop.className "fa-solid fa-circle-plus" ]
                     Html.i [prop.className "fa-solid fa-table-columns" ]
                 ]
             ],
             (fun _ -> addWidget Widget._BuildingBlock)
-        ).toReactElement()
+        )
     let addTemplate =
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Add Template",
-            [
-                Bulma.icon [ 
-                    Html.i [prop.className "fa-solid fa-circle-plus" ]
-                    Html.i [prop.className "fa-solid fa-table" ]
-                ]
+            React.fragment [
+                Html.i [prop.className "fa-solid fa-circle-plus" ]
+                Html.i [prop.className "fa-solid fa-table" ]
             ],
             (fun _ -> addWidget Widget._Template)
-        ).toReactElement()
+        )
     let filePicker =
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "File Picker",
-            [
-                Bulma.icon [ 
-                    Html.i [prop.className "fa-solid fa-file-signature" ]
-                ]
+            React.fragment [
+                Html.i [prop.className "fa-solid fa-file-signature" ]
             ],
             (fun _ -> addWidget Widget._FilePicker)
-        ).toReactElement()
+        )
     let dataAnnotator =
-        QuickAccessButton.create(
+        QuickAccessButton.Main(
             "Data Annotator",
-            [
-                Bulma.icon [ 
-                    Html.i [prop.className "fa-solid fa-object-group" ]
-                ]
+            React.fragment [
+                Html.i [prop.className "fa-solid fa-object-group" ]
             ],
             (fun _ -> addWidget Widget._DataAnnotator)
-        ).toReactElement()
+        )
     Html.div [
-        prop.style [
-            style.display.flex; style.flexDirection.row
-        ]
+        prop.className "flex flex-row"
         prop.children [
             match model.SpreadsheetModel.ActiveView with
             | Spreadsheet.ActivePattern.IsTable ->
@@ -154,42 +147,35 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
 
 [<ReactComponent>]
 let Main(model: Model, dispatch, widgets, setWidgets) =
-    let addWidget (widget: Widget) = 
+    let addWidget (widget: Widget) =
         let add (widget) widgets = widget::widgets |> List.rev |> setWidgets
-        if widgets |> List.contains widget then 
+        if widgets |> List.contains widget then
             List.filter (fun w -> w <> widget) widgets
             |> fun filteredWidgets -> add widget filteredWidgets
-        else 
+        else
             add widget widgets
-    Bulma.navbar [
-        prop.className "myNavbarSticky"
-        prop.id "swate-mainNavbar"
-        prop.role "navigation"
-        prop.ariaLabel "main navigation"
-        prop.style [
-            style.minHeight(length.rem 3.25)
-        ]
-        prop.children [
-            Bulma.navbarBrand.div [
+    Components.BaseNavbar.Main [
+        Html.div [
+            prop.className "grow-0"
+            prop.children [
                 FileName model
             ]
-            Bulma.navbarStart.div [
-                //prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexStart; style.custom("marginRight", "auto")]
+        ]
+        Daisy.navbarCenter [
+            prop.children [
+                QuickAccessButtonListStart model.History dispatch
+                WidgetNavbarList(model, dispatch, addWidget)
+            ]
+        ]
+        match model.PersistentStorageState.Host with
+        | Some (Swatehost.ARCitect) ->
+            Html.none
+        | Some _ ->
+            Html.div [
+                prop.className "ml-auto"
                 prop.children [
-                    quickAccessButtonListStart model.History dispatch
-                    WidgetNavbarList(model, dispatch, addWidget)
+                    QuickAccessButtonListEnd model dispatch
                 ]
             ]
-            match model.PersistentStorageState.Host with
-            | Some (Swatehost.ARCitect) ->
-                Html.none
-            | Some _ ->
-                Bulma.navbarEnd.div [
-                    //prop.style [style.display.flex; style.alignItems.stretch; style.justifyContent.flexEnd; style.custom("marginLeft", "auto")]
-                    prop.children [
-                        quickAccessButtonListEnd model dispatch
-                    ]
-                ]
-            | _ -> Html.none
-        ]
+        | _ -> Html.none
     ]

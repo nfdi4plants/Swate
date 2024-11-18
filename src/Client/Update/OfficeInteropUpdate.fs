@@ -8,7 +8,7 @@ open OfficeInterop.Core
 open Shared
 open Model
 
-module OfficeInterop = 
+module OfficeInterop =
     let update (state: OfficeInterop.Model) (model:Model) (msg: OfficeInterop.Msg) : OfficeInterop.Model * Model * Cmd<Messages.Msg> =
 
         let innerUpdate (state: OfficeInterop.Model) (model: Model) (msg: OfficeInterop.Msg) =
@@ -34,26 +34,10 @@ module OfficeInterop =
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
 
-            | TryFindAnnotationTable ->
-                let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run OfficeInterop.Core.AnnotationTable.tryGetActive
-                let cmd =
-                    Cmd.OfPromise.either
-                        p
-                        ()
-                        (Option.isSome >> OfficeInterop.AnnotationTableExists >> OfficeInteropMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-                state, model, cmd
-            | AnnotationTableExists exists ->
-                let nextState = {
-                    model.ExcelState with
-                        HasAnnotationTable = exists
-                }
-                nextState, model, Cmd.none
-
             | InsertOntologyTerm ontologyAnnotation ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.fillSelectedWithOntologyAnnotation  
+                        OfficeInterop.Core.fillSelectedWithOntologyAnnotation
                         (ontologyAnnotation)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -62,7 +46,7 @@ module OfficeInterop =
             | AddAnnotationBlock compositeColumn ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.Main.addCompositeColumn  
+                        OfficeInterop.Core.Main.addCompositeColumn
                         (compositeColumn)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -140,17 +124,11 @@ module OfficeInterop =
             | CreateAnnotationTable tryUsePrevOutput ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.AnnotationTable.create  
+                        OfficeInterop.Core.AnnotationTable.create
                         (false, tryUsePrevOutput)
-                        (curry GenericInteropLogs (AnnotationtableCreated |> OfficeInteropMsg |> Cmd.ofMsg) >> DevMsg) //success
+                        (curry GenericInteropLogs Cmd.none >> DevMsg) //success
                         (curry GenericError Cmd.none >> DevMsg) //error
                 state, model,cmd
-            | AnnotationtableCreated ->
-                let nextState = {
-                    model.ExcelState with
-                        HasAnnotationTable = true
-                }
-                nextState, model, Cmd.none
             | ValidateBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
@@ -181,9 +159,9 @@ module OfficeInterop =
                 nextState, model, Cmd.none
             //
             | InsertFileNames fileNameList ->
-                let cmd = 
+                let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.insertFileNamesFromFilePicker 
+                        OfficeInterop.Core.insertFileNamesFromFilePicker
                         (fileNameList)
                         (curry GenericLog Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -208,6 +186,6 @@ module OfficeInterop =
         try
             innerUpdate state model msg
         with
-            | e -> 
+            | e ->
                 let cmd = GenericError (Cmd.none, e) |> DevMsg |> Cmd.ofMsg
                 state, model, cmd

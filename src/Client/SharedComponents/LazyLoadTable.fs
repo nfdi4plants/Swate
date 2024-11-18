@@ -2,14 +2,14 @@ namespace Components
 
 open Fable
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open System
 
 /// https://www.bekk.christmas/post/2021/02/how-to-lazy-render-large-data-tables-to-up-performance
 type LazyLoadTable =
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="tableName">Used to generate unique react keys</param>
     /// <param name="data"></param>
@@ -93,7 +93,7 @@ type LazyLoadTable =
                         yield! createCell content
                 ]
             ]
-        Bulma.tableContainer [
+        Html.div [
             prop.ref ref
             prop.key $"lazy_load_table_{tableName}"
             if containerClasses.IsSome then prop.className containerClasses.Value
@@ -103,14 +103,17 @@ type LazyLoadTable =
                 else
                     style.maxHeight (length.perc 100)
                 style.overflowY.auto
+                style.overflowX.auto
                 style.flexGrow 1
             ]
             prop.children [
                 Html.table [
-                    if tableClasses.IsSome then
-                        prop.className tableClasses.Value
-                    else
-                        prop.className "table"
+                    prop.className [
+                        if tableClasses.IsSome then
+                            tableClasses.Value |> String.concat " "
+                        else
+                            "table"
+                    ]
                     prop.children [
                         if headerRow.IsSome then
                             Html.thead [

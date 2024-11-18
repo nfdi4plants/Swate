@@ -7,7 +7,8 @@ open Model
 open Messages
 open Shared
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
+open Components
 
 let interopLoggingModal(model:DevState, dispatch) (rmv: _ -> unit) =
     let closeMsg =
@@ -15,26 +16,21 @@ let interopLoggingModal(model:DevState, dispatch) (rmv: _ -> unit) =
             rmv e
             UpdateDisplayLogList [] |> DevMsg |> dispatch
     let logs = model.DisplayLogList
-    Bulma.modal [
-        Bulma.modal.isActive
+    Daisy.modal.div [
+        modal.active
         prop.children [
-            Bulma.modalBackground [ prop.onClick closeMsg ]
-            Bulma.notification [
-                prop.style [style.width(length.percent 80); style.maxHeight (length.percent 80)]
-                prop.children [
-                    Bulma.delete [ prop.onClick closeMsg ]
-                    Bulma.field.div [
-                        Bulma.table [
-                            Bulma.table.isFullWidth
-                            prop.children [
-                                Html.tbody (logs |> List.map LogItem.toTableRow)
-                            ]
+            Daisy.modalBackdrop [ prop.onClick closeMsg ]
+            Daisy.modalBox.div [
+                Daisy.alert [
+                    prop.style [style.width(length.percent 80); style.maxHeight (length.percent 80)]
+                    prop.children [
+                        Components.DeleteButton(props = [prop.onClick closeMsg])
+                        Daisy.table [
+                            Html.tbody (logs |> List.map LogItem.toTableRow)
                         ]
-                    ]
-                    Bulma.field.div [
-                        Bulma.button.a [
-                            Bulma.color.isWarning
-                            prop.style [style.float'.right]
+                        Daisy.button.a [
+                            button.warning
+                            prop.className "justify-end"
                             prop.onClick closeMsg
                             prop.text "Continue"
                         ]

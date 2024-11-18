@@ -5,26 +5,25 @@ open Fable.React.Props
 open Model
 open Messages
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
-module private HelperProtocolSearch = 
+module private HelperProtocolSearch =
 
     let breadcrumbEle (model:Model) dispatch =
-        Bulma.breadcrumb [
-            Bulma.breadcrumb.hasArrowSeparator
+        Daisy.breadcrumbs [
             prop.children [
                 Html.ul [
                     Html.li [Html.a [
-                        prop.onClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
-                        prop.text (Routing.Route.Protocol.toStringRdbl)
+                        prop.onClick (fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.Protocol} |> dispatch)
+                        prop.text (Routing.SidebarPage.Protocol.AsStringRdbl)
                     ]]
                     Html.li [
                         prop.className "is-active"
                         prop.children (Html.a [
-                            prop.onClick (fun _ -> UpdatePageState (Some Routing.Route.Protocol) |> dispatch)
-                            prop.text (Routing.Route.ProtocolSearch.toStringRdbl)
+                            prop.onClick (fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
+                            prop.text (Routing.SidebarPage.ProtocolSearch.AsStringRdbl)
                         ])
-                    ]    
+                    ]
                 ]
             ]
         ]
@@ -50,11 +49,11 @@ type SearchContainer =
                 HelperProtocolSearch.breadcrumbEle model dispatch
 
                 if isEmpty && not isLoading then
-                    Bulma.help [Bulma.color.isDanger; prop.text "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
+                    Html.p [prop.className "text-error text-sm"; prop.text "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
 
-                Bulma.label "Search the database for protocol templates."
+                Html.p "Search the database for protocol templates."
 
-                mainFunctionContainer [
+                SidebarComponents.SidebarLayout.LogicContainer [
                     Protocol.Search.InfoField()
                     Protocol.Search.FileSortElement(model, config, setConfig)
                     Protocol.Search.Component (filteredTemplates, model, dispatch)

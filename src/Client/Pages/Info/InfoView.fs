@@ -4,13 +4,14 @@ open ExcelColors
 open Model
 open Messages
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
-module private InfoHelper =
+module private AboutHelper =
 
     let IntroductionElement =
-        Bulma.field.div [
-            Bulma.content [
+        Html.div [
+
+            prop.children [
                 Html.p [
                     Html.b "Swate"
                     Html.text " is a "
@@ -23,32 +24,39 @@ module private InfoHelper =
                     Html.b "T"
                     Html.text "ool for "
                     Html.b "E"
-                    Html.text "xcel. This tool provides an easy way to annotate experimental data in an excel application that every wet lab scientist is familiar with. If you are interested check out the full "
-                    Html.a [prop.href Shared.URLs.SwateWiki; prop.target.blank; prop.text "documentation"]
+                    Html.text "veryone. This tool provides an easy way to annotate experimental data in an excel application that every wet lab scientist is familiar with. If you are interested check out the full "
+                    Html.a [prop.href Shared.URLs.SWATE_WIKI; prop.target.blank; prop.text "documentation"]
                     Html.text " 📚."
                 ]
             ]
         ]
 
 
-    let MediaContainer (content: ReactElement list) (imageSrc: string) (imageUrl: string)=
-        Bulma.media [
-            prop.className "w-full"
+    let MediaContainer (content: ReactElement, imageSrc: string, imageHref: string)=
+        Html.div [
+            prop.className "hero"
             prop.children [
-                Bulma.content [
-                    prop.className "grow"
-                    prop.children content
-                ]
-                Bulma.mediaRight [
-                    Html.a [
-                        prop.href imageUrl
-                        prop.target.blank
-                        prop.children [
-                            Bulma.image [
-                                prop.className "bg-white p-2 rounded transition hover:scale-110 shadow-md hover:shadow-cyan-500/50"
-                                image.is64x64
-                                prop.children [
-                                    Html.img [prop.src imageSrc]
+                Html.div [
+                    prop.className "hero-content flex-col"
+                    prop.children [
+                        Html.div [
+                            prop.className "prose"
+                            prop.children content
+                        ]
+                        Html.div [
+                            prop.className "not-prose"
+                            prop.children [
+                                Daisy.button.a [
+                                    prop.href imageHref
+                                    button.square
+                                    button.primary
+                                    button.lg
+                                    prop.className [
+
+                                    ]
+                                    prop.children [
+                                        Html.img [prop.src imageSrc; prop.className "size-12"]
+                                    ]
                                 ]
                             ]
                         ]
@@ -58,13 +66,9 @@ module private InfoHelper =
         ]
 
     let GetInContactElements =
-        Bulma.field.div [
-            Bulma.title [
-                title.is5
-                prop.text "Get In Contact With Us"
-            ]
-            MediaContainer
-                [
+        React.fragment [
+            MediaContainer (
+                React.fragment [
                     Html.strong "DataPLANT"
                     Html.br []
                     Html.p "Swate is part of the DataPLANT organisation."
@@ -79,22 +83,24 @@ module private InfoHelper =
                         Html.text "Got a good idea or just want to get in touch? "
                         Html.a [prop.href Shared.URLs.Helpdesk.Url; prop.target.blank; prop.text "Reach out to us!"]
                     ]
-                ]
-                "https://raw.githubusercontent.com/nfdi4plants/Branding/master/logos/DataPLANT/DataPLANT_logo_minimal_rounded_bg_transparent.svg"
+                ],
+                "https://raw.githubusercontent.com/nfdi4plants/Branding/refs/heads/master/logos/DataPLANT/DataPLANT_logo_minimal_rounded_bg_black.svg",
                 Shared.URLs.NfdiWebsite
+            )
 
-            MediaContainer
-                [
+            MediaContainer (
+                React.fragment [
                     Html.strong "X - @nfdi4plants"
                     Html.br []
                     Html.span "Follow us on X for more up-to-date information about research data management! "
                     Html.a [prop.href Shared.URLs.NFDITwitterUrl; prop.target.blank; prop.text "@nfdi4plants"]
-                ]
-                "/x-logo-black.png"
+                ],
+                "/x-logo-black.png",
                 Shared.URLs.NFDITwitterUrl
+            )
 
-            MediaContainer
-                [
+            MediaContainer (
+                React.fragment [
                     Html.strong "GitHub"
                     Html.br []
                     Html.text "You can find the Swate source code  "
@@ -102,15 +108,20 @@ module private InfoHelper =
                     Html.text ". Our developers are always happy to get in contact with you! If you don't have a GitHub account but want to reach out or want to snitch on some nasty bugs 🐛 you can tell us "
                     Html.a [prop.href Shared.URLs.Helpdesk.UrlSwateTopic; prop.target.blank; prop.text "here"]
                     Html.text "."
-                ]
-                "/github-mark.png"
+                ],
+                "/github-mark.png",
                 Shared.URLs.SwateRepo
+            )
     ]
 
-type Info =
+type About =
     static member Main =
-        Html.div [
-            pageHeader "Swate"
-            InfoHelper.IntroductionElement
-            InfoHelper.GetInContactElements
+        Components.Forms.Generic.Section [
+            Html.div [
+                prop.className "prose-sm md:prose lg:prose-lg divide-y-2 gap-y-2"
+                prop.children [
+                    AboutHelper.IntroductionElement
+                    AboutHelper.GetInContactElements
+                ]
+            ]
         ]

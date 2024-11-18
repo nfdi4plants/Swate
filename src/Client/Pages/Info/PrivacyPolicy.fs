@@ -2,7 +2,7 @@ namespace Pages
 
 open Fable.Core
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 // https://dsgvo-muster-datenschutzerklaerung.dg-datenschutz.de/#1487008989473-a9d4be68-00c7
 type PrivacyPolicy =
@@ -10,7 +10,8 @@ type PrivacyPolicy =
     [<ReactComponent>]
     static member Main() =
         Html.div [
-            prop.innerHtml $"""<div class="content">
+            prop.className "prose py-1 lg:py-4"
+            prop.innerHtml $"""
                 <h1>Privacy Policy</h1>
 
                 <p>We are very delighted that you have shown interest in our enterprise. Data protection is of a particularly high priority for the management of the Computational Systems Biology. The use of the Internet pages of the Computational Systems Biology is possible without any indication of personal data; however, if a data subject wants to use special enterprise services via our website, processing of personal data could become necessary. If the processing of personal data is necessary and there is no statutory basis for such processing, we generally obtain consent from the data subject.</p>
@@ -24,49 +25,49 @@ type PrivacyPolicy =
 
                 <p>In this data protection declaration, we use, inter alia, the following terms:</p>
 
-                <ul style="list-style: none">
+                <ul>
                     <li>
-                        <h6 className="mb-2 mt-3">a) Personal data</h6>
+                        <h6>a) Personal data</h6>
                         <p>Personal data means any information relating to an identified or identifiable natural person (“data subject”). An identifiable natural person is one who can be identified, directly or indirectly, in particular by reference to an identifier such as a name, an identification number, location data, an online identifier or to one or more factors specific to the physical, physiological, genetic, mental, economic, cultural or social identity of that natural person.</p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">b) Data subject</h6>
+                        <h6>b) Data subject</h6>
                         <p>Data subject is any identified or identifiable natural person, whose personal data is processed by the controller responsible for the processing.</p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">c) Processing</h6>
+                        <h6>c) Processing</h6>
                         <p>Processing is any operation or set of operations which is performed on personal data or on sets of personal data, whether or not by automated means, such as collection, recording, organisation, structuring, storage, adaptation or alteration, retrieval, consultation, use, disclosure by transmission, dissemination or otherwise making available, alignment or combination, restriction, erasure or destruction. </p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">d) Restriction of processing</h6>
+                        <h6>d) Restriction of processing</h6>
                         <p>Restriction of processing is the marking of stored personal data with the aim of limiting their processing in the future. </p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">e) Profiling</h6>
+                        <h6>e) Profiling</h6>
                         <p>Profiling means any form of automated processing of personal data consisting of the use of personal data to evaluate certain personal aspects relating to a natural person, in particular to analyse or predict aspects concerning that natural person's performance at work, economic situation, health, personal preferences, interests, reliability, behaviour, location or movements. </p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">f) Pseudonymisation</h6>
+                        <h6>f) Pseudonymisation</h6>
                         <p>Pseudonymisation is the processing of personal data in such a manner that the personal data can no longer be attributed to a specific data subject without the use of additional information, provided that such additional information is kept separately and is subject to technical and organisational measures to ensure that the personal data are not attributed to an identified or identifiable natural person. </p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">g) Controller or controller responsible for the processing</h6>
+                        <h6>g) Controller or controller responsible for the processing</h6>
                         <p>Controller or controller responsible for the processing is the natural or legal person, public authority, agency or other body which, alone or jointly with others, determines the purposes and means of the processing of personal data; where the purposes and means of such processing are determined by Union or Member State law, the controller or the specific criteria for its nomination may be provided for by Union or Member State law. </p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">h) Processor</h6>
+                        <h6>h) Processor</h6>
                         <p>Processor is a natural or legal person, public authority, agency or other body which processes personal data on behalf of the controller. </p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">i) Recipient</h6>
+                        <h6>i) Recipient</h6>
                         <p>Recipient is a natural or legal person, public authority, agency or another body, to which the personal data are disclosed, whether a third party or not. However, public authorities which may receive personal data in the framework of a particular inquiry in accordance with Union or Member State law shall not be regarded as recipients; the processing of those data by those public authorities shall be in compliance with the applicable data protection rules according to the purposes of the processing. </p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">j) Third party</h6>
+                        <h6>j) Third party</h6>
                         <p>Third party is a natural or legal person, public authority, agency or body other than the data subject, controller, processor and persons who, under the direct authority of the controller or processor, are authorised to process personal data.</p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">k) Consent</h6>
+                        <h6>k) Consent</h6>
                         <p>Consent of the data subject is any freely given, specific, informed and unambiguous indication of the data subject's wishes by which he or she, by a statement or by a clear affirmative action, signifies agreement to the processing of personal data relating to him or her. </p>
                     </li>
                 </ul>
@@ -101,11 +102,11 @@ type PrivacyPolicy =
                 <h4>6. Rights of the data subject</h4>
                 <ul style=list-style: none>
                     <li>
-                        <h6 className="mb-2 mt-3">a) Right of confirmation</h6>
+                        <h6>a) Right of confirmation</h6>
                         <p>Each data subject shall have the right granted by the European legislator to obtain from the controller the confirmation as to whether or not personal data concerning him or her are being processed. If a data subject wishes to avail himself of this right of confirmation, he or she may, at any time, contact any employee of the controller.</p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">b) Right of access</h6>
+                        <h6>b) Right of access</h6>
                         <p>Each data subject shall have the right granted by the European legislator to obtain from the controller free information about his or her personal data stored at any time and a copy of this information. Furthermore, the European directives and regulations grant the data subject access to the following information:</p>
 
                         <ul style=list-style: none>
@@ -124,13 +125,13 @@ type PrivacyPolicy =
                         <p>If a data subject wishes to avail himself of this right of access, he or she may, at any time, contact any employee of the controller.</p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">c) Right to rectification </h6>
+                        <h6>c) Right to rectification </h6>
                         <p>Each data subject shall have the right granted by the European legislator to obtain from the controller without undue delay the rectification of inaccurate personal data concerning him or her. Taking into account the purposes of the processing, the data subject shall have the right to have incomplete personal data completed, including by means of providing a supplementary statement.</p>
 
                         <p>If a data subject wishes to exercise this right to rectification, he or she may, at any time, contact any employee of the controller.</p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">d) Right to erasure (Right to be forgotten) </h6>
+                        <h6>d) Right to erasure (Right to be forgotten) </h6>
                         <p>Each data subject shall have the right granted by the European legislator to obtain from the controller the erasure of personal data concerning him or her without undue delay, and the controller shall have the obligation to erase personal data without undue delay where one of the following grounds applies, as long as the processing is not necessary: </p>
 
                         <ul style=list-style: none>
@@ -147,7 +148,7 @@ type PrivacyPolicy =
                         <p>Where the controller has made personal data public and is obliged pursuant to Article 17(1) to erase the personal data, the controller, taking account of available technology and the cost of implementation, shall take reasonable steps, including technical measures, to inform other controllers processing the personal data that the data subject has requested erasure by such controllers of any links to, or copy or replication of, those personal data, as far as processing is not required. An employees of the Computational Systems Biology will arrange the necessary measures in individual cases.</p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">e) Right of restriction of processing</h6>
+                        <h6>e) Right of restriction of processing</h6>
                         <p>Each data subject shall have the right granted by the European legislator to obtain from the controller restriction of processing where one of the following applies:</p>
 
                         <ul style=list-style: none>
@@ -160,7 +161,7 @@ type PrivacyPolicy =
                         <p>If one of the aforementioned conditions is met, and a data subject wishes to request the restriction of the processing of personal data stored by the Computational Systems Biology, he or she may at any time contact any employee of the controller. The employee of the Computational Systems Biology will arrange the restriction of the processing. </p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">f) Right to data portability</h6>
+                        <h6>f) Right to data portability</h6>
                         <p>Each data subject shall have the right granted by the European legislator, to receive the personal data concerning him or her, which was provided to a controller, in a structured, commonly used and machine-readable format. He or she shall have the right to transmit those data to another controller without hindrance from the controller to which the personal data have been provided, as long as the processing is based on consent pursuant to point (a) of Article 6(1) of the GDPR or point (a) of Article 9(2) of the GDPR, or on a contract pursuant to point (b) of Article 6(1) of the GDPR, and the processing is carried out by automated means, as long as the processing is not necessary for the performance of a task carried out in the public interest or in the exercise of official authority vested in the controller.</p>
 
                         <p>Furthermore, in exercising his or her right to data portability pursuant to Article 20(1) of the GDPR, the data subject shall have the right to have personal data transmitted directly from one controller to another, where technically feasible and when doing so does not adversely affect the rights and freedoms of others.</p>
@@ -169,7 +170,7 @@ type PrivacyPolicy =
 
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">g) Right to object</h6>
+                        <h6>g) Right to object</h6>
                         <p>Each data subject shall have the right granted by the European legislator to object, on grounds relating to his or her particular situation, at any time, to processing of personal data concerning him or her, which is based on point (e) or (f) of Article 6(1) of the GDPR. This also applies to profiling based on these provisions.</p>
 
                         <p>The Computational Systems Biology shall no longer process the personal data in the event of the objection, unless we can demonstrate compelling legitimate grounds for the processing which override the interests, rights and freedoms of the data subject, or for the establishment, exercise or defence of legal claims.</p>
@@ -181,7 +182,7 @@ type PrivacyPolicy =
                         <p>In order to exercise the right to object, the data subject may contact any employee of the Computational Systems Biology. In addition, the data subject is free in the context of the use of information society services, and notwithstanding Directive 2002/58/EC, to use his or her right to object by automated means using technical specifications.</p>
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">h) Automated individual decision-making, including profiling</h6>
+                        <h6>h) Automated individual decision-making, including profiling</h6>
                         <p>Each data subject shall have the right granted by the European legislator not to be subject to a decision based solely on automated processing, including profiling, which produces legal effects concerning him or her, or similarly significantly affects him or her, as long as the decision (1) is not is necessary for entering into, or the performance of, a contract between the data subject and a data controller, or (2) is not authorised by Union or Member State law to which the controller is subject and which also lays down suitable measures to safeguard the data subject's rights and freedoms and legitimate interests, or (3) is not based on the data subject's explicit consent.</p>
 
                         <p>If the decision (1) is necessary for entering into, or the performance of, a contract between the data subject and a data controller, or (2) it is based on the data subject's explicit consent, the Computational Systems Biology shall implement suitable measures to safeguard the data subject's rights and freedoms and legitimate interests, at least the right to obtain human intervention on the part of the controller, to express his or her point of view and contest the decision.</p>
@@ -190,7 +191,7 @@ type PrivacyPolicy =
 
                     </li>
                     <li>
-                        <h6 className="mb-2 mt-3">i) Right to withdraw data protection consent </h6>
+                        <h6>i) Right to withdraw data protection consent </h6>
                         <p>Each data subject shall have the right granted by the European legislator to withdraw his or her consent to processing of his or her personal data at any time. </p>
 
                         <p>If the data subject wishes to exercise the right to withdraw the consent, he or she may, at any time, contact any employee of the Computational Systems Biology.</p>
@@ -254,6 +255,5 @@ type PrivacyPolicy =
                 <p>As a responsible company, we do not use automatic decision-making or profiling.</p>
 
                 <p>Developed by the specialists for <a href="https://willing-able.com/">LegalTech</a> at Willing & Able that also developed the system for <a href="https://abletorecords.com/">DPIA</a>. The legal texts contained in our privacy policy generator have been provided and published by <a href="https://dg-datenschutz.de/">Prof. Dr. h.c. Heiko Jonny Maniero</a> from the German Association for Data Protection and <a href="https://www.wbs-law.de/" rel="nofollow">Christian Solmecke</a> from WBS law.</p>
-            </div>
             """
         ]

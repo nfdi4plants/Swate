@@ -9,11 +9,12 @@ open Model.BuildingBlock
 let isSameMajorCompositeHeaderDiscriminate (hct1: CompositeHeaderDiscriminate) (hct2: CompositeHeaderDiscriminate) =
     (hct1.IsTermColumn() = hct2.IsTermColumn())
     && (hct1.HasIOType() = hct2.HasIOType())
-    
-let selectCompositeHeaderDiscriminate (hct: CompositeHeaderDiscriminate) setUiState dispatch =
+
+let selectCompositeHeaderDiscriminate (hct: CompositeHeaderDiscriminate) setUiState close (dispatch: Msg -> unit)  =
     BuildingBlock.UpdateHeaderCellType hct |> BuildingBlockMsg |> dispatch
+    close()
     { DropdownPage = DropdownPage.Main; DropdownIsActive = false }|> setUiState
-    
+
 open Fable.Core
 
 let createCompositeHeaderFromState (state: BuildingBlock.Model) =
@@ -35,7 +36,7 @@ let createCompositeHeaderFromState (state: BuildingBlock.Model) =
     | CompositeHeaderDiscriminate.Output -> CompositeHeader.Output <| getIOType()
     | CompositeHeaderDiscriminate.Comment -> failwith "Comment header type is not yet implemented"
     | CompositeHeaderDiscriminate.Freetext -> failwith "Freetext header type is not yet implemented"
-   
+
 let tryCreateCompositeCellFromState (state: BuildingBlock.Model) =
     match state.HeaderArg, state.BodyCellType, state.BodyArg with
     | Some (U2.Case2 IOType.Data), _, _ -> CompositeCell.emptyData |> Some
@@ -45,6 +46,6 @@ let tryCreateCompositeCellFromState (state: BuildingBlock.Model) =
     | _ -> None
 
 let isValidColumn (header : CompositeHeader) =
-    header.IsFeaturedColumn 
+    header.IsFeaturedColumn
     || (header.IsTermColumn && header.ToTerm().NameText.Length > 0)
     || header.IsSingleColumn

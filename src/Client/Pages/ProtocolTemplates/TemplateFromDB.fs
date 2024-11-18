@@ -1,53 +1,45 @@
 namespace Protocol
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Messages
 open Model
 open Shared
 
 type TemplateFromDB =
-    
+
     static member toProtocolSearchElement (model:Model) dispatch =
-        Bulma.button.span [
-            prop.onClick(fun _ -> UpdatePageState (Some Routing.Route.ProtocolSearch) |> dispatch)
-            Bulma.color.isInfo
-            Bulma.button.isFullWidth
-            prop.style [style.margin (length.rem 1, length.px 0)]
-            prop.text "Browse database" ]
+        Daisy.button.button [
+            prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
+            button.primary
+            button.block
+            prop.text "Browse database"
+        ]
 
     static member addFromDBToTableButton (model:Model) dispatch =
-        Bulma.columns [
-            Bulma.columns.isMobile
+        Html.div [
+            prop.className "join flex flex-row justify-center gap-2"
             prop.children [
-                Bulma.column [
-                    prop.children [
-                        Bulma.button.a [
-                            Bulma.color.isSuccess
-                            if model.ProtocolState.TemplateSelected.IsSome then
-                                Bulma.button.isActive
-                            else
-                                Bulma.color.isDanger
-                                prop.disabled true
-                            Bulma.button.isFullWidth
-                            prop.onClick (fun _ ->
-                                if model.ProtocolState.TemplateSelected.IsNone then
-                                    failwith "No template selected!"
+                Daisy.button.a [
+                    button.success
+                    button.wide
+                    if model.ProtocolState.TemplateSelected.IsNone then
+                        button.error
+                        prop.disabled true
+                    prop.onClick (fun _ ->
+                        if model.ProtocolState.TemplateSelected.IsNone then
+                            failwith "No template selected!"
 
-                                SpreadsheetInterface.AddTemplate(model.ProtocolState.TemplateSelected.Value.Table) |> InterfaceMsg |> dispatch
-                            )
-                            prop.text "Add template"
-                        ]
-                    ]
+                        SpreadsheetInterface.AddTemplate(model.ProtocolState.TemplateSelected.Value.Table) |> InterfaceMsg |> dispatch
+                    )
+                    prop.text "Add template"
                 ]
                 if model.ProtocolState.TemplateSelected.IsSome then
-                    Bulma.column [
-                        Bulma.column.isNarrow
-                        Bulma.button.a [
-                            prop.onClick (fun e -> Protocol.RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
-                            Bulma.color.isDanger
-                            Html.i [prop.className "fa-solid fa-times"] |> prop.children
-                        ] |> prop.children
+                    Daisy.button.a [
+                        button.outline
+                        prop.onClick (fun e -> Protocol.RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
+                        button.error
+                        Html.i [prop.className "fa-solid fa-times"] |> prop.children
                     ]
             ]
         ]
@@ -56,9 +48,7 @@ type TemplateFromDB =
         Html.div [
             prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
             prop.children [
-                Bulma.table [
-                    Bulma.table.isFullWidth;
-                    Bulma.table.isBordered
+                Daisy.table [
                     prop.children [
                         Html.thead [
                             Html.tr [
@@ -85,29 +75,19 @@ type TemplateFromDB =
         ]
 
     static member Main(model:Model, dispatch) =
-        mainFunctionContainer [
-            Bulma.field.div [
-                Bulma.help [
-                    Html.b "Search the database for templates."
-                    Html.text " The building blocks from these templates can be inserted into the Swate table. "
-                    Html.span [
-                        color.hasTextDanger
-                        prop.text "Only missing building blocks will be added."
-                    ]
-                ]
-            ]
-            Bulma.field.div [
+        SidebarComponents.SidebarLayout.LogicContainer [
+            Html.div [
                 TemplateFromDB.toProtocolSearchElement model dispatch
             ]
 
-            Bulma.field.div [
+            Html.div [
                 TemplateFromDB.addFromDBToTableButton model dispatch
             ]
             if model.ProtocolState.TemplateSelected.IsSome then
-                Bulma.field.div [
+                Html.div [
                     TemplateFromDB.displaySelectedProtocolEle model dispatch
                 ]
-                Bulma.field.div [
+                Html.div [
                     TemplateFromDB.addFromDBToTableButton model dispatch
                 ]
         ]

@@ -6,21 +6,24 @@ open ExcelColors
 open Model
 open Messages
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
+open Components
 
 ///<summary>This modal is used to display errors from for example api communication</summary>
 let errorModal(error: exn) (rmv: _ -> unit) =
     let closeMsg = rmv
-    Bulma.modal [
-        Bulma.modal.isActive
+    Daisy.modal.div [
+        modal.active
         prop.children [
-            Bulma.modalBackground [ prop.onClick closeMsg ]
-            Bulma.notification [
-                Bulma.color.isDanger
-                prop.style [style.width(length.percent 90); style.maxHeight (length.percent 80); style.overflow.auto]
-                prop.children [
-                    Bulma.delete [prop.onClick closeMsg]
-                    Html.span (error.GetPropagatedError())
+            Daisy.modalBackdrop [ prop.onClick closeMsg ]
+            Daisy.modalBox.div [
+                Daisy.alert [
+                    alert.error
+                    prop.style [style.width(length.percent 90); style.maxHeight (length.percent 80); style.overflow.auto]
+                    prop.children [
+                        Components.DeleteButton(props = [prop.onClick closeMsg])
+                        Html.span (error.GetPropagatedError())
+                    ]
                 ]
             ]
         ]

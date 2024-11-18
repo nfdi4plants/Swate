@@ -17,11 +17,9 @@ type FillHiddenColsState =
         | ExcelWriteFoundTerms  -> "Write Terms"
 
 type Model = {
-    HasAnnotationTable          : bool
     FillHiddenColsStateStore    : FillHiddenColsState
 } with
     static member init () = {
-        HasAnnotationTable  = false
         FillHiddenColsStateStore = Inactive
     }
 
@@ -29,9 +27,6 @@ type Msg =
     // create and update table element functions
     | CreateAnnotationTable                 of tryUsePrevOutput:bool
     | UpdateArcFile                         of ArcFiles
-    | AnnotationtableCreated
-    | TryFindAnnotationTable
-    | AnnotationTableExists                 of bool
     | InsertOntologyTerm                    of OntologyAnnotation
     | ValidateBuildingBlock
     | AddAnnotationBlock                    of CompositeColumn
@@ -44,7 +39,7 @@ type Msg =
     | AutoFitTable                          of hideRefCols:bool
     // Term search functions
     // table+database interconnected functions
-    /// 
+    ///
     | RectifyTermColumns
     ///
     | UpdateFillHiddenColsState             of FillHiddenColsState

@@ -1,7 +1,7 @@
 namespace MainComponents
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 open SpreadsheetInterface
 open Messages
@@ -14,7 +14,6 @@ open Elmish
 
 
 module private UploadHandler =
-    let buttonStyle = prop.style [style.margin(length.rem 1.5)]
 
     open Fable.Core.JsInterop
 
@@ -52,14 +51,11 @@ module private Helper =
 
     let uploadNewTable dispatch =
         let uploadId = "UploadFiles_MainWindowInit"
-        Bulma.label [
-            //prop.onDragEnter <| UploadHandler.dontBubble
-            //prop.onDragLeave <| UploadHandler.dontBubble
-            prop.style [style.fontWeight.normal]
+        Html.p [
             prop.children [
                 Html.input [
                     prop.id uploadId
-                    prop.type' "file";
+                    prop.type'.file;
                     prop.style [style.display.none]
                     prop.onChange (fun (ev: Event) ->
                         let fileList : FileList = ev.target?files
@@ -72,7 +68,7 @@ module private Helper =
                             reader.onload <- fun evt ->
                                 let (r: byte []) = evt.target?result
                                 r |> ImportXlsx |> InterfaceMsg |> dispatch
-                                   
+
                             reader.onerror <- fun evt ->
                                 curry GenericLog Cmd.none ("Error", evt?Value) |> DevMsg |> dispatch
 
@@ -85,10 +81,9 @@ module private Helper =
                         ()
                     )
                 ]
-                Bulma.button.span [
-                    Bulma.button.isLarge
-                    UploadHandler.buttonStyle
-                    Bulma.color.isInfo
+                Daisy.button.button [
+                    button.lg
+                    button.outline
                     prop.onClick(fun e ->
                         e.preventDefault()
                         let getUploadElement = Browser.Dom.document.getElementById uploadId
@@ -102,38 +97,41 @@ module private Helper =
             ]
         ]
 
-    let createNewTable isActive toggle (dispatch: Messages.Msg -> unit) =
-    
-        Bulma.dropdown [
-            if isActive then 
-                Bulma.dropdown.isActive
-            UploadHandler.buttonStyle
+    let createNewTableItem (txt: string, onclick: Event -> unit)=
+        Html.li [Daisy.button.a [
+            button.block
+            button.ghost
+            button.sm
+            prop.className "justify-start"
+            prop.onClick (fun e ->
+                log "inner"
+                onclick e
+            )
+            prop.text txt
+        ]]
+
+    let createNewFile (dispatch: Messages.Msg -> unit) =
+
+        Daisy.dropdown [
             prop.children [
-                Bulma.dropdownTrigger [
-                    Bulma.button.span [
-                        Bulma.button.isLarge
-                        Bulma.color.isPrimary
-                        prop.onClick toggle
-                        //prop.onClick(fun e -> SpreadsheetInterface.CreateAnnotationTable e.ctrlKey |> Messages.InterfaceMsg |> dispatch)
-                        prop.children [
-                            Html.div "New File"
-                        ]
-                    ]
+                Html.div [
+                    prop.className "btn btn-lg btn-primary w-full"
+                    prop.tabIndex 0
+                    prop.text "New File"
                 ]
-                Bulma.dropdownMenu [
-                    Bulma.dropdownContent [
-                        Bulma.dropdownItem.a [
-                            prop.onClick(fun _ ->
+                Daisy.dropdownContent [
+                    prop.tabIndex 0
+                    prop.className "bg-base-300 [&_a]:rounded-none shadow"
+                    prop.children [
+                        Html.ul [
+                            createNewTableItem("Investigation", fun _ ->
                                 let i = ArcInvestigation.init("New Investigation")
                                 ArcFiles.Investigation i
                                 |> UpdateArcFile
                                 |> InterfaceMsg
                                 |> dispatch
                             )
-                            prop.text "Investigation"
-                        ]
-                        Bulma.dropdownItem.a [
-                            prop.onClick(fun _ ->
+                            createNewTableItem("Study", fun _ ->
                                 let s = ArcStudy.init("New Study")
                                 let _ = s.InitTable("New Study Table")
                                 ArcFiles.Study (s, [])
@@ -141,22 +139,18 @@ module private Helper =
                                 |> InterfaceMsg
                                 |> dispatch
                             )
-                            prop.text "Study"
-                        ]
-                        Bulma.dropdownItem.a [
-                            prop.onClick(fun _ ->
-                                let a = ArcAssay.init("New Assay")
-                                let newTable = a.InitTable("New Assay Table")
-                                ArcFiles.Assay a
-                                |> UpdateArcFile
-                                |> InterfaceMsg
-                                |> dispatch
+                            createNewTableItem("Assay", fun _ ->
+                                    log "Test"
+                                    let a = ArcAssay.init("New Assay")
+                                    let _ = a.InitTable("New Assay Table")
+                                    log "New Assay!"
+                                    ArcFiles.Assay a
+                                    |> UpdateArcFile
+                                    |> InterfaceMsg
+                                    |> dispatch
                             )
-                            prop.text "Assay"
-                        ]
-                        Bulma.dropdownDivider []
-                        Bulma.dropdownItem.a [
-                            prop.onClick(fun _ ->
+                            Html.li [Daisy.divider [divider.horizontal]]
+                            createNewTableItem("Template", fun _ ->
                                 let template = Template.init("New Template")
                                 let table = ArcTable.init("New Table")
                                 template.Table <- table
@@ -168,7 +162,6 @@ module private Helper =
                                 |> InterfaceMsg
                                 |> dispatch
                             )
-                            prop.text "Template"
                         ]
                     ]
                 ]
@@ -179,7 +172,6 @@ type NoFileElement =
 
     [<ReactComponent>]
     static member Main (args: {|dispatch: Messages.Msg -> unit|}) =
-        let isActive, setIsActive = React.useState(false)
         Html.div [
             prop.id UploadHandler.id
             prop.onDragEnter (fun e ->
@@ -204,10 +196,9 @@ type NoFileElement =
             ]
             prop.children [
                 Html.div [
-                    //prop.style [style.height.minContent; style.display.inheritFromParent; style.justifyContent.spaceBetween]
-                    prop.style [style.display.flex; style.justifyContent.spaceBetween]
+                    prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
-                        Helper.createNewTable isActive (fun _ -> not isActive |> setIsActive) args.dispatch
+                        Helper.createNewFile args.dispatch
                         Helper.uploadNewTable args.dispatch
                     ]
                 ]

@@ -8,7 +8,6 @@ open Elmish.React // do not delete this line, it is required #if !DEBUG
 open Fable.Core.JsInterop
 
 
-importSideEffects "./style.scss"
 importSideEffects "./tailwindstyle.scss"
 
 #if DEBUG

@@ -2,7 +2,7 @@ namespace Components.Forms
 
 open System
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 open Spreadsheet
 open Messages
@@ -48,17 +48,17 @@ module private API =
     let requestByORCID (orcid: string) =
         let url = $"https://pub.orcid.org/v3.0/{orcid}/record"
         promise {
-            let! json = requestAsJson url 
+            let! json = requestAsJson url
             let name: string = json?person?name?("given-names")?value
             let lastName: string = json?person?name?("family-name")?value
             let emails: obj [] = json?person?emails?email
             let email = if emails.Length = 0 then None else Some (emails.[0]?email)
             let groups: obj [] = json?("activities-summary")?employments?("affiliation-group")
-            let groupsParsed = 
-                groups |> Array.choose (fun json -> 
+            let groupsParsed =
+                groups |> Array.choose (fun json ->
                     let summaries : obj [] = json?summaries
-                    let summary = 
-                        summaries 
+                    let summary =
+                        summaries
                         |> Array.tryHead
                         |> Option.map (fun s0 ->
                             let s = s0?("employment-summary")
@@ -80,7 +80,7 @@ module private API =
             let! json = requestAsJson url
             let doi: string = json?DOI
             let pmid: string = json?PMID
-            let authors : Person [] = 
+            let authors : Person [] =
                 [|
                     for pj in json?author do
                         Person.create(LastName=pj?family, FirstName=pj?given)
@@ -108,16 +108,16 @@ module private API =
     let requestByDOI (doi: string) =
         let url_crossref = $"https://api.crossref.org/works/{doi}"
         promise {
-            let! json = requestAsJson url_crossref 
+            let! json = requestAsJson url_crossref
             let titles: string [] = json?message?title
             let title = if titles.Length = 0 then None else Some titles.[0]
             let authors : Person [] = [|
                 for pj in json?message?author do
                     let affiliationsJson: obj [] = pj?affiliation
-                    let affiliations : string [] = 
+                    let affiliations : string [] =
                         [|
-                            for aff in affiliationsJson do 
-                                yield aff?("name") 
+                            for aff in affiliationsJson do
+                                yield aff?("name")
                         |]
                     let affString = affiliations |> String.concat ", "
                     Person.create(ORCID=pj?ORCID, LastName=pj?family, FirstName=pj?given, affiliation=affString)
@@ -130,7 +130,7 @@ module private API =
 
     let start (call: 't -> Fable.Core.JS.Promise<'a>) (args:'t) (success) (fail) =
         call args
-        |> Promise.either 
+        |> Promise.either
             success
             fail
         |> Promise.start
@@ -138,17 +138,20 @@ module private API =
 module private Helper =
 
     let addButton (clickEvent: MouseEvent -> unit) =
-        Bulma.button.button [
+        Daisy.button.button [
             prop.text "+"
+            button.wide
             prop.onClick clickEvent
+            button.ghost
+            prop.className "text-accent"
         ]
 
     let deleteButton (clickEvent: MouseEvent -> unit) =
         Html.div [
             prop.className "grow-0"
             prop.children [
-                Bulma.button.button [
-                    Bulma.color.isDanger
+                Daisy.button.button [
+                    button.error
                     prop.text "Delete"
                     prop.onClick clickEvent
                 ]
@@ -157,65 +160,56 @@ module private Helper =
 
     let readOnlyFormElement(v: string option, label: string) =
         let v = defaultArg v "-"
-        Bulma.field.div [
-            prop.className "is-flex is-flex-direction-column is-flex-grow-1"
+        Daisy.formControl [
             prop.children [
-                Bulma.label label
-                Bulma.control.div [
-                    Bulma.control.isExpanded
-                    prop.children [
-                        Bulma.input.text [
-                            prop.readOnly true
-                            prop.valueOrDefault v
-                        ]
-                    ]
+                Daisy.label [
+                    Daisy.labelText label
+                ]
+                Daisy.input [
+                    input.bordered
+                    prop.disabled true
+                    prop.readOnly true
+                    prop.valueOrDefault v
                 ]
             ]
         ]
 
     let cardFormGroup (content: ReactElement list) =
-        Bulma.field.div [
-            prop.className "grid"
+        Html.div [
+            prop.className "grid @md/main:grid-cols-2 @xl/main:grid-flow-col gap-4 not-prose"
             prop.children content
         ]
 
     let personModal (person: Person, confirm, back) =
-        Bulma.modal [
-            Bulma.modal.isActive
+        Daisy.modal.div [
+            modal.active
             prop.children [
-                Bulma.modalBackground []
-                Bulma.modalClose []
-                Bulma.modalContent [
-                    Bulma.container [
-                        prop.className "p-1"
+                Daisy.modalBackdrop []
+                Daisy.modalBox.form [
+                    cardFormGroup [
+                        readOnlyFormElement(person.FirstName, "Given Name")
+                        readOnlyFormElement(person.LastName, "Family Name")
+                    ]
+                    cardFormGroup [
+                        readOnlyFormElement(person.EMail, "Email")
+                        readOnlyFormElement(person.ORCID, "ORCID")
+                    ]
+                    cardFormGroup [
+                        readOnlyFormElement(person.Affiliation, "Affiliation")
+                    ]
+                    Html.div [
+                        prop.className "flex justify-end gap-4"
+                        prop.style [style.gap (length.rem 1)]
                         prop.children [
-                            Bulma.box [
-                                cardFormGroup [
-                                    readOnlyFormElement(person.FirstName, "Given Name")
-                                    readOnlyFormElement(person.LastName, "Family Name")
-                                ]
-                                cardFormGroup [
-                                    readOnlyFormElement(person.EMail, "Email")
-                                    readOnlyFormElement(person.ORCID, "ORCID")
-                                ]
-                                cardFormGroup [
-                                    readOnlyFormElement(person.Affiliation, "Affiliation")
-                                ]
-                                Bulma.field.div [
-                                    prop.className "is-flex is-justify-content-flex-end"
-                                    prop.style [style.gap (length.rem 1)]
-                                    prop.children [
-                                        Bulma.button.button [
-                                            prop.text "back"
-                                            prop.onClick back
-                                        ]
-                                        Bulma.button.button [
-                                            Bulma.color.isSuccess
-                                            prop.text "confirm"
-                                            prop.onClick confirm
-                                        ]
-                                    ]
-                                ]
+                            Daisy.button.button [
+                                prop.text "back"
+                                button.outline
+                                prop.onClick back
+                            ]
+                            Daisy.button.button [
+                                button.success
+                                prop.text "confirm"
+                                prop.onClick confirm
                             ]
                         ]
                     ]
@@ -224,44 +218,36 @@ module private Helper =
         ]
 
     let publicationModal (pub: Publication, confirm, back) =
-        Bulma.modal [
-            Bulma.modal.isActive
+        Daisy.modal.div [
+            modal.active
             prop.children [
-                Bulma.modalBackground []
-                Bulma.modalClose []
-                Bulma.modalContent [
-                    Bulma.container [
-                        prop.className "p-1"
+                Daisy.modalBackdrop []
+                Daisy.modalBox.form [
+                    Html.div [
+                        readOnlyFormElement(pub.Title, "Title")
+                    ]
+                    Html.div [
+                        readOnlyFormElement(pub.DOI, "DOI")
+                        readOnlyFormElement(pub.PubMedID, "PubMedID")
+                    ]
+                    Html.div [
+                        readOnlyFormElement(pub.Authors, "Authors")
+                    ]
+                    Html.div [
+                        readOnlyFormElement(pub.Status |> Option.map _.ToString(), "Status")
+                    ]
+                    Html.div [
+                        prop.className "is-flex is-justify-content-flex-end"
+                        prop.style [style.gap (length.rem 1)]
                         prop.children [
-                            Bulma.box [
-                                Bulma.field.div [
-                                    readOnlyFormElement(pub.Title, "Title")
-                                ]
-                                Bulma.field.div [
-                                    readOnlyFormElement(pub.DOI, "DOI")
-                                    readOnlyFormElement(pub.PubMedID, "PubMedID")
-                                ]
-                                Bulma.field.div [
-                                    readOnlyFormElement(pub.Authors, "Authors")
-                                ]
-                                Bulma.field.div [
-                                    readOnlyFormElement(pub.Status |> Option.map _.ToString(), "Status")
-                                ]
-                                Bulma.field.div [
-                                    prop.className "is-flex is-justify-content-flex-end"
-                                    prop.style [style.gap (length.rem 1)]
-                                    prop.children [
-                                        Bulma.button.button [
-                                            prop.text "back"
-                                            prop.onClick back
-                                        ]
-                                        Bulma.button.button [
-                                            Bulma.color.isSuccess
-                                            prop.text "confirm"
-                                            prop.onClick confirm
-                                        ]
-                                    ]
-                                ]
+                            Daisy.button.button [
+                                prop.text "back"
+                                prop.onClick back
+                            ]
+                            Daisy.button.button [
+                                button.success
+                                prop.text "confirm"
+                                prop.onClick confirm
                             ]
                         ]
                     ]
@@ -270,17 +256,19 @@ module private Helper =
         ]
 
     let errorModal (error: exn, back) =
-        Bulma.modal [
-            Bulma.modal.isActive
+        Daisy.modal.div [
+            modal.active
             prop.children [
-                Bulma.modalBackground [prop.onClick back]
-                Bulma.modalClose [prop.onClick back]
-                Bulma.modalContent [
-                    Bulma.notification [
-                        Bulma.color.isDanger
-                        prop.children [
-                            Bulma.delete [prop.onClick back]
-                            Html.div error.Message
+                Daisy.modalBackdrop [prop.onClick back]
+                Daisy.modalBox.div [
+                    prop.className "bg-transparent p-0 border-0"
+                    prop.children [
+                        Daisy.alert [
+                            alert.error
+                            prop.children [
+                                Components.DeleteButton(props=[|prop.onClick back|])
+                                Html.div error.Message
+                            ]
                         ]
                     ]
                 ]
@@ -288,7 +276,6 @@ module private Helper =
         ]
 
 open JsBindings
-
 type FormComponents =
 
     [<ReactComponent>]
@@ -311,9 +298,7 @@ type FormComponents =
                         prop.custom(listener, sortable.listeners.get listener)
                     prop.className "cursor-grab flex items-center"
                     prop.children [
-                        Bulma.icon [
-                            Html.i [ prop.className "fa-solid fa-arrows-up-down fa-lg" ]
-                        ]
+                        Html.i [ prop.className "fa-solid fa-arrows-up-down fa-lg" ]
                     ]
                 ]
                 Html.div [
@@ -338,8 +323,8 @@ type FormComponents =
         // dnd-kit requires an id for each element in the list.
         // The id is used to keep track of the order of the elements in the list.
         // Because most of our classes do not have a unique id, we generate a new guid for each element in the list.
-        let sensors = DndKit.useSensors [| 
-            DndKit.useSensor(DndKit.PointerSensor) 
+        let sensors = DndKit.useSensors [|
+            DndKit.useSensor(DndKit.PointerSensor)
         |]
         /// This is guid is used to force a rerender of the list when the order of the elements changes.
         let OrderId = React.useRef (System.Guid.NewGuid())
@@ -353,7 +338,7 @@ type FormComponents =
         )
         let mkId index = guids.[index].ToString()
         let getIndexFromId (id:string) = guids.FindIndex (fun x -> x = Guid(id))
-        let handleDragEnd = fun (event: DndKit.IDndKitEvent) -> 
+        let handleDragEnd = fun (event: DndKit.IDndKitEvent) ->
             let active = event.active
             let over = event.over
             if (active.id <> over.id) then
@@ -365,58 +350,62 @@ type FormComponents =
                 OrderId.current <- System.Guid.NewGuid()
             ()
         Html.div [
-            if label.IsSome then Bulma.label label.Value
-            DndKit.DndContext(
-                sensors = sensors,
-                onDragEnd = handleDragEnd,
-                collisionDetection = DndKit.closestCenter,
-                children = [
-                    DndKit.SortableContext(
-                        items = guids,
-                        strategy = DndKit.verticalListSortingStrategy,
-                        children = ResizeArray [
-                            Html.div [
-                                prop.className "space-y-2"
-                                prop.children [
-                                    for i in 0 .. (inputs.Count-1) do
-                                        let item = inputs.[i]
-                                        let id = mkId i
-                                        FormComponents.InputSequenceElement(
-                                            id,
-                                            id,
-                                            (
-                                                inputComponent(
-                                                    item,
-                                                    (fun v -> 
-                                                        inputs.[i] <- v
-                                                        inputs |> setter 
-                                                    ),
-                                                    (fun _ ->
-                                                        inputs.RemoveAt i
-                                                        inputs |> setter
+            prop.children [
+                if label.IsSome then
+                    Generic.FieldTitle label.Value
+                DndKit.DndContext(
+                    sensors = sensors,
+                    onDragEnd = handleDragEnd,
+                    collisionDetection = DndKit.closestCenter,
+                    children = [
+                        DndKit.SortableContext(
+                            items = guids,
+                            strategy = DndKit.verticalListSortingStrategy,
+                            children = ResizeArray [
+                                Html.div [
+                                    prop.className "space-y-2"
+                                    prop.children [
+                                        for i in 0 .. (inputs.Count-1) do
+                                            let item = inputs.[i]
+                                            let id = mkId i
+                                            FormComponents.InputSequenceElement(
+                                                id,
+                                                id,
+                                                (
+                                                    inputComponent(
+                                                        item,
+                                                        (fun v ->
+                                                            inputs.[i] <- v
+                                                            inputs |> setter
+                                                        ),
+                                                        (fun _ ->
+                                                            inputs.RemoveAt i
+                                                            inputs |> setter
+                                                        )
                                                     )
                                                 )
                                             )
-                                        )
+                                    ]
                                 ]
                             ]
-                        ]
-                    )
-                ]
-            )
-            Html.div [
-                prop.className "flex justify-center w-full mt-2"
-                prop.children [
-                    Helper.addButton (fun _ ->
-                        inputs.Add (constructor()) 
-                        inputs |> setter
-                    )
+                        )
+                    ]
+                )
+                Html.div [
+                    prop.className "flex justify-center w-full mt-2"
+                    prop.children [
+                        Helper.addButton (fun _ ->
+                            inputs.Add (constructor())
+                            inputs |> setter
+                        )
+                    ]
                 ]
             ]
         ]
 
     [<ReactComponent>]
-    static member TextInput(value: string, setValue: string -> unit, ?label: string, ?validator: {| fn: string -> bool; msg: string |}, ?placeholder: string, ?isarea: bool) =
+    static member TextInput(value: string, setValue: string -> unit, ?label: string, ?validator: {| fn: string -> bool; msg: string |}, ?placeholder: string, ?isarea: bool, ?isJoin) =
+        let isJoin = defaultArg isJoin false
         let loading, setLoading = React.useState(false)
         let isValid, setIsValid = React.useState(true)
         let ref = React.useInputRef()
@@ -447,31 +436,43 @@ type FormComponents =
                     debounceSetter e
         )
         Html.div [
-            prop.className "grow"
+            prop.className "grow not-prose"
             prop.children [
-                if label.IsSome then Bulma.label label.Value
-                Bulma.control.div [
-                    if loading then control.isLoading
+                if label.IsSome then Generic.FieldTitle label.Value
+                Daisy.label [
+                    prop.className [
+                        if isarea.IsSome && isarea.Value then
+                            "textarea textarea-bordered"
+                        else
+                            "input input-bordered"
+                        "flex items-center gap-2"
+                        if isJoin then "join-item"
+                    ]
                     prop.children [
                         match isarea with
                         | Some true ->
-                            Bulma.textarea [
+                            Daisy.textarea [
+                                prop.className "grow ghost"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
                                 prop.onChange onChange
                             ]
                         | _ ->
-                            Bulma.input.text [
+                            Html.input [
+                                prop.className "trunacte w-full"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
                                 prop.onChange onChange
                             ]
+                        Daisy.loading [
+                            if not loading then prop.className "invisible"
+                        ]
                     ]
                 ]
                 if not isValid then
                     let txt = validator |> Option.map _.msg |> Option.defaultValue "Invalid input."
-                    Bulma.help [
-                        color.hasTextDanger
+                    Html.p [
+                        prop.className "text-error text-sm mt-1"
                         prop.text txt
                     ]
             ]
@@ -482,54 +483,48 @@ type FormComponents =
         let isExtended, setIsExtended = React.useState(false)
         let portal = React.useElementRef()
         Html.div [
-            if label.IsSome then Bulma.label label.Value
-            Html.div [
-                prop.ref portal
-                prop.className "flex flex-row gap-2 relative"
-                prop.children [
-                    TermSearch.Input(
-                        (fun oaOpt -> oaOpt |> Option.defaultValue (OntologyAnnotation()) |> setter),
-                        input,
-                        fullwidth=true,
-                        ?portalTermSelectArea=portal.current,
-                        ?parent=parent
-                    )
-                    if isExtended then
-                        FormComponents.TextInput(
-                            Option.defaultValue "" input.TermSourceREF,
-                            (fun (s: string) ->
-                                let s = s |> Option.whereNot String.IsNullOrWhiteSpace
-                                input.TermSourceREF <- s
-                                input |> setter),
-                            placeholder="term source ref"
+            prop.className "space-y-2"
+            prop.children [
+                if label.IsSome then Generic.FieldTitle label.Value
+                Html.div [
+                    prop.ref portal
+                    prop.className "w-full flex gap-2 relative"
+                    prop.children [
+                        TermSearch.Input(
+                            (fun oaOpt -> oaOpt |> Option.defaultValue (OntologyAnnotation()) |> setter),
+                            input,
+                            fullwidth=true,
+                            ?portalTermSelectArea=portal.current,
+                            ?parent=parent
                         )
-                        FormComponents.TextInput(
-                            Option.defaultValue "" input.TermAccessionNumber,
-                            (fun s0 -> 
-                                let s = s0 |> Option.whereNot String.IsNullOrWhiteSpace 
-                                input.TermAccessionNumber <- s
-                                input |> setter
-                            ),
-                            placeholder="term accession number"
-                        )
+                        Components.CollapseButton(isExtended, setIsExtended)
+                        if rmv.IsSome then
+                            Helper.deleteButton rmv.Value
+                    ]
+                ]
+                if isExtended then
                     Html.div [
-                        prop.className "grow-0"
+                        prop.className "flex flex-col @md/main:flex-row gap-2"
                         prop.children [
-                            Bulma.button.button [
-                                prop.onClick (fun _ -> not isExtended |> setIsExtended)
-                                prop.children [
-                                    Bulma.icon [
-                                        Html.i [
-                                            prop.className "fa-solid fa-chevron-right"
-                                        ]
-                                    ]
-                                ]
-                            ]
+                            FormComponents.TextInput(
+                                Option.defaultValue "" input.TermSourceREF,
+                                (fun (s: string) ->
+                                    let s = s |> Option.whereNot String.IsNullOrWhiteSpace
+                                    input.TermSourceREF <- s
+                                    input |> setter),
+                                placeholder="term source ref"
+                            )
+                            FormComponents.TextInput(
+                                Option.defaultValue "" input.TermAccessionNumber,
+                                (fun s0 ->
+                                    let s = s0 |> Option.whereNot String.IsNullOrWhiteSpace
+                                    input.TermAccessionNumber <- s
+                                    input |> setter
+                                ),
+                                placeholder="term accession number"
+                            )
                         ]
                     ]
-                    if rmv.IsSome then
-                        Helper.deleteButton rmv.Value
-                ]
             ]
         ]
 
@@ -538,7 +533,7 @@ type FormComponents =
         FormComponents.InputSequence(
             oas,
             OntologyAnnotation.empty,
-            setter, 
+            setter,
             (fun (v,setV,rmv) -> FormComponents.OntologyAnnotationInput(v,setV,?parent=parent,rmv=rmv)),
             ?label=label
         )
@@ -548,43 +543,38 @@ type FormComponents =
         let orcid = defaultArg orcid ""
         let state, setState = React.useState(API.Request<Person>.Idle)
         let resetState = fun _ -> setState API.Request.Idle
-        Bulma.field.div [
-            prop.className "is-flex-grow-1"
+        Html.div [
+            prop.className "grow cursor-auto"
             prop.children [
-                if label.IsSome then Bulma.label label.Value
-                Bulma.field.div [
-                    Bulma.field.hasAddons
+                match state with
+                | API.Request.Ok p -> Helper.personModal (p, (fun _ -> searchsetter p; resetState()), resetState)
+                | API.Request.Error e -> Helper.errorModal(e, resetState)
+                | API.Request.Loading -> Modals.Loading.Modal(rmv=resetState)
+                | _ -> Html.none
+                if label.IsSome then Generic.FieldTitle label.Value
+                Daisy.join [
+                    prop.className "w-full"
                     prop.children [
-                        //if state.IsSome || error.IsSome then
-                        match state with
-                        | API.Request.Ok p -> Helper.personModal (p, (fun _ -> searchsetter p; resetState()), resetState)
-                        | API.Request.Error e -> Helper.errorModal(e, resetState)
-                        | API.Request.Loading -> Modals.Loading.loadingModal
-                        | _ -> Html.none
-                        Bulma.control.div [
-                            Bulma.control.isExpanded
-                            prop.children [
-                                FormComponents.TextInput(
-                                    orcid,
-                                    doisetter,
-                                    placeholder="xxxx-xxxx-xxxx-xxxx"
-                                )
-                            ]
-                        ]
-                        Bulma.control.div [
-                            Bulma.button.button [
-                                Bulma.color.isInfo
-                                prop.text "Search"
-                                prop.onClick (fun _ ->
-                                    //API.requestByORCID ("0000-0002-8510-6810") |> Promise.start
-                                    setState API.Request.Loading
-                                    API.start
-                                        API.requestByORCID 
-                                        orcid
-                                        (API.Request.Ok >> setState)
-                                        (API.Request.Error >> setState)
-                                )
-                            ]
+                        FormComponents.TextInput(
+                            orcid,
+                            doisetter,
+                            placeholder="xxxx-xxxx-xxxx-xxxx",
+                            isJoin=true
+                        )
+                        Daisy.button.button [
+                            join.item
+                            button.info
+                            prop.text "Search"
+                            prop.onClick (fun _ ->
+                                setState API.Request.Loading
+                                // setState <| API.Request.Error (new Exception("Not implemented"))
+                                // setState <| (API.Request.Ok (Person.create(orcid=orcid,firstName="John",lastName="Doe")))
+                                API.start
+                                    API.requestByORCID
+                                    orcid
+                                    (API.Request.Ok >> setState)
+                                    (API.Request.Error >> setState)
+                            )
                         ]
                     ]
                 ]
@@ -593,9 +583,8 @@ type FormComponents =
 
     [<ReactComponent>]
     static member PersonInput(input: Person, setter: Person -> unit, ?rmv: MouseEvent -> unit) =
-        let isExtended, setIsExtended = React.useState(false)
-        let nameStr = 
-            let fn = Option.defaultValue "" input.FirstName 
+        let nameStr =
+            let fn = Option.defaultValue "" input.FirstName
             let ln = Option.defaultValue "" input.LastName
             let mi = Option.defaultValue "" input.MidInitials
             let x = $"{fn} {mi} {ln}".Trim()
@@ -604,9 +593,9 @@ type FormComponents =
         let createPersonFieldTextInput(field: string option, label, personSetter: string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
-                (fun s -> 
+                (fun s ->
                     let s = if s = "" then None else Some s
-                    personSetter s 
+                    personSetter s
                     input |> setter),
                 label
             )
@@ -626,72 +615,50 @@ type FormComponents =
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
-        Bulma.card [
-            prop.className "grow"
-            prop.children [
-                Bulma.cardHeader [
-                    Bulma.cardHeaderTitle.div [
-                        prop.children [
-                            Html.div [
-                                Bulma.title.h5 nameStr
-                                Bulma.subtitle.h6 orcid
-                            ]
-                            Html.div [
-                                prop.style [style.custom("marginLeft", "auto")]
-                                prop.text (countFilledFieldsString input)
-                            ]
-                        ]
-                    ]
-                    Bulma.cardHeaderIcon.a [
-                        prop.onClick (fun _ -> not isExtended |> setIsExtended)
-                        prop.children [
-                            Bulma.icon [Html.i [prop.classes ["fas"; "fa-angle-down"]]]
-                        ]
-                    ]
-                ]
-                Bulma.cardContent [
-                    prop.classes [if not isExtended then "is-hidden"]
-                    prop.children [
-                        Helper.cardFormGroup [
-                            createPersonFieldTextInput(input.FirstName, "First Name", fun s -> input.FirstName <- s)
-                            createPersonFieldTextInput(input.LastName, "Last Name", fun s -> input.LastName <- s)
-                        ]
-                        Helper.cardFormGroup [
-                            createPersonFieldTextInput(input.MidInitials, "Mid Initials", fun s -> input.MidInitials <- s)
-                            FormComponents.PersonRequestInput(
-                                input.ORCID,
-                                (fun s -> 
-                                    let s = if s = "" then None else Some s
-                                    input.ORCID <- s
-                                    input |> setter),
-                                    (fun s -> setter s),
-                                    "ORCID"
-                            )
-                        ]
-                        Helper.cardFormGroup [
-                            createPersonFieldTextInput(input.Affiliation, "Affiliation", fun s -> input.Affiliation <- s)
-                            createPersonFieldTextInput(input.Address, "Address", fun s -> input.Address <- s)
-                        ]
-                        Helper.cardFormGroup [
-                            createPersonFieldTextInput(input.EMail, "Email", fun s -> input.EMail <- s)
-                            createPersonFieldTextInput(input.Phone, "Phone", fun s -> input.Phone <- s)
-                            createPersonFieldTextInput(input.Fax, "Fax", fun s -> input.Fax <- s)
-                        ]
-                        FormComponents.OntologyAnnotationsInput(
-                            input.Roles,
-                            (fun oas -> 
-                                input.Roles <- oas
-                                input |> setter
-                            ),
-                            "Roles",
-                            parent=Shared.TermCollection.PersonRoleWithinExperiment
-                        )
-                        if rmv.IsSome then
-                            Helper.deleteButton rmv.Value
-                    ]
-                ]
+        Generic.Collapse
+            // title
+            [
+                Generic.CollapseTitle(nameStr, orcid, countFilledFieldsString input)
             ]
-        ]
+            // content
+            [
+                Helper.cardFormGroup [
+                    createPersonFieldTextInput(input.FirstName, "First Name", fun s -> input.FirstName <- s)
+                    createPersonFieldTextInput(input.LastName, "Last Name", fun s -> input.LastName <- s)
+                ]
+                Helper.cardFormGroup [
+                    createPersonFieldTextInput(input.MidInitials, "Mid Initials", fun s -> input.MidInitials <- s)
+                    FormComponents.PersonRequestInput(
+                        input.ORCID,
+                        (fun s ->
+                            let s = if s = "" then None else Some s
+                            input.ORCID <- s
+                            input |> setter),
+                            (fun s -> setter s),
+                            "ORCID"
+                    )
+                ]
+                Helper.cardFormGroup [
+                    createPersonFieldTextInput(input.Affiliation, "Affiliation", fun s -> input.Affiliation <- s)
+                    createPersonFieldTextInput(input.Address, "Address", fun s -> input.Address <- s)
+                ]
+                Helper.cardFormGroup [
+                    createPersonFieldTextInput(input.EMail, "Email", fun s -> input.EMail <- s)
+                    createPersonFieldTextInput(input.Phone, "Phone", fun s -> input.Phone <- s)
+                    createPersonFieldTextInput(input.Fax, "Fax", fun s -> input.Fax <- s)
+                ]
+                FormComponents.OntologyAnnotationsInput(
+                    input.Roles,
+                    (fun oas ->
+                        input.Roles <- oas
+                        input |> setter
+                    ),
+                    "Roles",
+                    parent=Shared.TermCollection.PersonRoleWithinExperiment
+                )
+                if rmv.IsSome then
+                    Helper.deleteButton rmv.Value
+            ]
 
     static member PersonsInput (persons: ResizeArray<Person>, setter: ResizeArray<Person> -> unit, ?label: string) =
         FormComponents.InputSequence(
@@ -703,7 +670,7 @@ type FormComponents =
         )
 
     [<ReactComponent>]
-    static member DateTimeInput (input: string, setter: string -> unit, ?label: string) =
+    static member DateTimeInput (input_: string, setter: string -> unit, ?label: string) =
         let loading, setLoading = React.useState(false)
         let ref = React.useInputRef()
         let debounceSetter = React.useMemo(
@@ -715,9 +682,9 @@ type FormComponents =
             (fun () ->
                 if ref.current.IsSome then
                     setLoading false
-                    ref.current.Value.value <- input
+                    ref.current.Value.value <- input_
             ),
-            [|box input|]
+            [|box input_|]
         )
         let onChange = React.useMemo(fun () ->
             fun (e: string) ->
@@ -727,19 +694,15 @@ type FormComponents =
         Html.div [
             prop.className "grow"
             prop.children [
-                if label.IsSome then Bulma.label label.Value
-                Bulma.control.div [
-                    if loading then Bulma.control.isLoading
-                    control.isExpanded
-                    prop.children [
-                        Bulma.input.datetimeLocal [
-                            prop.ref ref
-                            prop.onChange(fun (e: System.DateTime) ->
-                                let dtString = e.ToString("yyyy-MM-ddThh:mm")
-                                onChange dtString
-                            )
-                        ]
-                    ]
+                if label.IsSome then Generic.FieldTitle label.Value
+                Daisy.input [
+                    input.bordered
+                    prop.type'.dateTimeLocal
+                    prop.ref ref
+                    prop.onChange(fun (e: System.DateTime) ->
+                        let dtString = e.ToString("yyyy-MM-ddThh:mm")
+                        onChange dtString
+                    )
                 ]
             ]
         ]
@@ -755,14 +718,14 @@ type FormComponents =
     static member GUIDInput (input: Guid, setter: Guid -> unit, ?label: string) =
         //let regex = System.Text.RegularExpressions.Regex(@"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
         //let unmask (s:string) = s |> String.filter(fun c -> c <> '_' && c <> '-')
-        //let mask (s:string) = 
+        //let mask (s:string) =
         //    s.PadRight(32,'_').[0..31]
         //    |> fun padded -> sprintf "%s-%s-%s-%s-%s" padded.[0..7] padded.[8..11] padded.[12..15] padded.[16..19] padded.[20..31]
         FormComponents.TextInput(
             input.ToString(),
             (fun s -> System.Guid.Parse s |> setter),
             ?label=label,
-            validator={| fn = Guid.TryParse >> fst; msg = "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx." |}
+            validator={| fn = Guid.TryParse >> fst; msg = "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Using numbers 0 through 9 and letters A through F." |}
         )
 
     [<ReactComponent>]
@@ -770,42 +733,36 @@ type FormComponents =
         let id = defaultArg id ""
         let state, setState = React.useState(API.Request<Publication>.Idle)
         let resetState = fun _ -> setState API.Request.Idle
-        Bulma.field.div [
-            prop.className "is-flex-grow-1"
+        Html.div [
+            prop.className "grow"
             prop.children [
-                if label.IsSome then Bulma.label label.Value
-                Bulma.field.div [
-                    Bulma.field.hasAddons
+                if label.IsSome then Generic.FieldTitle label.Value
+                //if state.IsSome || error.IsSome then
+                match state with
+                | API.Request.Ok pub -> Helper.publicationModal(pub,(fun _ -> searchsetter pub; resetState()), resetState)
+                | API.Request.Error e -> Helper.errorModal(e, resetState)
+                | API.Request.Loading -> Modals.Loading.Modal(rmv=resetState)
+                | _ -> Html.none
+                Daisy.join [
+                    prop.className "w-full"
                     prop.children [
-                        //if state.IsSome || error.IsSome then
-                        match state with
-                        | API.Request.Ok pub -> Helper.publicationModal(pub,(fun _ -> searchsetter pub; resetState()), resetState)
-                        | API.Request.Error e -> Helper.errorModal(e, resetState)
-                        | API.Request.Loading -> Modals.Loading.loadingModal
-                        | _ -> Html.none
-                        Bulma.control.div [
-                            Bulma.control.isExpanded
-                            prop.children [
-                                FormComponents.TextInput(
-                                    id,
-                                    doisetter
-                                )
-                            ]
-                        ]
-                        Bulma.control.div [
-                            Bulma.button.button [
-                                Bulma.color.isInfo
-                                prop.text "Search"
-                                prop.onClick (fun _ ->
-                                    //API.requestByORCID ("0000-0002-8510-6810") |> Promise.start
-                                    setState API.Request.Loading
-                                    API.start
-                                        searchAPI 
-                                        id
-                                        (API.Request.Ok >> setState)
-                                        (API.Request.Error >> setState)
-                                )
-                            ]
+                        FormComponents.TextInput(
+                            id,
+                            doisetter,
+                            isJoin=true
+                        )
+                        Daisy.button.button [
+                            button.info
+                            join.item
+                            prop.text "Search"
+                            prop.onClick (fun _ ->
+                                setState API.Request.Loading
+                                API.start
+                                    searchAPI
+                                    id
+                                    (API.Request.Ok >> setState)
+                                    (API.Request.Error >> setState)
+                            )
                         ]
                     ]
                 ]
@@ -824,7 +781,7 @@ type FormComponents =
     static member PubMedIDInput (id: string option, doisetter, searchsetter: Publication -> unit, ?label:string) =
         FormComponents.PublicationRequestInput(
             id,
-            API.requestByPubMedID,             
+            API.requestByPubMedID,
             doisetter,
             searchsetter,
             ?label=label
@@ -833,7 +790,7 @@ type FormComponents =
     static member CommentInput (comment: Comment, setter: Comment -> unit, ?label: string, ?rmv: MouseEvent -> unit) =
         Html.div [
             prop.children [
-                if label.IsSome then Bulma.label label.Value
+                if label.IsSome then Daisy.label [Daisy.labelText label.Value]
                 Html.div [
                     prop.className "flex flex-row gap-2 relative"
                     prop.children [
@@ -846,7 +803,7 @@ type FormComponents =
                         )
                         FormComponents.TextInput(
                             comment.Value |> Option.defaultValue "",
-                            (fun s -> 
+                            (fun s ->
                                 comment.Value <- if s = "" then None else Some s
                                 comment |> setter),
                             placeholder="comment"
@@ -869,15 +826,14 @@ type FormComponents =
 
     [<ReactComponent>]
     static member PublicationInput(input: Publication, setter: Publication -> unit, ?rmv: MouseEvent -> unit) =
-        let isExtended, setIsExtended = React.useState(false)
         let title = Option.defaultValue "<title>" input.Title
         let doi = Option.defaultValue "<doi>" input.DOI
         let createFieldTextInput(field: string option, label, publicationSetter: string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
-                (fun s -> 
+                (fun s ->
                     let s = if s = "" then None else Some s
-                    publicationSetter s 
+                    publicationSetter s
                     input |> setter),
                 label
             )
@@ -892,74 +848,53 @@ type FormComponents =
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
-        Bulma.card [
-            Bulma.cardHeader [
-                Bulma.cardHeaderTitle.div [
-                    prop.children [
-                        Html.div [
-                            Bulma.title.h5 title
-                            Bulma.subtitle.h6 doi
-                        ]
-                        Html.div [
-                            prop.style [style.custom("marginLeft", "auto")]
-                            prop.text (countFilledFieldsString ())
-                        ]
-                    ]
-                ]
-                Bulma.cardHeaderIcon.a [
-                    prop.onClick (fun _ -> not isExtended |> setIsExtended)
-                    prop.children [
-                        Bulma.icon [Html.i [prop.classes ["fas"; "fa-angle-down"]]]
-                    ]
-                ]
+        Generic.Collapse
+            [
+                Generic.CollapseTitle(title, doi, countFilledFieldsString ())
             ]
-            Bulma.cardContent [
-                prop.classes [if not isExtended then "is-hidden"]
-                prop.children [
-                    createFieldTextInput(input.Title, "Title", fun s -> input.Title <- s)
-                    Helper.cardFormGroup [
-                        FormComponents.PubMedIDInput(
-                            input.PubMedID,
-                            (fun s -> 
-                                let s = if s = "" then None else Some s
-                                input.PubMedID <- s
-                                input |> setter),
-                            (fun pub -> setter pub),
-                            "PubMed Id"
-                        )
-                        FormComponents.DOIInput(
-                            input.DOI, 
-                            (fun s -> 
-                                let s = if s = "" then None else Some s
-                                input.DOI <- s
-                                input |> setter),
-                            (fun pub -> setter pub),
-                            "DOI"
-                        )
-                    ]
-                    createFieldTextInput(input.Authors, "Authors", fun s -> input.Authors <- s)
-                    FormComponents.OntologyAnnotationInput(
-                        Option.defaultValue (OntologyAnnotation.empty()) input.Status, 
-                        (fun s -> 
-                            input.Status <- s |> Option.whereNot _.isEmpty()
-                            input |> setter
-                        ),
-                        "Status",
-                        parent=Shared.TermCollection.PublicationStatus
+            [
+                createFieldTextInput(input.Title, "Title", fun s -> input.Title <- s)
+                Helper.cardFormGroup [
+                    FormComponents.PubMedIDInput(
+                        input.PubMedID,
+                        (fun s ->
+                            let s = if s = "" then None else Some s
+                            input.PubMedID <- s
+                            input |> setter),
+                        (fun pub -> setter pub),
+                        "PubMed Id"
                     )
-                    FormComponents.CommentsInput(
-                        input.Comments, 
-                        (fun c -> 
-                            input.Comments <- ResizeArray(c)
-                            input |> setter
-                        ),
-                        "Comments"
+                    FormComponents.DOIInput(
+                        input.DOI,
+                        (fun s ->
+                            let s = if s = "" then None else Some s
+                            input.DOI <- s
+                            input |> setter),
+                        (fun pub -> setter pub),
+                        "DOI"
                     )
-                    if rmv.IsSome then
-                        Helper.deleteButton rmv.Value
                 ]
+                createFieldTextInput(input.Authors, "Authors", fun s -> input.Authors <- s)
+                FormComponents.OntologyAnnotationInput(
+                    Option.defaultValue (OntologyAnnotation.empty()) input.Status,
+                    (fun s ->
+                        input.Status <- s |> Option.whereNot _.isEmpty()
+                        input |> setter
+                    ),
+                    "Status",
+                    parent=Shared.TermCollection.PublicationStatus
+                )
+                FormComponents.CommentsInput(
+                    input.Comments,
+                    (fun c ->
+                        input.Comments <- ResizeArray(c)
+                        input |> setter
+                    ),
+                    "Comments"
+                )
+                if rmv.IsSome then
+                    Helper.deleteButton rmv.Value
             ]
-        ]
 
     static member PublicationsInput(input: ResizeArray<Publication>, setter: ResizeArray<Publication> -> unit, label: string) =
         FormComponents.InputSequence(
@@ -972,13 +907,12 @@ type FormComponents =
 
     [<ReactComponent>]
     static member OntologySourceReferenceInput(input: OntologySourceReference, setter: OntologySourceReference -> unit, ?deletebutton: MouseEvent -> unit) =
-        let isExtended, setIsExtended = React.useState(false)
         let name = Option.defaultValue "<name>" input.Name
         let version = Option.defaultValue "<version>" input.Version
         let createFieldTextInput(field: string option, label, setFunction: string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
-                (fun s -> 
+                (fun s ->
                     s |> Option.whereNot System.String.IsNullOrWhiteSpace |> setFunction
                     input |> setter),
                 label
@@ -994,56 +928,35 @@ type FormComponents =
             let all = fields.Length
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
-        Bulma.card [
-            Bulma.cardHeader [
-                Bulma.cardHeaderTitle.div [
-                    prop.children [
-                        Html.div [
-                            Bulma.title.h5 name
-                            Bulma.subtitle.h6 version
-                        ]
-                        Html.div [
-                            prop.style [style.custom("marginLeft", "auto")]
-                            prop.text (countFilledFieldsString ())
-                        ]
-                    ]
-                ]
-                Bulma.cardHeaderIcon.a [
-                    prop.onClick (fun _ -> not isExtended |> setIsExtended)
-                    prop.children [
-                        Bulma.icon [Html.i [prop.classes ["fas"; "fa-angle-down"]]]
-                    ]
-                ]
+        Generic.Collapse
+            [
+                Generic.CollapseTitle(name, version, countFilledFieldsString ())
             ]
-            Bulma.cardContent [
-                prop.classes [if not isExtended then "is-hidden"]
-                prop.children [
-                    createFieldTextInput(input.Name, "Name", fun s -> input.Name <- s)
-                    Helper.cardFormGroup [ 
-                        createFieldTextInput(input.Version, "Version", fun s -> input.Version <- s)
-                        createFieldTextInput(input.File, "File", fun s -> input.File <- s)
-                    ]
-                    FormComponents.TextInput(
-                        Option.defaultValue "" input.Description,
-                        (fun s -> 
-                            input.Description <- s |> Option.whereNot System.String.IsNullOrWhiteSpace
-                            input |> setter),
-                        "Description",
-                        isarea=true
-                    )
-                    FormComponents.CommentsInput(
-                        input.Comments, 
-                        (fun c -> 
-                            input.Comments <- c
-                            input |> setter
-                        ),
-                        "Comments"
-                    )
-                    if deletebutton.IsSome then
-                        Helper.deleteButton deletebutton.Value
+            [
+                createFieldTextInput(input.Name, "Name", fun s -> input.Name <- s)
+                Helper.cardFormGroup [
+                    createFieldTextInput(input.Version, "Version", fun s -> input.Version <- s)
+                    createFieldTextInput(input.File, "File", fun s -> input.File <- s)
                 ]
+                FormComponents.TextInput(
+                    Option.defaultValue "" input.Description,
+                    (fun s ->
+                        input.Description <- s |> Option.whereNot System.String.IsNullOrWhiteSpace
+                        input |> setter),
+                    "Description",
+                    isarea=true
+                )
+                FormComponents.CommentsInput(
+                    input.Comments,
+                    (fun c ->
+                        input.Comments <- c
+                        input |> setter
+                    ),
+                    "Comments"
+                )
+                if deletebutton.IsSome then
+                    Helper.deleteButton deletebutton.Value
             ]
-        ]
 
     static member OntologySourceReferencesInput(input: ResizeArray<OntologySourceReference>, setter: ResizeArray<OntologySourceReference> -> unit, label: string) =
         FormComponents.InputSequence(

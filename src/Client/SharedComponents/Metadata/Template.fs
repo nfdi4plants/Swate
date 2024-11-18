@@ -1,18 +1,17 @@
 module Components.Metadata.Template
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ARCtrl
 open Components
 open Components.Forms
 
 [<ReactComponent>]
 let Main(template: Template, setTemplate: Template -> unit) =
-    Bulma.section [
-        Generic.BoxedField
-            (Some "Template Metadata")
-            None
-            [
+    Generic.Section [
+        Generic.BoxedField(
+            "Template Metadata",
+            content = [
                 FormComponents.GUIDInput (
                     template.Id,
                     (fun guid ->
@@ -23,14 +22,14 @@ let Main(template: Template, setTemplate: Template -> unit) =
                 )
                 FormComponents.TextInput (
                     template.Name,
-                    (fun (s:string) -> 
+                    (fun (s:string) ->
                         template.Name <- s
                         setTemplate template),
                     "Name"
                 )
                 FormComponents.TextInput (
                     template.Description,
-                    (fun (s:string) -> 
+                    (fun (s:string) ->
                         template.Description <- s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
                         setTemplate template),
@@ -39,14 +38,14 @@ let Main(template: Template, setTemplate: Template -> unit) =
                 )
                 FormComponents.TextInput (
                     template.Organisation.ToString(),
-                    (fun (s:string) -> 
+                    (fun (s:string) ->
                         template.Organisation <- Organisation.ofString(s)
                         setTemplate template),
                     "Organisation"
                 )
                 FormComponents.TextInput(
                     template.Version,
-                    (fun (s:string) -> 
+                    (fun (s:string) ->
                         template.Version <- s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
                         setTemplate template),
@@ -54,7 +53,7 @@ let Main(template: Template, setTemplate: Template -> unit) =
                 )
                 FormComponents.DateTimeInput(
                     template.LastUpdated,
-                    (fun dt -> 
+                    (fun dt ->
                         template.LastUpdated <- dt
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
                         setTemplate template),
@@ -62,7 +61,7 @@ let Main(template: Template, setTemplate: Template -> unit) =
                 )
                 FormComponents.OntologyAnnotationsInput(
                     template.Tags,
-                    (fun (s) -> 
+                    (fun (s) ->
                         template.Tags <- ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
                         setTemplate template),
@@ -70,7 +69,7 @@ let Main(template: Template, setTemplate: Template -> unit) =
                 )
                 FormComponents.OntologyAnnotationsInput(
                     template.EndpointRepositories,
-                    (fun (s) -> 
+                    (fun (s) ->
                         template.EndpointRepositories <- ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
                         setTemplate template),
@@ -78,11 +77,12 @@ let Main(template: Template, setTemplate: Template -> unit) =
                 )
                 FormComponents.PersonsInput(
                     template.Authors,
-                    (fun (s) -> 
+                    (fun (s) ->
                         template.Authors <-ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
                         setTemplate template),
                     "Authors"
                 )
             ]
+        )
     ]

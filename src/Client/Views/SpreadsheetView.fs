@@ -1,7 +1,7 @@
-module MainWindowView
+module SpreadsheetView
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open Messages
 open Shared
 open MainComponents
@@ -17,48 +17,17 @@ let private WidgetOrderContainer bringWidgetToFront (widget) =
         ]
     ]
 
-let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactElement) = 
-    
+let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactElement) =
+
     match widgets.Length with
-    | 0 -> 
+    | 0 ->
         Html.none
     | _ ->
         Html.div [
             for widget in widgets do displayWidget widget
         ]
 
-let private SpreadsheetSelectionFooter (model: Model) dispatch =
-    Html.div [
-        prop.style [
-            style.position.sticky;
-            style.bottom 0
-        ]
-        prop.children [
-            Html.div [
-                prop.children [
-                    Bulma.tabs [
-                        Bulma.tabs.isBoxed
-                        prop.children [
-                            Html.ul [
-                                Bulma.tab  [
-                                    prop.style [style.width (length.px 20); style.custom ("order", -2)]
-                                ]
-                                MainComponents.FooterTabs.MainMetadata (model, dispatch)
-                                if model.SpreadsheetModel.HasDataMap() then
-                                    MainComponents.FooterTabs.MainDataMap (model, dispatch)
-                                for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
-                                    MainComponents.FooterTabs.Main (index, model.SpreadsheetModel.Tables, model, dispatch)
-                                if model.SpreadsheetModel.CanHaveTables() then 
-                                    MainComponents.FooterTabs.MainPlus (model, dispatch)
-                                if model.SpreadsheetModel.TableViewIsActive() then
-                                    MainComponents.FooterTabs.ToggleSidebar(model, dispatch)
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ]
+
 
 open Shared
 
@@ -66,29 +35,24 @@ open Shared
 let Main (model: Model, dispatch) =
     let widgets, setWidgets = React.useState([])
     let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
-    let bringWidgetToFront (widget: Widget) = 
+    let bringWidgetToFront (widget: Widget) =
         let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev
         setWidgets newList
     let displayWidget (widget: Widget) =
         let rmv (widget: Widget) = fun _ -> rmvWidget widget
         let bringWidgetToFront = fun _ -> bringWidgetToFront widget
         match widget with
-        | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget) 
+        | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget)
         | Widget._Template -> Widget.Templates (model, dispatch, rmv widget)
         | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
         | Widget._DataAnnotator -> Widget.DataAnnotator(model, dispatch, rmv widget)
         |> WidgetOrderContainer bringWidgetToFront
-    let addWidget (widget: Widget) = 
+    let addWidget (widget: Widget) =
         widget::widgets |> List.rev |> setWidgets
     let state = model.SpreadsheetModel
     Html.div [
         prop.id "MainWindow"
-        prop.style [
-            style.display.flex
-            style.flexDirection.column
-            style.width (length.percent 100)
-            style.height (length.percent 100)
-        ]
+        prop.className "@container/main min-w-[400px] flex flex-col h-screen"
         prop.children [
             MainComponents.Navbar.Main (model, dispatch, widgets, setWidgets)
             ModalDisplay (widgets, displayWidget)
@@ -100,9 +64,9 @@ let Main (model: Model, dispatch) =
                     match state.ArcFile with
                     | None ->
                         MainComponents.NoFileElement.Main {|dispatch = dispatch|}
-                    | Some (ArcFiles.Assay _) 
+                    | Some (ArcFiles.Assay _)
                     | Some (ArcFiles.Study _)
-                    | Some (ArcFiles.Investigation _) 
+                    | Some (ArcFiles.Investigation _)
                     | Some (ArcFiles.Template _) ->
                         match model.SpreadsheetModel.ActiveView with
                         | Spreadsheet.ActiveView.Table _ ->
@@ -113,13 +77,12 @@ let Main (model: Model, dispatch) =
                                 MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget)
                             | _ ->
                                 MainComponents.SpreadsheetView.ArcTable.Main(model, dispatch)
-                                MainComponents.AddRows.Main dispatch
+                                MainComponents.TableFooter.Main dispatch
                         | Spreadsheet.ActiveView.Metadata ->
-                            Bulma.section [
+                            Html.section [
                                 prop.className "overflow-y-auto h-full"
                                 prop.children [
-                                    Bulma.container [
-                                        prop.className "is-max-desktop"
+                                    Html.div [
                                         prop.children [
                                             match model.SpreadsheetModel.ArcFile with
                                             | Some (ArcFiles.Assay assay) ->
@@ -150,10 +113,10 @@ let Main (model: Model, dispatch) =
                             ]
                         | Spreadsheet.ActiveView.DataMap ->
                             MainComponents.SpreadsheetView.DataMap.Main(model, dispatch)
-                            MainComponents.AddRows.Main dispatch
+                            MainComponents.TableFooter.Main dispatch
                 ]
             ]
-            if state.ArcFile.IsSome then 
-                SpreadsheetSelectionFooter model dispatch
+            if state.ArcFile.IsSome then
+                MainComponents.FooterTabs.SpreadsheetSelectionFooter model dispatch
         ]
     ]

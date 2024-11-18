@@ -1,25 +1,27 @@
-module Modals.Loading
+namespace Components.Modals
 
 open Fable.React
 open Fable.React.Props
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
-let loadingComponent =
-    Html.i [
-        prop.classes ["fa-solid"; "fa-spinner"; "fa-spin-pulse"; "fa-xl"]
-    ]
+type Loading =
+    static member Component =
+        Daisy.loading [
+            loading.ring
+            loading.lg
+        ]
 
-let loadingModal =
-    Bulma.modal [
-        Bulma.modal.isActive
-        prop.children [
-            Bulma.modalBackground []
-            Bulma.modalContent [
-                prop.style [style.custom("width","auto")]
-                prop.children [
-                    Bulma.box loadingComponent
+    static member Modal(?rmv: Browser.Types.MouseEvent -> unit) =
+        Daisy.modal.div [
+            prop.className "modal-open"
+            prop.children [
+                Daisy.modalBackdrop [if rmv.IsSome then prop.onClick rmv.Value]
+                Daisy.modalBox.div [
+                    prop.className "size-auto flex"
+                    prop.children [
+                        Loading.Component
+                    ]
                 ]
             ]
         ]
-    ]

@@ -18,26 +18,34 @@ open Messages
 open Elmish
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ARCtrl
 
 type Templates =
 
     static member Main (model:Model, dispatch) =
-        Html.div [
-            prop.onSubmit (fun e -> e.preventDefault())
-            prop.onKeyDown (fun k -> if k.key = "Enter" then k.preventDefault())
-            prop.children [
-                pageHeader "Templates"
+        SidebarComponents.SidebarLayout.Container [
+            SidebarComponents.SidebarLayout.Header "Templates"
 
-                // Box 1
-                Bulma.label "Add template from database."
 
-                TemplateFromDB.Main(model, dispatch)
+            SidebarComponents.SidebarLayout.Description (Html.p [
+                Html.b "Search the database for templates."
+                Html.text " The building blocks from these templates can be inserted into the Swate table. "
+                Html.span [
+                    prop.className "text-error"
+                    prop.text "Only missing building blocks will be added."
+                ]
+            ])
+            // Box 1
+            SidebarComponents.SidebarLayout.Description "Add template from database."
 
-                // Box 2
-                Bulma.label "Add template(s) from file."
+            TemplateFromDB.Main(model, dispatch)
 
-                TemplateFromFile.Main(model, dispatch)
-            ]
+            // Box 2
+            SidebarComponents.SidebarLayout.Description (Html.p [
+                Html.b "Import JSON files."
+                Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
+            ])
+
+            TemplateFromFile.Main(model, dispatch)
         ]

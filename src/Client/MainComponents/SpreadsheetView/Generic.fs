@@ -1,7 +1,7 @@
 module MainComponents.SpreadsheetView.Generic
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 open Spreadsheet
 open Messages
@@ -35,7 +35,12 @@ let Main (data, createCell, headers, createHeaderCell, model:Model, dispatch: Ms
                 createCell,
                 {|data=headers state setState; createCell=createHeaderCell|},
                 35,
-                tableClasses=[|"fixed_headers"|],
+                tableClasses=[|
+                    //sticky header
+                    "[&_thead_>_tr]:sticky [&_thead_>_tr]:top-0 [&_thead_>_tr]:bg-base-100"
+                    // sticky row
+                    "[&_tbody_>_tr_>_th]:sticky [&_tbody_>_tr_>_th]:left-0 [&_tbody_>_tr_>_th]:bg-base-100"
+                    |],
                 containerClasses=[|"pr-[10vw]"|],
                 rowLabel={|styling=Some createRowLabel|}
             )

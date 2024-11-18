@@ -1,7 +1,7 @@
 module MainComponents.FooterTabs
 
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 open ARCtrl
 open Model
 
@@ -20,183 +20,42 @@ type private FooterTab = {
 module private TableContextMenu =
 
     type ContextFunctions = {
-        Delete  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
-        Rename  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        Delete  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
+        Rename  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
     }
 
     let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        /// This element will remove the contextmenu when clicking anywhere else
-        let rmv_element = Html.div [
-            prop.onClick rmv
-            prop.onContextMenu(fun e -> e.preventDefault(); rmv e)
-            prop.style [
-                style.position.fixedRelativeToWindow
-                style.backgroundColor.transparent
-                style.left 0
-                style.top 0
-                style.right 0
-                style.bottom 0
-                style.display.block
-            ]
-        ]
-        let button (name:string, icon: string, msg, props) = Html.li [
-            Bulma.button.button [
-                prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
-                prop.onClick msg
-                prop.className "py-1"
-                Bulma.button.isFullWidth
-                //Bulma.button.isSmall
-                Bulma.color.isBlack
-                Bulma.button.isInverted
-                yield! props
-                prop.children [
-                    Bulma.icon [Html.i [prop.className icon]]
-                    Html.span name
-                ]
-            ]
-        ]
-        let divider = Html.li [
-            Html.div [ prop.style [style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0); style.width (length.perc 75); style.marginLeft length.auto] ]
-        ]
         let buttonList = [
-            button ("Delete", "fa-solid fa-trash", funcs.Delete rmv, [])
-            button ("Rename", "fa-solid fa-pen-to-square", funcs.Rename rmv, [])
+            Components.BaseContextMenu.Item (Html.span "Delete", funcs.Delete rmv, "fa-solid fa-trash")
+            Components.BaseContextMenu.Item (Html.span "Rename", funcs.Rename rmv, "fa-solid fa-pen-to-square")
         ]
-        Html.div [
-            prop.style [
-                style.backgroundColor "white"
-                style.position.absolute
-                style.left mousex
-                style.top (mousey-40)
-                style.width 150
-                style.zIndex 40 // to overlap navbar
-                style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base)
-            ]
-            prop.children [
-                rmv_element
-                Html.ul buttonList
-            ]
-        ]
+        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
 
 
 [<RequireQualifiedAccess>]
 module private PlusContextMenu =
     type ContextFunctions = {
-        AddTable  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
-        AddDatamap  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        AddTable  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
+        AddDatamap  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
     }
 
     let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        /// This element will remove the contextmenu when clicking anywhere else
-        let rmv_element = Html.div [
-            prop.onClick rmv
-            prop.onContextMenu(fun e -> e.preventDefault(); rmv e)
-            prop.style [
-                style.position.fixedRelativeToWindow
-                style.backgroundColor.transparent
-                style.left 0
-                style.top 0
-                style.right 0
-                style.bottom 0
-                style.display.block
-            ]
-        ]
-        let button (name:string, icon: string, msg, props) = Html.li [
-            Bulma.button.button [
-                prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
-                prop.onClick msg
-                prop.className "py-1"
-                Bulma.button.isFullWidth
-                //Bulma.button.isSmall
-                Bulma.color.isBlack
-                Bulma.button.isInverted
-                yield! props
-                prop.children [
-                    Bulma.icon [Html.i [prop.className icon]]
-                    Html.span name
-                ]
-            ]
-        ]
-        let divider = Html.li [
-            Html.div [ prop.style [style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0); style.width (length.perc 75); style.marginLeft length.auto] ]
-        ]
         let buttonList = [
-            button ("Add Table", "fa-solid fa-table", funcs.AddTable rmv, [])
-            button ("Add Datamap", "fa-solid fa-map", funcs.AddDatamap rmv, [])
+            Components.BaseContextMenu.Item (Html.span "Add Table", funcs.AddTable rmv, "fa-solid fa-table")
+            Components.BaseContextMenu.Item (Html.span "Add Datamap", funcs.AddDatamap rmv, "fa-solid fa-map")
         ]
-        Html.div [
-            prop.style [
-                style.backgroundColor "white"
-                style.position.absolute
-                style.left mousex
-                style.top (mousey-40)
-                style.width 150
-                style.zIndex 40 // to overlap navbar
-                style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base)
-            ]
-            prop.children [
-                rmv_element
-                Html.ul buttonList
-            ]
-        ]
+        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
 
 module DataMapContextMenu =
     type ContextFunctions = {
-        Delete  : (Browser.Types.MouseEvent -> unit) -> Browser.Types.MouseEvent -> unit
+        Delete  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
     }
 
     let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        /// This element will remove the contextmenu when clicking anywhere else
-        let rmv_element = Html.div [
-            prop.onClick rmv
-            prop.onContextMenu(fun e -> e.preventDefault(); rmv e)
-            prop.style [
-                style.position.fixedRelativeToWindow
-                style.backgroundColor.transparent
-                style.left 0
-                style.top 0
-                style.right 0
-                style.bottom 0
-                style.display.block
-            ]
-        ]
-        let button (name:string, icon: string, msg, props) = Html.li [
-            Bulma.button.button [
-                prop.style [style.borderRadius 0; style.justifyContent.spaceBetween; style.fontSize (length.rem 0.9)]
-                prop.onClick msg
-                prop.className "py-1"
-                Bulma.button.isFullWidth
-                //Bulma.button.isSmall
-                Bulma.color.isBlack
-                Bulma.button.isInverted
-                yield! props
-                prop.children [
-                    Bulma.icon [Html.i [prop.className icon]]
-                    Html.span name
-                ]
-            ]
-        ]
-        let divider = Html.li [
-            Html.div [ prop.style [style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base); style.margin(2,0); style.width (length.perc 75); style.marginLeft length.auto] ]
-        ]
         let buttonList = [
-            button ("Delete", "fa-solid fa-trash", funcs.Delete rmv, [])
+            Components.BaseContextMenu.Item (Html.span "Delete", funcs.Delete rmv, "fa-solid fa-trash")
         ]
-        Html.div [
-            prop.style [
-                style.backgroundColor "white"
-                style.position.absolute
-                style.left mousex
-                style.top (mousey-40)
-                style.width 150
-                style.zIndex 40 // to overlap navbar
-                style.border(1, borderStyle.solid, NFDIColors.DarkBlue.Base)
-            ]
-            prop.children [
-                rmv_element
-                Html.ul buttonList
-            ]
-        ]
+        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
 
 open Spreadsheet.Types
 
@@ -206,13 +65,13 @@ let private drag_preventdefault = fun (e: Browser.Types.DragEvent) ->
     e.stopPropagation()
 
 ///<summary>This is fired from the element on which something is dropped. Gets the data set during dragstart and uses it to update order.</summary>
-let private drop_handler (eleOrder, state, setState, dispatch) = fun (e: Browser.Types.DragEvent) -> 
+let private drop_handler (eleOrder, state, setState, dispatch) = fun (e: Browser.Types.DragEvent) ->
     // This event fire on the element on which something is dropped! Not on the element which is dropped!
     let data = e.dataTransfer.getData("text")
     let getData = FooterReorderData.ofJson data
     setState {state with IsDraggedOver = false}
     match getData with
-    | Ok data -> 
+    | Ok data ->
         let prev_index = data.OriginOrder
         let next_index = eleOrder
         Spreadsheet.UpdateTableOrder(prev_index, next_index) |> Messages.SpreadsheetMsg |> dispatch
@@ -224,7 +83,7 @@ let private dragenter_handler(state, setState) = fun (e: Browser.Types.DragEvent
     e.preventDefault()
     e.stopPropagation()
     setState {state with IsDraggedOver = true}
-        
+
 ///<summary>Removes dragenter styling.</summary>
 let private dragleave_handler(state, setState) = fun (e: Browser.Types.DragEvent) ->
     e.preventDefault()
@@ -236,7 +95,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
     let table = tables.GetTableAt(index)
     let state, setState = React.useState(FooterTab.init(table.Name))
     let id = $"ReorderMe_{index}_{table.Name}"
-    Bulma.tab [
+    Daisy.tab [
         if state.IsDraggedOver then prop.className "dragover-footertab"
         prop.draggable true
         prop.onDrop <| drop_handler (index, state, setState, dispatch)
@@ -255,14 +114,14 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
         // Use this to ensure updating reactelement correctly
         prop.key id
         prop.id id
-        if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then Bulma.tab.isActive
+        if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then tab.active
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView (Spreadsheet.ActiveView.Table index) |> Messages.SpreadsheetMsg |> dispatch)
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, int e.pageY
-            let deleteMsg rmv = fun e -> rmv e; Spreadsheet.RemoveTable index |> Messages.SpreadsheetMsg |> dispatch
-            let renameMsg rmv = fun e -> rmv e; {state with IsEditable = true} |> setState
+            let mousePosition = int e.pageX, int e.pageY - 30
+            let deleteMsg rmv = fun _ -> rmv(); Spreadsheet.RemoveTable index |> Messages.SpreadsheetMsg |> dispatch
+            let renameMsg rmv = fun _ -> rmv(); {state with IsEditable = true} |> setState
             let funcs : TableContextMenu.ContextFunctions = {
                 Rename = renameMsg
                 Delete = deleteMsg
@@ -278,7 +137,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                     if state.Name <> table.Name then
                         Spreadsheet.RenameTable (index, state.Name) |> Messages.SpreadsheetMsg |> dispatch
                     setState {state with IsEditable = false}
-                Bulma.input.text [
+                Html.input [
+                    prop.className "bg-transparent px-2 border-0 focus:ring-0"
                     prop.autoFocus(true)
                     prop.id (id + "input")
                     prop.onChange (fun e ->
@@ -297,9 +157,10 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                     prop.defaultValue table.Name
                 ]
             else
-                Html.a [
-                    Bulma.icon [Html.i [prop.className "fa-solid fa-table"]]
-                    Html.text table.Name
+                Html.i [prop.className "fa-solid fa-table"]
+                Html.span [
+                    prop.className "truncate"
+                    prop.text table.Name
                 ]
         ]
     ]
@@ -309,17 +170,15 @@ let MainMetadata(model: Model, dispatch: Messages.Msg -> unit) =
     let id = "Metadata-Tab"
     let nav = Spreadsheet.ActiveView.Metadata
     let order = nav.ViewIndex
-    Bulma.tab [
-        if model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
+    Daisy.tab [
+        if model.SpreadsheetModel.ActiveView = nav then tab.active
         prop.key id
         prop.id id
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
-            Html.a  [
-                Bulma.icon [Html.i [prop.className "fa-solid fa-circle-info"]]
-                Html.text model.SpreadsheetModel.FileType
-            ]
+            Html.i [prop.className "fa-solid fa-circle-info"]
+            Html.text model.SpreadsheetModel.FileType
         ]
     ]
 
@@ -328,8 +187,8 @@ let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
     let id = "Metadata-Tab"
     let nav = Spreadsheet.ActiveView.DataMap
     let order = nav.ViewIndex
-    Bulma.tab [
-        if model.SpreadsheetModel.ActiveView = nav then Bulma.tab.isActive
+    Daisy.tab [
+        if model.SpreadsheetModel.ActiveView = nav then tab.active
         prop.key id
         prop.id id
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
@@ -337,7 +196,7 @@ let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
             e.stopPropagation()
             e.preventDefault()
             let mousePosition = int e.pageX, int e.pageY
-            let deleteDatamapMsg rmv = fun e -> rmv e; SpreadsheetInterface.UpdateDatamap None |> Messages.InterfaceMsg |> dispatch
+            let deleteDatamapMsg rmv = fun _ -> rmv(); SpreadsheetInterface.UpdateDatamap None |> Messages.InterfaceMsg |> dispatch
             let funcs : DataMapContextMenu.ContextFunctions = {
                 Delete = deleteDatamapMsg
             }
@@ -347,10 +206,8 @@ let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
         )
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
-            Html.a [
-                Bulma.icon [Html.i [prop.className "fa-solid fa-map"]]
-                Html.text "Data Map"
-            ]
+            Html.i [prop.className "fa-solid fa-map"]
+            Html.text "Data Map"
         ]
     ]
 
@@ -359,7 +216,7 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
     let state, setState = React.useState(FooterTab.init())
     let order = System.Int32.MaxValue-1 // MaxValue will be sidebar toggle
     let id = "Add-Spreadsheet-Button"
-    Bulma.tab [
+    Daisy.tab [
         prop.key id
         prop.id id
         if state.IsDraggedOver then prop.className "dragover-footertab"
@@ -371,9 +228,9 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, int e.pageY
-            let addTableMsg rmv = fun e -> rmv e; SpreadsheetInterface.CreateAnnotationTable false |> Messages.InterfaceMsg |> dispatch
-            let addDatamapMsg rmv = fun e -> rmv e; SpreadsheetInterface.UpdateDatamap (DataMap.init() |> Some) |> Messages.InterfaceMsg |> dispatch
+            let mousePosition = int e.pageX, (int e.pageY - 20)
+            let addTableMsg rmv = fun _ -> rmv(); SpreadsheetInterface.CreateAnnotationTable false |> Messages.InterfaceMsg |> dispatch
+            let addDatamapMsg rmv = fun _ -> rmv(); SpreadsheetInterface.UpdateDatamap (DataMap.init() |> Some) |> Messages.InterfaceMsg |> dispatch
             let funcs : PlusContextMenu.ContextFunctions = {
                 AddTable = addTableMsg
                 AddDatamap = addDatamapMsg
@@ -384,40 +241,52 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
         )
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
-            Html.a [
-                prop.style [style.height.inheritFromParent; style.pointerEvents.none]
-                prop.children [
-                    Bulma.icon [
-                        Bulma.icon.isSmall
-                        prop.children [
-                            Html.i [prop.className "fa-solid fa-plus"]
-                        ]
-                    ]
-                ]
-            ]
+            Html.i [prop.className "fa-solid fa-plus"]
         ]
     ]
 
 let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
     let show = model.PersistentStorageState.ShowSideBar
-    let order = System.Int32.MaxValue
-    let id = "Toggle-Sidebar-Button"
-    Bulma.tab [
-        prop.key id
+    let id = "toggle-sidebar-button"
+    Html.div [
         prop.id id
-        prop.onClick (fun e -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
-        prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer; style.marginLeft length.auto]
+        prop.onClick (fun _ -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
+        prop.className "h-full cursor-pointer ml-auto"
         prop.children [
-            Html.a [
-                prop.style [style.height.inheritFromParent; style.pointerEvents.none]
+            Html.label [
+                // prop.for' "split-window-drawer"
+                prop.className "drawer-button btn btn-sm px-2 py-2 swap swap-rotate rounded-none h-full"
                 prop.children [
-                    Bulma.icon [
-                        Bulma.icon.isSmall
-                        prop.children [
-                            Html.i [prop.className ["fa-solid"; if show then "fa-chevron-right" else "fa-chevron-left"]]
-                        ]
-                    ]
+                    Html.input [prop.type'.checkbox]
+                    Html.i [prop.className ["fa-solid"; "fa-chevron-left"; "swap-off"]]
+                    Html.i [prop.className ["fa-solid"; "fa-chevron-right"; "swap-on" ]]
                 ]
             ]
+        ]
+    ]
+
+let SpreadsheetSelectionFooter (model: Model) dispatch =
+    Html.div [
+        prop.className "sticky bottom-0 flex flex-row border-t-2"
+        prop.children [
+            Html.div [
+                prop.className "tabs tabs-lifted w-full overflow-x-auto overflow-y-hidden
+                flex flex-row items-center pt-1
+                *:!border-b-0 *:gap-1 *:flex-nowrap"
+                prop.children [
+                    Daisy.tab  [
+                        prop.style [style.width (length.px 20); style.custom ("order", -2)]
+                    ]
+                    MainMetadata (model, dispatch)
+                    if model.SpreadsheetModel.HasDataMap() then
+                        MainDataMap (model, dispatch)
+                    for index in 0 .. (model.SpreadsheetModel.Tables.TableCount-1) do
+                        Main (index, model.SpreadsheetModel.Tables, model, dispatch)
+                    if model.SpreadsheetModel.CanHaveTables() then
+                        MainPlus (model, dispatch)
+                ]
+            ]
+            if model.SpreadsheetModel.TableViewIsActive() then
+                ToggleSidebar(model, dispatch)
         ]
     ]

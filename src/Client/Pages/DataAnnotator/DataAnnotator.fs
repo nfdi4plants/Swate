@@ -5,46 +5,43 @@ open DataAnnotator
 open Model
 open Messages
 open Feliz
-open Feliz.Bulma
+open Feliz.DaisyUI
 
 module private DataAnnotatorHelper =
 
     module DataAnnotatorButtons =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
-            Bulma.button.button [
-                prop.style [style.marginLeft length.auto]
+            Daisy.button.button [
                 prop.onClick rmvFile
+                button.outline
                 if model.DataAnnotatorModel.DataFile.IsNone then
-                    Bulma.button.isStatic
+                    button.disabled
                 else
-                    Bulma.color.isDanger
+                    button.error
                 prop.text "Reset"
             ]
 
         [<ReactComponent>]
         let UpdateSeparatorButton dispatch =
             let updateSeparator = fun s -> DataAnnotator.UpdateSeperator s |> DataAnnotatorMsg |> dispatch
-            let input, setInput = React.useState("")
-            Bulma.field.div [
-                field.hasAddons
-                prop.className "mb-0"
+            let input_, setInput = React.useState("")
+            Daisy.join [
                 prop.children [
-                    Bulma.control.div [
-                        Bulma.input.text [
-                            prop.placeholder ".. update separator"
-                            prop.defaultValue input
-                            prop.onChange(fun s -> setInput s)
-                            prop.onKeyDown(key.enter, fun e ->
-                                updateSeparator input
-                            )
-                        ]
+                    Daisy.input [
+                        input.bordered
+                        join.item
+                        prop.placeholder ".. update separator"
+                        prop.defaultValue input_
+                        prop.onChange(fun s -> setInput s)
+                        prop.onKeyDown(key.enter, fun e ->
+                            updateSeparator input_
+                        )
                     ]
-                    Bulma.control.div [
-                        Bulma.button.button [
-                            prop.text "Update"
-                            prop.onClick (fun _ -> updateSeparator input)
-                        ]
+                    Daisy.button.button [
+                        join.item
+                        prop.text "Update"
+                        prop.onClick (fun _ -> updateSeparator input_)
                     ]
                 ]
             ]
@@ -57,8 +54,8 @@ module private DataAnnotatorHelper =
                         prop.className "line-through"
                     prop.text "Has Header"
                 ]
-            Bulma.button.button [
-                if hasHeader then color.isSuccess
+            Daisy.button.button [
+                if hasHeader then button.primary
                 prop.onClick (fun _ -> DataAnnotator.ToggleHeader |> DataAnnotatorMsg |> dispatch)
                 prop.children txtEle
             ]
@@ -74,18 +71,23 @@ module private DataAnnotatorHelper =
                 | TargetColumn.Autodetect -> "Creates missing Input or Output column, if both exist submit will fail!"
                 | TargetColumn.Input -> "Create Input column, will overwrite!"
                 | TargetColumn.Output -> "Create Output column, will overwrite!"
-            Bulma.control.div [
-                control.hasIconsLeft
+            Daisy.tooltip [
+                tooltip.bottom
+                tooltip.text infoText
                 prop.children [
-                    Html.div [
-                        prop.title infoText
-                        prop.className "select"
-                        prop.defaultValue (string current)
-                        prop.onChange(fun (e: string) ->
-                            TargetColumn.fromString e |> setTarget
-                        )
+                    Daisy.indicator [
                         prop.children [
-                            Html.select [
+                            Html.i [
+                                prop.className "indicator-item fa-solid fa-info-circle fa-lg text-accent"
+                            ]
+                            Daisy.select [
+                                select.bordered
+                                join.item
+                                prop.title infoText
+                                prop.defaultValue (string current)
+                                prop.onChange(fun (e: string) ->
+                                            TargetColumn.fromString e |> setTarget
+                                        )
                                 prop.children [
                                     mkOption TargetColumn.Autodetect
                                     mkOption TargetColumn.Input
@@ -94,39 +96,22 @@ module private DataAnnotatorHelper =
                             ]
                         ]
                     ]
-                    Bulma.icon [
-                        icon.isLeft
-                        prop.children [
-                            Html.i [prop.className "fa-solid fa-info-circle"]
-                        ]
-                    ]
                 ]
             ]
-
         let UploadButton (ref: IRefValue<#Browser.Types.HTMLElement option>) (model: Model) (uploadFile: Browser.Types.File -> unit) =
-            let fileName = model.DataAnnotatorModel.DataFile |> Option.map (fun x -> x.DataFileName) |> Option.defaultValue "No file selected"
-            Bulma.file [
-                color.isSuccess
-                file.hasName
-                prop.children [
-                    Bulma.fileLabel.label [
-                        Bulma.fileInput [
-                            prop.ref ref
-                            prop.onChange uploadFile
-                        ]
-                        Bulma.fileCta [
-                            Bulma.fileIcon [Html.i [prop.className "fa-solid fa-upload"]]
-                            Bulma.fileLabel.span "Choose a file..."
-                        ]
-                        Bulma.fileName fileName
-                    ]
-                ]
+            Daisy.file [
+                prop.className "col-span-2"
+                file.primary
+                file.bordered
+                prop.ref ref
+                prop.onChange uploadFile
             ]
 
-        let OpenModalButton model mkOpen =  
-            Bulma.button.button [
+        let OpenModalButton model mkOpen =
+            Daisy.button.button [
+                button.primary
                 if model.DataAnnotatorModel.DataFile.IsNone then
-                    Bulma.button.isStatic
+                    button.disabled
                 prop.text "Open Annotator"
                 prop.onClick mkOpen
             ]
@@ -135,50 +120,42 @@ module private DataAnnotatorHelper =
 
 
     let ModalMangementComponent ref (model: Model) (openModal: Browser.Types.Event -> unit) rmvFile uploadFile =
-        Bulma.field.div [
-            field.isGroupedMultiline
-            field.isGrouped
+        Html.div [
+            prop.className "grid grid-cols-2 gap-4"
             prop.children [
-                Bulma.control.div [
-                    UploadButton ref model uploadFile
-                ]
-                Bulma.control.div [
-                    ResetButton model rmvFile
-                ]
-                Bulma.control.div [
-                    OpenModalButton model openModal
-                ]
+                UploadButton ref model uploadFile
+                ResetButton model rmvFile
+                OpenModalButton model openModal
             ]
         ]
 
     let DataFileConfigComponent model rmvFile target setTarget dispatch =
-        Bulma.block [
-            Bulma.buttons [
-                prop.children [
-                    match model.SpreadsheetModel.ActiveView with
-                    | Spreadsheet.ActivePattern.IsTable ->  
-                        UpdateSeparatorButton dispatch
-                        UpdateIsHeaderCheckbox model dispatch
-                        UpdateTargetColumn target setTarget
-                        ResetButton model rmvFile
-                    | Spreadsheet.ActivePattern.IsDataMap ->
-                        UpdateSeparatorButton dispatch
-                        UpdateIsHeaderCheckbox model dispatch
-                        ResetButton model rmvFile
-                    | _ -> Html.none
-                ]
+        Html.div [
+            prop.className "flex flex-row gap-4"
+            prop.children [
+                match model.SpreadsheetModel.ActiveView with
+                | Spreadsheet.ActivePattern.IsTable ->
+                    UpdateSeparatorButton dispatch
+                    UpdateIsHeaderCheckbox model dispatch
+                    UpdateTargetColumn target setTarget
+                    ResetButton model rmvFile
+                | Spreadsheet.ActivePattern.IsDataMap ->
+                    UpdateSeparatorButton dispatch
+                    UpdateIsHeaderCheckbox model dispatch
+                    ResetButton model rmvFile
+                | _ -> Html.none
             ]
         ]
 
     let FileMetadataComponent (file: DataFile) =
-        Bulma.block [
+        Html.p [
             Html.strong file.DataFileName
             Html.text " - "
             Html.strong file.DataFileType
         ]
 
     let IsAddedIcon =
-        Bulma.icon [
+        Html.div [
             prop.className "absolute top-0 right-0 has-text-success m-0"
             prop.children [
                     Html.i [prop.className "fa-solid fa-square-plus fa-lg"]
@@ -188,7 +165,7 @@ module private DataAnnotatorHelper =
     let CellButton (isHeader:bool, content: string, dtrgt: DataTarget option, state: Set<DataTarget>, setState) =
         let mkCell: IReactProperty list -> ReactElement = if isHeader then Html.th else Html.td
         match dtrgt with
-        | Some dtrgt -> 
+        | Some dtrgt ->
             let isDirectlyActive = state.Contains dtrgt
             let isActive =
                 match dtrgt with
@@ -198,12 +175,10 @@ module private DataAnnotatorHelper =
                 prop.className "p-0"
                 prop.key $"DataAnnotator_{dtrgt.ToReactKey()}"
                 prop.children [
-                    Bulma.button.button [
+                    Daisy.button.button [
                         prop.className ["w-full rounded-none border-0 relative"; if not isHeader then "font-light"]
                         if isDirectlyActive || isActive then
-                            color.isPrimary
-                        elif isHeader then
-                            color.hasTextLink
+                            button.primary
                         prop.onClick(fun _ ->
                             if isDirectlyActive then state.Remove dtrgt else state.Add dtrgt
                             |> setState
@@ -266,8 +241,8 @@ module private DataAnnotatorHelper =
                 ]
         |]
         let rowHeight = 57.
-        Bulma.block [
-            prop.className "overflow-hidden"
+        Html.div [
+            prop.className "overflow-hidden flex"
             prop.children [
                 Components.LazyLoadTable.Main(
                     "DataAnnotatorFileView",
@@ -281,6 +256,7 @@ module private DataAnnotatorHelper =
 
 open DataAnnotatorHelper
 open System
+open Components
 
 type DataAnnotator =
 
@@ -290,43 +266,49 @@ type DataAnnotator =
         let init: unit -> Set<DataTarget> = fun () -> Set.empty
         let state, setState = React.useState(init)
         let (targetCol: TargetColumn), setTargetCol = React.useState(TargetColumn.Autodetect)
-        Bulma.modal [
-            Bulma.modal.isActive
+        Daisy.modal.div [
+            modal.active
             prop.children [
-                Bulma.modalBackground [ prop.onClick rmv ]
-                Bulma.modalCard [
-                    prop.style [style.maxHeight(length.percent 80); style.width (length.perc 80); style.overflowY.hidden]
+                Daisy.modalBackdrop [ prop.onClick rmv ]
+                Daisy.modalBox.div [
+                    prop.className "max-w-none"
                     prop.children [
-                        Bulma.modalCardHead [
-                            Bulma.modalCardTitle "Data Annotator"
-                            Bulma.delete [ prop.onClick rmv ]
-                        ]
-                        Bulma.modalCardBody [
-                            prop.className "p-5 overflow-hidden flex flex-col"
+                        Daisy.card [
+                            card.compact
                             prop.children [
-                                DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
-                                FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
-                                FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
-                            ]
-                        ]    
-                        Bulma.modalCardFoot [
-                            Bulma.button.button [
-                                color.isInfo
-                                prop.style [style.marginLeft length.auto]
-                                prop.text "Submit"
-                                prop.onClick(fun e ->
-                                    match model.DataAnnotatorModel.DataFile with
-                                    | Some dtf ->
-                                        let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
-                                        let name = dtf.DataFileName
-                                        let dt = dtf.DataFileType
-                                        SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}
-                                        |> InterfaceMsg
-                                        |> dispatch
-                                    | None ->
-                                        logw "No file selected"
-                                    rmv e
-                                )
+                                Daisy.cardBody [
+                                    prop.className "grid grid-cols-1 grid-rows-[1fr_1fr_20px_8fr_1fr] h-[600px] w-full overflow-hidden"
+                                    prop.children [
+                                        Daisy.cardTitle [
+                                            Html.p "Data Annotator"
+                                            Daisy.cardActions [Components.DeleteButton(props = [prop.onClick rmv]) |> prop.children; prop.className "justify-end"]
+                                        ]
+                                        DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
+                                        FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
+                                        // Html.div [prop.text "Test 4"; prop.className "bg-yellow-300"]
+                                        FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
+                                        Daisy.cardActions [
+                                            Daisy.button.button [
+                                                button.info
+                                                prop.style [style.marginLeft length.auto]
+                                                prop.text "Submit"
+                                                prop.onClick(fun e ->
+                                                    match model.DataAnnotatorModel.DataFile with
+                                                    | Some dtf ->
+                                                        let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
+                                                        let name = dtf.DataFileName
+                                                        let dt = dtf.DataFileType
+                                                        SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}
+                                                        |> InterfaceMsg
+                                                        |> dispatch
+                                                    | None ->
+                                                        logw "No file selected"
+                                                    rmv e
+                                                )
+                                            ]
+                                        ]
+                                    ]
+                                ]
                             ]
                         ]
                     ]
@@ -351,10 +333,17 @@ type DataAnnotator =
             UpdateDataFile None |> DataAnnotatorMsg |> dispatch
             if ref.current.IsSome then
                 ref.current.Value.value <- null
-        Html.div [
-            ModalMangementComponent ref model (fun _ -> setShowModal true) rmvFile uploadFile
-            match model.DataAnnotatorModel, showModal with
-            | { DataFile = Some _; ParsedFile = Some _ }, true -> DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false)
-            | _, _ -> Html.none
+        SidebarComponents.SidebarLayout.Container [
+
+            SidebarComponents.SidebarLayout.Header "Data Annotator"
+
+            SidebarComponents.SidebarLayout.Description "Specify exact data points for annotation."
+
+            SidebarComponents.SidebarLayout.LogicContainer [
+                ModalMangementComponent ref model (fun _ -> setShowModal true) rmvFile uploadFile
+                match model.DataAnnotatorModel, showModal with
+                | { DataFile = Some _; ParsedFile = Some _ }, true -> DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false)
+                | _, _ -> Html.none
+            ]
         ]
 

@@ -7,38 +7,6 @@ open Feliz
 open Routing
 open Database
 
-type WindowSize =
-/// < 575
-| Mini
-/// > 575
-| MobileMini
-/// > 768
-| Mobile
-/// > 1023
-| Tablet
-/// > 1215
-| Desktop
-/// > 1407
-| Widescreen
-with
-    member this.threshold =
-        match this with
-        | Mini -> 0
-        | MobileMini -> 575
-        | Mobile -> 768
-        | Tablet -> 1023
-        | Desktop -> 1215
-        | Widescreen -> 1407
-    static member ofWidth (width:int) =
-        match width with
-        | _ when width < MobileMini.threshold -> Mini
-        | _ when width < Mobile.threshold -> MobileMini
-        | _ when width < Tablet.threshold -> Mobile
-        | _ when width < Desktop.threshold -> Tablet
-        | _ when width < Widescreen.threshold -> Desktop  
-        | _ when width >= Widescreen.threshold -> Widescreen
-        | anyElse -> failwithf "'%A' triggered an unexpected error when calculating screen size from width." anyElse        
-
 type LogItem =
     | Debug of (System.DateTime*string)
     | Info  of (System.DateTime*string)
@@ -107,7 +75,7 @@ module TermSearch =
 
 module AdvancedSearch =
 
-   
+
     type AdvancedSearchSubpages =
     | InputFormSubpage
     | ResultsSubpage
@@ -160,14 +128,18 @@ type PersistentStorageState = {
     }
 
 type PageState = {
-    CurrentPage : Routing.Route
-    IsExpert    : bool
+    SidebarPage : Routing.SidebarPage
+    MainPage: Routing.MainPage
 } with
-    static member init () = 
+    static member init () =
         {
-            CurrentPage = Route.BuildingBlock
-            IsExpert = false
+            SidebarPage = SidebarPage.BuildingBlock
+            MainPage = MainPage.Default
         }
+    member this.IsHome =
+        match this.MainPage with
+        | MainPage.Default -> true
+        | _ -> false
 
 module FilePicker =
     type Model = {
@@ -274,7 +246,7 @@ module Protocol =
 
     /// This model is used for both protocol insert and protocol search
     type Model = {
-        // Client 
+        // Client
         Loading                 : bool
         LastUpdated             : System.DateTime option
         // ------ Protocol from Database ------
