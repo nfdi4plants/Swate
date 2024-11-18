@@ -123,11 +123,11 @@ type FileExporter =
                     ]
                     Html.li [
                         Html.b "RO-Crate Metadata"
-                        Html.text ": ROCrate format ("
+                        Html.text ": RO-Crate format ("
                         Html.a [
                             prop.target.blank
                             prop.href "https://www.researchobject.org/ro-crate/"
-                            prop.text "ROCrate"
+                            prop.text "RO-Crate"
                         ]
                         Html.text ", "
                         Html.a [
