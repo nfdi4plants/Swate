@@ -78,6 +78,8 @@ module ARCtrlUtil =
 
 module ARCtrlExtensions =
 
+    open System
+
     type ArcFiles with
 
         /// <summary>
@@ -165,8 +167,9 @@ module ARCtrlExtensions =
 
                 let _ =
                     excelTable.load(U2.Case2 (ResizeArray [|"name"|])) |> ignore
-                    bodyRowRange.load(U2.Case2 (ResizeArray [|"numberFormat"; "values";|])) |> ignore
-                    headerRange.load(U2.Case2 (ResizeArray [|"columnCount"; "columnIndex"; "rowIndex"; "values"; |]))
+                    headerRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+                    bodyRowRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+                    
 
                 return! context.sync().``then``(fun _ ->
                     let headers =
@@ -187,7 +190,7 @@ module ARCtrlExtensions =
                                 |> Option.defaultValue ""
                             )
                         )
-                    try 
+                    try
                         ArcTable.fromStringSeqs(excelTable.worksheet.name, headers, bodyRows) |> Result.Ok
                     with
                         | exn -> Result.Error exn
@@ -266,8 +269,8 @@ module ARCtrlExtensions =
                 let bodyRowRange = excelTable.getDataBodyRange()
 
                 let _ =
-                    headerRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-                    bodyRowRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
+                    headerRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
+                    bodyRowRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
 
                 do! context.sync()
 
@@ -333,10 +336,12 @@ open ARCtrlExtensions
 let tryGetPrevAnnotationTableName (context: RequestContext) =
     promise {
 
-        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
-        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|" tables"|]))
+        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
         let tables = context.workbook.tables
-        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "position"; "values"|]))
+        let _ =
+            activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
+            tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "position"; "values"|]))
 
         let! prevTable = context.sync().``then``(fun _ ->
             /// Get all names of all tables in the whole workbook.
@@ -456,18 +461,19 @@ module AnnotationTable =
     /// <param name="context"></param>
     let tryGetActive (context: RequestContext) =
         promise {
-            let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+            let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
             let tables = context.workbook.tables
             let _ =
+                activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
                 context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|])) |> ignore
                 tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "style"; "values"|]))
-
+            
             return! context.sync().``then``(fun _ ->
                 /// Get name of the table of currently active worksheet.
                 let activeTable =
                     tables.items
                     |> Seq.toArray
-                    |> Array.tryFind (fun table ->
+                    |> Array.tryFind (fun table ->                        
                         table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) && table.worksheet.position = activeWorksheet.position
                     )
                 activeTable
@@ -1017,7 +1023,7 @@ let joinTable (tableToAdd: ArcTable, options: TableJoinOptions option) =
                         newTable.columns.load(propertyNames = U2.Case2 (ResizeArray["name"; "items"])) |> ignore
                         newBodyRange.load(propertyNames = U2.Case2 (ResizeArray["name"; "columnCount"; "values"]))
 
-                    do! context.sync().``then``(fun _ -> ())
+                    do! context.sync()
 
                     do! AnnotationTable.format(newTable, context, true)
 
@@ -1103,7 +1109,7 @@ let getArcIndex (excelTable: Table) (excelColumnIndex: float) (context: RequestC
         let protoHeaders = excelTable.getHeaderRowRange()
         let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let headers = AnnotationTable.getHeaders protoHeaders.values
 
@@ -1159,7 +1165,7 @@ let getArcMainColumn (excelTable: Table) (arcTable: ArcTable) (context: RequestC
         let protoHeaders = excelTable.getHeaderRowRange()
         let _ = protoHeaders.load(U2.Case2 (ResizeArray(["values"])))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let headers = AnnotationTable.getHeaders protoHeaders.values
 
@@ -1296,7 +1302,7 @@ let removeSelectedAnnotationBlock () =
                     log $"delete column {i}"
                     column.delete()
 
-                do! context.sync().``then``(fun _ -> ())
+                do! context.sync()
 
                 do! AnnotationTable.format(excelTable, context, true)
 
@@ -1442,7 +1448,7 @@ let convertBuildingBlock () =
 
                     let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["values"; "worksheet"]))
 
-                    do! context.sync().``then``(fun _ -> ())
+                    do! context.sync()
 
                     let activeSheet = newTableRange.worksheet
                     let _ = activeSheet.load(U2.Case2 (ResizeArray[|"tables"|]))
@@ -1589,9 +1595,11 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
             | None ->
                 //have to try to get the table without check in order to obtain an indexed error of the building block
                 let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
-                let activeWorksheet = context.workbook.worksheets.getActiveWorksheet().load(U2.Case1 "position")
+                let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
                 let tables = context.workbook.tables
-                let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+                let _ =
+                    activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
+                    tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
 
                 let! table = context.sync().``then``(fun _ ->
                     let activeWorksheetPosition = activeWorksheet.position
@@ -1676,132 +1684,6 @@ let updateSelectedBuildingBlocks (excelTable: Table) (arcTable: ArcTable) (prope
                 excelTable.columns.items.[pIndex].values <- bodyValues
             )
         }
-/// <summary>
-/// Validates the arc table of the currently selected work sheet
-/// When the validations returns an error, an error is returned to the user
-/// When the arc table is valid one or more of the following processes happen:
-/// * When the main column of term or unit is empty, then the Term Source REF and Term Accession Number are emptied
-/// * When the main column of term or unit contains a value, the Term Source REF and Term Accession Number are filled
-/// with the correct value
-/// The later is not implemented yet
-/// </summary>
-let rectifyTermColumns () =
-    Excel.run(fun context ->
-        promise {
-            let! excelTableRes = AnnotationTable.tryGetActive context
-
-            //When there are messages, then there is an error and further processes can be skipped because the annotation table is not valid
-            match excelTableRes with
-            | None -> return [InteropLogging.NoActiveTableMsg]
-            | Some excelTable ->
-                //Arctable enables a fast check for term and unit building blocks
-                let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
-
-                match arcTableRes with
-                | Result.Ok arcTable ->
-                    let columns = arcTable.Columns
-                    let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
-
-                    do! context.sync().``then``(fun _ -> ())
-
-                    let items = excelTable.columns.items
-
-                    let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
-                    let columns =
-                        items
-                        |> Array.ofSeq
-                        |> Array.map (fun c ->
-                            c.values
-                            |> Array.ofSeq
-                            |> Array.collect (fun cc ->
-                                cc
-                                |> Array.ofSeq
-                                |> Array.choose (fun r -> if r.IsSome then Some (r.ToString()) else None)
-                            )
-                        )
-
-                    let body = excelTable.getDataBodyRange()
-
-                    let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
-
-                    do! context.sync()
-
-                    for i in 0..columns.Length-1 do
-                        let column = columns.[i]
-                        if Array.contains (column.[0].Trim()) termAndUnitHeaders then
-                            let! potBuildingBlock = getCompositeColumnInfoByIndex excelTable i context
-                            let buildingBlock = potBuildingBlock |> Array.ofSeq
-
-                            // Check whether building block is unit or not
-                            // When it is unit, then delete the property column values only when the unit is empty, independent of the main column
-                            // When it is a term, then delete the property column values when the main column is empty
-                            let mainColumn =
-                                if snd buildingBlock.[1] = "Unit" then
-                                    excelTable.columns.items.Item (fst buildingBlock.[1])
-                                else excelTable.columns.items.Item (fst buildingBlock.[0])
-                            let potPropertyColumns =
-                                buildingBlock.[1..]
-                                |> Array.map (fun (index, _) -> index, excelTable.columns.items.Item index)
-
-                            let propertyColumns =
-                                potPropertyColumns
-                                |> Array.map (fun (index, c) ->
-                                    index,
-                                    c.values
-                                    |> Array.ofSeq
-                                    |> Array.collect (fun pc ->
-                                        pc
-                                        |> Array.ofSeq
-                                        |> Array.choose (fun pcv -> if pcv.IsSome then Some (pcv.ToString()) else None)
-                                    )
-                                )
-
-                            let mainColumnHasValues =
-                                mainColumn.values
-                                |> Array.ofSeq
-                                |> Array.collect (fun c ->
-                                    c
-                                    |> Array.ofSeq
-                                    |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
-                                    |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
-                                )
-
-                            let mutable names = []
-                            let mutable indices = []
-
-                            //Check whether value of property colum is fitting for value of main column and adapt if not
-                            //Delete values of property columns when main column is empty
-                            for pi in 0..propertyColumns.Length-1 do
-                                let pIndex, pcv = propertyColumns.[pi]
-                                let values = Array.create (arcTable.RowCount + 1) ""
-                                for mainIndex in 0..mainColumnHasValues.Length-1 do
-                                    let mc, isNull = mainColumnHasValues.[mainIndex]
-                                    if not isNull then
-                                        names <- mc::names
-                                        indices <- mainIndex::indices
-                                        values.[mainIndex] <- pcv.[mainIndex]
-                                let bodyValues =
-                                    values
-                                    |> Array.map (box >> Some)
-                                    |> Array.map (fun c -> ResizeArray[c])
-                                    |> ResizeArray
-                                excelTable.columns.items.[pIndex].values <- bodyValues
-
-                            let! terms = searchTermsInDatabase names
-
-                            let indexedTerms =
-                                indices
-                                |> List.mapi (fun ii index ->
-                                    index, terms.[ii])
-
-                            do! updateSelectedBuildingBlocks excelTable arcTable propertyColumns indexedTerms
-                    do! AnnotationTable.format(excelTable, context, true)
-
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
-
-                | Result.Error ex -> return [InteropLogging.Msg.create InteropLogging.Error ex.Message]
-        }
-    )
 
 /// <summary>
 /// Try to get the values of top level meta data from excel worksheet
@@ -1816,7 +1698,7 @@ let parseToTopLevelMetadata<'T> identifier (parseToMetadata: string option seq s
             workSheet.load(propertyNames = U2.Case2 (ResizeArray[|"name"|])) |> ignore
             range.load(propertyNames = U2.Case2 (ResizeArray["values"; "rowCount"]))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         if range.rowCount > 1 then
 
@@ -1842,8 +1724,13 @@ let parseToTopLevelMetadata<'T> identifier (parseToMetadata: string option seq s
 let getExcelAnnotationTables (context: RequestContext) =
     promise {
         let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
+
+        do! context.sync()
+
         let tables = context.workbook.tables
-        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "values"|]))
+        let _ = tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "name"|]))
+
+        do! context.sync()
 
         let! annotationTables =
             context.sync().``then``(fun _ ->
@@ -1884,7 +1771,7 @@ let deleteTopLevelMetadata () =
         promise {
             let worksheets = context.workbook.worksheets
 
-            let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
+            let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"; "values"|]))
 
             do! context.sync()
 
@@ -1922,9 +1809,8 @@ let private updateWorkSheet (context: RequestContext) (worksheetName: string) (s
 
         do! context.sync()
 
-        let range = worksheet.getUsedRange true
+        let range = worksheet.getUsedRange true        
         let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
-
         do! context.sync()
 
         range.values <- null
@@ -1984,7 +1870,7 @@ let expandTableRowCount (table: Table) (tableRowCount: int) (tableColumnCount: i
 
         ExcelUtil.Table.addRows -1. table tableColumnCount diff "" |> ignore
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
     }    
 
 /// <summary>
@@ -1997,7 +1883,7 @@ let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (
     promise {
         let _ = selectedRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let selectedRowCount =   int selectedRange.rowCount
         let selectedColumnCount = int selectedRange.columnCount
@@ -2017,7 +1903,7 @@ let insertOntology (selectedRange: Excel.Range) (ontology: OntologyAnnotation) (
         selectedRange.format.autofitColumns()
         selectedRange.format.autofitRows()
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
     }
 
 /// <summary>
@@ -2032,7 +1918,7 @@ let private isSelectedOutsideAnnotationTable (tableRange: Excel.Range) (selected
             tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount";|])) |> ignore
             selectedRange.load(U2.Case2 (ResizeArray[|"columnIndex"; "rowIndex";|]))
 
-        do! context.sync().``then``(fun _ -> ())
+        do! context.sync()
 
         let tableMaxRow = tableRange.rowCount
         let tableMaxColumn = tableRange.columnCount
@@ -2062,7 +1948,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
                 let mutable tableRange = excelTable.getRange()
                 let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
 
-                do! context.sync().``then``(fun _ -> ())
+                do! context.sync()
 
                 let! isAnnotationTableSelected = isSelectedOutsideAnnotationTable tableRange selectedRange context
 
@@ -2084,7 +1970,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
 
                     let _ = tableRange.load(U2.Case2 (ResizeArray[|"columnCount"; "rowCount"; "values"|]))
 
-                    do! context.sync().``then``(fun _ -> ())
+                    do! context.sync()
 
                     let tableValues =
                         tableRange.values
@@ -2147,7 +2033,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
 
                         tableRange.values <- bodyValues
 
-                        do! context.sync().``then``(fun _ -> ())
+                        do! context.sync()
 
                         do! AnnotationTable.format(excelTable, context, true)
 
@@ -2156,7 +2042,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
             | _ ->
                 let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowCount"; "rowIndex"|]))
 
-                do! context.sync().``then``(fun _ -> ())
+                do! context.sync()
 
                 do! insertOntology selectedRange ontologyAnnotation context
                 return [InteropLogging.Msg.create InteropLogging.Info "Filled the columns with the selected term"]
@@ -2255,7 +2141,6 @@ let insertFileNamesFromFilePicker (fileNameList: string list) =
 
 let getTableMetaData () =
     Excel.run (fun context ->
-
         promise {
             let! excelTable = AnnotationTable.tryGetActive context
             if excelTable.IsNone then failwith "Error. No active table found!"
@@ -2290,20 +2175,18 @@ let getTableMetaData () =
     )
 
 type Main =
-
     /// <summary>
     /// Reads all excel information and returns ArcFiles object, with metadata and tables.
     /// </summary>
-    static member tryParseToArcFile (?getTables) =
+    static member tryParseToArcFile (?getTables, ?context0) =
         let getTables = defaultArg getTables true
-        Excel.run(fun context ->
+        excelRunWith context0 <| fun context ->
             promise {
+                let _ = context.workbook.load(propertyNames = U2.Case2 (ResizeArray[|"worksheets"|]))
+                do! context.sync()
                 let worksheets = context.workbook.worksheets
-
-                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"values"; "name"|]))
-
-                do! context.sync().``then``(fun _ -> ())
-
+                let _ = worksheets.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
+                do! context.sync()
                 let worksheetTopLevelMetadata =
                     worksheets.items
                     |> Seq.tryFind (fun item -> isTopLevelMetadataSheet item.name)
@@ -2369,7 +2252,6 @@ type Main =
                     
                 | _ -> return Result.Error [InteropLogging.Msg.create InteropLogging.Error $"No top level metadata sheet is available that determines the type of data!"]
             }
-        )
 
     /// <summary>
     /// Create a new annotation table based on an arcTable 
@@ -2383,27 +2265,20 @@ type Main =
                 //delete existing worksheet with the same name
                 let worksheet0 = context.workbook.worksheets.getItemOrNullObject(worksheetName)
                 worksheet0.delete()
-
                 // create new worksheet
                 let worksheet = context.workbook.worksheets.add(worksheetName)
                 do! context.sync()
-
                 let tableValues = arcTable.ToStringSeqs()
                 let rowCount = tableValues.Count
                 let columnCount = tableValues |> Seq.map Seq.length |> Seq.max
                 let tableRange = worksheet.getRangeByIndexes(0, 0, rowCount, columnCount)
-
                 let table = worksheet.tables.add(U2.Case1 tableRange, true)
-
                 tableRange.values <- tableValues
                 table.name <- createNewTableName()
                 table.style <- TableStyleLight
-
                 // Only activate the worksheet if this function is specifically called
                 if context0.IsNone then worksheet.activate()
-
                 do! context.sync()
-
                 return worksheet, table
             }
 
@@ -2411,31 +2286,145 @@ type Main =
     /// This function deletes all existing arc tables in the excel file and metadata sheets, and writes a new ArcFile to excel
     /// </summary>
     /// <param name="arcFiles"></param>
-    static member updateArcFile (arcFiles: ArcFiles) =
-        Excel.run(fun context ->
+    static member updateArcFile (arcFiles: ArcFiles, ?context0) =
+        excelRunWith context0 <| fun context ->
             promise {
                 let worksheetName, seqOfSeqs = arcFiles.MetadataToExcelStringValues()
-
                 let! updatedWorksheet = updateWorkSheet context worksheetName seqOfSeqs
-
                 let tables = arcFiles.Tables()
                 for table in tables do
-                    do! Main.createNewAnnotationTable(table, context0=context).``then``(fun _ -> ())
-
+                    do! Main.createNewAnnotationTable(table, context).``then``(fun _ -> ())
                 updatedWorksheet.activate()
-
                 return [InteropLogging.Msg.create InteropLogging.Info $"Replaced existing Swate information! Added {tables.TableCount} tables!"]
             }
-        )
+
+    /// <summary>
+    /// Validates the arc table of the currently selected work sheet
+    /// When the validations returns an error, an error is returned to the user
+    /// When the arc table is valid one or more of the following processes happen:
+    /// * When the main column of term or unit is empty, then the Term Source REF and Term Accession Number are emptied
+    /// * When the main column of term or unit contains a value, the Term Source REF and Term Accession Number are filled
+    /// with the correct value
+    /// The later is not implemented yet
+    /// </summary>
+    static member rectifyTermColumns (?context0, ?getTerms0) =
+        excelRunWith context0 <| fun context ->
+            promise {
+                let! excelTableRes = AnnotationTable.tryGetActive context
+                //When there are messages, then there is an error and further processes can be skipped because the annotation table is not valid
+                match excelTableRes with
+                | None -> return [InteropLogging.NoActiveTableMsg]
+                | Some excelTable ->
+                    //Arctable enables a fast check for term and unit building blocks
+                    let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
+                    match arcTableRes with
+                    | Result.Ok arcTable ->
+                        let columns = arcTable.Columns
+                        let _ = excelTable.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "rowCount"; "values";|]))
+                        do! context.sync()
+                        let items = excelTable.columns.items
+                        let termAndUnitHeaders = columns |> Array.choose (fun item -> if item.Header.IsTermColumn then Some (item.Header.ToString()) else None)
+                        let columns =
+                            items
+                            |> Array.ofSeq
+                            |> Array.map (fun c ->
+                                c.values
+                                |> Array.ofSeq
+                                |> Array.collect (fun cc ->
+                                    cc
+                                    |> Array.ofSeq
+                                    |> Array.choose (fun r -> if r.IsSome then Some (r.ToString()) else None)
+                                )
+                            )
+                        let body = excelTable.getDataBodyRange()
+                        let _ = body.load(propertyNames = U2.Case2 (ResizeArray[|"values"|]))
+
+                        do! context.sync()
+                        for i in 0..columns.Length-1 do
+                            let column = columns.[i]
+                            if Array.contains (column.[0].Trim()) termAndUnitHeaders then
+                                let! potBuildingBlock = getCompositeColumnInfoByIndex excelTable i context
+                                let buildingBlock = potBuildingBlock |> Array.ofSeq
+
+                                // Check whether building block is unit or not
+                                // When it is unit, then delete the property column values only when the unit is empty, independent of the main column
+                                // When it is a term, then delete the property column values when the main column is empty
+                                let mainColumn =
+                                    if snd buildingBlock.[1] = "Unit" then
+                                        excelTable.columns.items.Item (fst buildingBlock.[1])
+                                    else excelTable.columns.items.Item (fst buildingBlock.[0])
+                                let potPropertyColumns =
+                                    buildingBlock.[1..]
+                                    |> Array.map (fun (index, _) -> index, excelTable.columns.items.Item index)
+
+                                let propertyColumns =
+                                    potPropertyColumns
+                                    |> Array.map (fun (index, c) ->
+                                        index,
+                                        c.values
+                                        |> Array.ofSeq
+                                        |> Array.collect (fun pc ->
+                                            pc
+                                            |> Array.ofSeq
+                                            |> Array.choose (fun pcv -> if pcv.IsSome then Some (pcv.ToString()) else None)
+                                        )
+                                    )
+
+                                let mainColumnHasValues =
+                                    mainColumn.values
+                                    |> Array.ofSeq
+                                    |> Array.collect (fun c ->
+                                        c
+                                        |> Array.ofSeq
+                                        |> Array.choose (fun cc -> if cc.IsSome then Some (cc.ToString()) else None)
+                                        |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
+                                    )
+
+                                let mutable names = []
+                                let mutable indices = []
+
+                                //Check whether value of property colum is fitting for value of main column and adapt if not
+                                //Delete values of property columns when main column is empty
+                                for pi in 0..propertyColumns.Length-1 do
+                                    let pIndex, pcv = propertyColumns.[pi]
+                                    let values = Array.create (arcTable.RowCount + 1) ""
+                                    for mainIndex in 0..mainColumnHasValues.Length-1 do
+                                        let mc, isNull = mainColumnHasValues.[mainIndex]
+                                        if not isNull then
+                                            names <- mc::names
+                                            indices <- mainIndex::indices
+                                            values.[mainIndex] <- pcv.[mainIndex]
+                                    let bodyValues =
+                                        values
+                                        |> Array.map (box >> Some)
+                                        |> Array.map (fun c -> ResizeArray[c])
+                                        |> ResizeArray
+                                    excelTable.columns.items.[pIndex].values <- bodyValues
+
+                                let getTerms = defaultArg getTerms0 searchTermsInDatabase
+
+                                let! terms = getTerms names
+
+                                let indexedTerms =
+                                    indices
+                                    |> List.mapi (fun ii index ->
+                                        index, terms.[ii])
+
+                                do! updateSelectedBuildingBlocks excelTable arcTable propertyColumns indexedTerms
+                        do! AnnotationTable.format(excelTable, context, true)
+
+                        return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+
+                    | Result.Error ex -> return [InteropLogging.Msg.create InteropLogging.Error ex.Message]
+            }
 
     /// <summary>
     /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
     /// </summary>
     /// <param name="newColumn"></param>
-    static member addCompositeColumn (newColumn: CompositeColumn,(*newHeader: CompositeHeader, ?newValues: U2<CompositeCell, CompositeCell[]>,*) ?table: Excel.Table, ?context: RequestContext) =
-        excelRunWith context <| fun context ->
+    static member addCompositeColumn (newColumn: CompositeColumn,(*newHeader: CompositeHeader, ?newValues: U2<CompositeCell, CompositeCell[]>,*) ?table: Excel.Table, ?context0: RequestContext) =
+        excelRunWith context0 <| fun context ->
             promise {
-
                 let! excelTable =
                     match table with
                     | Some table -> promise {return Some table}
@@ -2454,7 +2443,7 @@ type Main =
                             Array.create arcTable.RowCount newColumn.Cells.[0]
                         else
                             newColumn.Cells
-
+                    
                     arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
                     let! _ = Main.createNewAnnotationTable(arcTable)

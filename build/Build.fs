@@ -347,13 +347,15 @@ Target.create "RunDB" (fun _ ->
 module Tests =
 
     let buildSharedTests () = run dotnet [ "build" ] sharedTestsPath
+    /// This disables microsoft data collection for using `office-addin-mock`
+    let disableUserData() = run npx [ "office-addin-usage-data"; "off" ] __SOURCE_DIRECTORY__
 
     let Watch() =
         [
             "server", dotnet [ "watch"; "run" ] serverTestsPath
             // This below will start web ui for tests, but cannot execute due to office-addin-mock
-            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath
-            // "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
+            //"client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath
+            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js"; "--watch" ] clientTestsPath
         ]
         |> runParallel
 
@@ -387,6 +389,7 @@ let main args =
         | _ -> Run(false); 0
     | "test" :: a ->
         Tests.buildSharedTests()
+        Tests.disableUserData()
         match a with
         | "watch" :: _ -> Tests.Watch(); 0
         | _ -> Tests.Run(); 0
