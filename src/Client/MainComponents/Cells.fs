@@ -11,30 +11,6 @@ open Shared
 open ARCtrl
 open Components
 open Model
-
-module private CellComponents =
-
-    let extendHeaderButton (state_extend: Set<int>, columnIndex, setState_extend) =
-        let isExtended = state_extend.Contains(columnIndex)
-        Html.div [
-            prop.style [
-                style.minWidth 25
-                style.cursor.pointer
-            ]
-            prop.onDoubleClick(fun e ->
-                e.stopPropagation()
-                e.preventDefault()
-                ()
-            )
-            prop.onClick(fun e ->
-                e.stopPropagation()
-                e.preventDefault()
-                let nextState = if isExtended then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
-                setState_extend nextState
-            )
-            prop.children [Html.i [prop.classes ["fa-sharp"; "fa-solid"; "fa-angles-up"; if isExtended then "fa-rotate-270" else "fa-rotate-90"]; prop.style [style.fontSize(length.em 1)]]]
-        ]
-
 module private CellAux =
 
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
@@ -60,7 +36,6 @@ module private CellAux =
 
     let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, model, dispatch) else ContextMenu.DataMap.onContextMenu (index, model, dispatch)
 
-open CellComponents
 open CellAux
 
 module private EventPresets =
@@ -115,23 +90,14 @@ type Cell =
         let debounceStorage = React.useRef(newDebounceStorage())
         let loading, setLoading = React.useState(false)
         let dsetter (inp) = debouncel debounceStorage.current "TextChange" 1000 setLoading setter inp
-        Daisy.label [
-            prop.className "input input-bordered flex items-center gap-2 grow"
+        Html.label [
+            prop.className "items-center gap-2 grow m-0 w-full h-auto rounded-none bg-transparent border-0"
             prop.children [
                 Html.input [
                     prop.defaultValue input
                     prop.readOnly isReadOnly
                     prop.autoFocus true
-                    prop.style [
-                        if isHeader then style.fontWeight.bold
-                        style.width(length.percent 100)
-                        style.height.unset
-                        style.borderRadius(0)
-                        style.border(0,borderStyle.none,"")
-                        style.backgroundColor.transparent
-                        style.margin (0)
-                        style.padding(length.em 0.5,length.em 0.75)
-                    ]
+                    prop.className "bg-transparent w-full"
                     prop.onBlur(fun _ ->
                         if isHeader then setter state;
                         debounceStorage.current.ClearAndRun()
@@ -180,7 +146,6 @@ type Cell =
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
             prop.children [
                 Html.div [
-                    cellInnerContainerStyle []
                     if not isReadOnly then prop.onDoubleClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
@@ -195,9 +160,13 @@ type Cell =
                                 match columnType with
                                 | TSR | TAN -> $"{columnType} ({cellValue})"
                                 | _ -> cellValue
-                            basicValueDisplayCell cellValue
-                        if columnType = Main && not header.IsSingleColumn then
-                            extendHeaderButton(state_extend, columnIndex, setState_extend)
+                            let extendableButtonOpt =
+                                if columnType = Main && not header.IsSingleColumn then
+                                    extendHeaderButton(state_extend, columnIndex, setState_extend) |> Some
+                                else
+                                    None
+                            basicValueDisplayCell cellValue extendableButtonOpt
+
                     ]
                 ]
             ]
@@ -255,7 +224,7 @@ type Cell =
         Html.td [ cellStyle []; prop.readOnly true; prop.children [
             Html.div [
                 prop.style [style.height (length.perc 100); style.cursor.notAllowed; style.userSelect.none]
-                prop.className "is-flex is-align-items-center is-justify-content-center has-background-grey-lighter"
+                prop.className "flex grow items-center justify-center bg-base-300 opacity-60"
                 prop.children [
                     Html.div "-"
                 ]
@@ -310,7 +279,6 @@ type Cell =
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
             prop.children [
                 Html.div [
-                    cellInnerContainerStyle []
                     if not readonly then
                         prop.onDoubleClick(fun e ->
                             e.preventDefault()
@@ -343,7 +311,7 @@ type Cell =
                             if columnType = Main && oasetter.IsSome then
                                 CellStyles.compositeCellDisplay oasetter.Value.oa displayValue
                             else
-                                basicValueDisplayCell displayValue
+                                basicValueDisplayCell displayValue None
                     ]
                 ]
             ]
@@ -361,7 +329,6 @@ type Cell =
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
             prop.children [
                 Html.div [
-                    cellInnerContainerStyle []
                     prop.children [
                         Html.div [
                             prop.className "select w-full"

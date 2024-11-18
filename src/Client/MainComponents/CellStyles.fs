@@ -15,34 +15,61 @@ let cellStyle (adjusted: string list) =
         adjusted |> String.concat " "
     ]
 
-let cellInnerContainerStyle (adjusted: string list) =
+let private cellInnerContainerStyle (adjusted: string list) =
     prop.className [
-        "flex justify-between size-full items-center truncate px-2 py-1"
+        "flex justify-between flex-row flex-nowrap size-full items-center truncate px-2 py-1"
         adjusted |> String.concat " "
     ]
 
-let basicValueDisplayCell (v: string) =
-    Html.span [
+let extendHeaderButton (state_extend: Set<int>, columnIndex, setState_extend) =
+    let isExtended = state_extend.Contains(columnIndex)
+    Html.div [
+        prop.style [
+            style.minWidth 25
+            style.cursor.pointer
+        ]
+        prop.onDoubleClick(fun e ->
+            e.stopPropagation()
+            e.preventDefault()
+            ()
+        )
+        prop.onClick(fun e ->
+            e.stopPropagation()
+            e.preventDefault()
+            let nextState = if isExtended then state_extend.Remove(columnIndex) else state_extend.Add(columnIndex)
+            setState_extend nextState
+        )
+        prop.children [Html.i [prop.classes ["fa-sharp"; "fa-solid"; "fa-angles-up"; if isExtended then "fa-rotate-270" else "fa-rotate-90"]; prop.style [style.fontSize(length.em 1)]]]
+    ]
+
+let basicValueDisplayCell (v: string) (extendableButton: ReactElement option) =
+    Html.div [
+        cellInnerContainerStyle []
         if v.Length > 60 then
             prop.title v
-        prop.className [
-            "truncate"
+        prop.children [
+            Html.span v
+            if extendableButton.IsSome then
+                extendableButton.Value
         ]
-        prop.text v
     ]
+
 
 let compositeCellDisplay (oa: OntologyAnnotation) (displayValue: string) =
     let hasValidOA = oa.TermAccessionShort <> ""
     let v = displayValue
-    React.fragment [
-        Html.span [
-            prop.className "grow"
-            prop.text v
-        ]
-        if hasValidOA then
-            Html.i [
-                prop.className ["ml-auto text-primary"; "fa-solid"; "fa-check"; "size-4"]
+    Html.div [
+        cellInnerContainerStyle []
+        prop.children [
+            Html.span [
+                prop.className "grow"
+                prop.text v
             ]
+            if hasValidOA then
+                Html.i [
+                    prop.className ["ml-auto text-primary"; "fa-solid"; "fa-check"; "size-4"]
+                ]
+        ]
     ]
 
 /// <summary>
