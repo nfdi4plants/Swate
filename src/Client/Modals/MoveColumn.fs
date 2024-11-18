@@ -72,7 +72,7 @@ type MoveColumn =
                                 Daisy.cardTitle [
                                     prop.className "flex flex-row justify-between"
                                     prop.children [
-                                        Html.h2 "Move Column"
+                                        Html.span "Move Column"
                                         Components.DeleteButton(props=[prop.onClick rmv])
                                     ]
                                 ]
