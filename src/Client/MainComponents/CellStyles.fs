@@ -17,7 +17,7 @@ let cellStyle (adjusted: string list) =
 
 let private cellInnerContainerStyle (adjusted: string list) =
     prop.className [
-        "flex justify-between flex-row flex-nowrap size-full items-center truncate px-2 py-1"
+        "flex justify-between flex-row flex-nowrap size-full items-center truncate px-2 py-1 h-full"
         adjusted |> String.concat " "
     ]
 

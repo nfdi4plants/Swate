@@ -279,6 +279,7 @@ type Cell =
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
             prop.children [
                 Html.div [
+                    prop.className "h-full"
                     if not readonly then
                         prop.onDoubleClick(fun e ->
                             e.preventDefault()
