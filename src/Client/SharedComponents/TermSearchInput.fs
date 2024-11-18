@@ -61,7 +61,7 @@ module TermSearchAux =
                 async {
                     ClickOutsideHandler.AddListener(SelectAreaID, fun e -> stopSearch())
                 }
-                searchAllByParent(parent.TermAccessionShort,fun terms -> setSearchTreeState {Results = terms; SearchIs = SearchIs.Done})
+                searchAllByParent(parent.TermAccessionShort, fun terms -> setSearchTreeState {Results = terms; SearchIs = SearchIs.Done})
             ]
             |> Async.Parallel
             |> Async.Ignore
@@ -97,7 +97,7 @@ module TermSearchAux =
 
         let termSeachNoResults (advancedTermSearchActiveSetter: (bool -> unit) option) =
             Html.div [
-                prop.className "col-span-4"
+                prop.className "col-span-4 gap-y-2"
                 prop.children [
                     Html.div [
                         prop.key $"TermSelectItem_NoResults"
@@ -112,6 +112,7 @@ module TermSearchAux =
                             prop.children [
                                 Html.span "Can't find the term you are looking for? "
                                 Html.a [
+                                    prop.className "link link-primary"
                                     prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); advancedTermSearchActiveSetter.Value true)
                                     prop.text "Try Advanced Search!"
                                 ]
@@ -222,7 +223,7 @@ type TermSearch =
             && (searchNameState.Results |> Array.contains term)
         let matchSearchState (ss: SearchState) (isDirectedSearch: bool) =
             match ss with
-            | {SearchIs = SearchIs.Done; Results = [||]} when not isDirectedSearch ->
+            | {SearchIs = SearchIs.Done; Results = [||]} when isDirectedSearch ->
                 Components.termSeachNoResults setAdvancedTermSearchActive
             | {SearchIs = SearchIs.Done; Results = results} ->
                 React.fragment [

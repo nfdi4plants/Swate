@@ -2,7 +2,6 @@ module Modals.ErrorModal
 
 open Fable.React
 open Fable.React.Props
-open ExcelColors
 open Model
 open Messages
 open Feliz

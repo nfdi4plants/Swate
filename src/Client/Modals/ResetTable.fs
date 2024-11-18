@@ -2,7 +2,6 @@ module Modals.ResetTable
 
 open Feliz
 open Feliz.DaisyUI
-open ExcelColors
 open Model
 open Messages
 open Shared

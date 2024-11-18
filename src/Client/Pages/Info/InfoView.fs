@@ -1,6 +1,5 @@
 namespace Pages
 
-open ExcelColors
 open Model
 open Messages
 open Feliz

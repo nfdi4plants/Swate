@@ -2,7 +2,6 @@ module Modals.EditColumn
 
 open Feliz
 open Feliz.DaisyUI
-open ExcelColors
 open Messages
 open Shared
 open Spreadsheet

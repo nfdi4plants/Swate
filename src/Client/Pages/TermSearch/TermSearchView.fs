@@ -2,7 +2,6 @@ module TermSearch
 
 open Fable.React
 open Fable.React.Props
-open ExcelColors
 open Messages
 open Shared
 open Elmish

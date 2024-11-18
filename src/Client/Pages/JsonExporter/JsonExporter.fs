@@ -6,7 +6,6 @@ open Elmish
 
 open Shared
 
-open ExcelColors
 open Model
 
 open Messages

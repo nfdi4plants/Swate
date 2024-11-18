@@ -39,7 +39,6 @@ let FreeTextInputElement(onSubmit: string -> unit) =
 module private DropdownElements =
 
     let divider = Daisy.divider [prop.className "mx-2 my-0"]
-    let private itemTooltipStyle = [style.fontSize (length.rem 1.1); style.paddingRight (length.px 10); style.textAlign.center; style.color NFDIColors.Yellow.Darker20]
     let private annotationsPrinciplesLink = Html.a [prop.href Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.className "ml-auto link-info"; prop.text "info"]
 
     let createSubBuildingBlockDropdownLink (state:BuildingBlockUIState) setState (subpage: Model.BuildingBlock.DropdownPage) =

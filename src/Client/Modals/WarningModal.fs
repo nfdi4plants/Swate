@@ -2,7 +2,6 @@ module Modals.WarningModal
 
 open Fable.React
 open Fable.React.Props
-open ExcelColors
 open Model
 open Messages
 open Shared
@@ -41,7 +40,6 @@ let warningModal (warning:{|NextMsg:Msg; ModalMessage: string|}, model, dispatch
 
 open Feliz
 open Feliz.DaisyUI
-open ExcelColors
 
 let warningModalSimple (warning: string) (rmv: _ -> unit) =
     let closeMsg = rmv

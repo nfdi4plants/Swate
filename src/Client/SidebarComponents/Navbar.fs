@@ -279,59 +279,6 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
     ]
     |> React.fragment
 
-
-let private quickAccessDropdownElement model dispatch (state: NavbarState) (setState: NavbarState -> unit) (isSndNavbar:bool) =
-    Html.div [
-        prop.onClick (fun _ -> setState { state with QuickAccessActive = not state.QuickAccessActive })
-        prop.style [ style.padding 0; if isSndNavbar then style.custom("marginLeft", "auto")]
-        prop.title (if state.QuickAccessActive then "Close quick access" else "Open quick access")
-        prop.children [
-            Html.div [
-                prop.style [style.width(length.perc 100); style.height (length.perc 100); style.position.relative]
-                prop.children [
-                    Daisy.button.a [
-                        prop.style [style.backgroundColor "transparent"; style.height(length.perc 100); if state.QuickAccessActive then style.color NFDIColors.Yellow.Base]
-                        button.outline
-                        prop.children [
-                            Html.div [
-                                prop.style [ style.display.inlineFlex; style.position.relative; style.justifyContent.center]
-                                prop.children [
-                                    Html.i [
-                                        prop.style [
-                                            style.position.absolute
-                                            style.display.block
-                                            style.custom("transition", "opacity 0.25s, transform 0.25s")
-                                            style.opacity (if state.QuickAccessActive then 1 else 0)
-                                            style.transform (if state.QuickAccessActive then [transform.rotate -180] else [transform.rotate 0])
-                                        ]
-                                        prop.className "fa-solid fa-times"
-                                    ]
-                                    Html.i [
-                                        prop.style [
-                                            style.position.absolute
-                                            style.display.block
-                                            style.custom("transition","opacity 0.25s, transform 0.25s")
-                                            style.opacity (if state.QuickAccessActive then 0 else 1)
-                                        ]
-                                        prop.className "fa-solid fa-ellipsis"
-                                    ]
-                                    // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
-                                    Html.i [
-                                        prop.style [
-                                            style.display.block
-                                            style.opacity 0
-                                        ]
-                                        prop.className "fa-solid fa-ellipsis"
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ]
-
 [<ReactComponent>]
 let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) =
     let state, setState = React.useState(NavbarState.init)
