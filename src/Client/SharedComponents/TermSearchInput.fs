@@ -275,7 +275,8 @@ type TermSearch =
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
         ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
-        ?autofocus: bool, ?fullwidth: bool, ?isjoin: bool, ?displayParent: bool, ?classes: string)
+        ?autofocus: bool, ?fullwidth: bool, ?isjoin: bool, ?displayParent: bool, ?classes: string,
+        ?setParentTerm:OntologyAnnotation option -> unit)
         =
         let isjoin = defaultArg isjoin false
         let isSearchable = defaultArg isSearchable true
@@ -323,6 +324,14 @@ type TermSearch =
         let registerChange(searchTest: string option) =
             let oa = searchTest |> Option.map (fun x -> OntologyAnnotation x)
             debouncel debounceStorage.current "SetterDebounce" 500 setLoading setter oa
+
+        let setParentTerm () =
+            promise{
+                if setParentTerm.IsSome then
+                    let! parent = OfficeInterop.Core.Main.getParentTerm()
+                    log("parent", parent.IsSome)
+                    setParentTerm.Value parent
+            }
         Daisy.formControl [
             prop.className "w-full"
             prop.children [
@@ -344,6 +353,9 @@ type TermSearch =
                             if input.IsSome then prop.valueOrDefault input.Value.NameText
                             prop.ref inputRef
                             prop.onMouseDown(fun e -> e.stopPropagation())
+                            prop.onClick(fun _ ->
+                                Promise.start (setParentTerm())
+                            )
                             prop.onDoubleClick(fun e ->
                                 let s : string = e.target?value
                                 if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search

@@ -83,13 +83,14 @@ let private addButton (model: Model, dispatch) =
 [<ReactComponent>]
 let Main (model:Model, dispatch) =
     let setTerm = fun (term: OntologyAnnotation option) -> TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
+    let setParentTerm = fun (parent: OntologyAnnotation option) -> TermSearch.UpdateParentTerm parent |> TermSearchMsg |> dispatch
     SidebarComponents.SidebarLayout.Container  [
         SidebarComponents.SidebarLayout.Header "Ontology term search"
 
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
         SidebarComponents.SidebarLayout.LogicContainer [
-            Components.TermSearch.Input(setTerm, fullwidth=true, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch)
+            Components.TermSearch.Input(setTerm, fullwidth=true, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch, setParentTerm=setParentTerm)
             addButton(model, dispatch)
         ]
     ]

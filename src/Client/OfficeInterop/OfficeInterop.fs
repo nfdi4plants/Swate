@@ -2385,6 +2385,34 @@ type Main =
             }
         )
 
+    static member getParentTerm (?table: Excel.Table, ?context: RequestContext) =
+        excelRunWith context <| fun context ->
+            promise {
+
+                let! excelTable =
+                    match table with
+                    | Some table -> promise {return Some table}
+                    | None -> AnnotationTable.tryGetActive context
+
+                if excelTable.IsNone then failwith "Error. No active table found!"
+
+                let excelTable = excelTable.Value
+
+                let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
+
+                match arcTableRes with
+                | Ok arcTable ->
+                    let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowIndex"|]))
+                    let! (_, arcIndex) = getArcMainColumn excelTable arcTable context
+                    let rowIndex = selectedRange.rowIndex
+
+                    let parent = arcTable.GetColumn(arcIndex).Header.TryOA()
+
+                    return parent
+
+                | Result.Error exn -> return None
+            }
+
     /// <summary>
     /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
     /// </summary>
