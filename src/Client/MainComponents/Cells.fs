@@ -91,13 +91,13 @@ type Cell =
         let loading, setLoading = React.useState(false)
         let dsetter (inp) = debouncel debounceStorage.current "TextChange" 1000 setLoading setter inp
         Html.label [
-            prop.className "items-center gap-2 grow m-0 w-full h-auto rounded-none bg-transparent border-0"
+            prop.className "input flex flex-row items-center gap-2 grow m-0 w-full h-full rounded-none bg-transparent border-0"
             prop.children [
                 Html.input [
                     prop.defaultValue input
                     prop.readOnly isReadOnly
                     prop.autoFocus true
-                    prop.className "bg-transparent w-full"
+                    prop.className "bg-transparent w-full h-full"
                     prop.onBlur(fun _ ->
                         if isHeader then setter state;
                         debounceStorage.current.ClearAndRun()
@@ -166,7 +166,6 @@ type Cell =
                                 else
                                     None
                             basicValueDisplayCell cellValue extendableButtonOpt
-
                     ]
                 ]
             ]
@@ -277,44 +276,39 @@ type Cell =
             prop.readOnly readonly
             //prop.ref ref
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
+            if not readonly then
+                prop.onDoubleClick(fun e ->
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if isIdle then makeActive()
+                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                )
+                if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
+            prop.onMouseDown(fun e -> if isIdle && e.shiftKey then e.preventDefault())
             prop.children [
-                Html.div [
-                    prop.className "h-full"
-                    if not readonly then
-                        prop.onDoubleClick(fun e ->
-                            e.preventDefault()
-                            e.stopPropagation()
-                            if isIdle then makeActive()
-                            UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                if isActive then
+                    // Update change to mainState and exit active input.
+                    if oasetter.IsSome then
+                        let oa = oasetter.Value.oa
+                        let onBlur = fun e -> makeIdle();
+                        let onEscape = fun e -> makeIdle();
+                        let onEnter = fun e -> makeIdle();
+                        let setter = fun (oa: OntologyAnnotation option) ->
+                            let oa = oa |> Option.defaultValue (OntologyAnnotation())
+                            oasetter.Value.setter oa
+                        let headerOA = if state.TableViewIsActive() then state.ActiveTable.Headers.[columnIndex].TryOA() else None
+                        Components.TermSearch.Input(
+                            setter, input=oa, fullwidth=true, ?parent=headerOA, displayParent=false,
+                            onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true,
+                            classes="h-[35px] !rounded-none w-full !border-0"
                         )
-                        if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
-                    prop.onMouseDown(fun e -> if isIdle && e.shiftKey then e.preventDefault())
-                    prop.children [
-                        if isActive then
-                            // Update change to mainState and exit active input.
-                            if oasetter.IsSome then
-                                let oa = oasetter.Value.oa
-                                let onBlur = fun e -> makeIdle();
-                                let onEscape = fun e -> makeIdle();
-                                let onEnter = fun e -> makeIdle();
-                                let setter = fun (oa: OntologyAnnotation option) ->
-                                    let oa = oa |> Option.defaultValue (OntologyAnnotation())
-                                    oasetter.Value.setter oa
-                                let headerOA = if state.TableViewIsActive() then state.ActiveTable.Headers.[columnIndex].TryOA() else None
-                                Components.TermSearch.Input(
-                                    setter, input=oa, fullwidth=true, ?parent=headerOA, displayParent=false,
-                                    onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true,
-                                    classes="h-[35px] !rounded-none w-full !border-0"
-                                )
-                            else
-                                Cell.CellInputElement(cellValue, false, false, setter, makeIdle)
-                        else
-                            if columnType = Main && oasetter.IsSome then
-                                CellStyles.compositeCellDisplay oasetter.Value.oa displayValue
-                            else
-                                basicValueDisplayCell displayValue None
-                    ]
-                ]
+                    else
+                        Cell.CellInputElement(cellValue, false, false, setter, makeIdle)
+                else
+                    if columnType = Main && oasetter.IsSome then
+                        CellStyles.compositeCellDisplay oasetter.Value.oa displayValue
+                    else
+                        basicValueDisplayCell displayValue None
             ]
         ]
 

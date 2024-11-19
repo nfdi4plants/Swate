@@ -18,7 +18,7 @@ let cellStyle (adjusted: string list) =
 
 let private cellInnerContainerStyle (adjusted: string list) =
     prop.className [
-        "flex justify-between flex-row flex-nowrap size-full items-center truncate px-2 py-1 w-full"
+        "flex justify-between flex-row flex-nowrap size-full items-center *:truncate *:min-w-0 px-2 py-1 max-w-xl"
         adjusted |> String.concat " "
     ]
 
@@ -49,7 +49,9 @@ let basicValueDisplayCell (v: string) (extendableButton: ReactElement option) =
         if v.Length > 60 then
             prop.title v
         prop.children [
-            Html.text v
+            Html.span [
+                prop.text v
+            ]
             if extendableButton.IsSome then
                 extendableButton.Value
         ]
