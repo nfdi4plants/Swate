@@ -245,7 +245,7 @@ type Widget =
 
     static member FilePicker (model, dispatch, rmv) =
         let content = Html.div [
-            prop.className "@container/filePickerWidget"
+            prop.className "@container/filePickerWidget min-w-32"
             prop.children [
                 FilePicker.uploadButton model dispatch "@md/filePickerWidget:flex-row"
                 if model.FilePickerState.FileNames <> [] then

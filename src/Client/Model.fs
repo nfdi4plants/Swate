@@ -121,7 +121,7 @@ type PersistentStorageState = {
 } with
     static member init () = {
         SearchableOntologies    = [||]
-        Host                    = None
+        Host                    = Some Swatehost.Browser
         AppVersion              = ""
         ShowSideBar             = false
         HasOntologiesLoaded     = false
