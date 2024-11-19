@@ -24,49 +24,50 @@ let update (filePickerMsg:FilePicker.Msg) (state: FilePicker.Model) (model: Mode
         }
         nextState, Cmd.none
 
-let uploadButton (model:Model) dispatch =
+/// "parentContainerResizeClass": uses tailwind container queries. Expects a string like "@md/parentId:flex-row"
+let uploadButton (model:Model) dispatch (parentContainerResizeClass: string) =
     let inputId = "filePicker_OnFilePickerMainFunc"
     Html.div [
-        Html.input [
-            prop.style [style.display.none]
-            prop.id inputId
-            prop.multiple true
-            prop.type'.file
-            prop.onChange (fun (ev: File list) ->
-                let files = ev //ev.target?files
-
-                let fileNames =
-                    files |> List.map (fun f -> f.name)
-
-                fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
-
-                //let picker = Browser.Dom.document.getElementById(inputId)
-                //// https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
-                //picker?value <- null
-            )
+        prop.className [
+            "flex flex-col gap-2"
+            parentContainerResizeClass
         ]
-        match model.PersistentStorageState.Host with
+        prop.children [
+            Html.input [
+                prop.style [style.display.none]
+                prop.id inputId
+                prop.multiple true
+                prop.type'.file
+                prop.onChange (fun (ev: File list) ->
+                    let files = ev //ev.target?files
+
+                    let fileNames =
+                        files |> List.map (fun f -> f.name)
+
+                    fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
+
+                    //let picker = Browser.Dom.document.getElementById(inputId)
+                    //// https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
+                    //picker?value <- null
+                )
+            ]
+            match model.PersistentStorageState.Host with
             | Some (Swatehost.ARCitect) ->
-                Html.div [
-                    prop.className "flex flex-row gap-2"
-                    prop.children [
-                        Daisy.button.button [
-                            button.primary
-                            button.block
-                            prop.onClick(fun _ ->
-                                ARCitect.RequestPaths false |> ARCitect.ARCitect.send
-                            )
-                            prop.text "Pick Files"
-                        ]
-                        Daisy.button.button [
-                            button.primary
-                            button.block
-                            prop.onClick(fun _ ->
-                                ARCitect.RequestPaths true |> ARCitect.ARCitect.send
-                            )
-                            prop.text "Pick Directories"
-                        ]
-                    ]
+                Daisy.button.button [
+                    button.primary
+                    button.block
+                    prop.onClick(fun _ ->
+                        ARCitect.RequestPaths false |> ARCitect.ARCitect.send
+                    )
+                    prop.text "Pick Files"
+                ]
+                Daisy.button.button [
+                    button.primary
+                    button.block
+                    prop.onClick(fun _ ->
+                        ARCitect.RequestPaths true |> ARCitect.ARCitect.send
+                    )
+                    prop.text "Pick Directories"
                 ]
             | _ ->
                 Daisy.button.button [
@@ -78,6 +79,7 @@ let uploadButton (model:Model) dispatch =
                     )
                     prop.text "Pick file names"
                 ]
+        ]
     ]
 
 let insertButton (model:Model) dispatch =
@@ -216,7 +218,7 @@ module FileNameTable =
 let fileContainer (model:Model) dispatch =
     SidebarComponents.SidebarLayout.LogicContainer [
 
-        uploadButton model dispatch
+        uploadButton model dispatch "@md/sidebar:flex-row"
 
         if model.FilePickerState.FileNames <> [] then
             fileSortElements model dispatch

@@ -245,18 +245,21 @@ type Widget =
 
     static member FilePicker (model, dispatch, rmv) =
         let content = Html.div [
-            FilePicker.uploadButton model dispatch
-            if model.FilePickerState.FileNames <> [] then
-                FilePicker.fileSortElements model dispatch
+            prop.className "@container/filePickerWidget"
+            prop.children [
+                FilePicker.uploadButton model dispatch "@md/filePickerWidget:flex-row"
+                if model.FilePickerState.FileNames <> [] then
+                    FilePicker.fileSortElements model dispatch
 
-                Html.div [
-                    prop.style [style.maxHeight (length.px 350); style.overflow.auto]
-                    prop.children [
-                        FilePicker.FileNameTable.table model dispatch
+                    Html.div [
+                        prop.style [style.maxHeight (length.px 350); style.overflow.auto]
+                        prop.children [
+                            FilePicker.FileNameTable.table model dispatch
+                        ]
                     ]
-                ]
-                //fileNameElements model dispatch
-                FilePicker.insertButton model dispatch
+                    //fileNameElements model dispatch
+                    FilePicker.insertButton model dispatch
+            ]
         ]
         let prefix = WidgetLiterals.FilePicker
         Widget.Base(content, prefix, rmv)
