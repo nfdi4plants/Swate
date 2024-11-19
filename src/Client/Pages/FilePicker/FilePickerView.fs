@@ -8,14 +8,16 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
-let update (filePickerMsg:FilePicker.Msg) (currentState: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
+let update (filePickerMsg:FilePicker.Msg) (state: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
     match filePickerMsg with
     | LoadNewFiles fileNames ->
-        let nextState : FilePicker.Model = {
-            FileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
+        let nextModel = {
+            model with
+                Model.FilePickerState.FileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
+                Model.PageState.SidebarPage = Routing.SidebarPage.FilePicker
         }
-        let nextCmd = UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.FilePicker} |> Cmd.ofMsg
-        nextState, nextCmd
+        let nextCmd = UpdateModel nextModel|> Cmd.ofMsg
+        state, nextCmd
     | UpdateFileNames newFileNames ->
         let nextState : FilePicker.Model = {
             FileNames = newFileNames
