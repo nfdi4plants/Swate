@@ -169,7 +169,7 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
                 setExcelMetadataType (ExcelMetadataState.init())
                 let! result = OfficeInterop.Core.Main.tryParseToArcFile(getTables=false)
                 match result with
-                | Result.Ok (arcFile) ->
+                | Result.Ok arcFile ->
                     setExcelMetadataType {
                         excelMetadataType with
                             Loading = false

@@ -275,7 +275,7 @@ type TermSearch =
         ?isSearchable: bool,
         ?advancedSearchDispatch: Messages.Msg -> unit,
         ?portalTermSelectArea: HTMLElement,
-        ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit,
+        ?onBlur: Event -> unit, ?onEscape: KeyboardEvent -> unit, ?onEnter: KeyboardEvent -> unit, ?onFocus: FocusEvent -> Fable.Core.JS.Promise<unit>,
         ?autofocus: bool, ?fullwidth: bool, ?isjoin: bool, ?displayParent: bool, ?classes: string)
         =
         let isjoin = defaultArg isjoin false
@@ -324,6 +324,11 @@ type TermSearch =
         let registerChange(searchTest: string option) =
             let oa = searchTest |> Option.map (fun x -> OntologyAnnotation x)
             debouncel debounceStorage.current "SetterDebounce" 500 setLoading setter oa
+        React.useLayoutEffect((
+            fun _ ->
+                if autofocus && inputRef.current.IsSome then
+                    inputRef.current.Value.focus()
+        ), [|box parent|])
         Daisy.formControl [
             prop.className "w-full"
             prop.children [
@@ -344,7 +349,17 @@ type TermSearch =
                             prop.autoFocus autofocus
                             if input.IsSome then prop.valueOrDefault input.Value.NameText
                             prop.ref inputRef
-                            prop.onMouseDown(fun e -> e.stopPropagation())
+                            prop.onMouseDown(fun e ->
+                                e.stopPropagation()
+                            )
+                            if onFocus.IsSome then
+                                prop.onFocus(fun fe ->
+                                    promise {
+                                        do! onFocus.Value fe
+                                        inputRef.current.Value.focus()
+                                    }
+                                    |> Promise.start
+                                )
                             prop.onDoubleClick(fun e ->
                                 let s : string = e.target?value
                                 if s.Trim() = "" && parent.IsSome && parent.Value.TermAccessionShort <> "" then // trigger get all by parent search
