@@ -16,7 +16,13 @@ type SelectiveImportModal =
         let isDisabled = defaultArg isDisabled false
         Daisy.formControl [
             Daisy.label [
-                prop.className "cursor-pointer hover:bg-base-200 transition-colors"
+                prop.className [
+                    "cursor-pointer transition-colors"
+                    if isDisabled then
+                        "!cursor-not-allowed"
+                    else
+                        "hover:bg-base-300"
+                ]
                 prop.children [
                     Daisy.radio [
                         prop.disabled isDisabled
@@ -25,14 +31,17 @@ type SelectiveImportModal =
                         prop.isChecked isChecked
                         prop.onChange onChange
                     ]
-                    Daisy.labelText txt
+                    Html.span [
+                        prop.className "text-sm"
+                        prop.text txt
+                    ]
                 ]
             ]
         ]
     static member private Box (title: string, icon: string, content: ReactElement, ?className: string list) =
         Html.div [
             prop.className [
-                "rounded shadow p-2 flex flex-col gap-2"
+                "rounded shadow p-2 flex flex-col gap-2 border"
                 if className.IsSome then
                     className.Value |> String.concat " "
             ]
@@ -71,7 +80,10 @@ type SelectiveImportModal =
                             prop.type'.checkbox
                             prop.onChange (fun (b:bool) -> setActive b)
                         ]
-                        Daisy.labelText "Import"
+                        Html.span [
+                            prop.className "text-sm"
+                            prop.text "Import"
+                        ]
                     ]
                 ]
             ]
@@ -83,12 +95,11 @@ type SelectiveImportModal =
                 ]
             ]
         ],
-        className = [if isActive then "bg-info text-info-content"]
+        className = [if isActive then "!bg-info !text-info-content"]
     )
 
     [<ReactComponent>]
     static member private TableImport(index: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit) =
-        let showData, setShowData = React.useState(false)
         let name = table0.Name
         let radioGroup = "radioGroup_" + name
         let import = state.ImportTables |> List.tryFind (fun it -> it.Index = index)
@@ -113,9 +124,9 @@ type SelectiveImportModal =
                 )
             ]
             Daisy.collapse [
-                Html.input [prop.type'.checkbox]
+                Html.input [prop.type'.checkbox; prop.className "min-h-0 h-5"]
                 Daisy.collapseTitle [
-                    prop.className "p-1 min-h-0"
+                    prop.className "p-1 min-h-0 h-5 text-sm"
                     prop.text "Preview Table"
                 ]
                 Daisy.collapseContent [
@@ -143,7 +154,7 @@ type SelectiveImportModal =
                     ]
                 ]
         ]],
-            className = [if isActive then "bg-primary text-primary-content"]
+            className = [if isActive then "!bg-primary !text-primary-content"]
         )
 
     [<ReactComponent>]
@@ -156,7 +167,14 @@ type SelectiveImportModal =
             | Template t -> ResizeArray([t.Table]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
         let setMetadataImport = fun b ->
-            {state with ImportMetadata = b; ImportTables = state.ImportTables |> List.map (fun t -> {t with FullImport = true})} |> setState
+            if b then
+                {
+                    state with
+                        ImportMetadata = true;
+                        ImportTables = [ for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
+                } |> setState
+            else
+                SelectiveImportModalState.init() |> setState
         let addTableImport = fun (i:int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::state.ImportTables |> List.distinct
