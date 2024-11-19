@@ -16,6 +16,20 @@ module Spreadsheet =
 
     module Helper =
 
+        let fullSaveModel (state: Spreadsheet.Model) (model:Model) =
+            state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
+            let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
+            if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
+                match state.ArcFile with // model is not yet updated at this position.
+                | Some (Assay assay) ->
+                    ARCitect.ARCitect.send(ARCitect.AssayToARCitect assay)
+                | Some (Study (study,_)) ->
+                    ARCitect.ARCitect.send(ARCitect.StudyToARCitect study)
+                | Some (Investigation inv) ->
+                    ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
+                | _ -> ()
+            ()
+
         /// <summary>
         /// This function will store the information correctly.
         /// Can return save information to local storage (persistent between browser sessions) and session storage.
@@ -58,6 +72,9 @@ module Spreadsheet =
 
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
+            | ManualSave ->
+                Helper.fullSaveModel state model
+                state, model, Cmd.none
             | UpdateState nextState ->
                 nextState, model, Cmd.none
             | UpdateDatamap datamapOption ->

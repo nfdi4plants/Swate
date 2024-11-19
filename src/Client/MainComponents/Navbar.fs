@@ -76,17 +76,27 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                 React.fragment [
                     Html.i [prop.className "fa-solid fa-floppy-disk";]
                 ],
-                (fun _ -> Spreadsheet.ExportXlsx model.SpreadsheetModel.ArcFile.Value |> SpreadsheetMsg |> dispatch)
+                (fun _ ->
+                    Spreadsheet.ManualSave |> SpreadsheetMsg |> dispatch
+                    match model.PersistentStorageState.Host with
+                    | Some (Swatehost.Browser) ->
+                        Spreadsheet.ExportXlsx model.SpreadsheetModel.ArcFile.Value |> SpreadsheetMsg |> dispatch
+                    | _ -> ()
+                )
             )
-            QuickAccessButton.Main(
-                "Reset",
-                React.fragment [
-                    Html.i [prop.className "fa-solid fa-trash-can";]
-                ],
-                (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
-                classes = "hover:!text-error"
-            )
-            NavbarBurger.Main(model, dispatch)
+            match model.PersistentStorageState.Host with
+            | Some Swatehost.Browser ->
+                QuickAccessButton.Main(
+                    "Reset",
+                    React.fragment [
+                        Html.i [prop.className "fa-solid fa-trash-can";]
+                    ],
+                    (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
+                    classes = "hover:!text-error"
+                )
+                NavbarBurger.Main(model, dispatch)
+            | _ ->
+                Html.none
         ]
     ]
 
@@ -167,15 +177,21 @@ let Main(model: Model, dispatch, widgets, setWidgets) =
                 WidgetNavbarList(model, dispatch, addWidget)
             ]
         ]
-        match model.PersistentStorageState.Host with
-        | Some (Swatehost.ARCitect) ->
-            Html.none
-        | Some _ ->
-            Html.div [
-                prop.className "ml-auto"
-                prop.children [
-                    QuickAccessButtonListEnd model dispatch
-                ]
+        // match model.PersistentStorageState.Host with
+        // | Some (Swatehost.ARCitect) ->
+        //     Html.none
+        // | Some _ ->
+        //     Html.div [
+        //         prop.className "ml-auto"
+        //         prop.children [
+        //             QuickAccessButtonListEnd model dispatch
+        //         ]
+        //     ]
+        // | _ -> Html.none
+        Html.div [
+            prop.className "ml-auto"
+            prop.children [
+                QuickAccessButtonListEnd model dispatch
             ]
-        | _ -> Html.none
+        ]
     ]
