@@ -90,17 +90,17 @@ let Main (model: Model, dispatch) =
                                                     assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
                                                 let setAssayDataMap assay dataMap =
                                                     dataMap |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
-                                                Components.Metadata.Assay.Main(assay, setAssay, setAssayDataMap)
+                                                Components.Metadata.Assay.Main(assay, setAssay, setAssayDataMap, model)
                                             | Some (ArcFiles.Study (study, assays)) ->
                                                 let setStudy (study, assays) =
                                                     (study, assays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
                                                 let setStudyDataMap study dataMap =
                                                     dataMap |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
-                                                Components.Metadata.Study.Main(study, assays, setStudy, setStudyDataMap)
+                                                Components.Metadata.Study.Main(study, assays, setStudy, setStudyDataMap, model)
                                             | Some (ArcFiles.Investigation investigation) ->
                                                 let setInvesigation investigation =
                                                     investigation |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-                                                Components.Metadata.Investigation.Main(investigation, setInvesigation)
+                                                Components.Metadata.Investigation.Main(investigation, setInvesigation, model)
                                             | Some (ArcFiles.Template template) ->
                                                 let setTemplate template =
                                                     template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch

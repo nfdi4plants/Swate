@@ -163,7 +163,7 @@ let Main(model: Model, dispatch, widgets, setWidgets) =
         ]
         Daisy.navbarCenter [
             prop.children [
-                QuickAccessButtonListStart model.History dispatch
+                // QuickAccessButtonListStart model.History dispatch
                 WidgetNavbarList(model, dispatch, addWidget)
             ]
         ]

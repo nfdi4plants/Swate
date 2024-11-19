@@ -242,6 +242,7 @@ type TermSearch =
         Html.div [
             prop.id id
             prop.className [
+                "min-w-[400px]"
                 "grid grid-cols-[auto,1fr,1fr,auto] absolute left-0 z-50 w-full
                 bg-base-200 rounded shadow-md border-2 border-primary py-2 pl-4 max-h-[400px] overflow-y-auto w-full"
                 if not show then "hidden";

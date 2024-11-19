@@ -7,7 +7,7 @@ open ARCtrl
 open Components
 open Components.Forms
 
-let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit) =
+let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit, model: Model.Model) =
     Generic.Section [
         Generic.BoxedField(
             "Investigation Metadata",
@@ -17,7 +17,8 @@ let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> 
                     (fun s ->
                         let nextInvestigation = IdentifierSetters.setInvestigationIdentifier s investigation
                         setInvestigation nextInvestigation),
-                    "Identifier"
+                    "Identifier",
+                    disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host
                 )
                 FormComponents.TextInput (
                     Option.defaultValue "" investigation.Title,

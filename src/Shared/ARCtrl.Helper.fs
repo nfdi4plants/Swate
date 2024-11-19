@@ -24,7 +24,7 @@ module ARCtrlHelper =
     with
         member this.HasTableAt(index: int) =
             match this with
-            | Template _ -> index = 0 // Template always has exactly one table 
+            | Template _ -> index = 0 // Template always has exactly one table
             | Investigation i -> false
             | Study (s,_) -> s.TableCount <= index
             | Assay a -> a.TableCount <= index
@@ -56,6 +56,13 @@ module ARCtrlHelper =
             | "rocrate" -> ROCrate
             | _ -> failwithf "Unknown JSON export format: %s" str
 
+        member this.AsStringRdbl =
+            match this with
+            | ARCtrl -> "ARCtrl"
+            | ARCtrlCompressed -> "ARCtrl Compressed"
+            | ISA -> "ISA"
+            | ROCrate -> "RO-Crate Metadata"
+
 module Table =
 
     /// <summary>
@@ -82,7 +89,7 @@ module Table =
     /// It removes all values from the new table.
     /// It also fills new Input/Output columns with the input/output values of the active table.
     ///
-    /// The output of this function can be used with the SpreadsheetInterface.JoinTable Message. 
+    /// The output of this function can be used with the SpreadsheetInterface.JoinTable Message.
     /// </summary>
     /// <param name="activeTable">The active/current table</param>
     /// <param name="toJoinTable">The new table, which will be added to the existing one.</param>
@@ -123,7 +130,7 @@ module Helper =
         let ele = arr.[currentColumnIndex]
         arr.RemoveAt(currentColumnIndex)
         arr.Insert(newColumnIndex, ele)
-        
+
     let dictMoveColumn (currentColumnIndex: int) (newColumnIndex: int) (table: Dictionary<int * int, 'A>) =
         /// This is necessary to always access the correct value for an index.
         /// It is possible to only copy the specific target column at "currentColumnIndex" and sort the keys in the for loop depending on "currentColumnIndex" and "newColumnIndex".
@@ -133,7 +140,7 @@ module Helper =
         let range = [System.Math.Min(currentColumnIndex, newColumnIndex) .. System.Math.Max(currentColumnIndex,newColumnIndex)]
         for columnIndex, rowIndex in backupTable.Keys do
             let value = backupTable.[(columnIndex,rowIndex)]
-            let newColumnIndex = 
+            let newColumnIndex =
               if columnIndex = currentColumnIndex then
                 newColumnIndex
               elif List.contains columnIndex range then
@@ -171,7 +178,7 @@ with
         | Component
         | Characteristic
         | Factor
-        | Parameter 
+        | Parameter
         | ProtocolType -> true
         | _ -> false
     member this.HasOA() =
@@ -184,7 +191,7 @@ with
 
     member this.HasIOType() =
         match this with
-        | Input 
+        | Input
         | Output -> true
         | _ -> false
 
@@ -321,10 +328,10 @@ module Extensions =
             let updateBody =
                 Helper.dictMoveColumn currentIndex nextIndex this.Values
             ()
-                
+
 
     type Template with
-        member this.FileName 
+        member this.FileName
             with get() = this.Name.Replace(" ","_") + ".xlsx"
 
     type CompositeHeader with
@@ -349,18 +356,18 @@ module Extensions =
         /// This will only run successfully if the inner values are of the same type
         /// </summary>
         /// <param name="other">The header from which the inner value will be taken.</param>
-        member this.UpdateDeepWith(other:CompositeHeader) = 
+        member this.UpdateDeepWith(other:CompositeHeader) =
             match this, other with
             | h1, h2 when this.IsIOType && other.IsIOType ->
                 let io1 = h2.TryIOType().Value
-                match h1 with 
-                | CompositeHeader.Input _ -> CompositeHeader.Input io1 
+                match h1 with
+                | CompositeHeader.Input _ -> CompositeHeader.Input io1
                 | CompositeHeader.Output _ -> CompositeHeader.Output io1
                 | _ -> failwith "Error 1 in UpdateSurfaceTo. This should never hit."
             | h1, h2 when this.IsTermColumn && other.IsTermColumn && not this.IsFeaturedColumn && not other.IsFeaturedColumn ->
                 let oa1 = h2.ToTerm()
                 h1.UpdateWithOA oa1
-            | _ -> 
+            | _ ->
                 this
 
         member this.TryOA() =
@@ -394,7 +401,7 @@ module Extensions =
         /// <summary>
         /// This is an override of an existing ARCtrl version which does not return what i want 😤
         /// </summary>
-        member this.GetContentSwate() = 
+        member this.GetContentSwate() =
             match this with
             | CompositeCell.FreeText s -> [|s|]
             | CompositeCell.Term oa -> [| oa.NameText; defaultArg oa.TermSourceREF ""; defaultArg oa.TermAccessionNumber ""|]
@@ -414,7 +421,7 @@ module Extensions =
         //    | Error msg -> raise (exn msg)
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="content"></param>
         /// <param name="header"></param>
@@ -445,19 +452,19 @@ module Extensions =
 
         member this.ToTabStr() = this.GetContentSwate() |> String.concat "\t"
 
-        static member fromTabStr (str:string) (header: CompositeHeader) = 
+        static member fromTabStr (str:string) (header: CompositeHeader) =
             let content = str.Split('\t', System.StringSplitOptions.TrimEntries)
             CompositeCell.fromContentValid(content, header)
 
         static member ToTabTxt (cells: CompositeCell []) =
-            cells 
+            cells
             |> Array.map (fun c -> c.ToTabStr())
             |> String.concat (System.Environment.NewLine)
 
         static member fromTabTxt (tabTxt: string) (header: CompositeHeader) =
             let lines = tabTxt.Split(System.Environment.NewLine, System.StringSplitOptions.None)
             let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr line header)
-            cells 
+            cells
 
         member this.ConvertToValidCell (header: CompositeHeader) =
             match this with
@@ -492,7 +499,7 @@ module Extensions =
 
         member this.UpdateMainField(s: string) =
             match this with
-            | CompositeCell.Term oa -> 
+            | CompositeCell.Term oa ->
                 oa.Name <- Some s
                 CompositeCell.Term oa
             | CompositeCell.Unitized (_, oa) -> CompositeCell.Unitized (s, oa)

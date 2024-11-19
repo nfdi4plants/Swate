@@ -12,166 +12,139 @@ open Components
 
 type SelectiveImportModal =
 
+    static member private Radio(radioGroup: string, txt:string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
+        let isDisabled = defaultArg isDisabled false
+        Daisy.formControl [
+            Daisy.label [
+                prop.className "cursor-pointer hover:bg-base-200 transition-colors"
+                prop.children [
+                    Daisy.radio [
+                        prop.disabled isDisabled
+                        radio.xs
+                        prop.name radioGroup
+                        prop.isChecked isChecked
+                        prop.onChange onChange
+                    ]
+                    Daisy.labelText txt
+                ]
+            ]
+        ]
+    static member private Box (title: string, icon: string, content: ReactElement, ?className: string list) =
+        Html.div [
+            prop.className [
+                "rounded shadow p-2 flex flex-col gap-2"
+                if className.IsSome then
+                    className.Value |> String.concat " "
+            ]
+            prop.children [
+                Html.h3 [
+                    prop.className "font-semibold gap-2 flex flex-row items-center"
+                    prop.children [
+                        Html.i [prop.className icon]
+                        Html.span title
+                    ]
+                ]
+                content
+            ]
+        ]
+
     static member private ImportTypeRadio(importType: TableJoinOptions, setImportType: TableJoinOptions -> unit) =
         let myradio(target: TableJoinOptions, txt: string) =
             let isChecked = importType = target
-            Daisy.formControl [
-                Daisy.label [
-                    prop.children [
-                        Daisy.radio [
-                            prop.name "importType"
-                            prop.isChecked isChecked
-                            prop.onChange (fun (b:bool) -> if b then setImportType target)
-                        ]
-                        Daisy.labelText txt
-                    ]
-                ]
+            SelectiveImportModal.Radio("importType", txt, isChecked, fun (b:bool) -> if b then setImportType target)
+        SelectiveImportModal.Box ("Import Type", "fa-solid fa-cog", React.fragment [
+            Html.div [
+                myradio(ARCtrl.TableJoinOptions.Headers, " Column Headers")
+                myradio(ARCtrl.TableJoinOptions.WithUnit, " ..With Units")
+                myradio(ARCtrl.TableJoinOptions.WithValues, " ..With Values")
             ]
-        Daisy.card [
-            Daisy.cardBody [
-                Daisy.label [
-                    Daisy.labelText [
-                        Html.i [prop.className "fa-solid fa-cog"]
-                        Html.text (" Import Type")
-                    ]
-                ]
-                Html.div [
-                    prop.className "is-flex is-justify-content-space-between"
-                    prop.children [
-                        myradio(ARCtrl.TableJoinOptions.Headers, " Column Headers")
-                        myradio(ARCtrl.TableJoinOptions.WithUnit, " ..With Units")
-                        myradio(ARCtrl.TableJoinOptions.WithValues, " ..With Values")
-                    ]
-                ]
-            ]
-        ]
+        ])
 
     static member private MetadataImport(isActive: bool, setActive: bool -> unit, disArcFile: ArcFilesDiscriminate) =
         let name = string disArcFile
-        Daisy.card [
-            if isActive then prop.className "bg-info"
-            prop.children [
-                Html.div [
-                    Daisy.label [
-                        Daisy.labelText [
-                            Html.i [prop.className "fa-solid fa-lightbulb"]
-                            Html.textf " %s Metadata" name
+        SelectiveImportModal.Box (sprintf "%s Metadata" name, "fa-solid fa-lightbulb", React.fragment [
+            Daisy.formControl [
+                Daisy.label [
+                    prop.className "cursor-pointer"
+                    prop.children [
+                        Daisy.checkbox [
+                            prop.type'.checkbox
+                            prop.onChange (fun (b:bool) -> setActive b)
                         ]
-                    ]
-                    Daisy.formControl [
-                        Daisy.label [
-                            Daisy.checkbox [
-                                prop.type'.checkbox
-                                prop.onChange (fun (b:bool) -> setActive b)
-                            ]
-                            Daisy.labelText " Import"
-                        ]
-                    ]
-                    Html.span [
-                        prop.className "text-warning"
-                        prop.text "Importing metadata will overwrite the current file."
+                        Daisy.labelText "Import"
                     ]
                 ]
             ]
-        ]
+            Html.span [
+                prop.className "text-warning bg-warning-content flex flex-row gap-2 justify-center items-center"
+                prop.children [
+                    Html.i [prop.className "fa-solid fa-exclamation-triangle"]
+                    Html.text " Importing metadata will overwrite the current file."
+                ]
+            ]
+        ],
+        className = [if isActive then "bg-info text-info-content"]
+    )
 
     [<ReactComponent>]
-    static member private TableImport(index: int, table: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit) =
+    static member private TableImport(index: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit) =
         let showData, setShowData = React.useState(false)
-        let name = table.Name
+        let name = table0.Name
         let radioGroup = "radioGroup_" + name
         let import = state.ImportTables |> List.tryFind (fun it -> it.Index = index)
         let isActive = import.IsSome
-        let disableAppend = state.ImportMetadata
-        Daisy.card [
-            if isActive then prop.className "bg-success"
-            prop.children [
-                Html.div [
-                    Daisy.label [
-                        Daisy.labelText [
-                            Html.i [prop.className "fa-solid fa-table"]
-                            Html.span (" " + name)
-                            Daisy.button.label [
-                                if showData then button.active
-                                button.sm
-                                prop.onClick (fun _ -> setShowData (not showData))
-                                prop.style [style.float'.right; style.cursor.pointer]
-                                prop.children [
-                                    Html.i [
-                                        prop.style [style.transitionProperty "transform"; style.transitionDuration (System.TimeSpan.FromSeconds 0.35)]
-                                        prop.className ["fa-solid"; "fa-angle-down"; if showData then "fa-rotate-180"]
+        let isDisabled = state.ImportMetadata
+        SelectiveImportModal.Box (name, "fa-solid fa-table", React.fragment [
+            Html.div [
+                SelectiveImportModal.Radio (radioGroup, "Import",
+                    isActive && import.Value.FullImport,
+                    (fun (b:bool) -> addTableImport index true),
+                    isDisabled
+                )
+                SelectiveImportModal.Radio (radioGroup, "Append to active table",
+                    isActive && not import.Value.FullImport,
+                    (fun (b:bool) -> addTableImport index false),
+                    isDisabled
+                )
+                SelectiveImportModal.Radio (radioGroup, "No Import",
+                    not isActive,
+                    (fun (b:bool) -> rmvTableImport index),
+                    isDisabled
+                )
+            ]
+            Daisy.collapse [
+                Html.input [prop.type'.checkbox]
+                Daisy.collapseTitle [
+                    prop.className "p-1 min-h-0"
+                    prop.text "Preview Table"
+                ]
+                Daisy.collapseContent [
+                    prop.className "overflow-x-auto"
+                    prop.children [
+                        Daisy.table [
+                            table.xs
+                            prop.children [
+                                Html.thead [
+                                    Html.tr [
+                                        for c in table0.Headers do
+                                            Html.th (c.ToString())
                                     ]
                                 ]
-                            ]
-                        ]
-                    ]
-                    Html.div [
-                        Daisy.formControl [
-                            let isInnerActive = isActive && import.Value.FullImport
-                            Daisy.label [
-                                Daisy.radio [
-                                    prop.type'.radio
-                                    prop.name radioGroup
-                                    prop.isChecked isInnerActive
-                                    prop.onChange (fun (b:bool) -> addTableImport index true)
+                                Html.tbody [
+                                    for ri in 0 .. (table0.RowCount-1) do
+                                        let row = table0.GetRow(ri, true)
+                                        Html.tr [
+                                            for c in row do
+                                                Html.td (c.ToString())
+                                        ]
                                 ]
-                                Daisy.labelText " Import"
-                            ]
-                        ]
-                        Daisy.formControl [
-                            let isInnerActive = isActive && not import.Value.FullImport
-                            Daisy.label [
-                                Daisy.radio [
-                                    prop.type'.radio
-                                    prop.name radioGroup
-                                    if disableAppend then prop.disabled true
-                                    prop.isChecked isInnerActive
-                                    prop.onChange (fun (b:bool) -> addTableImport index true)
-                                ]
-                                Daisy.labelText " Append to active table"
-                            ]
-                        ]
-                        Daisy.formControl [
-                            let isInnerActive = not isActive
-                            Daisy.label [
-                                Daisy.radio [
-                                    prop.type'.radio
-                                    prop.name radioGroup
-                                    if disableAppend then prop.disabled true
-                                    prop.isChecked isInnerActive
-                                    prop.onChange (fun (b:bool) -> addTableImport index true)
-                                ]
-                                Daisy.labelText " No Import"
                             ]
                         ]
                     ]
                 ]
-                if showData then
-                    Html.div [
-                        prop.className "overflow-x-auto"
-                        prop.children [
-                            Daisy.table [
-                                prop.children [
-                                    Html.thead [
-                                        Html.tr [
-                                            for c in table.Headers do
-                                                Html.th (c.ToString())
-                                        ]
-                                    ]
-                                    Html.tbody [
-                                        for ri in 0 .. (table.RowCount-1) do
-                                            let row = table.GetRow(ri, true)
-                                            Html.tr [
-                                                for c in row do
-                                                    Html.td (c.ToString())
-                                            ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-            ]
-        ]
+        ]],
+            className = [if isActive then "bg-primary text-primary-content"]
+        )
 
     [<ReactComponent>]
     static member Main (import: ArcFiles) (model: Spreadsheet.Model) dispatch (rmv: _ -> unit) =
@@ -194,32 +167,30 @@ type SelectiveImportModal =
             modal.active
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
-                Daisy.card [
-                    prop.style [style.maxHeight(length.percent 70); style.overflowY.hidden]
+                Daisy.modalBox.div [
+                    prop.className "w-4/5 overflow-y-auto flex flex-col @container/importModal gap-2"
                     prop.children [
-                        Daisy.cardBody [
-                            Daisy.cardActions [
-                                prop.className "justify-end"
-                                prop.children [
-                                    Components.DeleteButton(props=[prop.onClick rmv])
-                                ]
+                        Daisy.cardTitle [
+                            prop.className "justify-between"
+                            prop.children [
+                                Html.p "Import"
+                                Components.DeleteButton(props=[prop.onClick rmv])
                             ]
-                            Daisy.cardTitle "Import"
-                            SelectiveImportModal.ImportTypeRadio(state.ImportType, fun it -> {state with ImportType = it} |> setState)
-                            SelectiveImportModal.MetadataImport(state.ImportMetadata, setMetadataImport, disArcfile)
-                            for ti in 0 .. (tables.Count-1) do
-                                let t = tables.[ti]
-                                SelectiveImportModal.TableImport(ti, t, state, addTableImport, rmvTableImport)
-                            Daisy.cardActions [
-                                Daisy.button.button [
-                                    button.info
-                                    prop.style [style.marginLeft length.auto]
-                                    prop.text "Submit"
-                                    prop.onClick(fun e ->
-                                        {| importState = state; importedFile = import|} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
-                                        rmv e
-                                    )
-                                ]
+                        ]
+                        SelectiveImportModal.ImportTypeRadio(state.ImportType, fun it -> {state with ImportType = it} |> setState)
+                        SelectiveImportModal.MetadataImport(state.ImportMetadata, setMetadataImport, disArcfile)
+                        for ti in 0 .. (tables.Count-1) do
+                            let t = tables.[ti]
+                            SelectiveImportModal.TableImport(ti, t, state, addTableImport, rmvTableImport)
+                        Daisy.cardActions [
+                            Daisy.button.button [
+                                button.info
+                                prop.style [style.marginLeft length.auto]
+                                prop.text "Submit"
+                                prop.onClick(fun e ->
+                                    {| importState = state; importedFile = import|} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                                    rmv e
+                                )
                             ]
                         ]
                     ]
