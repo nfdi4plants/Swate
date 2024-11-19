@@ -13,13 +13,13 @@ module Xlsx =
             let ws = fswb.GetWorksheets()
             let arcfile =
                 match ws with
-                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcAssay.isMetadataSheetName ws.Name) -> 
-                    ArcAssay.fromFsWorkbook fswb |> Assay 
-                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcStudy.isMetadataSheetName ws.Name) -> 
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcAssay.isMetadataSheetName ws.Name) ->
+                    ArcAssay.fromFsWorkbook fswb |> Assay
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcStudy.isMetadataSheetName ws.Name) ->
                     ArcStudy.fromFsWorkbook fswb |> Study
-                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcInvestigation.isMetadataSheetName ws.Name) -> 
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.ArcInvestigation.isMetadataSheetName ws.Name) ->
                     ArcInvestigation.fromFsWorkbook fswb |> Investigation
-                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.Template.metaDataSheetName = ws.Name || ARCtrl.Spreadsheet.Template.obsoletemetaDataSheetName = ws.Name) -> 
+                | _ when ws.Exists (fun ws -> ARCtrl.Spreadsheet.Template.metadataSheetName = ws.Name || ARCtrl.Spreadsheet.Template.obsoleteMetadataSheetName = ws.Name) ->
                     ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template
                 | _ -> failwith "Unable to identify given file. Missing metadata sheet with correct name."
             return arcfile
