@@ -16,6 +16,20 @@ module Spreadsheet =
 
     module Helper =
 
+        let fullSaveModel (state: Spreadsheet.Model) (model:Model) =
+            state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
+            let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
+            if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
+                match state.ArcFile with // model is not yet updated at this position.
+                | Some (Assay assay) ->
+                    ARCitect.ARCitect.send(ARCitect.AssayToARCitect assay)
+                | Some (Study (study,_)) ->
+                    ARCitect.ARCitect.send(ARCitect.StudyToARCitect study)
+                | Some (Investigation inv) ->
+                    ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
+                | _ -> ()
+            ()
+
         /// <summary>
         /// This function will store the information correctly.
         /// Can return save information to local storage (persistent between browser sessions) and session storage.
@@ -23,11 +37,11 @@ module Spreadsheet =
         /// </summary>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
             match msg with
-            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _ 
-            | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected -> 
+            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _
+            | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 state, model, cmd
-            | _ -> 
+            | _ ->
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
@@ -54,10 +68,13 @@ module Spreadsheet =
         //        (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
 
         //let newHistoryController (state, model, cmd) =
-        //    updateSessionStorageMsg msg, model 
+        //    updateSessionStorageMsg msg, model
 
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
+            | ManualSave ->
+                Helper.fullSaveModel state model
+                state, model, Cmd.none
             | UpdateState nextState ->
                 nextState, model, Cmd.none
             | UpdateDatamap datamapOption ->
@@ -92,7 +109,7 @@ module Spreadsheet =
                 let msg = fun t -> JoinTable(t, index, options) |> SpreadsheetMsg
                 let cmd =
                     Table.selectiveTablePrepare state.ActiveTable table
-                    |> msg                     
+                    |> msg
                     |> Cmd.ofMsg
                 state, model, cmd
             | JoinTable (table, index, options) ->
@@ -103,8 +120,8 @@ module Spreadsheet =
                 let nextState =
                     if reset then
                         Spreadsheet.Model.init(arcFile)
-                    else 
-                        { state with 
+                    else
+                        { state with
                             ArcFile = Some arcFile
                         }
                 nextState, model, Cmd.none
@@ -125,18 +142,18 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | UpdateCells arr ->
                 Controller.Generic.setCells arr state
-                let nextState = 
+                let nextState =
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
             | UpdateHeader (index, header) ->
-                let nextState = 
+                let nextState =
                     state.ActiveTable.UpdateHeader(index, header)
                     {state with ArcFile = state.ArcFile}
                 nextState, model, Cmd.none
             | UpdateActiveView nextView ->
-                let nextState = { 
-                    state with 
-                        ActiveView = nextView 
+                let nextState = {
+                    state with
+                        ActiveView = nextView
                         SelectedCells = Set.empty
                 }
                 nextState, model, Cmd.none
@@ -156,7 +173,7 @@ module Spreadsheet =
                         state, model
                     | _ ->
                         /// Run this first so an error breaks the function before any mutables are changed
-                        let nextState = 
+                        let nextState =
                             Spreadsheet.Model.fromSessionStorage(newPosition)
                         Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, string newPosition)
                         let nextModel = {model with History.HistoryCurrentPosition = newPosition}
@@ -203,7 +220,7 @@ module Spreadsheet =
                 let cmd =
                     match state.SelectedCells.IsEmpty with
                     | true -> Cmd.none
-                    | false -> 
+                    | false ->
                         let moveBy =
                             match keypressed with
                             | Key.Down -> (0,1)
@@ -224,7 +241,7 @@ module Spreadsheet =
                         UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
             | SetActiveCellFromSelected ->
-                let cmd = 
+                let cmd =
                     if state.SelectedCells.IsEmpty then
                         Cmd.none
                     else
@@ -236,30 +253,30 @@ module Spreadsheet =
                 let nextState = { state with ActiveCell = next }
                 nextState, model, Cmd.none
             | CopyCell index ->
-                let cmd = 
-                    Cmd.OfPromise.attempt 
-                        (Controller.Clipboard.copyCellByIndex index) 
+                let cmd =
+                    Cmd.OfPromise.attempt
+                        (Controller.Clipboard.copyCellByIndex index)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
             | CopyCells indices ->
-                let cmd = 
-                    Cmd.OfPromise.attempt 
-                        (Controller.Clipboard.copyCellsByIndex indices) 
+                let cmd =
+                    Cmd.OfPromise.attempt
+                        (Controller.Clipboard.copyCellsByIndex indices)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
             | CopySelectedCell ->
-                let cmd = 
-                    Cmd.OfPromise.attempt 
-                        (Controller.Clipboard.copySelectedCell) 
+                let cmd =
+                    Cmd.OfPromise.attempt
+                        (Controller.Clipboard.copySelectedCell)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
             | CopySelectedCells ->
-                let cmd = 
-                    Cmd.OfPromise.attempt 
-                        (Controller.Clipboard.copySelectedCells) 
+                let cmd =
+                    Cmd.OfPromise.attempt
+                        (Controller.Clipboard.copySelectedCells)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
@@ -319,7 +336,7 @@ module Spreadsheet =
                 let nextState = Controller.Table.fillColumnWithCell index state
                 nextState, model, Cmd.none
             //| EditColumn (columnIndex, newCellType, b_type) ->
-            //    let cmd = createPromiseCmd <| fun _ -> Controller.editColumn (columnIndex, newCellType, b_type) state 
+            //    let cmd = createPromiseCmd <| fun _ -> Controller.editColumn (columnIndex, newCellType, b_type) state
             //    state, model, cmd
             | ImportXlsx bytes ->
                 let cmd =
@@ -357,8 +374,8 @@ module Spreadsheet =
                 state, model, Cmd.none
         try
             innerUpdate state model msg
-            |> Helper.updateHistoryStorageMsg msg
+            // |> Helper.updateHistoryStorageMsg msg
         with
-            | e -> 
+            | e ->
                 let cmd = GenericError (Cmd.none, e) |> DevMsg |> Cmd.ofMsg
                 state, model, cmd

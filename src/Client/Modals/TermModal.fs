@@ -54,7 +54,7 @@ let Main (oa: OntologyAnnotation, dispatch) (rmv: _ -> unit) =
                                 prop.className "flex flex-row justify-between"
                                 prop.children [
                                     Html.div [
-                                        Html.h3 [ prop.className "font-bold"; prop.text oa.NameText]
+                                        Html.span [ prop.className "font-bold"; prop.text oa.NameText]
                                         Html.div [ prop.className "text-xs"; prop.text oa.TermAccessionShort]
                                     ]
                                     Components.Components.DeleteButton(props=[prop.onClick rmv])

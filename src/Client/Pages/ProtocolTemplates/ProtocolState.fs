@@ -54,11 +54,13 @@ module Protocol =
             }
             nextState, Cmd.none
         | SelectProtocol prot ->
-            let nextState = {
-                state with
-                    TemplateSelected = Some prot
+            log "SelectProtocol"
+            let nextModel = {
+                model with
+                    Model.ProtocolState.TemplateSelected = Some prot
+                    Model.PageState.SidebarPage = Routing.SidebarPage.Protocol
             }
-            nextState, Cmd.ofMsg (UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.Protocol})
+            state, Cmd.ofMsg (UpdateModel nextModel)
         | ProtocolIncreaseTimesUsed templateId ->
             failwith "ParseUploadedFileRequest IS NOT IMPLEMENTED YET"
             //let cmd =

@@ -8,7 +8,7 @@ open Components
 open Components.Forms
 
 [<ReactComponent>]
-let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit) =
+let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit, model: Model.Model) =
     Generic.Section [
         Generic.BoxedField(
             "Assay Metadata",
@@ -20,9 +20,9 @@ let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay ->
                         setArcAssay nextAssay
                     ),
                     "Identifier",
-                    validator = {| fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s); msg = "Invalid Identifier" |}
+                    validator = {| fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s); msg = "Invalid Identifier" |},
+                    disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host
                 )
-
                 FormComponents.OntologyAnnotationInput(
                     assay.MeasurementType |> Option.defaultValue (OntologyAnnotation()),
                     (fun oa ->

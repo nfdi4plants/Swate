@@ -17,6 +17,7 @@ open Feliz
 open Feliz.DaisyUI
 open Shared
 open ARCtrl
+open Fable.Core.JsInterop
 
 type private TemplateFromFileState = {
     /// User select type to upload
@@ -72,6 +73,10 @@ type TemplateFromFile =
             prop.className "w-full"
             prop.onChange (fun (ev: File list) ->
                 Helper.upload state setState dispatch ev
+            )
+            prop.onClick(fun e ->
+                log e
+                e.target?value <- null
             )
         ]
 

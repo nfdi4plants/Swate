@@ -54,10 +54,8 @@ module private Components =
             prop.className "grow"
             tabs.bordered
             prop.children [
-                Html.ul [
-                    Tab(FunctionPage.Create, currentPage, setPage)
-                    Tab(FunctionPage.Update, currentPage, setPage)
-                ]
+                Tab(FunctionPage.Create, currentPage, setPage)
+                Tab(FunctionPage.Update, currentPage, setPage)
             ]
         ]
 
@@ -67,8 +65,8 @@ module private Components =
             Html.td [
                 let s0,marked,s2 = split (fst markedIndices) (snd markedIndices) cell0
                 Html.span s0
-                Html.span [
-                    prop.className "has-background-info"
+                Html.mark [
+                    prop.className "bg-info text-info-content"
                     prop.text marked
                 ]
                 Html.span s2
@@ -117,30 +115,33 @@ type UpdateColumn =
             )
             |> setPreview
         React.fragment [
-            Daisy.label [
-                Daisy.labelText "BAse"
+            Daisy.formControl [
+                Daisy.label [
+                    Daisy.labelText "Base"
+                ]
+                Daisy.input [
+                    input.bordered
+                    prop.autoFocus true
+                    prop.valueOrDefault baseStr
+                    prop.onChange(fun s ->
+                        setBaseStr s
+                        updateCells s suffix
+                    )
+                ]
             ]
-            Daisy.input [
-                prop.autoFocus true
-                prop.valueOrDefault baseStr
-                prop.onChange(fun s ->
-                    setBaseStr s
-                    updateCells s suffix
-                )
-            ]
-            Html.label [
-                prop.className "is-flex is-align-items-center checkbox"
-                prop.style [style.gap (length.rem 0.5)]
-                prop.children [
-                    Html.input [
-                        prop.type' "checkbox"
-                        prop.isChecked suffix
-                        prop.onChange(fun e ->
-                            setSuffix e
-                            updateCells baseStr e
-                        )
+            Daisy.formControl [
+                Daisy.label [
+                    prop.className "cursor-pointer"
+                    prop.children [
+                        Daisy.labelText "Add number suffix"
+                        Daisy.checkbox [
+                            prop.isChecked suffix
+                            prop.onChange(fun e ->
+                                setSuffix e
+                                updateCells baseStr e
+                            )
+                        ]
                     ]
-                    Html.p [prop.text "Add number suffix"; prop.className "text-sm"]
                 ]
             ]
         ]
@@ -168,29 +169,34 @@ type UpdateColumn =
             else
                 ()
         Html.div [
-            prop.className "is-flex is-flex-direction-row"
-            prop.style [style.gap (length.rem 1)]
+            prop.className "flex gap-2"
             prop.children [
-                Daisy.label [
-                    Daisy.labelText "Regex"
+                Daisy.formControl [
+                    Daisy.label [
+                        Daisy.labelText "Regex"
+                    ]
+                    Daisy.input [
+                        prop.autoFocus true
+                        input.bordered
+                        prop.valueOrDefault regex
+                        prop.onChange (fun s ->
+                            setRegex s;
+                            updateCells replacement s
+                        )
+                    ]
                 ]
-                Daisy.input [
-                    prop.autoFocus true
-                    prop.valueOrDefault regex
-                    prop.onChange (fun s ->
-                        setRegex s;
-                        updateCells replacement s
-                    )
-                ]
-                Daisy.label [
-                    Daisy.labelText "Replacement"
-                ]
-                Daisy.input [
-                    prop.valueOrDefault replacement
-                    prop.onChange (fun s ->
-                        setReplacement s;
-                        updateCells s regex
-                    )
+                Daisy.formControl [
+                    Daisy.label [
+                        Daisy.labelText "Replacement"
+                    ]
+                    Daisy.input [
+                        input.bordered
+                        prop.valueOrDefault replacement
+                        prop.onChange (fun s ->
+                            setReplacement s;
+                            updateCells s regex
+                        )
+                    ]
                 ]
             ]
         ]
@@ -218,31 +224,35 @@ type UpdateColumn =
             modal.active
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
-                Daisy.card [
-                    prop.style [style.maxHeight(length.percent 70); style.overflowY.hidden]
+                Daisy.modalBox.div [
+                    prop.style [style.maxHeight(length.percent 70); style.maxWidth(length.px 900); style.overflowY.hidden]
                     prop.children [
-                        Daisy.cardBody [
-                            Daisy.cardActions [
-                                prop.className "justify-end"
-                                prop.children [
-                                    Components.DeleteButton(props=[prop.onClick rmv])
-                                ]
-                            ]
-                            Daisy.cardTitle "Update Column"
-                            Components.TabNavigation(currentPage, setPage)
-                            match currentPage with
-                            | FunctionPage.Create -> UpdateColumn.CreateForm(getCellStrings(), setPreview)
-                            | FunctionPage.Update -> UpdateColumn.UpdateForm(getCellStrings(), setPreview, regex, setRegex)
-                            Components.PreviewTable(column, preview, regex)
-                            Daisy.cardActions [
-                                Daisy.button.button [
-                                    button.info
-                                    prop.style [style.marginLeft length.auto]
-                                    prop.text "Submit"
-                                    prop.onClick(fun e ->
-                                        submit()
-                                        rmv e
-                                    )
+                        Daisy.card [
+                            prop.children [
+                                Daisy.cardBody [
+                                    Daisy.cardTitle [
+                                        prop.className "flex flex-row justify-between"
+                                        prop.children [
+                                            Html.p "Update Column"
+                                            Components.DeleteButton(props=[prop.onClick rmv])
+                                        ]
+                                    ]
+                                    Components.TabNavigation(currentPage, setPage)
+                                    match currentPage with
+                                    | FunctionPage.Create -> UpdateColumn.CreateForm(getCellStrings(), setPreview)
+                                    | FunctionPage.Update -> UpdateColumn.UpdateForm(getCellStrings(), setPreview, regex, setRegex)
+                                    Components.PreviewTable(column, preview, regex)
+                                    Daisy.cardActions [
+                                        Daisy.button.button [
+                                            button.info
+                                            prop.style [style.marginLeft length.auto]
+                                            prop.text "Submit"
+                                            prop.onClick(fun e ->
+                                                submit()
+                                                rmv e
+                                            )
+                                        ]
+                                    ]
                                 ]
                             ]
                         ]

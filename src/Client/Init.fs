@@ -7,9 +7,7 @@ open Model
 open Messages
 open Update
 
-let initializeModel () =
-    let dt = LocalStorage.Darkmode.DataTheme.GET()
-    LocalStorage.Darkmode.DataTheme.SET dt
+let initialModel =
     {
         PageState                   = PageState                 .init()
         PersistentStorageState      = PersistentStorageState    .init()
@@ -21,14 +19,12 @@ let initializeModel () =
         ProtocolState               = Protocol.Model            .init()
         CytoscapeModel              = Cytoscape.Model           .init()
         DataAnnotatorModel          = DataAnnotator.Model       .init()
-        SpreadsheetModel            = Spreadsheet.Model         .fromLocalStorage()
-        History                     = LocalHistory.Model        .init().UpdateFromSessionStorage()
+        SpreadsheetModel            = Spreadsheet.Model         .init()
+        History                     = LocalHistory.Model        .init()
     }
 
 
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
-    let initialModel, pageCmd = initializeModel () |> urlUpdate pageOpt
-    let cmd = Cmd.ofMsg <| InterfaceMsg (SpreadsheetInterface.Initialize initialModel.PersistentStorageState.Host.Value)
-    let batch = Cmd.batch [|pageCmd; cmd|]
-    initialModel, batch
+    let model, cmd = urlUpdate pageOpt initialModel
+    model, cmd

@@ -2,7 +2,6 @@ module Modals.EditColumn
 
 open Feliz
 open Feliz.DaisyUI
-open ExcelColors
 open Messages
 open Shared
 open Spreadsheet
@@ -204,7 +203,7 @@ let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
                         Daisy.cardTitle [
                             prop.className "flex flex-row justify-between"
                             prop.children [
-                                Html.h2 "Update Column"
+                                Html.span "Update Column"
                                 Components.Components.DeleteButton(props=[prop.onClick rmv])
                             ]
                         ]

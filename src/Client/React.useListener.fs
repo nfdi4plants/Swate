@@ -58,8 +58,28 @@ module Impl =
                 Some (jsOptions<RemoveEventListenerOptions>(fun o -> o.capture <- true))
             else None)
 
+type React =
+
+    static member inline useDebouncedCallback<'A>(func: 'A -> unit, ?delay: int) =
+        let timeout = React.useRef(None)
+        let delay = defaultArg delay 500
+
+        React.useCallback(
+            (fun (arg: 'A) ->
+
+                let later = fun () ->
+                    timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
+                    func arg
+
+                timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
+                timeout.current <- Some(Fable.Core.JS.setTimeout later delay)
+            ),
+            [| func; delay |]
+        )
+
 [<Erase;RequireQualifiedAccess>]
 module React =
+
     [<Erase>]
     type useListener =
         static member inline on (eventType: string, action: #Event -> unit, ?options: AddEventListenerOptions, ?dependencies: obj []) =

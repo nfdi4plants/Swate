@@ -14,7 +14,7 @@
     <Compile Include="Shared.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" Version="2.2.0" />
-    <PackageReference Include="ARCtrl.Json" Version="2.2.0" />
+    <PackageReference Include="ARCtrl.Core" Version="2.2.4" />
+    <PackageReference Include="ARCtrl.Json" Version="2.2.4" />
   </ItemGroup>
 </Project>

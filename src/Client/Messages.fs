@@ -7,7 +7,6 @@ open Fable.Remoting.Client
 open Fable.SimpleJson
 open Database
 
-open ExcelColors
 open OfficeInterop
 open Model
 open Routing
@@ -51,9 +50,6 @@ type DevMsg =
     | GenericInteropLogs    of Cmd<Messages.Msg> * InteropLogging.Msg list
     | GenericError          of Cmd<Messages.Msg> * exn
     | UpdateDisplayLogList  of LogItem list
-
-type StyleChangeMsg =
-    | UpdateColorMode of ColorMode
 
 module PersistentStorage =
     type Msg =

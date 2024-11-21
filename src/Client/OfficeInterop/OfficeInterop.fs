@@ -742,7 +742,7 @@ let updateInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composite
         else
             failwith "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
     else
-        failwith "Something went wrong! The update input column does not exist! Please report this as a bug to the developers."    
+        failwith "Something went wrong! The update input column does not exist! Please report this as a bug to the developers."
 
 /// <summary>
 /// Add a new inputcolumn to an annotation table
@@ -1536,7 +1536,7 @@ let validateBuildingBlock (excelTable: Table, context: RequestContext) =
         let _ =
             columns.load(propertyNames = U2.Case2 (ResizeArray[|"count"; "items"; "name"|])) |> ignore
             selectedRange.load(U2.Case2 (ResizeArray [|"values"; "columnIndex"|]))
-    
+
         do! context.sync().``then``( fun _ -> ())
 
         let columnIndex = selectedRange.columnIndex
@@ -1623,7 +1623,7 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
                         |> List.ofArray
                         |> List.collect (fun (ex, header ) ->
                             [InteropLogging.Msg.create InteropLogging.Warning $"The building block is not valid for a ARC table / ISA table: {ex.Message}";
-                             InteropLogging.Msg.create InteropLogging.Warning $"The column {header} is not valid! It needs further inspection what causes the error"])                    
+                             InteropLogging.Msg.create InteropLogging.Warning $"The column {header} is not valid! It needs further inspection what causes the error"])
 
                     return (List.append messages [InteropLogging.NoActiveTableMsg])
         }
@@ -1854,7 +1854,7 @@ let updateTopLevelMetadata (arcFiles: ArcFiles) =
     )
 
 
-    
+
 
 /// <summary>
 /// Add new rows to the end of the given table
@@ -1942,7 +1942,7 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
 
             match result with
             | Some excelTable ->
-                
+
                 let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowCount"; "rowIndex"|]))
 
                 let mutable tableRange = excelTable.getRange()
@@ -2249,12 +2249,12 @@ type Main =
                         return Result.Ok template
                     | None ->
                         return Result.Error [InteropLogging.Msg.create InteropLogging.Error $"No top level metadata sheet is available!"]
-                    
+
                 | _ -> return Result.Error [InteropLogging.Msg.create InteropLogging.Error $"No top level metadata sheet is available that determines the type of data!"]
             }
 
     /// <summary>
-    /// Create a new annotation table based on an arcTable 
+    /// Create a new annotation table based on an arcTable
     /// </summary>
     /// <param name="arcTable"></param>
     /// <param name="context0"></param>
@@ -2418,6 +2418,34 @@ type Main =
                     | Result.Error ex -> return [InteropLogging.Msg.create InteropLogging.Error ex.Message]
             }
 
+    static member getParentTerm (?table: Excel.Table, ?context: RequestContext) =
+        excelRunWith context <| fun context ->
+            promise {
+
+                let! excelTable =
+                    match table with
+                    | Some table -> promise {return Some table}
+                    | None -> AnnotationTable.tryGetActive context
+
+                if excelTable.IsNone then failwith "Error. No active table found!"
+
+                let excelTable = excelTable.Value
+
+                let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
+
+                match arcTableRes with
+                | Ok arcTable ->
+                    let selectedRange = context.workbook.getSelectedRange().load(U2.Case2 (ResizeArray[|"rowIndex"|]))
+                    let! (_, arcIndex) = getArcMainColumn excelTable arcTable context
+                    let rowIndex = selectedRange.rowIndex
+
+                    let parent = arcTable.GetColumn(arcIndex).Header.TryOA()
+
+                    return parent
+
+                | Result.Error exn -> return None
+            }
+
     /// <summary>
     /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
     /// </summary>
@@ -2476,9 +2504,9 @@ type Main =
                     //        | Some (U2.Case1 cell) -> [|cell|]
                     //        | Some (U2.Case2 cells) -> cells
                     //        | None -> [||]
-                            
+
                     //    //Adapt rowCount of composite column that shall be added
-                    //    let column = CompositeColumn.create(newHeader, values)                        
+                    //    let column = CompositeColumn.create(newHeader, values)
 
                     //    [|
                     //        for column in Spreadsheet.CompositeColumn.toStringCellColumns column do
@@ -2498,7 +2526,7 @@ type Main =
                     //let! selectedIndex = tryGetSelectedTableIndex excelTable context |> _.``then``(fun i ->
                     //    match i with | Some i -> i | None -> int ExcelUtil.AppendIndex)
 
-                    ////When single column replace existing column with same name or add at index                    
+                    ////When single column replace existing column with same name or add at index
                     //if newHeader.IsUnique then
 
                     //    let existingColumnRes = arcTable.TryGetColumnByHeader newHeader
@@ -2525,11 +2553,11 @@ type Main =
                     //                |> Seq.find (fun item ->
                     //                    item.name.StartsWith(startString))
                     //            excelTable.columns.items.[(int toUpdateColumn.index)].name <- columns.[0].[0]
-                    //        | None -> ExcelUtil.Table.addColumnAt selectedIndex excelTable columns.[0] |> ignore                            
+                    //        | None -> ExcelUtil.Table.addColumnAt selectedIndex excelTable columns.[0] |> ignore
                     //else
                     //    for i in 0 .. (columns.Length-1) do
                     //        let column = columns.[i]
-                    //        let index = selectedIndex + i                        
+                    //        let index = selectedIndex + i
                     //        ExcelUtil.Table.addColumnAt index excelTable column |> ignore
 
                     //do! context.sync()
@@ -2537,7 +2565,7 @@ type Main =
                     //do! AnnotationTable.format(excelTable, context, true)
 
                     //return []
-                        
+
                 | Result.Error exn ->
                     return [InteropLogging.Msg.create InteropLogging.Error exn.Message]
-            } 
+            }

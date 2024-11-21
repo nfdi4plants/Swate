@@ -83,89 +83,85 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
     ]
 
 let NoMetadataModalContent refresh (dispatch: Messages.Msg -> unit) =
-    Html.section [
-        Components.Forms.Generic.BoxedField [
-            Html.h2 "Create Top Level Metadata"
-            Html.p "Choose one of the following top level meta data types to create"
-            AddMetaDataButtons refresh dispatch
-        ]
-    ]
+    Components.Forms.Generic.BoxedField (content=[
+        Html.h2 "Create Top Level Metadata"
+        Html.p "Choose one of the following top level meta data types to create"
+        AddMetaDataButtons refresh dispatch
+    ])
 
-let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal (dispatch: Messages.Msg -> unit) =
-    Html.div [
-        prop.children [
-            match excelMetadataType with
-            | { Metadata = Some (ArcFiles.Assay assay)} ->
-                let setAssay (assay: ArcAssay) =
-                    setExcelMetadataType {
-                        excelMetadataType with
-                            Metadata = Some (ArcFiles.Assay assay)
-                    }
-                let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
-                    assay.DataMap <- dataMap
-                Assay.Main(assay, setAssay, setAssayDataMap)
-            | { Metadata = Some (ArcFiles.Study (study, assays))} ->
-                let setStudy (study: ArcStudy, assays: ArcAssay list) =
-                    setExcelMetadataType {
-                        excelMetadataType with
-                            Metadata = Some (ArcFiles.Study (study, assays))
-                    }
-                let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
-                    study.DataMap <- dataMap
-                Study.Main(study, assays, setStudy, setStudyDataMap)
-            | { Metadata = Some (ArcFiles.Investigation investigation)} ->
-                let setInvestigation (investigation: ArcInvestigation) =
-                    setExcelMetadataType {
-                        excelMetadataType with
-                            Metadata = Some (ArcFiles.Investigation investigation)
-                    }
-                Investigation.Main(investigation, setInvestigation)
-            | { Metadata = Some (ArcFiles.Template template)} ->
-                let setTemplate (template: Template) =
-                    setExcelMetadataType {
-                        excelMetadataType with
-                            Metadata = Some (ArcFiles.Template template)
-                    }
-                Template.Main(template, setTemplate)
-            | _ -> Html.none
-            Html.section [
-                prop.className "pt-0"
-                prop.children [
-                    Components.Forms.Generic.BoxedField [
-                        Html.div [
-                            Daisy.button.a [
-                                button.primary
-                                prop.text "Update Metadata Type"
-                                prop.onClick (fun _ ->
-                                    if excelMetadataType.Metadata.IsSome then
-                                        OfficeInterop.UpdateTopLevelMetadata(excelMetadataType.Metadata.Value)
-                                        |> OfficeInteropMsg
-                                        |> dispatch
-                                        closeModal()
-                                    else
-                                        logw ("Tried updating metadata sheet without given metadata")
-                                )
-                            ]
-                            Daisy.button.a [
-                                button.error
-                                prop.text "Delete Metadata Type"
-                                prop.onClick (fun _ ->
-                                    OfficeInterop.DeleteTopLevelMetadata
+let UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal model (dispatch: Messages.Msg -> unit) =
+    React.fragment [
+        match excelMetadataType with
+        | { Metadata = Some (ArcFiles.Assay assay)} ->
+            let setAssay (assay: ArcAssay) =
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some (ArcFiles.Assay assay)
+                }
+            let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) =
+                assay.DataMap <- dataMap
+            Assay.Main(assay, setAssay, setAssayDataMap, model)
+        | { Metadata = Some (ArcFiles.Study (study, assays))} ->
+            let setStudy (study: ArcStudy, assays: ArcAssay list) =
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some (ArcFiles.Study (study, assays))
+                }
+            let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) =
+                study.DataMap <- dataMap
+            Study.Main(study, assays, setStudy, setStudyDataMap, model)
+        | { Metadata = Some (ArcFiles.Investigation investigation)} ->
+            let setInvestigation (investigation: ArcInvestigation) =
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some (ArcFiles.Investigation investigation)
+                }
+            Investigation.Main(investigation, setInvestigation, model)
+        | { Metadata = Some (ArcFiles.Template template)} ->
+            let setTemplate (template: Template) =
+                setExcelMetadataType {
+                    excelMetadataType with
+                        Metadata = Some (ArcFiles.Template template)
+                }
+            Template.Main(template, setTemplate)
+        | _ -> Html.none
+        Components.Forms.Generic.Section [
+            Components.Forms.Generic.BoxedField (content= [
+                Html.div [
+                    prop.className "flex flex-col md:flex-row gap-4"
+                    prop.children [
+                        Daisy.button.a [
+                            button.primary
+                            prop.text "Update Metadata Type"
+                            prop.onClick (fun _ ->
+                                if excelMetadataType.Metadata.IsSome then
+                                    OfficeInterop.UpdateTopLevelMetadata(excelMetadataType.Metadata.Value)
                                     |> OfficeInteropMsg
                                     |> dispatch
                                     closeModal()
-                                )
-                            ]
+                                else
+                                    logw ("Tried updating metadata sheet without given metadata")
+                            )
+                        ]
+                        Daisy.button.a [
+                            button.error
+                            prop.text "Delete Metadata Type"
+                            prop.onClick (fun _ ->
+                                OfficeInterop.DeleteTopLevelMetadata
+                                |> OfficeInteropMsg
+                                |> dispatch
+                                closeModal()
+                            )
                         ]
                     ]
                 ]
-            ]
+            ])
         ]
     ]
 
 // Define a modal dialog component
 [<ReactComponent>]
-let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit) =
+let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -> unit) =
     let (excelMetadataType, setExcelMetadataType) = React.useState(ExcelMetadataState.init)
     let refreshMetadataState =
         fun () ->
@@ -173,7 +169,7 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
                 setExcelMetadataType (ExcelMetadataState.init())
                 let! result = OfficeInterop.Core.Main.tryParseToArcFile(getTables=false)
                 match result with
-                | Result.Ok (arcFile) ->
+                | Result.Ok arcFile ->
                     setExcelMetadataType {
                         excelMetadataType with
                             Loading = false
@@ -185,7 +181,7 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
                             Loading = false
                     }
             }
-    React.useEffectOnce(refreshMetadataState >> Promise.start)
+    React.useLayoutEffectOnce(refreshMetadataState >> Promise.start)
     Daisy.modal.div [
         // Add the "is-active" class to display the modal
         modal.active
@@ -193,16 +189,16 @@ let SelectModalDialog (closeModal: unit -> unit) (dispatch: Messages.Msg -> unit
             Daisy.modalBackdrop [
                 prop.onClick (fun _ -> closeModal())
             ]
-            Daisy.modalBox.form [
-                prop.className "overflow-y-auto"
+            Daisy.modalBox.div [
+                prop.className "overflow-y-auto h-[100%]"
                 prop.children [
                     match excelMetadataType with
                     | { Loading = true } ->
-                        Modals.Loading.Modal()
+                        Modals.Loading.Component
                     | { Metadata = None } ->
                         NoMetadataModalContent refreshMetadataState dispatch
                     | { Metadata = Some metadata } ->
-                        UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal dispatch
+                        UpdateMetadataModalContent excelMetadataType setExcelMetadataType closeModal model dispatch
                 ]
             ]
         ]
@@ -279,59 +275,6 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
     ]
     |> React.fragment
 
-
-let private quickAccessDropdownElement model dispatch (state: NavbarState) (setState: NavbarState -> unit) (isSndNavbar:bool) =
-    Html.div [
-        prop.onClick (fun _ -> setState { state with QuickAccessActive = not state.QuickAccessActive })
-        prop.style [ style.padding 0; if isSndNavbar then style.custom("marginLeft", "auto")]
-        prop.title (if state.QuickAccessActive then "Close quick access" else "Open quick access")
-        prop.children [
-            Html.div [
-                prop.style [style.width(length.perc 100); style.height (length.perc 100); style.position.relative]
-                prop.children [
-                    Daisy.button.a [
-                        prop.style [style.backgroundColor "transparent"; style.height(length.perc 100); if state.QuickAccessActive then style.color NFDIColors.Yellow.Base]
-                        button.outline
-                        prop.children [
-                            Html.div [
-                                prop.style [ style.display.inlineFlex; style.position.relative; style.justifyContent.center]
-                                prop.children [
-                                    Html.i [
-                                        prop.style [
-                                            style.position.absolute
-                                            style.display.block
-                                            style.custom("transition", "opacity 0.25s, transform 0.25s")
-                                            style.opacity (if state.QuickAccessActive then 1 else 0)
-                                            style.transform (if state.QuickAccessActive then [transform.rotate -180] else [transform.rotate 0])
-                                        ]
-                                        prop.className "fa-solid fa-times"
-                                    ]
-                                    Html.i [
-                                        prop.style [
-                                            style.position.absolute
-                                            style.display.block
-                                            style.custom("transition","opacity 0.25s, transform 0.25s")
-                                            style.opacity (if state.QuickAccessActive then 0 else 1)
-                                        ]
-                                        prop.className "fa-solid fa-ellipsis"
-                                    ]
-                                    // Invis placeholder to create correct space (Height, width, margin, padding, etc.)
-                                    Html.i [
-                                        prop.style [
-                                            style.display.block
-                                            style.opacity 0
-                                        ]
-                                        prop.className "fa-solid fa-ellipsis"
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ]
-
 [<ReactComponent>]
 let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) =
     let state, setState = React.useState(NavbarState.init)
@@ -340,6 +283,7 @@ let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) =
         if state.ExcelMetadataModalActive then
             SelectModalDialog
                 toggleMetdadataModal
+                model
                 dispatch
         Html.div [
             prop.ariaLabel "logo"

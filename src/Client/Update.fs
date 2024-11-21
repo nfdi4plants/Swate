@@ -9,17 +9,16 @@ open Routing
 open Messages
 open Model
 
-let urlUpdate (route: Route option) (currentModel:Model) : Model * Cmd<Messages.Msg> =
-    match route with
-    | Some (Route.Home queryIntegerOption) ->
-        let swatehost = Swatehost.ofQueryParam queryIntegerOption
-        let nextModel = {
-            currentModel with
-                Model.PersistentStorageState.Host = Some swatehost
-        }
-        nextModel,Cmd.none
-    | None ->
-        currentModel, Cmd.none
+let urlUpdate (route: Route option) (model:Model) : Model * Cmd<Messages.Msg> =
+    log "hit urlUpdate"
+    let cmd (host: Swatehost) = SpreadsheetInterface.Initialize host |> InterfaceMsg |> Cmd.ofMsg
+    let host =
+        match route with
+        | Some (Routing.Route.Home queryIntegerOption) ->
+            Swatehost.ofQueryParam queryIntegerOption
+        | None ->
+            Swatehost.Browser
+    {model with Model.PersistentStorageState.Host = Some host}, cmd host
 
 module AdvancedSearch =
 

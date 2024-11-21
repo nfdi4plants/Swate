@@ -14,6 +14,26 @@ open Shared
 open Fable.Core.JsInterop
 open Shared.ARCtrlHelper
 
+module private ModelUtil =
+
+    open LocalHistory
+    open Model
+
+    type Model.Model with
+        member this.UpdateFromLocalStorage() =
+            match this.PersistentStorageState.Host with
+            | Some Swatehost.Browser ->
+                let dt = LocalStorage.Darkmode.DataTheme.GET()
+                LocalStorage.Darkmode.DataTheme.SET dt
+                { this with
+                    Model.SpreadsheetModel = Spreadsheet.Model.fromLocalStorage()
+                    Model.History = this.History.UpdateFromSessionStorage()
+                }
+            | _ ->
+                this
+
+open ModelUtil
+
 /// This seems like such a hack :(
 module private ExcelHelper =
 
@@ -62,13 +82,13 @@ module Interface =
 
         let innerUpdate (model: Model) (msg: SpreadsheetInterface.Msg) =
             match msg with
-            // This is very bloated, might be good to reduce
             | Initialize host ->
                 let cmd =
                     Cmd.batch [
                         Cmd.ofMsg (Ontologies.GetOntologies |> OntologyMsg)
                         match host with
                         | Swatehost.Excel ->
+                            ExcelHelper.officeload() |> Async.StartImmediate
                             Cmd.none
                         | Swatehost.Browser ->
                             Cmd.none
@@ -78,7 +98,9 @@ module Interface =
                                 ARCitect.ARCitect.send ARCitect.Init
                             )
                     ]
-                model, cmd
+                /// Updates from local storage if standalone in browser
+                let nextModel = model.UpdateFromLocalStorage()
+                nextModel, cmd
             | CreateAnnotationTable usePrevOutput ->
                 match host with
                 | Some Swatehost.Excel ->

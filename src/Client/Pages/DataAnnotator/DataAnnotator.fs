@@ -280,8 +280,11 @@ type DataAnnotator =
                                     prop.className "grid grid-cols-1 grid-rows-[1fr_1fr_20px_8fr_1fr] h-[600px] w-full overflow-hidden"
                                     prop.children [
                                         Daisy.cardTitle [
-                                            Html.p "Data Annotator"
-                                            Daisy.cardActions [Components.DeleteButton(props = [prop.onClick rmv]) |> prop.children; prop.className "justify-end"]
+                                            prop.className "flex flex-row justify-between"
+                                            prop.children [
+                                                Html.span "Data Annotator"
+                                                Daisy.cardActions [Components.DeleteButton(props = [prop.onClick rmv]) |> prop.children; prop.className "justify-end"]
+                                            ]
                                         ]
                                         DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
                                         FileMetadataComponent model.DataAnnotatorModel.DataFile.Value

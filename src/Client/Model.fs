@@ -20,10 +20,10 @@ type LogItem =
         | InteropLogging.Error  -> Error(System.DateTime.UtcNow,msg.MessageTxt)
         | InteropLogging.Warning -> Warning(System.DateTime.UtcNow,msg.MessageTxt)
 
-    static member private DebugCell = Html.td [prop.style [style.color NFDIColors.LightBlue.Base; style.fontWeight.bold]; prop.text "Debug"]
-    static member private InfoCell = Html.td [prop.style [style.color NFDIColors.Mint.Base; style.fontWeight.bold]; prop.text "Info"]
-    static member private ErrorCell = Html.td [prop.style [style.color NFDIColors.Red.Base; style.fontWeight.bold]; prop.text "ERROR"]
-    static member private WarningCell = Html.td [prop.style [style.color NFDIColors.Yellow.Base; style.fontWeight.bold]; prop.text "Warning"]
+    static member private DebugCell = Html.td [prop.className "bg-info text-info-content font-semibold"; prop.text "Debug"]
+    static member private InfoCell = Html.td [prop.className "bg-primary text-primary-content font-semibold"; prop.text "Info"]
+    static member private ErrorCell = Html.td [prop.className "bg-error text-error-content font-semibold"; prop.text "ERROR"]
+    static member private WarningCell = Html.td [prop.className "bg-warning text-warning-content font-semibold"; prop.text "Warning"]
 
     static member toTableRow = function
         | Debug (t,m) ->
@@ -121,7 +121,7 @@ type PersistentStorageState = {
 } with
     static member init () = {
         SearchableOntologies    = [||]
-        Host                    = None
+        Host                    = Some Swatehost.Browser
         AppVersion              = ""
         ShowSideBar             = false
         HasOntologiesLoaded     = false

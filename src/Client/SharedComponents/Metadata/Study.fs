@@ -6,7 +6,7 @@ open Components
 open Components.Forms
 open System
 
-let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy * ArcAssay list) -> unit, setDatamap: ArcStudy -> DataMap option -> unit) =
+let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy * ArcAssay list) -> unit, setDatamap: ArcStudy -> DataMap option -> unit, model: Model.Model) =
     Generic.Section [
         Generic.BoxedField(
             "Study Metadata",
@@ -16,7 +16,16 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy 
                     (fun s ->
                         let nextStudy = IdentifierSetters.setStudyIdentifier s study
                         setArcStudy (nextStudy , assignedAssays)),
-                    "Identifier"
+                    "Identifier",
+                    validator = {| fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s); msg = "Invalid Identifier" |},
+                    disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host
+                )
+                FormComponents.TextInput (
+                    Option.defaultValue "" study.Title,
+                    (fun s ->
+                        study.Title <- s |> Option.whereNot String.IsNullOrWhiteSpace
+                        setArcStudy (study , assignedAssays)),
+                    "Title"
                 )
                 FormComponents.TextInput (
                     Option.defaultValue "" study.Description,

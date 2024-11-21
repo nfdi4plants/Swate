@@ -4,8 +4,6 @@ open Fable.React
 open Fable.React.Props
 open Fable.Core
 open Fable.Core.JsInterop
-
-open ExcelColors
 open Model
 open Messages
 open Messages.BuildingBlock

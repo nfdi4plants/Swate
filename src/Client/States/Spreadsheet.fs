@@ -13,7 +13,7 @@ type ColumnType =
 | DataFormat
 | DataSelectorFormat
 with
-    member this.AsNumber = 
+    member this.AsNumber =
         match this with
         | Main -> 0
         | Unit| DataSelector -> 1
@@ -30,15 +30,15 @@ with
         | DataSelectorFormat -> "Data Selector Format"
         | anyElse -> failwithf "Error. Unable to call `ColumnType.ToColumnHeader()` on %A!" anyElse
     member this.IsMainColumn = match this with | Main -> true | _ -> false
-    member this.IsRefColumn = not this.IsMainColumn 
+    member this.IsRefColumn = not this.IsMainColumn
 
 
 [<RequireQualifiedAccess>]
-type ActiveView = 
+type ActiveView =
 | Table of index:int
 | DataMap
 | Metadata
-with 
+with
     /// <summary>
     /// A identifier that returns an integer based on the ActiveView type.
     /// </summary>
@@ -115,10 +115,10 @@ type Model = {
             | None ->
                 ResizeArray() |> ArcTables
     member this.ActiveTable
-        with get() = 
+        with get() =
             match this.ActiveView with
             | ActiveView.Table i -> this.Tables.GetTableAt(i)
-            | ActiveView.Metadata | ActiveView.DataMap -> 
+            | ActiveView.Metadata | ActiveView.DataMap ->
                 let t = ArcTable.init("NULL_TABLE") //return NULL_TABLE-named table for easier handling of return value
                 t.AddColumn(CompositeHeader.FreeText "WARNING", [|CompositeCell.FreeText "If you see this table view, pls contact a developer and report it."|])
                 t
@@ -134,8 +134,8 @@ type Model = {
         | _ -> DataMap.init()
     member this.GetAssay() =
         match this.ArcFile with | Some (Assay a) -> a | _ -> ArcAssay.init("ASSAY_NULL")
-    member this.CanHaveTables() = 
-        match this.ArcFile with 
+    member this.CanHaveTables() =
+        match this.ArcFile with
         | Some (ArcFiles.Assay _) | Some (ArcFiles.Study _) -> true
         | _ -> false
     member this.TableViewIsActive() =
@@ -152,6 +152,7 @@ type Key =
 
 
 type Msg =
+| ManualSave
 // <--> UI <-->
 | UpdateState of Model
 | UpdateCell of (int*int) * CompositeCell

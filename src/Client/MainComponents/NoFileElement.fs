@@ -21,18 +21,21 @@ module private UploadHandler =
 
     [<Literal>]
     let id = "droparea"
+
+    [<Literal>]
+    let HightlightBorderClasses = "border-2 border-primary"
     let updateMsg = fun r -> r |> ImportXlsx |> InterfaceMsg
 
     let setActive_DropArea() =
         styleCounter <- styleCounter + 1
         let ele = Browser.Dom.document.getElementById(id)
-        ele?style?border <- $"2px solid {NFDIColors.Mint.Base}"
+        ele.classList.add HightlightBorderClasses
 
     let setInActive_DropArea() =
         styleCounter <- (System.Math.Max(styleCounter - 1,0))
         if styleCounter <= 0 then
             let ele = Browser.Dom.document.getElementById(id)
-            ele?style?border <- "unset"
+            ele.classList.remove HightlightBorderClasses
 
     let ondrop dispatch =
         fun (e: Browser.Types.DragEvent) ->

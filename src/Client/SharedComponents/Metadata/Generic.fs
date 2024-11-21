@@ -4,6 +4,10 @@ open Feliz.DaisyUI
 open Feliz
 
 type Generic =
+
+    static member isDisabledInARCitect (host: Swatehost option) =
+
+        host.IsSome && host.Value = Swatehost.ARCitect
     static member FieldTitle (title:string) =
         Html.h5 [
             prop.className "text-primary font-semibold mt-6 mb-2"
@@ -38,8 +42,6 @@ type Generic =
                 ]
             ]
         ]
-    static member BoxedField (content: ReactElement list) =
-        Generic.BoxedField (content = content)
 
     static member Section (children: ReactElement seq) =
         Html.section [

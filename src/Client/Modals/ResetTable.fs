@@ -2,7 +2,6 @@ module Modals.ResetTable
 
 open Feliz
 open Feliz.DaisyUI
-open ExcelColors
 open Model
 open Messages
 open Shared
@@ -20,7 +19,7 @@ let Main (dispatch) (rmv: _ -> unit) =
                 Daisy.cardTitle [
                     prop.className "flex flex-row justify-between"
                     prop.children [
-                        Html.h5 [prop.className "text-xl"; prop.text "Attention!"]
+                        Html.span [prop.className "text-xl"; prop.text "Attention!"]
                         Components.Components.DeleteButton(props=[prop.onClick rmv])
                     ]
                 ]

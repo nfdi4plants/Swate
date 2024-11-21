@@ -2,7 +2,6 @@ module SidebarView
 
 open Fable.React
 open Fable.React.Props
-open ExcelColors
 open Model
 open Messages
 open Browser

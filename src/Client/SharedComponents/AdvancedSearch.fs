@@ -6,7 +6,6 @@ open Elmish
 
 open Shared
 open Database
-open ExcelColors
 open Model
 open Messages
 
@@ -386,7 +385,7 @@ let Main (isActive: bool, setIsActive: bool -> unit, resultHandler: Term -> unit
                                 Daisy.cardTitle [
                                     prop.className "flex flex-row justify-between"
                                     prop.children [
-                                        Html.h3 "Advanced Search"
+                                        Html.span "Advanced Search"
                                         Components.DeleteButton(props=[prop.onClick(fun _ -> setIsActive false)])
                                     ]
                                 ]
