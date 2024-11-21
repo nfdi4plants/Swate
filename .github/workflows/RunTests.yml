@@ -19,7 +19,7 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-            dotnet-version: 8.x.x
+          dotnet-version: 8.x.x
 
       # Restore .NET tools
       - name: Restore .NET dependencies
@@ -35,5 +35,5 @@ jobs:
       - name: Install Node.js dependencies
         run: npm install
 
-      - name: Run .NET tests
-        run: ./build.sh test
+      - name: Run Tests
+        run: dotnet run --project ./build/Build.fsproj test
