@@ -1,11 +1,13 @@
 namespace Components
 
+open Fable.Core
 open Feliz
 open Browser.Types
-open Feliz.DaisyUI
 
+[<Erase>]
 type QuickAccessButton =
-    static member Main(desc:string, children: ReactElement, onclick: Event -> unit, ?isDisabled, ?props, ?classes: string) =
+
+    static member QuickAccessButton(desc:string, children: ReactElement, onclick: Event -> unit, ?isDisabled, ?props, ?classes: string) =
         let isDisabled = defaultArg isDisabled false
         Html.button [
             prop.className [

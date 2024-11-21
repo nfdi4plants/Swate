@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -10,7 +10,6 @@
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
-    <None Include="style.scss" />
     <Compile Include="Types.fs" />
     <Compile Include="Helper.fs" />
     <Compile Include="React.useListener.fs" />
@@ -61,7 +60,6 @@
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\AdvancedSearch.fs" />
     <Compile Include="SharedComponents\TermSearchInput.fs" />
-    <Compile Include="SharedComponents\QuickAccessButton.fs" />
     <Compile Include="SharedComponents\Metadata\Generic.fs" />
     <Compile Include="SharedComponents\Metadata\Forms.fs" />
     <Compile Include="SharedComponents\Metadata\DatamapConfig.fs" />
@@ -123,6 +121,7 @@
     <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Components\Components.fsproj" />
     <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
   <ItemGroup>

@@ -34,7 +34,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
-            QuickAccessButton.Main(
+            QuickAccessButton.QuickAccessButton(
                 "Back",
                 React.fragment [
                     Html.i [prop.className "fa-solid fa-rotate-left"]
@@ -50,7 +50,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                 ),
                 isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition + 1) |> not)
             )
-            QuickAccessButton.Main(
+            QuickAccessButton.QuickAccessButton(
                 "Forward",
                 React.fragment [
                     Html.i [prop.className "fa-solid fa-rotate-right"]
@@ -71,7 +71,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
             style.display.flex; style.flexDirection.row
         ]
         prop.children [
-            QuickAccessButton.Main(
+            QuickAccessButton.QuickAccessButton(
                 "Save",
                 React.fragment [
                     Html.i [prop.className "fa-solid fa-floppy-disk";]
@@ -86,7 +86,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
             )
             match model.PersistentStorageState.Host with
             | Some Swatehost.Browser ->
-                QuickAccessButton.Main(
+                QuickAccessButton.QuickAccessButton(
                     "Reset",
                     React.fragment [
                         Html.i [prop.className "fa-solid fa-trash-can";]
@@ -102,7 +102,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
 
 let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
     let addBuildingBlock =
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "Add Building Block",
             React.fragment [
                 React.fragment [
@@ -113,7 +113,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
             (fun _ -> addWidget Widget._BuildingBlock)
         )
     let addTemplate =
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "Add Template",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-circle-plus" ]
@@ -122,7 +122,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
             (fun _ -> addWidget Widget._Template)
         )
     let filePicker =
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "File Picker",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-file-signature" ]
@@ -130,7 +130,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
             (fun _ -> addWidget Widget._FilePicker)
         )
     let dataAnnotator =
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "Data Annotator",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-object-group" ]

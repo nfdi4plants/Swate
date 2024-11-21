@@ -206,7 +206,7 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
 
 let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -> unit) =
     [
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "Create Metadata",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-plus"]
@@ -215,7 +215,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             toggleMetdadataModal
         )
 
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "Create Annotation Table",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-plus"]
@@ -230,7 +230,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
-            QuickAccessButton.Main(
+            QuickAccessButton.QuickAccessButton(
                 "Autoformat Table",
                 React.fragment [
                     Html.i [prop.className "fa-solid fa-rotate"]
@@ -244,7 +244,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             )
         | _ ->
             ()
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "Rectify Ontology Terms",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-spell-check"]
@@ -255,7 +255,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch
             )
         )
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "Remove Building Block",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-minus pr-1"]
@@ -263,7 +263,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
         )
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "Get Building Block Information",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-question pr-1"]

@@ -73,7 +73,7 @@ type NavbarBurger =
     [<ReactComponent>]
     static member Main(model, dispatch) =
         let isOpen, setIsOpen = React.useState(false)
-        QuickAccessButton.Main(
+        QuickAccessButton.QuickAccessButton(
             "More",
             NavbarBurger.Dropdown(isOpen, setIsOpen, model, dispatch),
             (fun _ -> setIsOpen (not isOpen))
