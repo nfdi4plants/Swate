@@ -14,3 +14,7 @@ fsharp_newline_before_multiline_computation_expression = false
 [*.fsproj]
 indent_style = space
 indent_size = 2
+
+[*.yml]
+indent_style = space
+indent_size = 2
