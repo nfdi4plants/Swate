@@ -286,6 +286,23 @@ module Interface =
                             Spreadsheet.DeleteColumn (distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | GetBuildingBlockDetails ->
+                match host with
+                | Some Swatehost.Excel ->
+                    let cmd = OfficeInterop.GetBuildingBlockDetails |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                //| Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                //    if Set.isEmpty model.SpreadsheetModel.SelectedCells then failwith "No column selected"
+                //    let selectedColumns, _ = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.unzip
+                //    let distinct = selectedColumns |> Array.distinct
+                //    let cmd =
+                //        if distinct.Length <> 1 then
+                //            let msg = Failure("Please select one column only if you want to use `Remove Building Block`.")
+                //            GenericError (Cmd.none,msg) |> DevMsg |> Cmd.ofMsg
+                //        else
+                //            Spreadsheet.DeleteColumn (distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg
+                //    model, cmd
+                | _ -> failwith "not implemented"
             | AddDataAnnotation data ->
                 match host with
                 | Some Swatehost.Excel ->

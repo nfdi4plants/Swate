@@ -263,15 +263,15 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
         )
-        //QuickAccessButton.create(
-        //    "Get Building Block Information",
-        //    [
-        //        Html.i [prop.className "fa-solid fa-question pr-1"]
-        //        Html.span model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg
-        //        Html.i [prop.className "fa-solid fa-table-columns"]
-        //    ],
-        //    (fun _ -> SpreadsheetInterface.EditBuildingBlock |> InterfaceMsg |> dispatch)
-        //)
+        QuickAccessButton.Main(
+            "Get Building Block Information",
+            React.fragment [
+                Html.i [prop.className "fa-solid fa-question pr-1"]
+                //Html.span model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg
+                Html.i [prop.className "fa-solid fa-table-columns"]
+            ],
+            (fun _ -> SpreadsheetInterface.GetBuildingBlockDetails |> InterfaceMsg |> dispatch)
+        )
     ]
     |> React.fragment
 
