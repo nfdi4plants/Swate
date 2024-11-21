@@ -6,7 +6,7 @@ open Fable.Remoting.Client
 
 let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
 
-let downloadFromString(filename, content:string) = 
+let downloadFromString(filename, content:string) =
     let bytes = System.Text.Encoding.UTF8.GetBytes(content)
     bytes.SaveFileAs(filename)
 
@@ -46,7 +46,7 @@ module JsonImportHelper =
         arcFile
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="import"></param>
     /// <param name="importState"></param>
@@ -89,6 +89,7 @@ module JsonImportHelper =
                     nTable.Join(table, joinOptions=importState.ImportType)
                     nTable
                 )
+                |> Seq.rev // https://github.com/nfdi4plants/Swate/issues/577
                 |> Seq.iter (fun table -> existingTables.Add table)
             existing
         | None -> //
