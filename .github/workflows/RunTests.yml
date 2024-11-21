@@ -7,7 +7,13 @@ on:
   workflow_dispatch: # Allows manual runs from the Actions tab
 
 jobs:
-  build:
+  test:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
     runs-on: ubuntu-latest
 
     steps:
@@ -31,7 +37,7 @@ jobs:
         with:
           node-version: 18
 
-      # Install dependencies for Node.js project
+      # Install dependencies
       - name: Install Node.js dependencies
         run: npm install
 
