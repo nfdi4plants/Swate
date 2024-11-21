@@ -7,7 +7,7 @@ let log (a) = Browser.Dom.console.log a
 
 let logw (a) = Browser.Dom.console.warn a
 
-let logf a b = 
+let logf a b =
     let txt : string = sprintf a b
     log txt
 
@@ -54,12 +54,12 @@ let debounce<'T> (storage:DebounceStorage) (key: string) (timeout: int) (fn: 'T 
     | _ -> ()
 
     // Create a new timeout and memoize it
-    let timeoutId = 
-        Fable.Core.JS.setTimeout 
-            (fun () -> 
+    let timeoutId =
+        Fable.Core.JS.setTimeout
+            (fun () ->
                 storage.Remove(key) |> ignore
                 fn value
-            ) 
+            )
             timeout
     storage.Add(key, timeoutId, fun () -> fn value)
 
@@ -71,9 +71,9 @@ let debouncel<'T> (storage:DebounceStorage) (key: string) (timeout: int) (setLoa
     | _ -> setLoading true; ()
 
     // Create a new timeout and memoize it
-    let timeoutId = 
-        Fable.Core.JS.setTimeout 
-            (fun () -> 
+    let timeoutId =
+        Fable.Core.JS.setTimeout
+            (fun () ->
                 match storage.TryGetValue key with
                 | Some _ ->
                     storage.Remove(key) |> ignore
@@ -81,25 +81,11 @@ let debouncel<'T> (storage:DebounceStorage) (key: string) (timeout: int) (setLoa
                     fn value
                 | None ->
                     setLoading false
-            ) 
+            )
             timeout
     storage.Add(key, timeoutId, fun () -> fn value)
 
 let newDebounceStorage = fun () -> DebounceStorage()
-
-let debouncemin (fn: 'a -> unit, timeout: int) =
-    let ids : ResizeArray<int> = ResizeArray()
-    fun (arg: 'a) ->
-        for id in ids do
-            Fable.Core.JS.clearTimeout id
-        ids.Clear()
-        let timeoutId = 
-            Fable.Core.JS.setTimeout
-                (fun () ->
-                    fn arg
-                )
-                timeout
-        ids.Add timeoutId
 
 let throttle (fn: 'a -> unit, interval: int) =
     let mutable lastCall = System.DateTime.MinValue
@@ -125,7 +111,7 @@ let throttleAndDebounce(fn: 'a -> unit, timespan: int) =
             fn arg
         | _, Some id -> Fable.Core.JS.clearTimeout id
         | _, None -> ()
-        let timeoutId = 
+        let timeoutId =
             Fable.Core.JS.setTimeout
                 (fun () ->
                     fn arg

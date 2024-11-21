@@ -185,7 +185,7 @@ module private Helper =
             modal.active
             prop.children [
                 Daisy.modalBackdrop []
-                Daisy.modalBox.form [
+                Daisy.modalBox.div [
                     cardFormGroup [
                         readOnlyFormElement(person.FirstName, "Given Name")
                         readOnlyFormElement(person.LastName, "Family Name")
@@ -410,11 +410,7 @@ type FormComponents =
         let loading, setLoading = React.useState(false)
         let isValid, setIsValid = React.useState(true)
         let ref = React.useInputRef()
-        let debounceSetter = React.useMemo(
-            (fun () ->
-                debouncemin ((fun s -> setValue s; setLoading false), 1000)),
-            [||]
-        )
+        let debounceSetter = React.useDebouncedCallback(setValue)
         React.useEffect(
             (fun () ->
                 if ref.current.IsSome then
@@ -424,7 +420,7 @@ type FormComponents =
             ),
             [|box value|]
         )
-        let onChange = React.useMemo(fun () ->
+        let onChange =
             fun (e: string) ->
                 if validator.IsSome then
                     let isValid = validator.Value.fn e
@@ -435,7 +431,6 @@ type FormComponents =
                 else
                     setLoading true
                     debounceSetter e
-        )
         Html.div [
             prop.className "grow not-prose"
             prop.children [
@@ -588,6 +583,7 @@ type FormComponents =
 
     [<ReactComponent>]
     static member PersonInput(input: Person, setter: Person -> unit, ?rmv: MouseEvent -> unit) =
+        log ("rerender", input)
         let nameStr =
             let fn = Option.defaultValue "" input.FirstName
             let ln = Option.defaultValue "" input.LastName
@@ -595,13 +591,15 @@ type FormComponents =
             let x = $"{fn} {mi} {ln}".Trim()
             if x = "" then "<name>" else x
         let orcid = Option.defaultValue "<orcid>" input.ORCID
-        let createPersonFieldTextInput(field: string option, label, personSetter: string option -> unit) =
+        let updatePersonField =
+                fun s personSetter input ->
+                    let s = if s = "" then None else Some s
+                    personSetter input s
+                    input |> setter
+        let createPersonFieldTextInput(field: string option, label, personSetter: Person -> string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
-                (fun s ->
-                    let s = if s = "" then None else Some s
-                    personSetter s
-                    input |> setter),
+                (fun s -> updatePersonField s personSetter input),
                 label
             )
         let countFilledFieldsString (person: Person) =
@@ -628,29 +626,30 @@ type FormComponents =
             // content
             [
                 Helper.cardFormGroup [
-                    createPersonFieldTextInput(input.FirstName, "First Name", fun s -> input.FirstName <- s)
-                    createPersonFieldTextInput(input.LastName, "Last Name", fun s -> input.LastName <- s)
+                    createPersonFieldTextInput(input.FirstName, "First Name", fun input s -> input.FirstName <- s)
+                    createPersonFieldTextInput(input.LastName, "Last Name", fun input s -> input.LastName <- s)
                 ]
                 Helper.cardFormGroup [
-                    createPersonFieldTextInput(input.MidInitials, "Mid Initials", fun s -> input.MidInitials <- s)
+                    createPersonFieldTextInput(input.MidInitials, "Mid Initials", fun input s -> input.MidInitials <- s)
                     FormComponents.PersonRequestInput(
                         input.ORCID,
                         (fun s ->
                             let s = if s = "" then None else Some s
                             input.ORCID <- s
-                            input |> setter),
-                            (fun s -> setter s),
-                            "ORCID"
+                            input |> setter
+                        ),
+                        (fun s -> setter s),
+                        "ORCID"
                     )
                 ]
                 Helper.cardFormGroup [
-                    createPersonFieldTextInput(input.Affiliation, "Affiliation", fun s -> input.Affiliation <- s)
-                    createPersonFieldTextInput(input.Address, "Address", fun s -> input.Address <- s)
+                    createPersonFieldTextInput(input.Affiliation, "Affiliation", fun input s -> input.Affiliation <- s)
+                    createPersonFieldTextInput(input.Address, "Address", fun input s -> input.Address <- s)
                 ]
+                createPersonFieldTextInput(input.EMail, "Email", fun input s -> input.EMail <- s)
                 Helper.cardFormGroup [
-                    createPersonFieldTextInput(input.EMail, "Email", fun s -> input.EMail <- s)
-                    createPersonFieldTextInput(input.Phone, "Phone", fun s -> input.Phone <- s)
-                    createPersonFieldTextInput(input.Fax, "Fax", fun s -> input.Fax <- s)
+                    createPersonFieldTextInput(input.Phone, "Phone", fun input s -> input.Phone <- s)
+                    createPersonFieldTextInput(input.Fax, "Fax", fun input s -> input.Fax <- s)
                 ]
                 FormComponents.OntologyAnnotationsInput(
                     input.Roles,
@@ -676,26 +675,18 @@ type FormComponents =
 
     [<ReactComponent>]
     static member DateTimeInput (input_: string, setter: string -> unit, ?label: string) =
-        let loading, setLoading = React.useState(false)
         let ref = React.useInputRef()
-        let debounceSetter = React.useMemo(
-            (fun () ->
-                debouncemin ((fun s -> setter s; setLoading false), 1000)),
-            [||]
-        )
+        let debounceSetter = React.useDebouncedCallback (fun s -> setter s)
         React.useEffect(
             (fun () ->
                 if ref.current.IsSome then
-                    setLoading false
                     ref.current.Value.value <- input_
             ),
             [|box input_|]
         )
-        let onChange = React.useMemo(fun () ->
+        let onChange =
             fun (e: string) ->
-                setLoading true
                 debounceSetter e
-        )
         Html.div [
             prop.className "grow"
             prop.children [
