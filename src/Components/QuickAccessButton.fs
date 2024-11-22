@@ -4,9 +4,10 @@ open Fable.Core
 open Feliz
 open Browser.Types
 
-[<Erase>]
+[<Erase; Mangle(false)>]
 type QuickAccessButton =
 
+    [<NamedParams; ReactComponent(true)>]
     static member QuickAccessButton(desc:string, children: ReactElement, onclick: Event -> unit, ?isDisabled, ?props, ?classes: string) =
         let isDisabled = defaultArg isDisabled false
         Html.button [
