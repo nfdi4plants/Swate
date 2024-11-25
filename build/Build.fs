@@ -364,6 +364,7 @@ module Tests =
             "server", dotnet [ "run" ] serverTestsPath
             "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
         ]|> runParallel
+        run npm [ "run"; "test:run" ] "."
 
 Target.create "Format" (fun _ ->
     run dotnet [ "fantomas"; "."; "-r" ] "src"
