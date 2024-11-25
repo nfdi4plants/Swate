@@ -49,7 +49,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                         Spreadsheet.UpdateHistoryPosition newPosition |> Msg.SpreadsheetMsg |> dispatch
                 ),
                 isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition + 1) |> not)
-            )
+            ) |> toReact
             QuickAccessButton.QuickAccessButton(
                 "Forward",
                 React.fragment [
@@ -61,7 +61,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                         Spreadsheet.UpdateHistoryPosition newPosition |> Msg.SpreadsheetMsg |> dispatch
                 ),
                 isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition - 1) |> not)
-            )
+            ) |> toReact
         ]
     ]
 
@@ -83,7 +83,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                         Spreadsheet.ExportXlsx model.SpreadsheetModel.ArcFile.Value |> SpreadsheetMsg |> dispatch
                     | _ -> ()
                 )
-            )
+            ) |> toReact
             match model.PersistentStorageState.Host with
             | Some Swatehost.Browser ->
                 QuickAccessButton.QuickAccessButton(
@@ -93,7 +93,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                     ],
                     (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
                     classes = "hover:!text-error"
-                )
+                ) |> toReact
                 NavbarBurger.Main(model, dispatch)
             | _ ->
                 Html.none
@@ -111,7 +111,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                 ]
             ],
             (fun _ -> addWidget Widget._BuildingBlock)
-        )
+        ) |> toReact
     let addTemplate =
         QuickAccessButton.QuickAccessButton(
             "Add Template",
@@ -120,7 +120,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                 Html.i [prop.className "fa-solid fa-table" ]
             ],
             (fun _ -> addWidget Widget._Template)
-        )
+        ) |> toReact
     let filePicker =
         QuickAccessButton.QuickAccessButton(
             "File Picker",
@@ -128,7 +128,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                 Html.i [prop.className "fa-solid fa-file-signature" ]
             ],
             (fun _ -> addWidget Widget._FilePicker)
-        )
+        ) |> toReact
     let dataAnnotator =
         QuickAccessButton.QuickAccessButton(
             "Data Annotator",
@@ -136,7 +136,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                 Html.i [prop.className "fa-solid fa-object-group" ]
             ],
             (fun _ -> addWidget Widget._DataAnnotator)
-        )
+        ) |> toReact
     Html.div [
         prop.className "flex flex-row"
         prop.children [

@@ -77,4 +77,4 @@ type NavbarBurger =
             "More",
             NavbarBurger.Dropdown(isOpen, setIsOpen, model, dispatch),
             (fun _ -> setIsOpen (not isOpen))
-        )
+        ) |> toReact

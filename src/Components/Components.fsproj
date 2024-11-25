@@ -10,6 +10,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="Util.fs" />
+    <Compile Include="Example.fs" />
     <Compile Include="QuickAccessButton.fs" />
   </ItemGroup>
 
