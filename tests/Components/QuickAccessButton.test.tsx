@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { QuickAccessButtonT as QuickAccessButton } from "./output/QuickAccessButton";
+import { QuickAccessButton } from "./output/QuickAccessButton";
 
 describe('QuickAccessButton', () => {
   test('renders the button with correct title and children', () => {

@@ -7,11 +7,11 @@ open Browser.Types
 [<Erase; Mangle(false)>]
 type QuickAccessButton =
 
-    [<NamedParams>]
+    [<NamedParams; ExportDefault>]
     static member QuickAccessButton(
             desc:string, children: ReactElement, onclick: Event -> unit,
             ?isDisabled: bool, ?props: IReactProperty seq, ?classes: string
-        ) : ReactElement =
+        ) =
         let isDisabled = defaultArg isDisabled false
         Html.button [
             prop.className [
@@ -27,13 +27,6 @@ type QuickAccessButton =
                 children
             ]
         ]
-    [<NamedParams>]
-    static member QuickAccessButtonT(
-            desc:string, children: ReactElement, onclick: Event -> unit,
-            ?isDisabled: bool, ?props: IReactProperty seq, ?classes: string
-        ) : JSX.Element =
-        QuickAccessButton.QuickAccessButton(
-            desc, children, onclick,
-            ?isDisabled = isDisabled, ?props=props, ?classes=classes
-        )
-        |> unbox
+#if FABLE_COMPILER
+        |> unbox<JSX.Element>
+#endif
