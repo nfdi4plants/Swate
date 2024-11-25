@@ -214,7 +214,6 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             ],
             toggleMetdadataModal
         )
-
         QuickAccessButton.QuickAccessButton(
             "Create Annotation Table",
             React.fragment [
@@ -228,6 +227,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
             )
         )
+
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
             QuickAccessButton.QuickAccessButton(
@@ -242,8 +242,8 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                     OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
                 )
             )
-        | _ ->
-            ()
+        | _ -> ()
+
         QuickAccessButton.QuickAccessButton(
             "Rectify Ontology Terms",
             React.fragment [
@@ -251,9 +251,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
                 Html.i [prop.className "fa-solid fa-pen"]
             ],
-            (fun _ ->
-                SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch
-            )
+            (fun _ -> SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.QuickAccessButton(
             "Remove Building Block",
@@ -267,16 +265,26 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             "Get Building Block Information",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-question pr-1"]
-                //Html.span model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
-            (fun _ -> SpreadsheetInterface.GetBuildingBlockDetails |> InterfaceMsg |> dispatch)
+            (fun _ -> 
+                promise {
+                    let! ontologyAnnotationRes = OfficeInterop.Core.Main.getCompositeColumnDetails()
+
+                    match ontologyAnnotationRes with
+                    | Result.Error msgs -> GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
+                    | Result.Ok term ->
+                        let ontologyAnnotation = OntologyAnnotation.fromTerm term
+                        Modals.Controller.renderModal("TermDetails_Modal", Modals.TermModal.Main(ontologyAnnotation, dispatch))
+                }
+                |> Promise.start
+            )
         )
     ]
     |> React.fragment
 
 [<ReactComponent>]
-let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) =
+let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
     let state, setState = React.useState(NavbarState.init)
     let inline toggleMetdadataModal _ = { state with ExcelMetadataModalActive = not state.ExcelMetadataModalActive } |> setState
     Components.BaseNavbar.Glow [

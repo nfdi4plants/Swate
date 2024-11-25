@@ -133,7 +133,7 @@ module V1 =
                     return arr
                 }
 
-            getTermSuggestionsByParentTerm = fun (max:int,typedSoFar:string,parentTerm:TermMinimal) ->
+            getTermSuggestionsByParentTerm = fun (max:int, typedSoFar:string, parentTerm:TermMinimal) ->
                 async {
                     let dbSearchRes =
                         match typedSoFar with
@@ -157,7 +157,7 @@ module V1 =
                     return searchRes  
                 }
 
-            getTermSuggestionsByChildTerm = fun (max:int,typedSoFar:string,childTerm:TermMinimal) ->
+            getTermSuggestionsByChildTerm = fun (max:int, typedSoFar:string, childTerm:TermMinimal) ->
                 async {
 
                     let dbSearchRes =
@@ -167,9 +167,9 @@ module V1 =
                         | _ ->
                             if childTerm.TermAccession = ""
                             then
-                                Term.Term(credentials).getByNameAndChild_Name (typedSoFar,childTerm.Name,FullTextSearch.PerformanceComplete)
+                                Term.Term(credentials).getByNameAndChild_Name (typedSoFar, childTerm.Name, FullTextSearch.PerformanceComplete)
                             else
-                                Term.Term(credentials).getByNameAndChild(typedSoFar,childTerm.TermAccession,FullTextSearch.PerformanceComplete)
+                                Term.Term(credentials).getByNameAndChild(typedSoFar, childTerm.TermAccession, FullTextSearch.PerformanceComplete)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let res = if dbSearchRes.Length <= max then dbSearchRes else Array.take max dbSearchRes
@@ -349,9 +349,9 @@ module V2 =
                             let searchmode = if inp.query.Length < 3 then Database.FullTextSearch.Exact else Database.FullTextSearch.PerformanceComplete
                             if inp.child_term.TermAccession = ""
                             then
-                                Term.Term(credentials).getByNameAndChild_Name (inp.query,inp.child_term.Name,searchmode)
+                                Term.Term(credentials).getByNameAndChild_Name (inp.query, inp.child_term.Name, searchmode)
                             else
-                                Term.Term(credentials).getByNameAndChild(inp.query,inp.child_term.TermAccession,searchmode)
+                                Term.Term(credentials).getByNameAndChild(inp.query, inp.child_term.TermAccession, searchmode)
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms inp.query
                     let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes

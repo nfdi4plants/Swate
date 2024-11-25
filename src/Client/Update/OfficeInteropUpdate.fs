@@ -103,15 +103,6 @@ module OfficeInterop =
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
 
-            | GetBuildingBlockDetails ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        OfficeInterop.Core.getCompositeColumnDetails
-                        ()
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-                state, model, cmd
-
             | UpdateUnitForCells ->
                 let cmd =
                     Cmd.OfPromise.either

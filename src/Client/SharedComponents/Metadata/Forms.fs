@@ -534,7 +534,7 @@ type FormComponents =
             oas,
             OntologyAnnotation.empty,
             setter,
-            (fun (v,setV,rmv) -> FormComponents.OntologyAnnotationInput(v,setV,?parent=parent,rmv=rmv)),
+            (fun (v,setV,rmv) -> FormComponents.OntologyAnnotationInput(v, setV, ?parent=parent, rmv=rmv)),
             ?label=label
         )
 
