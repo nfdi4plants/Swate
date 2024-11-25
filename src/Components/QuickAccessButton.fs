@@ -7,7 +7,7 @@ open Browser.Types
 [<Erase; Mangle(false)>]
 type QuickAccessButton =
 
-    [<NamedParams; ExportDefault>]
+    [<ExportDefault; NamedParams>]
     static member QuickAccessButton(
             desc:string, children: ReactElement, onclick: Event -> unit,
             ?isDisabled: bool, ?props: IReactProperty seq, ?classes: string
@@ -23,10 +23,6 @@ type QuickAccessButton =
             prop.disabled isDisabled
             prop.onClick onclick
             if props.IsSome then yield! props.Value
-            prop.children [
-                children
-            ]
+            prop.children children
         ]
-#if FABLE_COMPILER
         |> unbox<JSX.Element>
-#endif
