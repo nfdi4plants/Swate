@@ -44,7 +44,8 @@ module TermSearchAux =
 
     let searchAllByParent(parentTAN: string, setResults: Term [] -> unit) =
         async {
-            let! terms = Api.api.getAllTermsByParentTerm <| Shared.SwateObsolete.TermMinimal.create "" parentTAN
+            let query = TermQuery.create("", 50, parentTAN)
+            let! terms = Api.ontology.findAllChildTerms query
             setResults terms
         }
 

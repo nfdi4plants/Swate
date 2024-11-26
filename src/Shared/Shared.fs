@@ -46,10 +46,12 @@ module SorensenDice =
 
 type IOntologyAPIv3 = {
     // Development
-    getTestNumber : unit -> Async<int>
-    searchTerm: TermQuery -> Async<Term []>
-    searchTerms: TermQuery[] -> Async<TermQueryResults[]>
-    getTermById: string -> Async<Term option>
+    getTestNumber           : unit          -> Async<int>
+    searchTerm              : TermQuery     -> Async<Term []>
+    searchTerms             : TermQuery[]   -> Async<TermQueryResults[]>
+    getTermById             : string        -> Async<Term option>
+    findAllChildTerms       : TermQuery     -> Async<Term []>
+
 }
 
 /// Development api

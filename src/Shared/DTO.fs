@@ -27,4 +27,3 @@ type TermQueryResults = {
         query = query
         results = results
     }
-

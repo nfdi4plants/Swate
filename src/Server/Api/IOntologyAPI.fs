@@ -46,12 +46,25 @@ module Helper =
                 return dbSearchRes
             }
 
+        let searchChildTerms credentials (content: TermQuery) =
+            async {
+                let dbSearchRes = 
+                    let searchmode = content.searchMode |> Option.defaultWith (fun () -> getSearchModeFromQuery content.query)
+                    let ontologies = content.ontologies |> Option.defaultValue [] |> getOntologiesModeFromList 
+                    if content.parentTermId.IsSome then
+                        Term.Term(credentials).findAllChildTerms(content.parentTermId.Value, ?limit=content.limit) |> Array.ofSeq
+                    else
+                        Term.Term(credentials).searchByName(content.query.Trim(), searchmode, ?limit=content.limit, ?sourceOntologyName = ontologies) |> Array.ofSeq
+                
+                return dbSearchRes
+            }
+
 open Helper
 
 [<RequireQualifiedAccess>]
 module V3 =
 
-    let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv3 =
+    let ontologyApi (credentials: Helper.Neo4JCredentials) : IOntologyAPIv3 =
         {
             //Development
             getTestNumber = 
@@ -80,6 +93,11 @@ module V3 =
                         | 0 -> None
                         | _ -> failwith $"Found multiple terms with the same accession: {id}" // must be multiples as negative cannot exist for length
                 }
+            findAllChildTerms  = fun content ->
+                async {
+                    let! results = Helper.V3.searchChildTerms credentials content
+                    return results
+                }
         }
 
     let createIOntologyApi credentials =
@@ -97,7 +115,7 @@ open Shared.SwateObsolete.Regex
 module V1 =
 
     /// <summary>Deprecated</summary>
-    let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
+    let ontologyApi (credentials: Helper.Neo4JCredentials) : IOntologyAPIv1 =
         /// We use sorensen dice to avoid scoring mutliple occassions of the same word (Issue https://github.com/nfdi4plants/Swate/issues/247)
         let sorensenDiceSortTerms (searchStr:string) (terms: Term []) =
             terms |> SorensenDice.sortBySimilarity searchStr (fun term -> term.Name)
@@ -193,7 +211,7 @@ module V1 =
                     return filteredResult
                 }
 
-            getUnitTermSuggestions = fun (max:int,typedSoFar:string) ->
+            getUnitTermSuggestions = fun (max:int, typedSoFar:string) ->
                 async {
                     let dbSearchRes =
                         match typedSoFar with
@@ -207,7 +225,7 @@ module V1 =
                     return res
                 }
 
-            getTermsByNames = fun (queryArr) ->
+            getTermsByNames = fun queryArr ->
                 async {
                     // check if search string is empty. This case should delete TAN- and TSR- values in table
                     let filteredQueries = queryArr |> Array.filter (fun x -> x.Term.Name <> "" || x.Term.TermAccession <> "")
@@ -224,7 +242,7 @@ module V1 =
                                 Term.TermQuery.getByName(searchTerm.Term.Name, searchType=FullTextSearch.Exact)
                         )
                     let result =
-                        Helper.Neo4j.runQueries(queries,credentials)
+                        Helper.Neo4j.runQueries(queries, credentials)
                         |> Array.map2 (fun termSearchable dbResults ->
                             // replicate if..elif..else conditions from 'queries'
                             if termSearchable.Term.TermAccession <> "" then

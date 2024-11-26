@@ -185,6 +185,24 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             printfn "%s" exn.Message
             [||]
 
+    /// <summary>
+    /// This is a more complete implementation, which should be abstracted more later.
+    /// </summary>
+    member this.findAllChildTerms(parentId: string, ?limit: int) =
+        let query =
+            sprintf
+                """MATCH (child)-[*1..]->(:Term {accession: $Accession})
+                RETURN child.accession, child.name, child.definition, child.is_obsolete
+                %s"""
+                (if limit.IsSome then "LIMIT $Limit" else "")
+        let param =
+            Map [
+                /// need to box values, because limit.Value will error if parsed as string
+                "Accession", box parentId
+                if limit.IsSome then "Limit", box limit.Value
+            ] |> Some
+        Neo4j.runQuery(query,param,(Term.asTerm("child")),?session=session,?credentials=credentials)
+
     /// This function will allow for raw apache lucene input. It is possible to search either term name or description or both.
     /// The function will error if both term name and term description are None.
     member this.getByAdvancedTermSearch(advancedSearchOptions:Shared.AdvancedSearchTypes.AdvancedSearchOptions) =
