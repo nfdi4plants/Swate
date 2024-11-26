@@ -48,10 +48,11 @@ type MoveColumn =
         ]
 
     [<ReactComponent>]
-    static member Main (columnIndex: int, model: Model, dispatch) (rmv: _ -> unit) =
+    static member Main (columnIndex: int, model: Model, dispatch) =
         let table = model.SpreadsheetModel.ActiveTable
         let state, setState = React.useState(Array.ofSeq table.Headers)
         let index, setIndex = React.useState(columnIndex)
+        let rmv = Util.RMV_MODAL dispatch
         let updateIndex(current, next) =
             setIndex next
             let nextState = ResizeArray(state)

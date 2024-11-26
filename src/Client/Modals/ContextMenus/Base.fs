@@ -1,16 +1,16 @@
-namespace Components
+namespace Modals.ContextMenus
 
 open Feliz
 open Feliz.DaisyUI
 
-type BaseContextMenu =
+type Base =
 
     static member Divider() =
         Daisy.divider [prop.className "!m-0 pl-1 pr-3 h-2"]
 
-    static member Item(content: ReactElement, onclick, ?icon: ReactElement, ?inactive: bool) =
+    static member Item(content: ReactElement, ?onclick, ?icon: ReactElement, ?inactive: bool) =
         Html.li [
-            prop.onClick onclick
+            if onclick.IsSome then prop.onClick onclick.Value
             prop.className [
                 "bg-base-300 text-base-content"
                 "flex flex-row justify-between cursor-pointer"
@@ -33,11 +33,11 @@ type BaseContextMenu =
 
     static member Item(content: ReactElement, onclick, ?icon: string, ?inactive) =
         let icon = icon |> Option.map (fun i -> Html.i [prop.className i])
-        BaseContextMenu.Item(content, onclick, ?icon = icon, ?inactive=inactive)
+        Base.Item(content, onclick, ?icon = icon, ?inactive=inactive)
 
     static member Item(content: string, onclick, ?icon: string, ?inactive) =
         let icon = icon |> Option.map (fun i -> Html.i [prop.className i])
-        BaseContextMenu.Item(Html.span content, onclick, ?icon = icon, ?inactive=inactive)
+        Base.Item(Html.span content, onclick, ?icon = icon, ?inactive=inactive)
 
     static member Item(content: ReactElement, onclick, ?icons: string [], ?inactive) =
         let icon = icons |> Option.map (fun icons ->
@@ -46,20 +46,21 @@ type BaseContextMenu =
                     Html.i [prop.className i]
             ]
         )
-        BaseContextMenu.Item(content, onclick, ?icon = icon, ?inactive=inactive)
+        Base.Item(content, onclick, ?icon = icon, ?inactive=inactive)
 
     [<ReactComponent>]
-    static member Main(mousex: int, mousey: int, rmv: unit -> unit, children: ReactElement seq) =
+    static member Main(mousex: int, mousey: int, children: (unit -> unit) -> ReactElement seq, dispatch) =
+        let rmv = Modals.Util.RMV_MODAL dispatch
         let ref = React.useElementRef()
         React.useListener.onClickAway(ref, fun _ -> rmv())
         Html.div [
             prop.ref ref
             prop.style [
                 style.left mousex
-                style.top (mousey - 40)
+                style.top mousey
             ]
             prop.className "fixed z-50 shadow-md rounded-md min-w-fit bg-base-300 text-black"
             prop.children [
-                Html.ul children
+                Html.ul (children rmv)
             ]
         ]

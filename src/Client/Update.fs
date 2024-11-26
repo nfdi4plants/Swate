@@ -10,7 +10,6 @@ open Messages
 open Model
 
 let urlUpdate (route: Route option) (model:Model) : Model * Cmd<Messages.Msg> =
-    log "hit urlUpdate"
     let cmd (host: Swatehost) = SpreadsheetInterface.Initialize host |> InterfaceMsg |> Cmd.ofMsg
     let host =
         match route with
@@ -53,8 +52,8 @@ module Dev =
                 DisplayLogList = parsedDisplayLogs@currentState.DisplayLogList
             }
             let batch = Cmd.batch [
-                let modalName = "GenericInteropLogs"
-                if List.isEmpty parsedDisplayLogs |> not then Cmd.ofEffect(fun dispatch -> Modals.Controller.renderModal(modalName, Modals.InteropLoggingModal.interopLoggingModal(nextState, dispatch)))
+                if List.isEmpty parsedDisplayLogs |> not then
+                    Model.ModalState.ExcelModals.InteropLogging |> Model.ModalState.ModalTypes.ExcelModal |> Some |> Messages.UpdateModal |> Cmd.ofMsg
                 nextCmd
             ]
             nextState, batch
@@ -65,8 +64,7 @@ module Dev =
                     Log = LogItem.Error(System.DateTime.Now,e.GetPropagatedError())::currentState.Log
                 }
             let batch = Cmd.batch [
-                let modalName = "GenericError"
-                Cmd.ofEffect(fun _ -> Modals.Controller.renderModal(modalName, Modals.ErrorModal.errorModal(e)))
+                Model.ModalState.GeneralModals.Error e |> Model.ModalState.ModalTypes.GeneralModal |> Some |> Messages.UpdateModal |> Cmd.ofMsg
                 nextCmd
             ]
             nextState, batch
@@ -152,6 +150,8 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
         | Run callback ->
             callback()
             model, Cmd.none
+        | UpdateModal modal ->
+            {model with Model.ModalState.ActiveModal = modal}, Cmd.none
         | UpdateHistory next -> {model with History = next}, Cmd.none
         | TestMyAPI ->
             let cmd =

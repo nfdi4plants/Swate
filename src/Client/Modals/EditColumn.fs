@@ -130,9 +130,10 @@ module private EditColumnComponents =
 open EditColumnComponents
 
 [<ReactComponent>]
-let Main (columnIndex: int) (model: Model) (dispatch) (rmv: _ -> unit) =
+let Main (columnIndex: int) (model: Model) (dispatch) =
     let column0 = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
     let state, setState = React.useState(State.init)
+    let rmv = Util.RMV_MODAL dispatch
     let cellsToTermCells(column:CompositeColumn) =
         [|for c in column.Cells do if c.isUnitized || c.isTerm then c else c.ToTermCell()|]
     let cellsToFreeText(column) =

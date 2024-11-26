@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -30,11 +30,17 @@
     <Compile Include="States\Spreadsheet.fs" />
     <Compile Include="States\LocalHistory.fs" />
     <Compile Include="States\CytoscapeState.fs" />
+    <Compile Include="States\ModalState.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Messages.fs" />
     <Compile Include="ARCitect\Interop.fs" />
     <Compile Include="ARCitect\ARCitect.fs" />
-    <Compile Include="Modals\Controller.fs" />
+    <Compile Include="Modals\Util.fs" />
+    <Compile Include="Modals\ContextMenus\Util.fs" />
+    <Compile Include="Modals\ContextMenus\Base.fs" />
+    <Compile Include="Modals\ContextMenus\TableCell.fs" />
+    <Compile Include="Modals\ContextMenus\DataMapCell.fs" />
+    <Compile Include="Modals\ContextMenus\FooterTabs.fs" />
     <Compile Include="Modals\Loading.fs" />
     <Compile Include="Modals\EditColumn.fs" />
     <Compile Include="Modals\ResetTable.fs" />
@@ -46,6 +52,7 @@
     <Compile Include="Modals\MoveColumn.fs" />
     <Compile Include="Modals\UpdateColumn.fs" />
     <Compile Include="Modals\SelectiveImportModal.fs" />
+    <Compile Include="Modals\ModalProvider.fs" />
     <Compile Include="Spreadsheet\IO.fs" />
     <Compile Include="Spreadsheet\Types.fs" />
     <Compile Include="Spreadsheet\Controller\Cells.fs" />
@@ -54,7 +61,6 @@
     <Compile Include="Spreadsheet\Controller\Table.fs" />
     <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
     <Compile Include="Spreadsheet\Controller\DataMap.fs" />
-    <Compile Include="SharedComponents\BaseContextMenu.fs" />
     <Compile Include="SharedComponents\BaseDropdown.fs" />
     <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />

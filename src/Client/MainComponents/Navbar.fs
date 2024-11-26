@@ -91,7 +91,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                     React.fragment [
                         Html.i [prop.className "fa-solid fa-trash-can";]
                     ],
-                    (fun _ -> Modals.Controller.renderModal("ResetTableWarning", Modals.ResetTable.Main dispatch)),
+                    (fun _ -> Model.ModalState.TableModals.ResetTable |> Model.ModalState.ModalTypes.TableModal |> Some |> Messages.UpdateModal |> dispatch),
                     classes = "hover:!text-error"
                 ) |> toReact
                 NavbarBurger.Main(model, dispatch)

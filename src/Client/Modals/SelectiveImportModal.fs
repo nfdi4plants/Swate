@@ -158,7 +158,7 @@ type SelectiveImportModal =
         )
 
     [<ReactComponent>]
-    static member Main (import: ArcFiles) (model: Spreadsheet.Model) dispatch (rmv: _ -> unit) =
+    static member Main(import: ArcFiles, dispatch, rmv) =
         let state, setState = React.useState(SelectiveImportModalState.init)
         let tables, disArcfile =
             match import with
@@ -215,3 +215,7 @@ type SelectiveImportModal =
                 ]
             ]
         ]
+
+    static member Main(import: ArcFiles, dispatch: Messages.Msg -> unit) =
+        let rmv = Util.RMV_MODAL dispatch
+        SelectiveImportModal.Main (import, dispatch, rmv = rmv)

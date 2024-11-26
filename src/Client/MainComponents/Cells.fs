@@ -34,7 +34,7 @@ module private CellAux =
 
     let oasetter (index, nextCell: CompositeCell, dispatch) = Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
 
-    let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, model, dispatch) else ContextMenu.DataMap.onContextMenu (index, model, dispatch)
+    let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, dispatch) else ContextMenu.DataMap.onContextMenu (index, dispatch)
 
 open CellAux
 

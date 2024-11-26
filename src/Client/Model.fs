@@ -294,4 +294,5 @@ type Model = {
     /// Contains all information about spreadsheet view
     SpreadsheetModel            : Spreadsheet.Model
     History                     : LocalHistory.Model
+    ModalState                  : ModalState
 }

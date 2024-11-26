@@ -269,7 +269,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 Html.i [prop.className "fa-solid fa-question pr-1"]
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
-            (fun _ -> 
+            (fun _ ->
                 promise {
                     let! ontologyAnnotationRes = OfficeInterop.Core.Main.getCompositeColumnDetails()
 
@@ -277,7 +277,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                     | Result.Error msgs -> GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
                     | Result.Ok term ->
                         let ontologyAnnotation = OntologyAnnotation.fromTerm term
-                        Modals.Controller.renderModal("TermDetails_Modal", Modals.TermModal.Main(ontologyAnnotation, dispatch))
+                        Model.ModalState.TableModals.TermDetails ontologyAnnotation |> Model.ModalState.ModalTypes.TableModal |> Some |> Messages.UpdateModal |> dispatch
                 }
                 |> Promise.start
             )

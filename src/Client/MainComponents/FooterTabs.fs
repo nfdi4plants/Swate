@@ -16,47 +16,6 @@ type private FooterTab = {
         Name = Option.defaultValue "" name
     }
 
-[<RequireQualifiedAccess>]
-module private TableContextMenu =
-
-    type ContextFunctions = {
-        Delete  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
-        Rename  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
-    }
-
-    let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        let buttonList = [
-            Components.BaseContextMenu.Item (Html.span "Delete", funcs.Delete rmv, "fa-solid fa-trash")
-            Components.BaseContextMenu.Item (Html.span "Rename", funcs.Rename rmv, "fa-solid fa-pen-to-square")
-        ]
-        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
-
-
-[<RequireQualifiedAccess>]
-module private PlusContextMenu =
-    type ContextFunctions = {
-        AddTable  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
-        AddDatamap  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
-    }
-
-    let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        let buttonList = [
-            Components.BaseContextMenu.Item (Html.span "Add Table", funcs.AddTable rmv, "fa-solid fa-table")
-            Components.BaseContextMenu.Item (Html.span "Add Datamap", funcs.AddDatamap rmv, "fa-solid fa-map")
-        ]
-        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
-
-module DataMapContextMenu =
-    type ContextFunctions = {
-        Delete  : (unit -> unit) -> Browser.Types.MouseEvent -> unit
-    }
-
-    let contextmenu (mousex: int, mousey: int) (funcs:ContextFunctions) (rmv: _ -> unit) =
-        let buttonList = [
-            Components.BaseContextMenu.Item (Html.span "Delete", funcs.Delete rmv, "fa-solid fa-trash")
-        ]
-        Components.BaseContextMenu.Main(mousex, mousey, rmv, buttonList)
-
 open Spreadsheet.Types
 
 ///<summary>This must be used on dragover events to enable dropping elements on them.</summary>
@@ -119,16 +78,13 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, int e.pageY - 30
-            let deleteMsg rmv = fun _ -> rmv(); Spreadsheet.RemoveTable index |> Messages.SpreadsheetMsg |> dispatch
-            let renameMsg rmv = fun _ -> rmv(); {state with IsEditable = true} |> setState
-            let funcs : TableContextMenu.ContextFunctions = {
-                Rename = renameMsg
-                Delete = deleteMsg
-            }
-            let child = TableContextMenu.contextmenu mousePosition funcs
-            let name = $"popup_{mousePosition}"
-            Modals.Controller.renderModal(name, child)
+            let mouseX, mouseY = int e.pageX, int e.pageY - 30
+            let startEdit = fun _ -> {state with IsEditable = true} |> setState
+            let modal = Modals.ContextMenus.FooterTabs.Table(mouseX, mouseY, index, startEdit, dispatch)
+            Model.ModalState.Force modal
+            |> Some
+            |> Messages.UpdateModal
+            |> dispatch
         )
         prop.draggable true
         prop.children [
@@ -195,14 +151,12 @@ let MainDataMap(model: Model, dispatch: Messages.Msg -> unit) =
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, int e.pageY
-            let deleteDatamapMsg rmv = fun _ -> rmv(); SpreadsheetInterface.UpdateDatamap None |> Messages.InterfaceMsg |> dispatch
-            let funcs : DataMapContextMenu.ContextFunctions = {
-                Delete = deleteDatamapMsg
-            }
-            let child = DataMapContextMenu.contextmenu mousePosition funcs
-            let name = $"popup_{mousePosition}"
-            Modals.Controller.renderModal(name, child)
+            let mouseX, mouseY = int e.pageX, (int e.pageY - 20)
+            let modal = Modals.ContextMenus.FooterTabs.DataMap(mouseX, mouseY, dispatch)
+            Model.ModalState.Force modal
+            |> Some
+            |> Messages.UpdateModal
+            |> dispatch
         )
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [
@@ -228,16 +182,12 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
         prop.onContextMenu(fun e ->
             e.stopPropagation()
             e.preventDefault()
-            let mousePosition = int e.pageX, (int e.pageY - 20)
-            let addTableMsg rmv = fun _ -> rmv(); SpreadsheetInterface.CreateAnnotationTable false |> Messages.InterfaceMsg |> dispatch
-            let addDatamapMsg rmv = fun _ -> rmv(); SpreadsheetInterface.UpdateDatamap (DataMap.init() |> Some) |> Messages.InterfaceMsg |> dispatch
-            let funcs : PlusContextMenu.ContextFunctions = {
-                AddTable = addTableMsg
-                AddDatamap = addDatamapMsg
-            }
-            let child = PlusContextMenu.contextmenu mousePosition funcs
-            let name = $"popup_{mousePosition}"
-            Modals.Controller.renderModal(name, child)
+            let mouseX, mouseY = int e.pageX, (int e.pageY - 20)
+            let modal = Modals.ContextMenus.FooterTabs.Plus(mouseX, mouseY, dispatch)
+            Model.ModalState.Force modal
+            |> Some
+            |> Messages.UpdateModal
+            |> dispatch
         )
         prop.style [style.custom ("order", order); style.height (length.percent 100); style.cursor.pointer]
         prop.children [

@@ -116,4 +116,5 @@ type Msg =
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI
+| UpdateModal                  of Model.ModalState.ModalTypes option
 | DoNothing

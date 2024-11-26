@@ -22,7 +22,7 @@ with
 
 type Queries =
 
-    static member OntologyFilter (filter:AnyOfOntology, nodeName: string) = 
+    static member OntologyFilter (filter:AnyOfOntology, nodeName: string) =
         let FilterSourceOntology (nodeName: string) = $"""    WITH {nodeName}
     MATCH ({nodeName})-[:CONTAINED_IN]->(:Ontology {{name: $OntologyName/}}) """
         let FilterSourceOntologies (nodeName: string) = $"""  WITH {nodeName}
@@ -53,10 +53,10 @@ YIELD {nodeName}""" |> ignore
             sb.AppendLine(Queries.OntologyFilter(ontologyFilter.Value, nodeName)) |> ignore
         sb.AppendLine(Queries.TermReturn nodeName) |> ignore
         sb.AppendLine($"""ORDER BY apoc.text.distance(toLower({nodeName}.name), toLower($Name))""") |> ignore
-        if limit.IsSome && limit.Value then 
+        if limit.IsSome && limit.Value then
             sb.AppendLine(Queries.Limit) |> ignore
         sb.ToString()
-            
+
 
 type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
@@ -111,8 +111,8 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         (endNode)<-[:is_a*]-(node)
     )
     RETURN node.accession, node.name, node.definition, node.is_obsolete"""
-    // These two examples can be used to check function for efficiency coming from both node directions. 
-    // Some searches are better optimized starting from child and checking for parent. For other queries it is the other way around, 
+    // These two examples can be used to check function for efficiency coming from both node directions.
+    // Some searches are better optimized starting from child and checking for parent. For other queries it is the other way around,
     // it depends on the relationship complexity of the parent and/or child node.
     // parent: "DPBO:1000161"  raw_query: "growth prot"
     // parent: "OBI:0100026" raw_query: "arabidopsis"
@@ -123,12 +123,12 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             else
                 FullTextSearch.PerformanceComplete.ofQueryString query
         use session = if session.IsSome then session.Value else Neo4j.establishConnection(credentials.Value)
-        let main = 
+        let main =
             task {
             let config = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(0.5)) |> ignore)
-            let! names_query = 
+            let! names_query =
                 session.RunAsync(
-                    searchNameQuery, 
+                    searchNameQuery,
                     System.Collections.Generic.Dictionary<string,obj>([
                         KeyValuePair("Name", box escaped);
                         KeyValuePair("Query", box fulltextSearchStr);
@@ -144,24 +144,24 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                         let id = record.["node.accession"].As<string>()
                         yield id
                 |]
-            let! tree_query = 
+            let! tree_query =
                 let parameters = System.Collections.Generic.Dictionary<string,obj>([
                     KeyValuePair("Parent", box parentId);
                     KeyValuePair("AccessionList", box names_results)
                     KeyValuePair("Limit", box limit)
                 ])
                 session.RunAsync(searchTreeQuery, parameters, config)
-            let! tree_records = tree_query.ToListAsync() 
-            // The following code was an idea to implement an alternative query in case the first one time outs. 
+            let! tree_records = tree_query.ToListAsync()
+            // The following code was an idea to implement an alternative query in case the first one time outs.
             // So we switch to the other search direction (parent -> child to child -> parent)
                 // async {
                 //   let! run =
                 //     async {
                 //       let! r = session.RunAsync(searchTreeQuery, parameters, action=config) |> Async.AwaitTask
                 //       return! r.ToListAsync() |> Async.AwaitTask
-                //     } 
+                //     }
                     // |> Async.Catch
-                // return 
+                // return
                 //   run
                     // match run with
                     // | Choice1Of2 terms ->
@@ -181,7 +181,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         try
             main.Result
         with
-            | exn -> 
+            | exn ->
             printfn "%s" exn.Message
             [||]
 
@@ -199,7 +199,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             if advancedSearchOptions.OntologyName.IsSome then
                 sprintf
-                    """CALL db.index.fulltext.queryNodes("%s", $Query) 
+                    """CALL db.index.fulltext.queryNodes("%s", $Query)
                     YIELD node
                     WHERE EXISTS((:Term {accession: node.accession})-[:CONTAINED_IN]->(:Ontology {name: $OntologyName}))
                     RETURN node.accession, node.name, node.definition, node.is_obsolete"""
@@ -231,7 +231,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// Exact match for unique identifier term accession.
     member this.getByName(name:string) =
-        let query = 
+        let query =
             """MATCH (term:Term {name: $Name})
             RETURN term.accession, term.name, term.definition, term.is_obsolete"""
         let param =
@@ -253,7 +253,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// Exact match for unique identifier term accession.
     member this.getByAccession(termAccession:string) =
-        let query = 
+        let query =
             """MATCH (term:Term {accession: $Accession})
             RETURN term.accession, term.name, term.definition, term.is_obsolete"""
         let param =
@@ -277,7 +277,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let query =
             sprintf
                 """MATCH (n:Term {accession: $Accession})
-                CALL apoc.path.subgraphNodes(n, {minLevel: 1, relationshipFilter:'<', labelFilter: "+Term"}) 
+                CALL apoc.path.subgraphNodes(n, {minLevel: 1, relationshipFilter:'<', labelFilter: "+Term"})
                 YIELD node as parent
                 WHERE parent.accession is not null
                 RETURN parent.accession, parent.name, parent.definition, parent.is_obsolete
@@ -313,7 +313,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         /// 2.5 It is possible to do (:Term {accession: $Accession})<-[*1..]-(node) but this will die whenever there are too many relationships (example: "arabidopsis", parent: "OBI:0100026")
         /// - (example: "neural", parent: "NCIT:C16275")
         /// Therefore i follow the assumption to limit n of searchresult, as they are sorted by best fit already, so whenever the user is close to the result he will get the desired search results.
-        """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+        """CALL db.index.fulltext.queryNodes("TermName", $Search)
         YIELD node
         WITH node LIMIT 50
         WHERE EXISTS ( (node)-[*1..]->(:Term {accession: $Accession})  )
@@ -328,7 +328,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 FullTextSearch.Complete.ofQueryString termName
         let param =
             Map [
-                "Accession", box parentAccession; 
+                "Accession", box parentAccession;
                 "Search", box fulltextSearchStr
             ] |> Some
         Neo4j.runQuery(Term.byParentQuery_Accession,param,(Term.asTerm("node")),?session=session,?credentials=credentials)
@@ -342,9 +342,9 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 FullTextSearch.Complete.ofQueryString term.Name
         let param =
             Map [
-                "Accession", box parent.TermAccession; 
+                "Accession", box parent.TermAccession;
                 "Search", box fulltextSearchStr
-            ] |> Some 
+            ] |> Some
         if session.IsSome then
             Neo4j.runQuery(
                 Term.byParentQuery_Accession,
@@ -369,7 +369,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 FullTextSearch.Complete.ofQueryString termName
         let param =
             Map [
-                "Accession", box parentAccession.TermAccession; 
+                "Accession", box parentAccession.TermAccession;
                 "Search", box fulltextSearchStr
             ] |> Some
         Neo4j.runQuery(
@@ -387,14 +387,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             else
                 FullTextSearch.Complete.ofQueryString termName
         let query =
-            """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+            """CALL db.index.fulltext.queryNodes("TermName", $Search)
             YIELD node
             WITH node LIMIT 50
             WHERE EXISTS ( (:Term {name: $Name})<-[*1..]-(node) )
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
-                "Name", box parentName; 
+                "Name", box parentName;
                 "Search", box fulltextSearchStr
             ] |> Some
         if session.IsSome then
@@ -414,7 +414,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// This function uses only the parent term accession
     member this.getAllByChild(childAccession:TermMinimal) =
-        let query = 
+        let query =
             """MATCH (n:Term {accession: $Accession})
             CALL apoc.path.subgraphNodes(n, {minLevel: 1, relationshipFilter:'>', labelFilter: "+Term"}) YIELD node as parent
             WHERE parent.accession is not null
@@ -445,14 +445,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             else
                 FullTextSearch.Complete.ofQueryString termName
         let query =
-            """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+            """CALL db.index.fulltext.queryNodes("TermName", $Search)
             YIELD node
             WITH node LIMIT 50
             WHERE EXISTS ( (:Term {accession: $Accession})-[*1..]->(node) )
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
-                "Accession", box childAccession; 
+                "Accession", box childAccession;
                 "Search", box fulltextSearchStr
             ] |> Some
         if session.IsSome then
@@ -478,14 +478,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             else
                 FullTextSearch.Complete.ofQueryString termName
         let query =
-            """CALL db.index.fulltext.queryNodes("TermName", $Search) 
+            """CALL db.index.fulltext.queryNodes("TermName", $Search)
             YIELD node
             WITH node LIMIT 50
             WHERE EXISTS ( (:Term {name: $Name})-[*1..]->(node) )
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
         let param =
             Map [
-                "Name", box childName; 
+                "Name", box childName;
                 "Search", box fulltextSearchStr
             ] |> Some
         if session.IsSome then
@@ -503,7 +503,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 credentials.Value
             )
 /// No idea what the idea behind this was
-type TermQuery = 
+type TermQuery =
 
     static member getByName(termName:string, ?searchType:FullTextSearch, ?sourceOntologyName:AnyOfOntology) =
         let _, fulltextSearchStr =
@@ -526,7 +526,7 @@ type TermQuery =
 
     /// Exact match for unique identifier term accession.
     static member getByAccession(termAccession:string) =
-        let query = 
+        let query =
             """MATCH (term:Term {accession: $Accession})
             RETURN term.accession, term.name, term.definition, term.is_obsolete"""
         let param =
