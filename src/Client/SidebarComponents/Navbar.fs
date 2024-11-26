@@ -267,16 +267,26 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             "Get Building Block Information",
             React.fragment [
                 Html.i [prop.className "fa-solid fa-question pr-1"]
-                //Html.span model.BuildingBlockDetailsState.CurrentRequestState.toStringMsg
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
-            (fun _ -> SpreadsheetInterface.GetBuildingBlockDetails |> InterfaceMsg |> dispatch)
+            (fun _ -> 
+                promise {
+                    let! ontologyAnnotationRes = OfficeInterop.Core.Main.getCompositeColumnDetails()
+
+                    match ontologyAnnotationRes with
+                    | Result.Error msgs -> GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
+                    | Result.Ok term ->
+                        let ontologyAnnotation = OntologyAnnotation.fromTerm term
+                        Modals.Controller.renderModal("TermDetails_Modal", Modals.TermModal.Main(ontologyAnnotation, dispatch))
+                }
+                |> Promise.start
+            )
         ) |> toReact
     ]
     |> React.fragment
 
 [<ReactComponent>]
-let NavbarComponent (model : Model) (dispatch : Messages.Msg -> unit) =
+let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
     let state, setState = React.useState(NavbarState.init)
     let inline toggleMetdadataModal _ = { state with ExcelMetadataModalActive = not state.ExcelMetadataModalActive } |> setState
     Components.BaseNavbar.Glow [

@@ -22,7 +22,6 @@ type Msg =
 | UpdateArcFile         of ArcFiles
 /// Inserts TermMinimal to selected fields of one column
 | InsertOntologyAnnotation of OntologyAnnotation
-| GetBuildingBlockDetails
 | InsertFileNames of string list
 | ImportXlsx of byte []
 | ImportJson of {|importState: SelectiveImportModalState; importedFile: ArcFiles|}

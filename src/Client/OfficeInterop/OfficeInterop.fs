@@ -1633,6 +1633,18 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
 /// Get term information from database based on names
 /// </summary>
 /// <param name="names"></param>
+let searchTermInDatabase name =
+    promise {
+        let term = TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
+        let! results = Async.StartAsPromise(Api.ontology.searchTerm term)
+        let result = Array.tryHead results
+        return result
+    }
+
+/// <summary>
+/// Get term informations from database based on names
+/// </summary>
+/// <param name="names"></param>
 let searchTermsInDatabase names =
     promise {
         let terms =
@@ -1641,8 +1653,7 @@ let searchTermsInDatabase names =
                 TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
             )
             |> Array.ofSeq
-        let! result = Async.StartAsPromise (Api.ontology.searchTerms terms)
-
+        let! result = Async.StartAsPromise(Api.ontology.searchTerms terms)
         return
             result
             |> Array.map (fun item -> Array.tryHead item.results)
@@ -2049,50 +2060,6 @@ let fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation) 
         }
     )
 
-let getCompositeColumnDetails () =
-    Excel.run(fun context ->
-        promise {
-            let! excelTableRes = AnnotationTable.tryGetActive context
-            match excelTableRes with
-            | Some excelTable ->
-
-                let! selectedCompositeColumn = getSelectedCompositeColumn excelTable context
-                let selectedRange = context.workbook.getSelectedRange()
-                let tableRange = excelTable.getRange()
-                let _ =
-                    tableRange.load(U2.Case2 (ResizeArray[|"values";|])) |> ignore
-                    selectedRange.load(U2.Case2 (ResizeArray[|"rowIndex";|]))
-
-                do! context.sync().``then``(fun _ -> ())
-
-                let mainColumnIndex = fst (selectedCompositeColumn.Item 0)
-                let rowIndex = int selectedRange.rowIndex
-
-                let values =
-                    tableRange.values
-                    |> Array.ofSeq
-                    |> Array.map (fun item ->
-                        item |> Array.ofSeq
-                        |> Array.map (fun itemi ->
-                            Option.map string itemi
-                            |> Option.defaultValue ""))
-
-                let value = values.[rowIndex].[mainColumnIndex]
-
-                let! termsRes = searchTermsInDatabase [value]
-
-                let terms =
-                    termsRes
-                    |> Array.choose (fun term -> term)
-
-                let name = terms |> Array.map (fun item -> item.Name)
-
-                return [InteropLogging.Msg.create InteropLogging.Info "Some Info"]
-            | None ->
-                return [InteropLogging.NoActiveTableMsg]
-        }
-    )
-
 /// <summary>This function is used to insert file names into the selected range.</summary>
 let insertFileNamesFromFilePicker (fileNameList: string list) =
     Excel.run(fun context ->
@@ -2444,6 +2411,64 @@ type Main =
                     return parent
 
                 | Result.Error exn -> return None
+            }
+
+    static member getCompositeColumnDetails (?table: Excel.Table, ?context: RequestContext) =
+        excelRunWith context <| fun context ->
+            promise {
+                let! excelTable =
+                    match table with
+                    | Some table -> promise {return Some table}
+                    | None -> AnnotationTable.tryGetActive context
+
+                if excelTable.IsNone then
+                    return (Result.Error [InteropLogging.NoActiveTableMsg])
+                else
+
+                    let excelTable = excelTable.Value
+
+                    let! selectedCompositeColumn = getSelectedCompositeColumn excelTable context
+                    let selectedRange = context.workbook.getSelectedRange()
+                    let tableRange = excelTable.getRange()
+                    let _ =
+                        tableRange.load(U2.Case2 (ResizeArray[|"values";|])) |> ignore
+                        selectedRange.load(U2.Case2 (ResizeArray[|"rowIndex";|]))
+
+                    do! context.sync().``then``(fun _ -> ())
+
+                    let mainColumnIndex = fst (selectedCompositeColumn.Item 0)
+                    let rowIndex = int selectedRange.rowIndex
+
+                    if rowIndex > 0 then
+                        let values =
+                            tableRange.values
+                            |> Array.ofSeq
+                            |> Array.map (fun item ->
+                                item |> Array.ofSeq
+                                |> Array.map (fun itemi ->
+                                    Option.map string itemi
+                                    |> Option.defaultValue ""))
+
+                        let value = values.[rowIndex].[mainColumnIndex]
+
+                        let! termRes = searchTermInDatabase value
+
+                        match termRes with
+                        | None -> return (Result.Error [InteropLogging.Msg.create InteropLogging.Warning $"{value} is not a valid term"])
+                        | Some term -> return (Result.Ok term)
+                    else
+                        let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
+
+                        match arcTableRes with
+                        | Ok arcTable ->
+                            let! (arcMainColumn, _) = getArcMainColumn excelTable arcTable context
+                            let value = arcMainColumn.Header.ToTerm().Name
+                            let! termRes = searchTermInDatabase value.Value
+
+                            match termRes with
+                            | None -> return (Result.Error [InteropLogging.Msg.create InteropLogging.Warning $"{value} is not a valid term"])
+                            | Some term -> return (Result.Ok term)
+                        | Error _ -> return (Result.Error [InteropLogging.NoActiveTableMsg])
             }
 
     /// <summary>
