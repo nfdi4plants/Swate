@@ -103,14 +103,14 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let limit = defaultArg limit 5
         let searchNameQuery = Queries.NameQueryFullText ("node", limit=true)
         let searchTreeQuery =
-          """MATCH (node:Term)
-    WHERE node.accession IN $AccessionList
-    MATCH (endNode:Term {accession: $Parent})
-    MATCH (node)
-    WHERE EXISTS (
-        (endNode)<-[:is_a*]-(node)
-    )
-    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
+            """MATCH (node:Term)
+            WHERE node.accession IN $AccessionList
+            MATCH (endNode:Term {accession: $Parent})
+            MATCH (node)
+            WHERE EXISTS (
+                (endNode)<-[:is_a*]-(node)
+            )
+            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
     // These two examples can be used to check function for efficiency coming from both node directions. 
     // Some searches are better optimized starting from child and checking for parent. For other queries it is the other way around, 
     // it depends on the relationship complexity of the parent and/or child node.
@@ -189,19 +189,40 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// This is a more complete implementation, which should be abstracted more later.
     /// </summary>
     member this.findAllChildTerms(parentId: string, ?limit: int) =
+        let limit = defaultArg limit 5
+
         let query =
-            sprintf
-                """MATCH (child)-[*1..]->(:Term {accession: $Accession})
-                RETURN child.accession, child.name, child.definition, child.is_obsolete
-                %s"""
-                (if limit.IsSome then "LIMIT $Limit" else "")
-        let param =
-            Map [
-                /// need to box values, because limit.Value will error if parsed as string
-                "Accession", box parentId
-                if limit.IsSome then "Limit", box limit.Value
-            ] |> Some
-        Neo4j.runQuery(query,param,(Term.asTerm("child")),?session=session,?credentials=credentials)
+            """MATCH (child)-[:is_a*]->(:Term {accession: $Parent})
+            RETURN child.accession, child.name, child.definition, child.is_obsolete
+            LIMIT $Limit"""
+
+        let config = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(0.5)) |> ignore)
+        use session = if session.IsSome then session.Value else Neo4j.establishConnection(credentials.Value)
+        let main = 
+            task {
+                let! tree_query = 
+                    let parameters = System.Collections.Generic.Dictionary<string,obj>([
+                        KeyValuePair("Parent", box parentId);
+                        KeyValuePair("Limit", box limit)
+                    ])
+                    session.RunAsync(query, parameters, config)
+        
+                let! tree_records = tree_query.ToListAsync()
+                let tree_results =
+                    [|
+                        for record in tree_records do
+                            yield Term.asTerm("child") record
+                    |]
+            return tree_results
+            }
+        try
+            main.Result
+        with
+            | exn -> 
+            printfn "%s" exn.Message
+            [||]
+
+        //Neo4j.runQuery(query, param, (Term.asTerm("child")), ?session=session, ?credentials=credentials)
 
     /// This function will allow for raw apache lucene input. It is possible to search either term name or description or both.
     /// The function will error if both term name and term description are None.
