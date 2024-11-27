@@ -924,7 +924,7 @@ let addCompositeColumn (excelTable: Table) (arcTable: ArcTable) (newColumn: Comp
 /// Prepare the given table to be joined with the currently active annotation table
 /// </summary>
 /// <param name="tableToAdd"></param>
-let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (context: RequestContext) =
+let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (selectedColumns:bool []) (context: RequestContext) =
     promise {
         let! originTableRes = ArcTable.fromExcelTable(table, context)
 
@@ -932,7 +932,13 @@ let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (context: Requ
         | Result.Error _ ->
             return failwith $"Failed to create arc table for table {table.name}"
         | Result.Ok originTable ->
-            let finalTable = Table.selectiveTablePrepare originTable tableToAdd
+            let selectedColumnIndices =
+                selectedColumns
+                |> Array.mapi (fun i item -> if item = false then Some i else None)
+                |> Array.choose (fun x -> x)
+                |> List.ofArray
+            
+            let finalTable = Table.selectiveTablePrepare originTable tableToAdd selectedColumnIndices
 
             let selectedRange = context.workbook.getSelectedRange()
 
@@ -959,9 +965,13 @@ let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (context: Requ
 /// <param name="tableToAdd"></param>
 /// <param name="index"></param>
 /// <param name="options"></param>
-let joinTable (tableToAdd: ArcTable, options: TableJoinOptions option) =
+let joinTable (tableToAdd: ArcTable, selectedColumns:bool [], options: TableJoinOptions option) =
     Excel.run(fun context ->
         promise {
+
+            let columns = tableToAdd.Columns
+
+            columns
 
             //When a name is available get the annotation and arctable for easy access of indices and value adaption
             //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
@@ -969,7 +979,7 @@ let joinTable (tableToAdd: ArcTable, options: TableJoinOptions option) =
 
             match result with
             | Some excelTable ->
-                let! (tableToAdd: ArcTable, index: int option) = prepareTemplateInMemory excelTable tableToAdd context
+                let! (tableToAdd: ArcTable, index: int option) = prepareTemplateInMemory excelTable tableToAdd selectedColumns context
 
                 //Arctable enables a fast check for the existence of input- and output-columns and their indices
                 let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)

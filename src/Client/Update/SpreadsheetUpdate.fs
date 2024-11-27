@@ -109,7 +109,7 @@ module Spreadsheet =
                 let options = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
                 let msg = fun t -> JoinTable(t, index, options) |> SpreadsheetMsg
                 let cmd =
-                    Table.selectiveTablePrepare state.ActiveTable table
+                    Table.selectiveTablePrepare state.ActiveTable table []
                     |> msg
                     |> Cmd.ofMsg
                 state, model, cmd

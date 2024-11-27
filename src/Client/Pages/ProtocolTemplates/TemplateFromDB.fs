@@ -6,6 +6,15 @@ open Messages
 open Model
 open Shared
 
+type SelectedColumns = {
+    Columns: bool []
+}
+with
+    static member init(length) =
+        {
+            Columns = Array.init length (fun _ -> true)
+        }
+
 type TemplateFromDB =
 
     static member toProtocolSearchElement (model:Model) dispatch =
@@ -16,7 +25,7 @@ type TemplateFromDB =
             prop.text "Browse database"
         ]
 
-    static member addFromDBToTableButton (model:Model) dispatch =
+    static member addFromDBToTableButton (model:Model) selectionInformation dispatch =
         Html.div [
             prop.className "join flex flex-row justify-center gap-2"
             prop.children [
@@ -30,21 +39,22 @@ type TemplateFromDB =
                         if model.ProtocolState.TemplateSelected.IsNone then
                             failwith "No template selected!"
 
-                        SpreadsheetInterface.AddTemplate(model.ProtocolState.TemplateSelected.Value.Table) |> InterfaceMsg |> dispatch
+                        SpreadsheetInterface.AddTemplate(model.ProtocolState.TemplateSelected.Value.Table, selectionInformation.Columns) |> InterfaceMsg |> dispatch
                     )
                     prop.text "Add template"
                 ]
                 if model.ProtocolState.TemplateSelected.IsSome then
                     Daisy.button.a [
                         button.outline
-                        prop.onClick (fun e -> Protocol.RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
+                        prop.onClick (fun _ -> Protocol.RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
                         button.error
                         Html.i [prop.className "fa-solid fa-times"] |> prop.children
                     ]
             ]
         ]
 
-    static member displaySelectedProtocolEle (model:Model) dispatch =
+    [<ReactComponent>]
+    static member displaySelectedProtocolEle (model:Model) (selectionInformation:SelectedColumns) (setSelectedColumns:SelectedColumns -> unit) dispatch =
         Html.div [
             prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
             prop.children [
@@ -52,6 +62,7 @@ type TemplateFromDB =
                     prop.children [
                         Html.thead [
                             Html.tr [
+                                Html.th "Selection"
                                 Html.th "Column"
                                 Html.th "Column TAN"
                                 //Html.th "Unit"
@@ -59,10 +70,24 @@ type TemplateFromDB =
                             ]
                         ]
                         Html.tbody [
-                            for column in model.ProtocolState.TemplateSelected.Value.Table.Columns do
+                            for i in 0..model.ProtocolState.TemplateSelected.Value.Table.Columns.Length-1 do
+                                let column = model.ProtocolState.TemplateSelected.Value.Table.Columns.[i]
                                 //let unitOption = column.TryGetColumnUnits()
                                 yield
                                     Html.tr [
+                                        Html.div [
+                                            prop.style [style.display.flex; style.justifyContent.center]
+                                            prop.children [
+                                                Daisy.checkbox [
+                                                    prop.type'.checkbox
+                                                    prop.isChecked selectionInformation.Columns.[i]
+                                                    prop.onChange (fun (b: bool) ->
+                                                        let selectedData = selectionInformation.Columns
+                                                        selectedData.[i] <- b
+                                                        {selectionInformation with Columns = selectedData} |> setSelectedColumns)
+                                                ]
+                                            ]
+                                        ]
                                         Html.td (column.Header.ToString())
                                         Html.td (if column.Header.IsTermColumn then column.Header.ToTerm().TermAccessionShort else "-")
                                         //td [] [str (if unitOption.IsSome then insertBB.UnitTerm.Value.Name else "-")]
@@ -75,19 +100,21 @@ type TemplateFromDB =
         ]
 
     static member Main(model:Model, dispatch) =
+        let length = if model.ProtocolState.TemplateSelected.IsSome then model.ProtocolState.TemplateSelected.Value.Table.Columns.Length else 0
+        let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init length)
         SidebarComponents.SidebarLayout.LogicContainer [
             Html.div [
                 TemplateFromDB.toProtocolSearchElement model dispatch
             ]
 
             Html.div [
-                TemplateFromDB.addFromDBToTableButton model dispatch
+                TemplateFromDB.addFromDBToTableButton model selectedColumns dispatch
             ]
             if model.ProtocolState.TemplateSelected.IsSome then
                 Html.div [
-                    TemplateFromDB.displaySelectedProtocolEle model dispatch
+                    TemplateFromDB.displaySelectedProtocolEle model selectedColumns setSelectedColumns dispatch
                 ]
                 Html.div [
-                    TemplateFromDB.addFromDBToTableButton model dispatch
+                    TemplateFromDB.addFromDBToTableButton model selectedColumns dispatch
                 ]
         ]

@@ -211,6 +211,8 @@ type Widget =
     [<ReactComponent>]
     static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
         let templates, setTemplates = React.useState(model.ProtocolState.Templates)
+        let selectedColumnsLength = if model.ProtocolState.TemplateSelected.IsSome then model.ProtocolState.TemplateSelected.Value.Table.Columns.Length else 0
+        let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init selectedColumnsLength)
         let config, setConfig = React.useState(TemplateFilterConfig.init)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
@@ -223,12 +225,12 @@ type Widget =
         let insertContent() =
             [
                 Html.div [
-                    Protocol.TemplateFromDB.addFromDBToTableButton model dispatch
+                    Protocol.TemplateFromDB.addFromDBToTableButton model selectedColumns dispatch
                 ]
                 Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.children [
-                        Protocol.TemplateFromDB.displaySelectedProtocolEle model dispatch
+                        Protocol.TemplateFromDB.displaySelectedProtocolEle model selectedColumns setSelectedColumns dispatch
                     ]
                 ]
             ]

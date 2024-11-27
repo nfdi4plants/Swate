@@ -164,10 +164,10 @@ module Interface =
                     model, cmd
                 | _ -> failwith "not implemented"
 
-            | AddTemplate table ->
+            | AddTemplate (table, selectedColumns) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.AddTemplate table |> OfficeInteropMsg |> Cmd.ofMsg
+                    let cmd = OfficeInterop.AddTemplate (table, selectedColumns) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.AddTemplate table |> SpreadsheetMsg |> Cmd.ofMsg
