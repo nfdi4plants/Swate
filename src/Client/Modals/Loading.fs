@@ -1,4 +1,4 @@
-namespace Components.Modals
+namespace Modals
 
 open Fable.React
 open Fable.React.Props
@@ -12,11 +12,11 @@ type Loading =
             loading.lg
         ]
 
-    static member Modal(?rmv: Browser.Types.MouseEvent -> unit) =
+    static member Modal(rmv: _ -> unit) =
         Daisy.modal.div [
             modal.open'
             prop.children [
-                Daisy.modalBackdrop [if rmv.IsSome then prop.onClick rmv.Value]
+                Daisy.modalBackdrop [prop.onClick rmv]
                 Daisy.modalBox.div [
                     prop.className "size-auto flex min-w-0"
                     prop.children [
@@ -25,3 +25,7 @@ type Loading =
                 ]
             ]
         ]
+
+    static member Modal(dispatch: Messages.Msg -> unit) =
+        let rmv = Util.RMV_MODAL dispatch
+        Loading.Modal(rmv = rmv)

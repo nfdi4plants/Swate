@@ -202,7 +202,8 @@ type UpdateColumn =
         ]
 
     [<ReactComponent>]
-    static member Main(index: int, column: CompositeColumn, dispatch) (rmv: _ -> unit) =
+    static member Main(index: int, column: CompositeColumn, dispatch) =
+        let rmv = Util.RMV_MODAL dispatch
         let getCellStrings() = column.Cells |> Array.map (fun c -> c.ToString())
         let preview, setPreview = React.useState(getCellStrings)
         let initPage = if preview.Length = 0 || preview |> String.concat "" = "" then FunctionPage.Create else FunctionPage.Update

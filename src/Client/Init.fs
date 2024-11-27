@@ -21,6 +21,7 @@ let initialModel =
         DataAnnotatorModel          = DataAnnotator.Model       .init()
         SpreadsheetModel            = Spreadsheet.Model         .init()
         History                     = LocalHistory.Model        .init()
+        ModalState                  = ModalState                .init()
     }
 
 

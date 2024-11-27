@@ -90,8 +90,9 @@ module Spreadsheet =
                 let nextState = Controller.Table.createTable usePrevOutput state
                 nextState, model, Cmd.none
             | AddAnnotationBlock column ->
-                let nextState = Controller.BuildingBlocks.addBuildingBlock column state
-                nextState, model, Cmd.none
+                let msg, nextState = Controller.BuildingBlocks.addBuildingBlock column state
+                let cmd = Cmd.ofMsg msg
+                nextState, model, cmd
             | AddAnnotationBlocks columns ->
                 let nextState = Controller.BuildingBlocks.addBuildingBlocks columns state
                 nextState, model, Cmd.none

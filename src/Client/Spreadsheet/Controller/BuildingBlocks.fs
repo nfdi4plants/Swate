@@ -19,7 +19,7 @@ module SidebarControllerAux =
     let getNextColumnIndex (state: Spreadsheet.Model) =
         // if cell is selected get column of selected cell we want to insert AFTER
         if not state.SelectedCells.IsEmpty then
-            let indexNextToSelected = state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1 
+            let indexNextToSelected = state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1
             indexNextToSelected
         else
             state.ActiveTable.ColumnCount
@@ -35,27 +35,35 @@ module SanityChecks =
 
 open SidebarControllerAux
 
-let addBuildingBlock(newColumn: CompositeColumn) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let addBuildingBlock(newColumn: CompositeColumn) (state: Spreadsheet.Model) : Messages.Msg * Spreadsheet.Model =
     let table = state.ActiveTable
     // add one to last column index OR to selected column index to append one to the right.
     let mutable nextIndex = getNextColumnIndex state
     let mutable newColumn = newColumn
-    if newColumn.Header.isOutput then
-        let hasOutput = table.TryGetOutputColumn()
-        if hasOutput.IsSome then
-            let msg = $"Found existing output column. Changed output column to \"{newColumn.Header.ToString()}\"."
-            let modal = Modals.WarningModal.warningModalSimple(msg)
-            Modals.Controller.renderModal("ColumnReplaced", modal)
-            newColumn <- {newColumn with Cells = hasOutput.Value.Cells}
-    if newColumn.Header.isInput then
-        let hasInput = table.TryGetInputColumn()
-        if hasInput.IsSome then
-            let msg = $"Found existing input column. Changed input column to \"{newColumn.Header.ToString()}\"."
-            let modal = Modals.WarningModal.warningModalSimple(msg)
-            Modals.Controller.renderModal("ColumnReplaced", modal)
-            newColumn <- {newColumn with Cells = hasInput.Value.Cells}
+    let msg =
+        // nested if cases to only run table operations if necessary
+        if newColumn.Header.isOutput then
+            let hasOutput = table.TryGetOutputColumn()
+            if hasOutput.IsSome then
+                let txt = $"Found existing output column. Changed output column to \"{newColumn.Header.ToString()}\"."
+                let msg0 = Model.ModalState.GeneralModals.Warning txt |> Model.ModalState.ModalTypes.GeneralModal |> Some |> Messages.UpdateModal
+                newColumn <- {newColumn with Cells = hasOutput.Value.Cells}
+                msg0
+            else
+                Messages.Msg.DoNothing
+        elif newColumn.Header.isInput then
+            let hasInput = table.TryGetInputColumn()
+            if hasInput.IsSome then
+                let txt = $"Found existing input column. Changed input column to \"{newColumn.Header.ToString()}\"."
+                let msg0 = Model.ModalState.GeneralModals.Warning txt |> Model.ModalState.ModalTypes.GeneralModal |> Some |> Messages.UpdateModal
+                newColumn <- {newColumn with Cells = hasInput.Value.Cells}
+                msg0
+            else
+                Messages.Msg.DoNothing
+        else
+            Messages.Msg.DoNothing
     table.AddColumn(newColumn.Header, newColumn.Cells, nextIndex, true)
-    {state with ArcFile = state.ArcFile}
+    msg, {state with ArcFile = state.ArcFile}
 
 
 let addBuildingBlocks(newColumns: CompositeColumn []) (state: Spreadsheet.Model) : Spreadsheet.Model =
