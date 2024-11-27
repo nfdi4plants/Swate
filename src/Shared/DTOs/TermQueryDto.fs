@@ -1,10 +1,8 @@
-module Shared.DTO
+module Shared.DTOs.TermQuery
 
-open ARCtrl
+open Shared
 
-open Database
-
-type TermQuery = {
+type TermQueryDto = {
     query: string
     limit: int option
     parentTermId: string option
@@ -19,12 +17,11 @@ type TermQuery = {
         searchMode = searchMode
     }
 
-type TermQueryResults = {
-    query: TermQuery
-    results: Term []
+type TermQueryDtoResults = {
+    query: TermQueryDto
+    results: Database.Term []
 } with
     static member create(query, results) = {
         query = query
         results = results
     }
-

@@ -3,7 +3,8 @@ namespace Shared
 open System
 open Shared
 open Database
-open DTO
+open DTOs.TermQuery
+open DTOs.ParentTermQuery
 
 [<AutoOpen>]
 module Regex =
@@ -46,10 +47,12 @@ module SorensenDice =
 
 type IOntologyAPIv3 = {
     // Development
-    getTestNumber : unit -> Async<int>
-    searchTerm: TermQuery -> Async<Term []>
-    searchTerms: TermQuery[] -> Async<TermQueryResults[]>
-    getTermById: string -> Async<Term option>
+    getTestNumber           : unit                  -> Async<int>
+    searchTerm              : TermQueryDto          -> Async<Term []>
+    searchTerms             : TermQueryDto[]        -> Async<TermQueryDtoResults[]>
+    getTermById             : string                -> Async<Term option>
+    findAllChildTerms       : ParentTermQueryDto    -> Async<ParentTermQueryDtoResults>
+
 }
 
 /// Development api

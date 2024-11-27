@@ -3,7 +3,8 @@ module API.IOntologyAPI
 open Shared
 open Database
 
-open DTO
+open DTOs.TermQuery
+open DTOs.ParentTermQuery
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open ARCtrl
@@ -26,7 +27,7 @@ module Helper =
     module V3 =
         open ARCtrl.Helper.Regex.ActivePatterns
 
-        let searchSingleTerm credentials (content: TermQuery) =
+        let searchSingleTerm credentials (content: TermQueryDto) =
             async {
                 let dbSearchRes =
                     match content.query.Trim() with
@@ -46,12 +47,20 @@ module Helper =
                 return dbSearchRes
             }
 
+        let searchChildTerms credentials (content: ParentTermQueryDto) =
+            async {
+                let dbSearchRes = 
+                    Term.Term(credentials).findAllChildTerms(content.parentTermId, ?limit=content.limit) |> Array.ofSeq
+                
+                return dbSearchRes
+            }
+
 open Helper
 
 [<RequireQualifiedAccess>]
 module V3 =
 
-    let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv3 =
+    let ontologyApi (credentials: Helper.Neo4JCredentials) : IOntologyAPIv3 =
         {
             //Development
             getTestNumber = 
@@ -68,7 +77,7 @@ module V3 =
                             Helper.V3.searchSingleTerm credentials query
                     ]
                     let! results = asyncQueries |> Async.Parallel
-                    let zipped = Array.map2 (fun a b -> TermQueryResults.create(a,b)) queries results
+                    let zipped = Array.map2 (fun a b -> TermQueryDtoResults.create(a,b)) queries results
                     return zipped
                 }
             getTermById = fun id  ->
@@ -79,6 +88,12 @@ module V3 =
                         | 1 -> dbSearchRes |> Seq.head |> Some
                         | 0 -> None
                         | _ -> failwith $"Found multiple terms with the same accession: {id}" // must be multiples as negative cannot exist for length
+                }
+            findAllChildTerms  = fun content ->
+                async {
+                    let! results = Helper.V3.searchChildTerms credentials content
+                    let zipped = ParentTermQueryDtoResults.create(content, results)
+                    return zipped
                 }
         }
 
@@ -97,7 +112,7 @@ open Shared.SwateObsolete.Regex
 module V1 =
 
     /// <summary>Deprecated</summary>
-    let ontologyApi (credentials : Helper.Neo4JCredentials) : IOntologyAPIv1 =
+    let ontologyApi (credentials: Helper.Neo4JCredentials) : IOntologyAPIv1 =
         /// We use sorensen dice to avoid scoring mutliple occassions of the same word (Issue https://github.com/nfdi4plants/Swate/issues/247)
         let sorensenDiceSortTerms (searchStr:string) (terms: Term []) =
             terms |> SorensenDice.sortBySimilarity searchStr (fun term -> term.Name)
@@ -193,7 +208,7 @@ module V1 =
                     return filteredResult
                 }
 
-            getUnitTermSuggestions = fun (max:int,typedSoFar:string) ->
+            getUnitTermSuggestions = fun (max:int, typedSoFar:string) ->
                 async {
                     let dbSearchRes =
                         match typedSoFar with
@@ -207,7 +222,7 @@ module V1 =
                     return res
                 }
 
-            getTermsByNames = fun (queryArr) ->
+            getTermsByNames = fun queryArr ->
                 async {
                     // check if search string is empty. This case should delete TAN- and TSR- values in table
                     let filteredQueries = queryArr |> Array.filter (fun x -> x.Term.Name <> "" || x.Term.TermAccession <> "")
@@ -224,7 +239,7 @@ module V1 =
                                 Term.TermQuery.getByName(searchTerm.Term.Name, searchType=FullTextSearch.Exact)
                         )
                     let result =
-                        Helper.Neo4j.runQueries(queries,credentials)
+                        Helper.Neo4j.runQueries(queries, credentials)
                         |> Array.map2 (fun termSearchable dbResults ->
                             // replicate if..elif..else conditions from 'queries'
                             if termSearchable.Term.TermAccession <> "" then

@@ -5,10 +5,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Database.fs" />
+    <Compile Include="DTOs\ParentTermQueryDto.fs" />
+    <Compile Include="DTOs\TermQueryDto.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="StaticTermCollection.fs" />
     <Compile Include="URLs.fs" />
-    <Compile Include="DTO.fs" />
     <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="AdvancedSearchTypes.fs" />
     <Compile Include="Shared.fs" />

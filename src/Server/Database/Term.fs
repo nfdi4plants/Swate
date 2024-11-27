@@ -1,7 +1,6 @@
 module Database.Term
 
 open Neo4j.Driver
-open Shared.DTO
 open Shared.Database
 open Shared.SwateObsolete
 open Helper
@@ -103,7 +102,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let limit = defaultArg limit 5
         let searchNameQuery = Queries.NameQueryFullText ("node", limit=true)
         let searchTreeQuery =
-          """MATCH (node:Term)
+            """MATCH (node:Term)
     WHERE node.accession IN $AccessionList
     MATCH (endNode:Term {accession: $Parent})
     MATCH (node)
@@ -184,6 +183,47 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             | exn ->
             printfn "%s" exn.Message
             [||]
+
+    /// <summary>
+    /// Find all child terms of a given parent
+    /// </summary>
+    /// <param name="parentId"></param>
+    /// <param name="limit"></param>
+    member this.findAllChildTerms(parentId: string, ?limit: int) =
+        let limit = defaultArg limit 5
+
+        let query =
+            """MATCH (child)-[:is_a*]->(:Term {accession: $Parent})
+            RETURN child.accession, child.name, child.definition, child.is_obsolete
+            LIMIT $Limit"""
+
+        let config = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(0.5)) |> ignore)
+        use session = if session.IsSome then session.Value else Neo4j.establishConnection(credentials.Value)
+        let main = 
+            task {
+                let! tree_query = 
+                    let parameters = System.Collections.Generic.Dictionary<string,obj>([
+                        KeyValuePair("Parent", box parentId);
+                        KeyValuePair("Limit", box limit)
+                    ])
+                    session.RunAsync(query, parameters, config)
+        
+                let! tree_records = tree_query.ToListAsync()
+                let tree_results =
+                    [|
+                        for record in tree_records do
+                            yield Term.asTerm("child") record
+                    |]
+            return tree_results
+            }
+        try
+            main.Result
+        with
+            | exn -> 
+            printfn "%s" exn.Message
+            [||]
+
+        //Neo4j.runQuery(query, param, (Term.asTerm("child")), ?session=session, ?credentials=credentials)
 
     /// This function will allow for raw apache lucene input. It is possible to search either term name or description or both.
     /// The function will error if both term name and term description are None.

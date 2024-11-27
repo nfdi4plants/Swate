@@ -9,7 +9,7 @@ open GlobalBindings
 
 open Shared
 open Database
-open DTO
+open DTOs.TermQuery
 
 open OfficeInterop
 open OfficeInterop.ExcelUtil
@@ -1635,7 +1635,7 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
 /// <param name="names"></param>
 let searchTermInDatabase name =
     promise {
-        let term = TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
+        let term = TermQueryDto.create(name, searchMode=Database.FullTextSearch.Exact)
         let! results = Async.StartAsPromise(Api.ontology.searchTerm term)
         let result = Array.tryHead results
         return result
@@ -1650,7 +1650,7 @@ let searchTermsInDatabase names =
         let terms =
             names
             |> List.map (fun name ->
-                TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
+                TermQueryDto.create(name, searchMode=Database.FullTextSearch.Exact)
             )
             |> Array.ofSeq
         let! result = Async.StartAsPromise(Api.ontology.searchTerms terms)
