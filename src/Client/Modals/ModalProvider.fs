@@ -45,17 +45,20 @@ type ModalProvider =
     [<ReactComponent>]
     static member Main (model: Model.Model, dispatch) =
         Html.div [
-            match model.ModalState with
-            | {ActiveModal = None } ->
-                Html.none
-            | {ActiveModal = Some modal } ->
-                match modal with
-                | GeneralModal m ->
-                    ModalProvider.GeneralModal(m, model, dispatch)
-                | TableModal m ->
-                    ModalProvider.TableModal(m, model, dispatch)
-                | ExcelModal m ->
-                    ModalProvider.ExcelModal(m, model, dispatch)
-                | Force ele ->
-                    ele
+            prop.id "modal-provider"
+            prop.children [
+                match model.ModalState with
+                | {ActiveModal = None } ->
+                    Html.none
+                | {ActiveModal = Some modal } ->
+                    match modal with
+                    | GeneralModal m ->
+                        ModalProvider.GeneralModal(m, model, dispatch)
+                    | TableModal m ->
+                        ModalProvider.TableModal(m, model, dispatch)
+                    | ExcelModal m ->
+                        ModalProvider.ExcelModal(m, model, dispatch)
+                    | Force ele ->
+                        ele
+            ]
         ]

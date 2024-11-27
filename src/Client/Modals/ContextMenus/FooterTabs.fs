@@ -13,6 +13,7 @@ type FooterTabs =
             Modals.ContextMenus.Base.Item (Html.span "Delete", delete >> rmv, "fa-solid fa-trash")
             Modals.ContextMenus.Base.Item (Html.span "Rename", rename >> rmv, "fa-solid fa-pen-to-square")
         ]
+        let mouseY = mouseY - 30
         Base.Main(mouseX, mouseY, children, dispatch)
 
 
@@ -31,6 +32,7 @@ type FooterTabs =
                 "fa-solid fa-map"
             )
         ]
+        let mouseY = mouseY - 30
         Base.Main(mouseX, mouseY, children, dispatch)
 
     static member DataMap (mouseX, mouseY, dispatch: Messages.Msg -> unit) =
@@ -38,5 +40,6 @@ type FooterTabs =
         let children (rmv: unit -> unit) : ReactElement seq = [
             Modals.ContextMenus.Base.Item ("Delete", delete >> rmv, "fa-solid fa-trash")
         ]
+        let mouseY = mouseY - 10
         Base.Main(mouseX, mouseY, children, dispatch)
-        
+
