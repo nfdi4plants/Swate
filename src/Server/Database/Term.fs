@@ -1,7 +1,6 @@
 module Database.Term
 
 open Neo4j.Driver
-open Shared.DTO
 open Shared.Database
 open Shared.SwateObsolete
 open Helper
@@ -104,13 +103,13 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         let searchNameQuery = Queries.NameQueryFullText ("node", limit=true)
         let searchTreeQuery =
             """MATCH (node:Term)
-            WHERE node.accession IN $AccessionList
-            MATCH (endNode:Term {accession: $Parent})
-            MATCH (node)
-            WHERE EXISTS (
-                (endNode)<-[:is_a*]-(node)
-            )
-            RETURN node.accession, node.name, node.definition, node.is_obsolete"""
+    WHERE node.accession IN $AccessionList
+    MATCH (endNode:Term {accession: $Parent})
+    MATCH (node)
+    WHERE EXISTS (
+        (endNode)<-[:is_a*]-(node)
+    )
+    RETURN node.accession, node.name, node.definition, node.is_obsolete"""
     // These two examples can be used to check function for efficiency coming from both node directions. 
     // Some searches are better optimized starting from child and checking for parent. For other queries it is the other way around, 
     // it depends on the relationship complexity of the parent and/or child node.
@@ -186,8 +185,10 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
             [||]
 
     /// <summary>
-    /// This is a more complete implementation, which should be abstracted more later.
+    /// Find all child terms of a given parent
     /// </summary>
+    /// <param name="parentId"></param>
+    /// <param name="limit"></param>
     member this.findAllChildTerms(parentId: string, ?limit: int) =
         let limit = defaultArg limit 5
 

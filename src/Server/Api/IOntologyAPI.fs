@@ -3,7 +3,8 @@ module API.IOntologyAPI
 open Shared
 open Database
 
-open DTO
+open DTOs.TermQuery
+open DTOs.ParentTermQuery
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open ARCtrl
@@ -26,7 +27,7 @@ module Helper =
     module V3 =
         open ARCtrl.Helper.Regex.ActivePatterns
 
-        let searchSingleTerm credentials (content: TermQuery) =
+        let searchSingleTerm credentials (content: TermQueryDto) =
             async {
                 let dbSearchRes =
                     match content.query.Trim() with
@@ -46,15 +47,10 @@ module Helper =
                 return dbSearchRes
             }
 
-        let searchChildTerms credentials (content: TermQuery) =
+        let searchChildTerms credentials (content: ParentTermQueryDto) =
             async {
                 let dbSearchRes = 
-                    let searchmode = content.searchMode |> Option.defaultWith (fun () -> getSearchModeFromQuery content.query)
-                    let ontologies = content.ontologies |> Option.defaultValue [] |> getOntologiesModeFromList 
-                    if content.parentTermId.IsSome then
-                        Term.Term(credentials).findAllChildTerms(content.parentTermId.Value, ?limit=content.limit) |> Array.ofSeq
-                    else
-                        Term.Term(credentials).searchByName(content.query.Trim(), searchmode, ?limit=content.limit, ?sourceOntologyName = ontologies) |> Array.ofSeq
+                    Term.Term(credentials).findAllChildTerms(content.parentTermId, ?limit=content.limit) |> Array.ofSeq
                 
                 return dbSearchRes
             }
@@ -81,7 +77,7 @@ module V3 =
                             Helper.V3.searchSingleTerm credentials query
                     ]
                     let! results = asyncQueries |> Async.Parallel
-                    let zipped = Array.map2 (fun a b -> TermQueryResults.create(a,b)) queries results
+                    let zipped = Array.map2 (fun a b -> TermQueryDtoResults.create(a,b)) queries results
                     return zipped
                 }
             getTermById = fun id  ->
@@ -96,7 +92,8 @@ module V3 =
             findAllChildTerms  = fun content ->
                 async {
                     let! results = Helper.V3.searchChildTerms credentials content
-                    return results
+                    let zipped = ParentTermQueryDtoResults.create(content, results)
+                    return zipped
                 }
         }
 
