@@ -13,6 +13,19 @@ open Components
 
 type ModalElements =
 
+    static member Button(text: string, onClickAction, buttonInput, ?isDisabled: bool) =
+        let isDisabled = defaultArg isDisabled false
+        Daisy.button.a [
+            button.success
+            button.wide
+            if isDisabled then
+                button.error
+            prop.disabled isDisabled
+            prop.onClick (fun _ -> onClickAction buttonInput)
+            
+            prop.text text
+        ]
+
     static member RadioPlugin(radioGroup: string, txt:string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
         let isDisabled = defaultArg isDisabled false
         Daisy.formControl [

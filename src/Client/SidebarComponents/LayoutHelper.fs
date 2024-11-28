@@ -39,6 +39,7 @@ type SidebarLayout =
             prop.className "relative flex p-4 animated-border shadow-md gap-4 flex-col" //experimental
             prop.children children
         ]
+
     static member Header(txt: string) =
         Html.h3 [
             prop.className "text-lg font-semibold"

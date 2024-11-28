@@ -17,7 +17,7 @@ with
 
 type TemplateFromDB =
 
-    static member toProtocolSearchElement (model:Model) dispatch =
+    static member toProtocolSearchElement (model: Model) dispatch =
         Daisy.button.button [
             prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
             button.primary
@@ -25,7 +25,7 @@ type TemplateFromDB =
             prop.text "Browse database"
         ]
 
-    static member addFromDBToTableButton (model:Model) selectionInformation dispatch =
+    static member addFromDBToTableButton (model: Model) selectionInformation dispatch =
         Html.div [
             prop.className "join flex flex-row justify-center gap-2"
             prop.children [
@@ -38,7 +38,6 @@ type TemplateFromDB =
                     prop.onClick (fun _ ->
                         if model.ProtocolState.TemplateSelected.IsNone then
                             failwith "No template selected!"
-
                         SpreadsheetInterface.AddTemplate(model.ProtocolState.TemplateSelected.Value.Table, selectionInformation.Columns) |> InterfaceMsg |> dispatch
                     )
                     prop.text "Add template"
@@ -54,7 +53,7 @@ type TemplateFromDB =
         ]
 
     [<ReactComponent>]
-    static member displaySelectedProtocolEle (model:Model) (selectionInformation:SelectedColumns) (setSelectedColumns:SelectedColumns -> unit) dispatch =
+    static member displaySelectedProtocolEle (model: Model) (selectionInformation:SelectedColumns) (setSelectedColumns:SelectedColumns -> unit) dispatch =
         Html.div [
             prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
             prop.children [
@@ -110,7 +109,6 @@ type TemplateFromDB =
             Html.div [
                 TemplateFromDB.toProtocolSearchElement model dispatch
             ]
-
             Html.div [
                 TemplateFromDB.addFromDBToTableButton model selectedColumns dispatch
             ]
