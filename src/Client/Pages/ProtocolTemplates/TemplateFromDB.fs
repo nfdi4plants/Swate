@@ -80,11 +80,15 @@ type TemplateFromDB =
                                             prop.children [
                                                 Daisy.checkbox [
                                                     prop.type'.checkbox
-                                                    prop.isChecked selectionInformation.Columns.[i]
+                                                    prop.isChecked
+                                                        (if selectionInformation.Columns.Length > 0 then
+                                                            selectionInformation.Columns.[i]
+                                                        else true)
                                                     prop.onChange (fun (b: bool) ->
-                                                        let selectedData = selectionInformation.Columns
-                                                        selectedData.[i] <- b
-                                                        {selectionInformation with Columns = selectedData} |> setSelectedColumns)
+                                                        if selectionInformation.Columns.Length > 0 then
+                                                            let selectedData = selectionInformation.Columns
+                                                            selectedData.[i] <- b
+                                                            {selectionInformation with Columns = selectedData} |> setSelectedColumns)
                                                 ]
                                             ]
                                         ]
