@@ -1,4 +1,4 @@
-namespace Modals
+namespace Modals.Import
 
 open Feliz
 open Feliz.DaisyUI
@@ -10,68 +10,14 @@ open ARCtrl
 open JsonImport
 open Components
 
+open Modals
+open Modals.ModalElements
+
 type SelectiveImportModal =
-
-    static member private Radio(radioGroup: string, txt:string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
-        let isDisabled = defaultArg isDisabled false
-        Daisy.formControl [
-            Daisy.label [
-                prop.className [
-                    "cursor-pointer transition-colors"
-                    if isDisabled then
-                        "!cursor-not-allowed"
-                    else
-                        "hover:bg-base-300"
-                ]
-                prop.children [
-                    Daisy.radio [
-                        prop.disabled isDisabled
-                        radio.xs
-                        prop.name radioGroup
-                        prop.isChecked isChecked
-                        prop.onChange onChange
-                    ]
-                    Html.span [
-                        prop.className "text-sm"
-                        prop.text txt
-                    ]
-                ]
-            ]
-        ]
-    static member private Box (title: string, icon: string, content: ReactElement, ?className: string list) =
-        Html.div [
-            prop.className [
-                "rounded shadow p-2 flex flex-col gap-2 border"
-                if className.IsSome then
-                    className.Value |> String.concat " "
-            ]
-            prop.children [
-                Html.h3 [
-                    prop.className "font-semibold gap-2 flex flex-row items-center"
-                    prop.children [
-                        Html.i [prop.className icon]
-                        Html.span title
-                    ]
-                ]
-                content
-            ]
-        ]
-
-    static member private ImportTypeRadio(importType: TableJoinOptions, setImportType: TableJoinOptions -> unit) =
-        let myradio(target: TableJoinOptions, txt: string) =
-            let isChecked = importType = target
-            SelectiveImportModal.Radio("importType", txt, isChecked, fun (b:bool) -> if b then setImportType target)
-        SelectiveImportModal.Box ("Import Type", "fa-solid fa-cog", React.fragment [
-            Html.div [
-                myradio(ARCtrl.TableJoinOptions.Headers, " Column Headers")
-                myradio(ARCtrl.TableJoinOptions.WithUnit, " ..With Units")
-                myradio(ARCtrl.TableJoinOptions.WithValues, " ..With Values")
-            ]
-        ])
 
     static member private MetadataImport(isActive: bool, setActive: bool -> unit, disArcFile: ArcFilesDiscriminate) =
         let name = string disArcFile
-        SelectiveImportModal.Box (sprintf "%s Metadata" name, "fa-solid fa-lightbulb", React.fragment [
+        ModalElements.Box (sprintf "%s Metadata" name, "fa-solid fa-lightbulb", React.fragment [
             Daisy.formControl [
                 Daisy.label [
                     prop.className "cursor-pointer"
@@ -105,19 +51,19 @@ type SelectiveImportModal =
         let import = state.ImportTables |> List.tryFind (fun it -> it.Index = index)
         let isActive = import.IsSome
         let isDisabled = state.ImportMetadata
-        SelectiveImportModal.Box (name, "fa-solid fa-table", React.fragment [
+        ModalElements.Box (name, "fa-solid fa-table", React.fragment [
             Html.div [
-                SelectiveImportModal.Radio (radioGroup, "Import",
+                ModalElements.RadioPlugin (radioGroup, "Import",
                     isActive && import.Value.FullImport,
                     (fun (b:bool) -> addTableImport index true),
                     isDisabled
                 )
-                SelectiveImportModal.Radio (radioGroup, "Append to active table",
+                ModalElements.RadioPlugin (radioGroup, "Append to active table",
                     isActive && not import.Value.FullImport,
                     (fun (b:bool) -> addTableImport index false),
                     isDisabled
                 )
-                SelectiveImportModal.Radio (radioGroup, "No Import",
+                ModalElements.RadioPlugin (radioGroup, "No Import",
                     not isActive,
                     (fun (b:bool) -> rmvTableImport index),
                     isDisabled
@@ -195,7 +141,14 @@ type SelectiveImportModal =
                                 Components.DeleteButton(props=[prop.onClick rmv])
                             ]
                         ]
-                        SelectiveImportModal.ImportTypeRadio(state.ImportType, fun it -> {state with ImportType = it} |> setState)
+                        ModalElements.ImportRadioPlugins(
+                            state.ImportType,
+                            [|
+                                ARCtrl.TableJoinOptions.Headers, " Column Headers";
+                                ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
+                                ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                            |],
+                            fun it -> {state with ImportType = it} |> setState)
                         SelectiveImportModal.MetadataImport(state.ImportMetadata, setMetadataImport, disArcfile)
                         for ti in 0 .. (tables.Count-1) do
                             let t = tables.[ti]
