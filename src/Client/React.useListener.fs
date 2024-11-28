@@ -77,6 +77,29 @@ type React =
             [| func; delay |]
         )
 
+    static member inline useDebouncedCallbackWithCancel<'A>(func: 'A -> unit, ?delay: int) =
+        let timeout = React.useRef(None)
+        let delay = defaultArg delay 500
+
+        let debouncedCallBack = React.useCallback(
+            (fun (arg: 'A) ->
+
+                let later = fun () ->
+                    timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
+                    func arg
+
+                timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
+                timeout.current <- Some(Fable.Core.JS.setTimeout later delay)
+            ),
+            [| func; delay |]
+        )
+        let cancel = React.useCallback(
+            (fun () ->
+                timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
+            )
+        )
+        cancel, debouncedCallBack
+
 [<Erase;RequireQualifiedAccess>]
 module React =
 

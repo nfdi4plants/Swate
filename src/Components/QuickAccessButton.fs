@@ -25,4 +25,4 @@ type QuickAccessButton =
             if props.IsSome then yield! props.Value
             prop.children children
         ]
-        |> unbox<JSX.Element>
+        |> toNative

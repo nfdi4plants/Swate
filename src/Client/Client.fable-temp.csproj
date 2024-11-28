@@ -1,5 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
+  <!--This is a temporary file used by Fable to restore dependencies.
+If you see this file in your project, you can delete it safely-->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <DefineConstants>FABLE_COMPILER</DefineConstants>
@@ -75,7 +77,6 @@
     <Compile Include="SharedComponents\Metadata\Template.fs" />
     <Compile Include="SharedComponents\BaseNavbar.fs" />
     <Compile Include="SharedComponents\NavbarBurger.fs" />
-    <Compile Include="SharedComponents\TermSearchV2.fs" />
     <Compile Include="SidebarComponents\LayoutHelper.fs" />
     <Compile Include="SidebarComponents\Tabs.fs" />
     <Compile Include="SidebarComponents\Navbar.fs" />
@@ -132,6 +133,7 @@
     <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="ARCtrl.Javascript" Version="2.2.4" />
     <PackageReference Include="Fable.Core" Version="4.3.0" />
     <PackageReference Include="Fable.Elmish" Version="4.2.0" />
     <PackageReference Include="Fable.Elmish.HMR" Version="7.0.0" />

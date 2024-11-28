@@ -171,6 +171,8 @@ module private Helper =
             ]
         ]
 
+open Fable.Core
+
 type NoFileElement =
 
     [<ReactComponent>]
@@ -201,8 +203,9 @@ type NoFileElement =
                 Html.div [
                     prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
-                        Helper.createNewFile args.dispatch
-                        Helper.uploadNewTable args.dispatch
+                        Components.TermSearchV2.TermSearch()
+                        // Helper.createNewFile args.dispatch
+                        // Helper.uploadNewTable args.dispatch
                     ]
                 ]
             ]
