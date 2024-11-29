@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
+open Modals.Template
 
 module private InitExtensions =
 
@@ -225,12 +226,12 @@ type Widget =
         let insertContent() =
             [
                 Html.div [
-                    Protocol.TemplateFromDB.addFromDBToTableButton model selectedColumns dispatch
+                    SelectiveTemplateFromDBModal.displaySelectedProtocolEle model selectedColumns setSelectedColumns dispatch
                 ]
                 Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.children [
-                        Protocol.TemplateFromDB.displaySelectedProtocolEle model selectedColumns setSelectedColumns dispatch
+                        SelectiveTemplateFromDBModal.displaySelectedProtocolEle model selectedColumns setSelectedColumns dispatch
                     ]
                 ]
             ]
