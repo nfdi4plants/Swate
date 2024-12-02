@@ -100,29 +100,32 @@ type SelectiveTemplateFromDBModal =
         ]
 
     [<ReactComponent>]
-    static member Main(model:Model, dispatch) =
+    static member Main(model: Model, dispatch) =
         let length =
             if model.ProtocolState.TemplateSelected.IsSome then
                 model.ProtocolState.TemplateSelected.Value.Table.Columns.Length
             else 0
         let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init length)
-        SelectiveTemplateFromDBModal.LogicContainer [
-            Html.div [
-                Daisy.button.button [
-                    prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
-                    button.primary
-                    button.block
-                    prop.text "Browse database"
-                ]
-            ]
-            Html.div [
-                SelectiveTemplateFromDBModal.addFromDBToTableButton model selectedColumns dispatch
-            ]
-            if model.ProtocolState.TemplateSelected.IsSome then
+        ModalElements.BoxWithChildren(
+            [
                 Html.div [
-                    SelectiveTemplateFromDBModal.displaySelectedProtocolEle model selectedColumns setSelectedColumns dispatch
+                    Daisy.button.button [
+                        prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
+                        button.primary
+                        button.block
+                        prop.text "Browse database"
+                    ]
                 ]
                 Html.div [
                     SelectiveTemplateFromDBModal.addFromDBToTableButton model selectedColumns dispatch
                 ]
-        ]
+                if model.ProtocolState.TemplateSelected.IsSome then
+                    Html.div [
+                        SelectiveTemplateFromDBModal.displaySelectedProtocolEle model selectedColumns setSelectedColumns dispatch
+                    ]
+                    Html.div [
+                        SelectiveTemplateFromDBModal.addFromDBToTableButton model selectedColumns dispatch
+                    ]
+            ],
+            "relative flex p-4 animated-border shadow-md gap-4 flex-col"
+        )

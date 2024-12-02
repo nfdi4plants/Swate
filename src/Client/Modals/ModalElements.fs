@@ -72,6 +72,28 @@ type ModalElements =
             ]
         ]
 
+    static member BoxWithChildren(children: ReactElement list, boxClass: string, ?title: string, ?icon: string, ?className: string list) =
+        Html.div [
+            prop.className [
+                "rounded shadow p-2 flex flex-col gap-2 border"
+                if className.IsSome then
+                    className.Value |> String.concat " "
+            ]
+            prop.children [
+                Html.h3 [
+                    prop.className boxClass
+                    if icon.IsSome || title.IsSome then
+                        prop.children [
+                            if icon.IsSome then
+                                Html.i [prop.className icon.Value]
+                            if title.IsSome then
+                                Html.span title.Value
+                        ]
+                    prop.children children
+                ]
+            ]
+        ]
+
     static member ImportRadioPlugins(importType: TableJoinOptions, radioData: (TableJoinOptions * string)[], setImportType: TableJoinOptions -> unit) =
         let myradio(target: TableJoinOptions, txt: string) =
             let isChecked = importType = target
