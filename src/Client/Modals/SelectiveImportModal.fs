@@ -11,6 +11,8 @@ open ARCtrl
 open JsonImport
 open Components
 
+open Modals
+
 type SelectiveImportModal =
 
     static member private MetadataImport(isActive: bool, setActive: bool -> unit, disArcFile: ArcFilesDiscriminate) =
@@ -128,7 +130,7 @@ type SelectiveImportModal =
                                 Components.DeleteButton(props=[prop.onClick rmv])
                             ]
                         ]
-                        ModalElements.RadioPluginsBox(
+                        SelectiveTemplateFromDBModal.RadioPluginsBox(
                             "Import Type",
                             "fa-solid fa-cog",
                             state.ImportType,

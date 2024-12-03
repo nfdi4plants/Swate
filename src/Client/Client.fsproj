@@ -52,8 +52,8 @@
     <Compile Include="Modals\CytoscapeView.fs" />
     <Compile Include="Modals\MoveColumn.fs" />
     <Compile Include="Modals\UpdateColumn.fs" />
-    <Compile Include="Modals\SelectiveImportModal.fs" />
     <Compile Include="Modals\SelectiveTemplateFromDB.fs" />
+    <Compile Include="Modals\SelectiveImportModal.fs" />
     <Compile Include="Modals\ModalProvider.fs" />
     <Compile Include="Spreadsheet\IO.fs" />
     <Compile Include="Spreadsheet\Types.fs" />
