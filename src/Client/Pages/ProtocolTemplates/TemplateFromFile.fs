@@ -106,10 +106,6 @@ type TemplateFromFile =
                 Modals.Import.SelectiveImportModal.Main (af, dispatch, rmv = (fun _ -> TemplateFromFileState.init() |> setState))
             | None -> Html.none
             Html.div [
-                SidebarComponents.SidebarLayout.Description (Html.p [
-                    Html.b "Import JSON files."
-                    Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
-                ])
                 Daisy.join [
                     prop.className "w-full"
                     prop.children [

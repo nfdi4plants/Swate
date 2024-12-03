@@ -66,7 +66,7 @@ type SelectiveTemplateFromDBModal =
             else 0
         let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init length)
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
-        Html.div [
+        SelectiveTemplateFromDBModal.LogicContainer [
             Html.div [
                 Daisy.button.button [
                     prop.onClick(fun _ -> UpdateModel { model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch } |> dispatch)
@@ -75,9 +75,8 @@ type SelectiveTemplateFromDBModal =
                     prop.text "Browse database"
                 ]
                 if model.ProtocolState.TemplateSelected.IsSome then
-                    SelectiveTemplateFromDBModal.LogicContainer [
+                    Html.div [
                         Html.div [
-                            SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false)
                             ModalElements.RadioPluginsBox(
                                 "Import Type",
                                 "fa-solid fa-cog",
@@ -89,8 +88,14 @@ type SelectiveTemplateFromDBModal =
                                 |],
                                 fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
                             )
+                            ModalElements.Box(
+                                model.ProtocolState.TemplateSelected.Value.Name,
+                                "",
+                                SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
                         ]
                     ]
-                SelectiveTemplateFromDBModal.addFromDBToTableButton model selectedColumns importTypeState dispatch
+                Html.div [
+                    SelectiveTemplateFromDBModal.addFromDBToTableButton model selectedColumns importTypeState dispatch
+                ]
             ]
         ]
