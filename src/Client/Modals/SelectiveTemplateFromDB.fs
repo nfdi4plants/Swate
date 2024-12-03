@@ -22,6 +22,14 @@ type SelectiveTemplateFromDBModal =
             prop.children children
         ]
 
+    static member toProtocolSearchElement (model: Model) dispatch =
+        Daisy.button.button [
+            prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
+            button.primary
+            button.block
+            prop.text "Browse database"
+        ]
+
     [<ReactComponent>]
     static member displaySelectedProtocolElements (model: Model, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit, dispatch, ?hasIcon: bool) =
         let hasIcon = defaultArg hasIcon true
@@ -68,34 +76,29 @@ type SelectiveTemplateFromDBModal =
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
         SelectiveTemplateFromDBModal.LogicContainer [
             Html.div [
-                Daisy.button.button [
-                    prop.onClick(fun _ -> UpdateModel { model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch } |> dispatch)
-                    button.primary
-                    button.block
-                    prop.text "Browse database"
-                ]
-                if model.ProtocolState.TemplateSelected.IsSome then
-                    Html.div [
-                        Html.div [
-                            ModalElements.RadioPluginsBox(
-                                "Import Type",
-                                "fa-solid fa-cog",
-                                importTypeState.ImportType,
-                                [|
-                                    ARCtrl.TableJoinOptions.Headers, " Column Headers";
-                                    ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
-                                    ARCtrl.TableJoinOptions.WithValues, " ..With Values";
-                                |],
-                                fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
-                            )
-                            ModalElements.Box(
-                                model.ProtocolState.TemplateSelected.Value.Name,
-                                "",
-                                SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
-                        ]
-                    ]
+                SelectiveTemplateFromDBModal.toProtocolSearchElement model dispatch
+            ]
+            if model.ProtocolState.TemplateSelected.IsSome then                    
                 Html.div [
-                    SelectiveTemplateFromDBModal.addFromDBToTableButton model selectedColumns importTypeState dispatch
+                    ModalElements.RadioPluginsBox(
+                        "Import Type",
+                        "fa-solid fa-cog",
+                        importTypeState.ImportType,
+                        [|
+                            ARCtrl.TableJoinOptions.Headers, " Column Headers";
+                            ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
+                            ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                        |],
+                        fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
+                    )
                 ]
+                Html.div [
+                    ModalElements.Box(
+                        model.ProtocolState.TemplateSelected.Value.Name,
+                        "",
+                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
+                ]
+            Html.div [
+                SelectiveTemplateFromDBModal.addFromDBToTableButton model selectedColumns importTypeState dispatch
             ]
         ]
