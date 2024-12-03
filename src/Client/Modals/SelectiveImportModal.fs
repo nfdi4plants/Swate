@@ -79,9 +79,9 @@ type SelectiveImportModal =
                     prop.className "overflow-x-auto"
                     prop.children [
                         if isActive then
-                            ModalElements.TableWithImportColumnCheckboxes(table0, selectedColumns, setSelectedColumns)
+                            SelectiveTemplateFromDBModal.TableWithImportColumnCheckboxes(table0, selectedColumns, setSelectedColumns)
                         else
-                            ModalElements.TableWithImportColumnCheckboxes(table0)
+                            SelectiveTemplateFromDBModal.TableWithImportColumnCheckboxes(table0)
                     ]
                 ]
             ]

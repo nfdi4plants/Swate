@@ -61,7 +61,7 @@ type SelectiveTemplateFromDBModal =
                                     prop.className "join flex flex-row centered gap-2"
                                     prop.children [
                                         if displayCheckBox then
-                                            SelectiveTemplateFromDBModal.checkBox(columns, i, selectionInformation.Value, setSelectedColumns.Value)
+                                            SelectiveTemplateFromDBModal.CheckBoxForTableColumnSelection(columns, i, selectionInformation.Value, setSelectedColumns.Value)
                                         Html.text (columns.[i].Header.ToString())
                                         Html.div [
                                             prop.onClick (fun e ->
@@ -106,7 +106,7 @@ type SelectiveTemplateFromDBModal =
                         Html.i [prop.className "fa-solid fa-cog"]
                     Html.span $"Template: {model.ProtocolState.TemplateSelected.Value.Name}"
                 if model.ProtocolState.TemplateSelected.IsSome then
-                    ModalElements.TableWithImportColumnCheckboxes(model.ProtocolState.TemplateSelected.Value.Table, selectionInformation, setSelectedColumns)
+                    SelectiveTemplateFromDBModal.TableWithImportColumnCheckboxes(model.ProtocolState.TemplateSelected.Value.Table, selectionInformation, setSelectedColumns)
             ]
         ]
 
