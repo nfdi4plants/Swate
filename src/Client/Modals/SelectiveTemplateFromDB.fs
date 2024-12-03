@@ -5,7 +5,7 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
-open SelectedColumns
+open Types.TableManipulation
 
 open ARCtrl
 open JsonImport
@@ -139,7 +139,7 @@ type SelectiveTemplateFromDBModal =
             else 0
         let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init length)
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
-        ModalElements.LogicContainer [
+        Components.LogicContainer [
             Html.div [
                 SelectiveTemplateFromDBModal.ToProtocolSearchElement model dispatch
             ]

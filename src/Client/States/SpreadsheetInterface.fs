@@ -1,7 +1,7 @@
 namespace SpreadsheetInterface
 
 open Shared
-open SelectedColumns
+open Types.TableManipulation
 open ARCtrl
 open JsonImport
 

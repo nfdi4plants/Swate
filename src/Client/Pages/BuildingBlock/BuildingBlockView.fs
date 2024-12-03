@@ -4,7 +4,7 @@ open Model
 open Messages
 open Messages.BuildingBlock
 open Shared
-open Modals
+open Components
 
 open Elmish
 
@@ -82,13 +82,13 @@ let addBuildingBlockComponent (model:Model) (dispatch:Messages.Msg -> unit) =
 
         // Input forms, etc related to add building block.
         SidebarComponents.SidebarLayout.Description "Add annotation building blocks (columns) to the annotation table."
-        ModalElements.LogicContainer [
+        Components.LogicContainer [
             SearchComponent.Main model dispatch
         ]
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
             Html.p "Convert existing Building Block."
-            ModalElements.LogicContainer [
+            Components.LogicContainer [
                 CellConvertComponent.Main ()
             ]
         | _ -> Html.none

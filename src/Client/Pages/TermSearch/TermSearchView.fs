@@ -8,7 +8,7 @@ open Elmish
 open TermSearch
 open Model
 
-open Modals
+open Components
 
 let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : TermSearch.Model * Cmd<Messages.Msg> =
     match termSearchMsg with
@@ -101,7 +101,7 @@ let Main (model:Model, dispatch) =
 
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
-        ModalElements.LogicContainer [
+        Components.LogicContainer [
             Components.TermSearch.Input(setTerm, fullwidth=true, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch, ?onFocus=excelGetParentTerm, autofocus=true)
             addButton(model, dispatch)
         ]

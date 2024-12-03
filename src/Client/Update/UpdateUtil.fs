@@ -2,7 +2,7 @@ module Update.UpdateUtil
 
 open ARCtrl
 open Shared
-open SelectedColumns
+open Types.TableManipulation
 open Fable.Remoting.Client
 
 let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)

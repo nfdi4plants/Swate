@@ -23,7 +23,6 @@
     <Compile Include="OfficeInterop\InteropLogging.fs" />
     <Compile Include="OfficeInterop\ExcelUtil.fs" />
     <Compile Include="OfficeInterop\OfficeInterop.fs" />
-    <Compile Include="States\SelectedColumns.fs" />
     <Compile Include="States\DataAnnotator.fs" />
     <Compile Include="States\ARCitect.fs" />
     <Compile Include="States\SpreadsheetInterface.fs" />

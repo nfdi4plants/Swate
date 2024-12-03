@@ -21,7 +21,7 @@ open GlobalBindings
 open ARCtrl
 open ARCtrl.Spreadsheet
 
-open Modals
+open Components
 
 let download(filename, text) =
   let element = document.createElement("a");
@@ -141,7 +141,7 @@ type FileExporter =
                     ]
                 ]
             ])
-            ModalElements.LogicContainer [
+            Components.LogicContainer [
                 FileExporter.JsonExport(model, dispatch)
             ]
         ]

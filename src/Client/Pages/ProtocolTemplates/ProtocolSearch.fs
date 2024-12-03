@@ -7,7 +7,7 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
-open Modals
+open Components
 
 module private HelperProtocolSearch =
 
@@ -55,7 +55,7 @@ type SearchContainer =
 
                 Html.p "Search the database for protocol templates."
 
-                ModalElements.LogicContainer [
+                Components.LogicContainer [
                     Protocol.Search.InfoField()
                     Protocol.Search.FileSortElement(model, config, setConfig)
                     Protocol.Search.Component (filteredTemplates, model, dispatch)
