@@ -5,13 +5,11 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
-open Shared.DTOs.SelectedColumnsModalDto
+open SelectedColumns
 
 open ARCtrl
 open JsonImport
 open Components
-
-open Modals
 
 type SelectiveImportModal =
 

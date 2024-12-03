@@ -4,8 +4,8 @@ open Feliz
 open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
-open Modals.Template
-open Shared.DTOs.SelectedColumnsModalDto
+open Modals
+open SelectedColumns
 
 module private InitExtensions =
 

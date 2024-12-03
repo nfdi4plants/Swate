@@ -1,4 +1,4 @@
-module Shared.DTOs.SelectedColumnsModalDto
+module SelectedColumns
 
 type SelectedColumns = {
     Columns: bool []
@@ -8,3 +8,4 @@ with
         {
             Columns = Array.init length (fun _ -> true)
         }
+

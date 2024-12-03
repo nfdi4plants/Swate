@@ -6,6 +6,7 @@ open Model
 open Messages
 open Feliz
 open Feliz.DaisyUI
+open Modals
 
 module private DataAnnotatorHelper =
 
@@ -342,7 +343,7 @@ type DataAnnotator =
 
             SidebarComponents.SidebarLayout.Description "Specify exact data points for annotation."
 
-            SidebarComponents.SidebarLayout.LogicContainer [
+            ModalElements.LogicContainer [
                 ModalMangementComponent ref model (fun _ -> setShowModal true) rmvFile uploadFile
                 match model.DataAnnotatorModel, showModal with
                 | { DataFile = Some _; ParsedFile = Some _ }, true -> DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false)

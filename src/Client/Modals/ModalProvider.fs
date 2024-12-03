@@ -23,9 +23,9 @@ type ModalProvider =
         | TableModals.TermDetails term ->
             Modals.TermModal.Main (term, dispatch)
         | TableModals.SelectiveTemplateImportFromDB ->
-            Modals.Template.SelectiveTemplateFromDBModal.Main (model, dispatch)
+            Modals.SelectiveTemplateFromDBModal.Main (model, dispatch)
         | TableModals.SelectiveFileImport arcfile ->
-            Modals.Import.SelectiveImportModal.Main (arcfile, dispatch)
+            Modals.SelectiveImportModal.Main (arcfile, dispatch)
         | TableModals.BatchUpdateColumnValues (columnIndex, column) ->
             Modals.UpdateColumn.Main (columnIndex, column, dispatch)
         | TableModals.TableCellContext (mouseX, mouseY, ci, ri) ->

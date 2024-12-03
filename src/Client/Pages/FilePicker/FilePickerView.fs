@@ -8,6 +8,8 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
+open Modals
+
 let update (filePickerMsg:FilePicker.Msg) (state: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
     match filePickerMsg with
     | LoadNewFiles fileNames ->
@@ -216,7 +218,7 @@ module FileNameTable =
 
 
 let fileContainer (model:Model) dispatch =
-    SidebarComponents.SidebarLayout.LogicContainer [
+    ModalElements.LogicContainer [
 
         uploadButton model dispatch "@md/sidebar:flex-row"
 

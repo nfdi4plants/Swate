@@ -1,7 +1,7 @@
 namespace SpreadsheetInterface
 
 open Shared
-open Shared.DTOs.SelectedColumnsModalDto
+open SelectedColumns
 open ARCtrl
 open JsonImport
 

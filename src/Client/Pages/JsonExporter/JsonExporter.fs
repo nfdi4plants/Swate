@@ -21,6 +21,8 @@ open GlobalBindings
 open ARCtrl
 open ARCtrl.Spreadsheet
 
+open Modals
+
 let download(filename, text) =
   let element = document.createElement("a");
   element.setAttribute("href", "data:text/plain;charset=utf-8," +  Fable.Core.JS.encodeURIComponent(text));
@@ -139,7 +141,7 @@ type FileExporter =
                     ]
                 ]
             ])
-            SidebarComponents.SidebarLayout.LogicContainer [
+            ModalElements.LogicContainer [
                 FileExporter.JsonExport(model, dispatch)
             ]
         ]
