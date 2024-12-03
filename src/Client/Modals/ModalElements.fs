@@ -124,6 +124,9 @@ type ModalElements =
             prop.children [
                 Daisy.checkbox [
                     prop.type'.checkbox
+                    prop.style [
+                        style.height(length.perc 100)
+                    ]
                     prop.isChecked
                         (if selectionInformation.Columns.Length > 0 then
                             selectionInformation.Columns.[index]
@@ -151,7 +154,8 @@ type ModalElements =
                                 Html.label [
                                     prop.className "join flex flex-row centered gap-2"
                                     prop.children [
-                                        if displayCheckBox then ModalElements.checkBox(columns, i, selectionInformation.Value, setSelectedColumns.Value)
+                                        if displayCheckBox then
+                                            ModalElements.checkBox(columns, i, selectionInformation.Value, setSelectedColumns.Value)
                                         Html.text (columns.[i].Header.ToString())
                                         Html.div [
                                             prop.onClick (fun e ->
