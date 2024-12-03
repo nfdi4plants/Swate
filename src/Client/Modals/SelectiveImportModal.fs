@@ -1,4 +1,4 @@
-namespace Modals.Import
+namespace Modals
 
 open Feliz
 open Feliz.DaisyUI
@@ -10,9 +10,6 @@ open Shared.DTOs.SelectedColumnsModalDto
 open ARCtrl
 open JsonImport
 open Components
-
-open Modals
-open Modals.ModalElements
 
 type SelectiveImportModal =
 
@@ -90,7 +87,7 @@ type SelectiveImportModal =
         className = [if isActive then "!bg-primary !text-primary-content"])
 
     [<ReactComponent>]
-    static member Main(import: ArcFiles, dispatch, rmv) =
+    static member Main (import: ArcFiles, dispatch, rmv) =
         let state, setState = React.useState(SelectiveImportModalState.init)
         let tables, disArcfile =
             match import with

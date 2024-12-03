@@ -1,4 +1,4 @@
-namespace Modals.Template
+namespace Modals
 
 open Feliz
 open Feliz.DaisyUI
@@ -11,18 +11,9 @@ open ARCtrl
 open JsonImport
 open Components
 
-open Modals
-open Modals.ModalElements
-
 type SelectiveTemplateFromDBModal =
 
-    static member private LogicContainer (children: ReactElement list) =
-        Html.div [
-            prop.className "relative flex p-4 animated-border shadow-md gap-4 flex-col" //experimental
-            prop.children children
-        ]
-
-    static member toProtocolSearchElement (model: Model) dispatch =
+    static member ToProtocolSearchElement (model: Model) dispatch =
         Daisy.button.button [
             prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
             button.primary
@@ -45,7 +36,7 @@ type SelectiveTemplateFromDBModal =
             ]
         ]
 
-    static member addFromDBToTableButton (model: Model) selectionInformation importType dispatch =
+    static member AddFromDBToTableButton (model: Model) selectionInformation importType dispatch =
         let addTemplate (templatePot: Template option, selectedColumns) =
             if model.ProtocolState.TemplateSelected.IsNone then
                 failwith "No template selected!"
@@ -67,16 +58,16 @@ type SelectiveTemplateFromDBModal =
         ]
 
     [<ReactComponent>]
-    static member Main(model: Model, dispatch) =
+    static member Main (model: Model, dispatch) =
         let length =
             if model.ProtocolState.TemplateSelected.IsSome then
                 model.ProtocolState.TemplateSelected.Value.Table.Columns.Length
             else 0
         let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init length)
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
-        SelectiveTemplateFromDBModal.LogicContainer [
+        ModalElements.LogicContainer [
             Html.div [
-                SelectiveTemplateFromDBModal.toProtocolSearchElement model dispatch
+                SelectiveTemplateFromDBModal.ToProtocolSearchElement model dispatch
             ]
             if model.ProtocolState.TemplateSelected.IsSome then                    
                 Html.div [
@@ -99,6 +90,6 @@ type SelectiveTemplateFromDBModal =
                         SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
                 ]
             Html.div [
-                SelectiveTemplateFromDBModal.addFromDBToTableButton model selectedColumns importTypeState dispatch
+                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState dispatch
             ]
         ]
