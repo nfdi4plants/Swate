@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Database.fs" />
+    <Compile Include="DTOs\SelectedColumnsModalDto.fs" />
     <Compile Include="DTOs\ParentTermQueryDto.fs" />
     <Compile Include="DTOs\TermQueryDto.fs" />
     <Compile Include="Extensions.fs" />

@@ -687,6 +687,16 @@ module AnnotationTable =
         |> Array.ofSeq
         |> Array.map (fun header -> header.ToString())
 
+    /// <summary>
+    /// Get headers from range
+    /// </summary>
+    /// <param name="range"></param>
+    let getBody (range: ResizeArray<ResizeArray<obj option>>) =
+        range
+        |> Array.ofSeq
+        |> (fun items -> items.[1..])
+        |> ResizeArray
+
 /// <summary>
 /// Try find annotation table in active worksheet and parse to ArcTable
 /// </summary>
@@ -920,6 +930,39 @@ let addCompositeColumn (excelTable: Table) (arcTable: ArcTable) (newColumn: Comp
 
     loggingList
 
+let selectiveTablePrepare (activeTable: ArcTable) (toJoinTable: ArcTable) (removeColumns: int list): ArcTable =
+    // Remove existing columns
+    let mutable columnsToRemove = removeColumns
+    // find duplicate columns
+    let tablecopy = toJoinTable.Copy()
+    for header in activeTable.Headers do
+        let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
+        if containsAtIndex.IsSome then
+            columnsToRemove <- containsAtIndex.Value::columnsToRemove
+
+    //Remove duplicates because unselected and already existing columns can overlap
+    let columnsToRemove = columnsToRemove |> Set.ofList |> Set.toList
+
+    tablecopy.RemoveColumns (Array.ofList columnsToRemove)
+    tablecopy.IteriColumns(fun i c0 ->
+        let c1 = {c0 with Cells = tablecopy.Columns.[i].Cells}
+        let c2 =
+            if c1.Header.isInput then
+                match activeTable.TryGetInputColumn() with
+                | Some ic ->
+                    {c1 with Cells = ic.Cells}
+                | _ -> c1
+            elif c1.Header.isOutput then
+                match activeTable.TryGetOutputColumn() with
+                | Some oc ->
+                    {c1 with Cells = oc.Cells}
+                | _ -> c1
+            else
+                c1
+        tablecopy.UpdateColumn(i, c2.Header, c2.Cells)
+    )
+    tablecopy
+
 /// <summary>
 /// Prepare the given table to be joined with the currently active annotation table
 /// </summary>
@@ -965,21 +1008,16 @@ let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (selectedColum
 /// <param name="tableToAdd"></param>
 /// <param name="index"></param>
 /// <param name="options"></param>
-let joinTable (tableToAdd: ArcTable, selectedColumns:bool [], options: TableJoinOptions option) =
+let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoinOptions option) =
     Excel.run(fun context ->
         promise {
-
-            let columns = tableToAdd.Columns
-
-            columns
-
             //When a name is available get the annotation and arctable for easy access of indices and value adaption
             //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
             let! result = AnnotationTable.tryGetActive context
 
             match result with
             | Some excelTable ->
-                let! (tableToAdd: ArcTable, index: int option) = prepareTemplateInMemory excelTable tableToAdd selectedColumns context
+                let! (refinedTableToAdd: ArcTable, index: int option) = prepareTemplateInMemory excelTable tableToAdd selectedColumns context
 
                 //Arctable enables a fast check for the existence of input- and output-columns and their indices
                 let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
@@ -987,11 +1025,11 @@ let joinTable (tableToAdd: ArcTable, selectedColumns:bool [], options: TableJoin
                 //When both tables could be accessed succesfully then check what kind of column shall be added an whether it is already there or not
                 match arcTableRes with
                 | Result.Ok arcTable ->
-                    arcTable.Join(tableToAdd, ?index=index, ?joinOptions=options, forceReplace=true)
+                    arcTable.Join(refinedTableToAdd, ?index=index, ?joinOptions=options, forceReplace=true)
 
                     let newTableRange = excelTable.getRange()
 
-                    let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowCount";]))
+                    let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowCount"]))
 
                     do! context.sync().``then``(fun _ ->
                         excelTable.delete()
@@ -999,14 +1037,16 @@ let joinTable (tableToAdd: ArcTable, selectedColumns:bool [], options: TableJoin
 
                     let! (newTable, _) = AnnotationTable.createAtRange(false, false, newTableRange, context)
 
-                    let _ = newTable.load(propertyNames = U2.Case2 (ResizeArray["name"; "values"; "columns";]))
+                    let _ = newTable.load(propertyNames = U2.Case2 (ResizeArray["name"; "values"; "columns"]))
+
+                    let tableSeqs = arcTable.ToStringSeqs()
 
                     do! context.sync().``then``(fun _ ->
 
                         newTable.name <- excelTable.name
 
                         let headerNames =
-                            let names = AnnotationTable.getHeaders (arcTable.ToStringSeqs())
+                            let names = AnnotationTable.getHeaders tableSeqs
                             names
                             |> Array.map (fun name -> extendName names name)
 
@@ -1035,9 +1075,12 @@ let joinTable (tableToAdd: ArcTable, selectedColumns:bool [], options: TableJoin
 
                     do! context.sync()
 
+                    let bodyValues = AnnotationTable.getBody tableSeqs
+                    newBodyRange.values <- bodyValues
+
                     do! AnnotationTable.format(newTable, context, true)
 
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"Joined template {tableToAdd.Name} to table {excelTable.name}!"]
+                    return [InteropLogging.Msg.create InteropLogging.Warning $"Joined template {refinedTableToAdd.Name} to table {excelTable.name}!"]
                 | Result.Error _ ->
                     return [InteropLogging.Msg.create InteropLogging.Error "No arc table could be created! This should not happen at this stage! Please report this as a bug to the developers.!"]
             | None -> return [InteropLogging.NoActiveTableMsg]

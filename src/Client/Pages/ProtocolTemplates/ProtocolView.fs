@@ -27,7 +27,6 @@ type Templates =
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "Templates"
 
-
             SidebarComponents.SidebarLayout.Description (Html.p [
                 Html.b "Search the database for templates."
                 Html.text " The building blocks from these templates can be inserted into the Swate table. "

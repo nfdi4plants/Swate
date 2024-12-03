@@ -93,7 +93,7 @@ module Table =
     /// </summary>
     /// <param name="activeTable">The active/current table</param>
     /// <param name="toJoinTable">The new table, which will be added to the existing one.</param>
-    let selectiveTablePrepare (activeTable: ArcTable) (toJoinTable: ArcTable) (removeColumns:int list): ArcTable =
+    let selectiveTablePrepare (activeTable: ArcTable) (toJoinTable: ArcTable) (removeColumns: int list): ArcTable =
         // Remove existing columns
         let mutable columnsToRemove = removeColumns
         // find duplicate columns
@@ -108,7 +108,7 @@ module Table =
 
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
         tablecopy.IteriColumns(fun i c0 ->
-            let c1 = {c0 with Cells = [||]}
+            let c1 = {c0 with Cells = tablecopy.Columns.[i].Cells}
             let c2 =
                 if c1.Header.isInput then
                     match activeTable.TryGetInputColumn() with

@@ -5,6 +5,7 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
+open Shared.DTOs.SelectedColumnsModalDto
 
 open ARCtrl
 open JsonImport
@@ -45,7 +46,7 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member private TableImport(index: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit) =
+    static member private TableImport(index: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns) =
         let name = table0.Name
         let radioGroup = "radioGroup_" + name
         let import = state.ImportTables |> List.tryFind (fun it -> it.Index = index)
@@ -72,36 +73,21 @@ type SelectiveImportModal =
             Daisy.collapse [
                 Html.input [prop.type'.checkbox; prop.className "min-h-0 h-5"]
                 Daisy.collapseTitle [
-                    prop.className "p-1 min-h-0 h-5 text-sm"
-                    prop.text "Preview Table"
+                    prop.className "p-1 min-h-0 h-5 text-sm"                    
+                    prop.text (if isActive then "Select Columns" else "Preview Table")
                 ]
                 Daisy.collapseContent [
                     prop.className "overflow-x-auto"
                     prop.children [
-                        Daisy.table [
-                            table.xs
-                            prop.children [
-                                Html.thead [
-                                    Html.tr [
-                                        for c in table0.Headers do
-                                            Html.th (c.ToString())
-                                    ]
-                                ]
-                                Html.tbody [
-                                    for ri in 0 .. (table0.RowCount-1) do
-                                        let row = table0.GetRow(ri, true)
-                                        Html.tr [
-                                            for c in row do
-                                                Html.td (c.ToString())
-                                        ]
-                                ]
-                            ]
-                        ]
+                        if isActive then
+                            ModalElements.TableWithImportColumnCheckboxes(table0, selectedColumns, setSelectedColumns)
+                        else
+                            ModalElements.TableWithImportColumnCheckboxes(table0)
                     ]
                 ]
-        ]],
-            className = [if isActive then "!bg-primary !text-primary-content"]
-        )
+            ]
+        ],
+        className = [if isActive then "!bg-primary !text-primary-content"])
 
     [<ReactComponent>]
     static member Main(import: ArcFiles, dispatch, rmv) =
@@ -116,17 +102,21 @@ type SelectiveImportModal =
             if b then
                 {
                     state with
-                        ImportMetadata = true;
-                        ImportTables = [ for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
+                        ImportMetadata  = true;
+                        ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
                 } |> setState
             else
                 SelectiveImportModalState.init() |> setState
-        let addTableImport = fun (i:int) (fullImport: bool) ->
+        let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::state.ImportTables |> List.distinct
             {state with ImportTables = newImportTables} |> setState
         let rmvTableImport = fun i ->
             {state with ImportTables = state.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setState
+        let selectedColumns =
+            tables
+            |> Array.ofSeq
+            |> Array.map (fun t -> React.useState(SelectedColumns.init t.Columns.Length))
         Daisy.modal.div [
             modal.active
             prop.children [
@@ -141,25 +131,28 @@ type SelectiveImportModal =
                                 Components.DeleteButton(props=[prop.onClick rmv])
                             ]
                         ]
-                        ModalElements.ImportRadioPlugins(
+                        ModalElements.RadioPluginsBox(
+                            "Import Type",
+                            "fa-solid fa-cog",
                             state.ImportType,
                             [|
-                                ARCtrl.TableJoinOptions.Headers, " Column Headers";
-                                ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
+                                ARCtrl.TableJoinOptions.Headers,    " Column Headers";
+                                ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
                                 ARCtrl.TableJoinOptions.WithValues, " ..With Values";
                             |],
-                            fun it -> {state with ImportType = it} |> setState)
+                            fun importType -> {state with ImportType = importType} |> setState)
                         SelectiveImportModal.MetadataImport(state.ImportMetadata, setMetadataImport, disArcfile)
                         for ti in 0 .. (tables.Count-1) do
                             let t = tables.[ti]
-                            SelectiveImportModal.TableImport(ti, t, state, addTableImport, rmvTableImport)
+                            let selectedColumns, setSelectedColumns = fst selectedColumns.[ti], snd selectedColumns.[ti]
+                            SelectiveImportModal.TableImport(ti, t, state, addTableImport, rmvTableImport, selectedColumns, setSelectedColumns)
                         Daisy.cardActions [
                             Daisy.button.button [
                                 button.info
                                 prop.style [style.marginLeft length.auto]
                                 prop.text "Submit"
                                 prop.onClick(fun e ->
-                                    {| importState = state; importedFile = import|} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                                    {| importState = state; importedFile = import; selectedColumns = selectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
                                     rmv e
                                 )
                             ]

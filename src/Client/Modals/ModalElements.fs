@@ -5,11 +5,12 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
+open Shared.DTOs.SelectedColumnsModalDto
 
 open ARCtrl
 open JsonImport
 open Components
-
+open Fable.React.Helpers
 
 type ModalElements =
 
@@ -72,7 +73,7 @@ type ModalElements =
             ]
         ]
 
-    static member BoxWithChildren(children: ReactElement list, boxClass: string, ?title: string, ?icon: string, ?className: string list) =
+    static member BoxWithChildren(children: ReactElement list, ?title: string, ?icon: string, ?className: string list) =
         Html.div [
             prop.className [
                 "rounded shadow p-2 flex flex-col gap-2 border"
@@ -81,7 +82,7 @@ type ModalElements =
             ]
             prop.children [
                 Html.h3 [
-                    prop.className boxClass
+                    prop.className "font-semibold gap-2 flex flex-row items-center"
                     if icon.IsSome || title.IsSome then
                         prop.children [
                             if icon.IsSome then
@@ -94,13 +95,85 @@ type ModalElements =
             ]
         ]
 
-    static member ImportRadioPlugins(importType: TableJoinOptions, radioData: (TableJoinOptions * string)[], setImportType: TableJoinOptions -> unit) =
+    static member SelectorButton<'a when 'a : equality> (targetselector: 'a, selector: 'a, setSelector: 'a -> unit, ?isDisabled) =
+        Daisy.button.button [
+            join.item
+            if isDisabled.IsSome then
+                prop.disabled isDisabled.Value
+            prop.style [style.flexGrow 1]
+            if (targetselector = selector) then
+                button.primary
+            prop.onClick (fun _ -> setSelector targetselector)
+            prop.text (string targetselector)
+        ]
+
+    static member RadioPluginsBox(boxName, icon, importType: TableJoinOptions, radioData: (TableJoinOptions * string)[], setImportType: TableJoinOptions -> unit) =
         let myradio(target: TableJoinOptions, txt: string) =
             let isChecked = importType = target
             ModalElements.RadioPlugin("importType", txt, isChecked, fun (b: bool) -> if b then setImportType target)
-        ModalElements.Box ("Import Type", "fa-solid fa-cog", React.fragment [
+        ModalElements.Box (boxName, icon, React.fragment [
             Html.div [
                 for i in 0..radioData.Length-1 do
                     myradio(radioData.[i])
             ]
         ])
+
+    static member checkBox(columns: CompositeColumn [], index, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit) =
+        Html.div [
+            prop.style [style.display.flex; style.justifyContent.center]
+            prop.children [
+                Daisy.checkbox [
+                    prop.type'.checkbox
+                    prop.isChecked
+                        (if selectionInformation.Columns.Length > 0 then
+                            selectionInformation.Columns.[index]
+                        else true)
+                    prop.onChange (fun (b: bool) ->
+                        if columns.Length > 0 then
+                            let selectedData = selectionInformation.Columns
+                            selectedData.[index] <- b
+                            {selectionInformation with Columns = selectedData} |> setSelectedColumns)
+                ]
+            ]
+        ]
+
+    static member TableWithImportColumnCheckboxes(table: ArcTable, ?selectionInformation: SelectedColumns, ?setSelectedColumns: SelectedColumns -> unit) =
+        let columns = table.Columns
+        let displayCheckBox =
+            //Determine whether to display checkboxes or not
+            selectionInformation.IsSome && setSelectedColumns.IsSome                    
+        Daisy.table [
+            prop.children [
+                Html.thead [
+                    Html.tr [
+                        for i in 0..columns.Length-1 do                            
+                            Html.th [
+                                Html.label [
+                                    prop.className "join flex flex-row centered gap-2"
+                                    prop.children [
+                                        if displayCheckBox then ModalElements.checkBox(columns, i, selectionInformation.Value, setSelectedColumns.Value)
+                                        Html.text (columns.[i].Header.ToString())
+                                        Html.div [
+                                            prop.onClick (fun e ->
+                                                if columns.Length > 0 && selectionInformation.IsSome then
+                                                    let selectedData = selectionInformation.Value.Columns
+                                                    selectedData.[i] <- not selectedData.[i]
+                                                    {selectionInformation.Value with Columns = selectedData} |> setSelectedColumns.Value)
+                                        ]
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+
+                Html.tbody [
+                    for ri in 0 .. (table.RowCount-1) do
+                        let row = table.GetRow(ri, true)
+                        Html.tr [
+                            for c in row do
+                                Html.td (c.ToString())
+                        ]
+                ]
+            ]
+        ]
+

@@ -164,10 +164,10 @@ module Interface =
                     model, cmd
                 | _ -> failwith "not implemented"
 
-            | AddTemplate (table, selectedColumns) ->
+            | AddTemplate (table, selectedColumns, importType) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.AddTemplate (table, selectedColumns) |> OfficeInteropMsg |> Cmd.ofMsg
+                    let cmd = OfficeInterop.AddTemplate (table, selectedColumns, importType) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd = Spreadsheet.AddTemplate (table, selectedColumns) |> SpreadsheetMsg |> Cmd.ofMsg
@@ -201,6 +201,9 @@ module Interface =
                     model, cmd
                 | _ -> failwith "not implemented"
             | ImportJson data ->
+                let selectedColumns =
+                    data.selectedColumns
+                    |> Array.map (fun (sc, _) -> sc)
                 match host with
                 | Some Swatehost.Excel ->
                     /// In Excel we must get the current information from worksheets and update them with the imported information
@@ -208,7 +211,7 @@ module Interface =
                         promise {
                             match data.importState.ImportMetadata with
                             | true -> // full import, does not require additional information
-                                return UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState
+                                return UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState selectedColumns
                             | false -> // partial import, requires additional information
                                 let! arcfile = OfficeInterop.Core.Main.tryParseToArcFile()
                                 let arcfileOpt = arcfile |> Result.toOption
@@ -217,9 +220,9 @@ module Interface =
                                 )
                                 let activeTableIndex =
                                     match arcfileOpt, activeTable with
-                                    | Some arcfile, Ok activeTable -> arcfile.Tables() |> Seq.tryFindIndex (fun x -> x = activeTable)
+                                    | Some arcfile, Ok activeTable -> arcfile.Tables() |> Seq.tryFindIndex (fun table -> table = activeTable)
                                     | _ -> None
-                                return UpdateUtil.JsonImportHelper.updateTables data.importedFile data.importState activeTableIndex arcfileOpt
+                                return UpdateUtil.JsonImportHelper.updateTables data.importedFile data.importState (*selectedColumns*) activeTableIndex arcfileOpt
                         }
                     let updateArcFile (arcFile: ArcFiles) = SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg
                     let cmd =
@@ -232,7 +235,7 @@ module Interface =
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd =
                         match data.importState.ImportMetadata with
-                        | true -> UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState
+                        | true -> UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState selectedColumns
                         | false -> UpdateUtil.JsonImportHelper.updateTables data.importedFile data.importState model.SpreadsheetModel.ActiveView.TryTableIndex model.SpreadsheetModel.ArcFile
                         |> SpreadsheetInterface.UpdateArcFile |> InterfaceMsg |> Cmd.ofMsg
                     model, cmd
