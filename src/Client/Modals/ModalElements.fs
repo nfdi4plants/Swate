@@ -27,7 +27,7 @@ type ModalElements =
             prop.text text
         ]
 
-    static member RadioPlugin(radioGroup: string, txt:string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
+    static member RadioPlugin(radioGroup: string, txt: string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
         let isDisabled = defaultArg isDisabled false
         Daisy.formControl [
             Daisy.label [

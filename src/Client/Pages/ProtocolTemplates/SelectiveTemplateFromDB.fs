@@ -74,6 +74,7 @@ type SelectiveTemplateFromDBModal =
                         "Import Type",
                         "fa-solid fa-cog",
                         importTypeState.ImportType,
+                        "importType",
                         [|
                             ARCtrl.TableJoinOptions.Headers, " Column Headers";
                             ARCtrl.TableJoinOptions.WithUnit, " ..With Units";

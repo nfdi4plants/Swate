@@ -13,10 +13,10 @@ open Components
 
 type SelectiveImportModal =
 
-    static member RadioPluginsBox(boxName, icon, importType: TableJoinOptions, radioData: (TableJoinOptions * string)[], setImportType: TableJoinOptions -> unit) =
+    static member RadioPluginsBox(boxName, icon, importType: TableJoinOptions, radioGroupName, radioData: (TableJoinOptions * string)[], setImportType: TableJoinOptions -> unit) =
         let myradio(target: TableJoinOptions, txt: string) =
             let isChecked = importType = target
-            ModalElements.RadioPlugin("importType", txt, isChecked, fun (b: bool) -> if b then setImportType target)
+            ModalElements.RadioPlugin(radioGroupName, txt, isChecked, fun (b: bool) -> if b then setImportType target)
         ModalElements.Box (boxName, icon, React.fragment [
             Html.div [
                 for i in 0..radioData.Length-1 do
@@ -206,6 +206,7 @@ type SelectiveImportModal =
                             "Import Type",
                             "fa-solid fa-cog",
                             state.ImportType,
+                            "importType",
                             [|
                                 ARCtrl.TableJoinOptions.Headers,    " Column Headers";
                                 ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
