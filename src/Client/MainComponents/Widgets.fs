@@ -4,6 +4,9 @@ open Feliz
 open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
+open Modals
+open Types.TableImport
+open Types.JsonImport
 
 module private InitExtensions =
 
@@ -212,6 +215,12 @@ type Widget =
     static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
         let templates, setTemplates = React.useState(model.ProtocolState.Templates)
         let config, setConfig = React.useState(TemplateFilterConfig.init)
+        let selectedColumnsLength =
+            if model.ProtocolState.TemplateSelected.IsSome then
+                model.ProtocolState.TemplateSelected.Value.Table.Columns.Length
+            else 0
+        let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init selectedColumnsLength)
+        let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         React.useEffect((fun _ -> setTemplates model.ProtocolState.Templates), [|box model.ProtocolState.Templates|])
@@ -223,12 +232,37 @@ type Widget =
         let insertContent() =
             [
                 Html.div [
-                    Protocol.TemplateFromDB.addFromDBToTableButton model dispatch
-                ]
-                Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.children [
-                        Protocol.TemplateFromDB.displaySelectedProtocolEle model dispatch
+                        SidebarComponents.SidebarLayout.LogicContainer [
+                            Html.div [
+                                SelectiveTemplateFromDBModal.ToProtocolSearchElement model dispatch
+                            ]
+                            if model.ProtocolState.TemplateSelected.IsSome then                    
+                                Html.div [
+                                    SelectiveImportModal.RadioPluginsBox(
+                                        "Import Type",
+                                        "fa-solid fa-cog",
+                                        importTypeState.ImportType,
+                                        "importType ",
+                                        [|
+                                            ARCtrl.TableJoinOptions.Headers, " Column Headers";
+                                            ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
+                                            ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                                        |],
+                                        fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
+                                    )
+                                ]
+                                Html.div [
+                                    ModalElements.Box(
+                                        model.ProtocolState.TemplateSelected.Value.Name,
+                                        "",
+                                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
+                                ]
+                            Html.div [
+                                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState dispatch
+                            ]
+                        ]
                     ]
                 ]
             ]

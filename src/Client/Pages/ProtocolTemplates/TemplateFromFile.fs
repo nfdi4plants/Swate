@@ -19,6 +19,8 @@ open Shared
 open ARCtrl
 open Fable.Core.JsInterop
 
+open Modals
+
 type private TemplateFromFileState = {
     /// User select type to upload
     FileType: ArcFilesDiscriminate
@@ -80,18 +82,6 @@ type TemplateFromFile =
             )
         ]
 
-    static member private SelectorButton<'a when 'a : equality> (targetselector: 'a, selector: 'a, setSelector: 'a -> unit, ?isDisabled) =
-        Daisy.button.button [
-            join.item
-            if isDisabled.IsSome then
-                prop.disabled isDisabled.Value
-            prop.style [style.flexGrow 1]
-            if (targetselector = selector) then
-                button.primary
-            prop.onClick (fun _ -> setSelector targetselector)
-            prop.text (string targetselector)
-        ]
-
     [<ReactComponent>]
     static member Main(model: Model, dispatch) =
         let state, setState = React.useState(TemplateFromFileState.init)
@@ -119,10 +109,10 @@ type TemplateFromFile =
                 Daisy.join [
                     prop.className "w-full"
                     prop.children [
-                        JsonExportFormat.ROCrate |> fun jef -> TemplateFromFile.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
-                        JsonExportFormat.ISA |> fun jef -> TemplateFromFile.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
-                        JsonExportFormat.ARCtrl |> fun jef -> TemplateFromFile.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
-                        JsonExportFormat.ARCtrlCompressed |> fun jef -> TemplateFromFile.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
+                        JsonExportFormat.ROCrate |> fun jef -> ModalElements.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
+                        JsonExportFormat.ISA |> fun jef -> ModalElements.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
+                        JsonExportFormat.ARCtrl |> fun jef -> ModalElements.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
+                        JsonExportFormat.ARCtrlCompressed |> fun jef -> ModalElements.SelectorButton<JsonExportFormat> (jef, state.JsonFormat, setJsonFormat, jsonFormatDisabled jef)
                     ]
                 ]
             ]
@@ -131,10 +121,10 @@ type TemplateFromFile =
                 Daisy.join [
                     prop.className "w-full"
                     prop.children [
-                        ArcFilesDiscriminate.Assay |> fun ft -> TemplateFromFile.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
-                        ArcFilesDiscriminate.Study |> fun ft -> TemplateFromFile.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
-                        ArcFilesDiscriminate.Investigation |> fun ft -> TemplateFromFile.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
-                        ArcFilesDiscriminate.Template |> fun ft -> TemplateFromFile.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
+                        ArcFilesDiscriminate.Assay |> fun ft -> ModalElements.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
+                        ArcFilesDiscriminate.Study |> fun ft -> ModalElements.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
+                        ArcFilesDiscriminate.Investigation |> fun ft -> ModalElements.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
+                        ArcFilesDiscriminate.Template |> fun ft -> ModalElements.SelectorButton<ArcFilesDiscriminate> (ft, state.FileType, setFileType, fileTypeDisabled ft)
                     ]
                 ]
             ]
